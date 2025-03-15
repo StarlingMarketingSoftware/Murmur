@@ -1,0 +1,99 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  name         String?       @db.VarChar(100)
+  email        String        @unique @db.VarChar(255)
+  passwordHash String        @map("password_hash")
+  role         String        @default("member") @db.VarChar(20)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @default(now()) @map("updated_at")
+  deletedAt    DateTime?     @map("deleted_at")
+  teamMembers  TeamMember[]
+  invitations  Invitation[]  @relation("InvitedBy")
+  activityLogs ActivityLog[]
+
+  @@map("users")
+}
+
+model Team {
+  id                  Int           @id @default(autoincrement())
+  name                String        @db.VarChar(100)
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @default(now()) @map("updated_at")
+  stripeCustomerId    String?       @unique @map("stripe_customer_id")
+  stripeSubscriptionId String?      @unique @map("stripe_subscription_id")
+  stripeProductId     String?       @map("stripe_product_id")
+  planName            String?       @db.VarChar(50) @map("plan_name")
+  subscriptionStatus  String?       @db.VarChar(20) @map("subscription_status")
+  teamMembers         TeamMember[]
+  activityLogs        ActivityLog[]
+  invitations         Invitation[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id       Int      @id @default(autoincrement())
+  userId   Int      @map("user_id")
+  teamId   Int      @map("team_id")
+  role     String   @db.VarChar(50)
+  joinedAt DateTime @default(now()) @map("joined_at")
+  user     User     @relation(fields: [userId], references: [id])
+  team     Team     @relation(fields: [teamId], references: [id])
+
+  @@map("team_members")
+}
+
+model ActivityLog {
+  id        Int       @id @default(autoincrement())
+  teamId    Int       @map("team_id")
+  userId    Int?      @map("user_id")
+  action    String
+  timestamp DateTime  @default(now())
+  ipAddress String?   @db.VarChar(45) @map("ip_address")
+  team      Team      @relation(fields: [teamId], references: [id])
+  user      User?     @relation(fields: [userId], references: [id])
+
+  @@map("activity_logs")
+}
+
+model Invitation {
+  id        Int      @id @default(autoincrement())
+  teamId    Int      @map("team_id")
+  email     String   @db.VarChar(255)
+  role      String   @db.VarChar(50)
+  invitedBy Int      @map("invited_by")
+  invitedAt DateTime @default(now()) @map("invited_at")
+  status    String   @default("pending") @db.VarChar(20)
+  team      Team     @relation(fields: [teamId], references: [id])
+  inviter   User     @relation("InvitedBy", fields: [invitedBy], references: [id])
+
+  @@map("invitations")
+}
+
+enum ActivityType {
+  SIGN_UP
+  SIGN_IN
+  SIGN_OUT
+  UPDATE_PASSWORD
+  DELETE_ACCOUNT
+  UPDATE_ACCOUNT
+  CREATE_TEAM
+  REMOVE_TEAM_MEMBER
+  INVITE_TEAM_MEMBER
+  ACCEPT_INVITATION
+}

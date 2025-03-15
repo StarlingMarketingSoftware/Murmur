@@ -1,21 +1,9 @@
 'use server';
 
 import { z } from 'zod';
-import { and, eq, sql } from 'drizzle-orm';
-import { db } from '@/lib/db/drizzle';
-import {
-  User,
-  users,
-  teams,
-  teamMembers,
-  activityLogs,
-  type NewUser,
-  type NewTeam,
-  type NewTeamMember,
-  type NewActivityLog,
-  ActivityType,
-  invitations,
-} from '@/lib/db/schema';
+import { Prisma } from '@prisma/client';
+import prisma from '@/lib/db/prisma';
+import { ActivityType } from '@/lib/db/queries';
 import { comparePasswords, hashPassword, setSession } from '@/lib/auth/session';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
@@ -25,6 +13,13 @@ import {
   validatedAction,
   validatedActionWithUser,
 } from '@/lib/auth/middleware';
+
+// Define types based on Prisma models
+type User = Prisma.UserGetPayload<{}>;
+type NewUser = Prisma.UserCreateInput;
+type NewTeam = Prisma.TeamCreateInput;
+type NewTeamMember = Prisma.TeamMemberCreateInput;
+type NewActivityLog = Prisma.ActivityLogCreateInput;
 
 async function logActivity(
   teamId: number | null | undefined,
@@ -36,12 +31,12 @@ async function logActivity(
     return;
   }
   const newActivity: NewActivityLog = {
-    teamId,
-    userId,
+    team: { connect: { id: teamId } },
+    user: { connect: { id: userId } },
     action: type,
     ipAddress: ipAddress || '',
   };
-  await db.insert(activityLogs).values(newActivity);
+  await prisma.activityLog.create({ data: newActivity });
 }
 
 const signInSchema = z.object({
@@ -52,26 +47,25 @@ const signInSchema = z.object({
 export const signIn = validatedAction(signInSchema, async (data, formData) => {
   const { email, password } = data;
 
-  const userWithTeam = await db
-    .select({
-      user: users,
-      team: teams,
-    })
-    .from(users)
-    .leftJoin(teamMembers, eq(users.id, teamMembers.userId))
-    .leftJoin(teams, eq(teamMembers.teamId, teams.id))
-    .where(eq(users.email, email))
-    .limit(1);
+  const foundUser = await prisma.user.findUnique({
+    where: { email },
+    include: {
+      teamMembers: {
+        include: {
+          team: true
+        },
+        take: 1
+      }
+    }
+  });
 
-  if (userWithTeam.length === 0) {
+  if (!foundUser) {
     return {
       error: 'Invalid email or password. Please try again.',
       email,
       password,
     };
   }
-
-  const { user: foundUser, team: foundTeam } = userWithTeam[0];
 
   const isPasswordValid = await comparePasswords(
     password,
@@ -85,6 +79,8 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
       password,
     };
   }
+
+  const foundTeam = foundUser.teamMembers[0]?.team;
 
   await Promise.all([
     setSession(foundUser),
@@ -109,13 +105,11 @@ const signUpSchema = z.object({
 export const signUp = validatedAction(signUpSchema, async (data, formData) => {
   const { email, password, inviteId } = data;
 
-  const existingUser = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
+  const existingUser = await prisma.user.findUnique({
+    where: { email }
+  });
 
-  if (existingUser.length > 0) {
+  if (existingUser) {
     return {
       error: 'Failed to create user. Please try again.',
       email,
@@ -125,66 +119,61 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
 
   const passwordHash = await hashPassword(password);
 
-  const newUser: NewUser = {
-    email,
-    passwordHash,
-    role: 'owner', // Default role, will be overridden if there's an invitation
-  };
-
-  const [createdUser] = await db.insert(users).values(newUser).returning();
-
-  if (!createdUser) {
-    return {
-      error: 'Failed to create user. Please try again.',
-      email,
-      password,
-    };
-  }
-
   let teamId: number;
   let userRole: string;
-  let createdTeam: typeof teams.$inferSelect | null = null;
+  let createdTeam: any = null;
 
   if (inviteId) {
     // Check if there's a valid invitation
-    const [invitation] = await db
-      .select()
-      .from(invitations)
-      .where(
-        and(
-          eq(invitations.id, parseInt(inviteId)),
-          eq(invitations.email, email),
-          eq(invitations.status, 'pending'),
-        ),
-      )
-      .limit(1);
+    const invitation = await prisma.invitation.findFirst({
+      where: {
+        id: parseInt(inviteId),
+        email,
+        status: 'pending',
+      }
+    });
 
     if (invitation) {
       teamId = invitation.teamId;
       userRole = invitation.role;
 
-      await db
-        .update(invitations)
-        .set({ status: 'accepted' })
-        .where(eq(invitations.id, invitation.id));
+      await prisma.invitation.update({
+        where: { id: invitation.id },
+        data: { status: 'accepted' }
+      });
+
+      // Create the user
+      const createdUser = await prisma.user.create({
+        data: {
+          email,
+          passwordHash,
+          role: userRole,
+          teamMembers: {
+            create: {
+              teamId,
+              role: userRole
+            }
+          }
+        }
+      });
 
       await logActivity(teamId, createdUser.id, ActivityType.ACCEPT_INVITATION);
 
-      [createdTeam] = await db
-        .select()
-        .from(teams)
-        .where(eq(teams.id, teamId))
-        .limit(1);
+      createdTeam = await prisma.team.findUnique({
+        where: { id: teamId }
+      });
+
+      await setSession(createdUser);
     } else {
       return { error: 'Invalid or expired invitation.', email, password };
     }
   } else {
     // Create a new team if there's no invitation
-    const newTeam: NewTeam = {
-      name: `${email}'s Team`,
-    };
-
-    [createdTeam] = await db.insert(teams).values(newTeam).returning();
+    createdTeam = await prisma.team.create({
+      data: {
+        name: `${email}'s Team`,
+      }
+    });
 
     if (!createdTeam) {
       return {
@@ -197,20 +186,27 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
     teamId = createdTeam.id;
     userRole = 'owner';
 
-    await logActivity(teamId, createdUser.id, ActivityType.CREATE_TEAM);
+    // Create user with team membership
+    const createdUser = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        role: userRole,
+        teamMembers: {
+          create: {
+            teamId,
+            role: userRole
+          }
+        }
+      }
+    });
+
+    await Promise.all([
+      logActivity(teamId, createdUser.id, ActivityType.CREATE_TEAM),
+      logActivity(teamId, createdUser.id, ActivityType.SIGN_UP),
+      setSession(createdUser),
+    ]);
   }
-
-  const newTeamMember: NewTeamMember = {
-    userId: createdUser.id,
-    teamId: teamId,
-    role: userRole,
-  };
-
-  await Promise.all([
-    db.insert(teamMembers).values(newTeamMember),
-    logActivity(teamId, createdUser.id, ActivityType.SIGN_UP),
-    setSession(createdUser),
-  ]);
 
   const redirectTo = formData.get('redirect') as string | null;
   if (redirectTo === 'checkout') {
@@ -263,10 +259,10 @@ export const updatePassword = validatedActionWithUser(
     const userWithTeam = await getUserWithTeam(user.id);
 
     await Promise.all([
-      db
-        .update(users)
-        .set({ passwordHash: newPasswordHash })
-        .where(eq(users.id, user.id)),
+      prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash: newPasswordHash }
+      }),
       logActivity(userWithTeam?.teamId, user.id, ActivityType.UPDATE_PASSWORD),
     ]);
 
@@ -297,23 +293,21 @@ export const deleteAccount = validatedActionWithUser(
     );
 
     // Soft delete
-    await db
-      .update(users)
-      .set({
-        deletedAt: sql`CURRENT_TIMESTAMP`,
-        email: sql`CONCAT(email, '-', id, '-deleted')`, // Ensure email uniqueness
-      })
-      .where(eq(users.id, user.id));
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        deletedAt: new Date(),
+        email: `${user.email}-${user.id}-deleted`, // Ensure email uniqueness
+      }
+    });
 
     if (userWithTeam?.teamId) {
-      await db
-        .delete(teamMembers)
-        .where(
-          and(
-            eq(teamMembers.userId, user.id),
-            eq(teamMembers.teamId, userWithTeam.teamId),
-          ),
-        );
+      await prisma.teamMember.deleteMany({
+        where: {
+          userId: user.id,
+          teamId: userWithTeam.teamId
+        }
+      });
     }
 
     (await cookies()).delete('session');
@@ -333,7 +327,10 @@ export const updateAccount = validatedActionWithUser(
     const userWithTeam = await getUserWithTeam(user.id);
 
     await Promise.all([
-      db.update(users).set({ name, email }).where(eq(users.id, user.id)),
+      prisma.user.update({
+        where: { id: user.id },
+        data: { name, email }
+      }),
       logActivity(userWithTeam?.teamId, user.id, ActivityType.UPDATE_ACCOUNT),
     ]);
 
@@ -355,14 +352,12 @@ export const removeTeamMember = validatedActionWithUser(
       return { error: 'User is not part of a team' };
     }
 
-    await db
-      .delete(teamMembers)
-      .where(
-        and(
-          eq(teamMembers.id, memberId),
-          eq(teamMembers.teamId, userWithTeam.teamId),
-        ),
-      );
+    await prisma.teamMember.delete({
+      where: {
+        id: memberId,
+        teamId: userWithTeam.teamId
+      }
+    });
 
     await logActivity(
       userWithTeam.teamId,
@@ -389,46 +384,43 @@ export const inviteTeamMember = validatedActionWithUser(
       return { error: 'User is not part of a team' };
     }
 
-    const existingMember = await db
-      .select()
-      .from(users)
-      .leftJoin(teamMembers, eq(users.id, teamMembers.userId))
-      .where(
-        and(
-          eq(users.email, email),
-          eq(teamMembers.teamId, userWithTeam.teamId),
-        ),
-      )
-      .limit(1);
+    const existingMember = await prisma.user.findFirst({
+      where: {
+        email,
+        teamMembers: {
+          some: {
+            teamId: userWithTeam.teamId
+          }
+        }
+      }
+    });
 
-    if (existingMember.length > 0) {
+    if (existingMember) {
       return { error: 'User is already a member of this team' };
     }
 
     // Check if there's an existing invitation
-    const existingInvitation = await db
-      .select()
-      .from(invitations)
-      .where(
-        and(
-          eq(invitations.email, email),
-          eq(invitations.teamId, userWithTeam.teamId),
-          eq(invitations.status, 'pending'),
-        ),
-      )
-      .limit(1);
+    const existingInvitation = await prisma.invitation.findFirst({
+      where: {
+        email,
+        teamId: userWithTeam.teamId,
+        status: 'pending'
+      }
+    });
 
-    if (existingInvitation.length > 0) {
+    if (existingInvitation) {
       return { error: 'An invitation has already been sent to this email' };
     }
 
     // Create a new invitation
-    await db.insert(invitations).values({
-      teamId: userWithTeam.teamId,
-      email,
-      role,
-      invitedBy: user.id,
-      status: 'pending',
+    await prisma.invitation.create({
+      data: {
+        teamId: userWithTeam.teamId,
+        email,
+        role,
+        invitedBy: user.id,
+        status: 'pending'
+      }
     });
 
     await logActivity(

@@ -1,11 +1,24 @@
 import Stripe from 'stripe';
 import { redirect } from 'next/navigation';
-import { Team } from '@/lib/db/schema';
+import prisma from '@/lib/db/prisma';
 import {
   getTeamByStripeCustomerId,
   getUser,
   updateTeamSubscription
 } from '@/lib/db/queries';
+
+// Define the Team type locally based on the Prisma schema
+type Team = {
+  id: number;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  stripeProductId: string | null;
+  planName: string | null;
+  subscriptionStatus: string | null;
+};
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-02-24.acacia'

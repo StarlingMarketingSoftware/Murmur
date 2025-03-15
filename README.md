@@ -26,11 +26,75 @@ This is a starter template for building a SaaS application using **Next.js** wit
 
 ## Getting Started
 
-```bash
-git clone https://github.com/nextjs/saas-starter
-cd saas-starter
-pnpm install
+### Prerequisites
+
+- Node.js 18+ and npm
+- PostgreSQL database
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/StarlingMarketingSoftware/Flock.git
+   cd flock
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Set up the database:
+   ```bash
+   npm run db:setup
+   ```
+
+4. Seed the database with sample data:
+   ```bash
+   npm run db:seed
+   ```
+
+5. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+6. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Database Management with Prisma
+
+This project uses Prisma as the ORM for database operations. Here are some common commands:
+
+- Generate Prisma client:
+  ```bash
+  npm run prisma:generate
+  ```
+
+- Create a new migration:
+  ```bash
+  npm run prisma:migrate
+  ```
+
+- Open Prisma Studio to view and edit data:
+  ```bash
+  npm run prisma:studio
+  ```
+
+## Environment Variables
+
+Create a `.env` file in the root directory with the following variables:
+
 ```
+DATABASE_URL=postgresql://username:password@localhost:5432/flock
+STRIPE_SECRET_KEY=your_stripe_secret_key
+STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
+BASE_URL=http://localhost:3000
+AUTH_SECRET=your_auth_secret
+```
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Running Locally
 
