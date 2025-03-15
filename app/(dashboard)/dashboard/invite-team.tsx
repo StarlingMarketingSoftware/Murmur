@@ -12,7 +12,7 @@ import {
 import { Loader2, PlusCircle } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { use, useActionState } from 'react';
+import { useActionState } from 'react';
 import { inviteTeamMember } from '@/app/(login)/actions';
 import { useUser } from '@/lib/auth';
 
@@ -22,13 +22,27 @@ type ActionState = {
 };
 
 export function InviteTeamMember() {
-  const { userPromise } = useUser();
-  const user = use(userPromise);
+  const { user, loading } = useUser();
   const isOwner = user?.role === 'owner';
   const [inviteState, inviteAction, isInvitePending] = useActionState<
     ActionState,
     FormData
   >(inviteTeamMember, { error: '', success: '' });
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Invite Team Member</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

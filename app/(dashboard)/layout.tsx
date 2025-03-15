@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { use, useState, Suspense } from 'react';
+import { useState, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { CircleIcon, Home, LogOut } from 'lucide-react';
 import {
@@ -12,19 +12,22 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useUser } from '@/lib/auth';
-import { signOut } from '@/app/(login)/actions';
 import { useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 
 function UserMenu() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { userPromise } = useUser();
-  const user = use(userPromise);
+  const { user, loading } = useUser();
   const router = useRouter();
 
   async function handleSignOut() {
-    await signOut();
+    await signOut({ redirect: false });
     router.refresh();
     router.push('/');
+  }
+
+  if (loading) {
+    return <div className="h-9 w-9 rounded-full bg-gray-200 animate-pulse" />;
   }
 
   if (!user) {
@@ -50,12 +53,11 @@ function UserMenu() {
     <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
       <DropdownMenuTrigger>
         <Avatar className="cursor-pointer size-9">
-          <AvatarImage alt={user.name || ''} />
+          <AvatarImage src={user.image || ''} alt={user.name || ''} />
           <AvatarFallback>
             {user.email
-              .split(' ')
-              .map((n) => n[0])
-              .join('')}
+              ? user.email.substring(0, 2).toUpperCase()
+              : 'U'}
           </AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>
@@ -66,14 +68,10 @@ function UserMenu() {
             <span>Dashboard</span>
           </Link>
         </DropdownMenuItem>
-        <form action={handleSignOut} className="w-full">
-          <button type="submit" className="flex w-full">
-            <DropdownMenuItem className="w-full flex-1 cursor-pointer">
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Sign out</span>
-            </DropdownMenuItem>
-          </button>
-        </form>
+        <DropdownMenuItem className="w-full flex-1 cursor-pointer" onClick={handleSignOut}>
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>Sign out</span>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

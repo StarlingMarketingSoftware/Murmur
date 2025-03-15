@@ -1,48 +1,39 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { signToken, verifyToken } from '@/lib/auth/session';
-
-const protectedRoutes = '/dashboard';
+import { getToken } from 'next-auth/jwt';
+import { NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const sessionCookie = request.cookies.get('session');
-  const isProtectedRoute = pathname.startsWith(protectedRoutes);
+  const token = await getToken({ req: request });
+  const isAuthenticated = !!token;
+  
+  // Define paths that require authentication
+  const isAuthPath = request.nextUrl.pathname.startsWith('/dashboard');
+  
+  // Define authentication paths
+  const isAuthPage = 
+    request.nextUrl.pathname.startsWith('/sign-in') || 
+    request.nextUrl.pathname.startsWith('/sign-up');
 
-  if (isProtectedRoute && !sessionCookie) {
-    return NextResponse.redirect(new URL('/sign-in', request.url));
+  // Redirect authenticated users away from auth pages
+  if (isAuthenticated && isAuthPage) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  let res = NextResponse.next();
-
-  if (sessionCookie && request.method === "GET") {
-    try {
-      const parsed = await verifyToken(sessionCookie.value);
-      const expiresInOneDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-      res.cookies.set({
-        name: 'session',
-        value: await signToken({
-          ...parsed,
-          expires: expiresInOneDay.toISOString(),
-        }),
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        expires: expiresInOneDay,
-      });
-    } catch (error) {
-      console.error('Error updating session:', error);
-      res.cookies.delete('session');
-      if (isProtectedRoute) {
-        return NextResponse.redirect(new URL('/sign-in', request.url));
-      }
-    }
+  // Redirect unauthenticated users to sign-in page
+  if (!isAuthenticated && isAuthPath) {
+    return NextResponse.redirect(
+      new URL(`/sign-in?callbackUrl=${encodeURIComponent(request.url)}`, request.url)
+    );
   }
 
-  return res;
+  return NextResponse.next();
 }
 
+// Configure which paths the middleware runs on
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/dashboard/:path*',
+    '/sign-in',
+    '/sign-up',
+  ],
 };

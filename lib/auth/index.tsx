@@ -1,32 +1,37 @@
 'use client';
 
-import { createContext, useContext, ReactNode } from 'react';
-import { User } from '@/lib/db/schema';
+import React, { createContext, useContext } from 'react';
+import { useSession } from 'next-auth/react';
 
+// Define a type for the user context
 type UserContextType = {
-  userPromise: Promise<User | null>;
+  user: any | null;
+  loading: boolean;
 };
 
-const UserContext = createContext<UserContextType | null>(null);
+// Create a context with a default value
+const UserContext = createContext<UserContextType>({
+  user: null,
+  loading: true,
+});
 
-export function useUser(): UserContextType {
-  let context = useContext(UserContext);
-  if (context === null) {
+// Create a provider component that uses NextAuth's useSession
+export function UserProvider({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
+  
+  const value = {
+    user: session?.user || null,
+    loading: status === 'loading',
+  };
+
+  return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
+}
+
+// Create a hook to use the user context
+export function useUser() {
+  const context = useContext(UserContext);
+  if (context === undefined) {
     throw new Error('useUser must be used within a UserProvider');
   }
   return context;
-}
-
-export function UserProvider({
-  children,
-  userPromise
-}: {
-  children: ReactNode;
-  userPromise: Promise<User | null>;
-}) {
-  return (
-    <UserContext.Provider value={{ userPromise }}>
-      {children}
-    </UserContext.Provider>
-  );
 }

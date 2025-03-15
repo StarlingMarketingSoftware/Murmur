@@ -30,6 +30,7 @@ This is a starter template for building a SaaS application using **Next.js** wit
 
 - Node.js 18+ and npm
 - PostgreSQL database
+- Google OAuth credentials
 
 ### Installation
 
@@ -61,6 +62,22 @@ This is a starter template for building a SaaS application using **Next.js** wit
 
 6. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+## Setting up Google OAuth
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Navigate to "APIs & Services" > "Credentials"
+4. Click "Create Credentials" > "OAuth client ID"
+5. Select "Web application" as the application type
+6. Add "http://localhost:3000" to the "Authorized JavaScript origins"
+7. Add "http://localhost:3000/api/auth/callback/google" to the "Authorized redirect URIs"
+8. Click "Create" and note your Client ID and Client Secret
+9. Add these credentials to your `.env` file:
+   ```
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
+   ```
+
 ## Database Management with Prisma
 
 This project uses Prisma as the ORM for database operations. Here are some common commands:
@@ -90,6 +107,10 @@ STRIPE_SECRET_KEY=your_stripe_secret_key
 STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
 BASE_URL=http://localhost:3000
 AUTH_SECRET=your_auth_secret
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your_nextauth_secret_key
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
 ```
 
 ## License

@@ -1,7 +1,6 @@
-import { cookies } from 'next/headers';
-import { verifyToken } from '@/lib/auth/session';
-import prisma from './prisma';
 import { Prisma } from '@prisma/client';
+import prisma from '@/lib/db/prisma';
+import { getCurrentUser, getCurrentUserWithTeam } from '@/lib/auth/session';
 
 // Re-export the ActivityType enum
 export enum ActivityType {
@@ -18,36 +17,7 @@ export enum ActivityType {
 }
 
 export async function getUser() {
-  const sessionCookie = (await cookies()).get('session');
-  if (!sessionCookie || !sessionCookie.value) {
-    return null;
-  }
-
-  const sessionData = await verifyToken(sessionCookie.value);
-  if (
-    !sessionData ||
-    !sessionData.user ||
-    typeof sessionData.user.id !== 'number'
-  ) {
-    return null;
-  }
-
-  if (new Date(sessionData.expires) < new Date()) {
-    return null;
-  }
-
-  const user = await prisma.user.findUnique({
-    where: {
-      id: sessionData.user.id,
-      deletedAt: null,
-    },
-  });
-
-  if (!user) {
-    return null;
-  }
-
-  return user;
+  return getCurrentUser();
 }
 
 export async function getTeamByStripeCustomerId(customerId: string) {
@@ -88,7 +58,7 @@ export async function getUserWithTeam(userId: number) {
         select: {
           teamId: true,
         },
-        take: 1,
+        take: 1
       },
     },
   });

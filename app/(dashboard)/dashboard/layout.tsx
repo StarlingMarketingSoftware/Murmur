@@ -4,7 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Users, Settings, Shield, Activity, Menu } from 'lucide-react';
+import { Users, Settings, Shield, Activity, Menu, LogOut } from 'lucide-react';
+import { SignOutButton } from '../sign-out-button';
+import { useSession } from 'next-auth/react';
 
 export default function DashboardLayout({
   children,
@@ -13,6 +15,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { data: session } = useSession();
 
   const navItems = [
     { href: '/dashboard', icon: Users, label: 'Team' },
@@ -47,7 +50,14 @@ export default function DashboardLayout({
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <nav className="h-full overflow-y-auto p-4">
+          <nav className="h-full overflow-y-auto p-4 flex flex-col">
+            <div className="flex items-center mb-6 px-2">
+              <div className="flex-1">
+                <p className="text-sm font-medium">{session?.user?.name || session?.user?.email}</p>
+                <p className="text-xs text-gray-500 truncate">{session?.user?.email}</p>
+              </div>
+            </div>
+            
             {navItems.map((item) => (
               <Link key={item.href} href={item.href} passHref>
                 <Button
@@ -62,6 +72,10 @@ export default function DashboardLayout({
                 </Button>
               </Link>
             ))}
+            
+            <div className="mt-auto pt-4 border-t border-gray-200">
+              <SignOutButton />
+            </div>
           </nav>
         </aside>
 

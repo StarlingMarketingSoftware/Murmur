@@ -1,6 +1,6 @@
 'use client';
 
-import { startTransition, use, useActionState } from 'react';
+import { startTransition, useActionState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,8 +15,7 @@ type ActionState = {
 };
 
 export default function GeneralPage() {
-  const { userPromise } = useUser();
-  const user = use(userPromise);
+  const { user, loading } = useUser();
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(
     updateAccount,
     { error: '', success: '' }
@@ -35,6 +34,19 @@ export default function GeneralPage() {
       formAction(new FormData(event.currentTarget));
     });
   };
+
+  if (loading) {
+    return (
+      <section className="flex-1 p-4 lg:p-8">
+        <h1 className="text-lg lg:text-2xl font-medium text-gray-900 mb-6">
+          General Settings
+        </h1>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="flex-1 p-4 lg:p-8">
