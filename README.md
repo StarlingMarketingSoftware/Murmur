@@ -1,28 +1,16 @@
-# Next.js SaaS Starter
+# Flock - Next.js 14 Application
 
-This is a starter template for building a SaaS application using **Next.js** with support for authentication, Stripe integration for payments, and a dashboard for logged-in users.
-
-**Demo: [https://next-saas-start.vercel.app/](https://next-saas-start.vercel.app/)**
-
-## Features
-
-- Marketing landing page (`/`) with animated Terminal element
-- Pricing page (`/pricing`) which connects to Stripe Checkout
-- Dashboard pages with CRUD operations on users/teams
-- Basic RBAC with Owner and Member roles
-- Subscription management with Stripe Customer Portal
-- Email/password authentication with JWTs stored to cookies
-- Global middleware to protect logged-in routes
-- Local middleware to protect Server Actions or validate Zod schemas
-- Activity logging system for any user events
+A modern web application built with Next.js 14, featuring authentication, database integration, and payment processing.
 
 ## Tech Stack
 
-- **Framework**: [Next.js](https://nextjs.org/)
-- **Database**: [Postgres](https://www.postgresql.org/)
-- **ORM**: [Drizzle](https://orm.drizzle.team/)
-- **Payments**: [Stripe](https://stripe.com/)
-- **UI Library**: [shadcn/ui](https://ui.shadcn.com/)
+- **Next.js 14**: React framework with App Router
+- **TypeScript**: Type-safe JavaScript
+- **Clerk**: Authentication with Google OAuth
+- **Prisma**: ORM for PostgreSQL
+- **Tailwind CSS**: Utility-first CSS framework
+- **shadcn/ui**: Reusable UI components
+- **Stripe**: Payment processing
 
 ## Getting Started
 
@@ -30,13 +18,12 @@ This is a starter template for building a SaaS application using **Next.js** wit
 
 - Node.js 18+ and npm
 - PostgreSQL database
-- Google OAuth credentials
 
 ### Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/StarlingMarketingSoftware/Flock.git
+   git clone https://github.com/yourusername/flock.git
    cd flock
    ```
 
@@ -45,152 +32,87 @@ This is a starter template for building a SaaS application using **Next.js** wit
    npm install
    ```
 
-3. Set up the database:
+3. Set up environment variables:
+   - Copy `.env.example` to `.env`
+   - Update the environment variables with your own values
+
+4. Set up the database:
    ```bash
-   npm run db:setup
+   npx prisma migrate dev --name init
    ```
 
-4. Seed the database with sample data:
-   ```bash
-   npm run db:seed
-   ```
-
-5. Start the development server:
+5. Run the development server:
    ```bash
    npm run dev
    ```
 
 6. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Setting up Google OAuth
-
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-3. Navigate to "APIs & Services" > "Credentials"
-4. Click "Create Credentials" > "OAuth client ID"
-5. Select "Web application" as the application type
-6. Add "http://localhost:3000" to the "Authorized JavaScript origins"
-7. Add "http://localhost:3000/api/auth/callback/google" to the "Authorized redirect URIs"
-8. Click "Create" and note your Client ID and Client Secret
-9. Add these credentials to your `.env` file:
-   ```
-   GOOGLE_CLIENT_ID=your_google_client_id
-   GOOGLE_CLIENT_SECRET=your_google_client_secret
-   ```
-
-## Database Management with Prisma
-
-This project uses Prisma as the ORM for database operations. Here are some common commands:
-
-- Generate Prisma client:
-  ```bash
-  npm run prisma:generate
-  ```
-
-- Create a new migration:
-  ```bash
-  npm run prisma:migrate
-  ```
-
-- Open Prisma Studio to view and edit data:
-  ```bash
-  npm run prisma:studio
-  ```
-
 ## Environment Variables
 
 Create a `.env` file in the root directory with the following variables:
 
 ```
-DATABASE_URL=postgresql://username:password@localhost:5432/flock
+# Database
+DATABASE_URL="postgresql://username:password@localhost:5432/flock?schema=public"
+
+# Clerk Authentication
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+CLERK_SECRET_KEY=your_clerk_secret_key
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
+
+# Stripe
 STRIPE_SECRET_KEY=your_stripe_secret_key
 STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
-BASE_URL=http://localhost:3000
-AUTH_SECRET=your_auth_secret
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your_nextauth_secret_key
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
+```
+
+## Features
+
+- **Authentication**: Sign in and sign up with Google OAuth via Clerk
+- **Dashboard**: User dashboard with subscription management
+- **Payments**: Subscription management with Stripe
+- **Database**: PostgreSQL database with Prisma ORM
+
+## Project Structure
+
+```
+flock/
+├── prisma/               # Prisma schema and migrations
+├── public/               # Static assets
+├── src/
+│   ├── app/              # App Router pages
+│   │   ├── (auth)/       # Authentication pages
+│   │   ├── (dashboard)/  # Dashboard pages
+│   │   ├── api/          # API routes
+│   │   └── page.tsx      # Home page
+│   ├── lib/              # Utility functions
+│   │   ├── prisma/       # Prisma client
+│   │   └── stripe/       # Stripe client
+│   └── middleware.ts     # Clerk middleware
+├── .env                  # Environment variables
+├── next.config.ts        # Next.js configuration
+└── package.json          # Dependencies
 ```
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
-## Running Locally
+## Learn More
 
-Use the included setup script to create your `.env` file:
+To learn more about Next.js, take a look at the following resources:
 
-```bash
-pnpm db:setup
-```
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-Then, run the database migrations and seed the database with a default user and team:
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-```bash
-pnpm db:migrate
-pnpm db:seed
-```
+## Deploy on Vercel
 
-This will create the following user and team:
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-- User: `test@test.com`
-- Password: `admin123`
-
-You can, of course, create new users as well through `/sign-up`.
-
-Finally, run the Next.js development server:
-
-```bash
-pnpm dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser to see the app in action.
-
-Optionally, you can listen for Stripe webhooks locally through their CLI to handle subscription change events:
-
-```bash
-stripe listen --forward-to localhost:3000/api/stripe/webhook
-```
-
-## Testing Payments
-
-To test Stripe payments, use the following test card details:
-
-- Card Number: `4242 4242 4242 4242`
-- Expiration: Any future date
-- CVC: Any 3-digit number
-
-## Going to Production
-
-When you're ready to deploy your SaaS application to production, follow these steps:
-
-### Set up a production Stripe webhook
-
-1. Go to the Stripe Dashboard and create a new webhook for your production environment.
-2. Set the endpoint URL to your production API route (e.g., `https://yourdomain.com/api/stripe/webhook`).
-3. Select the events you want to listen for (e.g., `checkout.session.completed`, `customer.subscription.updated`).
-
-### Deploy to Vercel
-
-1. Push your code to a GitHub repository.
-2. Connect your repository to [Vercel](https://vercel.com/) and deploy it.
-3. Follow the Vercel deployment process, which will guide you through setting up your project.
-
-### Add environment variables
-
-In your Vercel project settings (or during deployment), add all the necessary environment variables. Make sure to update the values for the production environment, including:
-
-1. `BASE_URL`: Set this to your production domain.
-2. `STRIPE_SECRET_KEY`: Use your Stripe secret key for the production environment.
-3. `STRIPE_WEBHOOK_SECRET`: Use the webhook secret from the production webhook you created in step 1.
-4. `POSTGRES_URL`: Set this to your production database URL.
-5. `AUTH_SECRET`: Set this to a random string. `openssl rand -base64 32` will generate one.
-
-## Other Templates
-
-While this template is intentionally minimal and to be used as a learning resource, there are other paid versions in the community which are more full-featured:
-
-- https://achromatic.dev
-- https://shipfa.st
-- https://makerkit.dev
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
