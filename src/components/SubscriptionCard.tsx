@@ -10,18 +10,17 @@ import { twMerge } from 'tailwind-merge';
 import { getStripePriceServer, StripeProduct } from '@/lib/stripe/products';
 import { Stripe } from 'stripe';
 
-interface SubscriptionCardProps {
+interface ProductCardProps {
 	product: StripeProduct;
 	className?: string;
 	onButtonClick?: () => void;
 }
 
-export async function SubscriptionCard({
+export async function ProductCard({
 	product,
 	className,
 	onButtonClick,
-}: SubscriptionCardProps) {
-	// Format price
+}: ProductCardProps) {
 	const formatPrice = (price: number, currency: string) => {
 		return new Intl.NumberFormat('en-US', {
 			style: 'currency',
@@ -31,9 +30,7 @@ export async function SubscriptionCard({
 	};
 
 	const prices: Stripe.Price[] = await getStripePriceServer(product.id);
-
 	let price: Stripe.Price;
-
 	if (prices.length > 0) {
 		price = prices[0];
 	} else {
@@ -45,29 +42,14 @@ export async function SubscriptionCard({
 		? formatPrice(price.unit_amount || 0, price.currency || 'usd')
 		: 'Custom';
 
-	// Extract period/interval
 	const period = price?.recurring?.interval ? `per ${price.recurring.interval}` : '';
 
-	// Extract features from product metadata or description
-
-	// Get button text from metadata or use default
 	const buttonText = product.metadata?.buttonText || 'Get Started';
 
 	const marketingFeatures: Stripe.Product.MarketingFeature[] = product.marketing_features;
 
-	console.log('🚀 ~ marketing_features:', marketingFeatures);
-
-	// Check if this is a highlighted/featured plan
-	const isHighlighted = product.metadata?.highlighted === 'true';
-
 	return (
-		<Card
-			className={twMerge(
-				'w-[325px] p-6',
-				isHighlighted ? 'border-primary' : '',
-				className
-			)}
-		>
+		<Card className={twMerge('w-[325px] p-6', className)}>
 			<CardTitle>
 				<TypographyH4 className="text-center">{product.name}</TypographyH4>
 				<TypographyH1 className="text-6xl text-center">{formattedPrice}</TypographyH1>

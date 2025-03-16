@@ -1,11 +1,9 @@
-import { SubscriptionCard } from '@/components/SubscriptionCard';
+import { ProductCard } from '@/components/SubscriptionCard';
 import { getStripeProductsServer } from '@/lib/stripe/products';
 
-export default async function Subscriptions() {
-	// Use the server-side function to get products
+export default async function Products() {
 	const products = await getStripeProductsServer();
 
-	// If no products are available, show a message
 	if (!products || products.length === 0) {
 		return (
 			<div className="flex flex-col items-center justify-center p-8">
@@ -15,10 +13,14 @@ export default async function Subscriptions() {
 		);
 	}
 
+	const sortedProducts = products.sort(
+		(a, b) => parseInt(a.metadata.order) - parseInt(b.metadata.order)
+	);
+
 	return (
 		<div className="flex flex-wrap gap-6 justify-center p-8">
-			{products.map((product) => (
-				<SubscriptionCard key={product.id} product={product} />
+			{sortedProducts.map((product) => (
+				<ProductCard key={product.id} product={product} />
 			))}
 		</div>
 	);
