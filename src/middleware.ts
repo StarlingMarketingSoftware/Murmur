@@ -6,7 +6,7 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
-  "/api/((?!webhooks).*)$" // Protect all API routes except webhooks
+  "/api/((?!webhooks).*)$", // Protect all API routes except webhooks
 ]); 
 
 export default clerkMiddleware(async (auth, req) => {
