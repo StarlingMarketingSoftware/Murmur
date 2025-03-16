@@ -1,6 +1,47 @@
 # Flock - Next.js 14 Application
 
-A modern web application built with Next.js 14, featuring authentication, database integration, and payment processing.
+A Next.js 14 application with Clerk, Prisma, Tailwind, shadcn, and Stripe.
+
+## Setup
+
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Copy `.env.example` to `.env` and fill in the required environment variables
+4. Run the development server: `npm run dev`
+
+## Clerk Webhook Setup
+
+To ensure users are created in your database when they sign up with Clerk, follow these steps:
+
+1. Go to your [Clerk Dashboard](https://dashboard.clerk.dev/)
+2. Navigate to the "Webhooks" section
+3. Create a new webhook with the following settings:
+   - URL: `https://your-domain.com/api/webhooks/clerk` (use your actual domain)
+   - Events: Select `user.created`
+   - Version: Choose the latest version
+   - Create a signing secret and copy it
+4. Add the signing secret to your `.env` file as `CLERK_WEBHOOK_SECRET`
+
+This webhook will automatically create a user record in your database whenever a new user signs up through Clerk.
+
+## Stripe Webhook Setup
+
+For Stripe subscription functionality, set up a webhook:
+
+1. Go to your [Stripe Dashboard](https://dashboard.stripe.com/webhooks)
+2. Create a new webhook with the following settings:
+   - URL: `https://your-domain.com/api/webhook` (use your actual domain)
+   - Events: Select `checkout.session.completed`, `customer.subscription.updated`, and `customer.subscription.deleted`
+   - Create a signing secret and copy it
+3. Add the signing secret to your `.env` file as `STRIPE_WEBHOOK_SECRET`
+
+## Features
+
+- Authentication with Clerk
+- Subscription management with Stripe
+- Database integration with Prisma
+- UI components with shadcn/ui
+- Responsive design with Tailwind CSS
 
 ## Tech Stack
 
@@ -22,26 +63,31 @@ A modern web application built with Next.js 14, featuring authentication, databa
 ### Installation
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/yourusername/flock.git
    cd flock
    ```
 
 2. Install dependencies:
+
    ```bash
    npm install
    ```
 
 3. Set up environment variables:
+
    - Copy `.env.example` to `.env`
    - Update the environment variables with your own values
 
 4. Set up the database:
+
    ```bash
    npx prisma migrate dev --name init
    ```
 
 5. Run the development server:
+
    ```bash
    npm run dev
    ```
@@ -69,13 +115,6 @@ STRIPE_SECRET_KEY=your_stripe_secret_key
 STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
 ```
-
-## Features
-
-- **Authentication**: Sign in and sign up with Google OAuth via Clerk
-- **Dashboard**: User dashboard with subscription management
-- **Payments**: Subscription management with Stripe
-- **Database**: PostgreSQL database with Prisma ORM
 
 ## Project Structure
 
