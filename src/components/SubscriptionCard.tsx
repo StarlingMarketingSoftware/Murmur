@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardTitle, CardFooter } from '@/components/ui/card';
 import {
 	TypographyH1,
@@ -9,6 +8,7 @@ import {
 import { twMerge } from 'tailwind-merge';
 import { getStripePriceServer, StripeProduct } from '@/lib/stripe/products';
 import { Stripe } from 'stripe';
+import { CheckoutButton } from './CheckoutButton';
 
 interface ProductCardProps {
 	product: StripeProduct;
@@ -64,9 +64,11 @@ export async function ProductCard({
 				</TypographyList>
 			</CardContent>
 			<CardFooter>
-				<Button className="mx-auto" onClick={onButtonClick}>
-					{buttonText}
-				</Button>
+				<CheckoutButton
+					priceId={price.id}
+					buttonText={buttonText}
+					onButtonClick={onButtonClick}
+				/>
 			</CardFooter>
 		</Card>
 	);
