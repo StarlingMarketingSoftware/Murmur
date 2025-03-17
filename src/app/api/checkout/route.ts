@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { stripe } from "@/lib/stripe/client";
+import { prisma } from '@/lib/prisma/client'
 
 export async function POST(req: Request) {
   try {
@@ -34,6 +35,9 @@ export async function POST(req: Request) {
         userId,
       },
     });
+    console.log("🚀 ~ POST ~ session:", session)
+
+    
 
     return NextResponse.json({ url: session.url });
   } catch (error) {

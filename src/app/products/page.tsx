@@ -13,7 +13,9 @@ export default async function Products() {
 		);
 	}
 
-	const sortedProducts = products.sort(
+	const activeProducts = products.filter((product) => product.active);
+
+	const sortedProducts = activeProducts.sort(
 		(a, b) => parseInt(a.metadata.order) - parseInt(b.metadata.order)
 	);
 

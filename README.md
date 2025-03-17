@@ -5,9 +5,15 @@ A Next.js 14 application with Clerk, Prisma, Tailwind, shadcn, and Stripe.
 ## Setup
 
 1. Clone the repository
-2. Install dependencies: `npm install`
+2. Install dependencies: 
+```bash
+npm install
+```
 3. Copy `.env.example` to `.env` and fill in the required environment variables
-4. Run the development server: `npm run dev`
+4. Run the development server: 
+```bash
+npm run dev
+```
 
 ## Clerk Webhook Setup
 
@@ -34,6 +40,25 @@ For Stripe subscription functionality, set up a webhook:
    - Events: Select `checkout.session.completed`, `customer.subscription.updated`, and `customer.subscription.deleted`
    - Create a signing secret and copy it
 3. Add the signing secret to your `.env` file as `STRIPE_WEBHOOK_SECRET`
+4. For testing locally, use Stripe CLI, instead of ngrok.
+   - https://docs.stripe.com/webhooks
+   - Run the following command:
+   ```bash
+   stripe listen --forward-to localhost:4242/webhook
+   ```
+   - Keep this terminal running and in a separate terminal, run 
+   ```bash
+   stripe trigger payment_intent.succeeded
+   ```
+   
+   - Customize the webhook type.
+      - customer.subscription.created
+      - customer.subscription.deleted
+      - customer.subscription.updated
+   - See full list of webhooks by running:
+   ```bash
+   stripe trigger
+   ```
 
 ## Features
 
@@ -45,7 +70,7 @@ For Stripe subscription functionality, set up a webhook:
 
 ## Tech Stack
 
-- **Next.js 14**: React framework with App Router
+- **Next.js 15**: React framework with App Router
 - **TypeScript**: Type-safe JavaScript
 - **Clerk**: Authentication with Google OAuth
 - **Prisma**: ORM for PostgreSQL
@@ -64,16 +89,16 @@ For Stripe subscription functionality, set up a webhook:
 
 1. Clone the repository:
 
-   ```bash
-   git clone https://github.com/yourusername/flock.git
-   cd flock
-   ```
+```bash
+git clone https://github.com/yourusername/flock.git
+cd flock
+```
 
 2. Install dependencies:
 
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+```
 
 3. Set up environment variables:
 
@@ -82,15 +107,15 @@ For Stripe subscription functionality, set up a webhook:
 
 4. Set up the database:
 
-   ```bash
-   npx prisma migrate dev --name init
-   ```
+```bash
+npx prisma migrate dev --name init
+```
 
 5. Run the development server:
 
-   ```bash
-   npm run dev
-   ```
+```bash
+npm run dev
+```
 
 6. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
