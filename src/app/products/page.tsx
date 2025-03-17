@@ -3,6 +3,7 @@ import { getStripeProductsServer } from '@/lib/stripe/products';
 
 export default async function Products() {
 	const products = await getStripeProductsServer();
+	console.log("🚀 ~ Products ~ products:", products)
 
 	if (!products || products.length === 0) {
 		return (
@@ -13,9 +14,7 @@ export default async function Products() {
 		);
 	}
 
-	const activeProducts = products.filter((product) => product.active);
-
-	const sortedProducts = activeProducts.sort(
+	const sortedProducts = products.sort(
 		(a, b) => parseInt(a.metadata.order) - parseInt(b.metadata.order)
 	);
 

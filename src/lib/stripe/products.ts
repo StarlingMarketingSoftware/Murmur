@@ -8,6 +8,7 @@ export interface StripeProduct extends Stripe.Product {
 export async function getStripeProductsServer(): Promise<StripeProduct[]> {
   try {
     const products = await stripe.products.list({
+      active: true,
     });
     
     return products.data as StripeProduct[];

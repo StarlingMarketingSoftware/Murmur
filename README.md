@@ -37,14 +37,14 @@ For Stripe subscription functionality, set up a webhook:
 1. Go to your [Stripe Dashboard](https://dashboard.stripe.com/webhooks)
 2. Create a new webhook with the following settings:
    - URL: `https://your-domain.com/api/webhook` (use your actual domain)
-   - Events: Select `checkout.session.completed`, `customer.subscription.updated`, and `customer.subscription.deleted`
+   - Events: Select `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, and `product.created`
    - Create a signing secret and copy it
 3. Add the signing secret to your `.env` file as `STRIPE_WEBHOOK_SECRET`
 4. For testing locally, use Stripe CLI, instead of ngrok.
    - https://docs.stripe.com/webhooks
    - Run the following command:
    ```bash
-   stripe listen --forward-to localhost:4242/webhook
+   stripe listen --forward-to localhost:3000/api/webhooks/stripe
    ```
    - Keep this terminal running and in a separate terminal, run 
    ```bash
@@ -52,6 +52,7 @@ For Stripe subscription functionality, set up a webhook:
    ```
    
    - Customize the webhook type.
+      - checkout.session.completed
       - customer.subscription.created
       - customer.subscription.deleted
       - customer.subscription.updated
