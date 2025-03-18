@@ -8,7 +8,7 @@ import { fulfillCheckout } from '@/utils/stripe';
 export async function POST(req: Request) {
 	const body = await req.text();
 	const headersList = await headers();
-
+	console.log('!!!!!!!!!');
 	const signature = headersList.get('stripe-signature') || '';
 
 	if (!process.env.STRIPE_WEBHOOK_SECRET) {
@@ -30,33 +30,47 @@ export async function POST(req: Request) {
 		return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
 	}
 
+	console.log(`Event type: ${event.type}`);
+
 	try {
-		if (
-			event.type === 'checkout.session.completed' ||
-			event.type === 'checkout.session.async_payment_succeeded'
-		) {
+		if (event.type === 'checkout.session.completed') {
+			console.log('checkout.session.completed');
 			const session = event.data.object as Stripe.Checkout.Session;
 
-			const subscription = await stripe.subscriptions.retrieve(
-				session.subscription as string
-			);
-			await fulfillCheckout(subscription, session.id); // This will be a cs_ id
-		} else if (event.type === 'customer.subscription.updated') {
-			const subscription = event.data.object as Stripe.Subscription;
-
-			// Update the subscription in the database
-			await prisma.subscription.update({
+			// Find existing active subscription
+			const existingSubscription = await prisma.subscription.findFirst({
 				where: {
-					stripeSubscriptionId: subscription.id,
-				},
-				data: {
-					status: subscription.status,
-					currentPeriodStart: new Date(subscription.current_period_start * 1000),
-					currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+					userId: session.metadata?.userId,
+					status: 'active',
 				},
 			});
+			console.log('🚀 ~ POST ~ existingSubscription:', existingSubscription);
 
-			console.log(`Subscription updated: ${subscription.id}`);
+			if (existingSubscription) {
+				console.log(
+					`Canceling existing subscription: ${existingSubscription.stripeSubscriptionId}`
+				);
+
+				// Cancel in Stripe
+				await stripe.subscriptions.update(existingSubscription.stripeSubscriptionId, {
+					cancel_at_period_end: true,
+				});
+
+				// Update our database
+				await prisma.subscription.update({
+					where: { id: existingSubscription.id },
+					data: {
+						status: 'canceling',
+						cancelAtPeriodEnd: false,
+					},
+				});
+			}
+
+			// Create new subscription
+			const newSubscription = await stripe.subscriptions.retrieve(
+				session.subscription as string
+			);
+			await fulfillCheckout(newSubscription, session.id);
 		} else if (event.type === 'customer.subscription.deleted') {
 			const subscription = event.data.object as Stripe.Subscription;
 
