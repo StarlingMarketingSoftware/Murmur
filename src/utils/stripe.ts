@@ -49,7 +49,7 @@ export async function fulfillCheckout(
 
 				await tx.subscription.create({
 					data: {
-						userId: customer.id,
+						userClerkId: customer.clerkId,
 						stripeSubscriptionId: subscription.id,
 						stripePriceId: subscription.items.data[0].price.id,
 						stripeCustomerId: customerId,
