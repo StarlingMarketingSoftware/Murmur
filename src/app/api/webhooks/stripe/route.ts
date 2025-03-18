@@ -49,51 +49,46 @@ export async function POST(req: Request) {
 			});
 			console.log('🚀 ~ POST ~ existingSubscription:', existingSubscription);
 
-			if (existingSubscription) {
-				console.log(
-					`Canceling existing subscription: ${existingSubscription.stripeSubscriptionId}`
-				);
+			// if (existingSubscription) {
+			// 	const subscriptions = await stripe.subscriptions.list({
+			// 		customer: existingSubscription.stripeCustomerId,
+			// 	})
 
-				// check if it's a upgrade or downgrade?
-				// compare current subscription price with new subscription price
-				// if it's a downgrade, we need to add a discount based on remaining amount for current month.
+			// 	if (subscriptions.data.length === 0) {
+			// 		throw Error('No subscriptions found for the customer');
+			// 	}
 
-				const currentSubscriptionPriceId: string = existingSubscription.stripePriceId;
+			// 	const subscriptionsData = subscriptions.data[0];
 
-				const currentSubscriptionPrice: Product = await prisma.product.findUniqueOrThrow({
-					where: {
-						stripePriceId: currentSubscriptionPriceId,
-					},
-				});
-				const newSubscriptionPriceId: string = newSubscription.items.data[0].price.id;
-				const newSubscriptionPrice: Product = await prisma.product.findUniqueOrThrow({
-					where: {
-						stripePriceId: newSubscriptionPriceId,
-					},
-				});
+			// 	const updatedSubscription = await stripe.subscriptions.update(subscriptions.data[0].id,
+			// 		{
+			// 			items: [
+			// 				{
+			// 					id: subscriptionsData.items.id,
+			// 					price: ,
+			// 				}
+			// 			]
+			// 		}
+			// 	)
 
-				const isUpgrade =
-					newSubscriptionPrice.unit_amount! > currentSubscriptionPrice.unit_amount!;
+			// 	const cancelledSubscription: Stripe.Subscription =
+			// 		await stripe.subscriptions.update(existingSubscription.stripeSubscriptionId, {
+			// 			cancel_at_period_end: false,
+			// 		});
 
-				console.log('🚀 ~ POST ~ isUpgrade:', isUpgrade);
+			// 	// Update our database
+			// 	await prisma.subscription.update({
+			// 		where: { id: existingSubscription.id },
+			// 		data: {
+			// 			status: cancelledSubscription.status,
+			// 			cancelAtPeriodEnd: cancelledSubscription.cancel_at_period_end,
+			// 		},
+			// 	});
+			// } else {
+			// 	// Create new subscription
 
-				// Cancel in Stripe, you need to add a discount based on remaining amount for current month.
-				const cancelledSubscription: Stripe.Subscription =
-					await stripe.subscriptions.update(existingSubscription.stripeSubscriptionId, {
-						cancel_at_period_end: false,
-					});
+			// }
 
-				// Update our database
-				await prisma.subscription.update({
-					where: { id: existingSubscription.id },
-					data: {
-						status: cancelledSubscription.status,
-						cancelAtPeriodEnd: cancelledSubscription.cancel_at_period_end,
-					},
-				});
-			}
-
-			// Create new subscription
 			await fulfillCheckout(newSubscription, session.id);
 		} else if (event.type === 'customer.subscription.deleted') {
 			const subscription = event.data.object as Stripe.Subscription;
