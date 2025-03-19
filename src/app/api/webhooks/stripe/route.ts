@@ -4,7 +4,6 @@ import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe/client';
 import { prisma } from '@/lib/prisma/client';
 import { fulfillCheckout } from '@/utils/stripe';
-import { Product } from '@prisma/client';
 
 export async function POST(req: Request) {
 	const body = await req.text();
@@ -20,7 +19,6 @@ export async function POST(req: Request) {
 	let event: Stripe.Event;
 
 	try {
-		// Verify the webhook signature
 		event = stripe.webhooks.constructEvent(
 			body,
 			signature,
@@ -41,107 +39,35 @@ export async function POST(req: Request) {
 				session.subscription as string
 			);
 
-			const existingSubscription = await prisma.subscription.findFirst({
-				where: {
-					userClerkId: session.metadata?.userId,
-					status: 'active',
-				},
-			});
-			console.log('🚀 ~ POST ~ existingSubscription:', existingSubscription);
+			// const existingSubscription = await stripe.subscriptions.retrieve({
+			// 	customer: newSubscription.customer as string,
+			// })
 
 			// if (existingSubscription) {
-			// 	const subscriptions = await stripe.subscriptions.list({
-			// 		customer: existingSubscription.stripeCustomerId,
-			// 	})
-
-			// 	if (subscriptions.data.length === 0) {
-			// 		throw Error('No subscriptions found for the customer');
-			// 	}
-
-			// 	const subscriptionsData = subscriptions.data[0];
-
-			// 	const updatedSubscription = await stripe.subscriptions.update(subscriptions.data[0].id,
-			// 		{
-			// 			items: [
-			// 				{
-			// 					id: subscriptionsData.items.id,
-			// 					price: ,
-			// 				}
-			// 			]
-			// 		}
-			// 	)
-
-			// 	const cancelledSubscription: Stripe.Subscription =
-			// 		await stripe.subscriptions.update(existingSubscription.stripeSubscriptionId, {
-			// 			cancel_at_period_end: false,
-			// 		});
-
-			// 	// Update our database
-			// 	await prisma.subscription.update({
-			// 		where: { id: existingSubscription.id },
-			// 		data: {
-			// 			status: cancelledSubscription.status,
-			// 			cancelAtPeriodEnd: cancelledSubscription.cancel_at_period_end,
-			// 		},
-			// 	});
-			// } else {
-			// 	// Create new subscription
-
+			// 	return NextResponse.json({ error: 'Subscription already exists' }, { status: 400 });
 			// }
 
 			await fulfillCheckout(newSubscription, session.id);
-		} else if (event.type === 'customer.subscription.deleted') {
-			const subscription = event.data.object as Stripe.Subscription;
+		} else if (event.type === 'customer.subscription.updated') {
+			console.log('subscription updated');
+			const subscription: Stripe.Subscription = event.data.object;
 
-			// Delete the subscription from the database
-			await prisma.subscription.delete({
-				where: {
-					stripeSubscriptionId: subscription.id,
-				},
-			});
-
-			console.log(`Subscription deleted: ${subscription.id}`);
-		} else if (event.type === 'product.created' || event.type === 'product.updated') {
-			const product = event.data.object as Stripe.Product;
-			if (!product.default_price) {
-				throw Error(
-					'A default_price id for the product could not be found. Make sure to set this value for every product.'
-				);
+			try {
+				await prisma.user.update({
+					where: {
+						stripeCustomerId: subscription.customer as string,
+					},
+					data: {
+						stripeSubscriptionStatus: subscription.status,
+						stripeSubscriptionId: subscription.id,
+						stripePriceId: subscription.items.data[0].price.id,
+					},
+				});
+			} catch (error) {
+				console.error('Error updating user:', error);
+				return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
 			}
-
-			const price = await stripe.prices.retrieve(product.default_price as string);
-
-			if (!price.unit_amount) {
-				throw Error('Price unit amount could not be retrieved based on the given id.');
-			}
-
-			await prisma.product.upsert({
-				where: { stripeProductId: product.id },
-				update: {
-					name: product.name,
-					description: product.description || '',
-					price: price.unit_amount,
-				},
-
-				create: {
-					stripeProductId: product.id,
-					stripePriceId: product.default_price as string,
-					price: price.unit_amount,
-					name: product.name,
-					description: product.description || '',
-				},
-			});
-		} else if (event.type === 'product.deleted') {
-			const product = event.data.object as Stripe.Product;
-
-			await prisma.product.delete({
-				where: { stripeProductId: product.id },
-			});
-		} else {
-			console.log('unhandled event type');
 		}
-
-		return NextResponse.json({ received: true });
 	} catch (error) {
 		console.error(`Error processing webhook: ${error}`);
 		return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

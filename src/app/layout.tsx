@@ -5,6 +5,8 @@ import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import { Toaster } from '@/components/ui/toast';
 import './globals.css';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import SubLayout from './sublayout';
 
 const geistSans = Geist({
 	variable: '--font-geist-sans',
@@ -17,7 +19,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-	title: 'Flock - Next.js 14 App',
+	title: 'Murmur',
 	description:
 		'A Next.js 14 application with Clerk, Prisma, Tailwind, shadcn, and Stripe',
 };
@@ -29,16 +31,18 @@ export default function RootLayout({
 }>) {
 	return (
 		<ClerkProvider>
-			<html lang="en">
-				<body
-					className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
-				>
-					<Navbar />
-					<main className="flex-1">{children}</main>
-					<Footer />
-					<Toaster />
-				</body>
-			</html>
+			<SubLayout>
+				<html lang="en">
+					<body
+						className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
+					>
+						<Navbar />
+						<main className="flex-1">{children}</main>
+						<Footer />
+						<Toaster />
+					</body>
+				</html>
+			</SubLayout>
 		</ClerkProvider>
 	);
 }

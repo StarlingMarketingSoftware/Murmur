@@ -6,7 +6,7 @@ export default function SignUpPage() {
 			<div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
 				<div className="text-center">
 					<h1 className="text-3xl font-bold">Sign Up</h1>
-					<p className="mt-2 text-gray-600">Create your Flock account</p>
+					<p className="mt-2 text-gray-600">Create your Murmur account</p>
 				</div>
 				<SignUp
 					appearance={{
