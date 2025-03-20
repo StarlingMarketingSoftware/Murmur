@@ -1,12 +1,11 @@
 import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
 import { ProductCard } from '@/app/products/_components/SubscriptionCard';
 import { getStripeProductsServer } from '@/utils/data/stripe/products';
-import { auth } from '@clerk/nextjs/server';
+import { getUser } from '@/utils/data/users/getUser';
 
 export default async function Products() {
 	const products = await getStripeProductsServer();
-	const { userId } = await auth();
-	const user = await getUserServer(userId);
+	const user = await getUser();
 
 	console.log('🚀 ~ Products ~ products:', products);
 
