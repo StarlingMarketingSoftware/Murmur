@@ -47,7 +47,6 @@ export async function ProductCard({
 	const buttonText = product.metadata?.buttonText || 'Get Started';
 
 	const marketingFeatures: Stripe.Product.MarketingFeature[] = product.marketing_features;
-
 	return (
 		<Card className={twMerge('w-[325px] p-6', className)}>
 			<CardTitle>

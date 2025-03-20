@@ -1,9 +1,10 @@
+import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
 import { ProductCard } from '@/components/SubscriptionCard';
 import { getStripeProductsServer } from '@/lib/stripe/products';
 
 export default async function Products() {
 	const products = await getStripeProductsServer();
-	console.log("🚀 ~ Products ~ products:", products)
+	console.log('🚀 ~ Products ~ products:', products);
 
 	if (!products || products.length === 0) {
 		return (
@@ -19,10 +20,13 @@ export default async function Products() {
 	);
 
 	return (
-		<div className="flex flex-wrap gap-6 justify-center p-8">
-			{sortedProducts.map((product) => (
-				<ProductCard key={product.id} product={product} />
-			))}
+		<div className="flex flex-col items-center justify-center p-8">
+			<div className="flex flex-wrap gap-6 justify-center p-8">
+				{sortedProducts.map((product) => (
+					<ProductCard key={product.id} product={product} />
+				))}
+			</div>
+			<ManageSubscriptionButton />
 		</div>
 	);
 }

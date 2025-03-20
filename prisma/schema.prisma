@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,45 +8,15 @@ datasource db {
 }
 
 model User {
-  id               String         @id @default(uuid())
-  clerkId          String         @unique
-  email            String         @unique
-  firstName        String?
-  lastName         String?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  subscriptions    Subscription[]
-  stripeCustomerId String?        @unique
-}
-
-model Product {
-  id              String         @id @default(uuid())
-  name            String
-  description     String
-  price           Float
-  stripeProductId String         @unique
-  stripePriceId   String         @unique
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  subscriptions   Subscription[]
-}
-
-model Subscription {
-  id                      String   @id @default(uuid())
-  stripeCheckoutSessionId String   @unique
-  stripeSubscriptionId    String   @unique
-  stripeCustomerId        String
-  stripePriceId           String
-  status                  String
-  currentPeriodStart      DateTime
-  currentPeriodEnd        DateTime
-  cancelAtPeriodEnd       Boolean
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
-  userClerkId             String
-  user                    User     @relation(fields: [userClerkId], references: [clerkId], onDelete: Cascade)
-  Product                 Product? @relation(fields: [productId], references: [id])
-  productId               String?
-
-  @@index([userClerkId])
+  id                       String   @id @default(uuid())
+  clerkId                  String   @unique
+  email                    String   @unique
+  firstName                String?
+  lastName                 String?
+  stripeCustomerId         String?  @unique
+  stripeSubscriptionId     String?
+  stripeSubscriptionStatus String?
+  stripePriceId            String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 }
