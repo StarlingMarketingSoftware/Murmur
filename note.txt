@@ -1,0 +1,3 @@
+use this repo as reference for folder structure
+
+https://github.com/michaelshimeles/goshenpay-nextjs/tree/development

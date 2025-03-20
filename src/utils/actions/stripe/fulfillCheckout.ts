@@ -1,4 +1,4 @@
-import { stripe } from '@/lib/stripe/client';
+import { stripe } from '../../../../stripe/client';
 import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
 

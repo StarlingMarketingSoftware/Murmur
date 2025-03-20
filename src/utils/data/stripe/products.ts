@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { stripe } from './client';
+import { stripe } from '../../../../stripe/client';
 
 export interface StripeProduct extends Stripe.Product {
 	default_price: Stripe.Price;
