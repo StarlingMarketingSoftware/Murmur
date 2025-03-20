@@ -73,10 +73,11 @@ For Stripe subscription functionality, set up a webhook:
 
 1. https://clerk.com/docs/webhooks/sync-data
 2. https://dashboard.ngrok.com/get-started/setup/windows
-3. ngrok http --url=marmot-modest-prawn.ngrok-free.app 3000
-4. Go to https://dashboard.ngrok.com/endpoints to see your url
-5. Add /api/webhooks/clerk to this url
+3. Run the ngrok tunnel: ngrok http --url=marmot-modest-prawn.ngrok-free.app 3000
+4. The static url is https://marmot-modest-prawn.ngrok-free.app
+5. The api URL is therefore https://marmot-modest-prawn.ngrok-free.app/api/webhooks/clerk
 6. Test directly via clerk, or use the ngrok url to create a user.
+7. When you create a user using the UI, you use localhost:3000 because this connects to Clerk, then Clerk sends the webhook to the ngrok api.
 
 ## Features
 
