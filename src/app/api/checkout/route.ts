@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { stripe } from '@/lib/stripe/client';
-import { prisma } from '@/lib/prisma/client';
+import { stripe } from '../../../stripe/client';
 import Stripe from 'stripe';
+import { getUser } from '@/utils/data/users/getUser';
 
 export async function POST(req: Request) {
 	try {
@@ -17,11 +17,15 @@ export async function POST(req: Request) {
 			return NextResponse.json({ error: 'Price ID is required' }, { status: 400 });
 		}
 
-		const existingSubscription = await prisma.subscription.findFirst({
-			where: {
-				userClerkId: userId,
-			},
-		});
+		const user = await getUser();
+
+		if (!user || !user.stripeSubscriptionId) {
+			return NextResponse.json({ error: 'User not found' }, { status: 404 });
+		}
+
+		const existingSubscription = await stripe.subscriptions.retrieve(
+			user.stripeSubscriptionId
+		);
 
 		let session: Stripe.Response<Stripe.Checkout.Session>;
 
@@ -29,6 +33,9 @@ export async function POST(req: Request) {
 		const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 		if (existingSubscription) {
+			return;
+
+			// handle this somewhere
 			session = await stripe.checkout.sessions.create({
 				mode: 'subscription',
 				payment_method_types: ['card'],

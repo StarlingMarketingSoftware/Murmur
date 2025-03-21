@@ -1,4 +1,4 @@
-import { stripe } from '@/lib/stripe/client';
+import { stripe } from '../../../../stripe/client';
 import { NextRequest, NextResponse } from 'next/server';
 
 interface PortalRequest {

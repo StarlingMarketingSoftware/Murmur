@@ -6,7 +6,7 @@ import {
 	TypographyList,
 } from '@/components/ui/typography';
 import { twMerge } from 'tailwind-merge';
-import { getStripePriceServer, StripeProduct } from '@/lib/stripe/products';
+import { getStripePriceServer, StripeProduct } from '@/utils/data/stripe/products';
 import { Stripe } from 'stripe';
 import { CheckoutButton } from './CheckoutButton';
 

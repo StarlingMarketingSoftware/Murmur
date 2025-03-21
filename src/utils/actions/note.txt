@@ -1,0 +1,9 @@
+- this is where your server actions go
+- essentially all of your mutations (updating, creating, deleting data)
+- they are essentially post requests 
+- server actions can be used in client component by doing 
+  async fucntion onSubmit() {
+    try{
+      const response =- await serverAction(data):
+    }
+  }

@@ -1,0 +1,6 @@
+- data access layer 
+- functions called only the server, can only be called on a server component or API route.
+- all your data requests go here...
+- the client cannot call these functions
+- the component where you fetch data is server component, then you can pass it into a client component. 
+- this is a safe way to fetch data
