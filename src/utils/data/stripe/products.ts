@@ -5,7 +5,7 @@ export interface StripeProduct extends Stripe.Product {
 	default_price: Stripe.Price;
 }
 
-export async function getStripeProductsServer(): Promise<StripeProduct[]> {
+export async function getStripeProducts(): Promise<StripeProduct[]> {
 	try {
 		const products = await stripe.products.list({
 			active: true,
@@ -18,7 +18,7 @@ export async function getStripeProductsServer(): Promise<StripeProduct[]> {
 	}
 }
 
-export async function getStripePriceServer(productId: string): Promise<Stripe.Price[]> {
+export async function getStripePrice(productId: string): Promise<Stripe.Price[]> {
 	try {
 		const prices = await stripe.prices.list({
 			product: productId,

@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { useUser } from '@clerk/nextjs';
 import { useTransition } from 'react';
 import { toast } from 'sonner';
 
@@ -16,6 +17,7 @@ export function CheckoutButton({
 	onButtonClick,
 }: CheckoutButtonProps) {
 	const [isPending, startTransition] = useTransition();
+	const { user } = useUser();
 
 	const handleCheckout = async () => {
 		startTransition(async () => {
@@ -27,6 +29,7 @@ export function CheckoutButton({
 					},
 					body: JSON.stringify({
 						priceId,
+						userId: user?.id,
 					}),
 				});
 

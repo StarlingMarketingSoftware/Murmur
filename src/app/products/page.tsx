@@ -1,10 +1,10 @@
 import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
-import { ProductCard } from '@/app/products/_components/SubscriptionCard';
-import { getStripeProductsServer } from '@/utils/data/stripe/products';
+import { ProductCard } from '@/app/products/_components/ProductCard';
+import { getStripeProducts } from '@/utils/data/stripe/products';
 import { getUser } from '@/utils/data/users/getUser';
 
 export default async function Products() {
-	const products = await getStripeProductsServer();
+	const products = await getStripeProducts();
 	const user = await getUser();
 
 	console.log('🚀 ~ Products ~ products:', products);
@@ -26,7 +26,7 @@ export default async function Products() {
 		<div className="flex flex-col items-center justify-center p-8">
 			<div className="flex flex-wrap gap-6 justify-center p-8">
 				{sortedProducts.map((product) => (
-					<ProductCard key={product.id} product={product} />
+					<ProductCard key={product.id} product={product} user={user} />
 				))}
 			</div>
 			<ManageSubscriptionButton />

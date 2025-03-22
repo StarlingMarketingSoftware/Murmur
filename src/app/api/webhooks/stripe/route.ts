@@ -39,15 +39,8 @@ export async function POST(req: Request) {
 				session.subscription as string
 			);
 
-			// const existingSubscription = await stripe.subscriptions.retrieve({
-			// 	customer: newSubscription.customer as string,
-			// })
-
-			// if (existingSubscription) {
-			// 	return NextResponse.json({ error: 'Subscription already exists' }, { status: 400 });
-			// }
-
-			await fulfillCheckout(newSubscription, session.id);
+			const customer = await fulfillCheckout(newSubscription, session.id);
+			return NextResponse.json({ customer }, { status: 200 });
 		} else if (event.type === 'customer.subscription.updated') {
 			console.log('subscription updated');
 			const subscription: Stripe.Subscription = event.data.object;
@@ -67,6 +60,8 @@ export async function POST(req: Request) {
 				console.error('Error updating user:', error);
 				return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
 			}
+		} else {
+			return NextResponse.json({ error: 'Unhandled event type' }, { status: 400 });
 		}
 	} catch (error) {
 		console.error(`Error processing webhook: ${error}`);

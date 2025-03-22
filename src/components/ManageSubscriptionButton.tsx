@@ -3,10 +3,10 @@ import { FC } from 'react';
 
 import { Button } from './ui/button';
 import { useMe } from '@/hooks/useMe';
-import { useRouter } from 'next/router';
 
 const ManageSubscriptionButton: FC = () => {
 	const { user } = useMe();
+	console.log('🚀 ~ user:', user);
 
 	const handlePortalAccess = async () => {
 		try {

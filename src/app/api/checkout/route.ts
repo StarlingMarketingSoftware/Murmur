@@ -19,51 +19,14 @@ export async function POST(req: Request) {
 
 		const user = await getUser();
 
-		if (!user || !user.stripeSubscriptionId) {
+		if (!user) {
 			return NextResponse.json({ error: 'User not found' }, { status: 404 });
 		}
 
-		const existingSubscription = await stripe.subscriptions.retrieve(
-			user.stripeSubscriptionId
-		);
+		const baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
 
-		let session: Stripe.Response<Stripe.Checkout.Session>;
-
-		// Use a default base URL if NEXT_PUBLIC_APP_URL is not set
-		const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-
-		if (existingSubscription) {
-			return;
-
-			// handle this somewhere
-			session = await stripe.checkout.sessions.create({
-				mode: 'subscription',
-				payment_method_types: ['card'],
-				customer: existingSubscription.stripeCustomerId,
-				metadata: {
-					userId,
-					isUpgrade: 'true',
-				},
-				line_items: [
-					{
-						price: priceId,
-						quantity: 1,
-					},
-				],
-				subscription_data: {
-					// Transfer any metadata from the existing subscription
-					metadata: {
-						previous_subscription: existingSubscription.stripeSubscriptionId,
-					},
-					// Prorate charges
-				},
-				// Redirect paths
-				success_url: `${baseUrl}/dashboard?success=true`,
-				cancel_url: `${baseUrl}/products?canceled=true`,
-			});
-		} else {
-			// Create a checkout session
-			session = await stripe.checkout.sessions.create({
+		const session: Stripe.Response<Stripe.Checkout.Session> =
+			await stripe.checkout.sessions.create({
 				payment_method_types: ['card'],
 				line_items: [
 					{
@@ -78,7 +41,6 @@ export async function POST(req: Request) {
 					userId,
 				},
 			});
-		}
 
 		return NextResponse.json({ url: session.url });
 	} catch (error) {

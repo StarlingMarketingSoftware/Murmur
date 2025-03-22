@@ -6,20 +6,23 @@ import {
 	TypographyList,
 } from '@/components/ui/typography';
 import { twMerge } from 'tailwind-merge';
-import { getStripePriceServer, StripeProduct } from '@/utils/data/stripe/products';
+import { getStripePrice, StripeProduct } from '@/utils/data/stripe/products';
 import { Stripe } from 'stripe';
 import { CheckoutButton } from './CheckoutButton';
-
+import { User } from '@prisma/client';
+import { STRIPE_SUBSCRIPTION_STATUS } from '@/constants/types';
 interface ProductCardProps {
 	product: StripeProduct;
 	className?: string;
 	onButtonClick?: () => void;
+	user: User | null;
 }
 
 export async function ProductCard({
 	product,
 	className,
 	onButtonClick,
+	user,
 }: ProductCardProps) {
 	const formatPrice = (price: number, currency: string) => {
 		return new Intl.NumberFormat('en-US', {
@@ -29,7 +32,7 @@ export async function ProductCard({
 		}).format(price / 100);
 	};
 
-	const prices: Stripe.Price[] = await getStripePriceServer(product.id);
+	const prices: Stripe.Price[] = await getStripePrice(product.id);
 	let price: Stripe.Price;
 	if (prices.length > 0) {
 		price = prices[0];
@@ -44,7 +47,24 @@ export async function ProductCard({
 
 	const period = price?.recurring?.interval ? `per ${price.recurring.interval}` : '';
 
-	const buttonText = product.metadata?.buttonText || 'Get Started';
+	const getButtonText = () => {
+		if (!user) {
+			return 'Get Started';
+		}
+
+		if (
+			user.stripePriceId === price.id &&
+			user.stripeSubscriptionStatus === STRIPE_SUBSCRIPTION_STATUS.ACTIVE
+		) {
+			return 'Manage Subscription';
+		}
+
+		if (user.stripeSubscriptionId) {
+			return 'Update Subscription';
+		}
+
+		return 'Get Started';
+	};
 
 	const marketingFeatures: Stripe.Product.MarketingFeature[] = product.marketing_features;
 	return (
@@ -64,8 +84,9 @@ export async function ProductCard({
 			</CardContent>
 			<CardFooter>
 				<CheckoutButton
+					user={user}
 					priceId={price.id}
-					buttonText={buttonText}
+					buttonText={getButtonText()}
 					onButtonClick={onButtonClick}
 				/>
 			</CardFooter>
