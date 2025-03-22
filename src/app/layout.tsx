@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
-import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import { Toaster } from '@/components/ui/toast';
 import './globals.css';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import SubLayout from './sublayout';
+import localFont from 'next/font/local';
+import { Navbar } from '@/components/Navbar';
 
 const geistSans = Geist({
 	variable: '--font-geist-sans',
@@ -16,6 +16,10 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
 	variable: '--font-geist-mono',
 	subsets: ['latin'],
+});
+
+const palatino = localFont({
+	src: '../../public/palatino.ttf',
 });
 
 export const metadata: Metadata = {
@@ -32,7 +36,7 @@ export default function RootLayout({
 	return (
 		<ClerkProvider>
 			<SubLayout>
-				<html lang="en">
+				<html lang="en" className={palatino.className}>
 					<body
 						className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
 					>

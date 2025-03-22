@@ -5,11 +5,11 @@ export function Footer() {
 	const currentYear = new Date().getFullYear();
 
 	return (
-		<footer className="border-t py-8 mt-auto">
+		<footer className="border-t py-8 mt-32">
 			<div className="container mx-auto px-4">
 				<div className="grid grid-cols-1 md:grid-cols-4 gap-8">
 					<div>
-						<h3 className="font-semibold text-lg mb-4">Flock</h3>
+						<h3 className="font-semibold text-lg mb-4">Murmur</h3>
 						<p className="text-muted-foreground">
 							A Next.js 14 application with modern tools and best practices.
 						</p>
@@ -28,18 +28,18 @@ export function Footer() {
 							</li>
 							<li>
 								<Link
-									href={urls.products.path}
+									href={urls.pricing.path}
 									className="text-muted-foreground hover:text-foreground transition-colors"
 								>
-									{urls.products.label}
+									{urls.pricing.label}
 								</Link>
 							</li>
 							<li>
 								<Link
-									href={urls.dashboard.path}
+									href={urls.contact.path}
 									className="text-muted-foreground hover:text-foreground transition-colors"
 								>
-									{urls.dashboard.label}
+									{urls.contact.label}
 								</Link>
 							</li>
 						</ul>

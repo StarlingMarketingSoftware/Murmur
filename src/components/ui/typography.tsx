@@ -9,10 +9,7 @@ interface TypographyProps {
 export function TypographyH1({ children, className }: TypographyProps) {
 	return (
 		<h1
-			className={twMerge(
-				'scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl',
-				className
-			)}
+			className={twMerge('scroll-m-20 text-4xl font-extrabold  lg:text-5xl', className)}
 		>
 			{children}
 		</h1>
@@ -23,7 +20,7 @@ export function TypographyH2({ children, className }: TypographyProps) {
 	return (
 		<h2
 			className={twMerge(
-				'scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0',
+				'scroll-m-20 border-b pb-2 text-3xl font-semibold  first:mt-0',
 				className
 			)}
 		>
@@ -34,9 +31,7 @@ export function TypographyH2({ children, className }: TypographyProps) {
 
 export function TypographyH3({ children, className }: TypographyProps) {
 	return (
-		<h3
-			className={twMerge('scroll-m-20 text-2xl font-semibold tracking-tight', className)}
-		>
+		<h3 className={twMerge('scroll-m-20 text-2xl font-semibold ', className)}>
 			{children}
 		</h3>
 	);
@@ -44,9 +39,7 @@ export function TypographyH3({ children, className }: TypographyProps) {
 
 export function TypographyH4({ children, className }: TypographyProps) {
 	return (
-		<h4
-			className={twMerge('scroll-m-20 text-xl font-semibold tracking-tight', className)}
-		>
+		<h4 className={twMerge('scroll-m-20 text-xl font-semibold ', className)}>
 			{children}
 		</h4>
 	);
@@ -54,7 +47,7 @@ export function TypographyH4({ children, className }: TypographyProps) {
 
 export function TypographyP({ children, className }: TypographyProps) {
 	return (
-		<p className={twMerge('leading-7 [&:not(:first-child)]:mt-6', className)}>
+		<p className={twMerge('leading-7 [&:not(:first-child)]:mt-6 text-xl', className)}>
 			{children}
 		</p>
 	);
@@ -62,7 +55,7 @@ export function TypographyP({ children, className }: TypographyProps) {
 
 export function TypographyBlockquote({ children, className }: TypographyProps) {
 	return (
-		<blockquote className={twMerge('mt-6 border-l-2 pl-6 italic', className)}>
+		<blockquote className={twMerge('mt-6 border-l-2 pl-6 italic ', className)}>
 			{children}
 		</blockquote>
 	);
@@ -76,7 +69,9 @@ export function TypographyTable({ children, className }: TypographyProps) {
 
 export function TypographyList({ children, className }: TypographyProps) {
 	return (
-		<ul className={twMerge('my-6 ml-6 list-disc [&>li]:mt-2', className)}>{children}</ul>
+		<ul className={twMerge('my-6 ml-6 list-disc [&>li]:mt-2  text-lg', className)}>
+			{children}
+		</ul>
 	);
 }
 
@@ -113,6 +108,6 @@ export function TypographySmall({ children, className }: TypographyProps) {
 
 export function TypographyMuted({ children, className }: TypographyProps) {
 	return (
-		<p className={twMerge('text-sm text-muted-foreground', className)}>{children}</p>
+		<p className={twMerge('text-lg text-muted-foreground', className)}>{children}</p>
 	);
 }
