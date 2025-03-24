@@ -1,13 +1,11 @@
 import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
 import { ProductCard } from '@/app/pricing/_components/ProductCard';
-import { getStripeProducts } from '@/utils/data/stripe/products';
-import { getUser } from '@/utils/data/users/getUser';
+import { getStripeProducts } from '@/app/utils/data/stripe/products';
+import { getUser } from '@/app/utils/data/users/getUser';
 
 export default async function Products() {
 	const products = await getStripeProducts();
 	const user = await getUser();
-
-	console.log('🚀 ~ Products ~ products:', products);
 
 	if (!products || products.length === 0) {
 		return (

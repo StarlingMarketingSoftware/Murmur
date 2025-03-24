@@ -8,9 +8,7 @@ interface TypographyProps {
 
 export function TypographyH1({ children, className }: TypographyProps) {
 	return (
-		<h1
-			className={twMerge('scroll-m-20 text-4xl font-extrabold  lg:text-5xl', className)}
-		>
+		<h1 className={twMerge('scroll-m-20 text-4xl font-extrabold lg:text-7xl', className)}>
 			{children}
 		</h1>
 	);

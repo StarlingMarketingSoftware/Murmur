@@ -78,7 +78,11 @@ function FormItem({ className, ...props }: React.ComponentProps<'div'>) {
 
 	return (
 		<FormItemContext.Provider value={{ id }}>
-			<div data-slot="form-item" className={cn('min-h-[85px]', className)} {...props} />
+			<div
+				data-slot="form-item"
+				className={cn('min-h-[90px] mb-6', className)}
+				{...props}
+			/>
 		</FormItemContext.Provider>
 	);
 }
@@ -93,7 +97,7 @@ function FormLabel({
 		<Label
 			data-slot="form-label"
 			data-error={!!error}
-			className={cn('data-[error=true]:text-destructive', className)}
+			className={cn('data-[error=true]: mb-1', className)}
 			htmlFor={formItemId}
 			{...props}
 		/>

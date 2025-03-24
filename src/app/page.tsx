@@ -34,8 +34,8 @@ export default async function HomePage() {
 			<main className="flex-grow">
 				<div className="py-16">
 					<div className="text-center">
-						<div className="h-screen -translate-y-[15%] flex items-center justify-center">
-							<TypographyH1 className="!text-9xl tracking-wider">Murmur</TypographyH1>
+						<div className="h-[20vh] -translate-y-[15%] flex items-center justify-center">
+							<TypographyH1 className=" tracking-wider">Murmur</TypographyH1>
 						</div>
 						<h2 className="!text-5xl font-extralight mt-10">
 							Make Email Campaigns Personalized

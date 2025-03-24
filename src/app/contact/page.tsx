@@ -23,18 +23,12 @@ import {
 	CardTitle,
 } from '@/components/ui/card';
 import MutedSubtext from '@/components/text/MutedSubtext';
-
-const formSchema = z.object({
-	name: z.string().min(1, { message: 'Name is required' }),
-	email: z.string().email({ message: 'Invalid email address' }),
-	subject: z.string().min(1, { message: 'Subject is required' }),
-	message: z.string().min(1, { message: 'Message is required' }),
-});
+import { contactFormSchema } from '@/constants/types';
+import { toast } from 'sonner';
 
 const Contact = () => {
-	// 1. Define your form.
-	const form = useForm<z.infer<typeof formSchema>>({
-		resolver: zodResolver(formSchema),
+	const form = useForm<z.infer<typeof contactFormSchema>>({
+		resolver: zodResolver(contactFormSchema),
 		defaultValues: {
 			name: '',
 			email: '',
@@ -43,24 +37,35 @@ const Contact = () => {
 		},
 	});
 
-	// 2. Define a submit handler.
-	function onSubmit(values: z.infer<typeof formSchema>) {
-		// Do something with the form values.
-		// ✅ This will be type-safe and validated.
-		console.log(values);
-	}
+	const onSubmit = async (values: z.infer<typeof contactFormSchema>) => {
+		const res = await fetch('/api/contact', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(values),
+		});
+		if (res.status === 200) {
+			form.reset();
+			toast.success('Message sent successfully!');
+		} else {
+			const { error } = await res.json();
+			toast.error(error);
+		}
+	};
+
 	return (
 		<div className="max-w-[900px] mx-auto">
 			<PageHeading>Contact Us</PageHeading>
 			<MutedSubtext>{`We're here to help with any questions you may have`}.</MutedSubtext>
 			<Card className="max-w-[750px] mx-auto">
-				<CardHeader className="bg-">
+				<CardHeader className="">
 					<CardTitle>Send us a message</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<Form {...form}>
-						<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-							<div className="flex flex-row items-center w-full gap-4 m-0 min-h[85px]">
+						<form onSubmit={form.handleSubmit(onSubmit)} className="">
+							<div className="flex flex-row items-center w-full gap-4 m-0">
 								<FormField
 									control={form.control}
 									name="name"
@@ -68,7 +73,7 @@ const Contact = () => {
 										<FormItem className="w-1/2">
 											<FormLabel>Name</FormLabel>
 											<FormControl>
-												<Input placeholder="Your Full Name" {...field} />
+												<Input {...field} />
 											</FormControl>
 											<FormMessage />
 										</FormItem>
@@ -81,7 +86,7 @@ const Contact = () => {
 										<FormItem className="w-1/2">
 											<FormLabel>Email</FormLabel>
 											<FormControl>
-												<Input placeholder="Your Email" {...field} />
+												<Input {...field} />
 											</FormControl>
 											<FormMessage />
 										</FormItem>
@@ -96,7 +101,7 @@ const Contact = () => {
 									<FormItem>
 										<FormLabel>Subject</FormLabel>
 										<FormControl>
-											<Input placeholder="Your Subject" {...field} />
+											<Input {...field} />
 										</FormControl>
 										<FormMessage />
 									</FormItem>
@@ -109,18 +114,15 @@ const Contact = () => {
 									<FormItem>
 										<FormLabel>Message</FormLabel>
 										<FormControl>
-											<Textarea
-												rows={145}
-												className="!h-48"
-												placeholder="Your message"
-												{...field}
-											/>
+											<Textarea className="h-44" {...field} />
 										</FormControl>
 										<FormMessage />
 									</FormItem>
 								)}
 							/>
-							<Button type="submit">Submit</Button>
+							<Button size="lg" type="submit">
+								Submit
+							</Button>
 						</form>
 					</Form>
 				</CardContent>
