@@ -1,5 +1,29 @@
+import { Button } from '@/components/ui/button';
+import { TypographyH1, TypographyP } from '@/components/ui/typography';
 import { SignUpButton } from '@clerk/nextjs';
 import { auth } from '@clerk/nextjs/server';
+import Image from 'next/image';
+
+const imageData = [
+	{
+		url: '/frontPhoto1.jpg',
+		alt: 'Automated email marketing campaign user.',
+		width: 4583,
+		height: 3055,
+	},
+	{
+		url: '/frontPhoto2.jpg',
+		alt: 'Automated email marketing campaign user',
+		width: 5353,
+		height: 3569,
+	},
+	{
+		url: '/frontPhoto3.jpg',
+		alt: 'Automated email marketing campaign user.',
+		width: 3180,
+		height: 2120,
+	},
+];
 
 export default async function HomePage() {
 	const { userId } = await auth();
@@ -8,23 +32,44 @@ export default async function HomePage() {
 	return (
 		<div className="min-h-screen flex flex-col">
 			<main className="flex-grow">
-				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+				<div className="py-16">
 					<div className="text-center">
-						<h2 className="text-4xl font-extrabold text-gray-900 sm:text-5xl sm:tracking-tight lg:text-6xl">
-							Welcome to Murmur
+						<div className="h-[20vh] -translate-y-[15%] flex items-center justify-center">
+							<TypographyH1 className=" tracking-wider">Murmur</TypographyH1>
+						</div>
+						<h2 className="!text-5xl font-extralight mt-10">
+							Make Email Campaigns Personalized
 						</h2>
-						<p className="mt-5 max-w-xl mx-auto text-xl text-gray-500">
-							A Next.js 14 application with Clerk, Prisma, Tailwind, shadcn, and Stripe
-						</p>
-						{!isSignedIn && (
-							<div className="mt-8 flex justify-center">
+						<div className="flex flex-row justify-center mt-8 w-full max-h-[500px]">
+							{imageData.map((image, index) => (
+								<div key={index} className="flex w-[calc(100vw/3)]">
+									<Image
+										src={image.url}
+										alt={image.alt}
+										width={image.width}
+										height={image.height}
+									/>
+								</div>
+							))}
+						</div>
+						<div className="flex flex-col items-center mt-24">
+							<TypographyP className="mt-8 max-w-[600px]">
+								Murmur is an AI-Driven email marketing interface optimized for deeper
+								personalization, creating a meaningful connection with the client in
+								outreach.
+							</TypographyP>
+						</div>
+						<div className="mt-14 flex justify-center">
+							{!isSignedIn ? (
 								<SignUpButton mode="modal">
 									<button className="bg-black text-white px-6 py-3 rounded-md text-lg font-medium hover:bg-gray-800">
 										Get Started
 									</button>
 								</SignUpButton>
-							</div>
-						)}
+							) : (
+								<Button className="">Open Murmur</Button>
+							)}
+						</div>
 					</div>
 				</div>
 			</main>

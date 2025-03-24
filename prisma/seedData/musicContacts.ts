@@ -1,0 +1,130 @@
+import { Contact } from '@/constants/types';
+
+export const musicContacts: Contact[] = [
+	{
+		name: 'Alex Rivera',
+		email: 'arivera@musicstudios.com',
+		category: 'music',
+		company: 'Harmonic Waves Studios',
+	},
+	{
+		name: 'Jasmine Thompson',
+		email: 'jthompson@recordlabel.com',
+		category: 'music',
+		company: 'Melody Records',
+	},
+	{
+		name: 'Marcus Bennett',
+		email: 'mbennett@soundproduction.com',
+		category: 'music',
+		company: 'Soundscape Productions',
+	},
+	{
+		name: 'Zoe Campbell',
+		email: 'zcampbell@musicagency.com',
+		category: 'music',
+		company: 'Crescendo Talent Agency',
+	},
+	{
+		name: 'Dylan Foster',
+		email: 'dfoster@melodylane.com',
+		category: 'music',
+		company: 'Melody Lane Entertainment',
+	},
+	{
+		name: 'Sophia Hughes',
+		email: 'shughes@harmonystudios.com',
+		category: 'music',
+		company: 'Harmony Studios International',
+	},
+	{
+		name: 'Tyler Washington',
+		email: 'twashington@rhythmworks.com',
+		category: 'music',
+		company: 'Rhythm Works Productions',
+	},
+	{
+		name: 'Olivia Blackwell',
+		email: 'oblackwell@tunecrafters.com',
+		category: 'music',
+		company: 'TuneCrafters Inc.',
+	},
+	{
+		name: 'Ethan Parker',
+		email: 'eparker@beatmakers.com',
+		category: 'music',
+		company: 'Beat Makers Collective',
+	},
+	{
+		name: 'Maya Rodriguez',
+		email: 'mrodriguez@songwriters.net',
+		category: 'music',
+		company: 'Songwriters Guild',
+	},
+	{
+		name: 'Jordan Hayes',
+		email: 'jhayes@melodymakers.com',
+		category: 'music',
+		company: 'Melody Makers Studio',
+	},
+	{
+		name: 'Leila Maxwell',
+		email: 'lmaxwell@tonestudios.com',
+		category: 'music',
+		company: 'Tone Studios LLC',
+	},
+	{
+		name: 'Cameron Brooks',
+		email: 'cbrooks@synthwave.com',
+		category: 'music',
+		company: 'Synthwave Productions',
+	},
+	{
+		name: 'Nina Santiago',
+		email: 'nsantiago@vocalists.org',
+		category: 'music',
+		company: 'Vocal Virtuosos Association',
+	},
+	{
+		name: 'Isaac Taylor',
+		email: 'itaylor@musicproducers.com',
+		category: 'music',
+		company: 'Taylor Sound Design',
+	},
+	{
+		name: 'Aria Johnson',
+		email: 'ajohnson@soundengineers.com',
+		category: 'music',
+		company: 'Acoustic Engineering Group',
+	},
+	{
+		name: 'Felix Carter',
+		email: 'fcarter@djcollective.com',
+		category: 'music',
+		company: 'Rhythm Nation DJs',
+	},
+	{
+		name: 'Lucia Montgomery',
+		email: 'lmontgomery@composersguild.com',
+		category: 'music',
+		company: 'Symphony Composers Guild',
+	},
+	{
+		name: 'Nate Wilson',
+		email: 'nwilson@beatproduction.org',
+		category: 'music',
+		company: 'Groove Factory',
+	},
+	{
+		name: 'Vivian Chen',
+		email: 'vchen@musicpublishing.com',
+		category: 'music',
+		company: 'Octave Publishing House',
+	},
+	{
+		name: 'Gabriel Morgan',
+		email: 'gmorgan@audioartists.net',
+		category: 'music',
+		company: 'Soundwave Artists Collective',
+	},
+];

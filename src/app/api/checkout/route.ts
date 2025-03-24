@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { stripe } from '../../../stripe/client';
 import Stripe from 'stripe';
-import { getUser } from '@/utils/data/users/getUser';
+import { getUser } from '@/app/utils/data/users/getUser';
 
 export async function POST(req: Request) {
 	try {
