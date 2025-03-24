@@ -1,8 +1,9 @@
 import prisma from '../src/lib/prisma';
+import { extraContacts } from './seedData/extraContacts';
 import { lawyerContacts } from './seedData/lawyerContacts';
 import { musicContacts } from './seedData/musicContacts';
 
-const contactList = [...lawyerContacts, ...musicContacts];
+const contactList = [...lawyerContacts, ...musicContacts, ...extraContacts];
 
 async function main() {
 	for (const contact of contactList) {
@@ -33,7 +34,6 @@ async function main() {
 			category: true,
 		},
 	});
-	console.log('🚀 ~ main ~ categoryCounts:', categoryCounts);
 
 	for (const category of categoryCounts) {
 		await prisma.contactList.upsert({

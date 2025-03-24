@@ -8,7 +8,6 @@ import {
 	CardFooter,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { TypographyH2 } from '@/components/ui/typography';
 import { Label } from '@radix-ui/react-label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@radix-ui/react-tabs';
 import SelectRecipients from './_components/SelectRecipients';

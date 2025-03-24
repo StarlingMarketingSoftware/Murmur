@@ -1,19 +1,20 @@
-'use client';
-
-import { ContactList } from '@prisma/client';
-import ContactListTable from './ContactListTable';
-import { ColumnDef } from '@tanstack/react-table';
-import { Button } from '@/components/ui/button';
-import { ArrowUpDown } from 'lucide-react';
 import { Card, CardHeader, CardDescription, CardContent } from '@/components/ui/card';
 import { TypographyH2 } from '@/components/ui/typography';
-import { useContactLists } from '@/hooks/useContactLists';
-import { useState } from 'react';
-import { Checkbox } from '@/components/ui/checkbox';
+import { FC, useEffect, useState } from 'react';
+import ContactListTable from './ContactListTable';
+import { useContacts } from '@/hooks/useContactsByCategory';
 import Spinner from '@/components/ui/spinner';
-import SelectRecipientsStep2 from './SelectRecipientsStep2';
+import { Button } from '@/components/ui/button';
+import { Contact } from '@prisma/client';
+import { Checkbox } from '@radix-ui/react-checkbox';
+import { ColumnDef } from '@tanstack/react-table';
+import { ArrowUpDown } from 'lucide-react';
 
-const columns: ColumnDef<ContactList>[] = [
+interface SelectedRecipientsStep2Props {
+	categories: string[];
+}
+
+const columns: ColumnDef<Contact>[] = [
 	{
 		id: 'select',
 		header: ({ table }) => (
@@ -70,42 +71,38 @@ const columns: ColumnDef<ContactList>[] = [
 	},
 ];
 
-const SelectRecipients = () => {
+const SelectRecipientsStep2: FC<SelectedRecipientsStep2Props> = ({ categories }) => {
+	const { data, isPending, fetchContacts } = useContacts();
 	const [selectedRows, setSelectedRows] = useState<string[]>([]);
-	const [step2, setStep2] = useState(false);
+	console.log('🚀 ~ selectedRows:', selectedRows);
 
-	const { data, isPending } = useContactLists();
+	useEffect(() => {
+		if (categories.length > 0) {
+			fetchContacts(categories);
+		}
+	}, [categories]);
 
 	if (isPending) {
 		return <Spinner />;
 	}
+
+	console.log('🚀 ~ data:', data);
 	return (
 		<>
-			<TypographyH2>Contact Lists</TypographyH2>
-			<Card>
+			<Card className="my-5">
 				<CardHeader>
-					<CardDescription>
-						Select a list to manage or import from Google Contacts.
-					</CardDescription>
+					<CardDescription>Select individual recipients.</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-2">
-					<ContactListTable
+					{/* <ContactListTable
 						columns={columns}
 						data={data}
 						setSelectedRows={setSelectedRows}
-					/>
+					/> */}
 				</CardContent>
-				<Button
-					disabled={selectedRows.length === 0}
-					className="w-fit max-w-[500px] mx-auto"
-					onClick={() => setStep2(true)}
-				>
-					Extract Contacts from Selected Lists
-				</Button>
 			</Card>
-			{step2 && <SelectRecipientsStep2 categories={selectedRows} />}
 		</>
 	);
 };
 
-export default SelectRecipients;
+export default SelectRecipientsStep2;
