@@ -1,6 +1,6 @@
 import { Card, CardHeader, CardDescription, CardContent } from '@/components/ui/card';
 import { FC, useEffect, useState } from 'react';
-import CustomTable from './CustomTable';
+import CustomTable from '../../CustomTable';
 import { useContacts } from '@/hooks/useContactsByCategory';
 import Spinner from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
