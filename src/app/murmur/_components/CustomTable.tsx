@@ -27,11 +27,11 @@ import { Input } from '@/components/ui/input';
 interface DataTableProps<TData, TValue> {
 	columns: ColumnDef<TData, TValue>[];
 	data: TData[] | undefined;
-	setSelectedRows: Dispatch<SetStateAction<string[]>>;
+	setSelectedRows: Dispatch<SetStateAction<TData[]>>;
 }
 
 // https://ui.shadcn.com/docs/components/data-table
-export function ContactListTable<TData, TValue>({
+export function CustomTable<TData, TValue>({
 	columns,
 	data,
 	setSelectedRows,
@@ -60,7 +60,7 @@ export function ContactListTable<TData, TValue>({
 	const rowModel = table.getSelectedRowModel();
 
 	useEffect(() => {
-		setSelectedRows(table.getSelectedRowModel().rows.map((row) => row.original.category));
+		setSelectedRows(table.getSelectedRowModel().rows.map((row) => row.original));
 	}, [rowModel, table, setSelectedRows]);
 
 	return (
@@ -120,29 +120,10 @@ export function ContactListTable<TData, TValue>({
 						)}
 					</TableBody>
 				</Table>
-
-				{/* <div className="flex items-center justify-end space-x-2 py-4">
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => table.page}
-						disabled={!table.getCanPreviousPage()}
-					>
-						Previous
-					</Button>
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => table.nextPage()}
-						disabled={!table.getCanNextPage()}
-					>
-						Next
-					</Button>
-				</div> */}
 			</div>
 			<CustomPagination<TData> currentPage={0} table={table} />
 		</div>
 	);
 }
 
-export default ContactListTable;
+export default CustomTable;

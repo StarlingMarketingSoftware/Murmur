@@ -1,14 +1,13 @@
 import { Card, CardHeader, CardDescription, CardContent } from '@/components/ui/card';
-import { TypographyH2 } from '@/components/ui/typography';
 import { FC, useEffect, useState } from 'react';
-import ContactListTable from './ContactListTable';
+import CustomTable from './CustomTable';
 import { useContacts } from '@/hooks/useContactsByCategory';
 import Spinner from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Contact } from '@prisma/client';
-import { Checkbox } from '@radix-ui/react-checkbox';
 import { ColumnDef } from '@tanstack/react-table';
 import { ArrowUpDown } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface SelectedRecipientsStep2Props {
 	categories: string[];
@@ -36,6 +35,40 @@ const columns: ColumnDef<Contact>[] = [
 		),
 	},
 	{
+		accessorKey: 'name',
+		header: ({ column }) => {
+			return (
+				<Button
+					variant="ghost"
+					onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+				>
+					Name
+					<ArrowUpDown className="h-4 w-4" />
+				</Button>
+			);
+		},
+		cell: ({ row }) => {
+			return <div className="text-left">{row.getValue('name')}</div>;
+		},
+	},
+	{
+		accessorKey: 'email',
+		header: ({ column }) => {
+			return (
+				<Button
+					variant="ghost"
+					onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+				>
+					Email
+					<ArrowUpDown className="h-4 w-4" />
+				</Button>
+			);
+		},
+		cell: ({ row }) => {
+			return <div className="text-left">{row.getValue('email')}</div>;
+		},
+	},
+	{
 		accessorKey: 'category',
 		header: ({ column }) => {
 			return (
@@ -53,27 +86,27 @@ const columns: ColumnDef<Contact>[] = [
 		},
 	},
 	{
-		accessorKey: 'count',
+		accessorKey: 'company',
 		header: ({ column }) => {
 			return (
 				<Button
 					variant="ghost"
 					onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
 				>
-					Number of contacts
+					Company
 					<ArrowUpDown className="h-4 w-4" />
 				</Button>
 			);
 		},
 		cell: ({ row }) => {
-			return <div className="text-left">{row.getValue('count')}</div>;
+			return <div className="text-left">{row.getValue('company')}</div>;
 		},
 	},
 ];
 
 const SelectRecipientsStep2: FC<SelectedRecipientsStep2Props> = ({ categories }) => {
 	const { data, isPending, fetchContacts } = useContacts();
-	const [selectedRows, setSelectedRows] = useState<string[]>([]);
+	const [selectedRows, setSelectedRows] = useState<Contact[]>([]);
 	console.log('🚀 ~ selectedRows:', selectedRows);
 
 	useEffect(() => {
@@ -86,7 +119,6 @@ const SelectRecipientsStep2: FC<SelectedRecipientsStep2Props> = ({ categories })
 		return <Spinner />;
 	}
 
-	console.log('🚀 ~ data:', data);
 	return (
 		<>
 			<Card className="my-5">
@@ -94,11 +126,7 @@ const SelectRecipientsStep2: FC<SelectedRecipientsStep2Props> = ({ categories })
 					<CardDescription>Select individual recipients.</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-2">
-					{/* <ContactListTable
-						columns={columns}
-						data={data}
-						setSelectedRows={setSelectedRows}
-					/> */}
+					<CustomTable columns={columns} data={data} setSelectedRows={setSelectedRows} />
 				</CardContent>
 			</Card>
 		</>

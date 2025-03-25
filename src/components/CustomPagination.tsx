@@ -25,7 +25,7 @@ const CustomPagination = <TData,>({ table }: CustomPaginationProps<TData>) => {
 		<Pagination className="my-4">
 			<PaginationContent>
 				<PaginationItem onClick={() => table.previousPage()}>
-					<PaginationPrevious href="#" />
+					<PaginationPrevious />
 				</PaginationItem>
 				{Array.from({ length: numPages }, (_, i) => i + 1).map((page) => (
 					<PaginationItem
@@ -37,7 +37,7 @@ const CustomPagination = <TData,>({ table }: CustomPaginationProps<TData>) => {
 						key={page}
 						onClick={() => table.setPageIndex(page - 1)}
 					>
-						<PaginationLink href="#">{page}</PaginationLink>
+						<PaginationLink>{page}</PaginationLink>
 					</PaginationItem>
 				))}
 
@@ -46,7 +46,7 @@ const CustomPagination = <TData,>({ table }: CustomPaginationProps<TData>) => {
 				</PaginationItem> */}
 
 				<PaginationItem onClick={() => table.nextPage()}>
-					<PaginationNext href="#" />
+					<PaginationNext />
 				</PaginationItem>
 			</PaginationContent>
 		</Pagination>

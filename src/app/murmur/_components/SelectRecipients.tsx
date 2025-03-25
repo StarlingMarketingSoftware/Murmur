@@ -1,77 +1,15 @@
 'use client';
 
-import { ContactList } from '@prisma/client';
-import ContactListTable from './ContactListTable';
-import { ColumnDef } from '@tanstack/react-table';
-import { Button } from '@/components/ui/button';
-import { ArrowUpDown } from 'lucide-react';
-import { Card, CardHeader, CardDescription, CardContent } from '@/components/ui/card';
+import { useState } from 'react';
+import Spinner from '@/components/ui/spinner';
 import { TypographyH2 } from '@/components/ui/typography';
 import { useContactLists } from '@/hooks/useContactLists';
-import { useState } from 'react';
-import { Checkbox } from '@/components/ui/checkbox';
-import Spinner from '@/components/ui/spinner';
+import { ContactList } from '@prisma/client';
 import SelectRecipientsStep2 from './SelectRecipientsStep2';
-
-const columns: ColumnDef<ContactList>[] = [
-	{
-		id: 'select',
-		header: ({ table }) => (
-			<Checkbox
-				checked={
-					table.getIsAllPageRowsSelected() ||
-					(table.getIsSomePageRowsSelected() && 'indeterminate')
-				}
-				onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-				aria-label="Select all"
-			/>
-		),
-		cell: ({ row }) => (
-			<Checkbox
-				checked={row.getIsSelected()}
-				onCheckedChange={(value) => row.toggleSelected(!!value)}
-				aria-label="Select row"
-			/>
-		),
-	},
-	{
-		accessorKey: 'category',
-		header: ({ column }) => {
-			return (
-				<Button
-					variant="ghost"
-					onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-				>
-					Category
-					<ArrowUpDown className="h-4 w-4" />
-				</Button>
-			);
-		},
-		cell: ({ row }) => {
-			return <div className="capitalize text-left">{row.getValue('category')}</div>;
-		},
-	},
-	{
-		accessorKey: 'count',
-		header: ({ column }) => {
-			return (
-				<Button
-					variant="ghost"
-					onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-				>
-					Number of contacts
-					<ArrowUpDown className="h-4 w-4" />
-				</Button>
-			);
-		},
-		cell: ({ row }) => {
-			return <div className="text-left">{row.getValue('count')}</div>;
-		},
-	},
-];
+import SelectRecipientsStep1 from './SelectRecipientsStep1';
 
 const SelectRecipients = () => {
-	const [selectedRows, setSelectedRows] = useState<string[]>([]);
+	const [selectedRows, setSelectedRows] = useState<ContactList[]>([]);
 	const [step2, setStep2] = useState(false);
 
 	const { data, isPending } = useContactLists();
@@ -82,28 +20,15 @@ const SelectRecipients = () => {
 	return (
 		<>
 			<TypographyH2>Contact Lists</TypographyH2>
-			<Card>
-				<CardHeader>
-					<CardDescription>
-						Select a list to manage or import from Google Contacts.
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="space-y-2">
-					<ContactListTable
-						columns={columns}
-						data={data}
-						setSelectedRows={setSelectedRows}
-					/>
-				</CardContent>
-				<Button
-					disabled={selectedRows.length === 0}
-					className="w-fit max-w-[500px] mx-auto"
-					onClick={() => setStep2(true)}
-				>
-					Extract Contacts from Selected Lists
-				</Button>
-			</Card>
-			{step2 && <SelectRecipientsStep2 categories={selectedRows} />}
+			<SelectRecipientsStep1
+				selectedRows={selectedRows}
+				setSelectedRows={setSelectedRows}
+				contactLists={data!}
+				setStep2={setStep2}
+			/>
+			{step2 && (
+				<SelectRecipientsStep2 categories={selectedRows.map((row) => row.category)} />
+			)}
 		</>
 	);
 };
