@@ -5,8 +5,8 @@ import Spinner from '@/components/ui/spinner';
 import { TypographyH2 } from '@/components/ui/typography';
 import { useContactLists } from '@/hooks/useContactLists';
 import { ContactList } from '@prisma/client';
-import SelectRecipientsStep2 from './SelectRecipientsStep2';
 import SelectRecipientsStep1 from './SelectRecipientsStep1';
+import SelectRecipientsStep2 from './SelectRecipientsStep2';
 
 const SelectRecipients = () => {
 	const [selectedRows, setSelectedRows] = useState<ContactList[]>([]);

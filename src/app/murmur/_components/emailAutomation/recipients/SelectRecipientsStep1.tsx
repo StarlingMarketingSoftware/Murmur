@@ -1,6 +1,6 @@
 import { Card, CardHeader, CardDescription, CardContent } from '@/components/ui/card';
 import { Dispatch, FC, SetStateAction } from 'react';
-import CustomTable from './CustomTable';
+import CustomTable from '../../CustomTable';
 import { Button } from '@/components/ui/button';
 import { ContactList } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
@@ -25,7 +25,6 @@ const columns: ColumnDef<ContactList>[] = [
 				checked={row.getIsSelected()}
 				onCheckedChange={(value) => row.toggleSelected(!!value)}
 				aria-label="Select row"
-				className="bg-red-500"
 			/>
 		),
 	},
