@@ -14,6 +14,7 @@ import { Url } from '@/constants/types';
 import { urls } from '@/constants/urls';
 import { headers } from 'next/headers';
 import { twMerge } from 'tailwind-merge';
+import { DarkModeToggle } from './DarkModeToggle';
 
 const urlList = [urls.home, urls.murmur, urls.pricing, urls.contact];
 
@@ -38,8 +39,6 @@ export async function Navbar() {
 	const { userId } = await auth();
 	const headersList = await headers();
 	const pathname = headersList.get('referer');
-	console.log('🚀 ~ Navbar ~ pathname:', pathname);
-	console.log('🚀 ~ Navbar ~ pathname:', pathname);
 	const isSignedIn = !!userId;
 
 	return (
@@ -53,13 +52,14 @@ export async function Navbar() {
 									key={index}
 									url={url}
 									className={twMerge(
-										pathname === url.path && 'border-b-[1px] border-black'
+										pathname === url.path && 'border-b-[1px] border-foreground'
 									)}
 								/>
 							))}
 						</NavigationMenuList>
 					</NavigationMenu>
 					<div className="absolute right-5 ml-auto flex items-center space-x-4">
+						<DarkModeToggle />
 						{isSignedIn ? (
 							<UserButton />
 						) : (

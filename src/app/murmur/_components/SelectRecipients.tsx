@@ -1,54 +1,34 @@
 'use client';
 
-import { ContactList } from '@prisma/client';
-import ContactListTable from './ContactListTable';
-import { ColumnDef } from '@tanstack/react-table';
-import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
-import {
-	Card,
-	CardHeader,
-	CardDescription,
-	CardContent,
-	CardFooter,
-} from '@/components/ui/card';
+import { useState } from 'react';
+import Spinner from '@/components/ui/spinner';
 import { TypographyH2 } from '@/components/ui/typography';
 import { useContactLists } from '@/hooks/useContactLists';
-
-export const columns: ColumnDef<Omit<ContactList, 'id'>>[] = [
-	{
-		accessorKey: 'category',
-		header: 'Category',
-	},
-	{
-		accessorKey: 'count',
-		header: 'Count',
-	},
-];
+import { ContactList } from '@prisma/client';
+import SelectRecipientsStep2 from './SelectRecipientsStep2';
+import SelectRecipientsStep1 from './SelectRecipientsStep1';
 
 const SelectRecipients = () => {
+	const [selectedRows, setSelectedRows] = useState<ContactList[]>([]);
+	const [step2, setStep2] = useState(false);
+
 	const { data, isPending } = useContactLists();
-	console.log('🚀 ~ SelectRecipients ~ data:', data);
 
 	if (isPending) {
-		return <Loader2 />;
+		return <Spinner />;
 	}
 	return (
 		<>
 			<TypographyH2>Contact Lists</TypographyH2>
-			<Card>
-				<CardHeader>
-					<CardDescription>
-						Select a list to manage or import from Google Contacts.
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="space-y-2">
-					{/* <ContactListTable columns={columns} data={data} />; */}
-				</CardContent>
-				<CardFooter>
-					<Button>Save changes</Button>
-				</CardFooter>
-			</Card>
+			<SelectRecipientsStep1
+				selectedRows={selectedRows}
+				setSelectedRows={setSelectedRows}
+				contactLists={data!}
+				setStep2={setStep2}
+			/>
+			{step2 && (
+				<SelectRecipientsStep2 categories={selectedRows.map((row) => row.category)} />
+			)}
 		</>
 	);
 };
