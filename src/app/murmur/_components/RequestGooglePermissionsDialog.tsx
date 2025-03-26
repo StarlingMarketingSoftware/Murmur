@@ -21,7 +21,7 @@ const RequestGooglePermissionsDialog = () => {
 	return (
 		<Dialog defaultOpen modal>
 			<DialogTrigger asChild>
-				<Button variant="outline">Authorize Murmur with Google Permissions</Button>
+				<Button variant="outline">Authorize Murmur with Google</Button>
 			</DialogTrigger>
 			<DialogContent hideCloseButton className="sm:max-w-[425px]">
 				<DialogHeader>
