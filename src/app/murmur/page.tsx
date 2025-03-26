@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import EmailAutomationSteps from './_components/EmailAutomationSteps';
 import Inbox from './_components/Inbox';
+import RequestGooglePermissionsDialog from './_components/RequestGooglePermissionsDialog';
 
 const Murmur = () => {
 	const router = useRouter();
@@ -39,6 +40,7 @@ const Murmur = () => {
 					</Card>
 				</TabsContent>
 			</Tabs>
+			<RequestGooglePermissionsDialog />
 		</div>
 	);
 };

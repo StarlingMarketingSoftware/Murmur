@@ -75,8 +75,10 @@ const SelectRecipientsStep1: FC<SelectRecipientsStep1Props> = ({
 	selectedRows,
 	setSelectedRows,
 	contactLists,
-	setStep2,
 }) => {
+	const handleImportGoogleContacts = () => {
+		console.log('import google');
+	};
 	return (
 		<Card>
 			<CardHeader>
@@ -91,10 +93,13 @@ const SelectRecipientsStep1: FC<SelectRecipientsStep1Props> = ({
 					setSelectedRows={setSelectedRows}
 				/>
 			</CardContent>
+			<Button variant="outline" className="w-fit mx-auto">
+				Import your Google Contacts
+			</Button>
 			<Button
 				disabled={selectedRows.length === 0}
 				className="w-fit max-w-[500px] mx-auto"
-				onClick={() => setStep2(true)}
+				onClick={handleImportGoogleContacts}
 			>
 				Extract Contacts from Selected Lists
 			</Button>
