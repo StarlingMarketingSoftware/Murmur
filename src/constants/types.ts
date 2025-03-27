@@ -86,3 +86,9 @@ export type ContactCategories =
 	| 'paramedic'
 	| 'professor'
 	| 'marketer';
+
+export type Draft = {
+	subject: string;
+	message: string;
+	contactEmail: string;
+};

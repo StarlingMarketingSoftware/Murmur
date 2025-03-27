@@ -20,7 +20,6 @@ const CustomPagination = <TData,>({ table }: CustomPaginationProps<TData>) => {
 	const numPages = table.getPageCount();
 	const currentPage = table.getState().pagination.pageIndex;
 
-	console.log(Array.from({ length: numPages }, (_, i) => i + 1));
 	return (
 		<Pagination className="my-4">
 			<PaginationContent>

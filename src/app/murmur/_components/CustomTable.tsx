@@ -28,6 +28,7 @@ interface DataTableProps<TData, TValue> {
 	columns: ColumnDef<TData, TValue>[];
 	data: TData[] | undefined;
 	setSelectedRows: Dispatch<SetStateAction<TData[]>>;
+	singleSelection?: boolean;
 }
 
 // https://ui.shadcn.com/docs/components/data-table
@@ -35,10 +36,12 @@ export function CustomTable<TData, TValue>({
 	columns,
 	data,
 	setSelectedRows,
+	singleSelection,
 }: DataTableProps<TData, TValue>) {
 	const [sorting, setSorting] = useState<SortingState>([]);
 	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 	const [rowSelection, setRowSelection] = useState({});
+	const [globalFilter, setGlobalFilter] = useState('');
 
 	const table = useReactTable({
 		data: data || [],
@@ -50,18 +53,28 @@ export function CustomTable<TData, TValue>({
 		onColumnFiltersChange: setColumnFilters,
 		getFilteredRowModel: getFilteredRowModel(),
 		onRowSelectionChange: setRowSelection,
+		enableMultiRowSelection: !singleSelection,
+		onGlobalFilterChange: setGlobalFilter,
+		globalFilterFn: 'includesString',
 		state: {
 			sorting,
 			columnFilters,
 			rowSelection,
+			globalFilter,
 		},
 	});
 
 	const rowModel = table.getSelectedRowModel();
 
 	useEffect(() => {
-		setSelectedRows(table.getSelectedRowModel().rows.map((row) => row.original));
-	}, [rowModel, table, setSelectedRows]);
+		if (!singleSelection) {
+			setSelectedRows(table.getSelectedRowModel().rows.map((row) => row.original));
+		} else {
+			const firstSelectedRow = table.getSelectedRowModel().rows[0];
+			if (!firstSelectedRow) return;
+			setSelectedRows([firstSelectedRow.original]);
+		}
+	}, [rowModel, table, setSelectedRows, singleSelection]);
 
 	return (
 		<div>
@@ -71,11 +84,9 @@ export function CustomTable<TData, TValue>({
 			</div>
 			<div className="flex items-center py-4">
 				<Input
-					placeholder="Search..."
-					value={(table.getColumn('category')?.getFilterValue() as string) ?? ''}
-					onChange={(event) =>
-						table.getColumn('category')?.setFilterValue(event.target.value)
-					}
+					placeholder="Search all columns..."
+					value={globalFilter ?? ''}
+					onChange={(event) => setGlobalFilter(event.target.value)}
 					className="max-w-sm"
 				/>
 			</div>
