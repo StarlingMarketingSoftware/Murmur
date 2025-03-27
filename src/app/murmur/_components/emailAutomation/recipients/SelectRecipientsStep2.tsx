@@ -120,7 +120,7 @@ const SelectRecipientsStep2: FC<SelectedRecipientsStep2Props> = ({ categories })
 
 	return (
 		<>
-			<Card className="my-5">
+			<Card>
 				<CardHeader>
 					<CardDescription>Select individual recipients.</CardDescription>
 				</CardHeader>
