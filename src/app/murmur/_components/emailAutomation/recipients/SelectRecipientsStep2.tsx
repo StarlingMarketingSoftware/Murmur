@@ -107,7 +107,6 @@ const columns: ColumnDef<Contact>[] = [
 const SelectRecipientsStep2: FC<SelectedRecipientsStep2Props> = ({ categories }) => {
 	const { data, isPending, fetchContacts } = useContacts();
 	const [selectedRows, setSelectedRows] = useState<Contact[]>([]);
-	console.log('🚀 ~ selectedRows:', selectedRows);
 
 	useEffect(() => {
 		if (categories.length > 0) {
