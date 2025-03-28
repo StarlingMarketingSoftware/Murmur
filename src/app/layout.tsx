@@ -5,10 +5,11 @@ import { Footer } from '@/components/Footer';
 import { Toaster } from '@/components/ui/toast';
 import './globals.css';
 import SubLayout from './sublayout';
-import localFont from 'next/font/local';
+// import localFont from 'next/font/local';
 import { Navbar } from '@/components/Navbar';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { dark } from '@clerk/themes';
+import StoreProvider from './StoreProvider';
 
 const geistSans = Geist({
 	variable: '--font-geist-sans',
@@ -20,9 +21,9 @@ const geistMono = Geist_Mono({
 	subsets: ['latin'],
 });
 
-const palatino = localFont({
-	src: '../../public/palatino.ttf',
-});
+// const palatino = localFont({
+// 	src: '../../public/palatino.ttf',
+// });
 
 export const metadata: Metadata = {
 	title: 'Murmur',
@@ -37,26 +38,28 @@ export default function RootLayout({
 }>) {
 	return (
 		<ClerkProvider appearance={{ baseTheme: dark }}>
-			<SubLayout>
-				{/* <html lang="en" className={palatino.className}> */}
-				<html lang="en" suppressHydrationWarning>
-					<body
-						className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
-					>
-						<ThemeProvider
-							attribute="class"
-							defaultTheme="system"
-							enableSystem
-							disableTransitionOnChange
+			<StoreProvider>
+				<SubLayout>
+					{/* <html lang="en" className={palatino.className}> */}
+					<html lang="en" suppressHydrationWarning>
+						<body
+							className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
 						>
-							<Navbar />
-							<main className="flex-1">{children}</main>
-							<Footer />
-							<Toaster />
-						</ThemeProvider>
-					</body>
-				</html>
-			</SubLayout>
+							<ThemeProvider
+								attribute="class"
+								defaultTheme="system"
+								enableSystem
+								disableTransitionOnChange
+							>
+								<Navbar />
+								<main className="flex-1">{children}</main>
+								<Footer />
+								<Toaster />
+							</ThemeProvider>
+						</body>
+					</html>
+				</SubLayout>
+			</StoreProvider>
 		</ClerkProvider>
 	);
 }
