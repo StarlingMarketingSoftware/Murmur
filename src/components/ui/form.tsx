@@ -80,7 +80,11 @@ function FormItem({ className, ...props }: React.ComponentProps<'div'>) {
 		<FormItemContext.Provider value={{ id }}>
 			<div
 				data-slot="form-item"
-				className={cn('min-h-[90px] mb-6', className)}
+				className={cn(
+					'mb-6',
+					className
+					//  'min-h-[90px]'
+				)}
 				{...props}
 			/>
 		</FormItemContext.Provider>

@@ -37,9 +37,6 @@ const Murmur = () => {
 			return;
 		}
 		if (urlGoogleAccessToken && urlScope && urlExpiresIn) {
-			console.log('🚀 ~ useEffect ~ urlExpiresIn:', urlExpiresIn);
-			console.log('🚀 ~ useEffect ~ urlScope:', urlScope);
-			console.log('🚀 ~ useEffect ~ urlGoogleAccessToken:', urlGoogleAccessToken);
 			const localAuthState = localStorage.getItem(LocalStorageKeys.GoogleAuthState);
 
 			if (localAuthState !== googleAuthState) {
@@ -97,7 +94,7 @@ const Murmur = () => {
 					</Card>
 				</TabsContent>
 			</Tabs>
-			<Button onClick={() => toast.error('Your toast message here.')}>Toasty</Button>
+			{/* <Button onClick={() => toast.error('Your toast message here.')}>Toasty</Button> */}
 		</div>
 	);
 };

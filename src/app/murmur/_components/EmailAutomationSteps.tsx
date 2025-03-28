@@ -1,9 +1,9 @@
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import SelectRecipients from './emailAutomation/recipients/SelectRecipients';
+import SelectRecipients from './emailAutomation/recipients/Recipients';
 import { Button } from '@/components/ui/button';
 import { ReactNode } from 'react';
-import Draft from './emailAutomation/draft/Draft';
+import DraftPage from './emailAutomation/draft/DraftPage';
 import Send from './emailAutomation/send/Send';
 
 type Step = {
@@ -24,7 +24,7 @@ const steps: Step[] = [
 		step: 2,
 		value: 'draft',
 		label: 'Draft',
-		component: <Draft />,
+		component: <DraftPage />,
 	},
 	{
 		step: 3,
@@ -73,7 +73,11 @@ const EmailAutomationSteps = () => {
 					</TabsContent>
 				))}
 			</Tabs>
-			{stepParam !== '3' && <Button onClick={advanceToNextStep}>Next Step</Button>}
+			{stepParam !== '3' && (
+				<Button className="mt-4" onClick={advanceToNextStep}>
+					Next Step
+				</Button>
+			)}
 		</>
 	);
 };
