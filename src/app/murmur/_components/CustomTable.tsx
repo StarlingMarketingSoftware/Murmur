@@ -27,8 +27,9 @@ import { Input } from '@/components/ui/input';
 interface DataTableProps<TData, TValue> {
 	columns: ColumnDef<TData, TValue>[];
 	data: TData[] | undefined;
-	setSelectedRows: Dispatch<SetStateAction<TData[]>>;
+	setSelectedRows: ((rows: TData[]) => void) | Dispatch<SetStateAction<TData[]>>;
 	singleSelection?: boolean;
+	noDataMessage?: string;
 }
 
 // https://ui.shadcn.com/docs/components/data-table
@@ -37,6 +38,7 @@ export function CustomTable<TData, TValue>({
 	data,
 	setSelectedRows,
 	singleSelection,
+	noDataMessage = 'No data was found.',
 }: DataTableProps<TData, TValue>) {
 	const [sorting, setSorting] = useState<SortingState>([]);
 	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -70,6 +72,7 @@ export function CustomTable<TData, TValue>({
 		if (!singleSelection) {
 			setSelectedRows(table.getSelectedRowModel().rows.map((row) => row.original));
 		} else {
+			console.log('were setting');
 			const firstSelectedRow = table.getSelectedRowModel().rows[0];
 			if (!firstSelectedRow) return;
 			setSelectedRows([firstSelectedRow.original]);
@@ -125,7 +128,7 @@ export function CustomTable<TData, TValue>({
 						) : (
 							<TableRow>
 								<TableCell colSpan={columns.length} className="h-24 text-center">
-									No results.
+									{noDataMessage}
 								</TableCell>
 							</TableRow>
 						)}

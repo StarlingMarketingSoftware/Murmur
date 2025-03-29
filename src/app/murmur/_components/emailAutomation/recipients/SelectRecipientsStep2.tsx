@@ -8,6 +8,8 @@ import { Contact } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
 import { ArrowUpDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useDispatch } from 'react-redux';
+import { setSelectedRecipients } from '@/lib/redux/features/murmur/murmurSlice';
 
 interface SelectedRecipientsStep2Props {
 	categories: string[];
@@ -106,7 +108,11 @@ const columns: ColumnDef<Contact>[] = [
 
 const SelectRecipientsStep2: FC<SelectedRecipientsStep2Props> = ({ categories }) => {
 	const { data, isPending, fetchContacts } = useContacts();
-	const [selectedRows, setSelectedRows] = useState<Contact[]>([]);
+	const dispatch = useDispatch();
+
+	const handleSelectedRowsChange = (rows: Contact[]) => {
+		dispatch(setSelectedRecipients(rows));
+	};
 
 	useEffect(() => {
 		if (categories.length > 0) {
@@ -125,7 +131,11 @@ const SelectRecipientsStep2: FC<SelectedRecipientsStep2Props> = ({ categories })
 					<CardDescription>Select individual recipients.</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-2">
-					<CustomTable columns={columns} data={data} setSelectedRows={setSelectedRows} />
+					<CustomTable
+						columns={columns}
+						data={data}
+						setSelectedRows={handleSelectedRowsChange}
+					/>
 				</CardContent>
 			</Card>
 		</>

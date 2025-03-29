@@ -41,6 +41,7 @@ export const contactFormSchema = z.object({
 export const emailDraftSchema = z.object({
 	subject: z.string().min(1, { message: 'Subject is required.' }),
 	message: z.string().min(1, { message: 'Message is required.' }),
+	aiModel: z.string().min(1, { message: 'Ai model is required.' }),
 });
 
 export type Contact = {
@@ -92,3 +93,18 @@ export type Draft = {
 	message: string;
 	contactEmail: string;
 };
+
+export type AiModel = 'sonar' | 'sonar-pro';
+
+export type AiType = 'perplexity' | 'openai';
+
+export type AiSelectValues = {
+	name: string;
+	value: AiModel;
+	type: AiType;
+};
+
+export enum PerplexityModelEnum {
+	Sonar = 'sonar',
+	SonarPro = 'sonar-pro',
+}

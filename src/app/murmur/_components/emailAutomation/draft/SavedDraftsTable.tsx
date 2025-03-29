@@ -94,6 +94,7 @@ const SavedDraftsTable: FC<SavedDraftsTableProps> = ({ drafts, setSelectedRows }
 					data={drafts}
 					setSelectedRows={setSelectedRows}
 					singleSelection
+					noDataMessage="Drafts will appear here as they are created."
 				/>
 			</CardContent>
 		</Card>
