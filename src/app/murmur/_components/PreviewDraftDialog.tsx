@@ -1,10 +1,8 @@
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
-	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 	DialogTrigger,
@@ -12,7 +10,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { TypographyP } from '@/components/ui/typography';
 import { Draft } from '@/constants/types';
 import { FC } from 'react';
 
@@ -21,8 +18,6 @@ interface PreviewDraftDialogProps {
 }
 
 const PreviewDraftDialog: FC<PreviewDraftDialogProps> = ({ draftEmail }) => {
-	console.log('🚀 ~ draftEmail:', typeof draftEmail);
-	console.log('🚀 ~ draftEmail:', draftEmail);
 	return (
 		<Dialog>
 			<DialogTrigger asChild>

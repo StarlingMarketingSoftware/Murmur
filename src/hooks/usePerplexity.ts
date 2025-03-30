@@ -5,12 +5,64 @@ import { Contact } from '@prisma/client';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-const rolePrompt = `You are a personal assistant who writes highly personalized, authentic-sounding emails.
-	1. Sound natural and conversational
-	2. Reference something specific about {company} that shows knowledge of their business
-	3. Be 3-4 short paragraphs (not too lengthy)
-	4. Include a clear call to action
-	5. Use a friendly, professional tone
+const rolePrompt = `Write a personalized email to {first_name} who works at {company}. 
+
+Here are some templates:
+
+1. "Hi {first_name},
+
+I'm reaching out again regarding an interest in how I could help {company}. [insert knowledge about the company in a way that feels anecdotal and not like you're reiterating their own sales pitches]
+
+I'm a local business owner
+
+If you’re available next week…”
+something like “Do you have any time next week? Id love to hop on a call and go over everything…"
+
+"I've been following Acme Corp's innovative work in sustainable packaging solutions, particularly your recent launch of biodegradable containers for the food industry. It's impressive how you're revolutionizing eco-friendly packaging without compromising on durability." as an example first paragraph tone is great.
+
+
+Overview:
+1. make sure it's positive and friendly in tone
+2. always word your email differently based on the text i've provided, making it as well-written as you can.
+3. Make it oriented toward helping them rather than just selling or securing work for us
+
+
+The third paragraph needs to prompt scheduling a phone call. Please talke politely about how we can work with them and ask if they have any time in the coming week.
+
+Please really make sure the third paragraph is less forceful. It seems like it's assuming a phone call. be more humble in paragraph 3.
+
+in Paragraph 3, try to keep the first sentence shorter and focus more on if they have availability this upcoming week to schedule a call.
+
+
+Do not include a subject line or signature - just the body text.
+
+Notes:
+0. No passive sentences, only active sentences
+1.Don't include "hope you're doing well"
+2. keep it very succinct
+3. Start with "Hi" instead of "Hey"
+4. make it formal and professional
+5. Remove "As a" in the second paragraph. "I have" or "we are" are better alternatives.
+6. Make it feel ever more assertive and confident.
+7. Make sure the third paragraph is asking to schedule a phone call rather than declaring. closer to "Let me know when you're available to schedule a phone call?" for example
+8. Avoid phrases like "potential synergies"
+9. Avoid phrases like "amplify your message" For example "Contribute" and "help" are good alternatives
+10. Avoid phrases like "potential collaboration" For example try i"how we can help"
+11. Avoid "Amplify your sustainability message"
+12. Avoid "Potential opportunities"
+13. In the third paragraph the key work is "help"
+14. instead of "let me know your availability" try "When you have a change, let me know if there's a good time that works for you"
+15. stop using the word "amplify"
+16. instead of "I believe we can contribute significantly" try "I'd love to speak and find how we could best help"
+17. don't say "brief call" say "call" instead
+18. Don't use the word "eager"
+19. use "help" instead of "elevate"
+20. Instead of "I noticed" try "I've been following
+21. Avoid referencing specific numerical figures in the first paragraph like "80,000-150,000 patients annually." or "6,000 case victories"
+22. Avoid the phrase "truly commendable"
+23. avoid the word "innovative"
+
+Write this how you think Jensen Huang would write an email. This should feel like it's written by a top CEO
 	`;
 
 const jsonFormatInstructions = `IMPORTANT: Please return valid JSON format and nothing else. I should be able to take your response and use it directly in JSON.parse() in JavaScript. For linebreaks in "message", use linebreak characters instead of raw line breaks. Use the following format: 
@@ -44,6 +96,7 @@ export const usePerplexityDraftEmail = () => {
 		data: dataDraftEmail,
 		isPending: isPendingDraftEmail,
 		mutate: draftEmail,
+		mutateAsync: draftEmailAsync,
 	} = useMutation({
 		mutationFn: async (params: DraftEmailParams): Promise<Draft> => {
 			const response = await fetch(perplexityEndpoint, {
@@ -85,9 +138,13 @@ export const usePerplexityDraftEmail = () => {
 					.replace(/^\s*{\s*/, '{') // Clean up leading spaces before first bracket
 					.trim();
 
+				const beginningIndex = jsonString.indexOf('{');
+				const endIndex = jsonString.lastIndexOf('}') + 1;
+				const jsonStringTrimmed = jsonString.slice(beginningIndex, endIndex).trim();
+
 				console.log('🚀 ~ mutationFn: ~ jsonString:', jsonString);
 
-				const parsedDraft = JSON.parse(jsonString) as Draft;
+				const parsedDraft = JSON.parse(jsonStringTrimmed) as Draft;
 
 				if (!parsedDraft.contactEmail || !parsedDraft.subject || !parsedDraft.message) {
 					throw new Error('Invalid draft format returned from AI. Please try again.');
@@ -129,6 +186,7 @@ export const usePerplexityDraftEmail = () => {
 		dataDraftEmail,
 		isPendingDraftEmail,
 		draftEmail,
+		draftEmailAsync,
 		dataBatchDraftEmail,
 		isPendingBatchDraftEmail,
 		batchDraftEmails,
