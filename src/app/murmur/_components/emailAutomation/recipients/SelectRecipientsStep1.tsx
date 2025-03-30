@@ -1,16 +1,21 @@
 import { Card, CardHeader, CardDescription, CardContent } from '@/components/ui/card';
-import { Dispatch, FC, SetStateAction, useState } from 'react';
+import { FC, useState } from 'react';
 import CustomTable from '../../CustomTable';
 import { Button } from '@/components/ui/button';
 import { ContactList } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
 import { ArrowUpDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FcGoogle } from 'react-icons/fc'; // Import the Google icon from react-icons
+import { FcGoogle } from 'react-icons/fc';
 import RequestPeopleAPIPermissionsDialog from '../../RequestPeopleAPIPermissionsDialog';
 import { LocalStorageKeys } from '@/constants/constants';
 import { hasContactsReadOnlyPermission } from '@/app/utils/googlePermissions';
 import { toast } from 'sonner';
+import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
+import {
+	setSelectedContactLists,
+	setStep2,
+} from '@/lib/redux/features/murmur/murmurSlice';
 
 const columns: ColumnDef<ContactList>[] = [
 	{
@@ -70,18 +75,14 @@ const columns: ColumnDef<ContactList>[] = [
 ];
 
 interface SelectRecipientsStep1Props {
-	selectedRows: ContactList[];
-	setSelectedRows: Dispatch<SetStateAction<ContactList[]>>;
 	contactLists: ContactList[];
-	setStep2: Dispatch<SetStateAction<boolean>>;
 }
 
-const SelectRecipientsStep1: FC<SelectRecipientsStep1Props> = ({
-	selectedRows,
-	setSelectedRows,
-	contactLists,
-	setStep2,
-}) => {
+const SelectRecipientsStep1: FC<SelectRecipientsStep1Props> = ({ contactLists }) => {
+	const selectedContactLists = useAppSelector(
+		(state) => state.murmur.recipients.selectedContactLists
+	);
+	const dispatch = useAppDispatch();
 	const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false);
 
 	const handleImportGoogleContacts = async () => {
@@ -110,14 +111,20 @@ const SelectRecipientsStep1: FC<SelectRecipientsStep1Props> = ({
 
 				const data = await response.json();
 				console.log('🚀 ~ handleImportGoogleContacts ~ data:', data);
-				// set state
-			} catch (error: any) {
-				toast.error('Error fetching Google contacts:', error);
+				// TODO set state
+			} catch (error) {
+				if (error instanceof Error) {
+					toast.error('Error fetching Google contacts: ' + error.message);
+				}
 				throw error;
 			}
 		} else {
 			setIsPermissionsDialogOpen(true);
 		}
+	};
+
+	const handleSelectedRowsChange = (rows: ContactList[]) => {
+		dispatch(setSelectedContactLists(rows));
 	};
 
 	return (
@@ -131,7 +138,8 @@ const SelectRecipientsStep1: FC<SelectRecipientsStep1Props> = ({
 				<CustomTable
 					columns={columns}
 					data={contactLists}
-					setSelectedRows={setSelectedRows}
+					setSelectedRows={handleSelectedRowsChange}
+					initialRowSelectionState={selectedContactLists}
 				/>
 			</CardContent>
 			<Button
@@ -143,8 +151,8 @@ const SelectRecipientsStep1: FC<SelectRecipientsStep1Props> = ({
 				Import your Google Contacts
 			</Button>
 			<Button
-				onClick={() => setStep2(true)}
-				disabled={selectedRows.length === 0}
+				onClick={() => dispatch(setStep2(true))}
+				disabled={selectedContactLists.length === 0}
 				className="w-fit max-w-[500px] mx-auto"
 			>
 				Extract Contacts from Selected Lists

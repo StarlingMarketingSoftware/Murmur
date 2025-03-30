@@ -91,7 +91,7 @@ const sampleDrafts: Draft[] = [
 const DraftPage = () => {
 	// const [selectedRecipient, setSelectedRecipient] = useState<string>(''); // store user emails here to coordiate between the recipients selection area and the draft selection area
 	const selectedRecipients: Contact[] = useAppSelector(
-		(state) => state.murmur.selectedRecipients
+		(state) => state.murmur.recipients.selectedRecipients
 	);
 
 	useEffect(() => {

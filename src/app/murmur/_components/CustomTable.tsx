@@ -30,6 +30,7 @@ interface DataTableProps<TData, TValue> {
 	setSelectedRows: ((rows: TData[]) => void) | Dispatch<SetStateAction<TData[]>>;
 	singleSelection?: boolean;
 	noDataMessage?: string;
+	initialRowSelectionState?: TData[];
 }
 
 // https://ui.shadcn.com/docs/components/data-table
@@ -39,10 +40,26 @@ export function CustomTable<TData, TValue>({
 	setSelectedRows,
 	singleSelection,
 	noDataMessage = 'No data was found.',
+	initialRowSelectionState,
 }: DataTableProps<TData, TValue>) {
+	const getInitialRowSelection = () => {
+		if (!initialRowSelectionState || !data) return {};
+
+		return data.reduce((acc, row, index) => {
+			const isSelected = initialRowSelectionState.some(
+				(selectedRow) => JSON.stringify(selectedRow) === JSON.stringify(row)
+			);
+			if (isSelected) {
+				acc[index] = true;
+			}
+			return acc;
+		}, {} as Record<string, boolean>);
+	};
+
+	const [rowSelection, setRowSelection] = useState(getInitialRowSelection());
+
 	const [sorting, setSorting] = useState<SortingState>([]);
 	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-	const [rowSelection, setRowSelection] = useState({});
 	const [globalFilter, setGlobalFilter] = useState('');
 
 	const table = useReactTable({
@@ -72,12 +89,11 @@ export function CustomTable<TData, TValue>({
 		if (!singleSelection) {
 			setSelectedRows(table.getSelectedRowModel().rows.map((row) => row.original));
 		} else {
-			console.log('were setting');
 			const firstSelectedRow = table.getSelectedRowModel().rows[0];
 			if (!firstSelectedRow) return;
 			setSelectedRows([firstSelectedRow.original]);
 		}
-	}, [rowModel, table, setSelectedRows, singleSelection]);
+	}, [rowModel, table, singleSelection]);
 
 	return (
 		<div>

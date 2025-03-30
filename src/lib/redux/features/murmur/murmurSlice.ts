@@ -1,15 +1,23 @@
 import { Draft } from '@/constants/types';
-import { Contact } from '@prisma/client';
+import { Contact, ContactList } from '@prisma/client';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export interface MurmurState {
-	selectedRecipients: Contact[];
+	recipients: {
+		selectedContactLists: ContactList[];
+		step2: boolean;
+		selectedRecipients: Contact[];
+	};
 	currentTestDraft: Draft | null;
 	completedDrafts: Draft[];
 }
 
 const initialState: MurmurState = {
-	selectedRecipients: [],
+	recipients: {
+		selectedContactLists: [],
+		step2: false,
+		selectedRecipients: [],
+	},
 	completedDrafts: [],
 	currentTestDraft: null,
 };
@@ -18,8 +26,14 @@ export const murmurSlice = createSlice({
 	name: 'murmur',
 	initialState,
 	reducers: {
+		setSelectedContactLists: (state, action: PayloadAction<ContactList[]>) => {
+			state.recipients.selectedContactLists = action.payload;
+		},
+		setStep2: (state, action: PayloadAction<boolean>) => {
+			state.recipients.step2 = action.payload;
+		},
 		setSelectedRecipients: (state, action: PayloadAction<Contact[]>) => {
-			state.selectedRecipients = action.payload;
+			state.recipients.selectedRecipients = action.payload;
 		},
 		setCompletedDrafts: (state, action: PayloadAction<Draft[]>) => {
 			state.completedDrafts = action.payload;
@@ -34,6 +48,8 @@ export const murmurSlice = createSlice({
 });
 
 export const {
+	setSelectedContactLists,
+	setStep2,
 	setSelectedRecipients,
 	setCompletedDrafts,
 	setCurrentTestDraft,
