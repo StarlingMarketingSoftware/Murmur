@@ -88,6 +88,7 @@ export interface SavedDraftsTableProps {
 }
 const SavedDraftsTable: FC<SavedDraftsTableProps> = ({ drafts, setSelectedRows }) => {
 	const completedDrafts = useAppSelector((state) => state.murmur.completedDrafts);
+	console.log('🚀 ~ completedDrafts:', completedDrafts);
 
 	return (
 		<Card>

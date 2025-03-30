@@ -32,7 +32,6 @@ import { AiModelOptions } from '@/constants/constants';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
 import {
 	addCompletedDrafts,
-	setCompletedDrafts,
 	setCurrentTestDraft,
 } from '@/lib/redux/features/murmur/murmurSlice';
 import { Draft } from '@/constants/types';
@@ -92,12 +91,12 @@ const ComposeEmailSection = () => {
 			const res: Draft = await draftEmailAsync({
 				generateSubject: isAiSubject,
 				model: values.aiModel,
-				recipient: murmurState.selectedRecipients[0],
+				recipient: murmurState.recipients.selectedRecipients[0],
 				prompt: values.message,
 			});
 			dispatch(setCurrentTestDraft(res));
 		} else if (isAiDraft) {
-			for (const recipient of murmurState.selectedRecipients) {
+			for (const recipient of murmurState.recipients.selectedRecipients) {
 				const newDraft: Draft = await draftEmailAsync({
 					generateSubject: isAiSubject,
 					model: values.aiModel,
@@ -194,39 +193,42 @@ const ComposeEmailSection = () => {
 								</FormItem>
 							)}
 						/>
-						<FormField
-							control={form.control}
-							name="aiModel"
-							render={({ field }) => (
-								<FormItem>
-									<FormLabel>AI Model</FormLabel>
-									<FormControl>
-										<Select onValueChange={field.onChange} defaultValue={field.value}>
-											<SelectTrigger className="w-[180px]">
-												<SelectValue />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectGroup>
-													<SelectLabel>AI Model</SelectLabel>
-													{AiModelOptions.map((model) => (
-														<SelectItem key={model.value} value={model.value}>
-															{model.name}
-														</SelectItem>
-													))}
-												</SelectGroup>
-											</SelectContent>
-										</Select>
-									</FormControl>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
+						{isAiDraft && (
+							<FormField
+								control={form.control}
+								name="aiModel"
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>AI Model</FormLabel>
+										<FormControl>
+											<Select onValueChange={field.onChange} defaultValue={field.value}>
+												<SelectTrigger className="w-[180px]">
+													<SelectValue />
+												</SelectTrigger>
+												<SelectContent>
+													<SelectGroup>
+														<SelectLabel>AI Model</SelectLabel>
+														{AiModelOptions.map((model) => (
+															<SelectItem key={model.value} value={model.value}>
+																{model.name}
+															</SelectItem>
+														))}
+													</SelectGroup>
+												</SelectContent>
+											</Select>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+						)}
 						<div className="flex gap-4">
 							<Button
 								type="button"
 								onClick={() => handleFormAction('test')}
 								variant="ghost"
 								isLoading={isTest && isPendingDraftEmail}
+								disabled={isPendingDraftEmail}
 							>
 								{isAiDraft ? 'Test Your Prompt' : 'Preview Draft'}
 							</Button>
@@ -248,6 +250,8 @@ const ComposeEmailSection = () => {
 												return;
 											}
 										}}
+										isLoading={isPendingDraftEmail && !isTest}
+										disabled={isPendingDraftEmail}
 									>
 										{isAiDraft
 											? 'Generate Custom Emails for All Recipients'

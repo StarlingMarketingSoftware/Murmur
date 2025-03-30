@@ -57,6 +57,7 @@ export function CustomTable<TData, TValue>({
 	};
 
 	const [rowSelection, setRowSelection] = useState(getInitialRowSelection());
+	const [isInitialMount, setIsInitialMount] = useState(true);
 
 	const [sorting, setSorting] = useState<SortingState>([]);
 	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -86,14 +87,30 @@ export function CustomTable<TData, TValue>({
 	const rowModel = table.getSelectedRowModel();
 
 	useEffect(() => {
-		if (!singleSelection) {
-			setSelectedRows(table.getSelectedRowModel().rows.map((row) => row.original));
-		} else {
-			const firstSelectedRow = table.getSelectedRowModel().rows[0];
-			if (!firstSelectedRow) return;
-			setSelectedRows([firstSelectedRow.original]);
+		// Only update selected rows if:
+		// 1. It's not the initial mount, OR
+		// 2. We have initial selection state
+		if (!isInitialMount || initialRowSelectionState?.length) {
+			if (!singleSelection) {
+				setSelectedRows(table.getSelectedRowModel().rows.map((row) => row.original));
+			} else {
+				const firstSelectedRow = table.getSelectedRowModel().rows[0];
+				setSelectedRows(firstSelectedRow ? [firstSelectedRow.original] : []);
+			}
 		}
 	}, [rowModel, table, singleSelection]);
+
+	// Mark initial mount as complete after first render
+	useEffect(() => {
+		setIsInitialMount(false);
+	}, []);
+
+	// Reset isInitialMount when data changes
+	useEffect(() => {
+		if (data) {
+			setIsInitialMount(true);
+		}
+	}, [data]);
 
 	return (
 		<div>

@@ -58,6 +58,7 @@ const ConfirmModal: FC<ConfirmModalProps> = ({
 
 	const handleConfirm = () => {
 		confirmAction();
+		setIsOpen(false);
 		setConfirmValue('');
 	};
 
