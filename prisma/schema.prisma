@@ -7,34 +7,80 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum EmailStatus {
+  draft
+  scheduled
+  sent
+  failed
+}
+
 model User {
-  id                       String   @id @default(uuid())
-  clerkId                  String   @unique
-  email                    String   @unique
+  id                       String     @id @default(uuid())
+  clerkId                  String     @unique
+  email                    String     @unique
   firstName                String?
   lastName                 String?
-  stripeCustomerId         String?  @unique
+  campaigns                Campaign[]
+  stripeCustomerId         String?    @unique
   stripeSubscriptionId     String?
   stripeSubscriptionStatus String?
   stripePriceId            String?
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  createdAt                DateTime   @default(now())
+  updatedAt                DateTime   @updatedAt
+  emails                   Email[]
 }
 
 model Contact {
-  id            String  @id @default(uuid())
+  id            String       @id @default(uuid())
   name          String
   email         String
   category      String
   company       String?
   contactListId String?
+  contactList   ContactList? @relation(fields: [contactListId], references: [id], onDelete: Cascade)
+  campaigns     Campaign[]
 
   @@unique([email, category])
+  @@index([contactListId])
 }
 
 // needs database trigger whenever a contact is added, update this table accordingly
 model ContactList {
-  id       String @id @default(uuid())
-  category String @unique
-  count    Int
+  id        String     @id @default(uuid())
+  category  String     @unique
+  count     Int
+  campaigns Campaign[]
+  contacts  Contact[]
+
+  @@index([category])
+}
+
+model Email {
+  id         String      @id @default(uuid())
+  subject    String
+  message    String      @db.Text
+  status     EmailStatus @default(draft)
+  sentAt     DateTime?
+  userId     String
+  user       User        @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  campaignId String
+  campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([campaignId])
+}
+
+model Campaign {
+  id           String        @id @default(uuid())
+  name         String
+  userId       String
+  user         User          @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  contactLists ContactList[]
+  contacts     Contact[]
+  emails       Email[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([userId])
 }

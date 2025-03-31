@@ -3,15 +3,15 @@
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import EmailAutomationSteps from './_components/EmailAutomationSteps';
-import Inbox from './_components/Inbox';
+import EmailAutomationSteps from '../../_components/EmailAutomationSteps';
+import Inbox from '../../_components/Inbox';
 import { toast } from 'sonner';
 import { LocalStorageKeys, requestedPeopleScopes } from '@/constants/constants';
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
 
 const Murmur = () => {
 	const router = useRouter();
+
 	const searchParams = useSearchParams();
 	const tab = searchParams.get('tab') ?? 'murmur';
 	const [isMounted, setIsMounted] = useState(false);
@@ -94,7 +94,6 @@ const Murmur = () => {
 					</Card>
 				</TabsContent>
 			</Tabs>
-			{/* <Button onClick={() => toast.error('Your toast message here.')}>Toasty</Button> */}
 		</div>
 	);
 };

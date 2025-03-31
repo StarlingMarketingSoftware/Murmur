@@ -1,6 +1,4 @@
-import { Url } from './types';
-
-export const urls: Record<string, Url> = {
+export const urls = {
 	home: {
 		path: '/',
 		label: 'Home',
@@ -10,6 +8,12 @@ export const urls: Record<string, Url> = {
 		path: '/murmur',
 		label: 'Murmur',
 		category: 'protected',
+		dashboard: {
+			path: '/murmur/dashboard',
+		},
+		campaign: {
+			path: '/murmur/campaign',
+		},
 	},
 	pricing: {
 		path: '/pricing',

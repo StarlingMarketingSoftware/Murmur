@@ -31,13 +31,6 @@ export const STRIPE_SUBSCRIPTION_STATUS: Record<string, StripeSubscriptionStatus
 
 // use zod for schema types
 
-export const contactFormSchema = z.object({
-	name: z.string().min(1, { message: 'Name is required.' }),
-	email: z.string().email({ message: 'Invalid email address.' }),
-	subject: z.string().min(1, { message: 'Subject is required.' }),
-	message: z.string().min(1, { message: 'Message is required.' }),
-});
-
 export type Contact = {
 	name: string;
 	email: string;

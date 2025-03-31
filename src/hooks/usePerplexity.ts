@@ -130,20 +130,11 @@ export const usePerplexityDraftEmail = () => {
 
 			const data = await response.json();
 			try {
-				const jsonString = data.choices[0].message.content
-					.replace(/`/g, '') // Remove all backticks
-					.replace(/^```json\s*/, '') // Remove leading ```json and any whitespace
-					.replace(/^json\s*/, '') // Remove leading 'json' and any whitespace
-					.replace(/```$/, '') // Remove trailing ```
-					.replace(/^\s*{\s*/, '{') // Clean up leading spaces before first bracket
-					.trim();
-
+				const jsonString = data.choices[0].message.content;
 				const beginningIndex = jsonString.indexOf('{');
 				const endIndex = jsonString.lastIndexOf('}') + 1;
 				const jsonStringTrimmed = jsonString.slice(beginningIndex, endIndex).trim();
-
-				console.log('🚀 ~ mutationFn: ~ jsonString:', jsonString);
-
+				console.log("🚀 ~ mutationFn: ~ jsonStringTrimmed:", jsonStringTrimmed)
 				const parsedDraft = JSON.parse(jsonStringTrimmed) as Draft;
 
 				if (!parsedDraft.contactEmail || !parsedDraft.subject || !parsedDraft.message) {
