@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 export const useCampaigns = () => {
 	const {
@@ -15,6 +16,7 @@ export const useCampaigns = () => {
 				body: JSON.stringify({ campaign }),
 			});
 			if (!response.ok) {
+				toast.error('Failed to create campaign. Please try again.');
 				throw new Error('Network response was not ok');
 			}
 			return response.json();

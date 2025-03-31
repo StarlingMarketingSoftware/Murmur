@@ -11,10 +11,13 @@ export async function GET(
 		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
+	const { campaignId } = await params;
+
 	try {
 		const campaign = await prisma.campaign.findUniqueOrThrow({
 			where: {
-				id: params.campaignId,
+				id: campaignId,
+				userId,
 			},
 		});
 

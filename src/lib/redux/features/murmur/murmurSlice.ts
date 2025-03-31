@@ -1,8 +1,10 @@
 import { Draft } from '@/constants/types';
-import { Contact, ContactList } from '@prisma/client';
+import { Campaign, Contact, ContactList } from '@prisma/client';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
-export interface MurmurState {
+export interface CampaignState {
+	campaignId: string;
+	campaignName: string;
 	recipients: {
 		selectedContactLists: ContactList[];
 		step2: boolean;
@@ -12,7 +14,9 @@ export interface MurmurState {
 	completedDrafts: Draft[];
 }
 
-const initialState: MurmurState = {
+const initialState: CampaignState = {
+	campaignId: '',
+	campaignName: '',
 	recipients: {
 		selectedContactLists: [],
 		step2: false,
@@ -26,6 +30,10 @@ export const murmurSlice = createSlice({
 	name: 'murmur',
 	initialState,
 	reducers: {
+		setCampaignState: (state, action: PayloadAction<Campaign>) => {
+			state.campaignId = action.payload.id;
+			state.campaignName = action.payload.name;
+		},
 		setSelectedContactLists: (state, action: PayloadAction<ContactList[]>) => {
 			state.recipients.selectedContactLists = action.payload;
 		},
@@ -48,6 +56,7 @@ export const murmurSlice = createSlice({
 });
 
 export const {
+	setCampaignState,
 	setSelectedContactLists,
 	setStep2,
 	setSelectedRecipients,
