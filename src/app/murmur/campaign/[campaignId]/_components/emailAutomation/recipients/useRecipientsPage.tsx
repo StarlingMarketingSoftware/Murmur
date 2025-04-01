@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Contact, ContactList } from '@prisma/client';
+import { Campaign, Contact, ContactList } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
 import { ArrowUpDown } from 'lucide-react';
 import { LocalStorageKeys } from '@/constants/constants';
@@ -8,7 +8,10 @@ import { hasContactsReadOnlyPermission } from '@/app/utils/googlePermissions';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
-
+import { CampaignWithRelations } from '@/constants/types';
+import { useParams } from 'next/navigation';
+import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/route';
+import { z } from 'zod';
 export const useRecipientsPage = () => {
 	const columns: ColumnDef<ContactList>[] = [
 		{
@@ -223,18 +226,21 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 	const { selectedContactList, isOpen, setIsOpen } = props;
 	const [selectedRows, setSelectedRows] = useState<Contact[]>([]);
 
+	const params = useParams();
+	const campaignId = params.campaignId as string;
+
 	const {
 		data,
 		isPending,
 		mutate: fetchContacts,
 	} = useMutation({
-		mutationFn: async (categories: string[]) => {
+		mutationFn: async (contactListIds: number[]) => {
 			const response = await fetch('/api/contacts/get-by-category', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
 				},
-				body: JSON.stringify({ categories }),
+				body: JSON.stringify({ contactListIds }),
 			});
 			if (!response.ok) {
 				throw new Error('Network response was not ok');
@@ -243,11 +249,45 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		},
 	});
 
+	const { isPendingUpdateCampaign, mutate: updateCampaign } = useMutation({
+		mutationFn: async (campaign: z.infer<typeof updateCampaignSchema>) => {
+			console.log('🚀 ~ mutationFn: ~ campaign:', campaign);
+			const response = await fetch(`/api/campaigns/${campaignId}`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(campaign),
+			});
+			console.log('🚀 ~ mutationFn: ~ response:', response);
+			if (!response.ok) {
+				throw new Error('Network response was not ok');
+			}
+			return response.json();
+		},
+		onSuccess: () => {
+			toast.success('Recipients saved successfully!');
+			setIsOpen(false);
+		},
+		onError: () => {
+			toast.error('Failed to save recipients. Please try again.');
+		},
+	});
+
 	useEffect(() => {
 		if (selectedContactList) {
-			fetchContacts([selectedContactList.category]);
+			fetchContacts([selectedContactList.id]);
 		}
 	}, [selectedContactList, fetchContacts]);
+
+	const saveSelectedRecipients = async () => {
+		console.log('were updating campaign');
+		if (selectedContactList && !!campaignId) {
+			updateCampaign({
+				contactIds: selectedRows.map((row) => row.id),
+			});
+		}
+	};
 
 	return {
 		data,
@@ -258,5 +298,6 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		columns,
 		setSelectedRows,
 		selectedContactList,
+		saveSelectedRecipients,
 	};
 };

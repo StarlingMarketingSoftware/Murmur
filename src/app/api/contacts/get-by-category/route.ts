@@ -6,9 +6,9 @@ const prisma = new PrismaClient();
 export async function POST(req: NextRequest) {
 	try {
 		const body = await req.json();
-		const { categories } = body;
+		const { contactListIds } = body;
 
-		if (!Array.isArray(categories) || categories.length === 0) {
+		if (!Array.isArray(contactListIds) || contactListIds.length === 0) {
 			return NextResponse.json(
 				{ error: 'Invalid or missing categories' },
 				{ status: 400 }
@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
 
 		const contacts = await prisma.contact.findMany({
 			where: {
-				category: {
-					in: categories,
+				contactListId: {
+					in: contactListIds,
 				},
 			},
 		});

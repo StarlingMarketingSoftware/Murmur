@@ -11,7 +11,6 @@ export type UrlCategory = 'protected' | 'mainMenu';
 
 export type CampaignWithRelations = Prisma.CampaignGetPayload<{
 	include: {
-		contactLists: true;
 		contacts: true;
 		emails: true;
 	};

@@ -46,10 +46,6 @@ export function CustomTable<TData, TValue>({
 }: DataTableProps<TData, TValue>) {
 	const getInitialRowSelection = () => {
 		if (!initialRowSelectionState || !data) return {};
-		console.log(
-			'🚀 ~ getInitialRowSelection ~ initialRowSelectionState:',
-			initialRowSelectionState
-		);
 
 		return data.reduce((acc, row, index) => {
 			const isSelected = initialRowSelectionState.some(
@@ -63,7 +59,6 @@ export function CustomTable<TData, TValue>({
 	};
 
 	const [rowSelection, setRowSelection] = useState(getInitialRowSelection());
-	console.log('🚀 ~ rowSelection:', rowSelection);
 	const [isInitialMount, setIsInitialMount] = useState(true);
 
 	const [sorting, setSorting] = useState<SortingState>([]);

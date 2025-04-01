@@ -24,8 +24,8 @@ const ContactListDialog: FC<ContactListDialogProps> = (props) => {
 		columns,
 		setSelectedRows,
 		selectedContactList,
+		saveSelectedRecipients,
 	} = useContactListDialog(props);
-
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen}>
 			<DialogContent className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px]">
@@ -35,7 +35,7 @@ const ContactListDialog: FC<ContactListDialogProps> = (props) => {
 					<>
 						<DialogHeader>
 							<DialogTitle className="capitalize">
-								{`Select Recipients from ${selectedContactList?.category}`}
+								{`${selectedContactList?.category}`}
 							</DialogTitle>
 							<DialogDescription>
 								Select recipients from the table, then save them to your campaign.
@@ -47,7 +47,7 @@ const ContactListDialog: FC<ContactListDialogProps> = (props) => {
 							setSelectedRows={setSelectedRows}
 						/>
 						<DialogFooter>
-							<Button>Save Recipients</Button>
+							<Button onClick={saveSelectedRecipients}>Save Selected Recipients</Button>
 						</DialogFooter>
 					</>
 				)}
