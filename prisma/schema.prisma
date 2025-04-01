@@ -33,7 +33,7 @@ model User {
 
 model Contact {
   id        Int      @id @default(autoincrement())
-  name      String
+  name      String?
   email     String
   company   String?
   website   String?
@@ -53,12 +53,13 @@ model Contact {
 
 // needs database trigger whenever a contact is added, update this table accordingly
 model ContactList {
-  id        Int       @id @default(autoincrement())
-  category  String    @unique
-  count     Int
-  contacts  Contact[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id         Int       @id @default(autoincrement())
+  category   String    @unique
+  identifier String    @unique
+  count      Int
+  contacts   Contact[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([category])
 }

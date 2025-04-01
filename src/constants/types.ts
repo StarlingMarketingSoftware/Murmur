@@ -17,6 +17,17 @@ export type CampaignWithRelations = Prisma.CampaignGetPayload<{
 	};
 }>;
 
+export type ContactCSVFormat = {
+	name: string;
+	company: string;
+	email: string;
+	address: string;
+	country: string;
+	state: string;
+	website: string;
+	phone: string;
+};
+
 export type StripeSubscriptionStatus =
 	| 'active'
 	| 'past_due'

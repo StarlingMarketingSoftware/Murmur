@@ -32,6 +32,7 @@
 		"@types/gapi": "^0.0.47",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
+		"csv-parse": "^5.6.0",
 		"google-api-javascript-client": "^0.1.0",
 		"lucide-react": "^0.482.0",
 		"next": "^15.2.4",
