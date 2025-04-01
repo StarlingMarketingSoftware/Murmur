@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 export type Url = {
@@ -7,6 +8,14 @@ export type Url = {
 };
 
 export type UrlCategory = 'protected' | 'mainMenu';
+
+export type CampaignWithRelations = Prisma.CampaignGetPayload<{
+	include: {
+		contactLists: true;
+		contacts: true;
+		emails: true;
+	};
+}>;
 
 export type StripeSubscriptionStatus =
 	| 'active'

@@ -6,9 +6,9 @@ export interface CampaignState {
 	campaignId: string;
 	campaignName: string;
 	recipients: {
-		selectedContactLists: ContactList[];
+		selectedContactLists: string[]; // Contact list ids only
 		step2: boolean;
-		selectedRecipients: Contact[];
+		selectedRecipients: string[]; // Contact ids only
 	};
 	currentTestDraft: Draft | null;
 	completedDrafts: Draft[];
@@ -33,15 +33,16 @@ export const murmurSlice = createSlice({
 		setCampaignState: (state, action: PayloadAction<Campaign>) => {
 			state.campaignId = action.payload.id;
 			state.campaignName = action.payload.name;
+			// state.recipients.selectedContactLists = action.payload.contactLists.map(());
 		},
 		setSelectedContactLists: (state, action: PayloadAction<ContactList[]>) => {
-			state.recipients.selectedContactLists = action.payload;
+			state.recipients.selectedContactLists = action.payload.map((list) => list.id);
 		},
 		setStep2: (state, action: PayloadAction<boolean>) => {
 			state.recipients.step2 = action.payload;
 		},
 		setSelectedRecipients: (state, action: PayloadAction<Contact[]>) => {
-			state.recipients.selectedRecipients = action.payload;
+			state.recipients.selectedRecipients = action.payload.map((contact) => contact.id);
 		},
 		setCompletedDrafts: (state, action: PayloadAction<Draft[]>) => {
 			state.completedDrafts = action.payload;

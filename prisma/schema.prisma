@@ -15,12 +15,12 @@ enum EmailStatus {
 }
 
 model User {
-  id                       String     @id @default(uuid())
-  clerkId                  String     @unique
-  email                    String     @unique
-  firstName                String?
-  lastName                 String?
-  campaigns                Campaign[]
+  id        Int     @id @default(autoincrement())
+  clerkId   String  @unique
+  email     String  @unique
+  firstName String?
+  lastName  String?
+
   stripeCustomerId         String?    @unique
   stripeSubscriptionId     String?
   stripeSubscriptionStatus String?
@@ -28,42 +28,50 @@ model User {
   createdAt                DateTime   @default(now())
   updatedAt                DateTime   @updatedAt
   emails                   Email[]
+  campaigns                Campaign[]
 }
 
 model Contact {
-  id            String       @id @default(uuid())
-  name          String
-  email         String
-  category      String
-  company       String?
-  contactListId String?
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String
+  company   String?
+  website   String?
+  state     String?
+  country   String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contactListId Int?
   contactList   ContactList? @relation(fields: [contactListId], references: [id], onDelete: Cascade)
   campaigns     Campaign[]
 
-  @@unique([email, category])
+  @@unique([email, contactListId])
   @@index([contactListId])
 }
 
 // needs database trigger whenever a contact is added, update this table accordingly
 model ContactList {
-  id        String     @id @default(uuid())
-  category  String     @unique
+  id        Int       @id @default(autoincrement())
+  category  String    @unique
   count     Int
-  campaigns Campaign[]
   contacts  Contact[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([category])
 }
 
 model Email {
-  id         String      @id @default(uuid())
+  id         Int         @id @default(autoincrement())
   subject    String
   message    String      @db.Text
   status     EmailStatus @default(draft)
   sentAt     DateTime?
   userId     String
   user       User        @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
-  campaignId String
+  campaignId Int
   campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
@@ -72,15 +80,14 @@ model Email {
 }
 
 model Campaign {
-  id           String        @id @default(uuid())
-  name         String
-  userId       String
-  user         User          @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
-  contactLists ContactList[]
-  contacts     Contact[]
-  emails       Email[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id        Int       @id @default(autoincrement())
+  name      String
+  userId    String
+  user      User      @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  contacts  Contact[]
+  emails    Email[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([userId])
 }

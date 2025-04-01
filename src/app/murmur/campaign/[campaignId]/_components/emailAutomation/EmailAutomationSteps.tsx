@@ -1,5 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import SelectRecipients from './recipients/Recipients';
+import SelectRecipients from './recipients/RecipientsPage';
 import { Button } from '@/components/ui/button';
 import { ReactNode } from 'react';
 import DraftPage from './draft/DraftPage';
@@ -35,8 +35,14 @@ const steps: Step[] = [
 ];
 
 const EmailAutomationSteps = () => {
-	const { stepParam, handleTabChange, advanceToNextStep, returnToPreviousStep } =
-		useEmailAutomationSteps();
+	const {
+		stepParam,
+		handleTabChange,
+		advanceToNextStep,
+		returnToPreviousStep,
+		handleSaveCampaign,
+		isPendingCampaign,
+	} = useEmailAutomationSteps();
 
 	return (
 		<>
@@ -74,7 +80,9 @@ const EmailAutomationSteps = () => {
 				>
 					Next Step
 				</Button>
-				<Button>Save Campaign</Button>
+				<Button isLoading={isPendingCampaign} onClick={handleSaveCampaign}>
+					Save Campaign
+				</Button>
 			</div>
 		</>
 	);

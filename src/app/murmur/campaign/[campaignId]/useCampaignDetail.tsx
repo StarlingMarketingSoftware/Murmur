@@ -94,6 +94,7 @@ export const useCampaignDetail = () => {
 	// set global state here
 	useEffect(() => {
 		if (isPending || !isFirstLoad || !data) return;
+		console.log('🚀 ~ SETTING GLOBAL STATE', data);
 		setIsFirstLoad(false);
 		dispatch(setCampaignState(data));
 	}, [isPending, isFirstLoad, data, dispatch]);

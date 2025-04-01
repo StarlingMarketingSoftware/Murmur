@@ -27,10 +27,11 @@ import { Input } from '@/components/ui/input';
 interface DataTableProps<TData, TValue> {
 	columns: ColumnDef<TData, TValue>[];
 	data: TData[] | undefined;
-	setSelectedRows: ((rows: TData[]) => void) | Dispatch<SetStateAction<TData[]>>;
+	setSelectedRows?: ((rows: TData[]) => void) | Dispatch<SetStateAction<TData[]>>;
 	singleSelection?: boolean;
+	handleRowClick?: (rowData: TData) => void;
 	noDataMessage?: string;
-	initialRowSelectionState?: TData[];
+	initialRowSelectionState?: string[];
 }
 
 // https://ui.shadcn.com/docs/components/data-table
@@ -39,11 +40,16 @@ export function CustomTable<TData, TValue>({
 	data,
 	setSelectedRows,
 	singleSelection,
+	handleRowClick,
 	noDataMessage = 'No data was found.',
 	initialRowSelectionState,
 }: DataTableProps<TData, TValue>) {
 	const getInitialRowSelection = () => {
 		if (!initialRowSelectionState || !data) return {};
+		console.log(
+			'🚀 ~ getInitialRowSelection ~ initialRowSelectionState:',
+			initialRowSelectionState
+		);
 
 		return data.reduce((acc, row, index) => {
 			const isSelected = initialRowSelectionState.some(
@@ -57,6 +63,7 @@ export function CustomTable<TData, TValue>({
 	};
 
 	const [rowSelection, setRowSelection] = useState(getInitialRowSelection());
+	console.log('🚀 ~ rowSelection:', rowSelection);
 	const [isInitialMount, setIsInitialMount] = useState(true);
 
 	const [sorting, setSorting] = useState<SortingState>([]);
@@ -90,7 +97,16 @@ export function CustomTable<TData, TValue>({
 		// Only update selected rows if:
 		// 1. It's not the initial mount, OR
 		// 2. We have initial selection state
-		if (!isInitialMount || initialRowSelectionState?.length) {
+		if (!setSelectedRows) return;
+		if (isInitialMount || initialRowSelectionState?.length) {
+			setIsInitialMount(false);
+			if (!singleSelection) {
+				setSelectedRows(table.getSelectedRowModel().rows.map((row) => row.original));
+			} else {
+				const firstSelectedRow = table.getSelectedRowModel().rows[0];
+				setSelectedRows(firstSelectedRow ? [firstSelectedRow.original] : []);
+			}
+		} else if (!isInitialMount) {
 			if (!singleSelection) {
 				setSelectedRows(table.getSelectedRowModel().rows.map((row) => row.original));
 			} else {
@@ -100,17 +116,17 @@ export function CustomTable<TData, TValue>({
 		}
 	}, [rowModel, table, singleSelection]);
 
-	// Mark initial mount as complete after first render
-	useEffect(() => {
-		setIsInitialMount(false);
-	}, []);
+	// // Mark initial mount as complete after first render
+	// useEffect(() => {
+	// 	setIsInitialMount(false);
+	// }, []);
 
-	// Reset isInitialMount when data changes
-	useEffect(() => {
-		if (data) {
-			setIsInitialMount(true);
-		}
-	}, [data]);
+	// // Reset isInitialMount when data changes
+	// useEffect(() => {
+	// 	if (data) {
+	// 		setIsInitialMount(true);
+	// 	}
+	// }, [data]);
 
 	return (
 		<div>
@@ -147,7 +163,16 @@ export function CustomTable<TData, TValue>({
 						{table.getRowModel().rows?.length ? (
 							table.getRowModel().rows.map((row) => (
 								<TableRow
-									onClick={() => row.toggleSelected()}
+									className={twMerge(
+										(handleRowClick || setSelectedRows) && 'cursor-pointer'
+									)}
+									onClick={() => {
+										if (!handleRowClick) {
+											row.toggleSelected();
+										} else {
+											handleRowClick(row.original);
+										}
+									}}
 									key={row.id}
 									data-state={row.getIsSelected() && 'selected'}
 								>
