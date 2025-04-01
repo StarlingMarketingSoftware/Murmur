@@ -1,10 +1,10 @@
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import SelectRecipients from './emailAutomation/recipients/Recipients';
+import SelectRecipients from './recipients/RecipientsPage';
 import { Button } from '@/components/ui/button';
 import { ReactNode } from 'react';
-import DraftPage from './emailAutomation/draft/DraftPage';
-import Send from './emailAutomation/send/Send';
+import DraftPage from './draft/DraftPage';
+import Send from './send/Send';
+import { useEmailAutomationSteps } from './useEmailAutomationSteps';
 
 type Step = {
 	step: number;
@@ -35,22 +35,14 @@ const steps: Step[] = [
 ];
 
 const EmailAutomationSteps = () => {
-	const router = useRouter();
-	const searchParams = useSearchParams();
-	const pathname = usePathname();
-	const stepParam = searchParams.get('step') ?? '1';
-
-	const handleTabChange = (value: string) => {
-		const params = new URLSearchParams(searchParams);
-		params.set('step', value);
-		router.push(`${pathname}?${params.toString()}`);
-	};
-
-	const advanceToNextStep = () => {
-		const params = new URLSearchParams(searchParams);
-		params.set('step', (parseInt(stepParam) + 1).toString());
-		router.push(`${pathname}?${params.toString()}`);
-	};
+	const {
+		stepParam,
+		handleTabChange,
+		advanceToNextStep,
+		returnToPreviousStep,
+		handleSaveCampaign,
+		isPendingCampaign,
+	} = useEmailAutomationSteps();
 
 	return (
 		<>
@@ -73,11 +65,25 @@ const EmailAutomationSteps = () => {
 					</TabsContent>
 				))}
 			</Tabs>
-			{stepParam !== '3' && (
-				<Button className="mt-4" onClick={advanceToNextStep}>
+			<div className="flex mx-auto justify-center gap-4 mt-4">
+				<Button
+					variant="outline"
+					disabled={stepParam === '1'}
+					onClick={returnToPreviousStep}
+				>
+					Previous Step
+				</Button>
+				<Button
+					variant="outline"
+					disabled={stepParam === '3'}
+					onClick={advanceToNextStep}
+				>
 					Next Step
 				</Button>
-			)}
+				<Button isLoading={isPendingCampaign} onClick={handleSaveCampaign}>
+					Save Campaign
+				</Button>
+			</div>
 		</>
 	);
 };

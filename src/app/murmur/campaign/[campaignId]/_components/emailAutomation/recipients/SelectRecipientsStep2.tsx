@@ -8,6 +8,9 @@ import { Contact } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
 import { ArrowUpDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useDispatch } from 'react-redux';
+import { setSelectedRecipients } from '@/lib/redux/features/murmur/murmurSlice';
+import { useAppSelector } from '@/lib/redux/hooks';
 
 interface SelectedRecipientsStep2Props {
 	categories: string[];
@@ -106,11 +109,23 @@ const columns: ColumnDef<Contact>[] = [
 
 const SelectRecipientsStep2: FC<SelectedRecipientsStep2Props> = ({ categories }) => {
 	const { data, isPending, fetchContacts } = useContacts();
-	const [selectedRows, setSelectedRows] = useState<Contact[]>([]);
+	const dispatch = useDispatch();
+	const selectedRecipients = useAppSelector(
+		(state) => state.murmur.recipients.selectedRecipients
+	);
+	console.log('🚀 ~ selectedRecipients:', selectedRecipients);
+
+	const handleSelectedRowsChange = (rows: Contact[]) => {
+		if (rows.length > 0) {
+			dispatch(setSelectedRecipients(rows));
+		}
+	};
 
 	useEffect(() => {
+		// it's fine to refetch categories and maintain the selection
 		if (categories.length > 0) {
 			fetchContacts(categories);
+			console.log('were refetching contacts');
 		}
 	}, [categories]);
 
@@ -125,7 +140,12 @@ const SelectRecipientsStep2: FC<SelectedRecipientsStep2Props> = ({ categories })
 					<CardDescription>Select individual recipients.</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-2">
-					<CustomTable columns={columns} data={data} setSelectedRows={setSelectedRows} />
+					<CustomTable
+						columns={columns}
+						data={data}
+						setSelectedRows={handleSelectedRowsChange}
+						initialRowSelectionState={selectedRecipients}
+					/>
 				</CardContent>
 			</Card>
 		</>

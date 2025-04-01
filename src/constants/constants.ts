@@ -1,3 +1,5 @@
+import { AiSelectValues } from './types';
+
 export enum LocalStorageKeys {
 	GoogleAuthState = 'googleAuthState',
 	GoogleAccessToken = 'googleAccessToken',
@@ -13,3 +15,16 @@ export enum GoogleScopes {
 export const requestedPeopleScopes = [GoogleScopes.ContactsReadOnly];
 
 export const requestedGmailScopes = ['https://www.googleapis.com/auth/gmail.send'];
+
+export const AiModelOptions: AiSelectValues[] = [
+	{
+		name: 'Murmur AI',
+		value: 'sonar',
+		type: 'perplexity',
+	},
+	{
+		name: 'Murmur AI Pro',
+		value: 'sonar-pro',
+		type: 'perplexity',
+	},
+];

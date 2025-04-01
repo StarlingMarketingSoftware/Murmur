@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 export type Url = {
@@ -7,6 +8,25 @@ export type Url = {
 };
 
 export type UrlCategory = 'protected' | 'mainMenu';
+
+export type CampaignWithRelations = Prisma.CampaignGetPayload<{
+	include: {
+		contactLists: true;
+		contacts: true;
+		emails: true;
+	};
+}>;
+
+export type ContactCSVFormat = {
+	name: string;
+	company: string;
+	email: string;
+	address: string;
+	country: string;
+	state: string;
+	website: string;
+	phone: string;
+};
 
 export type StripeSubscriptionStatus =
 	| 'active'
@@ -30,18 +50,6 @@ export const STRIPE_SUBSCRIPTION_STATUS: Record<string, StripeSubscriptionStatus
 } as const;
 
 // use zod for schema types
-
-export const contactFormSchema = z.object({
-	name: z.string().min(1, { message: 'Name is required.' }),
-	email: z.string().email({ message: 'Invalid email address.' }),
-	subject: z.string().min(1, { message: 'Subject is required.' }),
-	message: z.string().min(1, { message: 'Message is required.' }),
-});
-
-export const emailDraftSchema = z.object({
-	subject: z.string().min(1, { message: 'Subject is required.' }),
-	message: z.string().min(1, { message: 'Message is required.' }),
-});
 
 export type Contact = {
 	name: string;
@@ -92,3 +100,18 @@ export type Draft = {
 	message: string;
 	contactEmail: string;
 };
+
+export type AiModel = 'sonar' | 'sonar-pro';
+
+export type AiType = 'perplexity' | 'openai';
+
+export type AiSelectValues = {
+	name: string;
+	value: AiModel;
+	type: AiType;
+};
+
+export enum PerplexityModelEnum {
+	Sonar = 'sonar',
+	SonarPro = 'sonar-pro',
+}

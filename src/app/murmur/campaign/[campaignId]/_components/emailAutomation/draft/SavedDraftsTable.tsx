@@ -6,6 +6,7 @@ import { ArrowUpDown } from 'lucide-react';
 import { Dispatch, FC, SetStateAction } from 'react';
 import CustomTable from '../../CustomTable';
 import { Draft } from '@/constants/types';
+import { useAppSelector } from '@/lib/redux/hooks';
 
 const columns: ColumnDef<Draft>[] = [
 	{
@@ -86,14 +87,18 @@ export interface SavedDraftsTableProps {
 	setSelectedRows: Dispatch<SetStateAction<Draft[]>>;
 }
 const SavedDraftsTable: FC<SavedDraftsTableProps> = ({ drafts, setSelectedRows }) => {
+	const completedDrafts = useAppSelector((state) => state.murmur.completedDrafts);
+	console.log('🚀 ~ completedDrafts:', completedDrafts);
+
 	return (
 		<Card>
 			<CardContent>
 				<CustomTable
 					columns={columns}
-					data={drafts}
+					data={completedDrafts}
 					setSelectedRows={setSelectedRows}
 					singleSelection
+					noDataMessage="Drafts will appear here as they are created."
 				/>
 			</CardContent>
 		</Card>
