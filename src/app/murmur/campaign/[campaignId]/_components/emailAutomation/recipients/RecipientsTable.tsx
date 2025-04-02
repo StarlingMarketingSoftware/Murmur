@@ -1,4 +1,10 @@
-import { Card, CardHeader, CardDescription, CardContent } from '@/components/ui/card';
+import {
+	Card,
+	CardHeader,
+	CardDescription,
+	CardContent,
+	CardTitle,
+} from '@/components/ui/card';
 import { FC } from 'react';
 import CustomTable from '../../CustomTable';
 import Spinner from '@/components/ui/spinner';
@@ -15,7 +21,10 @@ const RecipientsTable: FC<RecipientsTableProps> = (props) => {
 		<>
 			<Card>
 				<CardHeader>
-					<CardDescription>Select individual recipients.</CardDescription>
+					<CardTitle>Selected Recipients</CardTitle>
+					<CardDescription>
+						Recipients you have selected for this campaign.
+					</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-2">
 					<CustomTable columns={columns} data={contacts} />

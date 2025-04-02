@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Campaign, Contact, ContactList } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown } from 'lucide-react';
+import { ArrowUpDown, DeleteIcon, TrashIcon } from 'lucide-react';
 import { LocalStorageKeys } from '@/constants/constants';
 import { hasContactsReadOnlyPermission } from '@/app/utils/googlePermissions';
 import { toast } from 'sonner';
@@ -12,6 +12,7 @@ import { CampaignWithRelations } from '@/constants/types';
 import { useParams } from 'next/navigation';
 import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/route';
 import { z } from 'zod';
+import { TableSortingButton } from '../../CustomTable';
 
 export interface RecipientsPageProps {
 	campaign: CampaignWithRelations;
@@ -22,15 +23,7 @@ export const useRecipientsPage = (props: RecipientsPageProps) => {
 		{
 			accessorKey: 'category',
 			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-					>
-						Category
-						<ArrowUpDown className="h-4 w-4" />
-					</Button>
-				);
+				return <TableSortingButton column={column} label="Category" />;
 			},
 			cell: ({ row }) => {
 				return <div className="capitalize text-left">{row.getValue('category')}</div>;
@@ -39,15 +32,7 @@ export const useRecipientsPage = (props: RecipientsPageProps) => {
 		{
 			accessorKey: 'count',
 			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-					>
-						Number of contacts
-						<ArrowUpDown className="h-4 w-4" />
-					</Button>
-				);
+				return <TableSortingButton column={column} label="Count" />;
 			},
 			cell: ({ row }) => {
 				return <div className="text-left">{row.getValue('count')}</div>;
@@ -164,15 +149,7 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		{
 			accessorKey: 'name',
 			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-					>
-						Name
-						<ArrowUpDown className="h-4 w-4" />
-					</Button>
-				);
+				return <TableSortingButton column={column} label="Name" />;
 			},
 			cell: ({ row }) => {
 				return <div className="text-left">{row.getValue('name')}</div>;
@@ -181,15 +158,7 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		{
 			accessorKey: 'email',
 			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-					>
-						Email
-						<ArrowUpDown className="h-4 w-4" />
-					</Button>
-				);
+				return <TableSortingButton column={column} label="Email" />;
 			},
 			cell: ({ row }) => {
 				return <div className="text-left">{row.getValue('email')}</div>;
@@ -198,15 +167,7 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		{
 			accessorKey: 'category',
 			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-					>
-						Category
-						<ArrowUpDown className="h-4 w-4" />
-					</Button>
-				);
+				return <TableSortingButton column={column} label="Category" />;
 			},
 			cell: ({ row }) => {
 				return <div className="capitalize text-left">{row.getValue('category')}</div>;
@@ -215,15 +176,7 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		{
 			accessorKey: 'company',
 			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-					>
-						Company
-						<ArrowUpDown className="h-4 w-4" />
-					</Button>
-				);
+				return <TableSortingButton column={column} label="Company" />;
 			},
 			cell: ({ row }) => {
 				return <div className="text-left">{row.getValue('company')}</div>;
@@ -320,26 +273,26 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 	const { contacts } = props;
 
 	const columns: ColumnDef<Contact>[] = [
-		{
-			id: 'select',
-			header: ({ table }) => (
-				<Checkbox
-					checked={
-						table.getIsAllPageRowsSelected() ||
-						(table.getIsSomePageRowsSelected() && 'indeterminate')
-					}
-					onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-					aria-label="Select all"
-				/>
-			),
-			cell: ({ row }) => (
-				<Checkbox
-					checked={row.getIsSelected()}
-					onCheckedChange={(value) => row.toggleSelected(!!value)}
-					aria-label="Select row"
-				/>
-			),
-		},
+		// {
+		// 	id: 'select',
+		// 	header: ({ table }) => (
+		// 		<Checkbox
+		// 			checked={
+		// 				table.getIsAllPageRowsSelected() ||
+		// 				(table.getIsSomePageRowsSelected() && 'indeterminate')
+		// 			}
+		// 			onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+		// 			aria-label="Select all"
+		// 		/>
+		// 	),
+		// 	cell: ({ row }) => (
+		// 		<Checkbox
+		// 			checked={row.getIsSelected()}
+		// 			onCheckedChange={(value) => row.toggleSelected(!!value)}
+		// 			aria-label="Select row"
+		// 		/>
+		// 	),
+		// },
 		{
 			accessorKey: 'name',
 			header: ({ column }) => {
@@ -360,53 +313,74 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 		{
 			accessorKey: 'email',
 			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-					>
-						Email
-						<ArrowUpDown className="h-4 w-4" />
-					</Button>
-				);
+				return <TableSortingButton column={column} label="Email" />;
 			},
 			cell: ({ row }) => {
 				return <div className="text-left">{row.getValue('email')}</div>;
 			},
 		},
+		// {
+		// 	accessorKey: 'website',
+		// 	header: ({ column }) => {
+		// 		return (
+		// 			<Button
+		// 				variant="ghost"
+		// 				onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+		// 			>
+		// 				Website
+		// 				<ArrowUpDown className="h-4 w-4" />
+		// 			</Button>
+		// 		);
+		// 	},
+		// 	cell: ({ row }) => {
+		// 		return <div className="text-left">{row.getValue('website')}</div>;
+		// 	},
+		// },
 		{
-			accessorKey: 'category',
+			accessorKey: 'state',
 			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-					>
-						Category
-						<ArrowUpDown className="h-4 w-4" />
-					</Button>
-				);
+				return <TableSortingButton column={column} label="State" />;
 			},
 			cell: ({ row }) => {
-				return <div className="capitalize text-left">{row.getValue('category')}</div>;
+				return <div className="text-left">{row.getValue('state')}</div>;
+			},
+		},
+		{
+			accessorKey: 'country',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Country" />;
+			},
+			cell: ({ row }) => {
+				return <div className="text-left">{row.getValue('country')}</div>;
 			},
 		},
 		{
 			accessorKey: 'company',
 			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-					>
-						Company
-						<ArrowUpDown className="h-4 w-4" />
-					</Button>
-				);
+				return <TableSortingButton column={column} label="Company" />;
 			},
 			cell: ({ row }) => {
 				return <div className="text-left">{row.getValue('company')}</div>;
 			},
+		},
+		{
+			id: 'delete',
+			cell: ({ row }) => (
+				<Button
+					variant="ghost" // or any other variant like "outline", "default"
+					size="icon"
+					onClick={(e) => {
+						e.stopPropagation();
+					}}
+				>
+					<TrashIcon className="h-3 w-2 text-destructive" />
+				</Button>
+				// <Checkbox
+				// 	checked={row.getIsSelected()}
+				// 	onCheckedChange={(value) => row.toggleSelected(!!value)}
+				// 	aria-label="Select row"
+				// />
+			),
 		},
 	];
 

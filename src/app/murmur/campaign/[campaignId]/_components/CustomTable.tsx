@@ -1,5 +1,6 @@
 'use client';
 import {
+	Column,
 	ColumnDef,
 	ColumnFiltersState,
 	flexRender,
@@ -19,10 +20,12 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table';
-import { Dispatch, SetStateAction, useEffect, useState } from 'react';
+import { Dispatch, FC, SetStateAction, useEffect, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import CustomPagination from '@/components/CustomPagination';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { ArrowUpDown } from 'lucide-react';
 
 interface DataTableProps<TData, TValue> {
 	columns: ColumnDef<TData, TValue>[];
@@ -35,6 +38,26 @@ interface DataTableProps<TData, TValue> {
 }
 
 // https://ui.shadcn.com/docs/components/data-table
+interface TableSortingButtonProps<TData> {
+	column: Column<TData, unknown>;
+	label: string;
+}
+
+export function TableSortingButton<TData>({
+	column,
+	label,
+}: TableSortingButtonProps<TData>) {
+	return (
+		<Button
+			variant="ghost"
+			onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+		>
+			{label}
+			<ArrowUpDown className="h-4 w-4" />
+		</Button>
+	);
+}
+
 export function CustomTable<TData, TValue>({
 	columns,
 	data,
