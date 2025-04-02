@@ -1,28 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Contact, ContactList } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown } from 'lucide-react';
+import { TrashIcon } from 'lucide-react';
 import { LocalStorageKeys } from '@/constants/constants';
 import { hasContactsReadOnlyPermission } from '@/app/utils/googlePermissions';
 import { toast } from 'sonner';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
+import { CampaignWithRelations } from '@/constants/types';
+import { useParams } from 'next/navigation';
+import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/route';
+import { z } from 'zod';
+import { TableSortingButton } from '../../CustomTable';
 
-export const useRecipientsPage = () => {
+export interface RecipientsPageProps {
+	campaign: CampaignWithRelations;
+}
+
+export const useRecipientsPage = (props: RecipientsPageProps) => {
 	const columns: ColumnDef<ContactList>[] = [
 		{
 			accessorKey: 'category',
 			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-					>
-						Category
-						<ArrowUpDown className="h-4 w-4" />
-					</Button>
-				);
+				return <TableSortingButton column={column} label="Category" />;
 			},
 			cell: ({ row }) => {
 				return <div className="capitalize text-left">{row.getValue('category')}</div>;
@@ -31,62 +32,55 @@ export const useRecipientsPage = () => {
 		{
 			accessorKey: 'count',
 			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-					>
-						Number of contacts
-						<ArrowUpDown className="h-4 w-4" />
-					</Button>
-				);
+				return <TableSortingButton column={column} label="Count" />;
 			},
 			cell: ({ row }) => {
 				return <div className="text-left">{row.getValue('count')}</div>;
 			},
 		},
 	];
+	const { campaign } = props;
 
-	const handleImportGoogleContacts = async () => {
-		if (hasContactsReadOnlyPermission()) {
-			console.log('calling peoples api');
-			try {
-				const response = await fetch(
-					'https://people.googleapis.com/v1/people/me/connections?' +
-						new URLSearchParams({
-							personFields: 'names,emailAddresses',
-							pageSize: '1000',
-						}),
-					{
-						headers: {
-							Authorization: `Bearer ${localStorage.getItem(
-								LocalStorageKeys.GoogleAccessToken
-							)}`,
-							Accept: 'application/json',
-						},
-					}
-				);
+	// const handleImportGoogleContacts = async () => {
+	// 	if (hasContactsReadOnlyPermission()) {
+	// 		console.log('calling peoples api');
+	// 		try {
+	// 			const response = await fetch(
+	// 				'https://people.googleapis.com/v1/people/me/connections?' +
+	// 					new URLSearchParams({
+	// 						personFields: 'names,emailAddresses',
+	// 						pageSize: '1000',
+	// 					}),
+	// 				{
+	// 					headers: {
+	// 						Authorization: `Bearer ${localStorage.getItem(
+	// 							LocalStorageKeys.GoogleAccessToken
+	// 						)}`,
+	// 						Accept: 'application/json',
+	// 					},
+	// 				}
+	// 			);
 
-				if (!response.ok) {
-					throw new Error(`HTTP error! status: ${response.status}`);
-				}
+	// 			if (!response.ok) {
+	// 				throw new Error(`HTTP error! status: ${response.status}`);
+	// 			}
 
-				const data = await response.json();
-				console.log('🚀 ~ handleImportGoogleContacts ~ data:', data);
-				// TODO set state
-			} catch (error) {
-				if (error instanceof Error) {
-					toast.error('Error fetching Google contacts: ' + error.message);
-				}
-				throw error;
-			}
-		} else {
-			setIsPermissionsDialogOpen(true);
-		}
-	};
+	// 			const data = await response.json();
+	// 			console.log('🚀 ~ handleImportGoogleContacts ~ data:', data);
+	// 			// TODO set state
+	// 		} catch (error) {
+	// 			if (error instanceof Error) {
+	// 				toast.error('Error fetching Google contacts: ' + error.message);
+	// 			}
+	// 			throw error;
+	// 		}
+	// 	} else {
+	// 		setIsPermissionsDialogOpen(true);
+	// 	}
+	// };
 
 	const [isContactListDialogOpen, setIsContactListDialogOpen] = useState(false);
-	const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false);
+	// const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false);
 	const [selectedContactList, setSelectedContactList] = useState<ContactList | null>(
 		null
 	);
@@ -120,6 +114,7 @@ export const useRecipientsPage = () => {
 		setIsContactListDialogOpen,
 		selectedContactList,
 		setSelectedContactList,
+		campaign,
 	};
 };
 
@@ -127,6 +122,7 @@ export interface ContactListDialogProps {
 	isOpen: boolean;
 	setIsOpen: (isOpen: boolean) => void;
 	selectedContactList: ContactList | null;
+	selectedRecipients: Contact[];
 }
 
 export const useContactListDialog = (props: ContactListDialogProps) => {
@@ -154,15 +150,7 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		{
 			accessorKey: 'name',
 			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-					>
-						Name
-						<ArrowUpDown className="h-4 w-4" />
-					</Button>
-				);
+				return <TableSortingButton column={column} label="Name" />;
 			},
 			cell: ({ row }) => {
 				return <div className="text-left">{row.getValue('name')}</div>;
@@ -171,15 +159,7 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		{
 			accessorKey: 'email',
 			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-					>
-						Email
-						<ArrowUpDown className="h-4 w-4" />
-					</Button>
-				);
+				return <TableSortingButton column={column} label="Email" />;
 			},
 			cell: ({ row }) => {
 				return <div className="text-left">{row.getValue('email')}</div>;
@@ -188,15 +168,7 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		{
 			accessorKey: 'category',
 			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-					>
-						Category
-						<ArrowUpDown className="h-4 w-4" />
-					</Button>
-				);
+				return <TableSortingButton column={column} label="Category" />;
 			},
 			cell: ({ row }) => {
 				return <div className="capitalize text-left">{row.getValue('category')}</div>;
@@ -205,36 +177,31 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		{
 			accessorKey: 'company',
 			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-					>
-						Company
-						<ArrowUpDown className="h-4 w-4" />
-					</Button>
-				);
+				return <TableSortingButton column={column} label="Company" />;
 			},
 			cell: ({ row }) => {
 				return <div className="text-left">{row.getValue('company')}</div>;
 			},
 		},
 	];
-	const { selectedContactList, isOpen, setIsOpen } = props;
+	const { selectedContactList, isOpen, setIsOpen, selectedRecipients } = props;
 	const [selectedRows, setSelectedRows] = useState<Contact[]>([]);
+
+	const params = useParams();
+	const { campaignId } = params;
 
 	const {
 		data,
 		isPending,
 		mutate: fetchContacts,
 	} = useMutation({
-		mutationFn: async (categories: string[]) => {
+		mutationFn: async (contactListIds: number[]) => {
 			const response = await fetch('/api/contacts/get-by-category', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
 				},
-				body: JSON.stringify({ categories }),
+				body: JSON.stringify({ contactListIds }),
 			});
 			if (!response.ok) {
 				throw new Error('Network response was not ok');
@@ -243,11 +210,59 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		},
 	});
 
+	const filteredData = useMemo(() => {
+		if (!data) return [];
+
+		return data.filter((contact: Contact) => {
+			return !selectedRecipients.some(
+				(selectedContact) => selectedContact.id === contact.id
+			);
+		});
+	}, [data, selectedRecipients]);
+
+	const queryClient = useQueryClient();
+
+	const { mutate: updateCampaign } = useMutation({
+		mutationFn: async (campaign: z.infer<typeof updateCampaignSchema>) => {
+			const response = await fetch(`/api/campaigns/${campaignId}`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(campaign),
+			});
+			if (!response.ok) {
+				throw new Error('Network response was not ok');
+			}
+			return response.json();
+		},
+		onSuccess: () => {
+			toast.success('Recipients saved successfully!');
+			setIsOpen(false);
+			queryClient.invalidateQueries({ queryKey: ['campaign'] });
+		},
+		onError: () => {
+			toast.error('Failed to save recipients. Please try again.');
+		},
+	});
+
 	useEffect(() => {
 		if (selectedContactList) {
-			fetchContacts([selectedContactList.category]);
+			fetchContacts([selectedContactList.id]);
 		}
 	}, [selectedContactList, fetchContacts]);
+
+	const saveSelectedRecipients = async () => {
+		console.log('were updating campaign');
+		if (selectedContactList && !!campaignId) {
+			updateCampaign({
+				contactOperation: {
+					action: 'connect',
+					contactIds: selectedRows.map((row) => row.id),
+				},
+			});
+		}
+	};
 
 	return {
 		data,
@@ -258,5 +273,150 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		columns,
 		setSelectedRows,
 		selectedContactList,
+		saveSelectedRecipients,
+		filteredData,
+	};
+};
+
+export interface RecipientsTableProps {
+	contacts: Contact[];
+}
+
+export const useRecipientsTable = (props: RecipientsTableProps) => {
+	const { contacts } = props;
+	const queryClient = useQueryClient();
+	const params = useParams();
+	const { campaignId } = params;
+
+	const { isPending: isPendingRemoveContacts, mutate: removeRecipients } = useMutation({
+		mutationFn: async (campaign: z.infer<typeof updateCampaignSchema>) => {
+			const response = await fetch(`/api/campaigns/${campaignId}`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(campaign),
+			});
+			if (!response.ok) {
+				throw new Error('Network response was not ok');
+			}
+			return response.json();
+		},
+		onSuccess: () => {
+			toast.success('Recipient successfully remove from campaign.');
+			queryClient.invalidateQueries({ queryKey: ['campaign'] });
+		},
+		onError: () => {
+			toast.error('Failed to remove recipient from campaign. Please try again.');
+		},
+	});
+
+	const columns: ColumnDef<Contact>[] = [
+		// {
+		// 	id: 'select',
+		// 	header: ({ table }) => (
+		// 		<Checkbox
+		// 			checked={
+		// 				table.getIsAllPageRowsSelected() ||
+		// 				(table.getIsSomePageRowsSelected() && 'indeterminate')
+		// 			}
+		// 			onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+		// 			aria-label="Select all"
+		// 		/>
+		// 	),
+		// 	cell: ({ row }) => (
+		// 		<Checkbox
+		// 			checked={row.getIsSelected()}
+		// 			onCheckedChange={(value) => row.toggleSelected(!!value)}
+		// 			aria-label="Select row"
+		// 		/>
+		// 	),
+		// },
+		{
+			accessorKey: 'name',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Name" />;
+			},
+			cell: ({ row }) => {
+				return <div className="text-left">{row.getValue('name')}</div>;
+			},
+		},
+		{
+			accessorKey: 'email',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Email" />;
+			},
+			cell: ({ row }) => {
+				return <div className="text-left">{row.getValue('email')}</div>;
+			},
+		},
+		// {
+		// 	accessorKey: 'website',
+		// 	header: ({ column }) => {
+		// 		return <TableSortingButton column={column} label="Website" />;
+		// 	},
+		// 	cell: ({ row }) => {
+		// 		return <div className="text-left">{row.getValue('website')}</div>;
+		// 	},
+		// },
+		{
+			accessorKey: 'state',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="State" />;
+			},
+			cell: ({ row }) => {
+				return <div className="text-left">{row.getValue('state')}</div>;
+			},
+		},
+		{
+			accessorKey: 'country',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Country" />;
+			},
+			cell: ({ row }) => {
+				return <div className="text-left">{row.getValue('country')}</div>;
+			},
+		},
+		{
+			accessorKey: 'company',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Company" />;
+			},
+			cell: ({ row }) => {
+				return <div className="text-left">{row.getValue('company')}</div>;
+			},
+		},
+		{
+			id: 'delete',
+			cell: ({ row }) => (
+				<Button
+					variant="ghost" // or any other variant like "outline", "default"
+					size="icon"
+					onClick={(e) => {
+						e.stopPropagation();
+						const contactId = row.original.id;
+						removeRecipients({
+							contactOperation: {
+								action: 'disconnect',
+								contactIds: [contactId],
+							},
+						});
+					}}
+				>
+					<TrashIcon className="h-3 w-2 text-destructive" />
+				</Button>
+				// <Checkbox
+				// 	checked={row.getIsSelected()}
+				// 	onCheckedChange={(value) => row.toggleSelected(!!value)}
+				// 	aria-label="Select row"
+				// />
+			),
+		},
+	];
+
+	return {
+		columns,
+		contacts,
+		isPendingRemoveContacts,
 	};
 };

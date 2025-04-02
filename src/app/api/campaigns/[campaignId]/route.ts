@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
-import { ContactList } from '@prisma/client';
+import { z } from 'zod';
 
 export async function GET(
 	req: NextRequest,
@@ -17,11 +17,10 @@ export async function GET(
 	try {
 		const campaign = await prisma.campaign.findUniqueOrThrow({
 			where: {
-				id: campaignId,
+				id: parseInt(campaignId),
 				userId,
 			},
 			include: {
-				contactLists: true,
 				contacts: true,
 				emails: true,
 			},
@@ -34,52 +33,79 @@ export async function GET(
 	}
 }
 
+// Input validation schema
+export const updateCampaignSchema = z.object({
+	name: z.string().optional(),
+	contactOperation: z
+		.object({
+			action: z.enum(['connect', 'disconnect']),
+			contactIds: z.array(z.number()),
+		})
+		.optional(),
+});
+
 export async function PATCH(
-	req: NextRequest,
+	req: Request,
 	{ params }: { params: { campaignId: string } }
 ) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
-	const { campaignId } = await params;
-
 	try {
-		// Check if campaign exists and belongs to user
-		const existingCampaign = await prisma.campaign.findFirst({
+		const { userId } = await auth();
+		if (!userId) {
+			return new NextResponse('Unauthorized', { status: 401 });
+		}
+
+		const { campaignId } = await params;
+
+		const body = await req.json();
+		const validatedData = updateCampaignSchema.parse(body);
+		console.log('🚀 ~ validatedData:', validatedData);
+
+		// Verify campaign exists and belongs to user
+		const existingCampaign = await prisma.campaign.findUnique({
 			where: {
-				id: campaignId,
-				userId,
+				id: parseInt(campaignId),
+				userId: userId,
+			},
+			include: {
+				contacts: true,
 			},
 		});
 
 		if (!existingCampaign) {
-			return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
+			return new NextResponse('Campaign not found', { status: 404 });
 		}
 
-		// Parse the request body
-		const data = await req.json();
-
-		// Update the campaign
+		// Update campaign with optional fields
 		const updatedCampaign = await prisma.campaign.update({
 			where: {
-				id: campaignId,
+				id: parseInt(campaignId),
 			},
 			data: {
-				name: data.name,
-				contactLists: {
-					// This will disconnect all existing connections and connect new ones
-					set: data.contactLists.map((list: ContactList) => ({
-						id: list.id,
-					})),
-				},
+				...(validatedData.name && { name: validatedData.name }),
+				...(validatedData.contactOperation && {
+					contacts: {
+						[validatedData.contactOperation.action]:
+							validatedData.contactOperation.contactIds.map((id: number) => {
+								console.log(
+									`Attempting to ${validatedData.contactOperation?.action} contact ID: ${id}`
+								);
+								return { id };
+							}),
+					},
+				}),
+			},
+			include: {
+				contacts: true,
 			},
 		});
+		console.log('🚀 ~ updatedCampaign:', updatedCampaign);
 
 		return NextResponse.json(updatedCampaign);
 	} catch (error) {
-		console.error(error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		if (error instanceof z.ZodError) {
+			return new NextResponse('Invalid request data', { status: 400 });
+		}
+		console.error('[CAMPAIGN_PATCH]', error);
+		return new NextResponse('Internal error', { status: 500 });
 	}
 }

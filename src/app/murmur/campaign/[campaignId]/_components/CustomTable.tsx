@@ -1,5 +1,6 @@
 'use client';
 import {
+	Column,
 	ColumnDef,
 	ColumnFiltersState,
 	flexRender,
@@ -23,6 +24,8 @@ import { Dispatch, SetStateAction, useEffect, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import CustomPagination from '@/components/CustomPagination';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { ArrowUpDown } from 'lucide-react';
 
 interface DataTableProps<TData, TValue> {
 	columns: ColumnDef<TData, TValue>[];
@@ -35,6 +38,26 @@ interface DataTableProps<TData, TValue> {
 }
 
 // https://ui.shadcn.com/docs/components/data-table
+interface TableSortingButtonProps<TData> {
+	column: Column<TData, unknown>;
+	label: string;
+}
+
+export function TableSortingButton<TData>({
+	column,
+	label,
+}: TableSortingButtonProps<TData>) {
+	return (
+		<Button
+			variant="ghost"
+			onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+		>
+			{label}
+			<ArrowUpDown className="h-4 w-4" />
+		</Button>
+	);
+}
+
 export function CustomTable<TData, TValue>({
 	columns,
 	data,
@@ -46,10 +69,6 @@ export function CustomTable<TData, TValue>({
 }: DataTableProps<TData, TValue>) {
 	const getInitialRowSelection = () => {
 		if (!initialRowSelectionState || !data) return {};
-		console.log(
-			'🚀 ~ getInitialRowSelection ~ initialRowSelectionState:',
-			initialRowSelectionState
-		);
 
 		return data.reduce((acc, row, index) => {
 			const isSelected = initialRowSelectionState.some(
@@ -63,7 +82,6 @@ export function CustomTable<TData, TValue>({
 	};
 
 	const [rowSelection, setRowSelection] = useState(getInitialRowSelection());
-	console.log('🚀 ~ rowSelection:', rowSelection);
 	const [isInitialMount, setIsInitialMount] = useState(true);
 
 	const [sorting, setSorting] = useState<SortingState>([]);
@@ -94,27 +112,32 @@ export function CustomTable<TData, TValue>({
 	const rowModel = table.getSelectedRowModel();
 
 	useEffect(() => {
-		// Only update selected rows if:
-		// 1. It's not the initial mount, OR
-		// 2. We have initial selection state
-		if (!setSelectedRows) return;
+		if (!setSelectedRows || !data) return;
+
+		const updateSelectedRows = () => {
+			const selectedRows = table.getSelectedRowModel().rows;
+			if (!singleSelection) {
+				setSelectedRows(selectedRows.map((row) => row.original));
+			} else {
+				const firstSelectedRow = selectedRows[0];
+				setSelectedRows(firstSelectedRow ? [firstSelectedRow.original] : []);
+			}
+		};
+
 		if (isInitialMount || initialRowSelectionState?.length) {
 			setIsInitialMount(false);
-			if (!singleSelection) {
-				setSelectedRows(table.getSelectedRowModel().rows.map((row) => row.original));
-			} else {
-				const firstSelectedRow = table.getSelectedRowModel().rows[0];
-				setSelectedRows(firstSelectedRow ? [firstSelectedRow.original] : []);
-			}
+			updateSelectedRows();
 		} else if (!isInitialMount) {
-			if (!singleSelection) {
-				setSelectedRows(table.getSelectedRowModel().rows.map((row) => row.original));
-			} else {
-				const firstSelectedRow = table.getSelectedRowModel().rows[0];
-				setSelectedRows(firstSelectedRow ? [firstSelectedRow.original] : []);
-			}
+			updateSelectedRows();
 		}
-	}, [rowModel, table, singleSelection]);
+	}, [
+		setSelectedRows,
+		rowSelection,
+		data,
+		singleSelection,
+		isInitialMount,
+		initialRowSelectionState,
+	]);
 
 	// // Mark initial mount as complete after first render
 	// useEffect(() => {

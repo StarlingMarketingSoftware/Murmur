@@ -133,6 +133,7 @@ async function processCSVFiles() {
 const generateCategoryName = (categoryName: string, secondaryIdentifier: string) => {
 	return `${categoryName} ${secondaryIdentifier}`;
 };
+
 const importCSVWithSubcategories = async (
 	relativeFilePath: string,
 	categoryName: string
@@ -178,9 +179,6 @@ const importCSVWithSubcategories = async (
 
 	const allContactLists = await prisma.contactList.findMany({});
 
-	console.log('🚀 ~ allContactLists:', allContactLists);
-
-	// Process each record
 	for (const record of records) {
 		const recordCategoryName = generateCategoryName(categoryName, record.state);
 		const recordContactListId = allContactLists.find(

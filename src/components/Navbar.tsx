@@ -16,7 +16,7 @@ import { headers } from 'next/headers';
 import { twMerge } from 'tailwind-merge';
 import { DarkModeToggle } from './DarkModeToggle';
 
-const urlList = [urls.home, urls.murmur, urls.pricing, urls.contact];
+const urlList = [urls.home, urls.murmur.dashboard, urls.pricing, urls.contact];
 
 interface NavItemProps {
 	url: Url;

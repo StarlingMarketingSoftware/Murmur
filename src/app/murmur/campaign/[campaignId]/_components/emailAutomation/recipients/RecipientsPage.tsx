@@ -1,13 +1,20 @@
 'use client';
 
 import Spinner from '@/components/ui/spinner';
-import { TypographyH2 } from '@/components/ui/typography';
-import { Card, CardHeader, CardDescription, CardContent } from '@/components/ui/card';
+import {
+	Card,
+	CardHeader,
+	CardDescription,
+	CardContent,
+	CardTitle,
+} from '@/components/ui/card';
 import CustomTable from '../../CustomTable';
-import { useRecipientsPage } from './useRecipientsPage';
+import { RecipientsPageProps, useRecipientsPage } from './useRecipientsPage';
 import ContactListDialog from './ContactListDialog';
+import RecipientsTable from './RecipientsTable';
+import { FC } from 'react';
 
-const SelectRecipients = () => {
+const SelectRecipients: FC<RecipientsPageProps> = (props) => {
 	const {
 		columns,
 		dataContactLists,
@@ -16,18 +23,19 @@ const SelectRecipients = () => {
 		isPendingContactLists,
 		setIsContactListDialogOpen,
 		selectedContactList,
-	} = useRecipientsPage();
+		campaign,
+	} = useRecipientsPage(props);
 
 	if (isPendingContactLists) {
 		return <Spinner />;
 	}
 	return (
 		<>
-			<TypographyH2>Contact Lists</TypographyH2>
 			<Card>
 				<CardHeader>
+					<CardTitle>Contact Lists</CardTitle>
 					<CardDescription>
-						Select a list to manage or import from Google Contacts.
+						Click on a list to view and select individual recipients.
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-2">
@@ -41,6 +49,7 @@ const SelectRecipients = () => {
 					isOpen={isContactListDialogOpen}
 					setIsOpen={setIsContactListDialogOpen}
 					selectedContactList={selectedContactList}
+					selectedRecipients={campaign.contacts}
 				/>
 				{/* <Button
 				onClick={handleImportGoogleContacts}
@@ -62,6 +71,7 @@ const SelectRecipients = () => {
 				setIsOpen={setIsPermissionsDialogOpen}
 			/> */}
 			</Card>
+			<RecipientsTable contacts={campaign.contacts} />
 		</>
 	);
 };

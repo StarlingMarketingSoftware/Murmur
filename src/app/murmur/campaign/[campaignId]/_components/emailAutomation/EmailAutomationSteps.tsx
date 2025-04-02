@@ -1,40 +1,12 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import SelectRecipients from './recipients/RecipientsPage';
 import { Button } from '@/components/ui/button';
-import { ReactNode } from 'react';
-import DraftPage from './draft/DraftPage';
-import Send from './send/Send';
-import { useEmailAutomationSteps } from './useEmailAutomationSteps';
+import { FC } from 'react';
+import {
+	EmailAutomationStepsProps,
+	useEmailAutomationSteps,
+} from './useEmailAutomationSteps';
 
-type Step = {
-	step: number;
-	value: string;
-	label: string;
-	component: ReactNode;
-};
-
-const steps: Step[] = [
-	{
-		step: 1,
-		value: 'recipients',
-		label: 'Recipients',
-		component: <SelectRecipients />,
-	},
-	{
-		step: 2,
-		value: 'draft',
-		label: 'Draft',
-		component: <DraftPage />,
-	},
-	{
-		step: 3,
-		value: 'send',
-		label: 'Send',
-		component: <Send />,
-	},
-];
-
-const EmailAutomationSteps = () => {
+const EmailAutomationSteps: FC<EmailAutomationStepsProps> = (props) => {
 	const {
 		stepParam,
 		handleTabChange,
@@ -42,7 +14,8 @@ const EmailAutomationSteps = () => {
 		returnToPreviousStep,
 		handleSaveCampaign,
 		isPendingCampaign,
-	} = useEmailAutomationSteps();
+		steps,
+	} = useEmailAutomationSteps(props);
 
 	return (
 		<>

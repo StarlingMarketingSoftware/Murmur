@@ -1,21 +1,8 @@
 import { Card, CardHeader, CardDescription, CardContent } from '@/components/ui/card';
-import { FC, useState } from 'react';
+import { FC } from 'react';
 import CustomTable from '../../CustomTable';
-import { Button } from '@/components/ui/button';
 import { ContactList } from '@prisma/client';
-import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown } from 'lucide-react';
-import { FcGoogle } from 'react-icons/fc';
-import RequestPeopleAPIPermissionsDialog from '../../RequestPeopleAPIPermissionsDialog';
-import { LocalStorageKeys } from '@/constants/constants';
-import { hasContactsReadOnlyPermission } from '@/app/utils/googlePermissions';
-import { toast } from 'sonner';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
-import {
-	setSelectedContactLists,
-	setStep2,
-} from '@/lib/redux/features/murmur/murmurSlice';
-import ContactListDialog from './ContactListDialog';
 
 interface SelectRecipientsStep1Props {
 	contactLists: ContactList[];
@@ -43,7 +30,6 @@ const SelectRecipientsStep1: FC<SelectRecipientsStep1Props> = ({ contactLists })
 					initialRowSelectionState={selectedContactLists}
 				/>
 			</CardContent>
-			<ContactListDialog />
 			{/* <Button
 				onClick={handleImportGoogleContacts}
 				variant="outline"

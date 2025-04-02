@@ -1,5 +1,4 @@
 import { Prisma } from '@prisma/client';
-import { z } from 'zod';
 
 export type Url = {
 	path: string;
@@ -11,7 +10,6 @@ export type UrlCategory = 'protected' | 'mainMenu';
 
 export type CampaignWithRelations = Prisma.CampaignGetPayload<{
 	include: {
-		contactLists: true;
 		contacts: true;
 		emails: true;
 	};

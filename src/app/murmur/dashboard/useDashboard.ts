@@ -44,10 +44,10 @@ export const useCreateCampaignDialog = () => {
 
 	const onSubmit = async () => {
 		console.log(form.getValues());
-		await createCampaign(form.getValues());
+		const campaign = await createCampaign(form.getValues());
 		form.reset();
 		toast.success('Campaign created successfully!');
-		router.push(urls.murmur.campaign.path);
+		router.push(`${urls.murmur.campaign.path}/${campaign.id}`);
 	};
 
 	return { form, onSubmit, isPending };

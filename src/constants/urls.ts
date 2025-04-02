@@ -10,6 +10,8 @@ export const urls = {
 		category: 'protected',
 		dashboard: {
 			path: '/murmur/dashboard',
+			label: 'Murmur',
+			category: 'protected',
 		},
 		campaign: {
 			path: '/murmur/campaign',
