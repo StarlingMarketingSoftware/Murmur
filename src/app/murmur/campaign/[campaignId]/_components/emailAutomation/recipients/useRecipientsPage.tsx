@@ -6,13 +6,18 @@ import { ArrowUpDown } from 'lucide-react';
 import { LocalStorageKeys } from '@/constants/constants';
 import { hasContactsReadOnlyPermission } from '@/app/utils/googlePermissions';
 import { toast } from 'sonner';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CampaignWithRelations } from '@/constants/types';
 import { useParams } from 'next/navigation';
 import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/route';
 import { z } from 'zod';
-export const useRecipientsPage = () => {
+
+export interface RecipientsPageProps {
+	campaign: CampaignWithRelations;
+}
+
+export const useRecipientsPage = (props: RecipientsPageProps) => {
 	const columns: ColumnDef<ContactList>[] = [
 		{
 			accessorKey: 'category',
@@ -49,6 +54,7 @@ export const useRecipientsPage = () => {
 			},
 		},
 	];
+	const { campaign } = props;
 
 	const handleImportGoogleContacts = async () => {
 		if (hasContactsReadOnlyPermission()) {
@@ -123,6 +129,7 @@ export const useRecipientsPage = () => {
 		setIsContactListDialogOpen,
 		selectedContactList,
 		setSelectedContactList,
+		campaign,
 	};
 };
 
@@ -249,6 +256,8 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		},
 	});
 
+	const queryClient = useQueryClient();
+
 	const { isPendingUpdateCampaign, mutate: updateCampaign } = useMutation({
 		mutationFn: async (campaign: z.infer<typeof updateCampaignSchema>) => {
 			console.log('🚀 ~ mutationFn: ~ campaign:', campaign);
@@ -268,6 +277,7 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		onSuccess: () => {
 			toast.success('Recipients saved successfully!');
 			setIsOpen(false);
+			queryClient.invalidateQueries({ queryKey: ['campaign'] });
 		},
 		onError: () => {
 			toast.error('Failed to save recipients. Please try again.');
@@ -299,5 +309,109 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		setSelectedRows,
 		selectedContactList,
 		saveSelectedRecipients,
+	};
+};
+
+export interface RecipientsTableProps {
+	contacts: Contact[];
+}
+
+export const useRecipientsTable = (props: RecipientsTableProps) => {
+	const { contacts } = props;
+
+	const columns: ColumnDef<Contact>[] = [
+		{
+			id: 'select',
+			header: ({ table }) => (
+				<Checkbox
+					checked={
+						table.getIsAllPageRowsSelected() ||
+						(table.getIsSomePageRowsSelected() && 'indeterminate')
+					}
+					onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+					aria-label="Select all"
+				/>
+			),
+			cell: ({ row }) => (
+				<Checkbox
+					checked={row.getIsSelected()}
+					onCheckedChange={(value) => row.toggleSelected(!!value)}
+					aria-label="Select row"
+				/>
+			),
+		},
+		{
+			accessorKey: 'name',
+			header: ({ column }) => {
+				return (
+					<Button
+						variant="ghost"
+						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+					>
+						Name
+						<ArrowUpDown className="h-4 w-4" />
+					</Button>
+				);
+			},
+			cell: ({ row }) => {
+				return <div className="text-left">{row.getValue('name')}</div>;
+			},
+		},
+		{
+			accessorKey: 'email',
+			header: ({ column }) => {
+				return (
+					<Button
+						variant="ghost"
+						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+					>
+						Email
+						<ArrowUpDown className="h-4 w-4" />
+					</Button>
+				);
+			},
+			cell: ({ row }) => {
+				return <div className="text-left">{row.getValue('email')}</div>;
+			},
+		},
+		{
+			accessorKey: 'category',
+			header: ({ column }) => {
+				return (
+					<Button
+						variant="ghost"
+						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+					>
+						Category
+						<ArrowUpDown className="h-4 w-4" />
+					</Button>
+				);
+			},
+			cell: ({ row }) => {
+				return <div className="capitalize text-left">{row.getValue('category')}</div>;
+			},
+		},
+		{
+			accessorKey: 'company',
+			header: ({ column }) => {
+				return (
+					<Button
+						variant="ghost"
+						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+					>
+						Company
+						<ArrowUpDown className="h-4 w-4" />
+					</Button>
+				);
+			},
+			cell: ({ row }) => {
+				return <div className="text-left">{row.getValue('company')}</div>;
+			},
+		},
+	];
+
+	return {
+		columns,
+		contacts,
 	};
 };
