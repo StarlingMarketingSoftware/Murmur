@@ -4,5 +4,6 @@
 	"[prisma]": {
 		"editor.defaultFormatter": "Prisma.prisma"
 	},
-	"files.refactoring.autoSave": true
+	"files.refactoring.autoSave": true,
+	"typescript.updateImportsOnFileMove.enabled": "always"
 }

@@ -4,7 +4,7 @@ import { Checkbox } from '@radix-ui/react-checkbox';
 import { ColumnDef } from '@tanstack/react-table';
 import { ArrowUpDown } from 'lucide-react';
 import { Dispatch, FC, SetStateAction } from 'react';
-import CustomTable from '../../CustomTable';
+import CustomTable from '../../../CustomTable';
 import { Draft } from '@/constants/types';
 import { useAppSelector } from '@/lib/redux/hooks';
 

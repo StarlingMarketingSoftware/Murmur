@@ -36,6 +36,11 @@ export async function GET(
 // Input validation schema
 export const updateCampaignSchema = z.object({
 	name: z.string().optional(),
+	subject: z.string().nullable().optional(),
+	message: z.string().nullable().optional(),
+	testSubject: z.string().nullable().optional(),
+	testMessage: z.string().nullable().optional(),
+	aiModel: z.enum(['sonar', 'sonar_pro']).nullable().optional(),
 	contactOperation: z
 		.object({
 			action: z.enum(['connect', 'disconnect']),
@@ -82,6 +87,15 @@ export async function PATCH(
 			},
 			data: {
 				...(validatedData.name && { name: validatedData.name }),
+				...(validatedData.subject !== undefined && { subject: validatedData.subject }),
+				...(validatedData.message !== undefined && { message: validatedData.message }),
+				...(validatedData.aiModel !== undefined && { aiModel: validatedData.aiModel }),
+				...(validatedData.testMessage !== undefined && {
+					testMessage: validatedData.testMessage,
+				}),
+				...(validatedData.testSubject !== undefined && {
+					testSubject: validatedData.testSubject,
+				}),
 				...(validatedData.contactOperation && {
 					contacts: {
 						[validatedData.contactOperation.action]:
@@ -98,7 +112,6 @@ export async function PATCH(
 				contacts: true,
 			},
 		});
-		console.log('🚀 ~ updatedCampaign:', updatedCampaign);
 
 		return NextResponse.json(updatedCampaign);
 	} catch (error) {

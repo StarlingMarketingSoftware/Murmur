@@ -9,17 +9,23 @@ import {
 import CustomTable from '../../../CustomTable';
 import ContactListDialog from '../ContactListDialog/ContactListDialog';
 import { ContactListTableProps, useContactListTable } from './useContactListTable';
+import Spinner from '@/components/ui/spinner';
 
 const ContactListTable: FC<ContactListTableProps> = (props) => {
 	const {
 		columns,
 		dataContactLists,
+		isPendingContactLists,
 		handleRowClick,
 		isContactListDialogOpen,
 		setIsContactListDialogOpen,
 		selectedContactList,
 		campaign,
 	} = useContactListTable(props);
+
+	if (isPendingContactLists) {
+		return <Spinner />;
+	}
 
 	return (
 		<Card>

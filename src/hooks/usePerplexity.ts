@@ -1,7 +1,7 @@
-import { AiModel, Draft } from '@/constants/types';
+import { Draft } from '@/constants/types';
 import { setCompletedDrafts } from '@/lib/redux/features/murmur/murmurSlice';
 import { useAppDispatch } from '@/lib/redux/hooks';
-import { Contact } from '@prisma/client';
+import { AiModel, Contact } from '@prisma/client';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -134,7 +134,7 @@ export const usePerplexityDraftEmail = () => {
 				const beginningIndex = jsonString.indexOf('{');
 				const endIndex = jsonString.lastIndexOf('}') + 1;
 				const jsonStringTrimmed = jsonString.slice(beginningIndex, endIndex).trim();
-				console.log("🚀 ~ mutationFn: ~ jsonStringTrimmed:", jsonStringTrimmed)
+				console.log('🚀 ~ mutationFn: ~ jsonStringTrimmed:', jsonStringTrimmed);
 				const parsedDraft = JSON.parse(jsonStringTrimmed) as Draft;
 
 				if (!parsedDraft.contactEmail || !parsedDraft.subject || !parsedDraft.message) {

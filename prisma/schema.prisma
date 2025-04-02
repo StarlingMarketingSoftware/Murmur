@@ -14,6 +14,11 @@ enum EmailStatus {
   failed
 }
 
+enum AiModel {
+  sonar
+  sonar_pro @map("sonar-pro")
+}
+
 model User {
   id        Int     @id @default(autoincrement())
   clerkId   String  @unique
@@ -81,14 +86,19 @@ model Email {
 }
 
 model Campaign {
-  id        Int       @id @default(autoincrement())
-  name      String
-  userId    String
-  user      User      @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
-  contacts  Contact[]
-  emails    Email[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          Int       @id @default(autoincrement())
+  name        String
+  userId      String
+  user        User      @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  contacts    Contact[]
+  subject     String?
+  message     String?   @db.Text
+  aiModel     AiModel?
+  testMessage String?   @db.Text
+  testSubject String?
+  emails      Email[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([userId])
 }

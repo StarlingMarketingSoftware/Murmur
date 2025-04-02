@@ -1,9 +1,9 @@
-import { Draft } from '@/constants/types';
-import { useEffect, useState } from 'react';
-import SavedDraftsTable from './SavedDraftsTable';
-import ComposeEmailSection from './ComposeEmailSection';
+import { CampaignWithRelations, Draft } from '@/constants/types';
+import { FC, useEffect, useState } from 'react';
+import SavedDraftsTable from './SavedDraftsTable/SavedDraftsTable';
 import { useAppSelector } from '@/lib/redux/hooks';
 import { Contact } from '@prisma/client';
+import ComposeEmailSection from './ComposeEmailSection/ComposeEmailSection';
 
 const sampleDrafts: Draft[] = [
 	{
@@ -88,21 +88,17 @@ const sampleDrafts: Draft[] = [
 	},
 ];
 
-const DraftPage = () => {
-	// const [selectedRecipient, setSelectedRecipient] = useState<string>(''); // store user emails here to coordiate between the recipients selection area and the draft selection area
-	const selectedRecipients: Contact[] = useAppSelector(
-		(state) => state.murmur.recipients.selectedRecipients
-	);
+interface DraftsPageProps {
+	campaign: CampaignWithRelations;
+}
 
-	useEffect(() => {
-		console.log('🚀 ~ DraftPage ~ selectedRecipients:', selectedRecipients);
-	}, [selectedRecipients]);
+const DraftPage: FC<DraftsPageProps> = ({ campaign }) => {
 	const [selectedRows, setSelectedRows] = useState<Draft[]>([]);
 	const [drafts, setDrafts] = useState<Draft[]>([]); // TODO store this in localStorage as well in case app crashes
 
 	return (
 		<>
-			<ComposeEmailSection setDrafts={setDrafts} />
+			<ComposeEmailSection campaign={campaign} />
 			<SavedDraftsTable drafts={drafts} setSelectedRows={setSelectedRows} />
 		</>
 	);
