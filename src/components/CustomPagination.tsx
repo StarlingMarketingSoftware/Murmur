@@ -19,8 +19,9 @@ interface CustomPaginationProps<TData> {
 const CustomPagination = <TData,>({ table }: CustomPaginationProps<TData>) => {
 	const numPages = table.getPageCount();
 	const currentPage = table.getState().pagination.pageIndex;
-	let paginationArray: number[] = [];
+
 	const generatePaginationItems = (): ReactNode[] => {
+		let paginationArray: number[] = [];
 		if (numPages > 9) {
 			if (currentPage >= 4 && currentPage < numPages - 3) {
 				paginationArray = [
@@ -82,12 +83,19 @@ const CustomPagination = <TData,>({ table }: CustomPaginationProps<TData>) => {
 	return (
 		<Pagination className="my-4">
 			<PaginationContent>
-				<PaginationItem onClick={() => table.previousPage()}>
+				<PaginationItem
+					className={twMerge(currentPage === 0 && 'pointer-events-none opacity-25')}
+					onClick={() => table.previousPage()}
+				>
 					<PaginationPrevious />
 				</PaginationItem>
 				{generatePaginationItems()}
-
-				<PaginationItem onClick={() => table.nextPage()}>
+				<PaginationItem
+					className={twMerge(
+						currentPage + 1 === numPages && 'pointer-events-none opacity-25'
+					)}
+					onClick={() => table.nextPage()}
+				>
 					<PaginationNext />
 				</PaginationItem>
 			</PaginationContent>
