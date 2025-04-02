@@ -24,12 +24,13 @@ import {
 } from '@/components/ui/select';
 
 import { AiModelOptions } from '@/constants/constants';
-import PreviewDraftDialog from '../../../PreviewDraftDialog';
+import PreviewDraftDialog from '../../../PreviewDraftDialog/PreviewDraftDialog';
 import ConfirmModal from '@/components/ConfirmModal';
 import { FC } from 'react';
 import useComposeEmailSection, {
 	ComposeEmailSectionProps,
 } from './useComposeEmailSection';
+import { Separator } from '@/components/ui/separator';
 
 const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 	const {
@@ -157,58 +158,64 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 								)}
 							/>
 						)}
-						<div className="flex gap-4">
-							<Button
-								type="button"
-								onClick={() => handleFormAction('test')}
-								variant="ghost"
-								isLoading={isTest && isPendingDraftEmail}
-								disabled={isPendingDraftEmail}
-							>
-								{isAiDraft ? 'Test Your Prompt' : 'Preview Draft'}
-							</Button>
+						<div className="flex flex-col gap-4">
+							<div className="flex gap-4">
+								<Button
+									type="button"
+									onClick={() => handleFormAction('test')}
+									variant="outline"
+									isLoading={isTest && isPendingDraftEmail}
+									disabled={isPendingDraftEmail}
+								>
+									{isAiDraft ? 'Test Your Prompt' : 'Preview Draft'}
+								</Button>
 
-							{dataDraftEmail && <PreviewDraftDialog draftEmail={dataDraftEmail} />}
-
-							<ConfirmModal
-								title="Confirm Batch Generation of Emails"
-								confirmAction={() => handleFormAction('submit')}
-								triggerButton={
-									<Button
-										type="button"
-										onClick={async (e) => {
-											// e.preventDefault();
-											e.stopPropagation();
-											await trigger();
-											const hasErrors = Object.keys(errors).length > 0;
-											if (hasErrors) {
-												return;
-											}
-										}}
-										isLoading={isPendingDraftEmail && !isTest}
-										disabled={isPendingDraftEmail}
-									>
-										{isAiDraft
-											? 'Generate Custom Emails for All Recipients'
-											: 'Save Drafts for All Recipients'}
-									</Button>
-								}
-							>
-								Are you sure you want to generate emails for all selected recipients?
-								<br /> <br />
-								This action will have AI create a custom email for each recipient based on
-								the prompt you provided and will count towards your monthly usage limits.
-							</ConfirmModal>
-							<Button
-								className=""
-								type="button"
-								onClick={handleSavePrompt}
-								variant="outline"
-								isLoading={isPendingSavePrompt}
-							>
-								{/* {isAiDraft ? 'Save Prompt' : 'Save Message'} */}
-								Save Section
-							</Button>
+								{dataDraftEmail && <PreviewDraftDialog draftEmail={dataDraftEmail} />}
+							</div>
+							<Separator />
+							<div className="flex gap-4">
+								<ConfirmModal
+									title="Confirm Batch Generation of Emails"
+									confirmAction={() => handleFormAction('submit')}
+									triggerButton={
+										<Button
+											type="button"
+											onClick={async (e) => {
+												// e.preventDefault();
+												e.stopPropagation();
+												await trigger();
+												const hasErrors = Object.keys(errors).length > 0;
+												if (hasErrors) {
+													return;
+												}
+											}}
+											isLoading={isPendingDraftEmail && !isTest}
+											disabled={isPendingDraftEmail}
+										>
+											{isAiDraft
+												? 'Generate Custom Emails for All Recipients'
+												: 'Save Drafts for All Recipients'}
+										</Button>
+									}
+								>
+									Are you sure you want to generate emails for all selected recipients?
+									<br /> <br />
+									This action will have AI create a custom email for each recipient based
+									on the prompt you provided and will count towards your monthly usage
+									limits.
+								</ConfirmModal>
+								{/* <Separator className="!h-auto" orientation="vertical" /> */}
+								<Button
+									className=""
+									type="button"
+									onClick={handleSavePrompt}
+									variant="default"
+									isLoading={isPendingSavePrompt}
+								>
+									{/* {isAiDraft ? 'Save Prompt' : 'Save Message'} */}
+									Save Section
+								</Button>
+							</div>
 						</div>
 					</form>
 				</Form>

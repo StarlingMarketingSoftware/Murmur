@@ -39,9 +39,9 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		draftEmail,
 		draftEmailAsync,
 	} = usePerplexityDraftEmail();
-	console.log('🚀 ~ useComposeEmailSection ~ rawDataDraftEmail:', rawDataDraftEmail);
 
 	let dataDraftEmail: Draft | undefined;
+
 	if (!rawDataDraftEmail && campaign.testMessage && campaign.testMessage.length > 0) {
 		dataDraftEmail = {
 			subject: campaign.testSubject || '',
@@ -51,8 +51,6 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	} else {
 		dataDraftEmail = rawDataDraftEmail;
 	}
-
-	console.log('🚀 ~ useComposeEmailSection ~ dataDraftEmail:', dataDraftEmail);
 
 	const form = useForm<z.infer<ReturnType<typeof getEmailDraftSchema>>>({
 		resolver: zodResolver(getEmailDraftSchema(isAiSubject)),
