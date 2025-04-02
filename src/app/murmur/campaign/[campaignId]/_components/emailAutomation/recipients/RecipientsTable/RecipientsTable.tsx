@@ -6,9 +6,9 @@ import {
 	CardTitle,
 } from '@/components/ui/card';
 import { FC } from 'react';
-import CustomTable from '../../CustomTable';
+import CustomTable from '../../../CustomTable';
 import Spinner from '@/components/ui/spinner';
-import { RecipientsTableProps, useRecipientsTable } from './useRecipientsPage';
+import { RecipientsTableProps, useRecipientsTable } from './useRecipientsTable';
 
 const RecipientsTable: FC<RecipientsTableProps> = (props) => {
 	const { columns, contacts, isPendingRemoveContacts } = useRecipientsTable(props);

@@ -8,13 +8,12 @@ import {
 	DialogTitle,
 } from '@/components/ui/dialog';
 import { FC } from 'react';
-import { ContactListDialogProps, useContactListDialog } from './useRecipientsPage';
 import Spinner from '@/components/ui/spinner';
-import CustomTable from '../../CustomTable';
+import CustomTable from '../../../CustomTable';
+import { ContactListDialogProps, useContactListDialog } from './useContactListDialog';
 
 const ContactListDialog: FC<ContactListDialogProps> = (props) => {
 	const {
-		data,
 		isPending,
 		isOpen,
 		setIsOpen,
@@ -24,7 +23,6 @@ const ContactListDialog: FC<ContactListDialogProps> = (props) => {
 		saveSelectedRecipients,
 		filteredData,
 	} = useContactListDialog(props);
-	console.log('🚀 ~ filteredData:', filteredData);
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen}>
 			<DialogContent className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px]">
