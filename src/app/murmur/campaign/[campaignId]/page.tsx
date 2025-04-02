@@ -1,11 +1,8 @@
 'use client';
 
-import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import EmailAutomationSteps from './_components/emailAutomation/EmailAutomationSteps';
 import { useCampaignDetail } from './useCampaignDetail';
-import { useAppSelector } from '@/lib/redux/hooks';
-import { TypographyH2 } from '@/components/ui/typography';
 import PageHeading from '@/components/text/PageHeading';
 import Spinner from '@/components/ui/spinner';
 

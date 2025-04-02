@@ -1,17 +1,14 @@
 import { LocalStorageKeys, requestedPeopleScopes } from '@/constants/constants';
-import { setCampaignState } from '@/lib/redux/features/murmur/murmurSlice';
 import { Campaign } from '@prisma/client';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { useDispatch } from 'react-redux';
 import { toast } from 'sonner';
 
 export const useCampaignDetail = () => {
 	const params = useParams();
 	const campaignId = params.campaignId;
-	const dispatch = useDispatch();
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const tab = searchParams.get('tab') ?? 'murmur';

@@ -1,7 +1,6 @@
 'use client';
 
 import Spinner from '@/components/ui/spinner';
-import { TypographyH2 } from '@/components/ui/typography';
 import {
 	Card,
 	CardHeader,
@@ -50,6 +49,7 @@ const SelectRecipients: FC<RecipientsPageProps> = (props) => {
 					isOpen={isContactListDialogOpen}
 					setIsOpen={setIsContactListDialogOpen}
 					selectedContactList={selectedContactList}
+					selectedRecipients={campaign.contacts}
 				/>
 				{/* <Button
 				onClick={handleImportGoogleContacts}

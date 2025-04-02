@@ -1,5 +1,4 @@
 import { Prisma } from '@prisma/client';
-import { z } from 'zod';
 
 export type Url = {
 	path: string;

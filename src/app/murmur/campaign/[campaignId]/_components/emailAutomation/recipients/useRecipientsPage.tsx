@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Campaign, Contact, ContactList } from '@prisma/client';
+import { Contact, ContactList } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, DeleteIcon, TrashIcon } from 'lucide-react';
+import { TrashIcon } from 'lucide-react';
 import { LocalStorageKeys } from '@/constants/constants';
 import { hasContactsReadOnlyPermission } from '@/app/utils/googlePermissions';
 import { toast } from 'sonner';
@@ -41,46 +41,46 @@ export const useRecipientsPage = (props: RecipientsPageProps) => {
 	];
 	const { campaign } = props;
 
-	const handleImportGoogleContacts = async () => {
-		if (hasContactsReadOnlyPermission()) {
-			console.log('calling peoples api');
-			try {
-				const response = await fetch(
-					'https://people.googleapis.com/v1/people/me/connections?' +
-						new URLSearchParams({
-							personFields: 'names,emailAddresses',
-							pageSize: '1000',
-						}),
-					{
-						headers: {
-							Authorization: `Bearer ${localStorage.getItem(
-								LocalStorageKeys.GoogleAccessToken
-							)}`,
-							Accept: 'application/json',
-						},
-					}
-				);
+	// const handleImportGoogleContacts = async () => {
+	// 	if (hasContactsReadOnlyPermission()) {
+	// 		console.log('calling peoples api');
+	// 		try {
+	// 			const response = await fetch(
+	// 				'https://people.googleapis.com/v1/people/me/connections?' +
+	// 					new URLSearchParams({
+	// 						personFields: 'names,emailAddresses',
+	// 						pageSize: '1000',
+	// 					}),
+	// 				{
+	// 					headers: {
+	// 						Authorization: `Bearer ${localStorage.getItem(
+	// 							LocalStorageKeys.GoogleAccessToken
+	// 						)}`,
+	// 						Accept: 'application/json',
+	// 					},
+	// 				}
+	// 			);
 
-				if (!response.ok) {
-					throw new Error(`HTTP error! status: ${response.status}`);
-				}
+	// 			if (!response.ok) {
+	// 				throw new Error(`HTTP error! status: ${response.status}`);
+	// 			}
 
-				const data = await response.json();
-				console.log('🚀 ~ handleImportGoogleContacts ~ data:', data);
-				// TODO set state
-			} catch (error) {
-				if (error instanceof Error) {
-					toast.error('Error fetching Google contacts: ' + error.message);
-				}
-				throw error;
-			}
-		} else {
-			setIsPermissionsDialogOpen(true);
-		}
-	};
+	// 			const data = await response.json();
+	// 			console.log('🚀 ~ handleImportGoogleContacts ~ data:', data);
+	// 			// TODO set state
+	// 		} catch (error) {
+	// 			if (error instanceof Error) {
+	// 				toast.error('Error fetching Google contacts: ' + error.message);
+	// 			}
+	// 			throw error;
+	// 		}
+	// 	} else {
+	// 		setIsPermissionsDialogOpen(true);
+	// 	}
+	// };
 
 	const [isContactListDialogOpen, setIsContactListDialogOpen] = useState(false);
-	const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false);
+	// const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false);
 	const [selectedContactList, setSelectedContactList] = useState<ContactList | null>(
 		null
 	);
@@ -122,6 +122,7 @@ export interface ContactListDialogProps {
 	isOpen: boolean;
 	setIsOpen: (isOpen: boolean) => void;
 	selectedContactList: ContactList | null;
+	selectedRecipients: Contact[];
 }
 
 export const useContactListDialog = (props: ContactListDialogProps) => {
@@ -183,11 +184,11 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 			},
 		},
 	];
-	const { selectedContactList, isOpen, setIsOpen } = props;
+	const { selectedContactList, isOpen, setIsOpen, selectedRecipients } = props;
 	const [selectedRows, setSelectedRows] = useState<Contact[]>([]);
 
 	const params = useParams();
-	const campaignId = params.campaignId as string;
+	const { campaignId } = params;
 
 	const {
 		data,
@@ -209,11 +210,20 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		},
 	});
 
+	const filteredData = useMemo(() => {
+		if (!data) return [];
+
+		return data.filter((contact: Contact) => {
+			return !selectedRecipients.some(
+				(selectedContact) => selectedContact.id === contact.id
+			);
+		});
+	}, [data, selectedRecipients]);
+
 	const queryClient = useQueryClient();
 
-	const { isPendingUpdateCampaign, mutate: updateCampaign } = useMutation({
+	const { mutate: updateCampaign } = useMutation({
 		mutationFn: async (campaign: z.infer<typeof updateCampaignSchema>) => {
-			console.log('🚀 ~ mutationFn: ~ campaign:', campaign);
 			const response = await fetch(`/api/campaigns/${campaignId}`, {
 				method: 'PATCH',
 				headers: {
@@ -221,7 +231,6 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 				},
 				body: JSON.stringify(campaign),
 			});
-			console.log('🚀 ~ mutationFn: ~ response:', response);
 			if (!response.ok) {
 				throw new Error('Network response was not ok');
 			}
@@ -247,7 +256,10 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		console.log('were updating campaign');
 		if (selectedContactList && !!campaignId) {
 			updateCampaign({
-				contactIds: selectedRows.map((row) => row.id),
+				contactOperation: {
+					action: 'connect',
+					contactIds: selectedRows.map((row) => row.id),
+				},
 			});
 		}
 	};
@@ -262,6 +274,7 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		setSelectedRows,
 		selectedContactList,
 		saveSelectedRecipients,
+		filteredData,
 	};
 };
 
@@ -271,6 +284,32 @@ export interface RecipientsTableProps {
 
 export const useRecipientsTable = (props: RecipientsTableProps) => {
 	const { contacts } = props;
+	const queryClient = useQueryClient();
+	const params = useParams();
+	const { campaignId } = params;
+
+	const { isPending: isPendingRemoveContacts, mutate: removeRecipients } = useMutation({
+		mutationFn: async (campaign: z.infer<typeof updateCampaignSchema>) => {
+			const response = await fetch(`/api/campaigns/${campaignId}`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(campaign),
+			});
+			if (!response.ok) {
+				throw new Error('Network response was not ok');
+			}
+			return response.json();
+		},
+		onSuccess: () => {
+			toast.success('Recipient successfully remove from campaign.');
+			queryClient.invalidateQueries({ queryKey: ['campaign'] });
+		},
+		onError: () => {
+			toast.error('Failed to remove recipient from campaign. Please try again.');
+		},
+	});
 
 	const columns: ColumnDef<Contact>[] = [
 		// {
@@ -296,15 +335,7 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 		{
 			accessorKey: 'name',
 			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-					>
-						Name
-						<ArrowUpDown className="h-4 w-4" />
-					</Button>
-				);
+				return <TableSortingButton column={column} label="Name" />;
 			},
 			cell: ({ row }) => {
 				return <div className="text-left">{row.getValue('name')}</div>;
@@ -322,15 +353,7 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 		// {
 		// 	accessorKey: 'website',
 		// 	header: ({ column }) => {
-		// 		return (
-		// 			<Button
-		// 				variant="ghost"
-		// 				onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-		// 			>
-		// 				Website
-		// 				<ArrowUpDown className="h-4 w-4" />
-		// 			</Button>
-		// 		);
+		// 		return <TableSortingButton column={column} label="Website" />;
 		// 	},
 		// 	cell: ({ row }) => {
 		// 		return <div className="text-left">{row.getValue('website')}</div>;
@@ -371,6 +394,13 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 					size="icon"
 					onClick={(e) => {
 						e.stopPropagation();
+						const contactId = row.original.id;
+						removeRecipients({
+							contactOperation: {
+								action: 'disconnect',
+								contactIds: [contactId],
+							},
+						});
 					}}
 				>
 					<TrashIcon className="h-3 w-2 text-destructive" />
@@ -387,5 +417,6 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 	return {
 		columns,
 		contacts,
+		isPendingRemoveContacts,
 	};
 };

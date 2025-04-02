@@ -1,9 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import SelectRecipients from './recipients/RecipientsPage';
 import { Button } from '@/components/ui/button';
-import { FC, ReactNode } from 'react';
-import DraftPage from './draft/DraftPage';
-import Send from './send/Send';
+import { FC } from 'react';
 import {
 	EmailAutomationStepsProps,
 	useEmailAutomationSteps,

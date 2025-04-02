@@ -20,7 +20,7 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table';
-import { Dispatch, FC, SetStateAction, useEffect, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import CustomPagination from '@/components/CustomPagination';
 import { Input } from '@/components/ui/input';
@@ -112,27 +112,32 @@ export function CustomTable<TData, TValue>({
 	const rowModel = table.getSelectedRowModel();
 
 	useEffect(() => {
-		// Only update selected rows if:
-		// 1. It's not the initial mount, OR
-		// 2. We have initial selection state
-		if (!setSelectedRows) return;
+		if (!setSelectedRows || !data) return;
+
+		const updateSelectedRows = () => {
+			const selectedRows = table.getSelectedRowModel().rows;
+			if (!singleSelection) {
+				setSelectedRows(selectedRows.map((row) => row.original));
+			} else {
+				const firstSelectedRow = selectedRows[0];
+				setSelectedRows(firstSelectedRow ? [firstSelectedRow.original] : []);
+			}
+		};
+
 		if (isInitialMount || initialRowSelectionState?.length) {
 			setIsInitialMount(false);
-			if (!singleSelection) {
-				setSelectedRows(table.getSelectedRowModel().rows.map((row) => row.original));
-			} else {
-				const firstSelectedRow = table.getSelectedRowModel().rows[0];
-				setSelectedRows(firstSelectedRow ? [firstSelectedRow.original] : []);
-			}
+			updateSelectedRows();
 		} else if (!isInitialMount) {
-			if (!singleSelection) {
-				setSelectedRows(table.getSelectedRowModel().rows.map((row) => row.original));
-			} else {
-				const firstSelectedRow = table.getSelectedRowModel().rows[0];
-				setSelectedRows(firstSelectedRow ? [firstSelectedRow.original] : []);
-			}
+			updateSelectedRows();
 		}
-	}, [rowModel, table, singleSelection]);
+	}, [
+		setSelectedRows,
+		rowSelection,
+		data,
+		singleSelection,
+		isInitialMount,
+		initialRowSelectionState,
+	]);
 
 	// // Mark initial mount as complete after first render
 	// useEffect(() => {

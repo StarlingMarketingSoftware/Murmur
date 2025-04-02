@@ -11,7 +11,7 @@ import Spinner from '@/components/ui/spinner';
 import { RecipientsTableProps, useRecipientsTable } from './useRecipientsPage';
 
 const RecipientsTable: FC<RecipientsTableProps> = (props) => {
-	const { columns, contacts } = useRecipientsTable(props);
+	const { columns, contacts, isPendingRemoveContacts } = useRecipientsTable(props);
 
 	if (!contacts) {
 		return <Spinner />;
@@ -19,7 +19,10 @@ const RecipientsTable: FC<RecipientsTableProps> = (props) => {
 
 	return (
 		<>
-			<Card>
+			<Card className="relative">
+				{isPendingRemoveContacts && (
+					<Spinner size="medium" className="absolute top-2 right-2" />
+				)}
 				<CardHeader>
 					<CardTitle>Selected Recipients</CardTitle>
 					<CardDescription>
@@ -27,7 +30,11 @@ const RecipientsTable: FC<RecipientsTableProps> = (props) => {
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-2">
-					<CustomTable columns={columns} data={contacts} />
+					<CustomTable
+						columns={columns}
+						data={contacts}
+						noDataMessage="There are no selected recipients for this campaign, please select from the table above."
+					/>
 				</CardContent>
 			</Card>
 		</>

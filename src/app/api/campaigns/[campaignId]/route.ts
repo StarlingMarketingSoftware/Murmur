@@ -36,7 +36,12 @@ export async function GET(
 // Input validation schema
 export const updateCampaignSchema = z.object({
 	name: z.string().optional(),
-	contactIds: z.array(z.number()).optional(),
+	contactOperation: z
+		.object({
+			action: z.enum(['connect', 'disconnect']),
+			contactIds: z.array(z.number()),
+		})
+		.optional(),
 });
 
 export async function PATCH(
@@ -77,13 +82,15 @@ export async function PATCH(
 			},
 			data: {
 				...(validatedData.name && { name: validatedData.name }),
-				...(validatedData.contactIds && {
+				...(validatedData.contactOperation && {
 					contacts: {
-						// This will only add new connections without removing existing ones
-						connect: validatedData.contactIds.map((id: number) => {
-							console.log(`Attempting to connect contact ID: ${id}`);
-							return { id };
-						}),
+						[validatedData.contactOperation.action]:
+							validatedData.contactOperation.contactIds.map((id: number) => {
+								console.log(
+									`Attempting to ${validatedData.contactOperation?.action} contact ID: ${id}`
+								);
+								return { id };
+							}),
 					},
 				}),
 			},
