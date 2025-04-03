@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { TrashIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { ellipsesText } from '@/app/utils/functions';
 
 export const useSavedDraftsTable = () => {
 	const queryClient = useQueryClient();
@@ -60,7 +61,8 @@ export const useSavedDraftsTable = () => {
 				return <TableSortingButton column={column} label="Subject" />;
 			},
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('subject')}</div>;
+				const subject: string = row.getValue('subject');
+				return <div className="text-left">{ellipsesText(subject, 30)}</div>;
 			},
 		},
 		{
@@ -71,7 +73,7 @@ export const useSavedDraftsTable = () => {
 			},
 			cell: ({ row }) => {
 				const message: string = row.getValue('message');
-				return <div className="text-left">{message.substring(0, 60) + '...'}</div>;
+				return <div className="text-left">{ellipsesText(message, 55)}</div>;
 			},
 		},
 		{

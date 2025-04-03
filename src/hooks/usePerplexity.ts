@@ -1,5 +1,4 @@
 import { Draft } from '@/constants/types';
-import { useAppDispatch } from '@/lib/redux/hooks';
 import { AiModel, Contact } from '@prisma/client';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -75,15 +74,13 @@ const messageOnlyFormat = `Return the message only, without any subject line, si
 
 const messageAndSubjectFormat = `Return the message and the subject line, without any signature or other text.`;
 
-const batchMessageOnlyFormat = `I will provide a json that contains information about each recipient. Return the message only, without any subject line, signature, or other text. Please return a list of messages corresponding to each recipient.`;
+// const batchMessageOnlyFormat = `I will provide a json that contains information about each recipient. Return the message only, without any subject line, signature, or other text. Please return a list of messages corresponding to each recipient.`;
 
-const batchMessageAndSubjectFormat = `I will provide a json that contains information about each recipient. Return the message and the subject line, without any signature or other text. Please format the response into a list of JSON strings with the keys "recipient", "subject", and "message".`;
+// const batchMessageAndSubjectFormat = `I will provide a json that contains information about each recipient. Return the message and the subject line, without any signature or other text. Please format the response into a list of JSON strings with the keys "recipient", "subject", and "message".`;
 
 const perplexityEndpoint = 'https://api.perplexity.ai/chat/completions';
 
 export const usePerplexityDraftEmail = () => {
-	const dispatch = useAppDispatch();
-
 	interface DraftEmailParams {
 		model: AiModel;
 		generateSubject: boolean;
@@ -150,9 +147,7 @@ export const usePerplexityDraftEmail = () => {
 		onError: (error) => {
 			toast.error(error.message);
 		},
-		onSuccess: (data) => {
-			// Handle successful response
-		},
+		onSuccess: () => {},
 	});
 
 	interface BatchDraftEmailParams {
@@ -168,6 +163,7 @@ export const usePerplexityDraftEmail = () => {
 		mutate: batchDraftEmails,
 	} = useMutation({
 		mutationFn: async (params: BatchDraftEmailParams) => {
+			console.log(params);
 			// map the contacts to only get the essential data?
 			// for each batch, add to the current redux state of "draftedEmails".
 		},

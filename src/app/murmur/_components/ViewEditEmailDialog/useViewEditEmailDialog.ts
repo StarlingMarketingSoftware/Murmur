@@ -30,11 +30,15 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 		},
 	});
 
-	useEffect(() => {
+	const resetFormToCurrentEmail = () => {
 		if (email) {
 			form.setValue('subject', email.subject);
 			form.setValue('message', email.message);
 		}
+	};
+
+	useEffect(() => {
+		resetFormToCurrentEmail();
 	}, [email, form]);
 
 	// Mutation for updating emails
@@ -65,12 +69,10 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 			toast.success('Email updated successfully');
 			setIsEdit(false);
 		},
-		onError: (error) => {
-			toast.error(`Failed to update email: ${error.message}`);
+		onError: () => {
+			toast.error(`Failed to update email.`);
 		},
 	});
-
-	console.log(form.getValues());
 
 	const handleSave = async (data: z.infer<typeof editEmailSchema>) => {
 		await editEmail(data);
@@ -84,5 +86,6 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 		form,
 		handleSave,
 		isPendingEditEmail,
+		resetFormToCurrentEmail,
 	};
 };
