@@ -1,11 +1,10 @@
 import { Draft } from '@/constants/types';
-import { setCompletedDrafts } from '@/lib/redux/features/murmur/murmurSlice';
 import { useAppDispatch } from '@/lib/redux/hooks';
 import { AiModel, Contact } from '@prisma/client';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-const rolePrompt = `Write a personalized email to {first_name} who works at {company}. 
+const rolePrompt = `Write a personalized email to {first_name} who works at {company}. If there is no recipient name provided, start the email with "Hello!"
 
 Here are some templates:
 
@@ -69,7 +68,7 @@ const jsonFormatInstructions = `IMPORTANT: Please return valid JSON format and n
 {
   "contactEmail": "name@web.com",
   "subject": "generatedSubject",
-  "message": "Hi Recipient,\n\nI came across...", 
+  "message": "Hi Josh,\n\nI came across...", 
 }`;
 
 const messageOnlyFormat = `Return the message only, without any subject line, signature, or other text.`;
@@ -134,7 +133,8 @@ export const usePerplexityDraftEmail = () => {
 				const beginningIndex = jsonString.indexOf('{');
 				const endIndex = jsonString.lastIndexOf('}') + 1;
 				const jsonStringTrimmed = jsonString.slice(beginningIndex, endIndex).trim();
-				console.log('🚀 ~ mutationFn: ~ jsonStringTrimmed:', jsonStringTrimmed);
+				console.log('jsonStringTrimmed:');
+				console.log(jsonStringTrimmed);
 				const parsedDraft = JSON.parse(jsonStringTrimmed) as Draft;
 
 				if (!parsedDraft.contactEmail || !parsedDraft.subject || !parsedDraft.message) {

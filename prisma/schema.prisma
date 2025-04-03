@@ -51,6 +51,7 @@ model Contact {
   contactListId Int?
   contactList   ContactList? @relation(fields: [contactListId], references: [id], onDelete: Cascade)
   campaigns     Campaign[]
+  Email         Email[]
 
   @@unique([email, contactListId])
   @@index([contactListId])
@@ -79,6 +80,8 @@ model Email {
   user       User        @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
   campaignId Int
   campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId  Int
+  contact    Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 

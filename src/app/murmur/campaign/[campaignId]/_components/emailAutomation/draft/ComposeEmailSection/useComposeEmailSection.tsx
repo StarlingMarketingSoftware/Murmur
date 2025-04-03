@@ -2,7 +2,7 @@ import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/route';
 import { CampaignWithRelations, Draft } from '@/constants/types';
 import { usePerplexityDraftEmail } from '@/hooks/usePerplexity';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AiModel } from '@prisma/client';
+import { AiModel, EmailStatus } from '@prisma/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -73,41 +73,6 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		trigger();
 	}, [isAiDraft, trigger]);
 
-	const handleFormAction = async (action: 'test' | 'submit') => {
-		// Check form validity first
-		const isValid = await trigger();
-		if (!isValid) return;
-
-		const values = getValues();
-
-		if (action === 'test') {
-			setIsTest(true);
-			// if error, don't cost the user any tokens
-			const res: Draft = await draftEmailAsync({
-				generateSubject: isAiSubject,
-				model: values.aiModel,
-				recipient: campaign.contacts[0],
-				prompt: values.message,
-			});
-			savePrompt({ testMessage: res.message, testSubject: res.subject });
-		} else if (isAiDraft) {
-			for (const recipient of campaign.contacts) {
-				const newDraft: Draft = await draftEmailAsync({
-					generateSubject: isAiSubject,
-					model: values.aiModel,
-					recipient,
-					prompt: values.message,
-				});
-				if (newDraft) {
-					if (!isAiSubject) {
-						newDraft.subject = values.subject ? values.subject : newDraft.subject;
-					}
-					// save generated draft to database
-				}
-			}
-		}
-	};
-
 	const queryClient = useQueryClient();
 
 	const { isPending: isPendingSavePrompt, mutate: savePrompt } = useMutation({
@@ -137,6 +102,98 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		},
 	});
 
+	const { isPending: isPendingCreateEmail, mutate: createEmail } = useMutation({
+		mutationFn: async (emailData: {
+			subject: string;
+			message: string;
+			contactEmail?: string;
+			campaignId: number;
+			status?: EmailStatus;
+			contactId: number;
+		}) => {
+			// TODO update this function to add contactId
+			const response = await fetch('/api/emails', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(emailData),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to create email');
+			}
+
+			queryClient.invalidateQueries({ queryKey: ['drafts'] });
+
+			return response.json();
+		},
+		onSuccess: (data) => {
+			toast.success('Email created successfully!');
+			queryClient.invalidateQueries({ queryKey: ['campaign'] });
+			return data;
+		},
+		onError: (error: Error) => {
+			toast.error(`Failed to create email: ${error.message}`);
+		},
+	});
+
+	const handleFormAction = async (action: 'test' | 'submit') => {
+		// Check form validity first
+		const isValid = await trigger();
+		if (!isValid) return;
+
+		const values = getValues();
+
+		if (action === 'test') {
+			setIsTest(true);
+			// if error, don't cost the user any tokens
+			const res: Draft = await draftEmailAsync({
+				generateSubject: isAiSubject,
+				model: values.aiModel,
+				recipient: campaign.contacts[0],
+				prompt: values.message,
+			});
+			savePrompt({ testMessage: res.message, testSubject: res.subject });
+		} else if (isAiDraft) {
+			for (const recipient of campaign.contacts) {
+				let newDraft: Draft | null;
+				try {
+					newDraft = await draftEmailAsync({
+						generateSubject: isAiSubject,
+						model: values.aiModel,
+						recipient,
+						prompt: values.message,
+					});
+				} catch {
+					continue;
+				}
+				if (newDraft) {
+					if (!isAiSubject) {
+						newDraft.subject = values.subject ? values.subject : newDraft.subject;
+					}
+					// Create email in database
+					createEmail({
+						subject: newDraft.subject,
+						message: newDraft.message,
+						campaignId: campaign.id,
+						status: 'draft' as EmailStatus,
+						contactId: recipient.id,
+					});
+				}
+			}
+		} else {
+			// For non-AI drafts, create the email directly with the form values
+			// createEmail({
+			// 	subject: values.subject,
+			// 	message: values.message,
+			// 	campaignId: campaign.id,
+			// 	status: 'draft' as EmailStatus,
+			// });
+		}
+	};
+
 	const handleSavePrompt = () => {
 		savePrompt(form.getValues());
 	};
@@ -159,6 +216,8 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		savePrompt,
 		isPendingSavePrompt,
 		handleSavePrompt,
+		createEmail,
+		isPendingCreateEmail,
 	};
 };
 
