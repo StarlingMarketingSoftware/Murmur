@@ -14,6 +14,11 @@ enum EmailStatus {
   failed
 }
 
+enum AiModel {
+  sonar
+  sonar_pro @map("sonar-pro")
+}
+
 model User {
   id        Int     @id @default(autoincrement())
   clerkId   String  @unique
@@ -46,6 +51,7 @@ model Contact {
   contactListId Int?
   contactList   ContactList? @relation(fields: [contactListId], references: [id], onDelete: Cascade)
   campaigns     Campaign[]
+  Email         Email[]
 
   @@unique([email, contactListId])
   @@index([contactListId])
@@ -74,6 +80,8 @@ model Email {
   user       User        @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
   campaignId Int
   campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId  Int
+  contact    Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
@@ -81,14 +89,19 @@ model Email {
 }
 
 model Campaign {
-  id        Int       @id @default(autoincrement())
-  name      String
-  userId    String
-  user      User      @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
-  contacts  Contact[]
-  emails    Email[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          Int       @id @default(autoincrement())
+  name        String
+  userId      String
+  user        User      @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  contacts    Contact[]
+  subject     String?
+  message     String?   @db.Text
+  aiModel     AiModel?
+  testMessage String?   @db.Text
+  testSubject String?
+  emails      Email[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([userId])
 }

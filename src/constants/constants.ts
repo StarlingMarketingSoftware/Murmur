@@ -24,7 +24,7 @@ export const AiModelOptions: AiSelectValues[] = [
 	},
 	{
 		name: 'Murmur AI Pro',
-		value: 'sonar-pro',
+		value: 'sonar_pro',
 		type: 'perplexity',
 	},
 ];

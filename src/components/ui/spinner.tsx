@@ -3,10 +3,10 @@ import { cn } from '@/lib/utils';
 
 interface SpinnerProps {
 	className?: string;
-	size?: 'small' | 'medium' | 'large' | number;
+	size?: 'small' | 'medium' | 'large' | 'xl' | number;
 }
 
-export function Spinner({ className, size = 'medium' }: SpinnerProps) {
+export function Spinner({ className, size = 'xl' }: SpinnerProps) {
 	const sizeValue = (): number => {
 		if (typeof size === 'number') {
 			return size;
@@ -19,8 +19,9 @@ export function Spinner({ className, size = 'medium' }: SpinnerProps) {
 				return 24;
 			case 'large':
 				return 32;
+			case 'xl':
 			default:
-				return 24;
+				return 48;
 		}
 	};
 

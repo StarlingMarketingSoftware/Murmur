@@ -83,7 +83,7 @@ export const useEmailAutomationSteps = (props: EmailAutomationStepsProps) => {
 			step: 2,
 			value: 'draft',
 			label: 'Draft',
-			component: <DraftPage />,
+			component: <DraftPage campaign={campaign} />,
 		},
 		{
 			step: 3,

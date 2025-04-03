@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { AiModel, Prisma } from '@prisma/client';
 
 export type Url = {
 	path: string;
@@ -12,6 +12,12 @@ export type CampaignWithRelations = Prisma.CampaignGetPayload<{
 	include: {
 		contacts: true;
 		emails: true;
+	};
+}>;
+
+export type EmailWithRelations = Prisma.EmailGetPayload<{
+	include: {
+		contact: true;
 	};
 }>;
 
@@ -98,8 +104,6 @@ export type Draft = {
 	message: string;
 	contactEmail: string;
 };
-
-export type AiModel = 'sonar' | 'sonar-pro';
 
 export type AiType = 'perplexity' | 'openai';
 

@@ -12,11 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Toggle } from '@/components/ui/toggle';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { Brain, PenLine } from 'lucide-react';
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
 import {
 	Select,
 	SelectContent,
@@ -27,91 +23,31 @@ import {
 	SelectValue,
 } from '@/components/ui/select';
 
-import { usePerplexityDraftEmail } from '@/hooks/usePerplexity';
 import { AiModelOptions } from '@/constants/constants';
-import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
-import {
-	addCompletedDrafts,
-	setCurrentTestDraft,
-} from '@/lib/redux/features/murmur/murmurSlice';
-import { Draft } from '@/constants/types';
-import PreviewDraftDialog from '../../PreviewDraftDialog';
+import PreviewTestDraftDialog from './PreviewTestDraftDialog/PreviewTestDraftDialog';
 import ConfirmModal from '@/components/ConfirmModal';
+import { FC } from 'react';
+import useComposeEmailSection, {
+	ComposeEmailSectionProps,
+} from './useComposeEmailSection';
+import { Separator } from '@/components/ui/separator';
 
-const getEmailDraftSchema = (isAiSubject: boolean) => {
-	return z.object({
-		subject: isAiSubject
-			? z.string().optional()
-			: z.string().min(1, { message: 'Subject is required.' }),
-		message: z.string().min(1, { message: 'Message is required.' }),
-		aiModel: z.enum(['sonar', 'sonar-pro'], {
-			required_error: 'AI model is required.',
-		}),
-	});
-};
-
-const ComposeEmailSection = () => {
-	const [isAiDraft, setIsAiDraft] = useState<boolean>(true);
-	const [isAiSubject, setIsAiSubject] = useState<boolean>(true);
-	const [isTest, setIsTest] = useState<boolean>(false);
-	const murmurState = useAppSelector((state) => state.murmur);
-
-	const dispatch = useAppDispatch();
-
-	const { dataDraftEmail, isPendingDraftEmail, draftEmail, draftEmailAsync } =
-		usePerplexityDraftEmail();
-
-	const form = useForm<z.infer<ReturnType<typeof getEmailDraftSchema>>>({
-		resolver: zodResolver(getEmailDraftSchema(isAiSubject)),
-		defaultValues: {
-			subject: '',
-			message: '',
-			aiModel: 'sonar',
-		},
-		mode: 'onChange',
-		reValidateMode: 'onChange',
-	});
-
+const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 	const {
+		form,
+		isAiDraft,
+		setIsAiDraft,
+		isAiSubject,
+		setIsAiSubject,
+		handleFormAction,
+		isTest,
+		isPendingDraftEmail,
+		dataDraftEmail,
 		trigger,
-		getValues,
-		formState: { errors },
-	} = form;
-
-	const handleFormAction = async (action: 'test' | 'submit') => {
-		// Check form validity first
-		const isValid = await trigger();
-		if (!isValid) return;
-
-		const values = getValues();
-
-		if (action === 'test') {
-			setIsTest(true);
-			// if error, don't cost the user any tokens
-			const res: Draft = await draftEmailAsync({
-				generateSubject: isAiSubject,
-				model: values.aiModel,
-				recipient: murmurState.recipients.selectedRecipients[0],
-				prompt: values.message,
-			});
-			dispatch(setCurrentTestDraft(res));
-		} else if (isAiDraft) {
-			for (const recipient of murmurState.recipients.selectedRecipients) {
-				const newDraft: Draft = await draftEmailAsync({
-					generateSubject: isAiSubject,
-					model: values.aiModel,
-					recipient,
-					prompt: values.message,
-				});
-				if (newDraft) {
-					if (!isAiSubject) {
-						newDraft.subject = values.subject ? values.subject : newDraft.subject;
-					}
-					dispatch(addCompletedDrafts(newDraft));
-				}
-			}
-		}
-	};
+		errors,
+		handleSavePrompt,
+		isPendingSavePrompt,
+	} = useComposeEmailSection(props);
 
 	return (
 		<Card>
@@ -222,48 +158,64 @@ const ComposeEmailSection = () => {
 								)}
 							/>
 						)}
-						<div className="flex gap-4">
-							<Button
-								type="button"
-								onClick={() => handleFormAction('test')}
-								variant="ghost"
-								isLoading={isTest && isPendingDraftEmail}
-								disabled={isPendingDraftEmail}
-							>
-								{isAiDraft ? 'Test Your Prompt' : 'Preview Draft'}
-							</Button>
-							{isTest && dataDraftEmail && !isPendingDraftEmail && (
-								<PreviewDraftDialog draftEmail={dataDraftEmail} />
-							)}
-							<ConfirmModal
-								title="Confirm Batch Generation of Emails"
-								confirmAction={() => handleFormAction('submit')}
-								triggerButton={
-									<Button
-										type="button"
-										onClick={async (e) => {
-											// e.preventDefault();
-											e.stopPropagation();
-											await trigger();
-											const hasErrors = Object.keys(errors).length > 0;
-											if (hasErrors) {
-												return;
-											}
-										}}
-										isLoading={isPendingDraftEmail && !isTest}
-										disabled={isPendingDraftEmail}
-									>
-										{isAiDraft
-											? 'Generate Custom Emails for All Recipients'
-											: 'Save Drafts for All Recipients'}
-									</Button>
-								}
-							>
-								Are you sure you want to generate emails for all selected recipients?
-								<br /> <br />
-								This action will have AI create a custom email for each recipient based on
-								the prompt you provided and will count towards your monthly usage limits.
-							</ConfirmModal>
+						<div className="flex flex-col gap-4">
+							<div className="flex gap-4">
+								<Button
+									type="button"
+									onClick={() => handleFormAction('test')}
+									variant="outline"
+									isLoading={isTest && isPendingDraftEmail}
+									disabled={isPendingDraftEmail}
+								>
+									{isAiDraft ? 'Test Your Prompt' : 'Preview Draft'}
+								</Button>
+
+								{dataDraftEmail && <PreviewTestDraftDialog draftEmail={dataDraftEmail} />}
+							</div>
+							<Separator />
+							<div className="flex gap-4">
+								<ConfirmModal
+									title="Confirm Batch Generation of Emails"
+									confirmAction={() => handleFormAction('submit')}
+									triggerButton={
+										<Button
+											type="button"
+											onClick={async (e) => {
+												// e.preventDefault();
+												e.stopPropagation();
+												await trigger();
+												const hasErrors = Object.keys(errors).length > 0;
+												if (hasErrors) {
+													return;
+												}
+											}}
+											isLoading={isPendingDraftEmail && !isTest}
+											disabled={isPendingDraftEmail}
+										>
+											{isAiDraft
+												? 'Generate Custom Emails for All Recipients'
+												: 'Save Drafts for All Recipients'}
+										</Button>
+									}
+								>
+									Are you sure you want to generate emails for all selected recipients?
+									<br /> <br />
+									This action will have AI create a custom email for each recipient based
+									on the prompt you provided and will count towards your monthly usage
+									limits.
+								</ConfirmModal>
+								{/* <Separator className="!h-auto" orientation="vertical" /> */}
+								<Button
+									className=""
+									type="button"
+									onClick={handleSavePrompt}
+									variant="default"
+									isLoading={isPendingSavePrompt}
+								>
+									{/* {isAiDraft ? 'Save Prompt' : 'Save Message'} */}
+									Save Section
+								</Button>
+							</div>
 						</div>
 					</form>
 				</Form>

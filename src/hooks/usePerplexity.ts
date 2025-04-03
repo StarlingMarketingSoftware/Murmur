@@ -1,11 +1,9 @@
-import { AiModel, Draft } from '@/constants/types';
-import { setCompletedDrafts } from '@/lib/redux/features/murmur/murmurSlice';
-import { useAppDispatch } from '@/lib/redux/hooks';
-import { Contact } from '@prisma/client';
+import { Draft } from '@/constants/types';
+import { AiModel, Contact } from '@prisma/client';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-const rolePrompt = `Write a personalized email to {first_name} who works at {company}. 
+const rolePrompt = `Write a personalized email to {first_name} who works at {company}. If there is no recipient name provided, start the email with "Hello!"
 
 Here are some templates:
 
@@ -65,26 +63,24 @@ Notes:
 Write this how you think Jensen Huang would write an email. This should feel like it's written by a top CEO
 	`;
 
-const jsonFormatInstructions = `IMPORTANT: Please return valid JSON format and nothing else. I should be able to take your response and use it directly in JSON.parse() in JavaScript. For linebreaks in "message", use linebreak characters instead of raw line breaks. Use the following format: 
+const jsonFormatInstructions = `IMPORTANT: Please return valid JSON format and nothing else. DO NOT use double quotes ("") inside any of the fields. I should be able to take your response and use it directly in JSON.parse() in JavaScript. For linebreaks in "message", use linebreak characters instead of raw line breaks. Use the following format: 
 {
   "contactEmail": "name@web.com",
   "subject": "generatedSubject",
-  "message": "Hi Recipient,\n\nI came across...", 
+  "message": "Hi Josh,\n\nI came across...", 
 }`;
 
 const messageOnlyFormat = `Return the message only, without any subject line, signature, or other text.`;
 
 const messageAndSubjectFormat = `Return the message and the subject line, without any signature or other text.`;
 
-const batchMessageOnlyFormat = `I will provide a json that contains information about each recipient. Return the message only, without any subject line, signature, or other text. Please return a list of messages corresponding to each recipient.`;
+// const batchMessageOnlyFormat = `I will provide a json that contains information about each recipient. Return the message only, without any subject line, signature, or other text. Please return a list of messages corresponding to each recipient.`;
 
-const batchMessageAndSubjectFormat = `I will provide a json that contains information about each recipient. Return the message and the subject line, without any signature or other text. Please format the response into a list of JSON strings with the keys "recipient", "subject", and "message".`;
+// const batchMessageAndSubjectFormat = `I will provide a json that contains information about each recipient. Return the message and the subject line, without any signature or other text. Please format the response into a list of JSON strings with the keys "recipient", "subject", and "message".`;
 
 const perplexityEndpoint = 'https://api.perplexity.ai/chat/completions';
 
 export const usePerplexityDraftEmail = () => {
-	const dispatch = useAppDispatch();
-
 	interface DraftEmailParams {
 		model: AiModel;
 		generateSubject: boolean;
@@ -134,7 +130,8 @@ export const usePerplexityDraftEmail = () => {
 				const beginningIndex = jsonString.indexOf('{');
 				const endIndex = jsonString.lastIndexOf('}') + 1;
 				const jsonStringTrimmed = jsonString.slice(beginningIndex, endIndex).trim();
-				console.log("🚀 ~ mutationFn: ~ jsonStringTrimmed:", jsonStringTrimmed)
+				console.log('jsonStringTrimmed:');
+				console.log(jsonStringTrimmed);
 				const parsedDraft = JSON.parse(jsonStringTrimmed) as Draft;
 
 				if (!parsedDraft.contactEmail || !parsedDraft.subject || !parsedDraft.message) {
@@ -150,9 +147,7 @@ export const usePerplexityDraftEmail = () => {
 		onError: (error) => {
 			toast.error(error.message);
 		},
-		onSuccess: (data) => {
-			// Handle successful response
-		},
+		onSuccess: () => {},
 	});
 
 	interface BatchDraftEmailParams {
@@ -168,6 +163,7 @@ export const usePerplexityDraftEmail = () => {
 		mutate: batchDraftEmails,
 	} = useMutation({
 		mutationFn: async (params: BatchDraftEmailParams) => {
+			console.log(params);
 			// map the contacts to only get the essential data?
 			// for each batch, add to the current redux state of "draftedEmails".
 		},
