@@ -2,6 +2,7 @@ import { Draft } from '@/constants/types';
 import { AiModel, Contact } from '@prisma/client';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { json } from 'stream/consumers';
 
 const rolePrompt = `Write a personalized email to {first_name} who works at {company}. If there is no recipient name provided, start the email with "Hello!"
 
@@ -80,6 +81,43 @@ const messageAndSubjectFormat = `Return the message and the subject line, withou
 
 const perplexityEndpoint = 'https://api.perplexity.ai/chat/completions';
 
+const safeParseAIResponse = (response: string): Draft => {
+	try {
+		// 1. Find the JSON object using regex
+		const jsonRegex = /{(?:[^{}]|{(?:[^{}]|{[^{}]*})*})*}/g;
+		const matches = response.match(jsonRegex);
+
+		if (!matches?.length) {
+			throw new Error('No valid JSON found in response');
+		}
+
+		// 2. Try to parse each match until we find valid JSON
+		for (const match of matches) {
+			try {
+				// 3. Clean the string before parsing
+				const cleaned = match
+					.replace(/[\u201C\u201D]/g, '"') // Replace smart quotes
+					.replace(/[\r\t]/g, '') // Remove newlines, carriage returns, tabs
+					.replace(/,\s*([\]}])/g, '$1'); // Remove trailing commas
+
+				const parsed = JSON.parse(cleaned) as Draft;
+
+				// 4. Validate the parsed object has required fields
+				if (parsed.contactEmail && parsed.subject && parsed.message) {
+					return parsed;
+				}
+			} catch (e) {
+				continue; // Try next match if this one fails
+			}
+		}
+
+		throw new Error('No valid JSON structure found');
+	} catch (error) {
+		console.error('Parse error:', error);
+		throw new Error('Failed to parse AI response');
+	}
+};
+
 export const usePerplexityDraftEmail = () => {
 	interface DraftEmailParams {
 		model: AiModel;
@@ -132,7 +170,8 @@ export const usePerplexityDraftEmail = () => {
 				const jsonStringTrimmed = jsonString.slice(beginningIndex, endIndex).trim();
 				console.log('jsonStringTrimmed:');
 				console.log(jsonStringTrimmed);
-				const parsedDraft = JSON.parse(jsonStringTrimmed) as Draft;
+				console.log(typeof jsonStringTrimmed);
+				const parsedDraft = safeParseAIResponse(jsonStringTrimmed);
 
 				if (!parsedDraft.contactEmail || !parsedDraft.subject || !parsedDraft.message) {
 					throw new Error('Invalid draft format returned from AI. Please try again.');

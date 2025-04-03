@@ -2,7 +2,7 @@ import { CampaignWithRelations } from '@/constants/types';
 import { useMutation } from '@tanstack/react-query';
 import { useSearchParams, useRouter, usePathname, useParams } from 'next/navigation';
 import { toast } from 'sonner';
-import Send from './send/Send';
+import SendPage from './send/SendPage';
 import DraftPage from './draft/DraftPage';
 import SelectRecipients from './recipients/RecipientsPage';
 import { ReactNode } from 'react';
@@ -89,7 +89,7 @@ export const useEmailAutomationSteps = (props: EmailAutomationStepsProps) => {
 			step: 3,
 			value: 'send',
 			label: 'Send',
-			component: <Send />,
+			component: <SendPage campaign={campaign} />,
 		},
 	];
 

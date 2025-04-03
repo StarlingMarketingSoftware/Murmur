@@ -219,7 +219,8 @@ const importCSVWithSubcategories = async (
 	}
 };
 async function main() {
-	importCSVWithSubcategories('demoCsvs/musicVenuesDemoReduced.csv', 'Music Venues');
+	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoReduced.csv', 'Music Venues');
+	importCSVWithSubcategories('demoCsvs/testListWithRealEmails.csv', 'Test List');
 
 	return;
 }
