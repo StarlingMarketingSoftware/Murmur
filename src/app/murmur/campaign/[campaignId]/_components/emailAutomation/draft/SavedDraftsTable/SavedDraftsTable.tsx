@@ -14,13 +14,17 @@ const SavedDraftsTable: FC = () => {
 		isDraftDialogOpen,
 		setIsDraftDialogOpen,
 		selectedDraft,
+		isPendingDeleteEmail,
 	} = useSavedDraftsTable();
 
 	if (isPending) {
 		return <Spinner />;
 	}
 	return (
-		<Card>
+		<Card className="relative">
+			{isPendingDeleteEmail && (
+				<Spinner size="medium" className="absolute top-2 right-2" />
+			)}
 			<CardContent>
 				<CustomTable
 					columns={columns}

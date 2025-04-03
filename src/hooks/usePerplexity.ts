@@ -64,7 +64,7 @@ Notes:
 Write this how you think Jensen Huang would write an email. This should feel like it's written by a top CEO
 	`;
 
-const jsonFormatInstructions = `IMPORTANT: Please return valid JSON format and nothing else. I should be able to take your response and use it directly in JSON.parse() in JavaScript. For linebreaks in "message", use linebreak characters instead of raw line breaks. Use the following format: 
+const jsonFormatInstructions = `IMPORTANT: Please return valid JSON format and nothing else. DO NOT use double quotes ("") inside any of the fields. I should be able to take your response and use it directly in JSON.parse() in JavaScript. For linebreaks in "message", use linebreak characters instead of raw line breaks. Use the following format: 
 {
   "contactEmail": "name@web.com",
   "subject": "generatedSubject",

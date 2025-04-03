@@ -22,14 +22,6 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 	const [isEdit, setIsEdit] = useState(false);
 	const queryClient = useQueryClient();
 
-	useEffect(() => {
-		if (email) {
-			form.setValue('subject', email.subject);
-			form.setValue('message', email.message);
-		}
-	}, [email]);
-
-	console.log('🚀 ~ useViewEditEmailDialog ~ email:', email);
 	const form = useForm<z.infer<typeof editEmailSchema>>({
 		resolver: zodResolver(editEmailSchema),
 		defaultValues: {
@@ -38,6 +30,13 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 		},
 	});
 
+	useEffect(() => {
+		if (email) {
+			form.setValue('subject', email.subject);
+			form.setValue('message', email.message);
+		}
+	}, [email, form]);
+
 	// Mutation for updating emails
 	const { isPending: isPendingEditEmail, mutateAsync: editEmail } = useMutation({
 		mutationFn: async (data: z.infer<typeof editEmailSchema>) => {
@@ -45,7 +44,6 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 				throw new Error('Email ID is required');
 			}
 
-			console.log('🚀 ~ mutationFn: ~ data:', data);
 			const response = await fetch(`/api/emails/${email.id}`, {
 				method: 'PATCH',
 				headers: {

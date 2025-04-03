@@ -101,3 +101,41 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
 	}
 }
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+	const { userId } = await auth();
+	if (!userId) {
+		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+	}
+
+	const { id } = params;
+
+	try {
+		// Validate that the email exists and belongs to the user
+		const existingEmail = await prisma.email.findUnique({
+			where: {
+				id: parseInt(id),
+				userId,
+			},
+		});
+
+		if (!existingEmail) {
+			return NextResponse.json(
+				{ error: 'Email not found or unauthorized' },
+				{ status: 404 }
+			);
+		}
+
+		// Delete the email
+		await prisma.email.delete({
+			where: {
+				id: parseInt(id),
+			},
+		});
+
+		return NextResponse.json({ success: true, message: 'Email deleted successfully' });
+	} catch (error) {
+		console.error('EMAIL_DELETE_ERROR:', error);
+		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+	}
+}
