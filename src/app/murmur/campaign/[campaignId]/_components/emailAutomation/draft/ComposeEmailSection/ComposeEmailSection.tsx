@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/select';
 
 import { AiModelOptions } from '@/constants/constants';
-import PreviewDraftDialog from '../../../PreviewDraftDialog/PreviewDraftDialog';
+import PreviewTestDraftDialog from './PreviewTestDraftDialog/PreviewTestDraftDialog';
 import ConfirmModal from '@/components/ConfirmModal';
 import { FC } from 'react';
 import useComposeEmailSection, {
@@ -170,7 +170,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 									{isAiDraft ? 'Test Your Prompt' : 'Preview Draft'}
 								</Button>
 
-								{dataDraftEmail && <PreviewDraftDialog draftEmail={dataDraftEmail} />}
+								{dataDraftEmail && <PreviewTestDraftDialog draftEmail={dataDraftEmail} />}
 							</div>
 							<Separator />
 							<div className="flex gap-4">

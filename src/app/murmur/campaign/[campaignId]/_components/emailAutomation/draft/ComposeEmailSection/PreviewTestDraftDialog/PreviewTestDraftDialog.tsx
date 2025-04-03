@@ -11,10 +11,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { FC } from 'react';
-import { PreviewDraftDialogProps, usePreviewDraftDialog } from './usePreviewDraftDialog';
+import {
+	PreviewTestDraftDialogProps,
+	usePreviewTestDraftDialog,
+} from './usePreviewTestDraftDialog';
 
-const PreviewDraftDialog: FC<PreviewDraftDialogProps> = (props) => {
-	const { draftEmail } = usePreviewDraftDialog(props);
+const PreviewTestDraftDialog: FC<PreviewTestDraftDialogProps> = (props) => {
+	const { draftEmail } = usePreviewTestDraftDialog(props);
 	return (
 		<Dialog>
 			<DialogTrigger asChild>
@@ -62,4 +65,4 @@ const PreviewDraftDialog: FC<PreviewDraftDialogProps> = (props) => {
 	);
 };
 
-export default PreviewDraftDialog;
+export default PreviewTestDraftDialog;

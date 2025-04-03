@@ -13,7 +13,6 @@ export const useCampaignDetail = () => {
 	const searchParams = useSearchParams();
 	const tab = searchParams.get('tab') ?? 'murmur';
 	const [isMounted, setIsMounted] = useState(false);
-	const [isFirstLoad, setIsFirstLoad] = useState(true);
 
 	useEffect(() => {
 		setIsMounted(true);

@@ -1,10 +1,10 @@
 import { Draft } from '@/constants/types';
 
-export interface PreviewDraftDialogProps {
+export interface PreviewTestDraftDialogProps {
 	draftEmail: Draft;
 }
 
-export const usePreviewDraftDialog = (props: PreviewDraftDialogProps) => {
+export const usePreviewTestDraftDialog = (props: PreviewTestDraftDialogProps) => {
 	const { draftEmail } = props;
 	return { draftEmail };
 };

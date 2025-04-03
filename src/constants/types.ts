@@ -15,6 +15,12 @@ export type CampaignWithRelations = Prisma.CampaignGetPayload<{
 	};
 }>;
 
+export type EmailWithRelations = Prisma.EmailGetPayload<{
+	include: {
+		contact: true;
+	};
+}>;
+
 export type ContactCSVFormat = {
 	name: string;
 	company: string;

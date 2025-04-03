@@ -19,6 +19,9 @@ export async function GET(req: NextRequest) {
 				userId,
 				...(campaignId && { campaignId: parseInt(campaignId, 10) }),
 			},
+			include: {
+				contact: true,
+			},
 			orderBy: {
 				createdAt: 'desc' as const,
 			},

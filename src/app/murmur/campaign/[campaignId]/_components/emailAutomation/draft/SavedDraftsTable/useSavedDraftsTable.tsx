@@ -1,45 +1,25 @@
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@radix-ui/react-checkbox';
-import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown } from 'lucide-react';
+import { AccessorFnColumnDef } from '@tanstack/react-table';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Email } from '@prisma/client';
 import { TableSortingButton } from '../../../CustomTable';
+import { EmailWithRelations } from '@/constants/types';
+import { useState } from 'react';
 
 export const useSavedDraftsTable = () => {
-	const columns: ColumnDef<Email>[] = [
+	const columns: AccessorFnColumnDef<EmailWithRelations>[] = [
 		{
-			id: 'select',
-			header: ({ table }) => (
-				<Checkbox
-					checked={
-						table.getIsAllPageRowsSelected() ||
-						(table.getIsSomePageRowsSelected() && 'indeterminate')
-					}
-					onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-					aria-label="Select all"
-				/>
-			),
-			cell: ({ row }) => (
-				<Checkbox
-					checked={row.getIsSelected()}
-					onCheckedChange={(value) => row.toggleSelected(!!value)}
-					aria-label="Select row"
-				/>
-			),
+			id: 'contactEmail',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Recipient" />;
+			},
+			accessorFn: (row) => row.contact?.email,
+			cell: ({ row }) => {
+				return <div className="text-left">{row.getValue('contactEmail')}</div>;
+			},
 		},
-		// {
-		// 	accessorKey: 'contactEmail',
-		// 	header: ({ column }) => {
-		// 		return <TableSortingButton column={column} label="Email" />;
-		// 	},
-		// 	cell: ({ row }) => {
-		// 		return <div className=" text-left">{row.getValue('contactEmail')}</div>;
-		// 	},
-		// },
 		{
-			accessorKey: 'subject',
+			id: 'subject',
+			accessorFn: (row) => row.subject,
 			header: ({ column }) => {
 				return <TableSortingButton column={column} label="Subject" />;
 			},
@@ -48,7 +28,8 @@ export const useSavedDraftsTable = () => {
 			},
 		},
 		{
-			accessorKey: 'message',
+			id: 'message',
+			accessorFn: (row) => row.message,
 			header: ({ column }) => {
 				return <TableSortingButton column={column} label="Message" />;
 			},
@@ -62,12 +43,9 @@ export const useSavedDraftsTable = () => {
 	const params = useParams();
 	const { campaignId } = params;
 
-	// Function to fetch emails for a specific campaign
-
-	// Set up the query to fetch drafts
 	const { data, isPending, isError, error } = useQuery({
 		queryKey: ['drafts', campaignId],
-		queryFn: async (): Promise<Email[]> => {
+		queryFn: async (): Promise<EmailWithRelations[]> => {
 			const response = await fetch(`/api/emails?campaignId=${campaignId}`);
 			if (!response.ok) {
 				throw new Error('Failed to fetch drafts');
@@ -77,11 +55,22 @@ export const useSavedDraftsTable = () => {
 		enabled: !!campaignId,
 	});
 
+	const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
+	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
+	const handleRowClick = (rowData: EmailWithRelations) => {
+		setIsDraftDialogOpen(true);
+		setSelectedDraft(rowData);
+	};
+
 	return {
 		columns,
 		data,
 		isPending,
 		isError,
 		error,
+		handleRowClick,
+		isDraftDialogOpen,
+		selectedDraft,
+		setIsDraftDialogOpen,
 	};
 };
