@@ -1,17 +1,41 @@
 import { CampaignWithRelations, EmailWithRelations } from '@/constants/types';
-import { Email } from '@prisma/client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEditCampaign } from '@/hooks/useCampaigns';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import FormData from 'form-data'; // form-data v4.0.1
 import Mailgun from 'mailgun.js'; // mailgun.js v11.1.0
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 
 export interface ConfirmSendDialogProps {
 	draftEmails: EmailWithRelations[];
 	campaign: CampaignWithRelations;
 }
 
+const addSenderInfoSchema = z.object({
+	senderName: z.string().min(1, { message: 'Sender name is required.' }),
+	senderEmail: z.string().min(1, { message: 'Sender email is required.' }),
+});
+
 export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 	const { campaign, draftEmails } = props;
 	const queryClient = useQueryClient();
+	const draftEmailCount = draftEmails.length;
+
+	const form = useForm<z.infer<typeof addSenderInfoSchema>>({
+		resolver: zodResolver(addSenderInfoSchema),
+		defaultValues: {
+			senderName: campaign.senderName || '',
+			senderEmail: campaign.senderEmail || '',
+		},
+	});
+
+	useEffect(() => {
+		console.log('campaignchaned', campaign);
+		form.setValue('senderName', campaign.senderName || '');
+		form.setValue('senderEmail', campaign.senderEmail || '');
+	}, [campaign, form]);
 
 	const sendMailgunMessage = async (
 		draftEmail: EmailWithRelations,
@@ -38,18 +62,25 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 				}
 			);
 			return data;
-
-			console.log(data); // logs response data
 		} catch (error) {
 			console.log(error); //logs any error
 		}
 	};
 
+	const { updateCampaign } = useEditCampaign(campaign.id, true);
+
 	const handleSend = async () => {
+		// save sender name and emailt o campaign
+		const formValues = form.getValues();
+		console.log('🚀 ~ handleSend ~ formValues:', formValues);
+		updateCampaign(form.getValues());
+		return;
 		for (const email of draftEmails) {
 			const res = await sendMailgunMessage(email, 'shingoAlert@gmail.com');
 			console.log('🚀 ~ handleSend ~ res:', res);
 			if (res?.status === 200) {
+				console.log('email status is 200!!');
+				// update email status to sent
 				queryClient.invalidateQueries({ queryKey: ['campaign'] });
 			}
 		}
@@ -57,5 +88,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 
 	return {
 		handleSend,
+		form,
+		draftEmailCount,
 	};
 };
