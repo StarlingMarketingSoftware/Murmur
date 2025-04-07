@@ -10,6 +10,7 @@ export interface ViewEditEmailDialogProps {
 	email: EmailWithRelations | null;
 	isOpen: boolean;
 	setIsOpen: Dispatch<SetStateAction<boolean>>;
+	isEditable?: boolean;
 }
 
 const editEmailSchema = z.object({
@@ -25,8 +26,8 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 	const form = useForm<z.infer<typeof editEmailSchema>>({
 		resolver: zodResolver(editEmailSchema),
 		defaultValues: {
-			subject: email?.subject || 'hello',
-			message: email?.message || 'hello',
+			subject: email?.subject || '',
+			message: email?.message || '',
 		},
 	});
 

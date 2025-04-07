@@ -11,7 +11,8 @@ export function Footer() {
 					<div>
 						<h3 className="font-semibold text-lg mb-4">Murmur</h3>
 						<p className="text-muted-foreground">
-							A Next.js 14 application with modern tools and best practices.
+							AI-powered marketing automation platform that helps you create, manage, and
+							optimize your email campaigns effortlessly.
 						</p>
 					</div>
 

@@ -9,7 +9,6 @@ import {
 	DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { FC } from 'react';
 import {
@@ -37,6 +36,7 @@ export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 		form,
 		isPendingEditEmail,
 		resetFormToCurrentEmail,
+		isEditable,
 	} = useViewEditEmailDialog(props);
 
 	return (
@@ -84,44 +84,44 @@ export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 										)}
 									/>
 								</div>
-
 								<DialogFooter>
-									{!isEdit ? (
-										<Button
-											type="button"
-											className="w-fit"
-											variant="outline"
-											onClick={(e) => {
-												e.preventDefault();
-												setIsEdit(true);
-											}}
-										>
-											Edit
-										</Button>
-									) : (
-										<div className="flex gap-4">
+									{isEditable &&
+										(!isEdit ? (
 											<Button
 												type="button"
 												className="w-fit"
 												variant="outline"
 												onClick={(e) => {
 													e.preventDefault();
-													setIsEdit(false);
-													resetFormToCurrentEmail();
+													setIsEdit(true);
 												}}
 											>
-												Cancel
+												Edit
 											</Button>
-											<Button
-												isLoading={isPendingEditEmail}
-												className="w-fit"
-												variant="default"
-												type="submit"
-											>
-												Save
-											</Button>
-										</div>
-									)}
+										) : (
+											<div className="flex gap-4">
+												<Button
+													type="button"
+													className="w-fit"
+													variant="outline"
+													onClick={(e) => {
+														e.preventDefault();
+														setIsEdit(false);
+														resetFormToCurrentEmail();
+													}}
+												>
+													Cancel
+												</Button>
+												<Button
+													isLoading={isPendingEditEmail}
+													className="w-fit"
+													variant="default"
+													type="submit"
+												>
+													Save
+												</Button>
+											</div>
+										))}
 								</DialogFooter>
 							</form>
 						</Form>

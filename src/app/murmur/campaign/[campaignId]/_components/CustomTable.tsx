@@ -155,7 +155,7 @@ export function CustomTable<TData, TValue>({
 		<div>
 			<div className="flex-1 text-sm text-muted-foreground">
 				{table.getFilteredSelectedRowModel().rows.length} of{' '}
-				{table.getFilteredRowModel().rows.length} contact rows selected.
+				{table.getFilteredRowModel().rows.length} rows selected.
 			</div>
 			<div className="flex items-center py-4">
 				<Input

@@ -40,6 +40,8 @@ export const updateCampaignSchema = z.object({
 	message: z.string().nullable().optional(),
 	testSubject: z.string().nullable().optional(),
 	testMessage: z.string().nullable().optional(),
+	senderEmail: z.string().nullable().optional(),
+	senderName: z.string().nullable().optional(),
 	aiModel: z.enum(['sonar', 'sonar_pro']).nullable().optional(),
 	contactOperation: z
 		.object({
@@ -73,6 +75,7 @@ export async function PATCH(
 			},
 			include: {
 				contacts: true,
+				emails: true,
 			},
 		});
 
@@ -95,6 +98,12 @@ export async function PATCH(
 				}),
 				...(validatedData.testSubject !== undefined && {
 					testSubject: validatedData.testSubject,
+				}),
+				...(validatedData.senderEmail !== undefined && {
+					senderEmail: validatedData.senderEmail,
+				}),
+				...(validatedData.senderName !== undefined && {
+					senderName: validatedData.senderName,
 				}),
 				...(validatedData.contactOperation && {
 					contacts: {
