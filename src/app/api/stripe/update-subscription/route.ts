@@ -39,14 +39,13 @@ export async function POST(req: Request) {
 		const currentSubscription = subscriptions.data[0];
 
 		if (!currentSubscription) {
-			return res.status(400).json({ error: 'No active subscription found' });
+			return NextResponse.json({ error: 'No active subscription found' });
 		}
 
 		const baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
 
 		const session: Stripe.Response<Stripe.Checkout.Session> =
 			await stripe.checkout.sessions.create({
-				mode: 'subscription',
 				customer: user.stripeCustomerId,
 				payment_method_types: ['card'],
 				line_items: [
@@ -55,19 +54,17 @@ export async function POST(req: Request) {
 						quantity: 1,
 					},
 				],
-				subscription_data: {
-					metadata: {
-						upgrading_from_sub: currentSubscription.id,
-					},
-					billing_cycle_anchor: 'now',
-					proration_behavior: 'create_prorations',
-					items: [
-						{
-							id: currentSubscription.items.data[0].id,
-							price: priceId,
-						},
-					],
-				},
+				// subscription_data: {
+				// 	billing_cycle_anchor: 'now',
+				// 	proration_behavior: 'create_prorations',
+				// 	items: [
+				// 		{
+				// 			id: currentSubscription.items.data[0].id,
+				// 			price: priceId,
+				// 		},
+				// 	],
+				// },
+				mode: 'subscription',
 				success_url: `${baseUrl}/pricing?success=true`,
 				cancel_url: `${baseUrl}/pricing?canceled=true`,
 				metadata: {

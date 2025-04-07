@@ -101,7 +101,6 @@ export async function POST(req: Request) {
 		}
 	} else if (evt.type === 'user.deleted') {
 		const { id } = evt.data;
-		console.log('🚀 ~ POST ~ id:', id);
 
 		try {
 			// Delete user from database
@@ -113,11 +112,13 @@ export async function POST(req: Request) {
 
 			console.log(`User deleted: ${id}`);
 			return new Response('User deleted successfully', { status: 200 });
-		} catch (err: any) {
-			console.error('Error: Could not delete user:', err);
-			return new Response(err.message, {
-				status: 500,
-			});
+		} catch (error) {
+			if (error instanceof Error) {
+				console.error('Error: Could not delete user:', error);
+				return new Response(error.message, {
+					status: 500,
+				});
+			}
 		}
 	}
 

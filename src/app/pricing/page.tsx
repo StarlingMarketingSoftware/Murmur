@@ -23,7 +23,9 @@ export default function Products() {
 		);
 	}
 
-	const sortedProducts = products.sort(
+	const filteredProducts = products.filter((product) => product.metadata.main === '1');
+
+	const sortedProducts = filteredProducts.sort(
 		(a, b) => parseInt(a.metadata.order) - parseInt(b.metadata.order)
 	);
 
@@ -34,7 +36,7 @@ export default function Products() {
 					<ProductCard key={product.id} product={product} user={user} />
 				))}
 			</div>
-			<ManageSubscriptionButton />
+			{user?.stripeSubscriptionId && <ManageSubscriptionButton />}
 		</div>
 	);
 }

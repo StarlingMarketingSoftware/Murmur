@@ -5,9 +5,10 @@ export async function GET(
 	request: Request,
 	{ params }: { params: { productId: string } }
 ) {
+	const { productId } = await params;
 	try {
 		const prices = await stripe.prices.list({
-			product: params.productId,
+			product: productId,
 			active: true,
 		});
 		return NextResponse.json(prices.data);

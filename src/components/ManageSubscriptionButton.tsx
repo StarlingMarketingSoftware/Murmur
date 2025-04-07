@@ -6,7 +6,15 @@ import { Button } from './ui/button';
 import { useMe } from '@/hooks/useMe';
 import { toast } from 'sonner';
 
-const ManageSubscriptionButton: FC = () => {
+interface ManageSubscriptionButtonProps {
+	isUpdateSubscription?: boolean;
+	className?: string;
+}
+
+const ManageSubscriptionButton: FC<ManageSubscriptionButtonProps> = ({
+	isUpdateSubscription,
+	className,
+}) => {
 	const { user } = useMe();
 
 	const { mutate: accessPortal, isPending } = useMutation({
@@ -17,7 +25,8 @@ const ManageSubscriptionButton: FC = () => {
 				body: JSON.stringify({ customerId: user?.stripeCustomerId }),
 			});
 			const { url } = await response.json();
-			window.location.href = url;
+			const updateSubscriptionUrl = `${url}/subscriptions/${user?.stripeSubscriptionId}/update`;
+			window.location.href = isUpdateSubscription ? updateSubscriptionUrl : url;
 		},
 		onError: () => {
 			toast.error('Error accessing customer portal. Please try again.');
@@ -25,8 +34,13 @@ const ManageSubscriptionButton: FC = () => {
 	});
 
 	return (
-		<Button onClick={() => accessPortal()} disabled={isPending} isLoading={isPending}>
-			Manage Your Subscription
+		<Button
+			className={className}
+			onClick={() => accessPortal()}
+			disabled={isPending}
+			isLoading={isPending}
+		>
+			{isUpdateSubscription ? 'Switch to This Plan' : 'Manage Your Subscription'}
 		</Button>
 	);
 };

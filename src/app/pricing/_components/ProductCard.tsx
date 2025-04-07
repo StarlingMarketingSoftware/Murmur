@@ -14,6 +14,7 @@ import { User } from '@prisma/client';
 import { STRIPE_SUBSCRIPTION_STATUS } from '@/constants/types';
 import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
 import Spinner from '@/components/ui/spinner';
+import { ReactNode } from 'react';
 
 interface ProductCardProps {
 	product: Stripe.Product;
@@ -45,28 +46,31 @@ export function ProductCard({
 	const formattedPrice = formatPrice(price.unit_amount || 0, price.currency || 'usd');
 	const period = price?.recurring?.interval ? `per ${price.recurring.interval}` : '';
 
-	const isCurrentSubscription =
-		user &&
-		user.stripePriceId === price.id &&
-		user.stripeSubscriptionStatus === STRIPE_SUBSCRIPTION_STATUS.ACTIVE;
-
-	const getButtonText = () => {
+	const getButton = (): ReactNode => {
+		const checkoutButton = (
+			<CheckoutButton
+				user={user}
+				priceId={price.id}
+				buttonText="Get Started"
+				onButtonClick={onButtonClick}
+			/>
+		);
 		if (!user) {
-			return 'Get Started';
+			return checkoutButton;
 		}
 
 		if (
 			user.stripePriceId === price.id &&
 			user.stripeSubscriptionStatus === STRIPE_SUBSCRIPTION_STATUS.ACTIVE
 		) {
-			return 'Manage Subscription';
+			return <ManageSubscriptionButton className="mx-auto" />;
 		}
 
 		if (user.stripeSubscriptionId) {
-			return 'Switch to This Plan';
+			return <ManageSubscriptionButton className="mx-auto" isUpdateSubscription />;
 		}
 
-		return 'Get Started';
+		return checkoutButton;
 	};
 
 	const marketingFeatures: Stripe.Product.MarketingFeature[] = product.marketing_features;
@@ -87,18 +91,7 @@ export function ProductCard({
 					</TypographyList>
 				</CardContent>
 			</div>
-			<CardFooter>
-				{isCurrentSubscription ? (
-					<ManageSubscriptionButton />
-				) : (
-					<CheckoutButton
-						user={user}
-						priceId={price.id}
-						buttonText={getButtonText()}
-						onButtonClick={onButtonClick}
-					/>
-				)}
-			</CardFooter>
+			<CardFooter>{getButton()}</CardFooter>
 		</Card>
 	);
 }

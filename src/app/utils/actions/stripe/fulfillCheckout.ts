@@ -18,6 +18,8 @@ export async function fulfillCheckout(
 			throw Error('Checkout session could not be retrieved.');
 		}
 
+		// if checkoutSession.metadata.userId does not exist, look in the product for the userId
+
 		if (checkoutSession.payment_status !== 'unpaid') {
 			const customerId = checkoutSession.customer as string;
 

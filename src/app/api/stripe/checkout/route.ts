@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 					},
 				],
 				mode: 'subscription',
-				success_url: `${baseUrl}/dashboard?success=true`,
+				success_url: `${baseUrl}/pricing?success=true`,
 				cancel_url: `${baseUrl}/pricing?canceled=true`,
 				metadata: {
 					userId,
