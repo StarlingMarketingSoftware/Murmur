@@ -8,6 +8,7 @@ export interface PrepareSendingTableProps {
 export const usePrepareSendingTable = (props: PrepareSendingTableProps) => {
 	const { campaign, emails } = props;
 	const draftEmails = emails.filter((email) => email.status === 'draft');
+	console.log('🚀 ~ usePrepareSendingTable ~ draftEmails:', draftEmails);
 
 	return {
 		...props,

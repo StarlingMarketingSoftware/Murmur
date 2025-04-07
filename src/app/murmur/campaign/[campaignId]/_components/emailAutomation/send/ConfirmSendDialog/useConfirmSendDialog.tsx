@@ -1,6 +1,8 @@
 import { CampaignWithRelations, EmailWithRelations } from '@/constants/types';
 import { useEditCampaign } from '@/hooks/useCampaigns';
+import { useEditEmail } from '@/hooks/useEmails';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { EmailStatus } from '@prisma/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import FormData from 'form-data'; // form-data v4.0.1
 import Mailgun from 'mailgun.js'; // mailgun.js v11.1.0
@@ -69,20 +71,28 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 
 	const { updateCampaign } = useEditCampaign(campaign.id, true);
 
+	const { mutate: updateEmail } = useEditEmail({
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['drafts'] });
+		},
+	});
+
 	const handleSend = async () => {
-		// save sender name and emailt o campaign
-		const formValues = form.getValues();
-		console.log('🚀 ~ handleSend ~ formValues:', formValues);
-		updateCampaign(form.getValues());
-		return;
+		// updateCampaign(form.getValues());
 		for (const email of draftEmails) {
-			const res = await sendMailgunMessage(email, 'shingoAlert@gmail.com');
-			console.log('🚀 ~ handleSend ~ res:', res);
-			if (res?.status === 200) {
-				console.log('email status is 200!!');
-				// update email status to sent
-				queryClient.invalidateQueries({ queryKey: ['campaign'] });
-			}
+			// const res = await sendMailgunMessage(email, 'shingoAlert@gmail.com');
+			// console.log('🚀 ~ handleSend ~ res:', res);
+			// if (res?.status === 200) {
+			console.log('email status is 200!!');
+			updateEmail({
+				emailId: email.id,
+				data: {
+					...email,
+					status: EmailStatus.sent,
+				},
+			});
+			queryClient.invalidateQueries({ queryKey: ['campaign'] });
+			// }
 		}
 	};
 
