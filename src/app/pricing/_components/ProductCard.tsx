@@ -1,4 +1,4 @@
-' use client';
+'use client';
 import { Card, CardContent, CardTitle, CardFooter } from '@/components/ui/card';
 import {
 	TypographyH1,
@@ -7,25 +7,29 @@ import {
 	TypographyList,
 } from '@/components/ui/typography';
 import { twMerge } from 'tailwind-merge';
-import { getStripePrice, StripeProduct } from '@/app/utils/data/stripe/products';
+import { useStripePrice } from '@/hooks/useStripePrice';
 import { Stripe } from 'stripe';
 import { CheckoutButton } from './CheckoutButton';
 import { User } from '@prisma/client';
 import { STRIPE_SUBSCRIPTION_STATUS } from '@/constants/types';
 import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
+import Spinner from '@/components/ui/spinner';
+
 interface ProductCardProps {
-	product: StripeProduct;
+	product: Stripe.Product;
 	className?: string;
 	onButtonClick?: () => void;
 	user: User | null | undefined;
 }
 
-export async function ProductCard({
+export function ProductCard({
 	product,
 	className,
 	onButtonClick,
 	user,
 }: ProductCardProps) {
+	const { data: prices, isLoading } = useStripePrice(product.id);
+
 	const formatPrice = (price: number, currency: string) => {
 		return new Intl.NumberFormat('en-US', {
 			style: 'currency',
@@ -34,19 +38,11 @@ export async function ProductCard({
 		}).format(price / 100);
 	};
 
-	const prices: Stripe.Price[] = await getStripePrice(product.id);
-	let price: Stripe.Price;
-	if (prices.length > 0) {
-		price = prices[0];
-	} else {
-		return null;
-	}
+	if (isLoading) return <Spinner />;
+	if (!prices || prices.length === 0) return null;
 
-	// Extract price information
-	const formattedPrice = price
-		? formatPrice(price.unit_amount || 0, price.currency || 'usd')
-		: 'Custom';
-
+	const price = prices[0];
+	const formattedPrice = formatPrice(price.unit_amount || 0, price.currency || 'usd');
 	const period = price?.recurring?.interval ? `per ${price.recurring.interval}` : '';
 
 	const isCurrentSubscription =

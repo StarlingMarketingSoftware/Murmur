@@ -4,13 +4,14 @@ import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
 import { ProductCard } from '@/app/pricing/_components/ProductCard';
 import { useStripeProducts } from '@/hooks/useStripeProducts';
 import { useMe } from '@/hooks/useMe';
+import Spinner from '@/components/ui/spinner';
 
 export default function Products() {
 	const { data: products, isLoading, error } = useStripeProducts();
 	const { user } = useMe();
 
 	if (isLoading) {
-		return <div>Loading...</div>;
+		return <Spinner />;
 	}
 
 	if (error || !products || products.length === 0) {
