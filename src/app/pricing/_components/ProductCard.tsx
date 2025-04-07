@@ -15,12 +15,14 @@ import { STRIPE_SUBSCRIPTION_STATUS } from '@/constants/types';
 import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
 import Spinner from '@/components/ui/spinner';
 import { ReactNode } from 'react';
+import UpdateSubscriptionButton from '@/components/UpdateSubscriptionButton';
 
 interface ProductCardProps {
 	product: Stripe.Product;
 	className?: string;
 	onButtonClick?: () => void;
 	user: User | null | undefined;
+	isLink?: boolean;
 }
 
 export function ProductCard({
@@ -28,6 +30,7 @@ export function ProductCard({
 	className,
 	onButtonClick,
 	user,
+	isLink = false,
 }: ProductCardProps) {
 	const { data: prices, isLoading } = useStripePrice(product.id);
 
@@ -57,25 +60,34 @@ export function ProductCard({
 		);
 		if (!user) {
 			return checkoutButton;
-		}
-
-		if (
+		} else if (
 			user.stripePriceId === price.id &&
 			user.stripeSubscriptionStatus === STRIPE_SUBSCRIPTION_STATUS.ACTIVE
 		) {
 			return <ManageSubscriptionButton className="mx-auto" />;
+		} else if (user.stripeSubscriptionId) {
+			return (
+				<UpdateSubscriptionButton priceId={price.id} user={user} productId={product.id} />
+			);
+		} else {
+			return checkoutButton;
 		}
+	};
 
-		if (user.stripeSubscriptionId) {
-			return <ManageSubscriptionButton className="mx-auto" isUpdateSubscription />;
-		}
-
-		return checkoutButton;
+	const handleClick = () => {
+		window.location.href = `/admin/products/${product.id}`;
 	};
 
 	const marketingFeatures: Stripe.Product.MarketingFeature[] = product.marketing_features;
 	return (
-		<Card className={twMerge('w-[325px] p-6 flex flex-col justify-between', className)}>
+		<Card
+			onClick={isLink ? handleClick : undefined}
+			className={twMerge(
+				'w-[325px] p-6 flex flex-col justify-between',
+				isLink && 'cursor-pointer',
+				className
+			)}
+		>
 			<div className="">
 				<CardTitle>
 					<TypographyH4 className="text-center">{product.name}</TypographyH4>
@@ -91,7 +103,7 @@ export function ProductCard({
 					</TypographyList>
 				</CardContent>
 			</div>
-			<CardFooter>{getButton()}</CardFooter>
+			{!isLink && <CardFooter>{getButton()}</CardFooter>}
 		</Card>
 	);
 }
