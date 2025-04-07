@@ -3,12 +3,12 @@ import { CampaignWithRelations, EmailWithRelations } from '@/constants/types';
 export interface PrepareSendingTableProps {
 	campaign: CampaignWithRelations;
 	emails: EmailWithRelations[];
+	isPending: boolean;
 }
 
 export const usePrepareSendingTable = (props: PrepareSendingTableProps) => {
-	const { campaign, emails } = props;
+	const { emails } = props;
 	const draftEmails = emails.filter((email) => email.status === 'draft');
-	console.log('🚀 ~ usePrepareSendingTable ~ draftEmails:', draftEmails);
 
 	return {
 		...props,

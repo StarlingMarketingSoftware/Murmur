@@ -2,6 +2,7 @@ import { FC } from 'react';
 import { PrepareSendingTable } from './PrepareSendingTable/PrepareSendingTable';
 import { SendPageProps, useSendPage } from './useSendPage';
 import Spinner from '@/components/ui/spinner';
+import { SentEmailsTable } from './SentEmailsTable/SentEmailsTable';
 
 const SendPage: FC<SendPageProps> = (props) => {
 	const { dataEmails, campaign, isPendingEmails } = useSendPage(props);
@@ -12,7 +13,12 @@ const SendPage: FC<SendPageProps> = (props) => {
 
 	return (
 		<>
-			<PrepareSendingTable campaign={campaign} emails={dataEmails!} />
+			<PrepareSendingTable
+				campaign={campaign}
+				emails={dataEmails!}
+				isPending={isPendingEmails}
+			/>
+			<SentEmailsTable emails={dataEmails!} isPending={isPendingEmails} />
 		</>
 	);
 };

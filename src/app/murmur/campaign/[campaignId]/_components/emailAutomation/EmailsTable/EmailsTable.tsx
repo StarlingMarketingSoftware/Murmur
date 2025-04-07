@@ -1,24 +1,27 @@
 import { FC } from 'react';
-import CustomTable from '../../../CustomTable';
-import { useSavedDraftsTable } from './useSavedDraftsTable';
+import CustomTable from '../../CustomTable';
+import { EmailsTableProps, useEmailsTable } from './useEmailsTable';
 import Spinner from '@/components/ui/spinner';
 import ViewEditEmailDialog from '@/app/murmur/_components/ViewEditEmailDialog/ViewEditEmailDialog';
 
-const SavedDraftsTable: FC = () => {
+const EmailsTable: FC<EmailsTableProps> = (props) => {
 	const {
-		data,
 		columns,
-		isPending,
 		handleRowClick,
 		isDraftDialogOpen,
 		setIsDraftDialogOpen,
 		selectedDraft,
 		isPendingDeleteEmail,
-	} = useSavedDraftsTable();
+		emails,
+		isPending,
+		noDataMessage,
+		isEditable,
+	} = useEmailsTable(props);
 
 	if (isPending) {
 		return <Spinner />;
 	}
+
 	return (
 		<>
 			{isPendingDeleteEmail && (
@@ -26,18 +29,19 @@ const SavedDraftsTable: FC = () => {
 			)}
 			<CustomTable
 				columns={columns}
-				data={data}
+				data={emails}
 				singleSelection
-				noDataMessage="Drafts will appear here as they are created."
+				noDataMessage={noDataMessage || 'No emails were found.'}
 				handleRowClick={handleRowClick}
 			/>
 			<ViewEditEmailDialog
 				email={selectedDraft}
 				isOpen={isDraftDialogOpen}
 				setIsOpen={setIsDraftDialogOpen}
+				isEditable={isEditable}
 			/>
 		</>
 	);
 };
 
-export default SavedDraftsTable;
+export default EmailsTable;

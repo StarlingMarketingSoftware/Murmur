@@ -1,7 +1,7 @@
 import { AccessorFnColumnDef, ColumnDef } from '@tanstack/react-table';
 import { useParams } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { TableSortingButton } from '../../../CustomTable';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { TableSortingButton } from '../../CustomTable';
 import { EmailWithRelations } from '@/constants/types';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,14 @@ import { TrashIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { ellipsesText } from '@/app/utils/functions';
 
-export const useSavedDraftsTable = () => {
+export interface EmailsTableProps {
+	emails: EmailWithRelations[];
+	isPending: boolean;
+	noDataMessage?: string;
+	isEditable?: boolean;
+}
+
+export const useEmailsTable = (props: EmailsTableProps) => {
 	const queryClient = useQueryClient();
 	const params = useParams();
 	const { campaignId } = params;
@@ -93,18 +100,6 @@ export const useSavedDraftsTable = () => {
 		},
 	];
 
-	const { data, isPending, isError, error } = useQuery({
-		queryKey: ['drafts', campaignId],
-		queryFn: async (): Promise<EmailWithRelations[]> => {
-			const response = await fetch(`/api/emails?campaignId=${campaignId}`);
-			if (!response.ok) {
-				throw new Error('Failed to fetch drafts');
-			}
-			return response.json();
-		},
-		enabled: !!campaignId,
-	});
-
 	const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	const handleRowClick = (rowData: EmailWithRelations) => {
@@ -114,15 +109,12 @@ export const useSavedDraftsTable = () => {
 
 	return {
 		columns,
-		data,
-		isPending,
-		isError,
-		error,
 		handleRowClick,
 		isDraftDialogOpen,
 		selectedDraft,
 		setIsDraftDialogOpen,
 		handleDeleteEmail,
 		isPendingDeleteEmail,
+		...props,
 	};
 };

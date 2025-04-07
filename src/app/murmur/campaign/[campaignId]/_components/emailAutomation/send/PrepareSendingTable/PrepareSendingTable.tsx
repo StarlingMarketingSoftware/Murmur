@@ -1,5 +1,5 @@
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
-import SavedDraftsTable from '../../draft/SavedDraftsTable/SavedDraftsTable';
+import EmailsTable from '../../EmailsTable/EmailsTable';
 import { ConfirmSendDialog } from '../ConfirmSendDialog/ConfirmSendDialog';
 import { FC } from 'react';
 import {
@@ -8,7 +8,7 @@ import {
 } from './usePrepareSendingTable';
 
 export const PrepareSendingTable: FC<PrepareSendingTableProps> = (props) => {
-	const { campaign, draftEmails } = usePrepareSendingTable(props);
+	const { campaign, draftEmails, isPending } = usePrepareSendingTable(props);
 
 	return (
 		<Card>
@@ -16,7 +16,11 @@ export const PrepareSendingTable: FC<PrepareSendingTableProps> = (props) => {
 				<CardTitle>Drafts to be Sent</CardTitle>
 			</CardHeader>
 			<CardContent>
-				<SavedDraftsTable />
+				<EmailsTable
+					emails={draftEmails}
+					isPending={isPending}
+					noDataMessage="No draft emails were found."
+				/>
 				<ConfirmSendDialog campaign={campaign} draftEmails={draftEmails} />
 			</CardContent>
 		</Card>

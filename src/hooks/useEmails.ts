@@ -42,8 +42,6 @@ export const useEditEmail = (options: EditEmailOptions = {}) => {
 			return response.json();
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['drafts'] });
-
 			if (!suppressToasts) {
 				toast.success(successMessage || 'Email updated successfully');
 			}

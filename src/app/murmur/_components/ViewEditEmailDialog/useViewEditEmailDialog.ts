@@ -10,6 +10,7 @@ export interface ViewEditEmailDialogProps {
 	email: EmailWithRelations | null;
 	isOpen: boolean;
 	setIsOpen: Dispatch<SetStateAction<boolean>>;
+	isEditable?: boolean;
 }
 
 const editEmailSchema = z.object({
