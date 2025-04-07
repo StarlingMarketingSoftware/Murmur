@@ -1,3 +1,4 @@
+' use client';
 import { Card, CardContent, CardTitle, CardFooter } from '@/components/ui/card';
 import {
 	TypographyH1,
@@ -11,11 +12,12 @@ import { Stripe } from 'stripe';
 import { CheckoutButton } from './CheckoutButton';
 import { User } from '@prisma/client';
 import { STRIPE_SUBSCRIPTION_STATUS } from '@/constants/types';
+import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
 interface ProductCardProps {
 	product: StripeProduct;
 	className?: string;
 	onButtonClick?: () => void;
-	user: User | null;
+	user: User | null | undefined;
 }
 
 export async function ProductCard({
@@ -47,6 +49,11 @@ export async function ProductCard({
 
 	const period = price?.recurring?.interval ? `per ${price.recurring.interval}` : '';
 
+	const isCurrentSubscription =
+		user &&
+		user.stripePriceId === price.id &&
+		user.stripeSubscriptionStatus === STRIPE_SUBSCRIPTION_STATUS.ACTIVE;
+
 	const getButtonText = () => {
 		if (!user) {
 			return 'Get Started';
@@ -60,7 +67,7 @@ export async function ProductCard({
 		}
 
 		if (user.stripeSubscriptionId) {
-			return 'Update Subscription';
+			return 'Switch to This Plan';
 		}
 
 		return 'Get Started';
@@ -85,12 +92,16 @@ export async function ProductCard({
 				</CardContent>
 			</div>
 			<CardFooter>
-				<CheckoutButton
-					user={user}
-					priceId={price.id}
-					buttonText={getButtonText()}
-					onButtonClick={onButtonClick}
-				/>
+				{isCurrentSubscription ? (
+					<ManageSubscriptionButton />
+				) : (
+					<CheckoutButton
+						user={user}
+						priceId={price.id}
+						buttonText={getButtonText()}
+						onButtonClick={onButtonClick}
+					/>
+				)}
 			</CardFooter>
 		</Card>
 	);

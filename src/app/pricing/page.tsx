@@ -1,13 +1,19 @@
+'use client';
+
 import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
 import { ProductCard } from '@/app/pricing/_components/ProductCard';
-import { getStripeProducts } from '@/app/utils/data/stripe/products';
-import { getUser } from '@/app/utils/data/users/getUser';
+import { useStripeProducts } from '@/hooks/useStripeProducts';
+import { useMe } from '@/hooks/useMe';
 
-export default async function Products() {
-	const products = await getStripeProducts();
-	const user = await getUser();
+export default function Products() {
+	const { data: products, isLoading, error } = useStripeProducts();
+	const { user } = useMe();
 
-	if (!products || products.length === 0) {
+	if (isLoading) {
+		return <div>Loading...</div>;
+	}
+
+	if (error || !products || products.length === 0) {
 		return (
 			<div className="flex flex-col items-center justify-center p-8">
 				<h2 className="text-2xl font-bold mb-4">No subscription plans available</h2>

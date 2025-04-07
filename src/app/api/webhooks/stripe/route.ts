@@ -8,7 +8,6 @@ import { fulfillCheckout } from '@/app/utils/actions/stripe/fulfillCheckout';
 export async function POST(req: Request) {
 	const body = await req.text();
 	const headersList = await headers();
-	console.log('!!!!!!!!!');
 	const signature = headersList.get('stripe-signature') || '';
 
 	if (!process.env.STRIPE_WEBHOOK_SECRET) {
@@ -24,8 +23,10 @@ export async function POST(req: Request) {
 			signature,
 			process.env.STRIPE_WEBHOOK_SECRET
 		);
-	} catch (error: any) {
-		console.error(`Webhook signature verification failed: ${error.message}`);
+	} catch (error) {
+		if (error instanceof Error) {
+			console.error(`Webhook signature verification failed: ${error.message}`);
+		}
 		return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
 	}
 
@@ -44,9 +45,9 @@ export async function POST(req: Request) {
 		} else if (event.type === 'customer.subscription.updated') {
 			console.log('subscription updated');
 			const subscription: Stripe.Subscription = event.data.object;
-
+			// need to update the expiration date
 			try {
-				await prisma.user.update({
+				const res = await prisma.user.update({
 					where: {
 						stripeCustomerId: subscription.customer as string,
 					},
@@ -56,6 +57,8 @@ export async function POST(req: Request) {
 						stripePriceId: subscription.items.data[0].price.id,
 					},
 				});
+
+				return NextResponse.json({ res }, { status: 200 });
 			} catch (error) {
 				console.error('Error updating user:', error);
 				return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });

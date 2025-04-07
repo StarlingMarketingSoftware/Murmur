@@ -1,32 +1,34 @@
 'use client';
 import { FC } from 'react';
+import { useMutation } from '@tanstack/react-query';
 
 import { Button } from './ui/button';
 import { useMe } from '@/hooks/useMe';
+import { toast } from 'sonner';
 
 const ManageSubscriptionButton: FC = () => {
 	const { user } = useMe();
-	console.log('🚀 ~ user:', user);
 
-	const handlePortalAccess = async () => {
-		try {
+	const { mutate: accessPortal, isPending } = useMutation({
+		mutationFn: async () => {
 			const response = await fetch('/api/stripe/stripe-portal', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ customerId: user?.stripeCustomerId }),
 			});
-			console.log('🚀 ~ handlePortalAccess ~ response:', response);
-
 			const { url } = await response.json();
-
 			window.location.href = url;
-			console.log('🚀 ~ handlePortalAccess ~ url:', url);
-		} catch (error) {
-			console.error('Error accessing customer portal:', error);
-		}
-	};
+		},
+		onError: () => {
+			toast.error('Error accessing customer portal. Please try again.');
+		},
+	});
 
-	return <Button onClick={handlePortalAccess}>Manage Your Subscription</Button>;
+	return (
+		<Button onClick={() => accessPortal()} disabled={isPending} isLoading={isPending}>
+			Manage Your Subscription
+		</Button>
+	);
 };
 
 export default ManageSubscriptionButton;
