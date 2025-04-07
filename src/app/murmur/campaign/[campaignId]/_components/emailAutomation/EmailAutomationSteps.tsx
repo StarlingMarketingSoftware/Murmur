@@ -7,15 +7,8 @@ import {
 } from './useEmailAutomationSteps';
 
 const EmailAutomationSteps: FC<EmailAutomationStepsProps> = (props) => {
-	const {
-		stepParam,
-		handleTabChange,
-		advanceToNextStep,
-		returnToPreviousStep,
-		handleSaveCampaign,
-		isPendingCampaign,
-		steps,
-	} = useEmailAutomationSteps(props);
+	const { stepParam, handleTabChange, advanceToNextStep, returnToPreviousStep, steps } =
+		useEmailAutomationSteps(props);
 
 	return (
 		<>
@@ -52,9 +45,6 @@ const EmailAutomationSteps: FC<EmailAutomationStepsProps> = (props) => {
 					onClick={advanceToNextStep}
 				>
 					Next Step
-				</Button>
-				<Button isLoading={isPendingCampaign} onClick={handleSaveCampaign}>
-					Save Campaign
 				</Button>
 			</div>
 		</>

@@ -1,7 +1,5 @@
 import { CampaignWithRelations } from '@/constants/types';
-import { useMutation } from '@tanstack/react-query';
-import { useSearchParams, useRouter, usePathname, useParams } from 'next/navigation';
-import { toast } from 'sonner';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import SendPage from './send/SendPage';
 import DraftPage from './draft/DraftPage';
 import SelectRecipients from './recipients/RecipientsPage';
@@ -22,7 +20,6 @@ export const useEmailAutomationSteps = (props: EmailAutomationStepsProps) => {
 	const { campaign } = props;
 	const router = useRouter();
 	const searchParams = useSearchParams();
-	const params = useParams<{ campaignId: string }>();
 	const pathname = usePathname();
 	const stepParam = searchParams.get('step') ?? '1';
 
@@ -42,35 +39,6 @@ export const useEmailAutomationSteps = (props: EmailAutomationStepsProps) => {
 		params.set('step', (parseInt(stepParam) - 1).toString());
 		router.push(`${pathname}?${params.toString()}`);
 	};
-
-	const { mutateAsync: updateCampaign, isPending: isPendingCampaign } = useMutation({
-		mutationFn: async (campaignData: Partial<CampaignWithRelations>) => {
-			const response = await fetch(`/api/campaigns/${params.campaignId}`, {
-				method: 'PATCH',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(campaignData),
-			});
-
-			if (!response.ok) {
-				toast.error('Failed to save campaign');
-				throw new Error('Failed to save campaign');
-			}
-
-			return response.json();
-		},
-		onSuccess: () => {
-			toast.success('Campaign updated successfully');
-		},
-		onError: (error) => {
-			if (error instanceof Error) {
-				toast.error('Failed to update campaign. Please try again.');
-			}
-		},
-	});
-
-	const handleSaveCampaign = async () => {};
 
 	const steps: Step[] = [
 		{
@@ -98,8 +66,6 @@ export const useEmailAutomationSteps = (props: EmailAutomationStepsProps) => {
 		handleTabChange,
 		advanceToNextStep,
 		returnToPreviousStep,
-		handleSaveCampaign,
-		isPendingCampaign,
 		steps,
 	};
 };
