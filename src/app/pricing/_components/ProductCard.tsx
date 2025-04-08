@@ -1,3 +1,4 @@
+'use client';
 import { Card, CardContent, CardTitle, CardFooter } from '@/components/ui/card';
 import {
 	TypographyH1,
@@ -6,24 +7,33 @@ import {
 	TypographyList,
 } from '@/components/ui/typography';
 import { twMerge } from 'tailwind-merge';
-import { getStripePrice, StripeProduct } from '@/app/utils/data/stripe/products';
+import { useStripePrice } from '@/hooks/useStripePrice';
 import { Stripe } from 'stripe';
 import { CheckoutButton } from './CheckoutButton';
 import { User } from '@prisma/client';
 import { STRIPE_SUBSCRIPTION_STATUS } from '@/constants/types';
+import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
+import Spinner from '@/components/ui/spinner';
+import { ReactNode } from 'react';
+import UpdateSubscriptionButton from '@/components/UpdateSubscriptionButton';
+
 interface ProductCardProps {
-	product: StripeProduct;
+	product: Stripe.Product;
 	className?: string;
 	onButtonClick?: () => void;
-	user: User | null;
+	user: User | null | undefined;
+	isLink?: boolean;
 }
 
-export async function ProductCard({
+export function ProductCard({
 	product,
 	className,
 	onButtonClick,
 	user,
+	isLink = false,
 }: ProductCardProps) {
+	const { data: prices, isLoading } = useStripePrice(product.id);
+
 	const formatPrice = (price: number, currency: string) => {
 		return new Intl.NumberFormat('en-US', {
 			style: 'currency',
@@ -32,43 +42,57 @@ export async function ProductCard({
 		}).format(price / 100);
 	};
 
-	const prices: Stripe.Price[] = await getStripePrice(product.id);
-	let price: Stripe.Price;
-	if (prices.length > 0) {
-		price = prices[0];
-	} else {
-		return null;
-	}
+	if (isLoading) return <Spinner />;
+	if (!prices || prices.length === 0) return null;
 
-	// Extract price information
-	const formattedPrice = price
-		? formatPrice(price.unit_amount || 0, price.currency || 'usd')
-		: 'Custom';
-
+	const price = prices[0];
+	const formattedPrice = formatPrice(price.unit_amount || 0, price.currency || 'usd');
 	const period = price?.recurring?.interval ? `per ${price.recurring.interval}` : '';
 
-	const getButtonText = () => {
+	const getButton = (): ReactNode => {
+		const checkoutButton = (
+			<CheckoutButton
+				user={user}
+				priceId={price.id}
+				buttonText="Get Started"
+				onButtonClick={onButtonClick}
+			/>
+		);
 		if (!user) {
-			return 'Get Started';
-		}
-
-		if (
+			return checkoutButton;
+		} else if (
 			user.stripePriceId === price.id &&
 			user.stripeSubscriptionStatus === STRIPE_SUBSCRIPTION_STATUS.ACTIVE
 		) {
-			return 'Manage Subscription';
+			return <ManageSubscriptionButton className="mx-auto" />;
+		} else if (user.stripeSubscriptionId) {
+			return (
+				<UpdateSubscriptionButton
+					priceId={price.id}
+					user={user}
+					productId={product.id}
+					className="mx-auto"
+				/>
+			);
+		} else {
+			return checkoutButton;
 		}
+	};
 
-		if (user.stripeSubscriptionId) {
-			return 'Update Subscription';
-		}
-
-		return 'Get Started';
+	const handleClick = () => {
+		window.location.href = `/admin/products/${product.id}`;
 	};
 
 	const marketingFeatures: Stripe.Product.MarketingFeature[] = product.marketing_features;
 	return (
-		<Card className={twMerge('w-[325px] p-6 flex flex-col justify-between', className)}>
+		<Card
+			onClick={isLink ? handleClick : undefined}
+			className={twMerge(
+				'w-[325px] p-6 flex flex-col justify-between',
+				isLink && 'cursor-pointer',
+				className
+			)}
+		>
 			<div className="">
 				<CardTitle>
 					<TypographyH4 className="text-center">{product.name}</TypographyH4>
@@ -84,14 +108,7 @@ export async function ProductCard({
 					</TypographyList>
 				</CardContent>
 			</div>
-			<CardFooter>
-				<CheckoutButton
-					user={user}
-					priceId={price.id}
-					buttonText={getButtonText()}
-					onButtonClick={onButtonClick}
-				/>
-			</CardFooter>
+			{!isLink && <CardFooter>{getButton()}</CardFooter>}
 		</Card>
 	);
 }

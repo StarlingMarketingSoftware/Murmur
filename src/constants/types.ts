@@ -117,3 +117,8 @@ export enum PerplexityModelEnum {
 	Sonar = 'sonar',
 	SonarPro = 'sonar-pro',
 }
+
+export type SubscriptionTierData = {
+	aiEmailCount: number;
+	viewEmailAddresses: boolean;
+};

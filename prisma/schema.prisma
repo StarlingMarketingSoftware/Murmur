@@ -19,12 +19,19 @@ enum AiModel {
   sonar_pro @map("sonar-pro")
 }
 
+enum UserRole {
+  user
+  admin
+}
+
 model User {
-  id        Int     @id @default(autoincrement())
-  clerkId   String  @unique
-  email     String  @unique
-  firstName String?
-  lastName  String?
+  id             Int      @id @default(autoincrement())
+  clerkId        String   @unique
+  email          String   @unique
+  firstName      String?
+  lastName       String?
+  role           UserRole @default(user)
+  aiDraftCredits Int      @default(5)
 
   stripeCustomerId         String?    @unique
   stripeSubscriptionId     String?

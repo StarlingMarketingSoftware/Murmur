@@ -1,17 +1,26 @@
 'use client';
 
-import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
 import { ProductCard } from '@/app/pricing/_components/ProductCard';
 import { useStripeProducts } from '@/hooks/useStripeProducts';
 import { useMe } from '@/hooks/useMe';
 import Spinner from '@/components/ui/spinner';
+import { UserRole } from '@prisma/client';
 
 export default function Products() {
 	const { data: products, isLoading, error } = useStripeProducts();
-	const { user } = useMe();
+	const { user, isPendingUser } = useMe();
 
-	if (isLoading) {
+	if (isLoading || isPendingUser) {
 		return <Spinner />;
+	}
+
+	if (user?.role !== UserRole.admin) {
+		return (
+			<div className="flex flex-col items-center justify-center p-8">
+				<h2 className="text-2xl font-bold mb-4">Access Denied</h2>
+				<p>You do not have permission to view this page.</p>
+			</div>
+		);
 	}
 
 	if (error || !products || products.length === 0) {
@@ -23,20 +32,15 @@ export default function Products() {
 		);
 	}
 
-	const filteredProducts = products.filter((product) => product.metadata.main === '1');
-
-	const sortedProducts = filteredProducts.sort(
-		(a, b) => parseInt(a.metadata.order) - parseInt(b.metadata.order)
-	);
+	const sortedProducts = products.sort((a, b) => a.created - b.created);
 
 	return (
 		<div className="flex flex-col items-center justify-center p-8">
 			<div className="flex flex-wrap gap-6 justify-center p-8">
 				{sortedProducts.map((product) => (
-					<ProductCard key={product.id} product={product} user={user} />
+					<ProductCard isLink key={product.id} product={product} user={user} />
 				))}
 			</div>
-			{user?.stripeSubscriptionId && <ManageSubscriptionButton />}
 		</div>
 	);
 }

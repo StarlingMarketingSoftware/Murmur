@@ -2,14 +2,14 @@
 
 import { Button } from '@/components/ui/button';
 import { User } from '@prisma/client';
-import { useTransition } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 interface CheckoutButtonProps {
 	priceId: string;
 	buttonText: string;
 	onButtonClick?: () => void;
-	user: User | null;
+	user: User | null | undefined;
 }
 
 export function CheckoutButton({
@@ -18,51 +18,44 @@ export function CheckoutButton({
 	onButtonClick,
 	user,
 }: CheckoutButtonProps) {
-	const [isPending, startTransition] = useTransition();
+	const { mutate: checkout, isPending } = useMutation({
+		mutationFn: async () => {
+			const response = await fetch('/api/stripe/checkout', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					priceId,
+					userId: user?.id,
+				}),
+			});
 
-	const handleCheckout = async () => {
-		startTransition(async () => {
-			try {
-				const response = await fetch('/api/checkout', {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-					},
-					body: JSON.stringify({
-						priceId,
-						userId: user?.id,
-					}),
-				});
-
-				const data = await response.json();
-
-				if (!response.ok) {
-					throw new Error(data.error || 'Failed to create checkout session');
-				}
-
-				if (data.url) {
-					// Redirect to Stripe Checkout
-					window.location.href = data.url;
-				} else {
-					throw new Error('No checkout URL returned');
-				}
-			} catch (error: unknown) {
-				const errorMessage =
-					error instanceof Error
-						? error.message
-						: 'Failed to start checkout process. Please try again.';
-				toast.error(errorMessage);
+			const data = await response.json();
+			if (!response.ok) {
+				throw new Error(data.error || 'Failed to create checkout session');
 			}
-		});
-	};
+			return data;
+		},
+		onSuccess: (data) => {
+			if (data.url) {
+				window.location.href = data.url;
+			} else {
+				throw new Error('No checkout URL returned');
+			}
+		},
+		onError: (error: Error) => {
+			toast.error(error.message || 'Failed to start checkout process. Please try again.');
+		},
+	});
 
 	return (
 		<Button
 			className="mx-auto"
-			onClick={onButtonClick || handleCheckout}
-			disabled={isPending}
+			onClick={onButtonClick || (() => checkout())}
+			isLoading={isPending}
 		>
-			{isPending ? 'Loading...' : buttonText}
+			{buttonText}
 		</Button>
 	);
 }

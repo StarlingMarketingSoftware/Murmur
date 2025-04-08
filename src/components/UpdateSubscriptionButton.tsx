@@ -3,30 +3,36 @@ import { FC } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from './ui/button';
-import { useMe } from '@/hooks/useMe';
 import { toast } from 'sonner';
+import { User } from '@prisma/client';
 
-interface ManageSubscriptionButtonProps {
-	isUpdateSubscription?: boolean;
+interface UpdateSubscriptionButtonProps {
 	className?: string;
+	priceId: string;
+	productId: string;
+	user: User;
 }
 
-const ManageSubscriptionButton: FC<ManageSubscriptionButtonProps> = ({
-	isUpdateSubscription,
+const UpdateSubscriptionButton: FC<UpdateSubscriptionButtonProps> = ({
 	className,
+	priceId,
+	user,
+	productId,
 }) => {
-	const { user } = useMe();
-
 	const { mutate: accessPortal, isPending } = useMutation({
 		mutationFn: async () => {
-			const response = await fetch('/api/stripe/stripe-portal', {
+			const response = await fetch('/api/stripe/stripe-portal/custom-product', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ customerId: user?.stripeCustomerId }),
+				body: JSON.stringify({
+					customerId: user?.stripeCustomerId,
+					priceId: priceId,
+					productId: productId,
+				}),
 			});
 			const { url } = await response.json();
 			const updateSubscriptionUrl = `${url}/subscriptions/${user?.stripeSubscriptionId}/update`;
-			window.location.href = isUpdateSubscription ? updateSubscriptionUrl : url;
+			window.location.href = updateSubscriptionUrl;
 		},
 		onError: () => {
 			toast.error('Error accessing customer portal. Please try again.');
@@ -40,9 +46,9 @@ const ManageSubscriptionButton: FC<ManageSubscriptionButtonProps> = ({
 			disabled={isPending}
 			isLoading={isPending}
 		>
-			{isUpdateSubscription ? 'Switch to This Plan' : 'Manage Your Subscription'}
+			{'Switch to This Plan'}
 		</Button>
 	);
 };
 
-export default ManageSubscriptionButton;
+export default UpdateSubscriptionButton;
