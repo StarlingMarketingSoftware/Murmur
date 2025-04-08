@@ -67,7 +67,12 @@ export function ProductCard({
 			return <ManageSubscriptionButton className="mx-auto" />;
 		} else if (user.stripeSubscriptionId) {
 			return (
-				<UpdateSubscriptionButton priceId={price.id} user={user} productId={product.id} />
+				<UpdateSubscriptionButton
+					priceId={price.id}
+					user={user}
+					productId={product.id}
+					className="mx-auto"
+				/>
 			);
 		} else {
 			return checkoutButton;

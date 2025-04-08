@@ -1,4 +1,4 @@
-import { AiSelectValues } from './types';
+import { AiSelectValues, SubscriptionTierData } from './types';
 
 export enum LocalStorageKeys {
 	GoogleAuthState = 'googleAuthState',
@@ -28,3 +28,26 @@ export const AiModelOptions: AiSelectValues[] = [
 		type: 'perplexity',
 	},
 ];
+
+export const subscriptionTierDataList: Record<string, SubscriptionTierData> = {
+	price_1RB9Uw02Nskp21xSrRxsLDT3: {
+		aiEmailCount: 500,
+		viewEmailAddresses: false,
+	},
+	custom: {
+		aiEmailCount: 1000,
+		viewEmailAddresses: false,
+	},
+	price_1RBX5302Nskp21xS93QdS0f9: {
+		aiEmailCount: 1500,
+		viewEmailAddresses: false,
+	},
+	price_1RBX6b02Nskp21xScZVyGvIb: {
+		aiEmailCount: 5000,
+		viewEmailAddresses: true,
+	},
+	price_1RBX7v02Nskp21xSePcdKsR0: {
+		aiEmailCount: 7500,
+		viewEmailAddresses: true,
+	},
+};

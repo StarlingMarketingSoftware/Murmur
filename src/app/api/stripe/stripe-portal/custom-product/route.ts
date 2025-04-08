@@ -31,7 +31,6 @@ export async function POST(
 				subscription_update: {
 					enabled: true,
 					default_allowed_updates: ['price'],
-					// Only allow updates for the specified product
 					products: [
 						{
 							product: productId,
@@ -53,7 +52,7 @@ export async function POST(
 		const portalSession = await stripe.billingPortal.sessions.create({
 			customer: customerId,
 			configuration: portalConfig.id, // Use the restricted config
-			return_url: `http://localhost:3000/admin/products`, // Redirect after portal
+			return_url: `http://localhost:3000/pricing`, // Redirect after portal
 		});
 		console.log('🚀 ~ portalSession:', portalSession);
 

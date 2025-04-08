@@ -1,6 +1,7 @@
 import { stripe } from '../../../../stripe/client';
 import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
+import { getSubscriptionTierWithPriceId } from '@/lib/utils';
 
 const prisma = new PrismaClient();
 type StripeSubscription = Stripe.Subscription;
@@ -20,6 +21,9 @@ export async function fulfillCheckout(
 
 		// if checkoutSession.metadata.userId does not exist, look in the product for the userId
 
+		const priceId = subscription.items.data[0].price.id;
+		const subscriptionTier = getSubscriptionTierWithPriceId(priceId);
+
 		if (checkoutSession.payment_status !== 'unpaid') {
 			const customerId = checkoutSession.customer as string;
 
@@ -30,8 +34,9 @@ export async function fulfillCheckout(
 				data: {
 					stripeCustomerId: customerId,
 					stripeSubscriptionId: subscription.id,
-					stripePriceId: subscription.items.data[0].price.id,
+					stripePriceId: priceId,
 					stripeSubscriptionStatus: subscription.status,
+					aiDraftCredits: subscriptionTier.aiEmailCount,
 				},
 			});
 

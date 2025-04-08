@@ -1,0 +1,21 @@
+{
+	"data": {
+		"object": {
+			"billing_reason": "subscription_cycle",
+			"customer": "cus_S5jcf4GjfTGmNN",
+			"subscription": "sub_1RBY9502Nskp21xSEFwMqijL",
+			"lines": {
+				"data": [
+					{
+						"price": {
+							"id": "price_1RBFPI02Nskp21xS1zgEzMXG"
+						}
+					}
+				]
+			},
+			"status_transitions": {
+				"paid_at": 1712577600
+			}
+		}
+	}
+}
