@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/toast';
 import './globals.css';
 import SubLayout from './sublayout';
 // import localFont from 'next/font/local';
-import { Navbar } from '@/components/Navbar';
+import { Navbar } from '@/components/navbar/Navbar';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { dark } from '@clerk/themes';
 import StoreProvider from './StoreProvider';

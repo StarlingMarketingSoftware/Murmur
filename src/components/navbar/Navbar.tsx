@@ -9,12 +9,13 @@ import {
 import { SignUpButton, UserButton } from '@clerk/nextjs';
 import { auth } from '@clerk/nextjs/server';
 import { SignInButton } from '@clerk/nextjs';
-import { Button } from './ui/button';
+import { Button } from '../ui/button';
 import { Url } from '@/constants/types';
 import { urls } from '@/constants/urls';
 import { headers } from 'next/headers';
 import { twMerge } from 'tailwind-merge';
-import { DarkModeToggle } from './DarkModeToggle';
+import { DarkModeToggle } from '../DarkModeToggle';
+import AiCredits from '../AiCredits/AiCredits';
 
 const urlList = [urls.home, urls.murmur.dashboard, urls.pricing, urls.contact];
 
@@ -59,6 +60,7 @@ export async function Navbar() {
 						</NavigationMenuList>
 					</NavigationMenu>
 					<div className="absolute right-5 ml-auto flex items-center space-x-4">
+						<AiCredits />
 						<DarkModeToggle />
 						{isSignedIn ? (
 							<UserButton />

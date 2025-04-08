@@ -31,7 +31,6 @@ export default function Products() {
 
 	return (
 		<div className="flex flex-col items-center justify-center p-8">
-			<div>{user?.aiDraftCredits}</div>
 			<div className="flex flex-wrap gap-6 justify-center p-8">
 				{sortedProducts.map((product) => (
 					<ProductCard key={product.id} product={product} user={user} />
