@@ -5,6 +5,7 @@ import { stripe } from '../../../../stripe/client';
 import prisma from '@/lib/prisma';
 import { fulfillCheckout } from '@/app/utils/actions/stripe/fulfillCheckout';
 import { getSubscriptionTierWithPriceId } from '@/lib/utils';
+import { STRIPE_SUBSCRIPTION_STATUS } from '@/constants/types';
 
 export async function POST(req: Request) {
 	const body = await req.text();
@@ -69,6 +70,31 @@ export async function POST(req: Request) {
 			} catch (error) {
 				console.error('Error updating user:', error);
 				return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
+			}
+		} else if (event.type === 'customer.subscription.deleted') {
+			console.log('subscription deleted');
+			const subscription: Stripe.Subscription = event.data.object;
+
+			try {
+				const res = await prisma.user.update({
+					where: {
+						stripeCustomerId: subscription.customer as string,
+					},
+					data: {
+						stripeSubscriptionStatus: subscription.status,
+						stripeSubscriptionId: null,
+						stripePriceId: null,
+						aiDraftCredits: 0,
+					},
+				});
+
+				return NextResponse.json({ res }, { status: 200 });
+			} catch (error) {
+				console.error('Error updating user subscription deletion:', error);
+				return NextResponse.json(
+					{ error: 'Failed to update user subscription status' },
+					{ status: 500 }
+				);
 			}
 		} else if (event.type === 'invoice.paid') {
 			return;
