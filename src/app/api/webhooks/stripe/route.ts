@@ -5,7 +5,6 @@ import { stripe } from '../../../../stripe/client';
 import prisma from '@/lib/prisma';
 import { fulfillCheckout } from '@/app/utils/actions/stripe/fulfillCheckout';
 import { getSubscriptionTierWithPriceId } from '@/lib/utils';
-import { STRIPE_SUBSCRIPTION_STATUS } from '@/constants/types';
 
 export async function POST(req: Request) {
 	const body = await req.text();

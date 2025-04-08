@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { stripe } from '../../../../stripe/client';
 import Stripe from 'stripe';
 import { getUser } from '@/app/utils/data/users/getUser';
+import prisma from '@/lib/prisma';
 
 export async function POST(req: Request) {
 	try {
@@ -28,6 +29,7 @@ export async function POST(req: Request) {
 		const session: Stripe.Response<Stripe.Checkout.Session> =
 			await stripe.checkout.sessions.create({
 				payment_method_types: ['card'],
+				customer: user.stripeCustomerId || undefined,
 				line_items: [
 					{
 						price: priceId,
