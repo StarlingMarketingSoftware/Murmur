@@ -4,14 +4,18 @@ import { Card } from '@/components/ui/card';
 import { CreateCampaignDialog } from './CreateCampaignDialog';
 import PageHeading from '@/components/text/PageHeading';
 import MutedSubtext from '@/components/text/MutedSubtext';
+import { CampaignsTable } from './CampaignsTable/CampaignsTable';
 
 const Dashboard = () => {
 	return (
-		<Card className="w-[900px] mx-auto mt-10">
-			<PageHeading>Welcome to Murmur</PageHeading>
-			<MutedSubtext>{`Let's start by creating a campaign.`}</MutedSubtext>
-			<CreateCampaignDialog />
-		</Card>
+		<div className="mt-0 mx-auto w-[900px]">
+			<Card className="">
+				<PageHeading>Welcome to Murmur</PageHeading>
+				<MutedSubtext>{`Let's start by creating a campaign.`}</MutedSubtext>
+				<CreateCampaignDialog />
+			</Card>
+			<CampaignsTable />
+		</div>
 	);
 };
 

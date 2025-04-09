@@ -1,30 +1,18 @@
 import { CampaignWithRelations } from '@/constants/types';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-export const useCampaigns = () => {
-	const {
-		data,
-		isPending,
-		mutate: fetchContacts,
-	} = useMutation({
-		mutationFn: async (campaign: { name: string }) => {
-			const response = await fetch('/api/campaigns', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({ campaign }),
-			});
+export const useGetCampaigns = () => {
+	return useQuery({
+		queryKey: ['campaigns'],
+		queryFn: async () => {
+			const response = await fetch('/api/campaigns');
 			if (!response.ok) {
-				toast.error('Failed to create campaign. Please try again.');
-				throw new Error('Network response was not ok');
+				throw new Error('Failed to fetch campaigns');
 			}
 			return response.json();
 		},
 	});
-
-	return { data, isPending, fetchContacts };
 };
 
 export const useEditCampaign = (
@@ -67,4 +55,49 @@ export const useEditCampaign = (
 		updateCampaign,
 		isPendingCampaign,
 	};
+};
+
+interface CampaignMutationOptions {
+	suppressToasts?: boolean;
+	successMessage?: string;
+	errorMessage?: string;
+	onSuccess?: () => void;
+}
+
+export const useDeleteCampaign = (options: CampaignMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Campaign deleted successfully',
+		errorMessage = 'Failed to delete campaign',
+		onSuccess: onSuccessCallback,
+	} = options;
+
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (campaignId: number) => {
+			const response = await fetch(`/api/campaigns/${campaignId}`, {
+				method: 'DELETE',
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to delete campaign');
+			}
+
+			return response.json();
+		},
+		onSuccess: () => {
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
+			queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
 };

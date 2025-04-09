@@ -25,7 +25,6 @@ import {
 
 import { AiModelOptions } from '@/constants/constants';
 import PreviewTestDraftDialog from './PreviewTestDraftDialog/PreviewTestDraftDialog';
-import ConfirmModal from '@/components/ConfirmModal';
 import { FC } from 'react';
 import useComposeEmailSection, {
 	ComposeEmailSectionProps,
@@ -33,6 +32,7 @@ import useComposeEmailSection, {
 import { Separator } from '@/components/ui/separator';
 import { TypographyMuted, TypographyP } from '@/components/ui/typography';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmModal } from '@/components/ConfirmModal/ConfirmModal';
 
 const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 	const {

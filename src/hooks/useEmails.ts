@@ -7,14 +7,14 @@ interface EditEmailData {
 	data: Email; // Consider creating a proper type for your email data
 }
 
-interface EditEmailOptions {
+interface EmailMutationOptions {
 	suppressToasts?: boolean;
 	successMessage?: string;
 	errorMessage?: string;
 	onSuccess?: () => void;
 }
 
-export const useEditEmail = (options: EditEmailOptions = {}) => {
+export const useEditEmail = (options: EmailMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
 		successMessage = 'Email updated successfully',

@@ -33,6 +33,7 @@ interface DataTableProps<TData, TValue> {
 	setSelectedRows?: ((rows: TData[]) => void) | Dispatch<SetStateAction<TData[]>>;
 	singleSelection?: boolean;
 	handleRowClick?: (rowData: TData) => void;
+	isSelectable?: boolean;
 	noDataMessage?: string;
 	initialRowSelectionState?: string[];
 }
@@ -64,11 +65,12 @@ export function CustomTable<TData, TValue>({
 	setSelectedRows,
 	singleSelection,
 	handleRowClick,
+	isSelectable = false,
 	noDataMessage = 'No data was found.',
 	initialRowSelectionState,
 }: DataTableProps<TData, TValue>) {
 	const getInitialRowSelection = () => {
-		if (!initialRowSelectionState || !data) return {};
+		if (!initialRowSelectionState || !data || !isSelectable) return {};
 
 		return data.reduce((acc, row, index) => {
 			const isSelected = initialRowSelectionState.some(
@@ -99,6 +101,7 @@ export function CustomTable<TData, TValue>({
 		getFilteredRowModel: getFilteredRowModel(),
 		onRowSelectionChange: setRowSelection,
 		enableMultiRowSelection: !singleSelection,
+		enableRowSelection: isSelectable,
 		onGlobalFilterChange: setGlobalFilter,
 		globalFilterFn: 'includesString',
 		state: {
@@ -112,7 +115,7 @@ export function CustomTable<TData, TValue>({
 	const rowModel = table.getSelectedRowModel();
 
 	useEffect(() => {
-		if (!setSelectedRows || !data) return;
+		if (!setSelectedRows || !data || !isSelectable) return;
 
 		const updateSelectedRows = () => {
 			const selectedRows = table.getSelectedRowModel().rows;
@@ -153,10 +156,12 @@ export function CustomTable<TData, TValue>({
 
 	return (
 		<div>
-			<div className="flex-1 text-sm text-muted-foreground">
-				{table.getFilteredSelectedRowModel().rows.length} of{' '}
-				{table.getFilteredRowModel().rows.length} rows selected.
-			</div>
+			{isSelectable && (
+				<div className="flex-1 text-sm text-muted-foreground">
+					{table.getFilteredSelectedRowModel().rows.length} of{' '}
+					{table.getFilteredRowModel().rows.length} rows selected.
+				</div>
+			)}
 			<div className="flex items-center py-4">
 				<Input
 					placeholder="Search all columns..."
@@ -187,9 +192,11 @@ export function CustomTable<TData, TValue>({
 							table.getRowModel().rows.map((row) => (
 								<TableRow
 									className={twMerge(
-										(handleRowClick || setSelectedRows) && 'cursor-pointer'
+										(handleRowClick || (setSelectedRows && isSelectable)) &&
+											'cursor-pointer'
 									)}
 									onClick={() => {
+										if (!isSelectable && !handleRowClick) return;
 										if (!handleRowClick) {
 											row.toggleSelected();
 										} else {
