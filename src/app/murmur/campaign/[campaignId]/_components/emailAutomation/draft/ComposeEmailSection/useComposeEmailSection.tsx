@@ -1,6 +1,8 @@
 import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/route';
 import { CampaignWithRelations, Draft } from '@/constants/types';
+import { useMe } from '@/hooks/useMe';
 import { usePerplexityDraftEmail } from '@/hooks/usePerplexity';
+import { useEditUser } from '@/hooks/useUsers';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AiModel, EmailStatus } from '@prisma/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -27,7 +29,9 @@ export interface ComposeEmailSectionProps {
 
 const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	const { campaign } = props;
-	console.log('🚀 ~ useComposeEmailSection ~ campaign:', campaign);
+	const { user } = useMe();
+	const aiDraftCredits = user?.aiDraftCredits;
+	const aiTestCredits = user?.aiTestCredits;
 
 	const [isAiDraft, setIsAiDraft] = useState<boolean>(campaign.subject?.length === 0);
 	const [isAiSubject, setIsAiSubject] = useState<boolean>(campaign.subject?.length === 0);
@@ -75,6 +79,8 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 
 	const queryClient = useQueryClient();
 
+	const { mutate: editUser } = useEditUser({ suppressToasts: true });
+
 	const { isPending: isPendingSavePrompt, mutate: savePrompt } = useMutation({
 		mutationFn: async (updateData: z.infer<typeof updateCampaignSchema>) => {
 			const response = await fetch(`/api/campaigns/${campaign.id}`, {
@@ -102,7 +108,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		},
 	});
 
-	const { isPending: isPendingCreateEmail, mutate: createEmail } = useMutation({
+	const { isPending: isPendingCreateEmail, mutateAsync: createEmail } = useMutation({
 		mutationFn: async (emailData: {
 			subject: string;
 			message: string;
@@ -132,6 +138,13 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		onSuccess: (data) => {
 			toast.success('Email created successfully!');
 			queryClient.invalidateQueries({ queryKey: ['campaign'] });
+			if (user && aiDraftCredits) {
+				editUser({
+					clerkId: user?.clerkId,
+					data: { aiDraftCredits: aiDraftCredits - 1 },
+				}); // update the aiDraftCredits
+			}
+			// update the aiDraftCredits
 			return data;
 		},
 		onError: (error: Error) => {
@@ -140,7 +153,6 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	});
 
 	const handleFormAction = async (action: 'test' | 'submit') => {
-		// Check form validity first
 		const isValid = await trigger();
 		if (!isValid) return;
 
@@ -157,7 +169,14 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 			});
 			savePrompt({ testMessage: res.message, testSubject: res.subject });
 		} else if (isAiDraft) {
+			let remainingCredits = aiDraftCredits || 0;
+
 			for (const recipient of campaign.contacts) {
+				if (remainingCredits <= 0) {
+					toast.error('You have run out of AI draft credits!');
+					break;
+				}
+
 				let newDraft: Draft | null;
 				try {
 					newDraft = await draftEmailAsync({
@@ -166,21 +185,23 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 						recipient,
 						prompt: values.message,
 					});
+
+					if (newDraft) {
+						if (!isAiSubject) {
+							newDraft.subject = values.subject ? values.subject : newDraft.subject;
+						}
+						await createEmail({
+							subject: newDraft.subject,
+							message: newDraft.message,
+							campaignId: campaign.id,
+							status: 'draft' as EmailStatus,
+							contactId: recipient.id,
+						});
+
+						remainingCredits--;
+					}
 				} catch {
 					continue;
-				}
-				if (newDraft) {
-					if (!isAiSubject) {
-						newDraft.subject = values.subject ? values.subject : newDraft.subject;
-					}
-					// Create email in database
-					createEmail({
-						subject: newDraft.subject,
-						message: newDraft.message,
-						campaignId: campaign.id,
-						status: 'draft' as EmailStatus,
-						contactId: recipient.id,
-					});
 				}
 			}
 		} else {
@@ -218,6 +239,8 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		handleSavePrompt,
 		createEmail,
 		isPendingCreateEmail,
+		aiDraftCredits,
+		aiTestCredits,
 	};
 };
 

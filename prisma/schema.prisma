@@ -32,6 +32,7 @@ model User {
   lastName       String?
   role           UserRole @default(user)
   aiDraftCredits Int      @default(5)
+  aiTestCredits  Int      @default(2)
 
   stripeCustomerId         String?    @unique
   stripeSubscriptionId     String?
