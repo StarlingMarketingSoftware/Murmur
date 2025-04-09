@@ -79,7 +79,7 @@ const messageAndSubjectFormat = `Return the message and the subject line, withou
 
 // const batchMessageAndSubjectFormat = `I will provide a json that contains information about each recipient. Return the message and the subject line, without any signature or other text. Please format the response into a list of JSON strings with the keys "recipient", "subject", and "message".`;
 
-const perplexityEndpoint = 'https://api.perplexity.ai/chat/completions';
+const perplexityEndpoint = '/api/perplexity';
 
 const safeParseAIResponse = (response: string): Draft => {
 	try {
@@ -137,7 +137,6 @@ export const usePerplexityDraftEmail = () => {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					Authorization: `Bearer ${process.env.NEXT_PUBLIC_PERPLEXITY_API_KEY}`,
 				},
 				body: JSON.stringify({
 					model: params.model,
@@ -159,7 +158,7 @@ export const usePerplexityDraftEmail = () => {
 				}),
 			});
 			if (!response.ok) {
-				throw new Error('Failed to generate email');
+				throw new Error('Failed to generate email.');
 			}
 
 			const data = await response.json();

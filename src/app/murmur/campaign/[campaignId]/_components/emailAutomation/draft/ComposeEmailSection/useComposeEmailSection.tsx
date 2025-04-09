@@ -81,7 +81,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 
 	const { mutate: editUser } = useEditUser({ suppressToasts: true });
 
-	const { isPending: isPendingSavePrompt, mutate: savePrompt } = useMutation({
+	const { isPending: isPendingSavePrompt, mutateAsync: savePrompt } = useMutation({
 		mutationFn: async (updateData: z.infer<typeof updateCampaignSchema>) => {
 			const response = await fetch(`/api/campaigns/${campaign.id}`, {
 				method: 'PATCH',
@@ -117,7 +117,6 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 			status?: EmailStatus;
 			contactId: number;
 		}) => {
-			// TODO update this function to add contactId
 			const response = await fetch('/api/emails', {
 				method: 'POST',
 				headers: {
@@ -160,14 +159,29 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 
 		if (action === 'test') {
 			setIsTest(true);
-			// if error, don't cost the user any tokens
-			const res: Draft = await draftEmailAsync({
-				generateSubject: isAiSubject,
-				model: values.aiModel,
-				recipient: campaign.contacts[0],
-				prompt: values.message,
-			});
-			savePrompt({ testMessage: res.message, testSubject: res.subject });
+			if (aiTestCredits === 0) {
+				toast.error('You have run out of AI test credits!');
+				return;
+			}
+
+			try {
+				const res: Draft = await draftEmailAsync({
+					generateSubject: isAiSubject,
+					model: values.aiModel,
+					recipient: campaign.contacts[0],
+					prompt: values.message,
+				});
+				await savePrompt({ testMessage: res.message, testSubject: res.subject });
+				toast.success('Test email generated successfully!');
+				if (user && aiTestCredits) {
+					editUser({
+						clerkId: user?.clerkId,
+						data: { aiTestCredits: aiTestCredits - 1 },
+					});
+				}
+			} catch {
+				toast.error('Failed to generate test email. Please try again.');
+			}
 		} else if (isAiDraft) {
 			let remainingCredits = aiDraftCredits || 0;
 
