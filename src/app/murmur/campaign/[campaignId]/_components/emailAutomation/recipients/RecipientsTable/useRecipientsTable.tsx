@@ -8,6 +8,10 @@ import { useParams } from 'next/navigation';
 import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/route';
 import { z } from 'zod';
 import { TableSortingButton } from '../../../CustomTable';
+import { useMe } from '@/hooks/useMe';
+import { TypographyMuted } from '@/components/ui/typography';
+import FeatureLockedButton from '@/app/murmur/_components/FeatureLockedButton';
+import { restrictedFeatureMessages } from '@/constants/constants';
 
 export interface RecipientsTableProps {
 	contacts: Contact[];
@@ -15,6 +19,8 @@ export interface RecipientsTableProps {
 
 export const useRecipientsTable = (props: RecipientsTableProps) => {
 	const { contacts } = props;
+	const { subscriptionTier } = useMe();
+
 	const queryClient = useQueryClient();
 	const params = useParams();
 	const { campaignId } = params;
@@ -34,7 +40,7 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 			return response.json();
 		},
 		onSuccess: () => {
-			toast.success('Recipient successfully remove from campaign.');
+			toast.success('Recipient successfully removed from campaign.');
 			queryClient.invalidateQueries({ queryKey: ['campaign'] });
 		},
 		onError: () => {
@@ -43,33 +49,18 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 	});
 
 	const columns: ColumnDef<Contact>[] = [
-		// {
-		// 	id: 'select',
-		// 	header: ({ table }) => (
-		// 		<Checkbox
-		// 			checked={
-		// 				table.getIsAllPageRowsSelected() ||
-		// 				(table.getIsSomePageRowsSelected() && 'indeterminate')
-		// 			}
-		// 			onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-		// 			aria-label="Select all"
-		// 		/>
-		// 	),
-		// 	cell: ({ row }) => (
-		// 		<Checkbox
-		// 			checked={row.getIsSelected()}
-		// 			onCheckedChange={(value) => row.toggleSelected(!!value)}
-		// 			aria-label="Select row"
-		// 		/>
-		// 	),
-		// },
 		{
 			accessorKey: 'name',
 			header: ({ column }) => {
 				return <TableSortingButton column={column} label="Name" />;
 			},
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('name')}</div>;
+				const name: string = row.getValue('name');
+				return name ? (
+					<div className="text-center">{name}</div>
+				) : (
+					<TypographyMuted className="text-sm">No Data</TypographyMuted>
+				);
 			},
 		},
 		{
@@ -78,18 +69,13 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 				return <TableSortingButton column={column} label="Email" />;
 			},
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('email')}</div>;
+				return subscriptionTier?.viewEmailAddresses ? (
+					<div className="text-left">{row.getValue('email')}</div>
+				) : (
+					<FeatureLockedButton message={restrictedFeatureMessages.viewEmails} />
+				);
 			},
 		},
-		// {
-		// 	accessorKey: 'website',
-		// 	header: ({ column }) => {
-		// 		return <TableSortingButton column={column} label="Website" />;
-		// 	},
-		// 	cell: ({ row }) => {
-		// 		return <div className="text-left">{row.getValue('website')}</div>;
-		// 	},
-		// },
 		{
 			accessorKey: 'state',
 			header: ({ column }) => {
@@ -136,11 +122,6 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 				>
 					<TrashIcon className="h-3 w-2 text-destructive" />
 				</Button>
-				// <Checkbox
-				// 	checked={row.getIsSelected()}
-				// 	onCheckedChange={(value) => row.toggleSelected(!!value)}
-				// 	aria-label="Select row"
-				// />
 			),
 		},
 	];

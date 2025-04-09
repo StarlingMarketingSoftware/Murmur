@@ -8,6 +8,9 @@ import { useParams } from 'next/navigation';
 import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/route';
 import { z } from 'zod';
 import { TableSortingButton } from '../../../CustomTable';
+import { useMe } from '@/hooks/useMe';
+import FeatureLockedButton from '@/app/murmur/_components/FeatureLockedButton';
+import { restrictedFeatureMessages } from '@/constants/constants';
 
 export interface ContactListDialogProps {
 	isOpen: boolean;
@@ -17,6 +20,8 @@ export interface ContactListDialogProps {
 }
 
 export const useContactListDialog = (props: ContactListDialogProps) => {
+	const { subscriptionTier } = useMe();
+
 	const columns: ColumnDef<Contact>[] = [
 		{
 			id: 'select',
@@ -53,18 +58,14 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 				return <TableSortingButton column={column} label="Email" />;
 			},
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('email')}</div>;
+				return subscriptionTier?.viewEmailAddresses ? (
+					<div className="text-left">{row.getValue('contactEmail')}</div>
+				) : (
+					<FeatureLockedButton message={restrictedFeatureMessages.viewEmails} />
+				);
 			},
 		},
-		{
-			accessorKey: 'category',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Category" />;
-			},
-			cell: ({ row }) => {
-				return <div className="capitalize text-left">{row.getValue('category')}</div>;
-			},
-		},
+
 		{
 			accessorKey: 'company',
 			header: ({ column }) => {

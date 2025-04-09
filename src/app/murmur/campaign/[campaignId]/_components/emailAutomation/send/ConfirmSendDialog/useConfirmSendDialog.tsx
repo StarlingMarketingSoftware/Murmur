@@ -1,13 +1,16 @@
 import { CampaignWithRelations, EmailWithRelations } from '@/constants/types';
 import { useEditCampaign } from '@/hooks/useCampaigns';
 import { useEditEmail } from '@/hooks/useEmails';
+import { useMe } from '@/hooks/useMe';
+import { useEditUser } from '@/hooks/useUsers';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { EmailStatus } from '@prisma/client';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import FormData from 'form-data'; // form-data v4.0.1
 import Mailgun from 'mailgun.js'; // mailgun.js v11.1.0
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
 import { z } from 'zod';
 
 export interface ConfirmSendDialogProps {
@@ -22,8 +25,11 @@ const addSenderInfoSchema = z.object({
 
 export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 	const { campaign, draftEmails } = props;
+	const { subscriptionTier, user } = useMe();
+
 	const queryClient = useQueryClient();
 	const draftEmailCount = draftEmails.length;
+	const hasReachedSendingLimit = !subscriptionTier && user && user?.emailSendCredits <= 0;
 
 	const form = useForm<z.infer<typeof addSenderInfoSchema>>({
 		resolver: zodResolver(addSenderInfoSchema),
@@ -44,7 +50,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		senderEmail: string
 	) => {
 		const form = new FormData();
-		form.append('h:Reply-To', 'reply.demoPerson123@gmail.com');
+		form.append('h:Reply-To', senderEmail);
 		const mailgun = new Mailgun(FormData);
 		const recipientEmail = draftEmail.contact.email;
 
@@ -71,28 +77,42 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 
 	const { updateCampaign } = useEditCampaign(campaign.id, true);
 
-	const { mutate: updateEmail } = useEditEmail({
+	const { mutateAsync: updateEmail } = useEditEmail({
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['drafts'] });
 		},
 	});
 
+	const { mutateAsync: updateEmailSendCredits } = useEditUser({ suppressToasts: true });
+
 	const handleSend = async () => {
-		// updateCampaign(form.getValues());
+		updateCampaign(form.getValues());
+		let currentEmailSendCredits = user?.emailSendCredits || 0;
 		for (const email of draftEmails) {
-			// const res = await sendMailgunMessage(email, 'shingoAlert@gmail.com');
-			// console.log('🚀 ~ handleSend ~ res:', res);
-			// if (res?.status === 200) {
-			console.log('email status is 200!!');
-			updateEmail({
-				emailId: email.id,
-				data: {
-					...email,
-					status: EmailStatus.sent,
-				},
-			});
-			queryClient.invalidateQueries({ queryKey: ['campaign'] });
-			// }
+			if (currentEmailSendCredits <= 0 && !subscriptionTier) {
+				toast.error(
+					'You have reached the sending limit of the free tier. Please upgrade to a paid plan to send more emails.'
+				);
+				return;
+			}
+			const res = await sendMailgunMessage(email, 'shingoAlert@gmail.com');
+			if (res?.status === 200) {
+				await updateEmail({
+					emailId: email.id,
+					data: {
+						...email,
+						status: EmailStatus.sent,
+					},
+				});
+				queryClient.invalidateQueries({ queryKey: ['campaign'] });
+				if (!subscriptionTier && user) {
+					await updateEmailSendCredits({
+						clerkId: user.clerkId,
+						data: { emailSendCredits: user.emailSendCredits - 1 },
+					});
+					currentEmailSendCredits--;
+				}
+			}
 		}
 	};
 
@@ -100,5 +120,6 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		handleSend,
 		form,
 		draftEmailCount,
+		hasReachedSendingLimit,
 	};
 };

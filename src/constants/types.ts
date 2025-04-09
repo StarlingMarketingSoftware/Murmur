@@ -119,6 +119,8 @@ export enum PerplexityModelEnum {
 }
 
 export type SubscriptionTierData = {
+	name: string;
 	aiEmailCount: number;
+	testEmailCount: number;
 	viewEmailAddresses: boolean;
 };

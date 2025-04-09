@@ -25,13 +25,15 @@ enum UserRole {
 }
 
 model User {
-  id             Int      @id @default(autoincrement())
-  clerkId        String   @unique
-  email          String   @unique
-  firstName      String?
-  lastName       String?
-  role           UserRole @default(user)
-  aiDraftCredits Int      @default(5)
+  id               Int      @id @default(autoincrement())
+  clerkId          String   @unique
+  email            String   @unique
+  firstName        String?
+  lastName         String?
+  role             UserRole @default(user)
+  aiDraftCredits   Int      @default(5)
+  aiTestCredits    Int      @default(2)
+  emailSendCredits Int      @default(1)
 
   stripeCustomerId         String?    @unique
   stripeSubscriptionId     String?

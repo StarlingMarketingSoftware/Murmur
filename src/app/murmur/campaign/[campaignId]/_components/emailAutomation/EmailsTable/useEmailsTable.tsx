@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button';
 import { TrashIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { ellipsesText } from '@/app/utils/functions';
+import { useMe } from '@/hooks/useMe';
+import FeatureLockedButton from '@/app/murmur/_components/FeatureLockedButton';
+import { restrictedFeatureMessages } from '@/constants/constants';
 
 export interface EmailsTableProps {
 	emails: EmailWithRelations[];
@@ -18,6 +21,7 @@ export interface EmailsTableProps {
 
 export const useEmailsTable = (props: EmailsTableProps) => {
 	const queryClient = useQueryClient();
+	const { subscriptionTier } = useMe();
 	const params = useParams();
 	const { campaignId } = params;
 
@@ -58,7 +62,11 @@ export const useEmailsTable = (props: EmailsTableProps) => {
 			},
 			accessorFn: (row) => row.contact?.email,
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('contactEmail')}</div>;
+				return subscriptionTier?.viewEmailAddresses ? (
+					<div className="text-left">{row.getValue('contactEmail')}</div>
+				) : (
+					<FeatureLockedButton message={restrictedFeatureMessages.viewEmails} />
+				);
 			},
 		},
 		{

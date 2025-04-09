@@ -2,7 +2,6 @@ import { Draft } from '@/constants/types';
 import { AiModel, Contact } from '@prisma/client';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { json } from 'stream/consumers';
 
 const rolePrompt = `Write a personalized email to {first_name} who works at {company}. If there is no recipient name provided, start the email with "Hello!"
 
@@ -79,7 +78,7 @@ const messageAndSubjectFormat = `Return the message and the subject line, withou
 
 // const batchMessageAndSubjectFormat = `I will provide a json that contains information about each recipient. Return the message and the subject line, without any signature or other text. Please format the response into a list of JSON strings with the keys "recipient", "subject", and "message".`;
 
-const perplexityEndpoint = 'https://api.perplexity.ai/chat/completions';
+const perplexityEndpoint = '/api/perplexity';
 
 const safeParseAIResponse = (response: string): Draft => {
 	try {
@@ -106,7 +105,7 @@ const safeParseAIResponse = (response: string): Draft => {
 				if (parsed.contactEmail && parsed.subject && parsed.message) {
 					return parsed;
 				}
-			} catch (e) {
+			} catch {
 				continue; // Try next match if this one fails
 			}
 		}
@@ -133,33 +132,46 @@ export const usePerplexityDraftEmail = () => {
 		mutateAsync: draftEmailAsync,
 	} = useMutation({
 		mutationFn: async (params: DraftEmailParams): Promise<Draft> => {
-			const response = await fetch(perplexityEndpoint, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${process.env.NEXT_PUBLIC_PERPLEXITY_API_KEY}`,
-				},
-				body: JSON.stringify({
-					model: params.model,
-					messages: [
-						{
-							role: 'system',
-							content: `${rolePrompt} ${
-								params.generateSubject ? messageAndSubjectFormat : messageOnlyFormat
-							} 
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+			let response;
+
+			try {
+				response = await fetch(perplexityEndpoint, {
+					signal: controller.signal,
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify({
+						model: params.model,
+						messages: [
+							{
+								role: 'system',
+								content: `${rolePrompt} ${
+									params.generateSubject ? messageAndSubjectFormat : messageOnlyFormat
+								} 
 							${jsonFormatInstructions}`,
-						},
-						{
-							role: 'user',
-							content: `${params.prompt}
+							},
+							{
+								role: 'user',
+								content: `${params.prompt}
 							Recipient: ${JSON.stringify(params.recipient)}
 							`,
-						},
-					],
-				}),
-			});
-			if (!response.ok) {
-				throw new Error('Failed to generate email');
+							},
+						],
+					}),
+				});
+			} catch (error) {
+				if (error instanceof Error && error.name === 'AbortError') {
+					toast.error('Request timed out. Please try again.');
+				}
+			}
+
+			clearTimeout(timeoutId);
+			if (!response || !response.ok) {
+				throw new Error('Failed to generate email.');
 			}
 
 			const data = await response.json();
@@ -189,32 +201,10 @@ export const usePerplexityDraftEmail = () => {
 		onSuccess: () => {},
 	});
 
-	interface BatchDraftEmailParams {
-		model: AiModel;
-		generateSubject: boolean;
-		recipients: Contact[];
-		prompt: string;
-	}
-
-	const {
-		data: dataBatchDraftEmail,
-		isPending: isPendingBatchDraftEmail,
-		mutate: batchDraftEmails,
-	} = useMutation({
-		mutationFn: async (params: BatchDraftEmailParams) => {
-			console.log(params);
-			// map the contacts to only get the essential data?
-			// for each batch, add to the current redux state of "draftedEmails".
-		},
-	});
-
 	return {
 		dataDraftEmail,
 		isPendingDraftEmail,
 		draftEmail,
 		draftEmailAsync,
-		dataBatchDraftEmail,
-		isPendingBatchDraftEmail,
-		batchDraftEmails,
 	};
 };

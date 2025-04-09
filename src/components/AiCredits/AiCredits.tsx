@@ -12,14 +12,16 @@ import {
 const AiCredits = () => {
 	const { user, isPendingUser } = useMe();
 
-	if (isPendingUser) return <Spinner size="small" />;
-
 	return (
 		<TooltipProvider>
 			<Tooltip>
 				<TooltipTrigger asChild>
-					<div className="flex gap-2">
-						<CreditCardIcon className="text-primary" />
+					<div className="flex items-center justify-center gap-2 w-[90px]">
+						{isPendingUser ? (
+							<Spinner size="small" />
+						) : (
+							<CreditCardIcon className="text-primary" />
+						)}
 						{user?.aiDraftCredits}
 					</div>
 				</TooltipTrigger>

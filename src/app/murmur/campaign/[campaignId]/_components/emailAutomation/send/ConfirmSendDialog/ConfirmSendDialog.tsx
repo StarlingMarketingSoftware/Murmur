@@ -20,15 +20,18 @@ import {
 import { FC } from 'react';
 import { ConfirmSendDialogProps, useConfirmSendDialog } from './useConfirmSendDialog';
 import { Input } from '@/components/ui/input';
+import FeatureLockedButton from '@/app/murmur/_components/FeatureLockedButton';
+import { restrictedFeatureMessages } from '@/constants/constants';
 
 export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
-	const { handleSend, form, draftEmailCount } = useConfirmSendDialog(props);
+	const { handleSend, form, draftEmailCount, hasReachedSendingLimit } =
+		useConfirmSendDialog(props);
 	return (
 		<Dialog modal>
 			<DialogTrigger asChild>
 				<Button variant="default">Proceed to Confirmation</Button>
 			</DialogTrigger>
-			<DialogContent hideCloseButton className="sm:max-w-[425px]">
+			<DialogContent className="sm:max-w-[425px]">
 				<DialogHeader>
 					<DialogTitle>Send Campaign Confirmation</DialogTitle>
 				</DialogHeader>
@@ -64,9 +67,20 @@ export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
 							/>
 						</div>
 						<DialogFooter>
-							<Button onClick={handleSend} className="mx-auto" type="submit">
-								{`Send ${draftEmailCount} Emails`}
-							</Button>
+							<div className="flex gap-2 w-full items-center justify-center">
+								<Button
+									disabled={hasReachedSendingLimit}
+									onClick={handleSend}
+									type="submit"
+								>
+									{`Send ${draftEmailCount} Emails`}
+								</Button>
+								{hasReachedSendingLimit && (
+									<FeatureLockedButton
+										message={restrictedFeatureMessages.freePlanSendingLimit}
+									/>
+								)}
+							</div>
 						</DialogFooter>
 					</form>
 				</Form>

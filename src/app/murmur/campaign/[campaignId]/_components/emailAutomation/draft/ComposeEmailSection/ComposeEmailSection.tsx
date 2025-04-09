@@ -31,6 +31,8 @@ import useComposeEmailSection, {
 	ComposeEmailSectionProps,
 } from './useComposeEmailSection';
 import { Separator } from '@/components/ui/separator';
+import { TypographyMuted, TypographyP } from '@/components/ui/typography';
+import { Badge } from '@/components/ui/badge';
 
 const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 	const {
@@ -47,6 +49,8 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 		errors,
 		handleSavePrompt,
 		isPendingSavePrompt,
+		aiDraftCredits,
+		aiTestCredits,
 	} = useComposeEmailSection(props);
 
 	return (
@@ -165,12 +169,14 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 									onClick={() => handleFormAction('test')}
 									variant="outline"
 									isLoading={isTest && isPendingDraftEmail}
-									disabled={isPendingDraftEmail}
+									disabled={isPendingDraftEmail || (isAiDraft && aiTestCredits === 0)}
 								>
 									{isAiDraft ? 'Test Your Prompt' : 'Preview Draft'}
 								</Button>
-
 								{dataDraftEmail && <PreviewTestDraftDialog draftEmail={dataDraftEmail} />}
+								{isAiDraft && (
+									<Badge variant="outline">Test Credits: {aiTestCredits}</Badge>
+								)}
 							</div>
 							<Separator />
 							<div className="flex gap-4">
@@ -190,7 +196,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 												}
 											}}
 											isLoading={isPendingDraftEmail && !isTest}
-											disabled={isPendingDraftEmail}
+											disabled={isPendingDraftEmail || aiDraftCredits === 0}
 										>
 											{isAiDraft
 												? 'Generate Custom Emails for All Recipients'

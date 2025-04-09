@@ -37,7 +37,10 @@ export async function fulfillCheckout(
 					stripePriceId: priceId,
 					stripeSubscriptionStatus: subscription.status,
 					aiDraftCredits: {
-						increment: subscriptionTier.aiEmailCount,
+						increment: subscriptionTier?.aiEmailCount,
+					},
+					aiTestCredits: {
+						increment: subscriptionTier?.testEmailCount,
 					},
 				},
 			});
