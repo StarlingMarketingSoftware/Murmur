@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { stripe } from '../../../../stripe/client';
 import prisma from '@/lib/prisma';
-import { fulfillCheckout } from '@/app/utils/actions/stripe/fulfillCheckout';
+import { fulfillCheckout } from '@/app/api/webhooks/stripe/fulfillCheckout';
 import { getSubscriptionTierWithPriceId } from '@/lib/utils';
 
 export async function POST(req: Request) {
@@ -46,7 +46,6 @@ export async function POST(req: Request) {
 		} else if (event.type === 'customer.subscription.updated') {
 			console.log('subscription updated');
 			const subscription: Stripe.Subscription = event.data.object;
-			// need to update the expiration date
 			const priceId = subscription.items.data[0].price.id;
 			const subscriptionTier = getSubscriptionTierWithPriceId(priceId);
 
@@ -60,7 +59,10 @@ export async function POST(req: Request) {
 						stripeSubscriptionId: subscription.id,
 						stripePriceId: priceId,
 						aiDraftCredits: {
-							increment: subscriptionTier.aiEmailCount,
+							increment: subscriptionTier?.aiEmailCount,
+						},
+						aiTestCredits: {
+							increment: subscriptionTier?.testEmailCount,
 						},
 					},
 				});

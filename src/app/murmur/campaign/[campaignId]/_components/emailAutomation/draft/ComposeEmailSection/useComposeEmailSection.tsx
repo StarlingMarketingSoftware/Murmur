@@ -171,7 +171,10 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 					recipient: campaign.contacts[0],
 					prompt: values.message,
 				});
-				await savePrompt({ testMessage: res.message, testSubject: res.subject });
+				await savePrompt({
+					testMessage: res.message,
+					testSubject: isAiSubject ? res.subject : values.subject,
+				});
 				toast.success('Test email generated successfully!');
 				if (user && aiTestCredits) {
 					editUser({

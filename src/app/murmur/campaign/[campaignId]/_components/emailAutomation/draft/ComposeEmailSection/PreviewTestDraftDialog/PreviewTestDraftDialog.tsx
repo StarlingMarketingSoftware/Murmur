@@ -15,15 +15,21 @@ import {
 	PreviewTestDraftDialogProps,
 	usePreviewTestDraftDialog,
 } from './usePreviewTestDraftDialog';
+import FeatureLockedButton from '@/app/murmur/_components/FeatureLockedButton';
 
 const PreviewTestDraftDialog: FC<PreviewTestDraftDialogProps> = (props) => {
-	const { draftEmail } = usePreviewTestDraftDialog(props);
+	const { draftEmail, canViewEmailAddress } = usePreviewTestDraftDialog(props);
 	return (
 		<Dialog>
 			<DialogTrigger asChild>
 				<Button variant="outline">View Test Draft</Button>
 			</DialogTrigger>
-			<DialogContent className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px]">
+			<DialogContent
+				onOpenAutoFocus={(e) => {
+					e.preventDefault();
+				}}
+				className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px]"
+			>
 				<DialogHeader>
 					<DialogTitle>Email Preview</DialogTitle>
 					<DialogDescription></DialogDescription>
@@ -32,9 +38,10 @@ const PreviewTestDraftDialog: FC<PreviewTestDraftDialogProps> = (props) => {
 					<Label htmlFor="name" className="text-right">
 						Recipient
 					</Label>
+					{!canViewEmailAddress && <FeatureLockedButton />}
 					<Input
-						id="name"
-						defaultValue={draftEmail.contactEmail}
+						id="email"
+						defaultValue={canViewEmailAddress ? draftEmail.contactEmail : '************'}
 						disabled
 						className="col-span-3 !cursor-text !pointer-events-auto"
 					/>

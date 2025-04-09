@@ -1,3 +1,5 @@
+import { SubscriptionTierData } from '@/constants/types';
+import { getSubscriptionTierWithPriceId } from '@/lib/utils';
 import { useAuth } from '@clerk/nextjs';
 import { User } from '@prisma/client';
 import { useQuery } from '@tanstack/react-query';
@@ -19,5 +21,9 @@ export const useMe = () => {
 		enabled: isLoaded && isSignedIn && Boolean(clerkUserId),
 	});
 
-	return { user, isPendingUser, isLoaded };
+	const stripePriceId = user?.stripePriceId;
+	const subscriptionTier: SubscriptionTierData | null =
+		getSubscriptionTierWithPriceId(stripePriceId);
+
+	return { user, isPendingUser, isLoaded, subscriptionTier };
 };

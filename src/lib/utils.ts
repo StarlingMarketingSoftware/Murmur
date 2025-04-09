@@ -7,7 +7,12 @@ export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
 }
 
-export const getSubscriptionTierWithPriceId = (priceId: string): SubscriptionTierData => {
+export const getSubscriptionTierWithPriceId = (
+	priceId: string | null | undefined
+): SubscriptionTierData | null => {
+	if (!priceId) {
+		return null;
+	}
 	const tier = subscriptionTierDataList[priceId];
 
 	if (!tier) {

@@ -1,4 +1,5 @@
 import { Draft } from '@/constants/types';
+import { useMe } from '@/hooks/useMe';
 
 export interface PreviewTestDraftDialogProps {
 	draftEmail: Draft;
@@ -6,5 +7,8 @@ export interface PreviewTestDraftDialogProps {
 
 export const usePreviewTestDraftDialog = (props: PreviewTestDraftDialogProps) => {
 	const { draftEmail } = props;
-	return { draftEmail };
+	const { subscriptionTier } = useMe();
+	const canViewEmailAddress = subscriptionTier?.viewEmailAddresses;
+
+	return { draftEmail, canViewEmailAddress };
 };

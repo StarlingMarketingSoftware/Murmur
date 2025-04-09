@@ -12,6 +12,7 @@ const updateUserSchema = z.object({
 	stripeSubscriptionId: z.string().optional().nullable(),
 	stripeSubscriptionStatus: z.string().optional().nullable(),
 	stripePriceId: z.string().optional().nullable(),
+	emailSendCredits: z.number().int().optional(),
 });
 
 export const GET = async function GET(
