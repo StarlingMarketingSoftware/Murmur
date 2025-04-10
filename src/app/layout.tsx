@@ -37,29 +37,27 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<ClerkProvider appearance={{ baseTheme: dark }}>
-			<StoreProvider>
-				<SubLayout>
-					{/* <html lang="en" className={palatino.className}> */}
-					<html lang="en" suppressHydrationWarning>
-						<body
-							className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
-						>
-							<ThemeProvider
-								attribute="class"
-								defaultTheme="system"
-								enableSystem
-								// disableTransitionOnChange
-							>
-								<Navbar />
-								<main className="flex-1">{children}</main>
-								<Footer />
-								<Toaster />
-							</ThemeProvider>
-						</body>
-					</html>
-				</SubLayout>
-			</StoreProvider>
-		</ClerkProvider>
+		<StoreProvider>
+			{/* <html lang="en" className={palatino.className}> */}
+			<html lang="en" suppressHydrationWarning>
+				<body
+					className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
+				>
+					<ThemeProvider
+						attribute="class"
+						defaultTheme="system"
+						enableSystem
+						// disableTransitionOnChange
+					>
+						<SubLayout>
+							<Navbar />
+							<main className="flex-1">{children}</main>
+							<Footer />
+							<Toaster />
+						</SubLayout>
+					</ThemeProvider>
+				</body>
+			</html>
+		</StoreProvider>
 	);
 }
