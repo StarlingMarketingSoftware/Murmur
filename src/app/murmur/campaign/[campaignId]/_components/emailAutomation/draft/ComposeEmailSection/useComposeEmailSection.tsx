@@ -32,8 +32,9 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	const { user } = useMe();
 	const aiDraftCredits = user?.aiDraftCredits;
 	const aiTestCredits = user?.aiTestCredits;
+	const [isFirstLoad, setIsFirstLoad] = useState(true);
 
-	const [isAiDraft, setIsAiDraft] = useState<boolean>(campaign.subject?.length === 0);
+	const [isAiDraft, setIsAiDraft] = useState<boolean>(true);
 	const [isAiSubject, setIsAiSubject] = useState<boolean>(campaign.subject?.length === 0);
 	const [isTest, setIsTest] = useState<boolean>(false);
 
@@ -74,8 +75,12 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	} = form;
 
 	useEffect(() => {
-		trigger();
-	}, [isAiDraft, trigger]);
+		if (isFirstLoad) {
+			setIsFirstLoad(false);
+		} else {
+			trigger('subject');
+		}
+	}, [isAiSubject, trigger, setIsFirstLoad, isFirstLoad]);
 
 	const queryClient = useQueryClient();
 

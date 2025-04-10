@@ -30,7 +30,6 @@ import useComposeEmailSection, {
 	ComposeEmailSectionProps,
 } from './useComposeEmailSection';
 import { Separator } from '@/components/ui/separator';
-import { TypographyMuted, TypographyP } from '@/components/ui/typography';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ConfirmDialog/ConfirmDialog';
 
