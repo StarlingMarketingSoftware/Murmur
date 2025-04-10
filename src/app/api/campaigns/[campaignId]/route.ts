@@ -131,3 +131,44 @@ export async function PATCH(
 		return new NextResponse('Internal error', { status: 500 });
 	}
 }
+
+export async function DELETE(
+	req: Request,
+	{ params }: { params: { campaignId: string } }
+) {
+	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return new NextResponse('Unauthorized', { status: 401 });
+		}
+
+		const { campaignId } = await params;
+
+		// Verify campaign exists and belongs to user
+		const campaign = await prisma.campaign.findUnique({
+			where: {
+				id: parseInt(campaignId),
+				userId: userId,
+			},
+		});
+
+		if (!campaign) {
+			return new NextResponse('Campaign not found', { status: 404 });
+		}
+
+		// Soft delete by updating status
+		const deletedCampaign = await prisma.campaign.update({
+			where: {
+				id: parseInt(campaignId),
+			},
+			data: {
+				status: 'deleted',
+			},
+		});
+
+		return NextResponse.json(deletedCampaign);
+	} catch (error) {
+		console.error('[CAMPAIGN_DELETE]', error);
+		return new NextResponse('Internal error', { status: 500 });
+	}
+}

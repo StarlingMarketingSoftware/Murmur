@@ -24,6 +24,12 @@ enum UserRole {
   admin
 }
 
+enum Status {
+  active
+  deleted
+  archived
+}
+
 model User {
   id               Int      @id @default(autoincrement())
   clerkId          String   @unique
@@ -100,6 +106,7 @@ model Email {
 model Campaign {
   id          Int       @id @default(autoincrement())
   name        String
+  status      Status    @default(active)
   userId      String
   user        User      @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
   contacts    Contact[]

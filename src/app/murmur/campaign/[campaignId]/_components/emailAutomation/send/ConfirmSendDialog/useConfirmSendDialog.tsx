@@ -75,9 +75,10 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		}
 	};
 
-	const { updateCampaign } = useEditCampaign(campaign.id, true);
+	const { mutate: editCampaign } = useEditCampaign({ suppressToasts: true });
 
 	const { mutateAsync: updateEmail } = useEditEmail({
+		suppressToasts: true,
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['drafts'] });
 		},
@@ -86,7 +87,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 	const { mutateAsync: updateEmailSendCredits } = useEditUser({ suppressToasts: true });
 
 	const handleSend = async () => {
-		updateCampaign(form.getValues());
+		editCampaign({ campaignId: 5, data: form.getValues() });
 		let currentEmailSendCredits = user?.emailSendCredits || 0;
 		for (const email of draftEmails) {
 			if (currentEmailSendCredits <= 0 && !subscriptionTier) {

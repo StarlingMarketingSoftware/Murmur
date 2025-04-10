@@ -1,5 +1,6 @@
+import { CustomMutationOptions } from '@/constants/types';
 import { Email } from '@prisma/client';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 interface EditEmailData {
@@ -7,22 +8,13 @@ interface EditEmailData {
 	data: Email; // Consider creating a proper type for your email data
 }
 
-interface EditEmailOptions {
-	suppressToasts?: boolean;
-	successMessage?: string;
-	errorMessage?: string;
-	onSuccess?: () => void;
-}
-
-export const useEditEmail = (options: EditEmailOptions = {}) => {
+export const useEditEmail = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
 		successMessage = 'Email updated successfully',
 		errorMessage = 'Failed to update email',
 		onSuccess: onSuccessCallback,
 	} = options;
-
-	const queryClient = useQueryClient();
 
 	return useMutation({
 		mutationFn: async ({ data, emailId }: EditEmailData) => {
@@ -48,7 +40,7 @@ export const useEditEmail = (options: EditEmailOptions = {}) => {
 
 			onSuccessCallback?.();
 		},
-		onError: (error) => {
+		onError: () => {
 			if (!suppressToasts) {
 				toast.error(errorMessage || 'Failed to update email. Please try again.');
 			}

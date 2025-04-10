@@ -25,7 +25,6 @@ import {
 
 import { AiModelOptions } from '@/constants/constants';
 import PreviewTestDraftDialog from './PreviewTestDraftDialog/PreviewTestDraftDialog';
-import ConfirmModal from '@/components/ConfirmModal';
 import { FC } from 'react';
 import useComposeEmailSection, {
 	ComposeEmailSectionProps,
@@ -33,6 +32,7 @@ import useComposeEmailSection, {
 import { Separator } from '@/components/ui/separator';
 import { TypographyMuted, TypographyP } from '@/components/ui/typography';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/ConfirmDialog/ConfirmDialog';
 
 const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 	const {
@@ -180,7 +180,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 							</div>
 							<Separator />
 							<div className="flex gap-4">
-								<ConfirmModal
+								<ConfirmDialog
 									title="Confirm Batch Generation of Emails"
 									confirmAction={() => handleFormAction('submit')}
 									triggerButton={
@@ -209,7 +209,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 									This action will have AI create a custom email for each recipient based
 									on the prompt you provided and will count towards your monthly usage
 									limits.
-								</ConfirmModal>
+								</ConfirmDialog>
 								{/* <Separator className="!h-auto" orientation="vertical" /> */}
 								<Button
 									className=""
