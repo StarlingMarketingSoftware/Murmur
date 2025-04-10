@@ -7,7 +7,6 @@ import MutedSubtext from '@/components/text/MutedSubtext';
 import { CampaignsTable } from './CampaignsTable/CampaignsTable';
 
 import { useDashboard } from './useDashboard';
-import Spinner from '@/components/ui/spinner';
 
 const Dashboard = () => {
 	useDashboard();
