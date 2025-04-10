@@ -24,48 +24,28 @@ export const ConfirmModal: FC<ConfirmModalProps> = (props) => {
 	const {
 		title,
 		open,
+		onOpenChange,
 		text,
-		onClose,
 		confirmAction,
 		confirmWithInput,
 		confirmWithInputValue = 'confirm',
+		placeholderText,
 		children,
 		triggerButton,
 		isLoading,
+		setInternalOpen,
+		formValue,
 		form,
 	} = useConfirmModal(props);
 
-	const [confirmValue, setConfirmValue] = useState('');
-	// Add state to control the dialog
-	const [isOpen, setIsOpen] = useState(open || false);
-
-	// Handle external open state changes
-	useEffect(() => {
-		if (open !== undefined) {
-			setIsOpen(open);
-		}
-	}, [open]);
-
-	const handleClose = () => {
-		setIsOpen(false);
-		setConfirmValue('');
-		if (onClose) {
-			onClose();
-		}
-	};
-
 	const handleConfirm = () => {
 		confirmAction();
-		setIsOpen(false);
-		setConfirmValue('');
 	};
 
 	return (
-		<Dialog open={isOpen} onOpenChange={setIsOpen}>
-			<DialogTrigger asChild onClick={(e) => e.stopPropagation()}>
-				{triggerButton}
-			</DialogTrigger>
-			<DialogContent onClick={(e) => e.stopPropagation()}>
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogTrigger asChild>{triggerButton}</DialogTrigger>
+			<DialogContent>
 				<DialogHeader>
 					<DialogTitle>{title}</DialogTitle>
 				</DialogHeader>
@@ -81,10 +61,14 @@ export const ConfirmModal: FC<ConfirmModalProps> = (props) => {
 									name="confirmInput"
 									render={({ field }) => (
 										<FormItem className="col-span-11">
-											<FormLabel>{`Type ${confirmValue} to confirm.`}</FormLabel>
+											<FormLabel>{`Type "${confirmWithInputValue}" to confirm.`}</FormLabel>
 											<FormControl>
 												<Input
-													placeholder={`Type "${confirmWithInputValue}" to confirm`}
+													placeholder={
+														placeholderText
+															? placeholderText
+															: 'Type the above value to confirm.'
+													}
 													className="flex-grow"
 													{...field}
 												/>
@@ -98,12 +82,12 @@ export const ConfirmModal: FC<ConfirmModalProps> = (props) => {
 					</Form>
 				)}
 				<DialogFooter>
-					<Button variant="outline" onClick={handleClose}>
+					<Button onClick={() => onOpenChange(false)} variant="outline">
 						Cancel
 					</Button>
 					<Button
 						isLoading={isLoading}
-						disabled={confirmWithInput && !(confirmValue === confirmWithInputValue)}
+						disabled={confirmWithInput && !(formValue === confirmWithInputValue)}
 						onClick={handleConfirm}
 						type="submit"
 					>

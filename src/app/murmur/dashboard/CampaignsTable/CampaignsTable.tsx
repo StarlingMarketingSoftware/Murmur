@@ -28,10 +28,8 @@ export const CampaignsTable: FC = () => {
 			<Card className="relative">
 				{isPending && <Spinner size="medium" className="absolute top-2 right-2" />}
 				<CardHeader>
-					<CardTitle>Selected Recipients</CardTitle>
-					<CardDescription>
-						Recipients you have selected for this campaign.
-					</CardDescription>
+					<CardTitle>Your Campaigns</CardTitle>
+					<CardDescription>Campaigns you have created.</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-2">
 					<CustomTable
@@ -44,6 +42,7 @@ export const CampaignsTable: FC = () => {
 			</Card>
 			<ConfirmModal
 				open={isConfirmDialogOpen}
+				placeholderText="Enter the name of the campaign."
 				onClose={() => setIsConfirmDialogOpen(false)}
 				confirmWithInput
 				confirmWithInputValue={currentRow?.name}
