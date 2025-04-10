@@ -16,47 +16,51 @@ export const useGetCampaigns = () => {
 	});
 };
 
-export const useEditCampaign = (
-	// this needs to be edited
-	campaignId: number,
-	suppressToasts?: boolean,
-	successMessage?: string,
-	errorMessage?: string
-) => {
+interface EditCampaignData {
+	campaignId: number;
+	data: Partial<CampaignWithRelations>;
+}
+
+export const useEditCampaign = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Campaign updated successfully',
+		errorMessage = 'Failed to update campaign',
+		onSuccess: onSuccessCallback,
+	} = options;
+
 	const queryClient = useQueryClient();
-	const { mutateAsync: updateCampaign, isPending: isPendingCampaign } = useMutation({
-		mutationFn: async (campaignData: Partial<CampaignWithRelations>) => {
+
+	return useMutation({
+		mutationFn: async ({ data, campaignId }: EditCampaignData) => {
 			const response = await fetch(`/api/campaigns/${campaignId}`, {
 				method: 'PATCH',
 				headers: {
 					'Content-Type': 'application/json',
 				},
-				body: JSON.stringify(campaignData),
+				body: JSON.stringify(data),
 			});
 
 			if (!response.ok) {
-				toast.error('Failed to save campaign');
-				throw new Error('Failed to save campaign');
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to update campaign');
 			}
-			queryClient.invalidateQueries({ queryKey: ['campaign'] });
+
 			return response.json();
 		},
 		onSuccess: () => {
-			if (suppressToasts) return;
-			toast.success(successMessage || 'Campaign updated successfully');
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
+			queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+			onSuccessCallback?.();
 		},
-		onError: (error) => {
-			if (suppressToasts) return;
-			if (error instanceof Error) {
-				toast.error(errorMessage || 'Failed to update campaign. Please try again.');
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
 			}
 		},
 	});
-
-	return {
-		updateCampaign,
-		isPendingCampaign,
-	};
 };
 
 export const useCreateCampaign = (options: CustomMutationOptions = {}) => {
