@@ -18,15 +18,15 @@ import {
 } from '../ui/form';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { ConfirmModalProps, useConfirmDialog } from './useConfirmDialog';
+import { ConfirmDialogProps, useConfirmDialog } from './useConfirmDialog';
 
-export const ConfirmDialog: FC<ConfirmModalProps> = (props) => {
+export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 	const {
 		title,
 		open,
 		onOpenChange,
 		text,
-		confirmAction,
+		onSubmit,
 		confirmWithInput,
 		confirmWithInputValue = 'confirm',
 		placeholderText,
@@ -37,12 +37,16 @@ export const ConfirmDialog: FC<ConfirmModalProps> = (props) => {
 		form,
 	} = useConfirmDialog(props);
 
-	const handleConfirm = () => {
-		confirmAction();
-	};
-
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
+		<Dialog
+			open={open}
+			onOpenChange={(open) => {
+				if (!open) {
+					form.reset();
+				}
+				onOpenChange(open);
+			}}
+		>
 			<DialogTrigger asChild>{triggerButton}</DialogTrigger>
 			<DialogContent>
 				<DialogHeader>
@@ -53,7 +57,7 @@ export const ConfirmDialog: FC<ConfirmModalProps> = (props) => {
 				</DialogDescription>
 				{confirmWithInput && (
 					<Form {...form}>
-						<form onSubmit={form.handleSubmit(confirmAction)}>
+						<form onSubmit={form.handleSubmit(onSubmit)}>
 							<div className="space-y-4">
 								<FormField
 									control={form.control}
@@ -77,22 +81,25 @@ export const ConfirmDialog: FC<ConfirmModalProps> = (props) => {
 									)}
 								/>
 							</div>
+							<DialogFooter>
+								<Button
+									type="button"
+									onClick={() => onOpenChange(false)}
+									variant="outline"
+								>
+									Cancel
+								</Button>
+								<Button
+									isLoading={isLoading}
+									disabled={confirmWithInput && !(formValue === confirmWithInputValue)}
+									type="submit"
+								>
+									Delete
+								</Button>
+							</DialogFooter>
 						</form>
 					</Form>
 				)}
-				<DialogFooter>
-					<Button onClick={() => onOpenChange(false)} variant="outline">
-						Cancel
-					</Button>
-					<Button
-						isLoading={isLoading}
-						disabled={confirmWithInput && !(formValue === confirmWithInputValue)}
-						onClick={handleConfirm}
-						type="submit"
-					>
-						Delete
-					</Button>
-				</DialogFooter>
 			</DialogContent>
 		</Dialog>
 	);

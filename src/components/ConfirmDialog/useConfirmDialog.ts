@@ -1,7 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
-export interface ConfirmModalProps {
+export interface ConfirmDialogProps {
 	title: string;
 	open?: boolean;
 	text?: string;
@@ -21,22 +21,12 @@ type ConfirmModalFormValues = {
 	confirmInput: string;
 };
 
-export const useConfirmDialog = (props: ConfirmModalProps) => {
+export const useConfirmDialog = (props: ConfirmDialogProps) => {
 	const [internalOpen, setInternalOpen] = useState(false);
 
+	const { confirmAction } = props;
 	const isControlled = props.isOpen !== undefined;
 	const open = isControlled ? props.isOpen : internalOpen;
-
-	const handleOpenChange = (newOpen: boolean) => {
-		if (!isControlled) {
-			setInternalOpen(newOpen);
-		}
-		props.onOpenChange?.(newOpen);
-		if (!newOpen) {
-			props.onClose?.();
-			form.reset();
-		}
-	};
 
 	const form = useForm<ConfirmModalFormValues>({
 		defaultValues: {
@@ -44,7 +34,23 @@ export const useConfirmDialog = (props: ConfirmModalProps) => {
 		},
 	});
 
+	const handleOpenChange = (newOpen: boolean) => {
+		if (!isControlled) {
+			setInternalOpen(newOpen);
+		}
+		props.onOpenChange?.(newOpen);
+		if (!newOpen) {
+			form.reset();
+			props.onClose?.();
+		}
+	};
+
 	const formValue = form.watch('confirmInput');
+
+	const onSubmit = () => {
+		confirmAction();
+		form.reset();
+	};
 
 	return {
 		form,
@@ -52,6 +58,7 @@ export const useConfirmDialog = (props: ConfirmModalProps) => {
 		onOpenChange: handleOpenChange,
 		setInternalOpen,
 		formValue,
+		onSubmit,
 		...props,
 	};
 };
