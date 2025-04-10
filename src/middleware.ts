@@ -7,11 +7,11 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 const isProtectedRoute = createRouteMatcher([
 	'/api/((?!webhooks).*)$', // Protect all API routes except webhooks
 	'/murmur/(.*)',
+	'/admin/(.*)',
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
 	if (isProtectedRoute(req)) {
-		console.log('is protected');
 		await auth.protect();
 	}
 });

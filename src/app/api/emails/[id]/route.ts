@@ -20,21 +20,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 	const { id } = await params;
 
 	try {
-		// Validate that the email exists and belongs to the user
-		const existingEmail = await prisma.email.findUnique({
-			where: {
-				id: parseInt(id),
-				userId,
-			},
-		});
-
-		if (!existingEmail) {
-			return NextResponse.json(
-				{ error: 'Email not found or unauthorized' },
-				{ status: 404 }
-			);
-		}
-
 		const body = await req.json();
 		const validatedData = updateEmailSchema.parse(body);
 
@@ -42,6 +27,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 		const updatedEmail = await prisma.email.update({
 			where: {
 				id: parseInt(id),
+				userId,
 			},
 			data: {
 				...(validatedData.subject !== undefined && { subject: validatedData.subject }),

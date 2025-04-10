@@ -3,10 +3,10 @@ import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
 
-export async function GET(
+export const GET = async (
 	req: NextRequest,
 	{ params }: { params: { campaignId: string } }
-) {
+) => {
 	const { userId } = await auth();
 	if (!userId) {
 		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -31,7 +31,7 @@ export async function GET(
 		console.error(error);
 		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
 	}
-}
+};
 
 // Input validation schema
 export const updateCampaignSchema = z.object({
@@ -65,28 +65,11 @@ export async function PATCH(
 
 		const body = await req.json();
 		const validatedData = updateCampaignSchema.parse(body);
-		console.log('🚀 ~ validatedData:', validatedData);
 
-		// Verify campaign exists and belongs to user
-		const existingCampaign = await prisma.campaign.findUnique({
-			where: {
-				id: parseInt(campaignId),
-				userId: userId,
-			},
-			include: {
-				contacts: true,
-				emails: true,
-			},
-		});
-
-		if (!existingCampaign) {
-			return new NextResponse('Campaign not found', { status: 404 });
-		}
-
-		// Update campaign with optional fields
 		const updatedCampaign = await prisma.campaign.update({
 			where: {
 				id: parseInt(campaignId),
+				userId,
 			},
 			data: {
 				...(validatedData.name && { name: validatedData.name }),
