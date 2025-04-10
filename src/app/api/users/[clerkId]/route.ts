@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { User } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
+import { auth } from '@clerk/nextjs/server';
 
 const updateUserSchema = z.object({
 	firstName: z.string().optional(),
@@ -39,7 +40,11 @@ export const PATCH = async function PATCH(
 	{ params }: { params: { clerkId: string } }
 ) {
 	try {
-		const { clerkId } = await params;
+		const { userId } = await auth();
+
+		if (!userId) {
+			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+		}
 		const data = await request.json();
 
 		// Validate the input data
@@ -53,7 +58,7 @@ export const PATCH = async function PATCH(
 		}
 
 		const updatedUser = await prisma.user.update({
-			where: { clerkId },
+			where: { clerkId: userId },
 			data: validatedData.data,
 		});
 

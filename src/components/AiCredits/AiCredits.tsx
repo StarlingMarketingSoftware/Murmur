@@ -8,9 +8,13 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useClerk } from '@clerk/nextjs';
 
 const AiCredits = () => {
 	const { user, isPendingUser } = useMe();
+	const { isSignedIn } = useClerk();
+
+	if (!isSignedIn) return null;
 
 	return (
 		<TooltipProvider>
