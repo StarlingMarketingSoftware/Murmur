@@ -1,18 +1,18 @@
-import { SignUp } from '@clerk/nextjs';
+import { SignIn } from '@clerk/nextjs';
 import { AuthPageLayout } from '../../AuthPageLayout';
 
-export default function SignUpPage() {
+export default function SignInPage() {
 	return (
 		<AuthPageLayout>
-			<SignUp
+			<SignIn
 				appearance={{
 					elements: {
 						formButtonPrimary: 'bg-black hover:bg-gray-800 text-sm normal-case',
 					},
 				}}
-				path="/sign-up"
+				path="/sign-in"
 				routing="path"
-				signInUrl="/sign-in"
+				signUpUrl="/sign-up"
 			/>
 		</AuthPageLayout>
 	);

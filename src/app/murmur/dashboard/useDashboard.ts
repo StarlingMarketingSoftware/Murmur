@@ -1,10 +1,17 @@
 'use client';
-import { urls } from '@/constants/urls';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { z } from 'zod';
+import { useAuth, useClerk, useSignIn } from '@clerk/nextjs';
+import { useEffect } from 'react';
 
-export const useDashboard = () => {};
+export const useDashboard = () => {
+	// const { isLoaded, isSignedIn } = useAuth();
+	// const clerk = useClerk();
+	// useEffect(() => {
+	// 	if (isLoaded && !isSignedIn) {
+	// 		clerk.openSignIn({});
+	// 	}
+	// }, [isLoaded, isSignedIn, clerk]);
+	// return {
+	// 	isLoaded,
+	// 	isSignedIn,
+	// };
+};
