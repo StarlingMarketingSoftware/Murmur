@@ -9,7 +9,8 @@ import {
 import Spinner from '@/components/ui/spinner';
 import CustomTable from '../../campaign/[campaignId]/_components/CustomTable';
 import { useCampaignsTable } from './useCampaignsTable';
-import { ConfirmModal } from '@/components/ConfirmModal/ConfirmModal';
+import { ConfirmDialog } from '@/components/ConfirmDialog/ConfirmDialog';
+import { Status } from '@prisma/client';
 
 export const CampaignsTable: FC = () => {
 	const {
@@ -19,6 +20,7 @@ export const CampaignsTable: FC = () => {
 		handleRowClick,
 		currentRow,
 		deleteCampaign,
+		isPendingDelete,
 		isConfirmDialogOpen,
 		setIsConfirmDialogOpen,
 	} = useCampaignsTable();
@@ -40,14 +42,22 @@ export const CampaignsTable: FC = () => {
 					/>
 				</CardContent>
 			</Card>
-			<ConfirmModal
+			<ConfirmDialog
 				open={isConfirmDialogOpen}
 				placeholderText="Enter the name of the campaign."
 				onClose={() => setIsConfirmDialogOpen(false)}
 				confirmWithInput
+				isLoading={isPendingDelete}
 				confirmWithInputValue={currentRow?.name}
 				title="Confirm Campaign Deletion"
-				confirmAction={() => currentRow && deleteCampaign(currentRow?.id)}
+				confirmAction={async () => {
+					if (currentRow) {
+						const res = await deleteCampaign(currentRow.id);
+						if (res.status === Status.deleted) {
+							setIsConfirmDialogOpen(false);
+						}
+					}
+				}}
 				text={`Are you sure you want to delete the campaign "${currentRow?.name}"? You will no longer be able to access the drafts and sent emails associated with this campaign.`}
 			/>
 		</>

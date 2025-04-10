@@ -8,7 +8,6 @@ import { useDeleteCampaign, useGetCampaigns } from '@/hooks/useCampaigns';
 import { MMddyyyyHHmm } from '@/app/utils/functions';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
-import { ConfirmModal } from '@/components/ConfirmModal/ConfirmModal';
 import { useState } from 'react';
 
 export const useCampaignsTable = () => {

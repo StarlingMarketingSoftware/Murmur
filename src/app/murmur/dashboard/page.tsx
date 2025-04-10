@@ -1,7 +1,7 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
-import { CreateCampaignDialog } from './CreateCampaignDialog';
+import { CreateCampaignDialog } from './CreateCampaignDialog/CreateCampaignDialog';
 import PageHeading from '@/components/text/PageHeading';
 import MutedSubtext from '@/components/text/MutedSubtext';
 import { CampaignsTable } from './CampaignsTable/CampaignsTable';

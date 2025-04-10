@@ -1,4 +1,5 @@
-import { CampaignWithRelations } from '@/constants/types';
+import { CreateCampaignBody } from '@/app/api/campaigns/route';
+import { CampaignWithRelations, CustomMutationOptions } from '@/constants/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -16,6 +17,7 @@ export const useGetCampaigns = () => {
 };
 
 export const useEditCampaign = (
+	// this needs to be edited
 	campaignId: number,
 	suppressToasts?: boolean,
 	successMessage?: string,
@@ -57,14 +59,49 @@ export const useEditCampaign = (
 	};
 };
 
-interface CampaignMutationOptions {
-	suppressToasts?: boolean;
-	successMessage?: string;
-	errorMessage?: string;
-	onSuccess?: () => void;
-}
+export const useCreateCampaign = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Campaign created successfully',
+		errorMessage = 'Failed to create campaign',
+		onSuccess: onSuccessCallback,
+	} = options;
 
-export const useDeleteCampaign = (options: CampaignMutationOptions = {}) => {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (data: CreateCampaignBody) => {
+			const response = await fetch('/api/campaigns', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(data),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to create campaign');
+			}
+
+			return response.json();
+		},
+		onSuccess: () => {
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
+			queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
+};
+
+export const useDeleteCampaign = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
 		successMessage = 'Campaign deleted successfully',

@@ -9,7 +9,6 @@ import {
 	DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { useCreateCampaignDialog } from './useDashboard';
 import {
 	Form,
 	FormControl,
@@ -18,11 +17,12 @@ import {
 	FormLabel,
 	FormMessage,
 } from '@/components/ui/form';
+import { useCreateCampaignDialog } from './useCreateCampaignDialog';
 
 export const CreateCampaignDialog = () => {
-	const { form, onSubmit, isPending } = useCreateCampaignDialog();
+	const { form, onSubmit, isPending, open, setOpen } = useCreateCampaignDialog();
 	return (
-		<Dialog>
+		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
 				<Button className="w-fit mx-auto" variant="outline">
 					Create New Campaign

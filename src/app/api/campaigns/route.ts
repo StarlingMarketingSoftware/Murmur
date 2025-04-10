@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
+import { AiModel, Status } from '@prisma/client';
+
+export type CreateCampaignBody = {
+	name: string;
+	status?: Status;
+	subject?: string;
+	message?: string;
+	aiModel?: AiModel;
+	testMessage?: string;
+	testSubject?: string;
+	senderEmail?: string;
+	senderName?: string;
+	contacts?: number[]; // Array of contact IDs
+};
 
 export async function POST(req: NextRequest) {
 	const { userId } = await auth();
@@ -8,13 +22,22 @@ export async function POST(req: NextRequest) {
 		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 	}
 	try {
-		const body = await req.json();
-		const { name } = body;
+		const body: CreateCampaignBody = await req.json();
+		const { name, contacts, ...restOfBody } = body;
 
 		const campaign = await prisma.campaign.create({
 			data: {
-				name: name,
-				userId: userId,
+				name,
+				userId,
+				...restOfBody,
+				...(contacts && {
+					contacts: {
+						connect: contacts.map((id) => ({ id })),
+					},
+				}),
+			},
+			include: {
+				contacts: true,
 			},
 		});
 
@@ -35,6 +58,7 @@ export async function GET() {
 		const campaigns = await prisma.campaign.findMany({
 			where: {
 				userId: userId,
+				status: Status.active,
 			},
 			orderBy: {
 				createdAt: 'desc',

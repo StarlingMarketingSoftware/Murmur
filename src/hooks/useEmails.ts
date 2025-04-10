@@ -1,3 +1,4 @@
+import { CustomMutationOptions } from '@/constants/types';
 import { Email } from '@prisma/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -7,14 +8,7 @@ interface EditEmailData {
 	data: Email; // Consider creating a proper type for your email data
 }
 
-interface EmailMutationOptions {
-	suppressToasts?: boolean;
-	successMessage?: string;
-	errorMessage?: string;
-	onSuccess?: () => void;
-}
-
-export const useEditEmail = (options: EmailMutationOptions = {}) => {
+export const useEditEmail = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
 		successMessage = 'Email updated successfully',

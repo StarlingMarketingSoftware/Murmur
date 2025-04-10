@@ -124,3 +124,10 @@ export type SubscriptionTierData = {
 	testEmailCount: number;
 	viewEmailAddresses: boolean;
 };
+
+export interface CustomMutationOptions {
+	suppressToasts?: boolean;
+	successMessage?: string;
+	errorMessage?: string;
+	onSuccess?: () => void;
+}

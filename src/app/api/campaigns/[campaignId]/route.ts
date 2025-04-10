@@ -142,7 +142,7 @@ export async function DELETE(
 			return new NextResponse('Unauthorized', { status: 401 });
 		}
 
-		const { campaignId } = params;
+		const { campaignId } = await params;
 
 		// Verify campaign exists and belongs to user
 		const campaign = await prisma.campaign.findUnique({
