@@ -45,11 +45,12 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 		isPendingDraftEmail,
 		dataDraftEmail,
 		trigger,
-		errors,
 		handleSavePrompt,
 		isPendingSavePrompt,
 		aiDraftCredits,
 		aiTestCredits,
+		isConfirmDialogOpen,
+		setIsConfirmDialogOpen,
 	} = useComposeEmailSection(props);
 
 	return (
@@ -179,36 +180,25 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 							</div>
 							<Separator />
 							<div className="flex gap-4">
-								<ConfirmDialog
-									title="Confirm Batch Generation of Emails"
-									confirmAction={() => handleFormAction('submit')}
-									triggerButton={
-										<Button
-											type="button"
-											onClick={async (e) => {
-												// e.preventDefault();
-												e.stopPropagation();
-												await trigger();
-												const hasErrors = Object.keys(errors).length > 0;
-												if (hasErrors) {
-													return;
-												}
-											}}
-											isLoading={isPendingDraftEmail && !isTest}
-											disabled={isPendingDraftEmail || aiDraftCredits === 0}
-										>
-											{isAiDraft
-												? 'Generate Custom Emails for All Recipients'
-												: 'Save Drafts for All Recipients'}
-										</Button>
-									}
+								<Button
+									type="button"
+									onClick={async (e) => {
+										e.stopPropagation();
+										const isValid = await trigger();
+										if (!isValid) {
+											e.preventDefault(); // Prevent modal from opening
+											return;
+										}
+										setIsConfirmDialogOpen(true);
+									}}
+									isLoading={isPendingDraftEmail && !isTest}
+									disabled={isPendingDraftEmail || aiDraftCredits === 0}
 								>
-									Are you sure you want to generate emails for all selected recipients?
-									<br /> <br />
-									This action will have AI create a custom email for each recipient based
-									on the prompt you provided and will count towards your monthly usage
-									limits.
-								</ConfirmDialog>
+									{isAiDraft
+										? 'Generate Custom Emails for All Recipients'
+										: 'Save Drafts for All Recipients'}
+								</Button>
+
 								{/* <Separator className="!h-auto" orientation="vertical" /> */}
 								<Button
 									className=""
@@ -222,6 +212,20 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 								</Button>
 							</div>
 						</div>
+						<ConfirmDialog
+							title="Confirm Batch Generation of Emails"
+							confirmAction={() => {
+								console.log('submit');
+								handleFormAction('submit');
+							}}
+							open={isConfirmDialogOpen}
+							onOpenChange={setIsConfirmDialogOpen}
+						>
+							Are you sure you want to generate emails for all selected recipients?
+							<br /> <br />
+							This action will have AI create a custom email for each recipient based on
+							the prompt you provided and will count towards your monthly usage limits.
+						</ConfirmDialog>
 					</form>
 				</Form>
 			</CardContent>

@@ -1,6 +1,6 @@
 import { CustomMutationOptions } from '@/constants/types';
 import { Email } from '@prisma/client';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 interface EditEmailData {
@@ -43,6 +43,42 @@ export const useEditEmail = (options: CustomMutationOptions = {}) => {
 		onError: () => {
 			if (!suppressToasts) {
 				toast.error(errorMessage || 'Failed to update email. Please try again.');
+			}
+		},
+	});
+};
+
+export const useDeleteEmail = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Email deleted successfully',
+		errorMessage = 'Failed to delete email',
+		onSuccess: onSuccessCallback,
+	} = options;
+
+	return useMutation({
+		mutationFn: async (emailId: number) => {
+			const response = await fetch(`/api/emails/${emailId}`, {
+				method: 'DELETE',
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to delete email');
+			}
+
+			return response.json();
+		},
+		onSuccess: () => {
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
+
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
 			}
 		},
 	});

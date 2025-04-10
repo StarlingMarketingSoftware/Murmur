@@ -16,9 +16,11 @@ interface CustomPaginationProps<TData> {
 	currentPage: number;
 }
 
-const CustomPagination = <TData,>({ table }: CustomPaginationProps<TData>) => {
+const CustomPagination = <TData,>({
+	table,
+	currentPage,
+}: CustomPaginationProps<TData>) => {
 	const numPages = table.getPageCount();
-	const currentPage = table.getState().pagination.pageIndex;
 
 	const generatePaginationItems = (): ReactNode[] => {
 		let paginationArray: number[] = [];
