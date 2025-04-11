@@ -32,9 +32,13 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	const { user } = useMe();
 	const aiDraftCredits = user?.aiDraftCredits;
 	const aiTestCredits = user?.aiTestCredits;
+	const [isFirstLoad, setIsFirstLoad] = useState(true);
+	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 
-	const [isAiDraft, setIsAiDraft] = useState<boolean>(campaign.subject?.length === 0);
-	const [isAiSubject, setIsAiSubject] = useState<boolean>(campaign.subject?.length === 0);
+	const [isAiDraft, setIsAiDraft] = useState<boolean>(true);
+	const [isAiSubject, setIsAiSubject] = useState<boolean>(
+		!campaign.subject || campaign.subject?.length === 0
+	);
 	const [isTest, setIsTest] = useState<boolean>(false);
 
 	const {
@@ -64,18 +68,22 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 			aiModel: campaign.aiModel ?? AiModel.sonar,
 		},
 		mode: 'onChange',
-		reValidateMode: 'onChange',
+		// reValidateMode: 'onChange',
 	});
 
 	const {
 		trigger,
 		getValues,
-		formState: { errors },
+		formState: { errors, isValid },
 	} = form;
 
-	useEffect(() => {
-		trigger();
-	}, [isAiDraft, trigger]);
+	// useEffect(() => {
+	// 	if (isFirstLoad) {
+	// 		setIsFirstLoad(false);
+	// 	} else {
+	// 		trigger('subject');
+	// 	}
+	// }, [isAiSubject, trigger, setIsFirstLoad, isFirstLoad]);
 
 	const queryClient = useQueryClient();
 
@@ -251,6 +259,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		campaign,
 		trigger,
 		errors,
+		isValid,
 		savePrompt,
 		isPendingSavePrompt,
 		handleSavePrompt,
@@ -258,6 +267,8 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		isPendingCreateEmail,
 		aiDraftCredits,
 		aiTestCredits,
+		isConfirmDialogOpen,
+		setIsConfirmDialogOpen,
 	};
 };
 

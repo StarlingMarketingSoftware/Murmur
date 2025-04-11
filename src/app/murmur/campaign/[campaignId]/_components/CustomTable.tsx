@@ -69,6 +69,11 @@ export function CustomTable<TData, TValue>({
 	noDataMessage = 'No data was found.',
 	initialRowSelectionState,
 }: DataTableProps<TData, TValue>) {
+	const [pagination, setPagination] = useState({
+		pageIndex: 0,
+		pageSize: 10, // or whatever default page size you want
+	});
+
 	const getInitialRowSelection = () => {
 		if (!initialRowSelectionState || !data || !isSelectable) return {};
 
@@ -101,6 +106,8 @@ export function CustomTable<TData, TValue>({
 		getFilteredRowModel: getFilteredRowModel(),
 		onRowSelectionChange: setRowSelection,
 		enableMultiRowSelection: !singleSelection,
+		onPaginationChange: setPagination,
+		autoResetPageIndex: false,
 		enableRowSelection: isSelectable,
 		onGlobalFilterChange: setGlobalFilter,
 		globalFilterFn: 'includesString',
@@ -109,10 +116,26 @@ export function CustomTable<TData, TValue>({
 			columnFilters,
 			rowSelection,
 			globalFilter,
+			pagination,
 		},
 	});
 
 	const rowModel = table.getSelectedRowModel();
+
+	useEffect(() => {
+		if (!data) return;
+
+		const totalPages = Math.ceil(data.length / pagination.pageSize);
+		const currentPage = pagination.pageIndex;
+
+		// If we're on a page that no longer exists, go to the last available page
+		if (currentPage > 0 && currentPage >= totalPages) {
+			setPagination((prev) => ({
+				...prev,
+				pageIndex: Math.max(0, totalPages - 1),
+			}));
+		}
+	}, [pagination.pageIndex, pagination.pageSize, data]);
 
 	useEffect(() => {
 		if (!setSelectedRows || !data || !isSelectable) return;
@@ -223,7 +246,7 @@ export function CustomTable<TData, TValue>({
 					</TableBody>
 				</Table>
 			</div>
-			<CustomPagination<TData> currentPage={0} table={table} />
+			<CustomPagination<TData> currentPage={pagination.pageIndex} table={table} />
 		</div>
 	);
 }

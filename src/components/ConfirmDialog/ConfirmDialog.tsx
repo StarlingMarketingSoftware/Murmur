@@ -35,6 +35,7 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 		isLoading,
 		formValue,
 		form,
+		confirmAction,
 	} = useConfirmDialog(props);
 
 	return (
@@ -55,7 +56,7 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 				<DialogDescription className="text-sm text-muted-foreground">
 					{text ? text : children}
 				</DialogDescription>
-				{confirmWithInput && (
+				{confirmWithInput ? (
 					<Form {...form}>
 						<form onSubmit={form.handleSubmit(onSubmit)}>
 							<div className="space-y-4">
@@ -99,6 +100,23 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 							</DialogFooter>
 						</form>
 					</Form>
+				) : (
+					<DialogFooter>
+						<Button type="button" onClick={() => onOpenChange(false)} variant="outline">
+							Cancel
+						</Button>
+						<Button
+							isLoading={isLoading}
+							disabled={confirmWithInput && !(formValue === confirmWithInputValue)}
+							type="button"
+							onClick={() => {
+								confirmAction();
+								onOpenChange(false);
+							}}
+						>
+							Confirm
+						</Button>
+					</DialogFooter>
 				)}
 			</DialogContent>
 		</Dialog>

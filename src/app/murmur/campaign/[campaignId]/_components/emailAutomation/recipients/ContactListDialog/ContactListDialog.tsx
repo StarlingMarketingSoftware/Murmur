@@ -43,6 +43,7 @@ const ContactListDialog: FC<ContactListDialogProps> = (props) => {
 							columns={columns}
 							data={filteredData}
 							setSelectedRows={setSelectedRows}
+							isSelectable
 							noDataMessage="All contacts in this list have been added to your campaign already!"
 						/>
 						<DialogFooter>

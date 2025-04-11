@@ -13,7 +13,6 @@ export interface ConfirmDialogProps {
 	children?: ReactNode;
 	isLoading?: boolean;
 	triggerButton?: ReactNode;
-	isOpen?: boolean;
 	onOpenChange?: (open: boolean) => void;
 }
 
@@ -25,8 +24,8 @@ export const useConfirmDialog = (props: ConfirmDialogProps) => {
 	const [internalOpen, setInternalOpen] = useState(false);
 
 	const { confirmAction } = props;
-	const isControlled = props.isOpen !== undefined;
-	const open = isControlled ? props.isOpen : internalOpen;
+	const isControlled = props.open !== undefined;
+	const open = isControlled ? props.open : internalOpen;
 
 	const form = useForm<ConfirmModalFormValues>({
 		defaultValues: {

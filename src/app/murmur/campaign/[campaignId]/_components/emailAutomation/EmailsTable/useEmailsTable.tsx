@@ -6,11 +6,11 @@ import { EmailWithRelations } from '@/constants/types';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { TrashIcon } from 'lucide-react';
-import { toast } from 'sonner';
 import { ellipsesText } from '@/app/utils/functions';
 import { useMe } from '@/hooks/useMe';
 import FeatureLockedButton from '@/app/murmur/_components/FeatureLockedButton';
 import { restrictedFeatureMessages } from '@/constants/constants';
+import { useDeleteEmail } from '@/hooks/useEmails';
 
 export interface EmailsTableProps {
 	emails: EmailWithRelations[];
@@ -22,33 +22,14 @@ export interface EmailsTableProps {
 export const useEmailsTable = (props: EmailsTableProps) => {
 	const queryClient = useQueryClient();
 	const { subscriptionTier } = useMe();
-	const params = useParams();
-	const { campaignId } = params;
 
-	const { mutate: deleteEmail, isPending: isPendingDeleteEmail } = useMutation({
-		mutationFn: async (emailId: number) => {
-			const response = await fetch(`/api/emails/${emailId}`, {
-				method: 'DELETE',
-			});
+	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
 
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to delete email');
-			}
-
-			return response.json();
-		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['drafts', campaignId] });
-			toast.success('Email deleted successfully');
-		},
-		onError: (error: Error) => {
-			toast.error(`Failed to delete email: ${error.message}`);
-		},
-	});
-
-	const handleDeleteEmail = (emailId: number) => {
-		deleteEmail(emailId);
+	const handleDeleteEmail = async (emailId: number) => {
+		const res = await deleteEmail(emailId);
+		if (res) {
+			queryClient.invalidateQueries({ queryKey: ['drafts'] });
+		}
 	};
 
 	const columns: (
