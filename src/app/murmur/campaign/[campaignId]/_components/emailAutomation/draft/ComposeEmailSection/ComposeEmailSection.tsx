@@ -32,6 +32,7 @@ import useComposeEmailSection, {
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ConfirmDialog/ConfirmDialog';
+import { ManageSignaturesDialog } from './ManageSignaturesDialog/ManageSignaturesDialog';
 
 const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 	const {
@@ -133,35 +134,43 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 								</FormItem>
 							)}
 						/>
-						{isAiDraft && (
-							<FormField
-								control={form.control}
-								name="aiModel"
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>AI Model</FormLabel>
-										<FormControl>
-											<Select onValueChange={field.onChange} defaultValue={field.value}>
-												<SelectTrigger className="w-[180px]">
-													<SelectValue />
-												</SelectTrigger>
-												<SelectContent>
-													<SelectGroup>
-														<SelectLabel>AI Model</SelectLabel>
-														{AiModelOptions.map((model) => (
-															<SelectItem key={model.value} value={model.value}>
-																{model.name}
-															</SelectItem>
-														))}
-													</SelectGroup>
-												</SelectContent>
-											</Select>
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-						)}
+						<div className="flex gap-4">
+							{isAiDraft && (
+								<FormField
+									control={form.control}
+									name="aiModel"
+									render={({ field }) => (
+										<FormItem>
+											<FormLabel>AI Model</FormLabel>
+											<FormControl>
+												<Select onValueChange={field.onChange} defaultValue={field.value}>
+													<SelectTrigger className="w-[180px]">
+														<SelectValue />
+													</SelectTrigger>
+													<SelectContent>
+														<SelectGroup>
+															<SelectLabel>AI Model</SelectLabel>
+															{AiModelOptions.map((model) => (
+																<SelectItem key={model.value} value={model.value}>
+																	{model.name}
+																</SelectItem>
+															))}
+														</SelectGroup>
+													</SelectContent>
+												</Select>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+							)}
+							<div>
+								<FormLabel>Signatures</FormLabel>
+
+								<ManageSignaturesDialog />
+							</div>
+						</div>
+
 						<div className="flex flex-col gap-4">
 							<div className="flex gap-4">
 								<Button
@@ -215,7 +224,6 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 						<ConfirmDialog
 							title="Confirm Batch Generation of Emails"
 							confirmAction={() => {
-								console.log('submit');
 								handleFormAction('submit');
 							}}
 							open={isConfirmDialogOpen}
