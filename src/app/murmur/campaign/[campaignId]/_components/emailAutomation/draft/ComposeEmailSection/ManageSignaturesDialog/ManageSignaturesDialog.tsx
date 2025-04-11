@@ -21,10 +21,15 @@ import {
 	FormLabel,
 	FormMessage,
 } from '@/components/ui/form';
-import { Textarea } from '@/components/ui/textarea';
+import RichTextEditor from '@/components/RichTextEditor/RichTextEditor';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Signature } from '@prisma/client';
+import Spinner from '@/components/ui/spinner';
 
 export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) => {
-	const { form, isEdit, setIsEdit, handleSave } = useManageSignaturesDialog(props);
+	const { signatures, isPendingSignatures, form, isEdit, setIsEdit, handleSave } =
+		useManageSignaturesDialog(props);
 
 	return (
 		<Dialog>
@@ -35,42 +40,55 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 				<DialogHeader>
 					<DialogTitle>Manage Signatures</DialogTitle>
 					<DialogDescription>
-						Signatures are text that will be placed at the end of every email you draft.
+						Create and edit your email signature using the rich text editor below. Your
+						signature will be added to the end of every email you draft.
 					</DialogDescription>
 				</DialogHeader>
-				<Form {...form}>
-					<form onSubmit={form.handleSubmit(handleSave)}>
-						<FormField
-							control={form.control}
-							name="signature"
-							render={({ field }) => (
-								<FormItem className="col-span-11">
-									<FormLabel>Message</FormLabel>
-									<FormControl>
-										<Textarea
-											className="flex-grow h-[275px]"
-											disabled={!isEdit}
-											{...field}
-										/>
-									</FormControl>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
-						<DialogFooter>
-							{!isEdit ? (
-								<Button
-									type="button"
-									className="w-fit"
-									variant="outline"
-									onClick={(e) => {
-										e.preventDefault();
-										setIsEdit(true);
-									}}
-								>
-									Edit
-								</Button>
-							) : (
+				<div className="flex flex-row gap-4">
+					<div className="w-3/12">
+						{isPendingSignatures ? (
+							<Spinner />
+						) : (
+							<ScrollArea className="h-72 w-full mb-4 rounded-md border">
+								<div className="p-4">
+									{signatures.map((signature: Signature, index: number) => (
+										<>
+											<div key={index} className="text-sm">
+												{signature.name}
+											</div>
+											<Separator className="my-2" />
+										</>
+									))}
+								</div>
+							</ScrollArea>
+						)}
+
+						<Button className="w-full">New Signature</Button>
+					</div>
+					<Separator orientation="vertical" className="h-[300px]" />
+					<Form {...form}>
+						<form
+							onSubmit={form.handleSubmit(handleSave)}
+							className="w-9/12 flex flex-col justify-between"
+						>
+							<FormField
+								control={form.control}
+								name="signature"
+								render={({ field }) => (
+									<FormItem className="col-span-11">
+										<FormControl>
+											<RichTextEditor
+												// isEdit={isEdit}
+												value={field.value}
+												onChange={field.onChange}
+												className="!h-full grow"
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+							<DialogFooter>
 								<div className="flex gap-4">
 									<Button
 										type="button"
@@ -87,14 +105,10 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 										Save
 									</Button>
 								</div>
-							)}
-						</DialogFooter>
-					</form>
-				</Form>
-				<div className="grid gap-4 py-4"></div>
-				{/* <DialogFooter>
-        <Button type="submit">Save changes</Button>
-      </DialogFooter> */}
+							</DialogFooter>
+						</form>
+					</Form>
+				</div>
 			</DialogContent>
 		</Dialog>
 	);

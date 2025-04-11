@@ -130,6 +130,7 @@ model Campaign {
 
 model Signature {
   id        Int        @id @default(autoincrement())
+  name      String
   content   Json       @db.JsonB
   userId    String
   user      User       @relation(fields: [userId], references: [clerkId], onDelete: Cascade)

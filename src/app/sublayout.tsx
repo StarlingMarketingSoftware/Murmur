@@ -12,7 +12,6 @@ interface SubLayoutProps {
 const SubLayout: FC<SubLayoutProps> = ({ children }) => {
 	const queryClient = new QueryClient();
 	const { theme } = useTheme();
-	console.log('🚀 ~ theme:', theme);
 
 	return (
 		<QueryClientProvider client={queryClient}>
