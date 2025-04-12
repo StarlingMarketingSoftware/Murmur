@@ -15,7 +15,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 			return new NextResponse('Unauthorized', { status: 401 });
 		}
 
-		const { id } = params;
+		const { id } = await params;
 
 		const body = await req.json();
 		const validatedData = updateSignatureSchema.parse(body);
@@ -59,7 +59,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 			return new NextResponse('Unauthorized', { status: 401 });
 		}
 
-		const { id } = params;
+		const { id } = await params;
 
 		const signature = await prisma.signature.findUnique({
 			where: {

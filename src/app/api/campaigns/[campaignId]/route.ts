@@ -23,6 +23,7 @@ export const GET = async (
 			include: {
 				contacts: true,
 				emails: true,
+				signature: true,
 			},
 		});
 
@@ -43,6 +44,7 @@ export const updateCampaignSchema = z.object({
 	senderEmail: z.string().nullable().optional(),
 	senderName: z.string().nullable().optional(),
 	aiModel: z.enum(['sonar', 'sonar_pro']).nullable().optional(),
+	signatureId: z.number().optional(),
 	contactOperation: z
 		.object({
 			action: z.enum(['connect', 'disconnect']),
@@ -65,6 +67,7 @@ export async function PATCH(
 
 		const body = await req.json();
 		const validatedData = updateCampaignSchema.parse(body);
+		console.log('🚀 ~ validatedData:', validatedData);
 
 		const updatedCampaign = await prisma.campaign.update({
 			where: {
@@ -87,6 +90,9 @@ export async function PATCH(
 				}),
 				...(validatedData.senderName !== undefined && {
 					senderName: validatedData.senderName,
+				}),
+				...(validatedData.signatureId !== undefined && {
+					signatureId: validatedData.signatureId,
 				}),
 				...(validatedData.contactOperation && {
 					contacts: {

@@ -28,8 +28,8 @@ export async function GET() {
 }
 
 const createSignatureSchema = z.object({
-	name: z.string(),
-	content: z.string().min(1, 'Signature content is required'),
+	name: z.string().min(1, 'Signature name is required'),
+	content: z.string(),
 });
 
 export async function POST(req: NextRequest) {

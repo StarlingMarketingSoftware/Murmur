@@ -52,6 +52,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 		aiTestCredits,
 		isConfirmDialogOpen,
 		setIsConfirmDialogOpen,
+		selectedSignature,
 	} = useComposeEmailSection(props);
 
 	return (
@@ -166,8 +167,13 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 							)}
 							<div>
 								<FormLabel>Signatures</FormLabel>
-
 								<ManageSignaturesDialog />
+							</div>
+							<div>
+								<FormLabel>Selected Signature</FormLabel>
+								<Button variant="outline" disabled>
+									{selectedSignature ? selectedSignature.name : 'No Signature Selected'}
+								</Button>
 							</div>
 						</div>
 

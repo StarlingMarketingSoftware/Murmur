@@ -18,6 +18,7 @@ export const useGetUserSignatures = () => {
 interface EditSignatureData {
 	signatureId: number;
 	data: {
+		name: string;
 		content: string;
 	};
 }
@@ -65,6 +66,7 @@ export const useEditSignature = (options: CustomMutationOptions = {}) => {
 };
 
 interface CreateSignatureData {
+	name: string;
 	content: string;
 }
 

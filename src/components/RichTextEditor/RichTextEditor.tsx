@@ -51,7 +51,12 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 		editorProps: {
 			attributes: {
 				class: twMerge(
-					'min-h-[200px] py-2 px-4 border-[1px] border-solid border-border',
+					' min-h-[200px]  w-full rounded-md border border-input bg-input/30',
+					' px-3 py-2 text-sm ring-offset-background ',
+					'placeholder:text-muted-foreground',
+					' focus-visible:outline-none focus-visible:ring-2 ',
+					'focus-visible:ring-ring focus-visible:ring-offset-2 ',
+					'disabled:cursor-not-allowed disabled:opacity-50',
 					className
 				),
 			},
