@@ -1,12 +1,11 @@
 import { AccessorFnColumnDef, ColumnDef } from '@tanstack/react-table';
-import { useParams } from 'next/navigation';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { TableSortingButton } from '../../CustomTable';
 import { EmailWithRelations } from '@/constants/types';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { TrashIcon } from 'lucide-react';
-import { ellipsesText } from '@/app/utils/functions';
+import { ellipsesText, stripHtmlTags } from '@/app/utils/functions';
 import { useMe } from '@/hooks/useMe';
 import FeatureLockedButton from '@/app/murmur/_components/FeatureLockedButton';
 import { restrictedFeatureMessages } from '@/constants/constants';
@@ -63,7 +62,7 @@ export const useEmailsTable = (props: EmailsTableProps) => {
 		},
 		{
 			id: 'message',
-			accessorFn: (row) => row.message,
+			accessorFn: (row) => stripHtmlTags(row.message),
 			header: ({ column }) => {
 				return <TableSortingButton column={column} label="Message" />;
 			},

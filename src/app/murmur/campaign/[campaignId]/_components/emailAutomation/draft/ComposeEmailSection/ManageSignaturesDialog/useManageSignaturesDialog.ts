@@ -109,5 +109,6 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 		isPendingSaveSignatureToCampaign,
 		campaignId,
 		handleSaveSignatureToCampaign,
+		...props,
 	};
 };
