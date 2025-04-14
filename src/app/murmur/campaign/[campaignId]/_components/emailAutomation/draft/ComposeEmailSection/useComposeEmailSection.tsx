@@ -82,13 +82,15 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		formState: { errors, isValid, isDirty },
 	} = form;
 
-	// useEffect(() => {
-	// 	if (isFirstLoad) {
-	// 		setIsFirstLoad(false);
-	// 	} else {
-	// 		trigger('subject');
-	// 	}
-	// }, [isAiSubject, trigger, setIsFirstLoad, isFirstLoad]);
+	useEffect(() => {
+		if (isFirstLoad) {
+			setIsFirstLoad(false);
+		} else {
+			if (isAiSubject) {
+				trigger('subject');
+			}
+		}
+	}, [isAiSubject, trigger, setIsFirstLoad, isFirstLoad]);
 
 	const queryClient = useQueryClient();
 
@@ -262,7 +264,6 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		isPendingDraftEmail,
 		draftEmail,
 		draftEmailAsync,
-		campaign,
 		trigger,
 		errors,
 		isValid,
@@ -277,6 +278,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		setIsConfirmDialogOpen,
 		selectedSignature,
 		isDirty,
+		...props,
 	};
 };
 

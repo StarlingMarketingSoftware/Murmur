@@ -39,3 +39,7 @@ export const getTestEmailCount = (aiEmailCount: number): number => {
 };
 
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export const calcAiCreditsFromPrice = (priceInCents: number): number => {
+	return Math.floor((priceInCents / 100) * 5);
+};

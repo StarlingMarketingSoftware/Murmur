@@ -44,6 +44,18 @@ interface TableSortingButtonProps<TData> {
 	label: string;
 }
 
+import { cn } from '@/lib/utils';
+
+interface NoDataCellProps {
+	className?: string;
+}
+
+export const NoDataCell = ({ className }: NoDataCellProps) => {
+	return (
+		<span className={cn('text-muted-foreground text-sm italic', className)}>No data</span>
+	);
+};
+
 export function TableSortingButton<TData>({
 	column,
 	label,
@@ -119,8 +131,6 @@ export function CustomTable<TData, TValue>({
 			pagination,
 		},
 	});
-
-	const rowModel = table.getSelectedRowModel();
 
 	useEffect(() => {
 		if (!data) return;

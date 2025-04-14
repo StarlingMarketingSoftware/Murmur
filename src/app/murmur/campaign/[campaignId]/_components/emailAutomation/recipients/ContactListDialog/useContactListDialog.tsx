@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useParams } from 'next/navigation';
 import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/route';
 import { z } from 'zod';
-import { TableSortingButton } from '../../../CustomTable';
+import { NoDataCell, TableSortingButton } from '../../../CustomTable';
 import { useMe } from '@/hooks/useMe';
 import FeatureLockedButton from '@/app/murmur/_components/FeatureLockedButton';
 import { restrictedFeatureMessages } from '@/constants/constants';
@@ -49,6 +49,9 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 				return <TableSortingButton column={column} label="Name" />;
 			},
 			cell: ({ row }) => {
+				const name: string = row.getValue('name');
+				if (!name) return <NoDataCell />;
+
 				return <div className="text-left">{row.getValue('name')}</div>;
 			},
 		},

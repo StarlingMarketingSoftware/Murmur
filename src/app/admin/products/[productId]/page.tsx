@@ -14,7 +14,11 @@ export const AdminProducts = () => {
 	if (error) return <div>Error: {(error as Error).message}</div>;
 	if (!product) return <div>Product not found</div>;
 
-	return <ProductCard user={user} product={product} />;
+	return (
+		<div className="flex items-center justify-center h-[90vh] w-full">
+			<ProductCard user={user} product={product} />
+		</div>
+	);
 };
 
 export default AdminProducts;

@@ -41,14 +41,14 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 	const form = useForm<z.infer<typeof addSenderInfoSchema>>({
 		resolver: zodResolver(addSenderInfoSchema),
 		defaultValues: {
-			senderName: campaign.senderName || '',
-			senderEmail: campaign.senderEmail || '',
+			senderName: campaign?.senderName || '',
+			senderEmail: campaign?.senderEmail || '',
 		},
 	});
 
 	useEffect(() => {
-		form.setValue('senderName', campaign.senderName || '');
-		form.setValue('senderEmail', campaign.senderEmail || '');
+		form.setValue('senderName', campaign?.senderName || '');
+		form.setValue('senderEmail', campaign?.senderEmail || '');
 	}, [campaign, form]);
 
 	const sendMailgunMessage = async (

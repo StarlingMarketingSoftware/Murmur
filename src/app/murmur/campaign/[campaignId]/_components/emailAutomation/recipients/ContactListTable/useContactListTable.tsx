@@ -77,7 +77,6 @@ export const useContactListTable = (props: ContactListTableProps) => {
 	);
 
 	const handleRowClick = (rowData: ContactList) => {
-		console.log('🚀 ~ handleRowClick ~ rowData:', rowData);
 		setIsContactListDialogOpen(true);
 		setSelectedContactList(rowData);
 	};
