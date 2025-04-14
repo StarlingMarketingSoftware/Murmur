@@ -8,7 +8,7 @@ import { EmailStatus } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
 import FormData from 'form-data'; // form-data v4.0.1
 import Mailgun from 'mailgun.js'; // mailgun.js v11.1.0
-import { useEffect } from 'react';
+import { Dispatch, SetStateAction, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -16,6 +16,7 @@ import { z } from 'zod';
 export interface ConfirmSendDialogProps {
 	draftEmails: EmailWithRelations[];
 	campaign: CampaignWithRelations;
+	setSendingProgress: Dispatch<SetStateAction<number>>;
 }
 
 const addSenderInfoSchema = z.object({
@@ -26,6 +27,8 @@ const addSenderInfoSchema = z.object({
 export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 	const { campaign, draftEmails } = props;
 	const { subscriptionTier, user } = useMe();
+	const [isOpen, setIsOpen] = useState(false);
+	const { setSendingProgress } = props;
 
 	const queryClient = useQueryClient();
 	const draftEmailCount = draftEmails.length;
@@ -40,7 +43,6 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 	});
 
 	useEffect(() => {
-		console.log('campaignchaned', campaign);
 		form.setValue('senderName', campaign.senderName || '');
 		form.setValue('senderEmail', campaign.senderEmail || '');
 	}, [campaign, form]);
@@ -86,10 +88,18 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 
 	const { mutateAsync: updateEmailSendCredits } = useEditUser({ suppressToasts: true });
 
+	const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 	const handleSend = async () => {
+		setIsOpen(false);
+		setSendingProgress(0);
 		editCampaign({ campaignId: 5, data: form.getValues() });
 		let currentEmailSendCredits = user?.emailSendCredits || 0;
+		console.log('🚀 ~ handleSend ~ draftEmails:', draftEmails.length);
+
 		for (const email of draftEmails) {
+			console.log('RUNNNN');
+			await delay(2000);
 			if (currentEmailSendCredits <= 0 && !subscriptionTier) {
 				toast.error(
 					'You have reached the sending limit of the free tier. Please upgrade to a paid plan to send more emails.'
@@ -103,8 +113,10 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 					data: {
 						...email,
 						status: EmailStatus.sent,
+						sentAt: new Date(),
 					},
 				});
+				setSendingProgress((prev) => prev + 1);
 				queryClient.invalidateQueries({ queryKey: ['campaign'] });
 				if (!subscriptionTier && user) {
 					await updateEmailSendCredits({
@@ -122,5 +134,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		form,
 		draftEmailCount,
 		hasReachedSendingLimit,
+		isOpen,
+		setIsOpen,
 	};
 };
