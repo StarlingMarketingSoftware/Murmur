@@ -5,6 +5,8 @@ import { stripe } from '../../../../stripe/client';
 import prisma from '@/lib/prisma';
 import { fulfillCheckout } from '@/app/api/webhooks/stripe/fulfillCheckout';
 import { getSubscriptionTierWithPriceId } from '@/lib/utils';
+import { calcAiCreditsFromPrice, getTestEmailCount } from '@/app/utils/functions';
+import { calcAiCredits } from './calcAiCredits';
 
 export async function POST(req: Request) {
 	const body = await req.text();
@@ -48,6 +50,9 @@ export async function POST(req: Request) {
 			const subscription: Stripe.Subscription = event.data.object;
 			const priceId = subscription.items.data[0].price.id;
 			const subscriptionTier = getSubscriptionTierWithPriceId(priceId);
+			console.log('🚀 ~ POST ~ subscriptionTier:', subscriptionTier);
+
+			const aiDraftCredits = await calcAiCredits(subscriptionTier, priceId);
 
 			try {
 				const res = await prisma.user.update({
@@ -59,10 +64,10 @@ export async function POST(req: Request) {
 						stripeSubscriptionId: subscription.id,
 						stripePriceId: priceId,
 						aiDraftCredits: {
-							increment: subscriptionTier?.aiEmailCount,
+							increment: aiDraftCredits,
 						},
 						aiTestCredits: {
-							increment: subscriptionTier?.testEmailCount,
+							increment: getTestEmailCount(aiDraftCredits),
 						},
 					},
 				});
@@ -86,6 +91,7 @@ export async function POST(req: Request) {
 						stripeSubscriptionId: null,
 						stripePriceId: null,
 						aiDraftCredits: 0,
+						aiTestCredits: 0,
 					},
 				});
 

@@ -46,7 +46,7 @@ export function Footer() {
 						</ul>
 					</div>
 
-					<div>
+					{/* <div>
 						<h3 className="font-semibold text-lg mb-4">Legal</h3>
 						<ul className="space-y-2">
 							<li>
@@ -66,14 +66,14 @@ export function Footer() {
 								</Link>
 							</li>
 						</ul>
-					</div>
+					</div> */}
 
-					<div>
+					{/* <div>
 						<h3 className="font-semibold text-lg mb-4">Contact</h3>
 						<ul className="space-y-2">
-							<li className="text-muted-foreground">support@example.com</li>
+							<Link href={urls.contact.path}>Reach out to us via the contact form.</Link>
 						</ul>
-					</div>
+					</div> */}
 				</div>
 
 				<div className="border-t mt-8 pt-8 text-center text-muted-foreground">

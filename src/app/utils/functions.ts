@@ -33,3 +33,13 @@ export const stripHtmlTags = (html: string): string => {
 	tmp.innerHTML = html;
 	return tmp.textContent || tmp.innerText || '';
 };
+
+export const getTestEmailCount = (aiEmailCount: number): number => {
+	return Math.floor(aiEmailCount / 10);
+};
+
+export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export const calcAiCreditsFromPrice = (priceInCents: number): number => {
+	return Math.floor((priceInCents / 100) * 5);
+};

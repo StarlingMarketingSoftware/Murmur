@@ -1,5 +1,5 @@
 import { CampaignWithRelations, EmailWithRelations } from '@/constants/types';
-import { useEditCampaign } from '@/hooks/useCampaigns';
+import { useEditCampaign, useGetCampaign } from '@/hooks/useCampaigns';
 import { useEditEmail } from '@/hooks/useEmails';
 import { useMe } from '@/hooks/useMe';
 import { useEditUser } from '@/hooks/useUsers';
@@ -8,7 +8,8 @@ import { EmailStatus } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
 import FormData from 'form-data'; // form-data v4.0.1
 import Mailgun from 'mailgun.js'; // mailgun.js v11.1.0
-import { useEffect } from 'react';
+import { useParams } from 'next/navigation';
+import { Dispatch, SetStateAction, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -16,6 +17,7 @@ import { z } from 'zod';
 export interface ConfirmSendDialogProps {
 	draftEmails: EmailWithRelations[];
 	campaign: CampaignWithRelations;
+	setSendingProgress: Dispatch<SetStateAction<number>>;
 }
 
 const addSenderInfoSchema = z.object({
@@ -24,8 +26,13 @@ const addSenderInfoSchema = z.object({
 });
 
 export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
-	const { campaign, draftEmails } = props;
+	const { draftEmails } = props;
+	const { campaignId } = useParams() as { campaignId: string };
+	const { data: campaign } = useGetCampaign(parseInt(campaignId));
+
 	const { subscriptionTier, user } = useMe();
+	const [isOpen, setIsOpen] = useState(false);
+	const { setSendingProgress } = props;
 
 	const queryClient = useQueryClient();
 	const draftEmailCount = draftEmails.length;
@@ -34,15 +41,14 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 	const form = useForm<z.infer<typeof addSenderInfoSchema>>({
 		resolver: zodResolver(addSenderInfoSchema),
 		defaultValues: {
-			senderName: campaign.senderName || '',
-			senderEmail: campaign.senderEmail || '',
+			senderName: campaign?.senderName || '',
+			senderEmail: campaign?.senderEmail || '',
 		},
 	});
 
 	useEffect(() => {
-		console.log('campaignchaned', campaign);
-		form.setValue('senderName', campaign.senderName || '');
-		form.setValue('senderEmail', campaign.senderEmail || '');
+		form.setValue('senderName', campaign?.senderName || '');
+		form.setValue('senderEmail', campaign?.senderEmail || '');
 	}, [campaign, form]);
 
 	const sendMailgunMessage = async (
@@ -87,8 +93,13 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 	const { mutateAsync: updateEmailSendCredits } = useEditUser({ suppressToasts: true });
 
 	const handleSend = async () => {
-		editCampaign({ campaignId: 5, data: form.getValues() });
+		setIsOpen(false);
+		setSendingProgress(0);
+		editCampaign({ campaignId: campaign.id, data: form.getValues() });
 		let currentEmailSendCredits = user?.emailSendCredits || 0;
+
+		return;
+
 		for (const email of draftEmails) {
 			if (currentEmailSendCredits <= 0 && !subscriptionTier) {
 				toast.error(
@@ -103,8 +114,10 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 					data: {
 						...email,
 						status: EmailStatus.sent,
+						sentAt: new Date(),
 					},
 				});
+				setSendingProgress((prev) => prev + 1);
 				queryClient.invalidateQueries({ queryKey: ['campaign'] });
 				if (!subscriptionTier && user) {
 					await updateEmailSendCredits({
@@ -122,5 +135,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		form,
 		draftEmailCount,
 		hasReachedSendingLimit,
+		isOpen,
+		setIsOpen,
 	};
 };

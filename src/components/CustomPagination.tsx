@@ -94,7 +94,8 @@ const CustomPagination = <TData,>({
 				{generatePaginationItems()}
 				<PaginationItem
 					className={twMerge(
-						currentPage + 1 === numPages && 'pointer-events-none opacity-25'
+						(currentPage + 1 === numPages || table.getRowModel().rows.length === 0) &&
+							'pointer-events-none opacity-25'
 					)}
 					onClick={() => table.nextPage()}
 				>

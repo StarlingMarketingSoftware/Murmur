@@ -6,7 +6,6 @@ import {
 	FormLabel,
 	FormMessage,
 } from '@/components/ui/form';
-
 import { Button } from '@/components/ui/button';
 import {
 	Dialog,
@@ -24,12 +23,14 @@ import FeatureLockedButton from '@/app/murmur/_components/FeatureLockedButton';
 import { restrictedFeatureMessages } from '@/constants/constants';
 
 export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
-	const { handleSend, form, draftEmailCount, hasReachedSendingLimit } =
+	const { handleSend, form, draftEmailCount, hasReachedSendingLimit, isOpen, setIsOpen } =
 		useConfirmSendDialog(props);
 	return (
-		<Dialog modal>
+		<Dialog open={isOpen} onOpenChange={setIsOpen} modal>
 			<DialogTrigger asChild>
-				<Button variant="default">Proceed to Confirmation</Button>
+				<Button disabled={draftEmailCount <= 0} variant="default">
+					Proceed to Confirmation
+				</Button>
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-[425px]">
 				<DialogHeader>
@@ -68,11 +69,7 @@ export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
 						</div>
 						<DialogFooter>
 							<div className="flex gap-2 w-full items-center justify-center">
-								<Button
-									disabled={hasReachedSendingLimit}
-									onClick={handleSend}
-									type="submit"
-								>
+								<Button disabled={hasReachedSendingLimit} type="submit">
 									{`Send ${draftEmailCount} Emails`}
 								</Button>
 								{hasReachedSendingLimit && (

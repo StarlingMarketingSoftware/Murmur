@@ -39,7 +39,6 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 	const selectedSignature: Signature | null = campaign?.signature;
-	console.log('🚀 ~ useComposeEmailSection ~ selectedSignature:', selectedSignature);
 
 	const [isAiDraft, setIsAiDraft] = useState<boolean>(true);
 	const [isAiSubject, setIsAiSubject] = useState<boolean>(
@@ -80,16 +79,18 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	const {
 		trigger,
 		getValues,
-		formState: { errors, isValid },
+		formState: { errors, isValid, isDirty },
 	} = form;
 
-	// useEffect(() => {
-	// 	if (isFirstLoad) {
-	// 		setIsFirstLoad(false);
-	// 	} else {
-	// 		trigger('subject');
-	// 	}
-	// }, [isAiSubject, trigger, setIsFirstLoad, isFirstLoad]);
+	useEffect(() => {
+		if (isFirstLoad) {
+			setIsFirstLoad(false);
+		} else {
+			if (isAiSubject) {
+				trigger('subject');
+			}
+		}
+	}, [isAiSubject, trigger, setIsFirstLoad, isFirstLoad]);
 
 	const queryClient = useQueryClient();
 
@@ -116,6 +117,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 					: 'Message section saved successfully!'
 			);
 			queryClient.invalidateQueries({ queryKey: ['campaign'] });
+			form.reset(form.getValues());
 		},
 		onError: () => {
 			toast.error('Failed to save prompt. Please try again.');
@@ -262,7 +264,6 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		isPendingDraftEmail,
 		draftEmail,
 		draftEmailAsync,
-		campaign,
 		trigger,
 		errors,
 		isValid,
@@ -276,6 +277,8 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		isConfirmDialogOpen,
 		setIsConfirmDialogOpen,
 		selectedSignature,
+		isDirty,
+		...props,
 	};
 };
 

@@ -64,10 +64,13 @@ export async function PATCH(
 		}
 
 		const { campaignId } = await params;
+		console.log('🚀 ~ campaignId:', campaignId);
 
 		const body = await req.json();
 		const validatedData = updateCampaignSchema.parse(body);
-		console.log('🚀 ~ validatedData:', validatedData);
+
+		console.log('🚀 ~ validatedData.senderName:', validatedData.senderName);
+		console.log('🚀 ~ validatedData.senderName:', validatedData.senderEmail);
 
 		const updatedCampaign = await prisma.campaign.update({
 			where: {

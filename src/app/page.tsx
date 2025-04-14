@@ -1,8 +1,10 @@
 import { Button } from '@/components/ui/button';
 import { TypographyH1, TypographyP } from '@/components/ui/typography';
+import { urls } from '@/constants/urls';
 import { SignUpButton } from '@clerk/nextjs';
 import { auth } from '@clerk/nextjs/server';
 import Image from 'next/image';
+import Link from 'next/link';
 
 const imageData = [
 	{
@@ -67,7 +69,9 @@ export default async function HomePage() {
 									</button>
 								</SignUpButton>
 							) : (
-								<Button className="">Open Murmur</Button>
+								<Link href={urls.murmur.dashboard.path}>
+									<Button className="">Open Murmur</Button>
+								</Link>
 							)}
 						</div>
 					</div>

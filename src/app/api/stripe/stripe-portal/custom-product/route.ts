@@ -11,7 +11,6 @@ export async function POST(
 	req: NextRequest
 ): Promise<NextResponse<{ url: string }> | NextResponse<{ error: string }>> {
 	const body = (await req.json()) as UpdateSubscriptionPortalRequest;
-	console.log('🚀 ~ body:', body);
 
 	const { customerId, productId, priceId } = body;
 
@@ -54,7 +53,6 @@ export async function POST(
 			configuration: portalConfig.id, // Use the restricted config
 			return_url: `http://localhost:3000/pricing`, // Redirect after portal
 		});
-		console.log('🚀 ~ portalSession:', portalSession);
 
 		return NextResponse.json({ url: portalSession.url });
 	} catch (err) {

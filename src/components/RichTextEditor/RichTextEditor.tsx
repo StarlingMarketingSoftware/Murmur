@@ -10,9 +10,10 @@ import { twMerge } from 'tailwind-merge';
 
 interface RichTextEditorProps {
 	value: string;
-	onChange: (value: string) => void;
+	onChange?: (value: string) => void;
 	isEdit?: boolean;
 	className?: string;
+	hideMenuBar?: boolean;
 }
 
 const RichTextEditor: FC<RichTextEditorProps> = ({
@@ -20,6 +21,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 	onChange,
 	isEdit = true,
 	className,
+	hideMenuBar = false,
 }) => {
 	const editor = useEditor({
 		extensions: [
@@ -51,8 +53,8 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 		editorProps: {
 			attributes: {
 				class: twMerge(
-					' min-h-[200px]  w-full rounded-md border border-input bg-input/30',
-					' px-3 py-2 text-sm ring-offset-background ',
+					'min-h-[200px] w-full rounded-md border border-input bg-input/30',
+					'px-3 py-2 text-sm ring-offset-background ',
 					'placeholder:text-muted-foreground',
 					' focus-visible:outline-none focus-visible:ring-2 ',
 					'focus-visible:ring-ring focus-visible:ring-offset-2 ',
@@ -62,7 +64,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 			},
 		},
 		onUpdate: ({ editor }) => {
-			onChange(editor.getHTML());
+			onChange?.(editor.getHTML());
 		},
 	});
 
@@ -80,7 +82,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 
 	return (
 		<div className="flex flex-col gap-2">
-			<RichTextMenuBar editor={editor} isEdit={isEdit} />
+			{!hideMenuBar && <RichTextMenuBar editor={editor} isEdit={isEdit} />}
 			<EditorContent editor={editor} />
 		</div>
 	);
