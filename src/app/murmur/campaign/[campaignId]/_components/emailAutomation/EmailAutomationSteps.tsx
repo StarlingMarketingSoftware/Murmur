@@ -5,6 +5,8 @@ import {
 	EmailAutomationStepsProps,
 	useEmailAutomationSteps,
 } from './useEmailAutomationSteps';
+import Link from 'next/link';
+import { urls } from '@/constants/urls';
 
 const EmailAutomationSteps: FC<EmailAutomationStepsProps> = (props) => {
 	const { stepParam, handleTabChange, advanceToNextStep, returnToPreviousStep, steps } =
@@ -32,6 +34,9 @@ const EmailAutomationSteps: FC<EmailAutomationStepsProps> = (props) => {
 				))}
 			</Tabs>
 			<div className="flex mx-auto justify-center gap-4 mt-4">
+				<Link href={urls.murmur.dashboard.path}>
+					<Button variant="ghost">Back to Dashboard</Button>
+				</Link>
 				<Button
 					variant="outline"
 					disabled={stepParam === '1'}

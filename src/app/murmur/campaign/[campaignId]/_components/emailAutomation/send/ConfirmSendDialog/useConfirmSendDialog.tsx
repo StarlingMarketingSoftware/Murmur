@@ -95,10 +95,8 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		setSendingProgress(0);
 		editCampaign({ campaignId: 5, data: form.getValues() });
 		let currentEmailSendCredits = user?.emailSendCredits || 0;
-		console.log('🚀 ~ handleSend ~ draftEmails:', draftEmails.length);
 
 		for (const email of draftEmails) {
-			console.log('RUNNNN');
 			await delay(2000);
 			if (currentEmailSendCredits <= 0 && !subscriptionTier) {
 				toast.error(

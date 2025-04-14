@@ -6,7 +6,6 @@ import {
 	FormLabel,
 	FormMessage,
 } from '@/components/ui/form';
-
 import { Button } from '@/components/ui/button';
 import {
 	Dialog,
@@ -29,7 +28,9 @@ export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen} modal>
 			<DialogTrigger asChild>
-				<Button variant="default">Proceed to Confirmation</Button>
+				<Button disabled={draftEmailCount <= 0} variant="default">
+					Proceed to Confirmation
+				</Button>
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-[425px]">
 				<DialogHeader>

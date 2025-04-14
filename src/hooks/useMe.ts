@@ -24,6 +24,7 @@ export const useMe = () => {
 	const stripePriceId = user?.stripePriceId;
 	const subscriptionTier: SubscriptionTierData | null =
 		getSubscriptionTierWithPriceId(stripePriceId);
+	console.log('🚀 ~ useMe ~ subscriptionTier:', subscriptionTier);
 
 	return { user, isPendingUser, isLoaded, subscriptionTier };
 };

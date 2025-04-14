@@ -30,7 +30,7 @@ export const AiModelOptions: AiSelectValues[] = [
 ];
 
 export const subscriptionTierDataList: Record<string, SubscriptionTierData> = {
-	price_1RB9Uw02Nskp21xSrRxsLDT3: {
+	[process.env.NEXT_PUBLIC_ESSENTIALS_PRICE_ID as string]: {
 		name: 'Essentials',
 		aiEmailCount: 500,
 		testEmailCount: 50,
@@ -42,19 +42,19 @@ export const subscriptionTierDataList: Record<string, SubscriptionTierData> = {
 		testEmailCount: 100,
 		viewEmailAddresses: false,
 	},
-	price_1RBX5302Nskp21xS93QdS0f9: {
+	[process.env.NEXT_PUBLIC_PROFESSIONAL_PRICE_ID as string]: {
 		name: 'Professional',
 		aiEmailCount: 1500,
 		testEmailCount: 150,
 		viewEmailAddresses: false,
 	},
-	price_1RBX6b02Nskp21xScZVyGvIb: {
+	[process.env.NEXT_PUBLIC_ELITE_PRICE_ID as string]: {
 		name: 'Elite',
 		aiEmailCount: 5000,
 		testEmailCount: 500,
 		viewEmailAddresses: true,
 	},
-	price_1RBX7v02Nskp21xSePcdKsR0: {
+	[process.env.NEXT_PUBLIC_PROPHET_PRICE_ID as string]: {
 		name: 'Prophet',
 		aiEmailCount: 7500,
 		testEmailCount: 750,

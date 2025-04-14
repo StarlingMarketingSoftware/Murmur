@@ -9,10 +9,7 @@ export interface SendingProgressIndicatorProps {
 export const useSendingProgressIndicator = (props: SendingProgressIndicatorProps) => {
 	const [isOpen, setIsOpen] = useState(false);
 	const totalEmailsRef = useRef(props.totalEmails);
-	console.log(
-		'🚀 ~ useSendingProgressIndicator ~ totalEmailsRef:',
-		totalEmailsRef.current
-	);
+	console.log(totalEmailsRef.current);
 	const { sendingProgress, setSendingProgress } = props;
 
 	const progressPercentage = (props.sendingProgress / totalEmailsRef.current) * 100;
@@ -30,6 +27,7 @@ export const useSendingProgressIndicator = (props: SendingProgressIndicatorProps
 		} else {
 			setSendingProgress(-1);
 		}
+		/* eslint-disable react-hooks/exhaustive-deps */
 	}, [isOpen, setSendingProgress]);
 
 	return {
