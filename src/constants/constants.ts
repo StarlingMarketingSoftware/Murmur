@@ -1,3 +1,4 @@
+import { getTestEmailCount } from '@/app/utils/functions';
 import { AiSelectValues, SubscriptionTierData } from './types';
 
 export enum LocalStorageKeys {
@@ -33,32 +34,42 @@ export const subscriptionTierDataList: Record<string, SubscriptionTierData> = {
 	[process.env.NEXT_PUBLIC_ESSENTIALS_PRICE_ID as string]: {
 		name: 'Essentials',
 		aiEmailCount: 500,
-		testEmailCount: 50,
 		viewEmailAddresses: false,
+		get testEmailCount() {
+			return getTestEmailCount(this.aiEmailCount);
+		},
 	},
 	custom: {
 		name: 'Custom',
 		aiEmailCount: 1000,
-		testEmailCount: 100,
 		viewEmailAddresses: false,
+		get testEmailCount() {
+			return getTestEmailCount(this.aiEmailCount);
+		},
 	},
 	[process.env.NEXT_PUBLIC_PROFESSIONAL_PRICE_ID as string]: {
 		name: 'Professional',
 		aiEmailCount: 1500,
-		testEmailCount: 150,
 		viewEmailAddresses: false,
+		get testEmailCount() {
+			return getTestEmailCount(this.aiEmailCount);
+		},
 	},
 	[process.env.NEXT_PUBLIC_ELITE_PRICE_ID as string]: {
 		name: 'Elite',
 		aiEmailCount: 5000,
-		testEmailCount: 500,
 		viewEmailAddresses: true,
+		get testEmailCount() {
+			return getTestEmailCount(this.aiEmailCount);
+		},
 	},
 	[process.env.NEXT_PUBLIC_PROPHET_PRICE_ID as string]: {
 		name: 'Prophet',
 		aiEmailCount: 7500,
-		testEmailCount: 750,
 		viewEmailAddresses: true,
+		get testEmailCount() {
+			return getTestEmailCount(this.aiEmailCount);
+		},
 	},
 };
 

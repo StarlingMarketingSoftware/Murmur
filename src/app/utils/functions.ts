@@ -33,3 +33,7 @@ export const stripHtmlTags = (html: string): string => {
 	tmp.innerHTML = html;
 	return tmp.textContent || tmp.innerText || '';
 };
+
+export const getTestEmailCount = (aiEmailCount: number): number => {
+	return Math.floor(aiEmailCount / 10);
+};
