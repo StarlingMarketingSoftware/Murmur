@@ -1,11 +1,13 @@
 import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/route';
 import { CampaignWithRelations, Draft } from '@/constants/types';
+import { useGetCampaign } from '@/hooks/useCampaigns';
 import { useMe } from '@/hooks/useMe';
 import { usePerplexityDraftEmail } from '@/hooks/usePerplexity';
 import { useEditUser } from '@/hooks/useUsers';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AiModel, EmailStatus } from '@prisma/client';
+import { AiModel, EmailStatus, Signature } from '@prisma/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -28,16 +30,20 @@ export interface ComposeEmailSectionProps {
 }
 
 const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
-	const { campaign } = props;
+	const { campaignId } = useParams() as { campaignId: string };
+
+	const { data: campaign } = useGetCampaign(parseInt(campaignId));
 	const { user } = useMe();
 	const aiDraftCredits = user?.aiDraftCredits;
 	const aiTestCredits = user?.aiTestCredits;
 	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+	const selectedSignature: Signature | null = campaign?.signature;
+	console.log('🚀 ~ useComposeEmailSection ~ selectedSignature:', selectedSignature);
 
 	const [isAiDraft, setIsAiDraft] = useState<boolean>(true);
 	const [isAiSubject, setIsAiSubject] = useState<boolean>(
-		!campaign.subject || campaign.subject?.length === 0
+		!campaign?.subject || campaign?.subject?.length === 0
 	);
 	const [isTest, setIsTest] = useState<boolean>(false);
 
@@ -50,11 +56,11 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 
 	let dataDraftEmail: Draft | undefined;
 
-	if (!rawDataDraftEmail && campaign.testMessage && campaign.testMessage.length > 0) {
+	if (!rawDataDraftEmail && campaign?.testMessage && campaign?.testMessage.length > 0) {
 		dataDraftEmail = {
-			subject: campaign.testSubject || '',
-			message: campaign.testMessage,
-			contactEmail: campaign.contacts[0].email,
+			subject: campaign?.testSubject || '',
+			message: campaign?.testMessage,
+			contactEmail: campaign?.contacts[0].email,
 		};
 	} else {
 		dataDraftEmail = rawDataDraftEmail;
@@ -63,9 +69,9 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	const form = useForm<z.infer<ReturnType<typeof getEmailDraftSchema>>>({
 		resolver: zodResolver(getEmailDraftSchema(isAiSubject)),
 		defaultValues: {
-			subject: campaign.subject ?? '',
-			message: campaign.message ?? '',
-			aiModel: campaign.aiModel ?? AiModel.sonar,
+			subject: campaign?.subject ?? '',
+			message: campaign?.message ?? '',
+			aiModel: campaign?.aiModel ?? AiModel.sonar,
 		},
 		mode: 'onChange',
 		// reValidateMode: 'onChange',
@@ -269,6 +275,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		aiTestCredits,
 		isConfirmDialogOpen,
 		setIsConfirmDialogOpen,
+		selectedSignature,
 	};
 };
 

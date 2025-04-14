@@ -16,6 +16,20 @@ export const useGetCampaigns = () => {
 	});
 };
 
+export const useGetCampaign = (campaignId: number) => {
+	return useQuery({
+		queryKey: ['campaign', campaignId],
+		queryFn: async () => {
+			const response = await fetch(`/api/campaigns/${campaignId}`);
+			if (!response.ok) {
+				throw new Error('Failed to fetch campaign');
+			}
+			return response.json();
+		},
+		enabled: !!campaignId,
+	});
+};
+
 interface EditCampaignData {
 	campaignId: number;
 	data: Partial<CampaignWithRelations>;
@@ -52,7 +66,7 @@ export const useEditCampaign = (options: CustomMutationOptions = {}) => {
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}
-			queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+			queryClient.invalidateQueries({ queryKey: ['campaigns', 'campaign'] });
 			onSuccessCallback?.();
 		},
 		onError: () => {

@@ -24,6 +24,7 @@ import {
 	FormLabel,
 	FormMessage,
 } from '@/components/ui/form';
+import RichTextEditor from '@/components/RichTextEditor/RichTextEditor';
 
 export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 	const {
@@ -73,10 +74,11 @@ export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 											<FormItem className="col-span-11">
 												<FormLabel>Message</FormLabel>
 												<FormControl>
-													<Textarea
-														className="flex-grow h-[275px]"
-														disabled={!isEdit}
-														{...field}
+													<RichTextEditor
+														value={field.value}
+														isEdit={isEdit}
+														onChange={field.onChange}
+														className="!h-full grow max-h-[200px] overflow-y-auto"
 													/>
 												</FormControl>
 												<FormMessage />

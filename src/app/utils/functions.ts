@@ -27,3 +27,9 @@ export const yyyyMMddHHmm = (date: Date | undefined): string | undefined | null 
 export const MMddyyyyHHmm = (date: Date | undefined): string | undefined | null => {
 	return _format(date, 'MM/dd/yyyy HH:mm');
 };
+
+export const stripHtmlTags = (html: string): string => {
+	const tmp = document.createElement('DIV');
+	tmp.innerHTML = html;
+	return tmp.textContent || tmp.innerText || '';
+};

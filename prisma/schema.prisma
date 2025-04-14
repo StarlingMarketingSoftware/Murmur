@@ -41,14 +41,15 @@ model User {
   aiTestCredits    Int      @default(2)
   emailSendCredits Int      @default(1)
 
-  stripeCustomerId         String?    @unique
+  stripeCustomerId         String?     @unique
   stripeSubscriptionId     String?
   stripeSubscriptionStatus String?
   stripePriceId            String?
-  createdAt                DateTime   @default(now())
-  updatedAt                DateTime   @updatedAt
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
   emails                   Email[]
   campaigns                Campaign[]
+  signatures               Signature[]
 }
 
 model Contact {
@@ -104,22 +105,39 @@ model Email {
 }
 
 model Campaign {
-  id          Int       @id @default(autoincrement())
+  id          Int        @id @default(autoincrement())
   name        String
-  status      Status    @default(active)
+  status      Status     @default(active)
   userId      String
-  user        User      @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  user        User       @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
   contacts    Contact[]
   subject     String?
-  message     String?   @db.Text
+  message     String?    @db.Text
   aiModel     AiModel?
-  testMessage String?   @db.Text
+  testMessage String?    @db.Text
   testSubject String?
   emails      Email[]
   senderEmail String?
   senderName  String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  signatureId Int?
+  signature   Signature? @relation(fields: [signatureId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Signature {
+  id        Int        @id @default(autoincrement())
+  name      String
+  content   String     @default("")
+  userId    String
+  user      User       @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  campaigns Campaign[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
 }
