@@ -9,7 +9,6 @@ import {
 	DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { FC } from 'react';
 import {
 	useViewEditEmailDialog,
@@ -61,7 +60,7 @@ export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 											<FormItem className="col-span-11">
 												<FormLabel>Subject</FormLabel>
 												<FormControl>
-													<Input className="flex-grow" disabled={!isEdit} {...field} />
+													<Input className="flex-grow" readOnly={!isEdit} {...field} />
 												</FormControl>
 												<FormMessage />
 											</FormItem>
