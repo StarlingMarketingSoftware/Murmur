@@ -22,12 +22,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
-import {
-	TooltipProvider,
-	Tooltip,
-	TooltipTrigger,
-	TooltipContent,
-} from '@/components/ui/tooltip';
 
 import { AiModelOptions } from '@/constants/constants';
 import PreviewTestDraftDialog from './PreviewTestDraftDialog/PreviewTestDraftDialog';
@@ -59,6 +53,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 		isConfirmDialogOpen,
 		setIsConfirmDialogOpen,
 		selectedSignature,
+		isDirty,
 	} = useComposeEmailSection(props);
 
 	return (
@@ -232,6 +227,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 									{/* {isAiDraft ? 'Save Prompt' : 'Save Message'} */}
 									Save Section
 								</Button>
+								{isDirty && <Badge variant="warning">You have unsaved changes</Badge>}
 							</div>
 						</div>
 						<ConfirmDialog

@@ -80,7 +80,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	const {
 		trigger,
 		getValues,
-		formState: { errors, isValid },
+		formState: { errors, isValid, isDirty },
 	} = form;
 
 	// useEffect(() => {
@@ -116,6 +116,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 					: 'Message section saved successfully!'
 			);
 			queryClient.invalidateQueries({ queryKey: ['campaign'] });
+			form.reset(form.getValues());
 		},
 		onError: () => {
 			toast.error('Failed to save prompt. Please try again.');
@@ -276,6 +277,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		isConfirmDialogOpen,
 		setIsConfirmDialogOpen,
 		selectedSignature,
+		isDirty,
 	};
 };
 
