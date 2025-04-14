@@ -37,3 +37,5 @@ export const stripHtmlTags = (html: string): string => {
 export const getTestEmailCount = (aiEmailCount: number): number => {
 	return Math.floor(aiEmailCount / 10);
 };
+
+export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

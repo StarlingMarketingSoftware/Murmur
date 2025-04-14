@@ -1,5 +1,5 @@
 import { CampaignWithRelations, EmailWithRelations } from '@/constants/types';
-import { useEditCampaign } from '@/hooks/useCampaigns';
+import { useEditCampaign, useGetCampaign } from '@/hooks/useCampaigns';
 import { useEditEmail } from '@/hooks/useEmails';
 import { useMe } from '@/hooks/useMe';
 import { useEditUser } from '@/hooks/useUsers';
@@ -8,6 +8,7 @@ import { EmailStatus } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
 import FormData from 'form-data'; // form-data v4.0.1
 import Mailgun from 'mailgun.js'; // mailgun.js v11.1.0
+import { useParams } from 'next/navigation';
 import { Dispatch, SetStateAction, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -25,7 +26,10 @@ const addSenderInfoSchema = z.object({
 });
 
 export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
-	const { campaign, draftEmails } = props;
+	const { draftEmails } = props;
+	const { campaignId } = useParams() as { campaignId: string };
+	const { data: campaign } = useGetCampaign(parseInt(campaignId));
+
 	const { subscriptionTier, user } = useMe();
 	const [isOpen, setIsOpen] = useState(false);
 	const { setSendingProgress } = props;
@@ -88,16 +92,15 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 
 	const { mutateAsync: updateEmailSendCredits } = useEditUser({ suppressToasts: true });
 
-	const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 	const handleSend = async () => {
 		setIsOpen(false);
 		setSendingProgress(0);
-		editCampaign({ campaignId: 5, data: form.getValues() });
+		editCampaign({ campaignId: campaign.id, data: form.getValues() });
 		let currentEmailSendCredits = user?.emailSendCredits || 0;
 
+		return;
+
 		for (const email of draftEmails) {
-			await delay(2000);
 			if (currentEmailSendCredits <= 0 && !subscriptionTier) {
 				toast.error(
 					'You have reached the sending limit of the free tier. Please upgrade to a paid plan to send more emails.'

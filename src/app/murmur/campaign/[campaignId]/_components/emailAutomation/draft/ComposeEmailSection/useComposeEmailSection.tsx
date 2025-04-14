@@ -39,7 +39,6 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 	const selectedSignature: Signature | null = campaign?.signature;
-	console.log('🚀 ~ useComposeEmailSection ~ selectedSignature:', selectedSignature);
 
 	const [isAiDraft, setIsAiDraft] = useState<boolean>(true);
 	const [isAiSubject, setIsAiSubject] = useState<boolean>(
