@@ -22,6 +22,12 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
+import {
+	TooltipProvider,
+	Tooltip,
+	TooltipTrigger,
+	TooltipContent,
+} from '@/components/ui/tooltip';
 
 import { AiModelOptions } from '@/constants/constants';
 import PreviewTestDraftDialog from './PreviewTestDraftDialog/PreviewTestDraftDialog';
@@ -58,7 +64,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 	return (
 		<Card>
 			<CardContent className="space-y-2">
-				<ToggleGroup
+				{/* <ToggleGroup
 					// onClick={handleModeClick}
 					variant="outline"
 					className="mx-auto"
@@ -74,11 +80,12 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 						<Brain />
 						AI Draft
 					</ToggleGroupItem>
-					<ToggleGroupItem value="compose">
+
+					<ToggleGroupItem value="compose" disabled>
 						<PenLine />
 						Compose
 					</ToggleGroupItem>
-				</ToggleGroup>
+				</ToggleGroup> */}
 				<Form {...form}>
 					<form onSubmit={(e) => e.preventDefault()} className="space-y-8">
 						<div className="m-0 grid grid-cols-12 gap-4 items-center">
