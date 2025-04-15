@@ -11,8 +11,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Toggle } from '@/components/ui/toggle';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Brain, PenLine } from 'lucide-react';
+import { Brain } from 'lucide-react';
 import {
 	Select,
 	SelectContent,

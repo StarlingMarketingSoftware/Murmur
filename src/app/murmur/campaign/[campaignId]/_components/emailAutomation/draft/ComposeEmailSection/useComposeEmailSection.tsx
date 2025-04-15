@@ -1,6 +1,6 @@
-import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/route';
 import { CampaignWithRelations, Draft } from '@/constants/types';
-import { useGetCampaign } from '@/hooks/useCampaigns';
+import { useEditCampaign, useGetCampaign } from '@/hooks/useCampaigns';
+import { useCreateEmail } from '@/hooks/useEmails';
 import { useMe } from '@/hooks/useMe';
 import { usePerplexityDraftEmail } from '@/hooks/usePerplexity';
 import { useEditUser } from '@/hooks/useUsers';
@@ -11,7 +11,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { z } from 'zod';
+import { set, z } from 'zod';
 
 const getEmailDraftSchema = (isAiSubject: boolean) => {
 	return z.object({
@@ -76,6 +76,16 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		// reValidateMode: 'onChange',
 	});
 
+	useEffect(() => {
+		if (campaign) {
+			form.reset({
+				subject: campaign.subject ?? '',
+				message: campaign.message ?? '',
+				aiModel: campaign.aiModel ?? AiModel.sonar,
+			});
+		}
+	}, [campaign, form]);
+
 	const {
 		trigger,
 		getValues,
@@ -96,78 +106,34 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 
 	const { mutate: editUser } = useEditUser({ suppressToasts: true });
 
-	const { isPending: isPendingSavePrompt, mutateAsync: savePrompt } = useMutation({
-		mutationFn: async (updateData: z.infer<typeof updateCampaignSchema>) => {
-			const response = await fetch(`/api/campaigns/${campaign.id}`, {
-				method: 'PATCH',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(updateData),
-			});
-			if (!response.ok) {
-				throw new Error('Network response was not ok');
-			}
-			return response.json();
-		},
+	const { isPending: isPendingSavePrompt, mutateAsync: savePrompt } = useEditCampaign({
 		onSuccess: () => {
-			toast.success(
-				isAiDraft
-					? 'Prompt section saved successfully!'
-					: 'Message section saved successfully!'
-			);
-			queryClient.invalidateQueries({ queryKey: ['campaign'] });
+			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id] });
 			form.reset(form.getValues());
-		},
-		onError: () => {
-			toast.error('Failed to save prompt. Please try again.');
 		},
 	});
 
-	const { isPending: isPendingCreateEmail, mutateAsync: createEmail } = useMutation({
-		mutationFn: async (emailData: {
-			subject: string;
-			message: string;
-			contactEmail?: string;
-			campaignId: number;
-			status?: EmailStatus;
-			contactId: number;
-		}) => {
-			const response = await fetch('/api/emails', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(emailData),
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to create email');
-			}
-
-			queryClient.invalidateQueries({ queryKey: ['drafts'] });
-
-			return response.json();
+	const { mutateAsync: saveTestEmail } = useEditCampaign({
+		suppressToasts: true,
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id] });
 		},
-		onSuccess: (data) => {
-			toast.success('Email created successfully!');
-			queryClient.invalidateQueries({ queryKey: ['campaign'] });
+	});
+
+	const { isPending: isPendingCreateEmail, mutateAsync: createEmail } = useCreateEmail({
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['drafts'] });
 			if (user && aiDraftCredits) {
 				editUser({
 					clerkId: user?.clerkId,
 					data: { aiDraftCredits: aiDraftCredits - 1 },
-				}); // update the aiDraftCredits
+				});
 			}
-			// update the aiDraftCredits
-			return data;
-		},
-		onError: (error: Error) => {
-			toast.error(`Failed to create email: ${error.message}`);
 		},
 	});
 
 	const handleFormAction = async (action: 'test' | 'submit') => {
+		console.log('generating test prompt');
 		const isValid = await trigger();
 		if (!isValid) return;
 
@@ -187,9 +153,12 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 					recipient: campaign.contacts[0],
 					prompt: values.message,
 				});
-				await savePrompt({
-					testMessage: res.message,
-					testSubject: isAiSubject ? res.subject : values.subject,
+				await saveTestEmail({
+					campaignId: campaign.id,
+					data: {
+						testMessage: res.message,
+						testSubject: isAiSubject ? res.subject : values.subject,
+					},
 				});
 				toast.success('Test email generated successfully!');
 				if (user && aiTestCredits) {
@@ -201,7 +170,9 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 			} catch {
 				toast.error('Failed to generate test email. Please try again.');
 			}
+			setIsTest(false);
 		} else if (isAiDraft) {
+			console.log('drafting emails');
 			let remainingCredits = aiDraftCredits || 0;
 
 			for (const recipient of campaign.contacts) {
@@ -249,7 +220,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	};
 
 	const handleSavePrompt = () => {
-		savePrompt(form.getValues());
+		savePrompt({ data: { ...form.getValues() }, campaignId: campaign.id });
 	};
 
 	return {

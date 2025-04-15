@@ -63,22 +63,30 @@ Notes:
 Write this how you think Jensen Huang would write an email. This should feel like it's written by a top CEO
 	`;
 
-const jsonFormatInstructions = `IMPORTANT: Please return valid JSON format and nothing else. DO NOT use double quotes ("") inside any of the fields. I should be able to take your response and use it directly in JSON.parse() in JavaScript. For linebreaks in "message", use linebreak characters instead of raw line breaks. Use the following format: 
-{
-  "contactEmail": "name@web.com",
-  "subject": "generatedSubject",
-  "message": "Hi Josh,\n\nI came across...", 
-}`;
-
-const messageOnlyFormat = `Return the message only, without any subject line, signature, or other text.`;
+const jsonFormatInstructions = `IMPORTANT: Format your entire response in valid JSON format as follows, using double line breaks between sections:
+	<JSON>
+	{
+		"contactEmail": "name@web.com",
+		"subject": "generatedSubject",
+		"message": "<p>Hi Josh,</p><p></p><p>Paragraph 1 content</p><p></p><p>Paragraph 2 content</p><p></p><p>Paragraph 3 content</p>"
+	}
+	</JSON>`;
 
 const messageAndSubjectFormat = `Return the message and the subject line, without any signature or other text.`;
 
-// const batchMessageOnlyFormat = `I will provide a json that contains information about each recipient. Return the message only, without any subject line, signature, or other text. Please return a list of messages corresponding to each recipient.`;
-
-// const batchMessageAndSubjectFormat = `I will provide a json that contains information about each recipient. Return the message and the subject line, without any signature or other text. Please format the response into a list of JSON strings with the keys "recipient", "subject", and "message".`;
-
 const perplexityEndpoint = '/api/perplexity';
+
+const cleanMessage = (jsonString: string): string => {
+	const beginningIndex = jsonString.indexOf(`"message": "`) + 12;
+	const firstPart = jsonString.slice(0, beginningIndex);
+	const message = jsonString.slice(beginningIndex, jsonString.length - 2);
+	const lastPart = jsonString.slice(jsonString.length - 2);
+
+	const cleaned = message.replace(/\\/g, '').replace(/"/g, '').replace(/’/g, `'`);
+	console.log('🚀 ~ cleanMessage ~ cleaned:', cleaned);
+
+	return firstPart + cleaned + lastPart;
+};
 
 const safeParseAIResponse = (response: string): Draft => {
 	try {
@@ -96,15 +104,22 @@ const safeParseAIResponse = (response: string): Draft => {
 				// 3. Clean the string before parsing
 				const cleaned = match
 					.replace(/[\u201C\u201D]/g, '"') // Replace smart quotes
-					.replace(/[\r\t]/g, '') // Remove newlines, carriage returns, tabs
+					.replace(/[\n\r\t]/g, '') // Remove newlines, carriage returns, tabs
 					.replace(/,\s*([\]}])/g, '$1'); // Remove trailing commas
 
-				const parsed = JSON.parse(cleaned) as Draft;
+				const cleaned2 = cleanMessage(cleaned);
+				console.log('🚀 ~ safeParseAIResponse ~ cleaned2:', cleaned2);
+
+				try {
+					const parsed = JSON.parse(cleaned2) as Draft;
+					if (parsed.subject && parsed.message) {
+						return parsed;
+					}
+				} catch (e) {
+					console.error('Error parsing JSON:', e.message);
+				}
 
 				// 4. Validate the parsed object has required fields
-				if (parsed.contactEmail && parsed.subject && parsed.message) {
-					return parsed;
-				}
 			} catch {
 				continue; // Try next match if this one fails
 			}
@@ -149,10 +164,7 @@ export const usePerplexityDraftEmail = () => {
 						messages: [
 							{
 								role: 'system',
-								content: `${rolePrompt} ${
-									params.generateSubject ? messageAndSubjectFormat : messageOnlyFormat
-								} 
-							${jsonFormatInstructions}`,
+								content: `${jsonFormatInstructions}\n\nInstructions for email content:\n${rolePrompt}\n\nOutput format:\n${messageAndSubjectFormat}`,
 							},
 							{
 								role: 'user',
@@ -175,19 +187,17 @@ export const usePerplexityDraftEmail = () => {
 			}
 
 			const data = await response.json();
+
 			try {
 				const jsonString = data.choices[0].message.content;
 				const beginningIndex = jsonString.indexOf('{');
 				const endIndex = jsonString.lastIndexOf('}') + 1;
 				const jsonStringTrimmed = jsonString.slice(beginningIndex, endIndex).trim();
-				console.log('jsonStringTrimmed:');
-				console.log(jsonStringTrimmed);
-				console.log(typeof jsonStringTrimmed);
 				const parsedDraft = safeParseAIResponse(jsonStringTrimmed);
 
-				if (!parsedDraft.contactEmail || !parsedDraft.subject || !parsedDraft.message) {
-					throw new Error('Invalid draft format returned from AI. Please try again.');
-				}
+				// if (!parsedDraft.subject || !parsedDraft.message) {
+				// 	throw new Error('Invalid draft format returned from AI. Please try again.');
+				// }
 
 				return parsedDraft;
 			} catch (error) {
