@@ -2,16 +2,16 @@ import { CampaignWithRelations, Draft } from '@/constants/types';
 import { useEditCampaign, useGetCampaign } from '@/hooks/useCampaigns';
 import { useCreateEmail } from '@/hooks/useEmails';
 import { useMe } from '@/hooks/useMe';
-import { usePerplexityDraftEmail } from '@/hooks/usePerplexity';
+import { AiResponse, usePerplexityDraftEmail } from '@/hooks/usePerplexity';
 import { useEditUser } from '@/hooks/useUsers';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AiModel, EmailStatus, Signature } from '@prisma/client';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { set, z } from 'zod';
+import { z } from 'zod';
 
 const getEmailDraftSchema = (isAiSubject: boolean) => {
 	return z.object({
@@ -31,20 +31,21 @@ export interface ComposeEmailSectionProps {
 
 const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	const { campaignId } = useParams() as { campaignId: string };
-
 	const { data: campaign } = useGetCampaign(parseInt(campaignId));
 	const { user } = useMe();
-	const aiDraftCredits = user?.aiDraftCredits;
-	const aiTestCredits = user?.aiTestCredits;
+
+	const [generationProgress, setGenerationProgress] = useState(-1);
 	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
-	const selectedSignature: Signature | null = campaign?.signature;
-
+	const [isTest, setIsTest] = useState<boolean>(false);
 	const [isAiDraft, setIsAiDraft] = useState<boolean>(true);
 	const [isAiSubject, setIsAiSubject] = useState<boolean>(
 		!campaign?.subject || campaign?.subject?.length === 0
 	);
-	const [isTest, setIsTest] = useState<boolean>(false);
+
+	const aiDraftCredits = user?.aiDraftCredits;
+	const aiTestCredits = user?.aiTestCredits;
+	const selectedSignature: Signature | null = campaign?.signature;
 
 	const {
 		dataDraftEmail: rawDataDraftEmail,
@@ -53,7 +54,11 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		draftEmailAsync,
 	} = usePerplexityDraftEmail();
 
-	let dataDraftEmail: Draft | undefined;
+	let dataDraftEmail: Draft = {
+		subject: '',
+		message: '',
+		contactEmail: campaign?.contacts[0].email,
+	};
 
 	if (!rawDataDraftEmail && campaign?.testMessage && campaign?.testMessage.length > 0) {
 		dataDraftEmail = {
@@ -62,7 +67,8 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 			contactEmail: campaign?.contacts[0].email,
 		};
 	} else {
-		dataDraftEmail = rawDataDraftEmail;
+		dataDraftEmail.subject = rawDataDraftEmail?.subject || '';
+		dataDraftEmail.message = rawDataDraftEmail?.message || '';
 	}
 
 	const form = useForm<z.infer<ReturnType<typeof getEmailDraftSchema>>>({
@@ -147,7 +153,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 			}
 
 			try {
-				const res: Draft = await draftEmailAsync({
+				const res: AiResponse = await draftEmailAsync({
 					generateSubject: isAiSubject,
 					model: values.aiModel,
 					recipient: campaign.contacts[0],
@@ -172,16 +178,18 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 			}
 			setIsTest(false);
 		} else if (isAiDraft) {
-			console.log('drafting emails');
 			let remainingCredits = aiDraftCredits || 0;
+			setGenerationProgress(0);
 
-			for (const recipient of campaign.contacts) {
+			let i = 0;
+			while (i < campaign.contacts.length) {
+				const recipient = campaign.contacts[i];
 				if (remainingCredits <= 0) {
 					toast.error('You have run out of AI draft credits!');
 					break;
 				}
 
-				let newDraft: Draft | null;
+				let newDraft: AiResponse | null;
 				try {
 					newDraft = await draftEmailAsync({
 						generateSubject: isAiSubject,
@@ -201,8 +209,9 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 							status: 'draft' as EmailStatus,
 							contactId: recipient.id,
 						});
-
+						setGenerationProgress((prev) => prev + 1);
 						remainingCredits--;
+						i++;
 					}
 				} catch {
 					continue;
@@ -249,6 +258,8 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		setIsConfirmDialogOpen,
 		selectedSignature,
 		isDirty,
+		generationProgress,
+		setGenerationProgress,
 		...props,
 	};
 };

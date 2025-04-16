@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
 
 	try {
 		const body = await req.json();
+		console.log('🚀 ~ POST ~ body:', body);
 		const validatedData = createEmailSchema.parse(body);
 
 		// Validate that the campaign exists and belongs to the user

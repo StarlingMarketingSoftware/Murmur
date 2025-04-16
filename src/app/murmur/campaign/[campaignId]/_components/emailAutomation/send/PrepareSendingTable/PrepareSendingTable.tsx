@@ -6,7 +6,7 @@ import {
 	PrepareSendingTableProps,
 	usePrepareSendingTable,
 } from './usePrepareSendingTable';
-import SendingProgressIndicator from '../SendingProgressIndicator/SendingProgressIndicator';
+import ProgressIndicator from '../../../ProgressIndicator/ProgressIndicator';
 
 export const PrepareSendingTable: FC<PrepareSendingTableProps> = (props) => {
 	const { campaign, draftEmails, isPending, sendingProgress, setSendingProgress } =
@@ -28,10 +28,12 @@ export const PrepareSendingTable: FC<PrepareSendingTableProps> = (props) => {
 					campaign={campaign}
 					draftEmails={draftEmails}
 				/>
-				<SendingProgressIndicator
-					sendingProgress={sendingProgress}
-					totalEmails={draftEmails.length}
-					setSendingProgress={setSendingProgress}
+				<ProgressIndicator
+					progress={sendingProgress}
+					total={draftEmails.length}
+					setProgress={setSendingProgress}
+					pendingMessage="Sending {{progress}} emails..."
+					completeMessage="Finished sending {{progress}} emails."
 				/>
 			</CardContent>
 		</Card>

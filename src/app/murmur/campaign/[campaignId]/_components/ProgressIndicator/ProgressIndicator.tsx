@@ -1,30 +1,28 @@
 import { FC } from 'react';
-import {
-	SendingProgressIndicatorProps,
-	useSendingProgressIndicator,
-} from './useSendingProgressIndicator';
+import { ProgressIndicatorProps, useProgressIndicator } from './useProgressIndicator';
 import { Progress } from '@/components/ui/progress';
 import { TypographySmall } from '@/components/ui/typography';
 import { CheckCircle2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Spinner from '@/components/ui/spinner';
 
-const SendingProgressIndicator: FC<SendingProgressIndicatorProps> = (props) => {
+const ProgressIndicator: FC<ProgressIndicatorProps> = (props) => {
 	const {
-		sendingProgress,
+		progress: sendingProgress,
 		progressPercentage,
 		isComplete,
 		isOpen,
 		setIsOpen,
-		totalEmailsRef,
-	} = useSendingProgressIndicator(props);
+		finalPendingMessage,
+		finalCompleteMessage,
+	} = useProgressIndicator(props);
 
 	if (sendingProgress < 0 || !isOpen) {
 		return null;
 	}
 
 	return (
-		<div className="border-border border-[1px] rounded-md p-4 fixed bottom-5 w-[45vw]  min-w-[300px] max-w-[600px] bg-background z-10 left-1/2 transform -translate-x-1/2">
+		<div className="border-border border-[1px] rounded-md p-4 fixed bottom-5 w-[45vw] min-w-[300px] max-w-[600px] bg-background z-10 left-1/2 transform -translate-x-1/2">
 			<Button
 				onClick={() => setIsOpen(false)}
 				variant="ghost"
@@ -34,9 +32,9 @@ const SendingProgressIndicator: FC<SendingProgressIndicatorProps> = (props) => {
 				<X size="20px" className="text-primary" />
 			</Button>
 			<div className="flex flex-row items-center gap-2">
-				<TypographySmall className="">{`${
-					isComplete ? 'Finished sending' : 'Sending'
-				} ${sendingProgress}/${totalEmailsRef.current} emails.`}</TypographySmall>
+				<TypographySmall>
+					{isComplete ? finalCompleteMessage : finalPendingMessage}
+				</TypographySmall>
 				{isComplete ? (
 					<CheckCircle2 size="20px" className="text-success animate-pulse" />
 				) : (
@@ -48,4 +46,4 @@ const SendingProgressIndicator: FC<SendingProgressIndicatorProps> = (props) => {
 	);
 };
 
-export default SendingProgressIndicator;
+export default ProgressIndicator;

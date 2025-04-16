@@ -62,12 +62,17 @@ Notes:
 Write this how you think Jensen Huang would write an email. This should feel like it's written by a top CEO
 	`;
 
-const responseFormatInstructions = `IMPORTANT: Format your entire response in the following pseudo-HTML format. Within the <MESSAGE>, use <p></p> to create double line breaks between sections as follows:
-	<SUBJECT>generatedSubject</SUBJECT><MESSAGE><p>Hi Josh,</p><p></p><p>Paragraph 1 content</p><p></p><p>Paragraph 2 content</p><p></p><p>Paragraph 3 content</p></MESSAGE>`;
+const responseFormatInstructions = `IMPORTANT: Format your entire response in the following pseudo-HTML format. Within the <MESSAGE>, use an extra <p></p> to create line breaks between paragraphs as follows:
+<SUBJECT>generatedSubject</SUBJECT><MESSAGE><p>Hi Josh,</p><p></p><p>Paragraph 1 content</p><p></p><p>Paragraph 2 content</p><p></p><p>Paragraph 3 content</p></MESSAGE>`;
 
 const messageAndSubjectFormat = `Return the message and the subject line, without any signature or other text.`;
 
 const perplexityEndpoint = '/api/perplexity';
+
+export type AiResponse = {
+	message: string;
+	subject: string;
+};
 
 const extractJsonFromPseudoHTML = (
 	pseudoHTML: string
@@ -77,11 +82,16 @@ const extractJsonFromPseudoHTML = (
 
 	const messageMatch = pseudoHTML.match(/<MESSAGE>(.*?)<\/MESSAGE>/);
 	const message = messageMatch ? messageMatch[1] : '';
-
+	const cleanedMessage = cleanLineBreakCharacters(message);
 	return {
 		subject,
-		message,
+		message: cleanedMessage,
 	};
+};
+
+const cleanLineBreakCharacters = (text: string): string => {
+	const lineBreakRegex = /(\r\n|\r|\n|\u2028|\u2029|\v|\f)/g;
+	return text.replace(lineBreakRegex, '');
 };
 
 export const usePerplexityDraftEmail = () => {
@@ -98,9 +108,7 @@ export const usePerplexityDraftEmail = () => {
 		mutate: draftEmail,
 		mutateAsync: draftEmailAsync,
 	} = useMutation({
-		mutationFn: async (
-			params: DraftEmailParams
-		): Promise<{ message: string; subject: string }> => {
+		mutationFn: async (params: DraftEmailParams): Promise<AiResponse> => {
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -144,6 +152,7 @@ export const usePerplexityDraftEmail = () => {
 
 			try {
 				const jsonString = data.choices[0].message.content;
+				console.log('🚀 ~ mutationFn: ~ jsonString:', jsonString);
 				const parsedDraft = extractJsonFromPseudoHTML(jsonString);
 
 				return parsedDraft;
