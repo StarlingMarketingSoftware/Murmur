@@ -155,6 +155,9 @@ export const usePerplexityDraftEmail = () => {
 			try {
 				const jsonString = data.choices[0].message.content;
 				const parsedDraft = extractJsonFromPseudoHTML(jsonString);
+				if (parsedDraft.message.length < 50) {
+					throw new Error('Generated email was too short. Please try again.');
+				}
 
 				return parsedDraft;
 			} catch (error) {
