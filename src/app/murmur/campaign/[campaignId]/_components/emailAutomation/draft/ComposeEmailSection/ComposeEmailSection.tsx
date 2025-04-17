@@ -11,8 +11,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Toggle } from '@/components/ui/toggle';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Brain, PenLine } from 'lucide-react';
+import { Brain } from 'lucide-react';
 import {
 	Select,
 	SelectContent,
@@ -36,6 +35,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ConfirmDialog/ConfirmDialog';
 import { ManageSignaturesDialog } from './ManageSignaturesDialog/ManageSignaturesDialog';
+import ProgressIndicator from '../../../ProgressIndicator/ProgressIndicator';
 
 const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 	const {
@@ -57,6 +57,9 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 		selectedSignature,
 		isDirty,
 		campaign,
+		generationProgress,
+		setGenerationProgress,
+		cancelGeneration,
 	} = useComposeEmailSection(props);
 
 	return (
@@ -274,6 +277,14 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 					</Form>
 				</CardContent>
 			</Card>
+			<ProgressIndicator
+				progress={generationProgress}
+				setProgress={setGenerationProgress}
+				total={campaign.contacts.length}
+				pendingMessage="Generating {{progress}} emails..."
+				completeMessage="Finished generating {{progress}} emails."
+				cancelAction={cancelGeneration}
+			/>
 		</>
 	);
 };

@@ -1,4 +1,3 @@
-import { Draft } from '@/constants/types';
 import { AiModel, Contact } from '@prisma/client';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -63,58 +62,36 @@ Notes:
 Write this how you think Jensen Huang would write an email. This should feel like it's written by a top CEO
 	`;
 
-const jsonFormatInstructions = `IMPORTANT: Please return valid JSON format and nothing else. DO NOT use double quotes ("") inside any of the fields. I should be able to take your response and use it directly in JSON.parse() in JavaScript. For linebreaks in "message", use linebreak characters instead of raw line breaks. Use the following format: 
-{
-  "contactEmail": "name@web.com",
-  "subject": "generatedSubject",
-  "message": "Hi Josh,\n\nI came across...", 
-}`;
-
-const messageOnlyFormat = `Return the message only, without any subject line, signature, or other text.`;
+const responseFormatInstructions = `IMPORTANT: Format your entire response in the following pseudo-HTML format. Within the <MESSAGE>, use an extra <p></p> to create line breaks between paragraphs as follows:
+<SUBJECT>generatedSubject</SUBJECT><MESSAGE><p>Hi Josh,</p><p></p><p>Paragraph 1 content</p><p></p><p>Paragraph 2 content</p><p></p><p>Paragraph 3 content</p></MESSAGE>`;
 
 const messageAndSubjectFormat = `Return the message and the subject line, without any signature or other text.`;
 
-// const batchMessageOnlyFormat = `I will provide a json that contains information about each recipient. Return the message only, without any subject line, signature, or other text. Please return a list of messages corresponding to each recipient.`;
-
-// const batchMessageAndSubjectFormat = `I will provide a json that contains information about each recipient. Return the message and the subject line, without any signature or other text. Please format the response into a list of JSON strings with the keys "recipient", "subject", and "message".`;
-
 const perplexityEndpoint = '/api/perplexity';
 
-const safeParseAIResponse = (response: string): Draft => {
-	try {
-		// 1. Find the JSON object using regex
-		const jsonRegex = /{(?:[^{}]|{(?:[^{}]|{[^{}]*})*})*}/g;
-		const matches = response.match(jsonRegex);
+export type AiResponse = {
+	message: string;
+	subject: string;
+};
 
-		if (!matches?.length) {
-			throw new Error('No valid JSON found in response');
-		}
+const extractJsonFromPseudoHTML = (
+	pseudoHTML: string
+): { subject: string; message: string } => {
+	const subjectMatch = pseudoHTML.match(/<SUBJECT>(.*?)<\/SUBJECT>/);
+	const subject = subjectMatch ? subjectMatch[1] : '';
 
-		// 2. Try to parse each match until we find valid JSON
-		for (const match of matches) {
-			try {
-				// 3. Clean the string before parsing
-				const cleaned = match
-					.replace(/[\u201C\u201D]/g, '"') // Replace smart quotes
-					.replace(/[\r\t]/g, '') // Remove newlines, carriage returns, tabs
-					.replace(/,\s*([\]}])/g, '$1'); // Remove trailing commas
+	const messageMatch = pseudoHTML.match(/<MESSAGE>(.*?)<\/MESSAGE>/);
+	const message = messageMatch ? messageMatch[1] : '';
+	const cleanedMessage = cleanLineBreakCharacters(message);
+	return {
+		subject,
+		message: cleanedMessage,
+	};
+};
 
-				const parsed = JSON.parse(cleaned) as Draft;
-
-				// 4. Validate the parsed object has required fields
-				if (parsed.contactEmail && parsed.subject && parsed.message) {
-					return parsed;
-				}
-			} catch {
-				continue; // Try next match if this one fails
-			}
-		}
-
-		throw new Error('No valid JSON structure found');
-	} catch (error) {
-		console.error('Parse error:', error);
-		throw new Error('Failed to parse AI response');
-	}
+const cleanLineBreakCharacters = (text: string): string => {
+	const lineBreakRegex = /(\r\n|\r|\n|\u2028|\u2029|\v|\f)/g;
+	return text.replace(lineBreakRegex, '');
 };
 
 export const usePerplexityDraftEmail = () => {
@@ -123,6 +100,7 @@ export const usePerplexityDraftEmail = () => {
 		generateSubject: boolean;
 		recipient: Contact;
 		prompt: string;
+		signal?: AbortSignal; // Add this line
 	}
 
 	const {
@@ -131,7 +109,7 @@ export const usePerplexityDraftEmail = () => {
 		mutate: draftEmail,
 		mutateAsync: draftEmailAsync,
 	} = useMutation({
-		mutationFn: async (params: DraftEmailParams): Promise<Draft> => {
+		mutationFn: async (params: DraftEmailParams): Promise<AiResponse> => {
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -139,7 +117,7 @@ export const usePerplexityDraftEmail = () => {
 
 			try {
 				response = await fetch(perplexityEndpoint, {
-					signal: controller.signal,
+					signal: params.signal, // Use the passed signal instead of creating new one
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json',
@@ -149,10 +127,7 @@ export const usePerplexityDraftEmail = () => {
 						messages: [
 							{
 								role: 'system',
-								content: `${rolePrompt} ${
-									params.generateSubject ? messageAndSubjectFormat : messageOnlyFormat
-								} 
-							${jsonFormatInstructions}`,
+								content: `${responseFormatInstructions}\n\nInstructions for email content:\n${rolePrompt}\n\nOutput format:\n${messageAndSubjectFormat}`,
 							},
 							{
 								role: 'user',
@@ -165,8 +140,9 @@ export const usePerplexityDraftEmail = () => {
 				});
 			} catch (error) {
 				if (error instanceof Error && error.name === 'AbortError') {
-					toast.error('Request timed out. Please try again.');
+					throw new Error('Email generation cancelled.');
 				}
+				throw error;
 			}
 
 			clearTimeout(timeoutId);
@@ -175,19 +151,10 @@ export const usePerplexityDraftEmail = () => {
 			}
 
 			const data = await response.json();
+
 			try {
 				const jsonString = data.choices[0].message.content;
-				const beginningIndex = jsonString.indexOf('{');
-				const endIndex = jsonString.lastIndexOf('}') + 1;
-				const jsonStringTrimmed = jsonString.slice(beginningIndex, endIndex).trim();
-				console.log('jsonStringTrimmed:');
-				console.log(jsonStringTrimmed);
-				console.log(typeof jsonStringTrimmed);
-				const parsedDraft = safeParseAIResponse(jsonStringTrimmed);
-
-				if (!parsedDraft.contactEmail || !parsedDraft.subject || !parsedDraft.message) {
-					throw new Error('Invalid draft format returned from AI. Please try again.');
-				}
+				const parsedDraft = extractJsonFromPseudoHTML(jsonString);
 
 				return parsedDraft;
 			} catch (error) {

@@ -41,7 +41,12 @@ export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen}>
-			<DialogContent className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px]">
+			<DialogContent
+				onOpenAutoFocus={(e) => {
+					e.preventDefault();
+				}}
+				className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px]"
+			>
 				<DialogHeader>
 					<DialogTitle>Email</DialogTitle>
 					<DialogDescription></DialogDescription>

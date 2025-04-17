@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 
 interface EditEmailData {
 	emailId: number;
-	data: Email; // Consider creating a proper type for your email data
+	data: Email;
 }
 
 export const useEditEmail = (options: CustomMutationOptions = {}) => {
@@ -74,6 +74,57 @@ export const useDeleteEmail = (options: CustomMutationOptions = {}) => {
 				toast.success(successMessage);
 			}
 
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
+};
+
+export interface CreateEmailBody {
+	subject: string;
+	message: string;
+	campaignId: number;
+	status?: 'draft' | 'scheduled' | 'sent' | 'failed';
+	sentAt?: string | null;
+	contactId: number;
+}
+
+export const useCreateEmail = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Email created successfully',
+		errorMessage = 'Failed to create email',
+		onSuccess: onSuccessCallback,
+	} = options;
+
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (data: CreateEmailBody) => {
+			const response = await fetch('/api/emails', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(data),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to create email');
+			}
+
+			return response.json();
+		},
+		onSuccess: () => {
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
+			queryClient.invalidateQueries({ queryKey: ['emails'] });
 			onSuccessCallback?.();
 		},
 		onError: () => {
