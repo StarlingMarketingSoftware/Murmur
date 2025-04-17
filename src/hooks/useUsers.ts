@@ -41,7 +41,7 @@ export const useEditUser = (options: EditUserOptions = {}) => {
 
 			return response.json();
 		},
-		onSuccess: (data) => {
+		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['user'] });
 			if (!suppressToasts) {
 				toast.success(successMessage);

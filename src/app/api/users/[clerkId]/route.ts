@@ -35,10 +35,7 @@ export const GET = async function GET(
 	}
 };
 
-export const PATCH = async function PATCH(
-	request: Request,
-	{ params }: { params: { clerkId: string } }
-) {
+export const PATCH = async function PATCH(request: Request) {
 	try {
 		const { userId } = await auth();
 

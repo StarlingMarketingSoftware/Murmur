@@ -5,7 +5,7 @@ import { stripe } from '../../../../stripe/client';
 import prisma from '@/lib/prisma';
 import { fulfillCheckout } from '@/app/api/webhooks/stripe/fulfillCheckout';
 import { getSubscriptionTierWithPriceId } from '@/lib/utils';
-import { calcAiCreditsFromPrice, getTestEmailCount } from '@/app/utils/functions';
+import { getTestEmailCount } from '@/app/utils/functions';
 import { calcAiCredits } from './calcAiCredits';
 
 export async function POST(req: Request) {

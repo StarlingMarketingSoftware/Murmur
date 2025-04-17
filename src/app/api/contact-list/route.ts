@@ -2,11 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@clerk/nextjs/server';
 
-export const GET = async function GET(
-	request: Request,
-	{ params }: { params: { clerkId: string } }
-) {
-	// gets all contact lists
+export const GET = async function GET() {
 	const { userId } = await auth();
 	if (!userId) {
 		return NextResponse.json({ error: 'User not found' }, { status: 404 });

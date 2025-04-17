@@ -3,7 +3,6 @@ import { auth } from '@clerk/nextjs/server';
 import { stripe } from '../../../../stripe/client';
 import Stripe from 'stripe';
 import { getUser } from '@/app/utils/data/users/getUser';
-import prisma from '@/lib/prisma';
 
 export async function POST(req: Request) {
 	try {
