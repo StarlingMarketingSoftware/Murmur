@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect, useState } from 'react';
+import { MouseEvent, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import {
@@ -29,9 +29,8 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 	const [currentSignature, setCurrentSignature] = useState<Signature | null>(null);
 
 	const { data: signatures, isPending: isPendingSignatures } = useGetUserSignatures();
-	const { mutate: saveSignature, isPending: isPendingSaveSignature } = useEditSignature(
-		{}
-	);
+	const { mutateAsync: saveSignature, isPending: isPendingSaveSignature } =
+		useEditSignature({});
 	const { mutate: deleteSignature, isPending: isPendingDeleteSignature } =
 		useDeleteSignature({});
 	const { mutate: createSignature, isPending: isPendingCreateSignature } =
@@ -66,29 +65,39 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 		}
 	}, [currentSignature, form]);
 
-	const handleSave = (data: z.infer<typeof signatureSchema>) => {
+	const handleSave = async (data: z.infer<typeof signatureSchema>) => {
 		if (!currentSignature) {
 			toast.error('No signature selected.');
 			return;
 		}
-		saveSignature({
+		await saveSignature({
 			signatureId: currentSignature.id,
 			data,
 		});
+		queryClient.invalidateQueries({ queryKey: ['campaign', campaignId] });
 	};
 
 	const queryClient = useQueryClient();
-	const handleSaveSignatureToCampaign = async (e) => {
+	const handleSaveSignatureToCampaign = async (e: MouseEvent) => {
 		e.preventDefault();
+		if (!currentSignature) {
+			toast.error('No signature selected.');
+			return;
+		}
+		await saveSignature({
+			signatureId: currentSignature?.id,
+			data: {
+				name: form.getValues('name'),
+				content: form.getValues('content'),
+			},
+		});
 		await saveSignatureToCampaign({
 			campaignId: parseInt(campaignId),
 			data: {
 				signatureId: currentSignature?.id,
 			},
 		});
-		// Invalidate both the campaigns list and the specific campaign
-		queryClient.invalidateQueries({ queryKey: ['campaigns'] });
-		queryClient.invalidateQueries({ queryKey: ['campaign', parseInt(campaignId)] });
+		queryClient.invalidateQueries({ queryKey: ['campaign', campaignId] });
 	};
 
 	return {

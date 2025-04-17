@@ -18,7 +18,6 @@ import {
 	FormControl,
 	FormField,
 	FormItem,
-	FormLabel,
 	FormMessage,
 } from '@/components/ui/form';
 import RichTextEditor from '@/components/RichTextEditor/RichTextEditor';
@@ -43,9 +42,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 		isPendingSaveSignature,
 		isPendingDeleteSignature,
 		isPendingCreateSignature,
-		saveSignatureToCampaign,
 		isPendingSaveSignatureToCampaign,
-		campaignId,
 		handleSaveSignatureToCampaign,
 	} = useManageSignaturesDialog(props);
 
@@ -158,7 +155,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 										onClick={(e) => handleSaveSignatureToCampaign(e)}
 										isLoading={isPendingSaveSignatureToCampaign}
 									>
-										Use Selected Signature
+										Assign Signature to Campaign
 									</Button>
 									<Button
 										isLoading={isPendingSaveSignature}

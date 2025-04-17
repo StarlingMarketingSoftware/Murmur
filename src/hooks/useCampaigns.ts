@@ -17,7 +17,7 @@ export const useGetCampaigns = () => {
 };
 
 export const useGetCampaign = (campaignId: number) => {
-	return useQuery({
+	return useQuery<CampaignWithRelations>({
 		queryKey: ['campaign', campaignId],
 		queryFn: async () => {
 			const response = await fetch(`/api/campaigns/${campaignId}`);

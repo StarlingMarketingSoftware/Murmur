@@ -1,14 +1,13 @@
 import { CampaignWithRelations, Draft } from '@/constants/types';
-import { useEditCampaign, useGetCampaign } from '@/hooks/useCampaigns';
+import { useEditCampaign } from '@/hooks/useCampaigns';
 import { useCreateEmail } from '@/hooks/useEmails';
 import { useMe } from '@/hooks/useMe';
 import { AiResponse, usePerplexityDraftEmail } from '@/hooks/usePerplexity';
 import { useEditUser } from '@/hooks/useUsers';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AiModel, EmailStatus, Signature } from '@prisma/client';
+import { AiModel, EmailStatus } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -30,8 +29,9 @@ export interface ComposeEmailSectionProps {
 }
 
 const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
-	const { campaignId } = useParams() as { campaignId: string };
-	const { data: campaign } = useGetCampaign(parseInt(campaignId));
+	// const { campaignId } = useParams() as { campaignId: string };
+	// const { data: campaign } = useGetCampaign(parseInt(campaignId));
+	const { campaign } = props;
 	const { user } = useMe();
 
 	const [generationProgress, setGenerationProgress] = useState(-1);
@@ -40,7 +40,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	const [isTest, setIsTest] = useState<boolean>(false);
 	const [isAiDraft, setIsAiDraft] = useState<boolean>(true);
 	const [isAiSubject, setIsAiSubject] = useState<boolean>(
-		!campaign?.subject || campaign?.subject?.length === 0
+		!campaign.subject || campaign.subject.length === 0
 	);
 
 	const isGenerationCancelledRef = useRef(false);
@@ -49,7 +49,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 
 	const aiDraftCredits = user?.aiDraftCredits;
 	const aiTestCredits = user?.aiTestCredits;
-	const selectedSignature: Signature | null = campaign?.signature;
+	const selectedSignature = campaign.signature;
 
 	const {
 		dataDraftEmail: rawDataDraftEmail,
@@ -61,14 +61,14 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	let dataDraftEmail: Draft = {
 		subject: '',
 		message: '',
-		contactEmail: campaign?.contacts[0].email,
+		contactEmail: campaign.contacts[0].email || '',
 	};
 
-	if (!rawDataDraftEmail && campaign?.testMessage && campaign?.testMessage.length > 0) {
+	if (!rawDataDraftEmail && campaign.testMessage && campaign.testMessage.length > 0) {
 		dataDraftEmail = {
-			subject: campaign?.testSubject || '',
-			message: campaign?.testMessage,
-			contactEmail: campaign?.contacts[0].email,
+			subject: campaign.testSubject || '',
+			message: campaign.testMessage,
+			contactEmail: campaign.contacts[0].email,
 		};
 	} else {
 		dataDraftEmail.subject = rawDataDraftEmail?.subject || '';
@@ -78,9 +78,9 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	const form = useForm<z.infer<ReturnType<typeof getEmailDraftSchema>>>({
 		resolver: zodResolver(getEmailDraftSchema(isAiSubject)),
 		defaultValues: {
-			subject: campaign?.subject ?? '',
-			message: campaign?.message ?? '',
-			aiModel: campaign?.aiModel ?? AiModel.sonar,
+			subject: campaign.subject ?? '',
+			message: campaign.message ?? '',
+			aiModel: campaign.aiModel ?? AiModel.sonar,
 		},
 		mode: 'onChange',
 		// reValidateMode: 'onChange',
@@ -136,7 +136,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 			queryClient.invalidateQueries({ queryKey: ['drafts'] });
 			if (user && aiDraftCredits) {
 				editUser({
-					clerkId: user?.clerkId,
+					clerkId: user.clerkId,
 					data: { aiDraftCredits: aiDraftCredits - 1 },
 				});
 			}
@@ -152,123 +152,106 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		}
 	};
 
-	const handleFormAction = useCallback(
-		async (action: 'test' | 'submit') => {
-			const isValid = await trigger();
-			if (!isValid) return;
+	const handleFormAction = async (action: 'test' | 'submit') => {
+		const isValid = await trigger();
+		if (!isValid) return;
 
-			const values = getValues();
+		const values = getValues();
 
-			if (action === 'test') {
-				setIsTest(true);
-				if (aiTestCredits === 0) {
-					toast.error('You have run out of AI test credits!');
-					return;
+		if (action === 'test') {
+			setIsTest(true);
+			if (aiTestCredits === 0) {
+				toast.error('You have run out of AI test credits!');
+				return;
+			}
+
+			try {
+				const res: AiResponse = await draftEmailAsync({
+					generateSubject: isAiSubject,
+					model: values.aiModel,
+					recipient: campaign.contacts[0],
+					prompt: values.message,
+				});
+				await saveTestEmail({
+					campaignId: campaign.id,
+					data: {
+						testMessage: res.message,
+						testSubject: isAiSubject ? res.subject : values.subject,
+					},
+				});
+				toast.success('Test email generated successfully!');
+				if (user && aiTestCredits) {
+					editUser({
+						clerkId: user.clerkId,
+						data: { aiTestCredits: aiTestCredits - 1 },
+					});
+				}
+			} catch {
+				toast.error('Failed to generate test email. Please try again.');
+			}
+			setIsTest(false);
+		} else if (isAiDraft) {
+			let remainingCredits = aiDraftCredits || 0;
+			setGenerationProgress(0);
+			isGenerationCancelledRef.current = false;
+
+			const controller = new AbortController();
+			setAbortController(controller);
+
+			let i = 0;
+			while (i < campaign.contacts.length && !isGenerationCancelledRef.current) {
+				const recipient = campaign.contacts[i];
+				if (remainingCredits <= 0) {
+					toast.error('You have run out of AI draft credits!');
+					break;
 				}
 
 				try {
-					const res: AiResponse = await draftEmailAsync({
+					const newDraft = await draftEmailAsync({
 						generateSubject: isAiSubject,
 						model: values.aiModel,
-						recipient: campaign.contacts[0],
+						recipient,
 						prompt: values.message,
+						signal: controller.signal,
 					});
-					await saveTestEmail({
-						campaignId: campaign.id,
-						data: {
-							testMessage: res.message,
-							testSubject: isAiSubject ? res.subject : values.subject,
-						},
-					});
-					toast.success('Test email generated successfully!');
-					if (user && aiTestCredits) {
-						editUser({
-							clerkId: user?.clerkId,
-							data: { aiTestCredits: aiTestCredits - 1 },
+
+					if (newDraft) {
+						if (!isAiSubject) {
+							newDraft.subject = values.subject ? values.subject : newDraft.subject;
+						}
+						await createEmail({
+							subject: newDraft.subject,
+							message: newDraft.message + '<p></p>' + campaign.signature?.content,
+							campaignId: campaign.id,
+							status: 'draft' as EmailStatus,
+							contactId: recipient.id,
 						});
+						setGenerationProgress((prev) => prev + 1);
+						remainingCredits--;
+						i++;
 					}
-				} catch {
-					toast.error('Failed to generate test email. Please try again.');
-				}
-				setIsTest(false);
-			} else if (isAiDraft) {
-				let remainingCredits = aiDraftCredits || 0;
-				setGenerationProgress(0);
-				isGenerationCancelledRef.current = false;
-
-				const controller = new AbortController();
-				setAbortController(controller);
-
-				let i = 0;
-				while (i < campaign.contacts.length && !isGenerationCancelledRef.current) {
-					const recipient = campaign.contacts[i];
-					if (remainingCredits <= 0) {
-						toast.error('You have run out of AI draft credits!');
+				} catch (error) {
+					if (error instanceof Error && error.message === 'Request cancelled.') {
 						break;
 					}
-
-					try {
-						const newDraft = await draftEmailAsync({
-							generateSubject: isAiSubject,
-							model: values.aiModel,
-							recipient,
-							prompt: values.message,
-							signal: controller.signal,
-						});
-
-						if (newDraft) {
-							if (!isAiSubject) {
-								newDraft.subject = values.subject ? values.subject : newDraft.subject;
-							}
-							await createEmail({
-								subject: newDraft.subject,
-								message: newDraft.message,
-								campaignId: campaign.id,
-								status: 'draft' as EmailStatus,
-								contactId: recipient.id,
-							});
-							setGenerationProgress((prev) => prev + 1);
-							remainingCredits--;
-							i++;
-						}
-					} catch (error) {
-						if (error instanceof Error && error.message === 'Request cancelled.') {
-							break;
-						}
-						continue;
-					}
+					continue;
 				}
-
-				setAbortController(null);
-				if (i === campaign.contacts.length) {
-					toast.success('Email generation completed!');
-				}
-			} else {
-				// For non-AI drafts, create the email directly with the form values
-				// createEmail({
-				// 	subject: values.subject,
-				// 	message: values.message,
-				// 	campaignId: campaign.id,
-				// 	status: 'draft' as EmailStatus,
-				// });
 			}
-		},
-		[
-			isGenerationCancelledRef,
-			isAiDraft,
-			isAiSubject,
-			aiDraftCredits,
-			aiTestCredits,
-			trigger,
-			getValues,
-			campaign,
-			draftEmailAsync,
-			createEmail,
-			saveTestEmail,
-			editUser,
-			user,
-		]
-	);
+
+			setAbortController(null);
+			if (i === campaign.contacts.length) {
+				toast.success('Email generation completed!');
+			}
+		} else {
+			// For non-AI drafts, create the email directly with the form values
+			// createEmail({
+			// 	subject: values.subject,
+			// 	message: values.message,
+			// 	campaignId: campaign.id,
+			// 	status: 'draft' as EmailStatus,
+			// });
+		}
+	};
 
 	// Cleanup on unmount
 	useEffect(() => {
