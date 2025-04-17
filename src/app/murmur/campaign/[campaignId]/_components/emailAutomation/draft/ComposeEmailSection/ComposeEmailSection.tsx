@@ -59,6 +59,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 		campaign,
 		generationProgress,
 		setGenerationProgress,
+		cancelGeneration,
 	} = useComposeEmailSection(props);
 
 	return (
@@ -282,6 +283,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 				total={campaign.contacts.length}
 				pendingMessage="Generating {{progress}} emails..."
 				completeMessage="Finished generating {{progress}} emails."
+				cancelAction={cancelGeneration}
 			/>
 		</>
 	);

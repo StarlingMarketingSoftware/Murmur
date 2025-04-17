@@ -100,6 +100,7 @@ export const usePerplexityDraftEmail = () => {
 		generateSubject: boolean;
 		recipient: Contact;
 		prompt: string;
+		signal?: AbortSignal; // Add this line
 	}
 
 	const {
@@ -116,7 +117,7 @@ export const usePerplexityDraftEmail = () => {
 
 			try {
 				response = await fetch(perplexityEndpoint, {
-					signal: controller.signal,
+					signal: params.signal, // Use the passed signal instead of creating new one
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json',
@@ -139,8 +140,9 @@ export const usePerplexityDraftEmail = () => {
 				});
 			} catch (error) {
 				if (error instanceof Error && error.name === 'AbortError') {
-					toast.error('Request timed out. Please try again.');
+					throw new Error('Email generation cancelled.');
 				}
+				throw error;
 			}
 
 			clearTimeout(timeoutId);
@@ -152,7 +154,6 @@ export const usePerplexityDraftEmail = () => {
 
 			try {
 				const jsonString = data.choices[0].message.content;
-				console.log('🚀 ~ mutationFn: ~ jsonString:', jsonString);
 				const parsedDraft = extractJsonFromPseudoHTML(jsonString);
 
 				return parsedDraft;

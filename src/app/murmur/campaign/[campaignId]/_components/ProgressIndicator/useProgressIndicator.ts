@@ -17,6 +17,7 @@ export interface ProgressIndicatorProps {
 	total: number;
 	pendingMessage?: string;
 	completeMessage?: string;
+	cancelAction?: () => void;
 }
 
 export const useProgressIndicator = (props: ProgressIndicatorProps) => {
