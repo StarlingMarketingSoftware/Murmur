@@ -25,21 +25,21 @@ export const RichTextMenuBar: FC<RichTextMenuBarProps> = ({ editor, isEdit }) =>
 		return null;
 	}
 	const Options = [
-		{
-			icon: <Heading1 className="size-4" />,
-			onClick: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
-			pressed: editor.isActive('heading', { level: 1 }),
-		},
-		{
-			icon: <Heading2 className="size-4" />,
-			onClick: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-			pressed: editor.isActive('heading', { level: 2 }),
-		},
-		{
-			icon: <Heading3 className="size-4" />,
-			onClick: () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
-			pressed: editor.isActive('heading', { level: 3 }),
-		},
+		// {
+		// 	icon: <Heading1 className="size-4" />,
+		// 	onClick: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
+		// 	pressed: editor.isActive('heading', { level: 1 }),
+		// },
+		// {
+		// 	icon: <Heading2 className="size-4" />,
+		// 	onClick: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+		// 	pressed: editor.isActive('heading', { level: 2 }),
+		// },
+		// {
+		// 	icon: <Heading3 className="size-4" />,
+		// 	onClick: () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+		// 	pressed: editor.isActive('heading', { level: 3 }),
+		// },
 		{
 			icon: <Bold className="size-4" />,
 			onClick: () => editor.chain().focus().toggleBold().run(),
@@ -80,11 +80,11 @@ export const RichTextMenuBar: FC<RichTextMenuBarProps> = ({ editor, isEdit }) =>
 			onClick: () => editor.chain().focus().toggleOrderedList().run(),
 			pressed: editor.isActive('orderedList'),
 		},
-		{
-			icon: <Highlighter className="size-4" />,
-			onClick: () => editor.chain().focus().toggleHighlight().run(),
-			pressed: editor.isActive('highlight'),
-		},
+		// {
+		// 	icon: <Highlighter className="size-4" />,
+		// 	onClick: () => editor.chain().focus().toggleHighlight().run(),
+		// 	pressed: editor.isActive('highlight'),
+		// },
 	];
 
 	return (
