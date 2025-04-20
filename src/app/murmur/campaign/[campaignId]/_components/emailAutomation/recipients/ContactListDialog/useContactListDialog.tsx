@@ -5,12 +5,12 @@ import { toast } from 'sonner';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useParams } from 'next/navigation';
-import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/route';
 import { z } from 'zod';
 import { NoDataCell, TableSortingButton } from '../../../CustomTable';
 import { useMe } from '@/hooks/useMe';
 import FeatureLockedButton from '@/app/murmur/_components/FeatureLockedButton';
 import { restrictedFeatureMessages } from '@/constants/constants';
+import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/schema';
 
 export interface ContactListDialogProps {
 	isOpen: boolean;
