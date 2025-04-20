@@ -1,13 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
 import { updateCampaignSchema } from './schema';
 
-export const GET = async (
-	req: NextRequest,
-	{ params }: { params: { campaignId: string } }
-) => {
+type Params = Promise<{ campaignId: string }>;
+
+export async function GET(request: Request, { params }: { params: Params }) {
 	const { userId } = await auth();
 	if (!userId) {
 		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -33,14 +32,11 @@ export const GET = async (
 		console.error(error);
 		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
 	}
-};
+}
 
 // Input validation schema
 
-export async function PATCH(
-	req: Request,
-	{ params }: { params: { campaignId: string } }
-) {
+export async function PATCH(req: Request, { params }: { params: Params }) {
 	try {
 		const { userId } = await auth();
 		if (!userId) {
@@ -108,10 +104,7 @@ export async function PATCH(
 	}
 }
 
-export async function DELETE(
-	req: Request,
-	{ params }: { params: { campaignId: string } }
-) {
+export async function DELETE(req: Request, { params }: { params: Params }) {
 	try {
 		const { userId } = await auth();
 		if (!userId) {
