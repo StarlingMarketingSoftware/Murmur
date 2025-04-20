@@ -1,16 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
 import { updateCampaignSchema } from './schema';
 
-export async function GET(request: Request, context: { params: { campaignId: string } }) {
+export const GET = async (
+	req: NextRequest,
+	{ params }: { params: { campaignId: string } }
+) => {
 	const { userId } = await auth();
 	if (!userId) {
 		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	const { campaignId } = await context.params;
+	const { campaignId } = await params;
 
 	try {
 		const campaign = await prisma.campaign.findUniqueOrThrow({
@@ -30,7 +33,7 @@ export async function GET(request: Request, context: { params: { campaignId: str
 		console.error(error);
 		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
 	}
-}
+};
 
 // Input validation schema
 
