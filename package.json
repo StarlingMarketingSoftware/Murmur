@@ -6,7 +6,9 @@
 		"dev": "next dev --turbopack",
 		"build": "next build",
 		"start": "next start",
-		"lint": "next lint"
+		"lint": "next lint",
+		"vercel-build": "prisma generate && prisma migrate deploy && next build",
+		"postinstall": "prisma generate"
 	},
 	"prisma": {
 		"seed": "ts-node prisma/seed.ts"
