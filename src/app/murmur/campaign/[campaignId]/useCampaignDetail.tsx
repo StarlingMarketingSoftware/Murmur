@@ -1,5 +1,5 @@
 import { LocalStorageKeys, requestedPeopleScopes } from '@/constants/constants';
-import { Campaign } from '@prisma/client';
+import { CampaignWithRelations } from '@/constants/types';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
@@ -73,7 +73,7 @@ export const useCampaignDetail = () => {
 
 	const { data, isPending } = useQuery({
 		queryKey: ['campaign', campaignId],
-		queryFn: async (): Promise<Campaign> => {
+		queryFn: async (): Promise<CampaignWithRelations> => {
 			const response = await fetch(`/api/campaigns/${campaignId}`, {
 				method: 'GET',
 				headers: {
@@ -92,5 +92,5 @@ export const useCampaignDetail = () => {
 		handleTabChange,
 		data,
 		isPending,
-	};
+	} as const;
 };

@@ -95,10 +95,11 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 	const handleSend = async () => {
 		setIsOpen(false);
 		setSendingProgress(0);
+		if (!campaign) {
+			return null;
+		}
 		editCampaign({ campaignId: campaign.id, data: form.getValues() });
 		let currentEmailSendCredits = user?.emailSendCredits || 0;
-
-		return;
 
 		for (const email of draftEmails) {
 			if (currentEmailSendCredits <= 0 && !subscriptionTier) {

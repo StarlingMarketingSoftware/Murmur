@@ -137,7 +137,7 @@ export async function POST(req: Request) {
 						}
 
 						console.log('Current credits before update:', currentUser.aiDraftCredits);
-						console.log('Adding credits:', subscriptionTier.aiEmailCount);
+						console.log('Adding credits:', subscriptionTier?.aiEmailCount);
 
 						// Perform the update within the transaction
 						return await tx.user.update({
@@ -146,7 +146,7 @@ export async function POST(req: Request) {
 							},
 							data: {
 								aiDraftCredits: {
-									increment: subscriptionTier.aiEmailCount,
+									increment: subscriptionTier?.aiEmailCount,
 								},
 							},
 							select: {
