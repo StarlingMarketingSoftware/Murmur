@@ -8,7 +8,9 @@ const updateSignatureSchema = z.object({
 	content: z.string().min(1, 'Signature content is required'),
 });
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+type Params = Promise<{ id: string }>;
+
+export async function PATCH(req: Request, { params }: { params: Params }) {
 	try {
 		const { userId } = await auth();
 		if (!userId) {
@@ -52,7 +54,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 	}
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Params }) {
 	try {
 		const { userId } = await auth();
 		if (!userId) {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { mailOptions, transporter } from './nodemailerFunctions';
-import { contactFormSchema } from '@/constants/types';
+import { contactFormSchema } from '@/app/contact/page';
 
 // Define the same schema for server-side validation
 

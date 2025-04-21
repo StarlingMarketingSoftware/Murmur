@@ -61,7 +61,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	let dataDraftEmail: Draft = {
 		subject: '',
 		message: '',
-		contactEmail: campaign.contacts[0].email || '',
+		contactEmail: campaign.contacts[0]?.email || '',
 	};
 
 	if (!rawDataDraftEmail && campaign.testMessage && campaign.testMessage.length > 0) {

@@ -51,7 +51,7 @@ export async function Navbar() {
 							{urlList.map((url, index) => (
 								<NavItem
 									key={index}
-									url={url}
+									url={url as Url}
 									className={twMerge(
 										pathname === url.path && 'border-b-[1px] border-foreground'
 									)}

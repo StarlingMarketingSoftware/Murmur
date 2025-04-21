@@ -6,8 +6,6 @@ import { useEditUser } from '@/hooks/useUsers';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { EmailStatus } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
-import FormData from 'form-data'; // form-data v4.0.1
-import Mailgun from 'mailgun.js'; // mailgun.js v11.1.0
 import { useParams } from 'next/navigation';
 import { Dispatch, SetStateAction, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -55,29 +53,28 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		draftEmail: EmailWithRelations,
 		senderEmail: string
 	) => {
-		const form = new FormData();
-		form.append('h:Reply-To', senderEmail);
-		const mailgun = new Mailgun(FormData);
-		const recipientEmail = draftEmail.contact.email;
-
-		const mg = mailgun.client({
-			username: 'api',
-			key: process.env.NEXT_PUBLIC_MAILGUN_API_KEY || '',
-		});
 		try {
-			const data = await mg.messages.create(
-				'sandbox19faacf722c14c58b751195591eb4fcf.mailgun.org',
-				{
-					from: 'Mailgun Sandbox <postmaster@sandbox19faacf722c14c58b751195591eb4fcf.mailgun.org>',
-
-					to: [recipientEmail],
+			const response = await fetch('/api/emails/send', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					recipientEmail: draftEmail.contact.email,
 					subject: draftEmail.subject,
-					text: draftEmail.message,
-				}
-			);
-			return data;
+					message: draftEmail.message,
+					senderEmail,
+				}),
+			});
+
+			const data = await response.json();
+			if (!data.success) {
+				throw new Error('Failed to send email');
+			}
+			return data.data;
 		} catch (error) {
-			console.log(error); //logs any error
+			console.error(error);
+			return null;
 		}
 	};
 
@@ -95,10 +92,11 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 	const handleSend = async () => {
 		setIsOpen(false);
 		setSendingProgress(0);
+		if (!campaign) {
+			return null;
+		}
 		editCampaign({ campaignId: campaign.id, data: form.getValues() });
 		let currentEmailSendCredits = user?.emailSendCredits || 0;
-
-		return;
 
 		for (const email of draftEmails) {
 			if (currentEmailSendCredits <= 0 && !subscriptionTier) {
