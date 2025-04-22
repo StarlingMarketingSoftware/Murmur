@@ -16,12 +16,10 @@ import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
 import Spinner from '@/components/ui/spinner';
 import { ReactNode } from 'react';
 import UpdateSubscriptionButton from '@/components/UpdateSubscriptionButton';
-import { useClerk } from '@clerk/nextjs';
 
 interface ProductCardProps {
 	product: Stripe.Product;
 	className?: string;
-	onButtonClick?: () => void;
 	user: User | null | undefined;
 	isLink?: boolean;
 }
@@ -29,12 +27,10 @@ interface ProductCardProps {
 export function ProductCard({
 	product,
 	className,
-	onButtonClick,
 	user,
 	isLink = false,
 }: ProductCardProps) {
 	const { data: prices, isLoading } = useStripePrice(product.id);
-	const { isSignedIn, redirectToSignIn } = useClerk();
 
 	const formatPrice = (price: number, currency: string) => {
 		return new Intl.NumberFormat('en-US', {
@@ -53,18 +49,7 @@ export function ProductCard({
 
 	const getButton = (): ReactNode => {
 		const checkoutButton = (
-			<CheckoutButton
-				user={user}
-				priceId={price.id}
-				buttonText="Get Started"
-				onButtonClick={() => {
-					if (isSignedIn) {
-						onButtonClick?.();
-					} else {
-						redirectToSignIn();
-					}
-				}}
-			/>
+			<CheckoutButton user={user} priceId={price.id} buttonText="Get Started" />
 		);
 		if (!user) {
 			return checkoutButton;
