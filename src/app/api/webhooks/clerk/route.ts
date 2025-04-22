@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { WebhookEvent } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 export async function POST(req: Request) {
-	const SIGNING_SECRET = process.env.SIGNING_SECRET;
+	const SIGNING_SECRET = process.env.CLERK_SIGNING_SECRET;
 
 	if (!SIGNING_SECRET) {
 		throw new Error(
