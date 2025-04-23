@@ -16,10 +16,9 @@ const updateUserSchema = z.object({
 	emailSendCredits: z.number().int().optional(),
 });
 
-export const GET = async function GET(
-	request: Request,
-	{ params }: { params: { clerkId: string } }
-) {
+type Params = Promise<{ clerkId: string }>;
+
+export const GET = async function GET(request: Request, { params }: { params: Params }) {
 	try {
 		const { clerkId } = await params;
 
@@ -35,10 +34,7 @@ export const GET = async function GET(
 	}
 };
 
-export const PATCH = async function PATCH(
-	request: Request,
-	{ params }: { params: { clerkId: string } }
-) {
+export const PATCH = async function PATCH(request: Request) {
 	try {
 		const { userId } = await auth();
 

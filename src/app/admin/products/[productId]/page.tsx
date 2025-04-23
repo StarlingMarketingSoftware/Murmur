@@ -4,8 +4,9 @@ import { ProductCard } from '@/app/pricing/_components/ProductCard';
 import { useMe } from '@/hooks/useMe';
 import { useParams } from 'next/navigation';
 import { useStripeProduct } from '@/hooks/useStripeProduct';
+import { FC } from 'react';
 
-export const AdminProducts = () => {
+const AdminProducts: FC = () => {
 	const { productId } = useParams();
 	const { user } = useMe();
 	const { data: product, isLoading, error } = useStripeProduct(productId as string);

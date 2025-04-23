@@ -71,6 +71,22 @@ export const subscriptionTierDataList: Record<string, SubscriptionTierData> = {
 			return getTestEmailCount(this.aiEmailCount);
 		},
 	},
+	[process.env.NEXT_PUBLIC_ADMIN_LITE_PRICE_ID as string]: {
+		name: 'Prophet',
+		aiEmailCount: 100000,
+		viewEmailAddresses: true,
+		get testEmailCount() {
+			return getTestEmailCount(this.aiEmailCount);
+		},
+	},
+	[process.env.NEXT_PUBLIC_ADMIN_FULL_PRICE_ID as string]: {
+		name: 'Prophet',
+		aiEmailCount: 500000,
+		viewEmailAddresses: true,
+		get testEmailCount() {
+			return getTestEmailCount(this.aiEmailCount);
+		},
+	},
 };
 
 export const restrictedFeatureMessages = {

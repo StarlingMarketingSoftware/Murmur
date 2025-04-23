@@ -9,7 +9,7 @@ import Spinner from '@/components/ui/spinner';
 const Murmur = () => {
 	const { tab, handleTabChange, data, isPending } = useCampaignDetail();
 
-	if (isPending) {
+	if (isPending || !data) {
 		return <Spinner />;
 	}
 	return (

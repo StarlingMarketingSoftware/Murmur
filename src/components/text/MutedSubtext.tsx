@@ -1,5 +1,5 @@
 import { FC, ReactNode } from 'react';
-import { TypographyH1, TypographyMuted } from '../ui/typography';
+import { TypographyMuted } from '../ui/typography';
 
 interface MutedSubtextProps {
 	children?: ReactNode;

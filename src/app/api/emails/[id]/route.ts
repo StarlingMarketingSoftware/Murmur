@@ -11,7 +11,9 @@ const updateEmailSchema = z.object({
 	sentAt: z.string().datetime().nullable().optional(),
 });
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+type Params = Promise<{ id: string }>;
+
+export async function PATCH(req: NextRequest, { params }: { params: Params }) {
 	const { userId } = await auth();
 	if (!userId) {
 		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -55,13 +57,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 	}
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Params }) {
 	const { userId } = await auth();
 	if (!userId) {
 		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	const { id } = params;
+	const { id } = await params;
 
 	try {
 		const email = await prisma.email.findUnique({
@@ -88,13 +90,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 	}
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Params }) {
 	const { userId } = await auth();
 	if (!userId) {
 		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	const { id } = params;
+	const { id } = await params;
 
 	try {
 		// Validate that the email exists and belongs to the user

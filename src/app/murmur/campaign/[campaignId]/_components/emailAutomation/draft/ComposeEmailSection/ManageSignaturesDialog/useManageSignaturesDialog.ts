@@ -14,14 +14,12 @@ import { useEditCampaign } from '@/hooks/useCampaigns';
 import { useParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 
-export interface ManageSignaturesDialogProps {}
-
 const signatureSchema = z.object({
 	name: z.string().min(1, { message: 'Signature name is required.' }),
 	content: z.string(),
 });
 
-export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) => {
+export const useManageSignaturesDialog = () => {
 	const params = useParams();
 	const { campaignId } = params as { campaignId: string };
 
@@ -118,6 +116,5 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 		isPendingSaveSignatureToCampaign,
 		campaignId,
 		handleSaveSignatureToCampaign,
-		...props,
 	};
 };

@@ -5,7 +5,7 @@ import { stripe } from '../../../../stripe/client';
 import prisma from '@/lib/prisma';
 import { fulfillCheckout } from '@/app/api/webhooks/stripe/fulfillCheckout';
 import { getSubscriptionTierWithPriceId } from '@/lib/utils';
-import { calcAiCreditsFromPrice, getTestEmailCount } from '@/app/utils/functions';
+import { getTestEmailCount } from '@/app/utils/functions';
 import { calcAiCredits } from './calcAiCredits';
 
 export async function POST(req: Request) {
@@ -137,7 +137,7 @@ export async function POST(req: Request) {
 						}
 
 						console.log('Current credits before update:', currentUser.aiDraftCredits);
-						console.log('Adding credits:', subscriptionTier.aiEmailCount);
+						console.log('Adding credits:', subscriptionTier?.aiEmailCount);
 
 						// Perform the update within the transaction
 						return await tx.user.update({
@@ -146,7 +146,7 @@ export async function POST(req: Request) {
 							},
 							data: {
 								aiDraftCredits: {
-									increment: subscriptionTier.aiEmailCount,
+									increment: subscriptionTier?.aiEmailCount,
 								},
 							},
 							select: {

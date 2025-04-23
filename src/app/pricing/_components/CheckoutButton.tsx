@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { useClerk } from '@clerk/nextjs';
 import { User } from '@prisma/client';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -18,6 +19,8 @@ export function CheckoutButton({
 	onButtonClick,
 	user,
 }: CheckoutButtonProps) {
+	const { isSignedIn, redirectToSignIn } = useClerk();
+
 	const { mutate: checkout, isPending } = useMutation({
 		mutationFn: async () => {
 			const response = await fetch('/api/stripe/checkout', {
@@ -49,12 +52,21 @@ export function CheckoutButton({
 		},
 	});
 
+	const handleClick = () => {
+		if (!isSignedIn) {
+			redirectToSignIn();
+			return;
+		}
+
+		if (onButtonClick) {
+			onButtonClick();
+		} else {
+			checkout();
+		}
+	};
+
 	return (
-		<Button
-			className="mx-auto"
-			onClick={onButtonClick || (() => checkout())}
-			isLoading={isPending}
-		>
+		<Button className="mx-auto" onClick={handleClick} isLoading={isPending}>
 			{buttonText}
 		</Button>
 	);

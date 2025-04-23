@@ -25,7 +25,7 @@ import {
 import MutedSubtext from '@/components/text/MutedSubtext';
 import { toast } from 'sonner';
 
-const contactFormSchema = z.object({
+export const contactFormSchema = z.object({
 	name: z.string().min(1, { message: 'Name is required.' }),
 	email: z.string().email({ message: 'Invalid email address.' }),
 	subject: z.string().min(1, { message: 'Subject is required.' }),

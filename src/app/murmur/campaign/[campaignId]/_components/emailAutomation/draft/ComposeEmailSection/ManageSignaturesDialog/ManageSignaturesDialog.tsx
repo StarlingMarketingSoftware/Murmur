@@ -9,10 +9,7 @@ import {
 	DialogTrigger,
 } from '@/components/ui/dialog';
 import { FC } from 'react';
-import {
-	ManageSignaturesDialogProps,
-	useManageSignaturesDialog,
-} from './useManageSignaturesDialog';
+import { useManageSignaturesDialog } from './useManageSignaturesDialog';
 import {
 	Form,
 	FormControl,
@@ -29,7 +26,7 @@ import { twMerge } from 'tailwind-merge';
 import { Input } from '@/components/ui/input';
 import { TrashIcon } from 'lucide-react';
 
-export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) => {
+export const ManageSignaturesDialog: FC = () => {
 	const {
 		signatures,
 		isPendingSignatures,
@@ -44,7 +41,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 		isPendingCreateSignature,
 		isPendingSaveSignatureToCampaign,
 		handleSaveSignatureToCampaign,
-	} = useManageSignaturesDialog(props);
+	} = useManageSignaturesDialog();
 
 	return (
 		<Dialog>
