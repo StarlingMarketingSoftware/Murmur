@@ -5,6 +5,7 @@ import StarterKit from '@tiptap/starter-kit';
 import { RichTextMenuBar } from './RichTextMenuBar';
 import Highlight from '@tiptap/extension-highlight';
 import TextAlign from '@tiptap/extension-text-align';
+import Underline from '@tiptap/extension-underline';
 import { FC, useEffect } from 'react';
 import { twMerge } from 'tailwind-merge';
 
@@ -26,6 +27,11 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 	const editor = useEditor({
 		extensions: [
 			StarterKit.configure({
+				// paragraph: {
+				// 	HTMLAttributes: {
+				// 		style: 'margin-top:3px; padding:0;',
+				// 	},
+				// },
 				bulletList: {
 					HTMLAttributes: {
 						class: 'list-disc pl-6',
@@ -42,6 +48,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 					class: 'bg-yellow-200',
 				},
 			}),
+			Underline,
 			TextAlign.configure({
 				types: ['heading', 'paragraph'],
 				alignments: ['left', 'center', 'right'],
@@ -67,7 +74,6 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 			onChange?.(editor.getHTML());
 		},
 	});
-
 	useEffect(() => {
 		if (editor && value !== editor.getHTML()) {
 			editor.commands.setContent(value);
