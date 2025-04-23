@@ -44,44 +44,17 @@ export const calcAiCreditsFromPrice = (priceInCents: number): number => {
 	return Math.floor((priceInCents / 100) * 5);
 };
 
-export function addInlineStylesToHTML(html: string): string {
-	return (
-		html
-			.replace(/<p>/g, '<p style="margin:0; padding:0; l;">')
-			// Handle paragraphs that already have some style attributes
-			.replace(/<p style="([^"]*)">/g, (match, existingStyles) => {
-				// Preserve existing styles while adding line-height if not present
-				if (!existingStyles.includes('line-height')) {
-					return `<p style="${existingStyles}; 5;">`;
-				}
-				return match;
-			})
-			// Ensure empty paragraphs maintain height
-			.replace(
-				/<p([^>]*)><\/p>/g,
-				'<p$1 style="margin:0; padding:0; l; min-height:1.5em;">'
-			)
-			// Standardize other common elements
-			.replace(/<strong>/g, '<strong style="font-weight:bold;">')
-			.replace(/<em>/g, '<em style="font-style:italic;">')
-	);
-}
+export const replacePTagsInSignature = (html: string): string => {
+	// First capture group is everything before the signature div
+	// Second capture group is the content within signature div
+	// Third capture group is everything after
+	const regex = /^([\s\S]*<div>)([\s\S]*?)(<\/div>[\s\S]*)$/;
 
-export function removeMarginsFromPTags(html: string): string {
-	return html.replace(/<p>/g, '<p style="margin:0; padding:0;">');
-}
+	return html.replace(regex, (_, before, signatureContent, after) => {
+		const updatedSignatureContent = signatureContent
+			.replace(/<p/g, '<div')
+			.replace(/<\/p>/g, '</div>');
 
-export const replaceEmptyPTagsWithSpacerDivs = (html: string): string => {
-	return html.replaceAll(
-		'<p></p>',
-		'<div style="height:1em; line-height:1em; margin:0; padding:0;">&nbsp;</div>'
-	);
-};
-
-export const removeEmptyPTags = (html: string): string => {
-	return html.replaceAll('<p></p>', '');
-};
-
-export const replacePwithDiv = (html: string): string => {
-	return html.replaceAll('<p>', '<div>').replaceAll('</p>', '</div>');
+		return `${before}${updatedSignatureContent}${after}`;
+	});
 };

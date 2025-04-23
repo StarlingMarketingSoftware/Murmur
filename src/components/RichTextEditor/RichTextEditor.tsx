@@ -8,6 +8,7 @@ import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
 import { FC, useEffect } from 'react';
 import { twMerge } from 'tailwind-merge';
+import { Node } from '@tiptap/core';
 
 interface RichTextEditorProps {
 	value: string;
@@ -16,6 +17,18 @@ interface RichTextEditorProps {
 	className?: string;
 	hideMenuBar?: boolean;
 }
+
+const Div = Node.create({
+	name: 'div',
+	group: 'block',
+	content: 'block+',
+	parseHTML() {
+		return [{ tag: 'div' }];
+	},
+	renderHTML({ HTMLAttributes }) {
+		return ['div', HTMLAttributes, 0];
+	},
+});
 
 const RichTextEditor: FC<RichTextEditorProps> = ({
 	value,
@@ -53,6 +66,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 				types: ['heading', 'paragraph'],
 				alignments: ['left', 'center', 'right'],
 			}),
+			Div, // Add the Div extension here
 		],
 		editable: isEdit,
 		immediatelyRender: false,

@@ -1,11 +1,7 @@
 import { NextResponse } from 'next/server';
 import FormData from 'form-data';
 import Mailgun from 'mailgun.js';
-import {
-	removeEmptyPTags,
-	replaceEmptyPTagsWithSpacerDivs,
-	replacePwithDiv,
-} from '@/app/utils/functions';
+import { replacePTagsInSignature } from '@/app/utils/functions';
 
 export async function POST(request: Request) {
 	const { recipientEmail, subject, message, senderEmail, senderName } =
@@ -22,7 +18,7 @@ export async function POST(request: Request) {
 			from: `${senderName} <postmaster@murmurpro.com>`,
 			to: [recipientEmail],
 			subject: subject,
-			html: replacePwithDiv(message),
+			html: replacePTagsInSignature(message),
 			text: message,
 			'h:Reply-To': senderEmail,
 		});

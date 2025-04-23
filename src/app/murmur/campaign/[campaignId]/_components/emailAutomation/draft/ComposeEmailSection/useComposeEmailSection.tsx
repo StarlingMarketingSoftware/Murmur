@@ -1,4 +1,3 @@
-import { removeMarginsFromPTags } from '@/app/utils/functions';
 import { CampaignWithRelations, Draft } from '@/constants/types';
 import { useEditCampaign } from '@/hooks/useCampaigns';
 import { useCreateEmail } from '@/hooks/useEmails';
@@ -222,7 +221,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 						}
 						await createEmail({
 							subject: newDraft.subject,
-							message: `${newDraft.message}<p></p><div id="signature">${campaign.signature?.content}</div>`,
+							message: `${newDraft.message}<p></p><div>${campaign.signature?.content}</div>`,
 							campaignId: campaign.id,
 							status: 'draft' as EmailStatus,
 							contactId: recipient.id,
