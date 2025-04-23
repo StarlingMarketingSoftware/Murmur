@@ -9,6 +9,7 @@ import {
 	List,
 	ListOrdered,
 	Strikethrough,
+	Underline,
 } from 'lucide-react';
 import { Toggle } from '../ui/toggle';
 
@@ -40,6 +41,11 @@ export const RichTextMenuBar: FC<RichTextMenuBarProps> = ({ editor, isEdit }) =>
 			icon: <Bold className="size-4" />,
 			onClick: () => editor.chain().focus().toggleBold().run(),
 			pressed: editor.isActive('bold'),
+		},
+		{
+			icon: <Underline className="size-4" />,
+			onClick: () => editor.chain().focus().toggleUnderline().run(),
+			pressed: editor.isActive('underline'),
 		},
 		{
 			icon: <Italic className="size-4" />,

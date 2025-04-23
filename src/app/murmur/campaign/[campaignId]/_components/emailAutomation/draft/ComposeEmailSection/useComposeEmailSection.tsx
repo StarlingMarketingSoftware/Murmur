@@ -221,7 +221,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 						}
 						await createEmail({
 							subject: newDraft.subject,
-							message: newDraft.message + '<p></p>' + campaign.signature?.content,
+							message: `${newDraft.message}<p></p><div>${campaign.signature?.content}</div>`,
 							campaignId: campaign.id,
 							status: 'draft' as EmailStatus,
 							contactId: recipient.id,
