@@ -43,3 +43,18 @@ export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve
 export const calcAiCreditsFromPrice = (priceInCents: number): number => {
 	return Math.floor((priceInCents / 100) * 5);
 };
+
+export const replacePTagsInSignature = (html: string): string => {
+	// First capture group is everything before the signature div
+	// Second capture group is the content within signature div
+	// Third capture group is everything after
+	const regex = /^([\s\S]*<div>)([\s\S]*?)(<\/div>[\s\S]*)$/;
+
+	return html.replace(regex, (_, before, signatureContent, after) => {
+		const updatedSignatureContent = signatureContent
+			.replace(/<p/g, '<div')
+			.replace(/<\/p>/g, '</div>');
+
+		return `${before}${updatedSignatureContent}${after}`;
+	});
+};

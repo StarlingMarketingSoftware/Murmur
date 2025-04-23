@@ -62,7 +62,7 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 			},
 			cell: ({ row }) => {
 				return subscriptionTier?.viewEmailAddresses ? (
-					<div className="text-left">{row.getValue('contactEmail')}</div>
+					<div className="text-left">{row.getValue('email')}</div>
 				) : (
 					<FeatureLockedButton message={restrictedFeatureMessages.viewEmails} />
 				);

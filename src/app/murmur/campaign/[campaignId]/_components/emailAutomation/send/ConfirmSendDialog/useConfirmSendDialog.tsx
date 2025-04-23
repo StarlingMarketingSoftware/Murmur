@@ -51,10 +51,11 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 
 	const sendMailgunMessage = async (
 		draftEmail: EmailWithRelations,
-		senderEmail: string
+		senderEmail: string,
+		senderName: string
 	) => {
 		try {
-			const response = await fetch('/api/emails/send', {
+			const response = await fetch('/api/mailgun/', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
@@ -64,6 +65,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 					subject: draftEmail.subject,
 					message: draftEmail.message,
 					senderEmail,
+					senderName,
 				}),
 			});
 
@@ -105,7 +107,11 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 				);
 				return;
 			}
-			const res = await sendMailgunMessage(email, 'shingoAlert@gmail.com');
+			const res = await sendMailgunMessage(
+				email,
+				form.getValues().senderEmail,
+				form.getValues().senderName
+			);
 			if (res?.status === 200) {
 				await updateEmail({
 					emailId: email.id,

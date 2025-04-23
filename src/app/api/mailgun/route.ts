@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import FormData from 'form-data';
 import Mailgun from 'mailgun.js';
+import { replacePTagsInSignature } from '@/app/utils/functions';
 
 export async function POST(request: Request) {
-	const { recipientEmail, subject, message, senderEmail } = await request.json();
+	const { recipientEmail, subject, message, senderEmail, senderName } =
+		await request.json();
 
 	const mailgun = new Mailgun(FormData);
 	const mg = mailgun.client({
@@ -12,18 +14,14 @@ export async function POST(request: Request) {
 	});
 
 	try {
-		const form = new FormData();
-		form.append('h:Reply-To', senderEmail);
-
-		const data = await mg.messages.create(
-			'sandbox19faacf722c14c58b751195591eb4fcf.mailgun.org',
-			{
-				from: 'Mailgun Sandbox <postmaster@sandbox19faacf722c14c58b751195591eb4fcf.mailgun.org>',
-				to: [recipientEmail],
-				subject: subject,
-				text: message,
-			}
-		);
+		const data = await mg.messages.create('murmurpro.com', {
+			from: `${senderName} <postmaster@murmurpro.com>`,
+			to: [recipientEmail],
+			subject: subject,
+			html: replacePTagsInSignature(message),
+			text: message,
+			'h:Reply-To': senderEmail,
+		});
 
 		return NextResponse.json({ success: true, data });
 	} catch (error) {
