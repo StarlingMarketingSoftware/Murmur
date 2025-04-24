@@ -41,15 +41,16 @@ model User {
   aiTestCredits    Int      @default(2)
   emailSendCredits Int      @default(1)
 
-  stripeCustomerId         String?     @unique
+  stripeCustomerId         String?       @unique
   stripeSubscriptionId     String?
   stripeSubscriptionStatus String?
   stripePriceId            String?
-  createdAt                DateTime    @default(now())
-  updatedAt                DateTime    @updatedAt
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
   emails                   Email[]
   campaigns                Campaign[]
   signatures               Signature[]
+  contactLists             ContactList[]
 }
 
 model Contact {
@@ -75,15 +76,13 @@ model Contact {
 
 // needs database trigger whenever a contact is added, update this table accordingly
 model ContactList {
-  id         Int       @id @default(autoincrement())
-  category   String    @unique
-  identifier String    @unique
-  count      Int
-  contacts   Contact[]
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  @@index([category])
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  count     Int?      @default(0)
+  contacts  Contact[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User[]
 }
 
 model Email {
