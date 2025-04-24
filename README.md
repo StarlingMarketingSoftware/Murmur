@@ -48,6 +48,11 @@ For Stripe subscription functionality, set up a webhook:
 6. Test directly via clerk, or use the ngrok url to create a user.
 7. When you create a user using the UI, you use localhost:3000 because this connects to Clerk, then Clerk sends the webhook to the ngrok api.
 
+## Stripe Management
+
+- The billing portal settings can be found here: https://dashboard.stripe.com/settings/billing/portal
+- This is where customers can manage their existing subscription.
+
 ## License
 
 This project is licensed under the MIT License.
