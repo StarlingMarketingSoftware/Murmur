@@ -1,29 +1,31 @@
 'use client';
-
-import { Button } from '@/components/ui/button';
-
 import { FC } from 'react';
 import Spinner from '@/components/ui/spinner';
-
 import CustomTable from '@/app/murmur/campaign/[campaignId]/_components/CustomTable';
 import { useManageContactListDetail } from './useManageContactListDetail';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusIcon } from 'lucide-react';
+import ContactCSVUploadDialog from '@/components/organisms/dialogs/ContactCSVUploadDialog/ContactCSVUploadDialog';
 
 const ManageContactListDetail: FC = () => {
-	const { data, isPending, columns } = useManageContactListDetail();
+	const { data, isPending, columns, contactListData, isPendingContactList } =
+		useManageContactListDetail();
 	return (
 		<>
-			{isPending || !data ? (
+			{isPending || isPendingContactList || !data ? (
 				<Spinner />
 			) : (
-				<Card className="w-29/30 mx-auto mt-4 max-w-[1920px]">
+				<Card size="lg">
+					<CardHeader>
+						<CardTitle>{contactListData?.name}</CardTitle>
+					</CardHeader>
 					<CardContent>
-						<CardTitle>Contact List Title</CardTitle>
-						<Button>
-							<PlusIcon />
-							Add Contact
-						</Button>
+						<div className="flex flex-row gap-4">
+							{/* <Button variant="default">
+								<PlusIcon />
+								Add Contact
+							</Button> */}
+							<ContactCSVUploadDialog />
+						</div>
 						<CustomTable
 							columns={columns}
 							data={data}

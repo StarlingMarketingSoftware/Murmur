@@ -155,3 +155,61 @@ export const useDeleteContact = (options: CustomMutationOptions = {}) => {
 		},
 	});
 };
+
+interface BatchCreateContactBody {
+	contacts: Array<{
+		name?: string | null;
+		email: string;
+		company?: string | null;
+		website?: string | null;
+		state?: string | null;
+		country?: string | null;
+		phone?: string | null;
+	}>;
+	contactListId?: number;
+}
+
+export const useBatchCreateContacts = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Contacts created successfully',
+		errorMessage = 'Failed to create contacts',
+		onSuccess: onSuccessCallback,
+	} = options;
+
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (data: BatchCreateContactBody) => {
+			const response = await fetch('/api/contacts/batch', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(data),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to create contacts');
+			}
+
+			return response.json();
+		},
+		onSuccess: (data) => {
+			if (!suppressToasts) {
+				toast.success(
+					`${successMessage}! ${data.created} contacts created. ${data.skipped} duplicate contacts skipped.`
+				);
+			}
+
+			queryClient.invalidateQueries({ queryKey: ['contacts'] });
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
+};

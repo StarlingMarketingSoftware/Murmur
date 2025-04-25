@@ -28,7 +28,7 @@ export const useGetContactLists = () => {
 };
 
 export const useGetContactList = (id: number) => {
-	return useQuery({
+	return useQuery<ContactList>({
 		queryKey: ['contactList', id],
 		queryFn: async () => {
 			const response = await fetch(`/api/contact-list/${id}`);

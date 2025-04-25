@@ -2,13 +2,23 @@ import * as React from 'react';
 
 import { cn } from '../../lib/utils';
 
-function Card({ className, ...props }: React.ComponentProps<'div'>) {
+type CardProps = React.ComponentProps<'div'> & {
+	size?: 'none' | 'sm' | 'md' | 'lg';
+};
+
+function Card({ className, size = 'none', ...props }: CardProps) {
 	return (
 		<div
 			data-slot="card"
 			className={cn(
 				'bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm',
 				'my-4',
+				{
+					'': size === 'none',
+					'w-15/30 mx-auto mt-4 max-w-[756px]': size === 'sm',
+					'w-20/30 mx-auto mt-4 max-w-[1080px]': size === 'md',
+					'w-29/30 mx-auto mt-4 max-w-[1920px]': size === 'lg',
+				},
 				className
 			)}
 			{...props}

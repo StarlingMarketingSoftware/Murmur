@@ -23,23 +23,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Params }) {
 		const body = await req.json();
 		const validatedData = updateContactListSchema.parse(body);
 
-		// Find contact list and verify user has access
 		const existingList = await prisma.contactList.findFirst({
 			where: {
 				id: parseInt(id),
-				user: {
-					some: {
-						clerkId: userId,
-					},
-				},
 			},
 		});
 
 		if (!existingList) {
-			return NextResponse.json(
-				{ error: 'Contact list not found or unauthorized' },
-				{ status: 404 }
-			);
+			return NextResponse.json({ error: 'Contact list not found.' }, { status: 404 });
 		}
 
 		// Update the contact list with validated data
@@ -81,11 +72,6 @@ export async function GET(req: NextRequest, { params }: { params: Params }) {
 		const contactList = await prisma.contactList.findFirst({
 			where: {
 				id: parseInt(id),
-				user: {
-					some: {
-						clerkId: userId,
-					},
-				},
 			},
 			include: {
 				contacts: true,
@@ -93,10 +79,7 @@ export async function GET(req: NextRequest, { params }: { params: Params }) {
 		});
 
 		if (!contactList) {
-			return NextResponse.json(
-				{ error: 'Contact list not found or unauthorized' },
-				{ status: 404 }
-			);
+			return NextResponse.json({ error: 'Contact list not found.' }, { status: 404 });
 		}
 
 		return NextResponse.json(contactList);
@@ -119,19 +102,11 @@ export async function DELETE(req: NextRequest, { params }: { params: Params }) {
 		const existingList = await prisma.contactList.findFirst({
 			where: {
 				id: parseInt(id),
-				user: {
-					some: {
-						clerkId: userId,
-					},
-				},
 			},
 		});
 
 		if (!existingList) {
-			return NextResponse.json(
-				{ error: 'Contact list not found or unauthorized' },
-				{ status: 404 }
-			);
+			return NextResponse.json({ error: 'Contact list not found.' }, { status: 404 });
 		}
 
 		// Delete the contact list
@@ -143,7 +118,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Params }) {
 
 		return NextResponse.json({
 			success: true,
-			message: 'Contact list deleted successfully',
+			message: 'Contact list deleted successfully.',
 		});
 	} catch (error) {
 		console.error('CONTACT_LIST_DELETE_ERROR:', error);
