@@ -73,7 +73,7 @@ export function ProductCard({
 	};
 
 	const handleClick = () => {
-		window.location.href = `/admin/products/${product.id}`;
+		window.location.href = `/pricing/${product.id}`;
 	};
 
 	const marketingFeatures: Stripe.Product.MarketingFeature[] = product.marketing_features;
