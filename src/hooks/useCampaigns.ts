@@ -66,7 +66,7 @@ export const useEditCampaign = (options: CustomMutationOptions = {}) => {
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}
-			queryClient.invalidateQueries({ queryKey: ['campaigns', 'campaign'] });
+			// queryClient.invalidateQueries({ queryKey: ['campaigns', 'campaign'] });
 			onSuccessCallback?.();
 		},
 		onError: () => {

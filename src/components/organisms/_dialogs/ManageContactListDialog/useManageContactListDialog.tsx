@@ -126,7 +126,7 @@ export const useManageContactListDialog = (props: ManageContactListDialogProps) 
 		onSuccess: () => {
 			toast.success('Recipients saved successfully!');
 			setIsOpen(false);
-			queryClient.invalidateQueries({ queryKey: ['campaign'] });
+			queryClient.invalidateQueries({ queryKey: ['campaign', campaignId?.toString()] });
 		},
 		onError: () => {
 			toast.error('Failed to save recipients. Please try again.');

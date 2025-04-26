@@ -122,7 +122,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 					},
 				});
 				setSendingProgress((prev) => prev + 1);
-				queryClient.invalidateQueries({ queryKey: ['campaign'] });
+				queryClient.invalidateQueries({ queryKey: ['campaign', campaignId.toString()] });
 				if (!subscriptionTier && user) {
 					await updateEmailSendCredits({
 						clerkId: user.clerkId,

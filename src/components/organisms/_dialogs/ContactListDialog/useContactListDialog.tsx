@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Contact, ContactList } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
 import { toast } from 'sonner';
@@ -14,6 +14,7 @@ import {
 	NoDataCell,
 	TableSortingButton,
 } from '@/components/molecules/CustomTable/CustomTable';
+import { useGetContactsByCategory } from '@/hooks/useContacts';
 
 export interface ContactListDialogProps {
 	isOpen: boolean;
@@ -88,25 +89,7 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 	const params = useParams();
 	const { campaignId } = params;
 
-	const {
-		data,
-		isPending,
-		mutate: fetchContacts,
-	} = useMutation({
-		mutationFn: async (contactListIds: number[]) => {
-			const response = await fetch('/api/contacts/get-by-category', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({ contactListIds }),
-			});
-			if (!response.ok) {
-				throw new Error('Network response was not ok');
-			}
-			return response.json();
-		},
-	});
+	const { data, isPending } = useGetContactsByCategory(selectedContactList?.id);
 
 	const filteredData = useMemo(() => {
 		if (!data) return [];
@@ -137,18 +120,12 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 		onSuccess: () => {
 			toast.success('Recipients saved successfully!');
 			setIsOpen(false);
-			queryClient.invalidateQueries({ queryKey: ['campaign'] });
+			queryClient.invalidateQueries({ queryKey: ['campaign', campaignId?.toString()] });
 		},
 		onError: () => {
 			toast.error('Failed to save recipients. Please try again.');
 		},
 	});
-
-	useEffect(() => {
-		if (selectedContactList) {
-			fetchContacts([selectedContactList.id]);
-		}
-	}, [selectedContactList, fetchContacts]);
 
 	const saveSelectedRecipients = async () => {
 		console.log('were updating campaign');
@@ -165,7 +142,6 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 	return {
 		data,
 		isPending,
-		fetchContacts,
 		isOpen,
 		setIsOpen,
 		columns,
