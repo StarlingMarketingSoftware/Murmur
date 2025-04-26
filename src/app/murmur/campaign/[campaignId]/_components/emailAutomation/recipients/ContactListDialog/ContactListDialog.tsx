@@ -32,7 +32,7 @@ const ContactListDialog: FC<ContactListDialogProps> = (props) => {
 				) : (
 					<>
 						<DialogTitle className="capitalize">
-							{`${selectedContactList?.category}`}
+							{`${selectedContactList?.name}`}
 						</DialogTitle>
 						<DialogHeader>
 							<DialogDescription>
