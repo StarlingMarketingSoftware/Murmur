@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
-import { Footer } from '@/components/Footer';
+import { Footer } from '@/components/molecules/Footer/Footer';
 import { Toaster } from '@/components/ui/toast';
 import './globals.css';
 import SubLayout from './sublayout';
 // import localFont from 'next/font/local';
-import { Navbar } from '@/components/navbar/Navbar';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import StoreProvider from './StoreProvider';
+import { Navbar } from '@/components/organisms/Navbar/Navbar';
 
 const geistSans = Geist({
 	variable: '--font-geist-sans',

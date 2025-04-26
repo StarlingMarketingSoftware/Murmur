@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import PageHeading from '@/components/text/PageHeading';
 import {
 	Card,
 	CardContent,
@@ -22,8 +21,9 @@ import {
 	CardHeader,
 	CardTitle,
 } from '@/components/ui/card';
-import MutedSubtext from '@/components/text/MutedSubtext';
 import { toast } from 'sonner';
+import PageHeading from '@/components/atoms/_text/PageHeading';
+import MutedSubtext from '@/components/atoms/_text/MutedSubtext';
 
 export const contactFormSchema = z.object({
 	name: z.string().min(1, { message: 'Name is required.' }),

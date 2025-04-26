@@ -1,10 +1,10 @@
 'use client';
 import { FC } from 'react';
 import Spinner from '@/components/ui/spinner';
-import CustomTable from '@/app/murmur/campaign/[campaignId]/_components/CustomTable';
+import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import { useManageContactListDetail } from './useManageContactListDetail';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import ContactCSVUploadDialog from '@/components/organisms/dialogs/ContactCSVUploadDialog/ContactCSVUploadDialog';
+import ContactCSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactCSVUploadDialog';
 
 const ManageContactListDetail: FC = () => {
 	const { data, isPending, columns, contactListData, isPendingContactList } =

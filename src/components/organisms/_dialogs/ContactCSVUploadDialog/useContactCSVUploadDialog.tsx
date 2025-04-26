@@ -1,30 +1,66 @@
-'use client';
-import { Contact } from '@prisma/client';
+import { useState, useRef } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { useParams } from 'next/navigation';
-import { useMe } from '@/hooks/useMe';
-import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
-import { restrictedFeatureMessages } from '@/constants/constants';
+import { Contact } from '@prisma/client';
+import { TableDeleteRowButton } from '@/components/molecules/TableDeleteRowButton/TableDeleteRowButton';
 import {
 	NoDataCell,
 	TableSortingButton,
 } from '@/components/molecules/CustomTable/CustomTable';
-import { useDeleteContact, useGetContactsByCategory } from '@/hooks/useContacts';
-import { useQueryClient } from '@tanstack/react-query';
-import { TableDeleteRowButton } from '@/components/molecules/TableDeleteRowButton/TableDeleteRowButton';
-import { useGetContactList } from '@/hooks/useContactLists';
+import { useBatchCreateContacts } from '@/hooks/useContacts';
+import { useParams } from 'next/navigation';
 
-export const useManageContactListDetail = () => {
-	const { subscriptionTier } = useMe();
+export const useContactCSVUploadDialog = () => {
 	const params = useParams<{ id: string }>();
 	const contactListId = parseInt(params.id);
+	const [open, setOpen] = useState(false);
+	const [csvData, setCsvData] = useState<Contact[]>([]);
+	const fileInputRef = useRef<HTMLInputElement>(null);
 
-	const queryClient = useQueryClient();
-	const { data, isPending } = useGetContactsByCategory(contactListId);
-	const { data: contactListData, isPending: isPendingContactList } =
-		useGetContactList(contactListId);
-	const { mutateAsync: deleteContact, isPending: isPendingDeleteContact } =
-		useDeleteContact();
+	const { mutateAsync: createContacts, isPending } = useBatchCreateContacts();
+
+	const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+		const file = event.target.files?.[0];
+		if (!file) return;
+
+		const reader = new FileReader();
+		reader.onload = (e) => {
+			const text = e.target?.result as string;
+			const lines = text.split('\n');
+			const headers = lines[0].split(',').map((header) => header.trim());
+
+			const parsedData = lines
+				.slice(1)
+				.filter((line) => line.trim() !== '')
+				.map((line, index) => {
+					const values = line.split(',').map((value) => value.trim());
+					const contact: Partial<Contact> = {
+						id: index,
+						name: values[headers.indexOf('name')] || '',
+						email: values[headers.indexOf('email')] || '',
+						company: values[headers.indexOf('company')] || '',
+						country: values[headers.indexOf('country')] || '',
+						state: values[headers.indexOf('state')] || '',
+						website: values[headers.indexOf('website')] || '',
+						phone: values[headers.indexOf('phone')] || '',
+					};
+					return contact as Contact;
+				});
+
+			setCsvData(parsedData);
+		};
+		reader.readAsText(file);
+		event.target.value = ''; // Reset input
+	};
+
+	const handleUploadClick = () => {
+		fileInputRef.current?.click();
+	};
+
+	const handleSave = async () => {
+		await createContacts({ contacts: csvData, contactListId });
+		setCsvData([]);
+		setOpen(false);
+	};
 
 	const columns: ColumnDef<Contact>[] = [
 		{
@@ -45,11 +81,7 @@ export const useManageContactListDetail = () => {
 				return <TableSortingButton column={column} label="Email" />;
 			},
 			cell: ({ row }) => {
-				return subscriptionTier?.viewEmailAddresses ? (
-					<div className="text-left">{row.getValue('email')}</div>
-				) : (
-					<FeatureLockedButton message={restrictedFeatureMessages.viewEmails} />
-				);
+				return <div className="text-left">{row.getValue('email')}</div>;
 			},
 		},
 		{
@@ -113,23 +145,33 @@ export const useManageContactListDetail = () => {
 			id: 'action',
 			cell: ({ row }) => (
 				<TableDeleteRowButton
-					onClick={async () => {
-						await deleteContact(row.original.id);
-						queryClient.invalidateQueries({
-							queryKey: ['contacts', 'by-category', contactListId],
-						});
+					onClick={() => {
+						setCsvData((prev) => prev.filter((_, index) => index !== row.index));
 					}}
 				/>
 			),
 		},
 	];
 
+	const handleTemplateDownload = () => {
+		const link = document.createElement('a');
+		link.href = '/sampleContactListCSV.csv';
+		link.download = 'contact-template.csv';
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+	};
+
 	return {
-		data,
 		isPending,
+		open,
+		setOpen,
 		columns,
-		isPendingDeleteContact,
-		contactListData,
-		isPendingContactList,
+		csvData,
+		handleTemplateDownload,
+		handleFileUpload,
+		handleUploadClick,
+		fileInputRef,
+		handleSave,
 	};
 };
