@@ -1,10 +1,10 @@
 'use client';
 
 import { Tabs, TabsContent } from '@/components/ui/tabs';
-import EmailAutomationSteps from './_components/emailAutomation/EmailAutomationSteps';
+import EmailAutomationSteps from './emailAutomation/EmailAutomationSteps';
 import { useCampaignDetail } from './useCampaignDetail';
-import PageHeading from '@/components/text/PageHeading';
 import Spinner from '@/components/ui/spinner';
+import PageHeading from '@/components/atoms/_text/PageHeading';
 
 const Murmur = () => {
 	const { tab, handleTabChange, data, isPending } = useCampaignDetail();

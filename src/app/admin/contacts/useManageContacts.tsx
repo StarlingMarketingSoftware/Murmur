@@ -1,5 +1,5 @@
 'use client';
-import { TableSortingButton } from '@/app/murmur/campaign/[campaignId]/_components/CustomTable';
+import { TableSortingButton } from '@/components/molecules/CustomTable/CustomTable';
 import { TableDeleteRowButton } from '@/components/molecules/TableDeleteRowButton/TableDeleteRowButton';
 import { useDeleteContactList, useGetContactLists } from '@/hooks/useContactLists';
 import { ContactList } from '@prisma/client';

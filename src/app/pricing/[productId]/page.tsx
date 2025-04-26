@@ -1,6 +1,6 @@
 'use client';
 
-import { ProductCard } from '@/app/pricing/_components/ProductCard';
+import { ProductCard } from '@/components/organisms/ProductCard/ProductCard';
 import { useMe } from '@/hooks/useMe';
 import { useParams } from 'next/navigation';
 import { useStripeProduct } from '@/hooks/useStripeProduct';

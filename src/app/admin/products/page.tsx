@@ -1,6 +1,6 @@
 'use client';
 
-import { ProductCard } from '@/app/pricing/_components/ProductCard';
+import { ProductCard } from '@/components/organisms/ProductCard/ProductCard';
 import { useStripeProducts } from '@/hooks/useStripeProducts';
 import { useMe } from '@/hooks/useMe';
 import Spinner from '@/components/ui/spinner';
