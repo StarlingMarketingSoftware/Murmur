@@ -16,8 +16,7 @@ import { headers } from 'next/headers';
 import { twMerge } from 'tailwind-merge';
 import { DarkModeToggle } from '../DarkModeToggle';
 import AiCredits from '../AiCredits/AiCredits';
-
-const urlList = [urls.home, urls.murmur.dashboard, urls.pricing, urls.contact];
+import prisma from '@/lib/prisma';
 
 interface NavItemProps {
 	url: Url;
@@ -38,9 +37,21 @@ const NavItem: React.FC<NavItemProps> = ({ url, className }) => {
 
 export async function Navbar() {
 	const { userId } = await auth();
+	const user = await prisma.user.findUnique({
+		where: { clerkId: userId || undefined },
+		select: { role: true },
+	});
 	const headersList = await headers();
 	const pathname = headersList.get('referer');
 	const isSignedIn = !!userId;
+
+	const urlList = [
+		urls.home,
+		urls.murmur.dashboard,
+		urls.pricing,
+		urls.contact,
+		urls.admin,
+	];
 
 	return (
 		<>
@@ -48,15 +59,18 @@ export async function Navbar() {
 				<div className="flex h-16 items-center justify-center px-4 container mx-auto">
 					<NavigationMenu>
 						<NavigationMenuList>
-							{urlList.map((url, index) => (
-								<NavItem
-									key={index}
-									url={url as Url}
-									className={twMerge(
-										pathname === url.path && 'border-b-[1px] border-foreground'
-									)}
-								/>
-							))}
+							{urlList.map((url, index) => {
+								if (user?.role !== 'admin' && url.path === urls.admin.path) return;
+								return (
+									<NavItem
+										key={index}
+										url={url as Url}
+										className={twMerge(
+											pathname === url.path && 'border-b-[1px] border-foreground'
+										)}
+									/>
+								);
+							})}
 						</NavigationMenuList>
 					</NavigationMenu>
 					<div className="absolute right-5 ml-auto flex items-center space-x-4">

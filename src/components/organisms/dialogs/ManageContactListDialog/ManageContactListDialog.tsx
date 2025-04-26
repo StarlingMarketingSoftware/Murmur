@@ -2,49 +2,43 @@ import { Button } from '@/components/ui/button';
 import {
 	Dialog,
 	DialogContent,
-	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from '@/components/ui/dialog';
 import { FC } from 'react';
 import Spinner from '@/components/ui/spinner';
-import CustomTable from '../../../CustomTable';
-import { ContactListDialogProps, useContactListDialog } from './useContactListDialog';
+import {
+	ManageContactListDialogProps,
+	useManageContactListDialog,
+} from './useManageContactListDialog';
+import CustomTable from '@/app/murmur/campaign/[campaignId]/_components/CustomTable';
 
-const ContactListDialog: FC<ContactListDialogProps> = (props) => {
+export const ManageContactListDialog: FC<ManageContactListDialogProps> = (props) => {
 	const {
 		isPending,
+		data,
 		isOpen,
 		setIsOpen,
 		columns,
-		setSelectedRows,
 		selectedContactList,
 		saveSelectedRecipients,
-		filteredData,
-	} = useContactListDialog(props);
+	} = useManageContactListDialog(props);
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen}>
 			<DialogContent className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px]">
-				<DialogTitle className="capitalize"></DialogTitle>
-				{isPending || !filteredData ? (
+				{isPending || !data ? (
 					<Spinner />
 				) : (
 					<>
 						<DialogTitle className="capitalize">
-							{`${selectedContactList?.name}`}
+							{`Manage "${selectedContactList?.name}"`}
 						</DialogTitle>
-						<DialogHeader>
-							<DialogDescription>
-								Select recipients from the table, then save them to your campaign.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeader></DialogHeader>
 						<CustomTable
 							columns={columns}
-							data={filteredData}
-							setSelectedRows={setSelectedRows}
-							isSelectable
-							noDataMessage="All contacts in this list have been added to your campaign already!"
+							data={data}
+							noDataMessage="There are no contacts in this contact list."
 						/>
 						<DialogFooter>
 							<Button onClick={saveSelectedRecipients}>Save Selected Recipients</Button>
@@ -55,5 +49,3 @@ const ContactListDialog: FC<ContactListDialogProps> = (props) => {
 		</Dialog>
 	);
 };
-
-export default ContactListDialog;
