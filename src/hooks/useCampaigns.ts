@@ -43,8 +43,6 @@ export const useEditCampaign = (options: CustomMutationOptions = {}) => {
 		onSuccess: onSuccessCallback,
 	} = options;
 
-	const queryClient = useQueryClient();
-
 	return useMutation({
 		mutationFn: async ({ data, campaignId }: EditCampaignData) => {
 			const response = await fetch(`/api/campaigns/${campaignId}`, {
@@ -66,7 +64,7 @@ export const useEditCampaign = (options: CustomMutationOptions = {}) => {
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}
-			queryClient.invalidateQueries({ queryKey: ['campaigns', 'campaign'] });
+			// queryClient.invalidateQueries({ queryKey: ['campaigns', 'campaign'] });
 			onSuccessCallback?.();
 		},
 		onError: () => {

@@ -13,8 +13,6 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import PageHeading from '@/components/text/PageHeading';
 import {
 	Card,
 	CardContent,
@@ -22,17 +20,19 @@ import {
 	CardHeader,
 	CardTitle,
 } from '@/components/ui/card';
-import MutedSubtext from '@/components/text/MutedSubtext';
-import { toast } from 'sonner';
-
-export const contactFormSchema = z.object({
-	name: z.string().min(1, { message: 'Name is required.' }),
-	email: z.string().email({ message: 'Invalid email address.' }),
-	subject: z.string().min(1, { message: 'Subject is required.' }),
-	message: z.string().min(1, { message: 'Message is required.' }),
-});
+import PageHeading from '@/components/atoms/_text/PageHeading';
+import MutedSubtext from '@/components/atoms/_text/MutedSubtext';
+import { useSendMailgunMessage } from '@/hooks/useMailgun';
+import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 
 const Contact = () => {
+	const contactFormSchema = z.object({
+		name: z.string().min(1, { message: 'Name is required.' }),
+		email: z.string().email({ message: 'Invalid email address.' }),
+		subject: z.string().min(1, { message: 'Subject is required.' }),
+		message: z.string().min(1, { message: 'Message is required.' }),
+	});
+
 	const form = useForm<z.infer<typeof contactFormSchema>>({
 		resolver: zodResolver(contactFormSchema),
 		defaultValues: {
@@ -43,21 +43,22 @@ const Contact = () => {
 		},
 	});
 
-	const onSubmit = async (values: z.infer<typeof contactFormSchema>) => {
-		const res = await fetch('/api/contact', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify(values),
-		});
-		if (res.status === 200) {
+	const { isPending, mutate } = useSendMailgunMessage({
+		onSuccess: () => {
 			form.reset();
-			toast.success('Message sent successfully!');
-		} else {
-			const { error } = await res.json();
-			toast.error(error);
-		}
+		},
+	});
+
+	const onSubmit = (values: z.infer<typeof contactFormSchema>) => {
+		const emailBody: string = `<p>Name: ${values.name}</p><p></p><p>Email: ${values.email}</p><p></p><p>Message: ${values.message}</p>`;
+
+		mutate({
+			recipientEmail: process.env.NEXT_PUBLIC_CONTACT_FORM_RECIPIENT!,
+			...values,
+			senderEmail: values.email,
+			senderName: `Murmur Inquiry from ${values.name}`,
+			message: emailBody,
+		});
 	};
 
 	return (
@@ -120,13 +121,17 @@ const Contact = () => {
 									<FormItem>
 										<FormLabel>Message</FormLabel>
 										<FormControl>
-											<Textarea className="h-44" {...field} />
+											<RichTextEditor
+												hideMenuBar
+												value={field.value}
+												onChange={field.onChange}
+											/>
 										</FormControl>
 										<FormMessage />
 									</FormItem>
 								)}
 							/>
-							<Button size="lg" type="submit">
+							<Button size="lg" type="submit" isLoading={isPending}>
 								Submit
 							</Button>
 						</form>

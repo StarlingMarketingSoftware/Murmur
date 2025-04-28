@@ -1,18 +1,163 @@
+import { CustomMutationOptions } from '@/constants/types';
 import { ContactList } from '@prisma/client';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
-export const useContactLists = () => {
-	const { data, isPending } = useQuery<ContactList[]>({
-		queryKey: ['contact-list'],
+interface EditContactListData {
+	listId: number;
+	data: Partial<ContactList>;
+}
+
+interface CreateContactListBody {
+	name: string;
+	count?: number;
+	userIds?: string[];
+}
+
+export const useGetContactLists = () => {
+	return useQuery({
+		queryKey: ['contactLists'],
 		queryFn: async () => {
-			const response = await fetch(`/api/contact-list/`);
+			const response = await fetch('/api/contact-list');
 			if (!response.ok) {
-				const error = await response.json();
-				throw new Error(error.message);
+				throw new Error('Failed to fetch contact lists');
 			}
-			return await response.json();
+			return response.json();
 		},
 	});
+};
 
-	return { data, isPending };
+export const useGetContactList = (id: number) => {
+	return useQuery<ContactList>({
+		queryKey: ['contactList', id],
+		queryFn: async () => {
+			const response = await fetch(`/api/contact-list/${id}`);
+			if (!response.ok) {
+				throw new Error('Failed to fetch contact list');
+			}
+			return response.json();
+		},
+	});
+};
+
+export const useCreateContactList = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Contact list created successfully',
+		errorMessage = 'Failed to create contact list',
+		onSuccess: onSuccessCallback,
+	} = options;
+
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (data: CreateContactListBody) => {
+			const response = await fetch('/api/contact-list', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(data),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to create contact list');
+			}
+
+			return response.json();
+		},
+		onSuccess: () => {
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
+			queryClient.invalidateQueries({ queryKey: ['contactLists'] });
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
+};
+
+export const useEditContactList = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Contact list updated successfully',
+		errorMessage = 'Failed to update contact list',
+		onSuccess: onSuccessCallback,
+	} = options;
+
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async ({ data, listId }: EditContactListData) => {
+			const response = await fetch(`/api/contact-list/${listId}`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(data),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to update contact list');
+			}
+
+			return response.json();
+		},
+		onSuccess: () => {
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
+			queryClient.invalidateQueries({ queryKey: ['contactLists'] });
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
+};
+
+export const useDeleteContactList = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Contact list deleted successfully',
+		errorMessage = 'Failed to delete contact list',
+		onSuccess: onSuccessCallback,
+	} = options;
+
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (listId: number) => {
+			const response = await fetch(`/api/contact-list/${listId}`, {
+				method: 'DELETE',
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to delete contact list');
+			}
+
+			return response.json();
+		},
+		onSuccess: () => {
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
+			queryClient.invalidateQueries({ queryKey: ['contactLists'] });
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
 };

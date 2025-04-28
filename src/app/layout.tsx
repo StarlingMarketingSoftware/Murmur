@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
-import { Footer } from '@/components/Footer';
+import { Footer } from '@/components/molecules/Footer/Footer';
 import { Toaster } from '@/components/ui/toast';
 import './globals.css';
 import SubLayout from './sublayout';
-// import localFont from 'next/font/local';
-import { Navbar } from '@/components/navbar/Navbar';
+import localFont from 'next/font/local';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import StoreProvider from './StoreProvider';
+import { Navbar } from '@/components/organisms/Navbar/Navbar';
 
 const geistSans = Geist({
 	variable: '--font-geist-sans',
@@ -19,9 +19,9 @@ const geistMono = Geist_Mono({
 	subsets: ['latin'],
 });
 
-// const palatino = localFont({
-// 	src: '../../public/palatino.ttf',
-// });
+const timesNewRoman = localFont({
+	src: '../../public/timesNewRoman.ttf',
+});
 
 export const metadata: Metadata = {
 	title: 'Murmur',
@@ -36,17 +36,12 @@ export default function RootLayout({
 }>) {
 	return (
 		<StoreProvider>
-			{/* <html lang="en" className={palatino.className}> */}
-			<html lang="en" suppressHydrationWarning>
+			<html lang="en" className={timesNewRoman.className} suppressHydrationWarning>
+				{/* <html lang="en" suppressHydrationWarning> */}
 				<body
 					className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
 				>
-					<ThemeProvider
-						attribute="class"
-						defaultTheme="system"
-						enableSystem
-						// disableTransitionOnChange
-					>
+					<ThemeProvider attribute="class" defaultTheme="light">
 						<SubLayout>
 							<Navbar />
 							<main className="flex-1">{children}</main>

@@ -1,7 +1,7 @@
 'use client';
 
-import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
-import { ProductCard } from '@/app/pricing/_components/ProductCard';
+import ManageSubscriptionButton from '@/components/organisms/ManageSubscriptionButton/ManageSubscriptionButton';
+import { ProductCard } from '@/components/organisms/ProductCard/ProductCard';
 import { useStripeProducts } from '@/hooks/useStripeProducts';
 import { useMe } from '@/hooks/useMe';
 import Spinner from '@/components/ui/spinner';
