@@ -6,9 +6,11 @@ import { RichTextMenuBar } from './RichTextMenuBar';
 import Highlight from '@tiptap/extension-highlight';
 import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
+import FontFamily from '@tiptap/extension-font-family';
 import { FC, useEffect } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { Node } from '@tiptap/core';
+import TextStyle from '@tiptap/extension-text-style';
 
 interface RichTextEditorProps {
 	value: string;
@@ -66,6 +68,8 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 				types: ['heading', 'paragraph'],
 				alignments: ['left', 'center', 'right'],
 			}),
+			FontFamily,
+			TextStyle.configure({ mergeNestedSpanStyles: true }),
 			Div, // Add the Div extension here
 		],
 		editable: isEdit,

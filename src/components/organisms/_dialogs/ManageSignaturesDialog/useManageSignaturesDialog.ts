@@ -72,7 +72,7 @@ export const useManageSignaturesDialog = () => {
 			signatureId: currentSignature.id,
 			data,
 		});
-		queryClient.invalidateQueries({ queryKey: ['campaign', campaignId] });
+		queryClient.invalidateQueries({ queryKey: ['campaign', campaignId.toString()] });
 	};
 
 	const queryClient = useQueryClient();
@@ -95,7 +95,7 @@ export const useManageSignaturesDialog = () => {
 				signatureId: currentSignature?.id,
 			},
 		});
-		queryClient.invalidateQueries({ queryKey: ['campaign', campaignId] });
+		queryClient.invalidateQueries({ queryKey: ['campaign', campaignId.toString()] });
 	};
 
 	return {

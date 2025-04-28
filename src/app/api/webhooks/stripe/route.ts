@@ -50,7 +50,6 @@ export async function POST(req: Request) {
 			const subscription: Stripe.Subscription = event.data.object;
 			const priceId = subscription.items.data[0].price.id;
 			const subscriptionTier = getSubscriptionTierWithPriceId(priceId);
-			console.log('🚀 ~ POST ~ subscriptionTier:', subscriptionTier);
 
 			const aiDraftCredits = await calcAiCredits(subscriptionTier, priceId);
 

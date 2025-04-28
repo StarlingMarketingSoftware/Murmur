@@ -71,8 +71,8 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 			contactEmail: campaign.contacts[0].email,
 		};
 	} else {
-		dataDraftEmail.subject = rawDataDraftEmail?.subject || '';
-		dataDraftEmail.message = rawDataDraftEmail?.message || '';
+		dataDraftEmail.subject = campaign.testSubject || '';
+		dataDraftEmail.message = campaign.testMessage || '';
 	}
 
 	const form = useForm<z.infer<ReturnType<typeof getEmailDraftSchema>>>({
@@ -118,15 +118,15 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 
 	const { isPending: isPendingSavePrompt, mutateAsync: savePrompt } = useEditCampaign({
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id] });
-			form.reset(form.getValues());
+			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id.toString()] });
+			// form.reset(form.getValues());
 		},
 	});
 
 	const { mutateAsync: saveTestEmail } = useEditCampaign({
 		suppressToasts: true,
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id] });
+			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id.toString()] });
 		},
 	});
 
@@ -175,10 +175,11 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 				await saveTestEmail({
 					campaignId: campaign.id,
 					data: {
-						testMessage: res.message,
+						testMessage: `${res.message}<p></p><div>${campaign.signature?.content}</div>`,
 						testSubject: isAiSubject ? res.subject : values.subject,
 					},
 				});
+				queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id.toString()] });
 				toast.success('Test email generated successfully!');
 				if (user && aiTestCredits) {
 					editUser({
@@ -186,9 +187,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 						data: { aiTestCredits: aiTestCredits - 1 },
 					});
 				}
-			} catch {
-				toast.error('Failed to generate test email. Please try again.');
-			}
+			} catch {}
 			setIsTest(false);
 		} else if (isAiDraft) {
 			let remainingCredits = aiDraftCredits || 0;
@@ -262,8 +261,9 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		};
 	}, []);
 
-	const handleSavePrompt = () => {
-		savePrompt({ data: { ...form.getValues() }, campaignId: campaign.id });
+	const handleSavePrompt = async () => {
+		await savePrompt({ data: { ...form.getValues() }, campaignId: campaign.id });
+		queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id.toString()] });
 	};
 
 	return {

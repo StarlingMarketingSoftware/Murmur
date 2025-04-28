@@ -214,7 +214,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 									>
 										{isAiDraft ? 'Test Your Prompt' : 'Preview Draft'}
 									</Button>
-									{dataDraftEmail && (
+									{dataDraftEmail.message.length > 0 && (
 										<PreviewTestDraftDialog draftEmail={dataDraftEmail} />
 									)}
 									{isAiDraft && (

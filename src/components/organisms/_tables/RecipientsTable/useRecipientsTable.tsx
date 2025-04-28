@@ -41,7 +41,7 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 		},
 		onSuccess: () => {
 			toast.success('Recipient successfully removed from campaign.');
-			queryClient.invalidateQueries({ queryKey: ['campaign'] });
+			queryClient.invalidateQueries({ queryKey: ['campaign', campaignId?.toString()] });
 		},
 		onError: () => {
 			toast.error('Failed to remove recipient from campaign. Please try again.');

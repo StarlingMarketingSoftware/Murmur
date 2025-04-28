@@ -65,12 +65,14 @@ const PreviewTestDraftDialog: FC<PreviewTestDraftDialogProps> = (props) => {
 					</div>
 					<div className="grid gap-2">
 						<Label htmlFor="message">Message</Label>
-						<RichTextEditor hideMenuBar isEdit={false} value={draftEmail.message} />
+						<RichTextEditor
+							className="!h-full grow max-h-[200px] overflow-y-auto"
+							// hideMenuBar
+							isEdit={false}
+							value={draftEmail.message}
+						/>
 					</div>
 				</div>
-				{/* <DialogFooter>
-					<Button type="submit">Save changes</Button>
-				</DialogFooter> */}
 			</DialogContent>
 		</Dialog>
 	);
