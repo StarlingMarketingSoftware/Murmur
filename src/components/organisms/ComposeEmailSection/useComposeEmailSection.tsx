@@ -71,8 +71,8 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 			contactEmail: campaign.contacts[0].email,
 		};
 	} else {
-		dataDraftEmail.subject = rawDataDraftEmail?.subject || '';
-		dataDraftEmail.message = rawDataDraftEmail?.message || '';
+		dataDraftEmail.subject = campaign.testSubject || '';
+		dataDraftEmail.message = campaign.testMessage || '';
 	}
 
 	const form = useForm<z.infer<ReturnType<typeof getEmailDraftSchema>>>({
@@ -151,14 +151,12 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 			setAbortController(null);
 		}
 	};
-	console.log('🚀 ~ handleFormAction ~ isAiSubject:', isAiSubject);
 
 	const handleFormAction = async (action: 'test' | 'submit') => {
 		const isValid = await trigger();
 		if (!isValid) return;
 
 		const values = getValues();
-		console.log('🚀 ~ handleFormAction ~ values:', values);
 
 		if (action === 'test') {
 			setIsTest(true);
@@ -174,7 +172,6 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 					recipient: campaign.contacts[0],
 					prompt: values.message,
 				});
-				console.log('siagnture', campaign.signature);
 				await saveTestEmail({
 					campaignId: campaign.id,
 					data: {
@@ -190,9 +187,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 						data: { aiTestCredits: aiTestCredits - 1 },
 					});
 				}
-			} catch {
-				toast.error('Failed to generate test email. Please try again.');
-			}
+			} catch {}
 			setIsTest(false);
 		} else if (isAiDraft) {
 			let remainingCredits = aiDraftCredits || 0;

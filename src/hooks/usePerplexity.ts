@@ -165,10 +165,6 @@ export const usePerplexityDraftEmail = () => {
 				throw new Error('Failed to parse AI response. Please try again.');
 			}
 		},
-		onError: (error) => {
-			toast.error(error.message);
-		},
-		onSuccess: () => {},
 	});
 
 	return {
