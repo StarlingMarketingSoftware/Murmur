@@ -1,6 +1,5 @@
 import { AiModel, Contact } from '@prisma/client';
 import { useMutation } from '@tanstack/react-query';
-import { toast } from 'sonner';
 
 const rolePrompt = `Write a personalized email to {first_name} who works at {company}. If there is no recipient name provided, start the email with "Hello!"
 
