@@ -9,14 +9,27 @@ import {
 	List,
 	ListOrdered,
 	Strikethrough,
+	TypeIcon,
 	Underline,
 } from 'lucide-react';
 import { Toggle } from '../../ui/toggle';
+import {
+	Select,
+	SelectContent,
+	SelectGroup,
+	SelectItem,
+	SelectLabel,
+	SelectTrigger,
+	SelectValue,
+} from '@/components/ui/select';
 
 interface RichTextMenuBarProps {
 	editor: Editor | null;
 	isEdit?: boolean;
 }
+
+const fontOptions = ['Times New Roman', 'Arial', 'Calibri', 'Georgia', 'Courier New'];
+
 export const RichTextMenuBar: FC<RichTextMenuBarProps> = ({ editor, isEdit }) => {
 	if (!editor) {
 		return null;
@@ -82,15 +95,10 @@ export const RichTextMenuBar: FC<RichTextMenuBarProps> = ({ editor, isEdit }) =>
 			onClick: () => editor.chain().focus().toggleOrderedList().run(),
 			pressed: editor.isActive('orderedList'),
 		},
-		// {
-		// 	icon: <Highlighter className="size-4" />,
-		// 	onClick: () => editor.chain().focus().toggleHighlight().run(),
-		// 	pressed: editor.isActive('highlight'),
-		// },
 	];
 
 	return (
-		<div className="border rounded-md p-1 mb-1 space-x-2 z-50">
+		<div className="border rounded-md p-1 mb-1 space-x-2 z-50 flex">
 			{Options.map((option, index) => (
 				<Toggle
 					disabled={!isEdit}
@@ -101,6 +109,27 @@ export const RichTextMenuBar: FC<RichTextMenuBarProps> = ({ editor, isEdit }) =>
 					{option.icon}
 				</Toggle>
 			))}
+			<Select
+				onValueChange={(font) => editor.chain().focus().setFontFamily(font).run()}
+				defaultValue={fontOptions[0]}
+				value={editor.getAttributes('textStyle').fontFamily}
+				disabled={!isEdit}
+			>
+				<SelectTrigger>
+					<TypeIcon className="size-4 mr-2" />
+					<SelectValue placeholder="Select font" />
+				</SelectTrigger>
+				<SelectContent>
+					<SelectGroup>
+						<SelectLabel>Fonts</SelectLabel>
+						{fontOptions.map((font) => (
+							<SelectItem key={font} value={font} style={{ fontFamily: font }}>
+								{font}
+							</SelectItem>
+						))}
+					</SelectGroup>
+				</SelectContent>
+			</Select>
 		</div>
 	);
 };
