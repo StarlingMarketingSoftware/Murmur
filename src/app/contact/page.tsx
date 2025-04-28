@@ -25,14 +25,14 @@ import MutedSubtext from '@/components/atoms/_text/MutedSubtext';
 import { useSendMailgunMessage } from '@/hooks/useMailgun';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 
-export const contactFormSchema = z.object({
-	name: z.string().min(1, { message: 'Name is required.' }),
-	email: z.string().email({ message: 'Invalid email address.' }),
-	subject: z.string().min(1, { message: 'Subject is required.' }),
-	message: z.string().min(1, { message: 'Message is required.' }),
-});
-
 const Contact = () => {
+	const contactFormSchema = z.object({
+		name: z.string().min(1, { message: 'Name is required.' }),
+		email: z.string().email({ message: 'Invalid email address.' }),
+		subject: z.string().min(1, { message: 'Subject is required.' }),
+		message: z.string().min(1, { message: 'Message is required.' }),
+	});
+
 	const form = useForm<z.infer<typeof contactFormSchema>>({
 		resolver: zodResolver(contactFormSchema),
 		defaultValues: {
