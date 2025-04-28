@@ -4,6 +4,11 @@ export const urls = {
 		label: 'Home',
 		category: 'mainMenu',
 	},
+	about: {
+		path: '/',
+		label: 'About Us',
+		category: 'mainMenu',
+	},
 	murmur: {
 		path: '/murmur',
 		label: 'Murmur',
