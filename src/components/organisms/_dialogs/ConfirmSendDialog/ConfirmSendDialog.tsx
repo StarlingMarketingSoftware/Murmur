@@ -21,6 +21,7 @@ import { ConfirmSendDialogProps, useConfirmSendDialog } from './useConfirmSendDi
 import { Input } from '@/components/ui/input';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
 import { restrictedFeatureMessages } from '@/constants/constants';
+import { CheckIcon, SendIcon } from 'lucide-react';
 
 export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
 	const { handleSend, form, draftEmailCount, hasReachedSendingLimit, isOpen, setIsOpen } =
@@ -28,7 +29,12 @@ export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen} modal>
 			<DialogTrigger asChild>
-				<Button disabled={draftEmailCount <= 0} variant="default">
+				<Button
+					className="w-full sm:w-fit"
+					disabled={draftEmailCount <= 0}
+					variant="default"
+				>
+					<CheckIcon />
 					Proceed to Confirmation
 				</Button>
 			</DialogTrigger>
@@ -70,6 +76,7 @@ export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
 						<DialogFooter>
 							<div className="flex gap-2 w-full items-center justify-center">
 								<Button disabled={hasReachedSendingLimit} type="submit">
+									<SendIcon />
 									{`Send ${draftEmailCount} Emails`}
 								</Button>
 								{hasReachedSendingLimit && (

@@ -175,18 +175,6 @@ export function CustomTable<TData, TValue>({
 		initialRowSelectionState,
 	]);
 
-	// // Mark initial mount as complete after first render
-	// useEffect(() => {
-	// 	setIsInitialMount(false);
-	// }, []);
-
-	// // Reset isInitialMount when data changes
-	// useEffect(() => {
-	// 	if (data) {
-	// 		setIsInitialMount(true);
-	// 	}
-	// }, [data]);
-
 	return (
 		<div>
 			{isSelectable && (

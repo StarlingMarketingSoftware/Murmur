@@ -23,7 +23,6 @@ import { forwardRef, useState } from 'react';
 export const Navbar = () => {
 	const { user } = useMe();
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
-	console.log('🚀 ~ Navbar ~ isMobileMenuOpen:', isMobileMenuOpen);
 	const urlList = [
 		urls.home,
 		urls.about,
@@ -89,7 +88,9 @@ export const Navbar = () => {
 			<div
 				className={cn(
 					'fixed z-40 top-16 right-0 w-full h-[calc(100vh-4rem)] bg-background shadow-lg transform transition-opacity duration-500 ease-in-out lg:hidden',
-					isMobileMenuOpen ? 'opacity-100' : 'opacity-0'
+					isMobileMenuOpen
+						? 'pointer-events-auto opacity-100'
+						: 'pointer-events-none opacity-0'
 				)}
 			>
 				<nav className="flex flex-col p-4 items-center justify-evenly h-full space-y-2">
@@ -99,10 +100,7 @@ export const Navbar = () => {
 								key={index}
 								href={url.path}
 								className="px-4 py-2 rounded-md w-[125%] text-center hover:bg-card transition-all duration-500 text-3xl "
-								onClick={() => {
-									console.log('hi');
-									setMobileMenuOpen(false);
-								}}
+								onClick={() => setMobileMenuOpen(false)}
 							>
 								{url.label}
 							</Link>

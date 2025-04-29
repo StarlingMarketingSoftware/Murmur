@@ -7,6 +7,7 @@ import {
 } from './useEmailAutomationSteps';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
+import { ArrowLeft, ArrowRight, SquareChevronLeft } from 'lucide-react';
 
 const EmailAutomationSteps: FC<EmailAutomationStepsProps> = (props) => {
 	const { stepParam, handleTabChange, advanceToNextStep, returnToPreviousStep, steps } =
@@ -20,10 +21,11 @@ const EmailAutomationSteps: FC<EmailAutomationStepsProps> = (props) => {
 				onValueChange={handleTabChange}
 				className="w-full"
 			>
-				<TabsList className="grid grid-cols-3 mx-auto bg-transparent">
+				<TabsList className="mx-auto">
 					{steps.map((step) => (
 						<TabsTrigger key={step.step} value={step.step.toString()}>
-							{`Step ${step.step}: ${step.label}`}
+							{step.icon}
+							{`${step.label}`}
 						</TabsTrigger>
 					))}
 				</TabsList>
@@ -33,24 +35,30 @@ const EmailAutomationSteps: FC<EmailAutomationStepsProps> = (props) => {
 					</TabsContent>
 				))}
 			</Tabs>
-			<div className="flex mx-auto justify-center gap-4 mt-4">
+			<div className="flex sm:flex-row flex-col-reverse mx-auto justify-center items-center gap-4 mt-4">
 				<Link href={urls.murmur.dashboard.path}>
-					<Button variant="ghost">Back to Dashboard</Button>
+					<Button variant="ghost">
+						<SquareChevronLeft />
+						Back to Dashboard
+					</Button>
 				</Link>
-				<Button
-					variant="outline"
-					disabled={stepParam === '1'}
-					onClick={returnToPreviousStep}
-				>
-					Previous Step
-				</Button>
-				<Button
-					variant="outline"
-					disabled={stepParam === '3'}
-					onClick={advanceToNextStep}
-				>
-					Next Step
-				</Button>
+				<div className="flex flex-row justify-center items-center gap-4">
+					<Button
+						variant="outline"
+						disabled={stepParam === '1'}
+						onClick={returnToPreviousStep}
+					>
+						<ArrowLeft />
+						Previous Step
+					</Button>
+					<Button
+						variant="outline"
+						disabled={stepParam === '3'}
+						onClick={advanceToNextStep}
+					>
+						Next Step <ArrowRight />
+					</Button>
+				</div>
 			</div>
 		</>
 	);
