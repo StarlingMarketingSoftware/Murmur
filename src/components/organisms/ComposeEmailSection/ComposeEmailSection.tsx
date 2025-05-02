@@ -191,7 +191,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 								<div className="flex flex-row gap-4 w-full">
 									<div className="w-full sm:w-fit">
 										<FormLabel>Signatures</FormLabel>
-										<ManageSignaturesDialog />
+										<ManageSignaturesDialog handleSavePrompt={handleSavePrompt} />
 									</div>
 									<div className="w-full sm:w-fit">
 										<FormLabel>Selected Signature</FormLabel>

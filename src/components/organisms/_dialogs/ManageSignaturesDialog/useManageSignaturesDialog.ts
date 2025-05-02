@@ -19,10 +19,14 @@ const signatureSchema = z.object({
 	content: z.string(),
 });
 
-export const useManageSignaturesDialog = () => {
+export interface ManageSignaturesDialogProps {
+	handleSavePrompt?: () => Promise<void>;
+}
+
+export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) => {
 	const params = useParams();
 	const { campaignId } = params as { campaignId: string };
-
+	const { handleSavePrompt } = props;
 	const [isEdit, setIsEdit] = useState(false);
 	const [currentSignature, setCurrentSignature] = useState<Signature | null>(null);
 
@@ -68,6 +72,9 @@ export const useManageSignaturesDialog = () => {
 			toast.error('No signature selected.');
 			return;
 		}
+		if (handleSavePrompt) {
+			await handleSavePrompt();
+		}
 		await saveSignature({
 			signatureId: currentSignature.id,
 			data,
@@ -81,6 +88,9 @@ export const useManageSignaturesDialog = () => {
 		if (!currentSignature) {
 			toast.error('No signature selected.');
 			return;
+		}
+		if (handleSavePrompt) {
+			await handleSavePrompt();
 		}
 		await saveSignature({
 			signatureId: currentSignature?.id,
@@ -116,5 +126,6 @@ export const useManageSignaturesDialog = () => {
 		isPendingSaveSignatureToCampaign,
 		campaignId,
 		handleSaveSignatureToCampaign,
+		...props,
 	};
 };
