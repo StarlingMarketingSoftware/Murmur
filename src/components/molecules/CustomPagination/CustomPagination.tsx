@@ -22,38 +22,69 @@ const CustomPagination = <TData,>({
 }: CustomPaginationProps<TData>) => {
 	const numPages = table.getPageCount();
 
-	const generatePaginationItems = (): ReactNode[] => {
+	const generatePaginationItems = (mobile: boolean): ReactNode[] => {
 		let paginationArray: number[] = [];
-		if (numPages > 9) {
-			if (currentPage >= 4 && currentPage < numPages - 3) {
-				paginationArray = [
-					1,
-					-1,
-					currentPage - 1,
-					currentPage,
-					currentPage + 1,
-					currentPage + 2,
-					currentPage + 3,
-					-1,
-					numPages,
-				];
-			} else if (currentPage > numPages - 4) {
-				paginationArray = [
-					1,
-					-1,
-					numPages - 6,
-					numPages - 5,
-					numPages - 4,
-					numPages - 3,
-					numPages - 2,
-					numPages - 1,
-					numPages,
-				];
+
+		if (mobile) {
+			if (numPages > 5) {
+				if (currentPage >= 3 && currentPage < numPages - 2) {
+					paginationArray = [
+						1,
+						-1,
+						currentPage - 1,
+						currentPage,
+						currentPage + 1,
+						-1,
+						numPages,
+					];
+				} else if (currentPage > numPages - 3) {
+					paginationArray = [
+						1,
+						-1,
+						numPages - 4,
+						numPages - 3,
+						numPages - 2,
+						numPages - 1,
+						numPages,
+					];
+				} else {
+					paginationArray = [1, 2, 3, -1, numPages];
+				}
 			} else {
-				paginationArray = [1, 2, 3, 4, 5, 6, 7, -1, numPages];
+				paginationArray = Array.from({ length: numPages }, (_, i) => i + 1);
 			}
 		} else {
-			paginationArray = Array.from({ length: numPages }, (_, i) => i + 1);
+			if (numPages > 9) {
+				if (currentPage >= 4 && currentPage < numPages - 3) {
+					paginationArray = [
+						1,
+						-1,
+						currentPage - 1,
+						currentPage,
+						currentPage + 1,
+						currentPage + 2,
+						currentPage + 3,
+						-1,
+						numPages,
+					];
+				} else if (currentPage > numPages - 4) {
+					paginationArray = [
+						1,
+						-1,
+						numPages - 6,
+						numPages - 5,
+						numPages - 4,
+						numPages - 3,
+						numPages - 2,
+						numPages - 1,
+						numPages,
+					];
+				} else {
+					paginationArray = [1, 2, 3, 4, 5, 6, 7, -1, numPages];
+				}
+			} else {
+				paginationArray = Array.from({ length: numPages }, (_, i) => i + 1);
+			}
 		}
 
 		const items = paginationArray.map((page: number, index) => {
@@ -77,7 +108,7 @@ const CustomPagination = <TData,>({
 					</PaginationItem>
 				);
 			}
-		}); // Remove the extra semicolon and curly brace here
+		});
 
 		return items;
 	};
@@ -91,7 +122,8 @@ const CustomPagination = <TData,>({
 				>
 					<PaginationPrevious />
 				</PaginationItem>
-				{generatePaginationItems()}
+				<div className="hidden sm:flex">{generatePaginationItems(false)}</div>
+				<div className="flex sm:hidden">{generatePaginationItems(true)}</div>
 				<PaginationItem
 					className={twMerge(
 						(currentPage + 1 === numPages || table.getRowModel().rows.length === 0) &&

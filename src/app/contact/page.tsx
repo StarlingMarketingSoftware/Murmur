@@ -21,9 +21,10 @@ import {
 	CardTitle,
 } from '@/components/ui/card';
 import PageHeading from '@/components/atoms/_text/PageHeading';
-import MutedSubtext from '@/components/atoms/_text/MutedSubtext';
 import { useSendMailgunMessage } from '@/hooks/useMailgun';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
+import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
+import { TypographyP } from '@/components/ui/typography';
 
 const Contact = () => {
 	const contactFormSchema = z.object({
@@ -62,22 +63,26 @@ const Contact = () => {
 	};
 
 	return (
-		<div className="max-w-[900px] mx-auto">
+		<AppLayout>
 			<PageHeading>Contact Us</PageHeading>
-			<MutedSubtext>{`We're here to help with any questions you may have`}.</MutedSubtext>
-			<Card className="max-w-[750px] mx-auto">
+			<TypographyP>
+				You can reach us at any time, on any day, and we will get back to you immediately.
+				We run this business to the highest degree of excellence we possibly can, and we
+				seek to serve you to the best of our ability, according to the task at hand.
+			</TypographyP>{' '}
+			<Card>
 				<CardHeader className="">
 					<CardTitle>Send us a message</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<Form {...form}>
 						<form onSubmit={form.handleSubmit(onSubmit)} className="">
-							<div className="flex flex-row items-center w-full gap-4 m-0">
+							<div className="flex sm:flex-row flex-col items-center w-full gap-0 sm:gap-4 m-0">
 								<FormField
 									control={form.control}
 									name="name"
 									render={({ field }) => (
-										<FormItem className="w-1/2">
+										<FormItem className="w-full sm:w-1/2">
 											<FormLabel>Name</FormLabel>
 											<FormControl>
 												<Input {...field} />
@@ -90,7 +95,7 @@ const Contact = () => {
 									control={form.control}
 									name="email"
 									render={({ field }) => (
-										<FormItem className="w-1/2">
+										<FormItem className="w-full sm:w-1/2">
 											<FormLabel>Email</FormLabel>
 											<FormControl>
 												<Input {...field} />
@@ -139,12 +144,10 @@ const Contact = () => {
 				</CardContent>
 				<CardFooter></CardFooter>
 			</Card>
-
 			<div className="flex flex-row justify-center items-center">
 				<div></div>
 			</div>
-			<MutedSubtext>We typically respond within 24 hours.</MutedSubtext>
-		</div>
+		</AppLayout>
 	);
 };
 
