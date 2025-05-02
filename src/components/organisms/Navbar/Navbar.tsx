@@ -35,9 +35,12 @@ export const Navbar = () => {
 		<>
 			<div className="sticky top-0 z-10 bg-background shadow-sm">
 				<div className="flex h-16 items-center justify-center px-4 container mx-auto">
-					<div className="ml-4 hidden lg:flex absolute h-6/10 left-0 justify-center items-center space-x-2">
+					<Link
+						href={urls.home.path}
+						className="ml-4 hidden lg:flex absolute h-6/10 left-0 justify-center items-center space-x-2"
+					>
 						<Logo pathClassName="fill-foreground stroke-foreground" />
-					</div>
+					</Link>
 					<div className="ml-4 absolute h-6/10 left-0 flex lg:hidden justify-center items-center space-x-2">
 						<LogoIcon pathClassName="fill-foreground stroke-foreground" />
 					</div>

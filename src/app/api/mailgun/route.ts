@@ -14,8 +14,8 @@ export async function POST(request: Request) {
 	});
 
 	try {
-		const data = await mg.messages.create('murmurpro.com', {
-			from: `${senderName} <postmaster@murmurpro.com>`,
+		const data = await mg.messages.create('murmurmailbox.com', {
+			from: `${senderName} <postmaster@murmurmailbox.com>`,
 			to: [recipientEmail],
 			subject: subject,
 			html: replacePTagsInSignature(message),

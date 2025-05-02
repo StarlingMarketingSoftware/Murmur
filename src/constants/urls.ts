@@ -5,7 +5,7 @@ export const urls = {
 		category: 'mainMenu',
 	},
 	about: {
-		path: '/',
+		path: '/about',
 		label: 'About Us',
 		category: 'mainMenu',
 	},

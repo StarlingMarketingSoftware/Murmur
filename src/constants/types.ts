@@ -6,6 +6,12 @@ export type Url = {
 	category?: UrlCategory;
 };
 
+export type Logo = {
+	fileName: string;
+	width: number;
+	darkFileName?: string;
+};
+
 export type UrlCategory = 'protected' | 'mainMenu';
 
 export type CampaignWithRelations = Prisma.CampaignGetPayload<{

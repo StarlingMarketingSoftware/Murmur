@@ -36,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { ManageSignaturesDialog } from '../_dialogs/ManageSignaturesDialog/ManageSignaturesDialog';
 import ProgressIndicator from '../../molecules/ProgressIndicator/ProgressIndicator';
 import { ConfirmDialog } from '../_dialogs/ConfirmDialog/ConfirmDialog';
+import { ellipsesText } from '@/app/utils/functions';
 
 const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 	const {
@@ -194,9 +195,9 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 									</div>
 									<div className="w-full sm:w-fit">
 										<FormLabel>Selected Signature</FormLabel>
-										<Button className="w-full" variant="outline" disabled>
+										<Button className="w-full max-w-[150px]" variant="outline" disabled>
 											{selectedSignature
-												? selectedSignature.name
+												? ellipsesText(selectedSignature.name, 18)
 												: 'No Signature Selected'}
 										</Button>
 									</div>

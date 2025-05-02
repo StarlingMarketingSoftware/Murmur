@@ -63,6 +63,7 @@
 		"react-dom": "^19.0.0",
 		"react-hook-form": "^7.55.0",
 		"react-icons": "^5.5.0",
+		"react-infinite-logo-slider": "^1.1.4",
 		"react-redux": "^9.2.0",
 		"sonner": "^2.0.1",
 		"stripe": "^16.12.0",
