@@ -24,7 +24,21 @@ import { Signature } from '@prisma/client';
 import Spinner from '@/components/ui/spinner';
 import { twMerge } from 'tailwind-merge';
 import { Input } from '@/components/ui/input';
-import { TrashIcon } from 'lucide-react';
+import {
+	ArrowDownNarrowWideIcon,
+	SaveIcon,
+	SignatureIcon,
+	TrashIcon,
+} from 'lucide-react';
+import {
+	Select,
+	SelectContent,
+	SelectGroup,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from '@/components/ui/select';
+import { SelectLabel } from '@radix-ui/react-select';
 
 export const ManageSignaturesDialog: FC = () => {
 	const {
@@ -46,7 +60,10 @@ export const ManageSignaturesDialog: FC = () => {
 	return (
 		<Dialog>
 			<DialogTrigger asChild>
-				<Button variant="outline">Manage Signatures</Button>
+				<Button className="w-full sm:w-fit" variant="outline">
+					<SignatureIcon />
+					Manage Signatures
+				</Button>
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px]">
 				<DialogHeader>
@@ -55,8 +72,56 @@ export const ManageSignaturesDialog: FC = () => {
 						Your selected signature will be added to the end of every email you draft.
 					</DialogDescription>
 				</DialogHeader>
-				<div className="flex flex-row gap-4">
-					<div className="w-3/12">
+				<div className="grid grid-cols-2 gap-4 md:hidden w-full">
+					{isPendingSignatures ? (
+						<Spinner />
+					) : (
+						<Select
+							onValueChange={(signature) =>
+								setCurrentSignature(
+									signatures.find((s: Signature) => s.id.toString() === signature)
+								)
+							}
+							defaultValue={currentSignature?.id.toString()}
+							value={currentSignature?.id.toString()}
+						>
+							<SelectTrigger className="w-full">
+								<SelectValue placeholder="Select font" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectGroup>
+									<SelectLabel>Signatures</SelectLabel>
+									{signatures.map((signature: Signature) => {
+										const isSelected = currentSignature?.id === signature.id;
+										return (
+											<div key={signature.id}>
+												<SelectItem
+													value={signature.id.toString()}
+													onClick={() => setCurrentSignature(signature)}
+													className={twMerge(
+														'w-full max-w-[100%]',
+														isSelected && 'pointer-events-none'
+													)}
+												>
+													<div className="text-sm">{signature.name}</div>
+												</SelectItem>
+											</div>
+										);
+									})}
+								</SelectGroup>
+							</SelectContent>
+						</Select>
+					)}
+					<Button
+						onClick={() => createSignature({ name: 'New Signature', content: '<p></p>' })}
+						className="grid-cols-1"
+						isLoading={isPendingCreateSignature}
+					>
+						New Signature
+					</Button>
+				</div>
+				<div className="flex flex-row gap-0 md:gap-4">
+					<div className="hidden md:block w-3/12">
 						{isPendingSignatures ? (
 							<Spinner />
 						) : (
@@ -94,11 +159,12 @@ export const ManageSignaturesDialog: FC = () => {
 							New Signature
 						</Button>
 					</div>
+
 					<Separator orientation="vertical" className="h-[300px]" />
 					<Form {...form}>
 						<form
 							onSubmit={form.handleSubmit(handleSave)}
-							className="w-9/12 flex flex-col justify-between"
+							className="w-full md:w-9/12 flex flex-col justify-between"
 						>
 							<FormField
 								control={form.control}
@@ -129,10 +195,9 @@ export const ManageSignaturesDialog: FC = () => {
 								)}
 							/>
 							<DialogFooter>
-								<div className="flex gap-4">
+								<div className="flex flex-col sm:flex-row gap-4">
 									<Button
 										type="button"
-										className="w-fit"
 										variant="outline"
 										isLoading={isPendingDeleteSignature}
 										onClick={(e) => {
@@ -147,20 +212,18 @@ export const ManageSignaturesDialog: FC = () => {
 									</Button>
 									<Button
 										type="button"
-										className="w-fit"
 										variant="outline"
 										onClick={(e) => handleSaveSignatureToCampaign(e)}
 										isLoading={isPendingSaveSignatureToCampaign}
 									>
-										Assign Signature to Campaign
+										<ArrowDownNarrowWideIcon /> Assign Signature to Campaign
 									</Button>
 									<Button
 										isLoading={isPendingSaveSignature}
-										className="w-fit"
 										variant="default"
 										type="submit"
 									>
-										Save
+										<SaveIcon /> Save
 									</Button>
 								</div>
 							</DialogFooter>

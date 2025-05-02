@@ -11,7 +11,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Toggle } from '@/components/ui/toggle';
-import { Brain } from 'lucide-react';
+import { Brain, FlaskConical, SaveIcon, WandSparklesIcon } from 'lucide-react';
 import {
 	Select,
 	SelectContent,
@@ -36,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { ManageSignaturesDialog } from '../_dialogs/ManageSignaturesDialog/ManageSignaturesDialog';
 import ProgressIndicator from '../../molecules/ProgressIndicator/ProgressIndicator';
 import { ConfirmDialog } from '../_dialogs/ConfirmDialog/ConfirmDialog';
+import { ellipsesText } from '@/app/utils/functions';
 
 const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 	const {
@@ -108,7 +109,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 										required: isAiSubject,
 									}}
 									render={({ field }) => (
-										<FormItem className="col-span-11">
+										<FormItem className="col-span-10 sm:col-span-11">
 											<FormLabel>Subject</FormLabel>
 											<FormControl>
 												<Input
@@ -125,7 +126,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 									)}
 								/>
 								<Toggle
-									className="w-5 -translate-y-1"
+									className="w-5 -translate-y-1 col-span-2 sm:col-span-1"
 									pressed={isAiSubject}
 									onPressedChange={() => setIsAiSubject(!isAiSubject)}
 									disabled={!isAiDraft}
@@ -154,7 +155,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 									</FormItem>
 								)}
 							/>
-							<div className="flex gap-4">
+							<div className="flex flex-col sm:flex-row gap-4">
 								{isAiDraft && (
 									<FormField
 										control={form.control}
@@ -187,42 +188,51 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 										)}
 									/>
 								)}
-								<div>
-									<FormLabel>Signatures</FormLabel>
-									<ManageSignaturesDialog />
-								</div>
-								<div>
-									<FormLabel>Selected Signature</FormLabel>
-									<Button variant="outline" disabled>
-										{selectedSignature ? selectedSignature.name : 'No Signature Selected'}
-									</Button>
+								<div className="flex flex-row gap-4 w-full">
+									<div className="w-full sm:w-fit">
+										<FormLabel>Signatures</FormLabel>
+										<ManageSignaturesDialog />
+									</div>
+									<div className="w-full sm:w-fit">
+										<FormLabel>Selected Signature</FormLabel>
+										<Button className="w-full max-w-[150px]" variant="outline" disabled>
+											{selectedSignature
+												? ellipsesText(selectedSignature.name, 18)
+												: 'No Signature Selected'}
+										</Button>
+									</div>
 								</div>
 							</div>
 
 							<div className="flex flex-col gap-4">
 								<div className="flex gap-4">
-									<Button
-										type="button"
-										onClick={() => handleFormAction('test')}
-										variant="outline"
-										isLoading={isTest && isPendingDraftEmail}
-										disabled={
-											campaign?.contacts.length === 0 ||
-											isPendingDraftEmail ||
-											(isAiDraft && aiTestCredits === 0)
-										}
-									>
-										{isAiDraft ? 'Test Your Prompt' : 'Preview Draft'}
-									</Button>
-									{dataDraftEmail.message.length > 0 && (
-										<PreviewTestDraftDialog draftEmail={dataDraftEmail} />
-									)}
+									<div className="flex flex-col sm:flex-row gap-4 w-full sm:w-fit">
+										<Button
+											type="button"
+											className="w-full sm:w-fit"
+											onClick={() => handleFormAction('test')}
+											variant="outline"
+											isLoading={isTest && isPendingDraftEmail}
+											disabled={
+												campaign?.contacts.length === 0 ||
+												isPendingDraftEmail ||
+												(isAiDraft && aiTestCredits === 0)
+											}
+										>
+											<FlaskConical />
+											{isAiDraft ? 'Test Your Prompt' : 'Preview Draft'}
+										</Button>
+										{dataDraftEmail.message.length > 0 && (
+											<PreviewTestDraftDialog draftEmail={dataDraftEmail} />
+										)}
+									</div>
+
 									{isAiDraft && (
 										<Badge variant="outline">Test Credits: {aiTestCredits}</Badge>
 									)}
 								</div>
 								<Separator />
-								<div className="flex gap-4">
+								<div className="flex flex-col sm:flex-row gap-4">
 									<Button
 										type="button"
 										onClick={async (e) => {
@@ -241,21 +251,18 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 											aiDraftCredits === 0
 										}
 									>
+										<WandSparklesIcon />
 										{isAiDraft
-											? 'Generate Custom Emails for All Recipients'
+											? 'Generate Emails for All Recipients'
 											: 'Save Drafts for All Recipients'}
 									</Button>
-
-									{/* <Separator className="!h-auto" orientation="vertical" /> */}
 									<Button
-										className=""
 										type="button"
 										onClick={handleSavePrompt}
 										variant="default"
 										isLoading={isPendingSavePrompt}
 									>
-										{/* {isAiDraft ? 'Save Prompt' : 'Save Message'} */}
-										Save Section
+										<SaveIcon /> Save Section
 									</Button>
 									{isDirty && <Badge variant="warning">You have unsaved changes</Badge>}
 								</div>

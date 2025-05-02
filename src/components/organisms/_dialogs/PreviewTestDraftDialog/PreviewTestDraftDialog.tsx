@@ -17,13 +17,17 @@ import {
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
 import { restrictedFeatureMessages } from '@/constants/constants';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
+import { EyeIcon } from 'lucide-react';
 
 const PreviewTestDraftDialog: FC<PreviewTestDraftDialogProps> = (props) => {
 	const { draftEmail, canViewEmailAddress } = usePreviewTestDraftDialog(props);
 	return (
 		<Dialog>
 			<DialogTrigger asChild>
-				<Button variant="outline">View Test Draft</Button>
+				<Button variant="outline">
+					<EyeIcon />
+					View Test Draft
+				</Button>
 			</DialogTrigger>
 			<DialogContent
 				onOpenAutoFocus={(e) => {
@@ -67,7 +71,6 @@ const PreviewTestDraftDialog: FC<PreviewTestDraftDialogProps> = (props) => {
 						<Label htmlFor="message">Message</Label>
 						<RichTextEditor
 							className="!h-full grow max-h-[200px] overflow-y-auto"
-							// hideMenuBar
 							isEdit={false}
 							value={draftEmail.message}
 						/>

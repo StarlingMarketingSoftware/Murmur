@@ -32,7 +32,7 @@ export function Footer() {
 									href={urls.pricing.path}
 									className="text-muted-foreground hover:text-foreground transition-colors"
 								>
-									{urls.pricing.label}
+									{urls.about.label}
 								</Link>
 							</li>
 							<li>

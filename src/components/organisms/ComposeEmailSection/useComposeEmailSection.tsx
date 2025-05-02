@@ -29,8 +29,6 @@ export interface ComposeEmailSectionProps {
 }
 
 const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
-	// const { campaignId } = useParams() as { campaignId: string };
-	// const { data: campaign } = useGetCampaign(parseInt(campaignId));
 	const { campaign } = props;
 	const { user } = useMe();
 
@@ -83,7 +81,6 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 			aiModel: campaign.aiModel ?? AiModel.sonar,
 		},
 		mode: 'onChange',
-		// reValidateMode: 'onChange',
 	});
 
 	useEffect(() => {
@@ -119,7 +116,6 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	const { isPending: isPendingSavePrompt, mutateAsync: savePrompt } = useEditCampaign({
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id.toString()] });
-			// form.reset(form.getValues());
 		},
 	});
 
@@ -252,7 +248,6 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		}
 	};
 
-	// Cleanup on unmount
 	useEffect(() => {
 		return () => {
 			if (abortController) {

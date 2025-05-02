@@ -5,6 +5,7 @@ import EmailAutomationSteps from './emailAutomation/EmailAutomationSteps';
 import { useCampaignDetail } from './useCampaignDetail';
 import Spinner from '@/components/ui/spinner';
 import PageHeading from '@/components/atoms/_text/PageHeading';
+import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 
 const Murmur = () => {
 	const { tab, handleTabChange, data, isPending } = useCampaignDetail();
@@ -13,7 +14,7 @@ const Murmur = () => {
 		return <Spinner />;
 	}
 	return (
-		<div className="max-w-[900px] mx-auto">
+		<AppLayout>
 			<PageHeading>{data?.name}</PageHeading>
 			<Tabs
 				defaultValue="murmur"
@@ -21,20 +22,12 @@ const Murmur = () => {
 				onValueChange={handleTabChange}
 				className="w-full"
 			>
-				{/* <TabsList className="grid grid-cols-2 mx-auto">
-					<TabsTrigger value="murmur">Murmur</TabsTrigger>
-					<TabsTrigger value="inbox">Inbox</TabsTrigger>
-				</TabsList> */}
 				<TabsContent value="murmur">
 					<EmailAutomationSteps campaign={data} />
 				</TabsContent>
-				<TabsContent value="inbox">
-					{/* <Card>
-						<Inbox />
-					</Card> */}
-				</TabsContent>
+				<TabsContent value="inbox"></TabsContent>
 			</Tabs>
-		</div>
+		</AppLayout>
 	);
 };
 

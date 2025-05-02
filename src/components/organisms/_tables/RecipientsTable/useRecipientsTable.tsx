@@ -57,7 +57,7 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 			cell: ({ row }) => {
 				const name: string = row.getValue('name');
 				return name ? (
-					<div className="text-center">{name}</div>
+					<div>{name}</div>
 				) : (
 					<TypographyMuted className="text-sm">No Data</TypographyMuted>
 				);

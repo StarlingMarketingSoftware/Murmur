@@ -33,6 +33,10 @@ module.exports = {
 				warning: amber[600],
 				error: rose[800],
 			},
+			animation: {
+				'flicker-opacity': 'flicker-opacity 1.5s infinite',
+				scroll: 'scroll 30s linear infinite',
+			},
 			keyframes: {
 				'flicker-opacity': {
 					'0%': { opacity: '70%' },
@@ -41,9 +45,10 @@ module.exports = {
 					'51%': { opacity: '70%' },
 					'100%': { opacity: '70%' },
 				},
-			},
-			animation: {
-				'flicker-opacity': 'flicker-opacity 1.5s infinite',
+				scroll: {
+					'0%': { transform: 'translateX(0)' },
+					'100%': { transform: 'translateX(calc(-50%))' },
+				},
 			},
 		},
 	},
