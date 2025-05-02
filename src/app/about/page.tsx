@@ -1,7 +1,6 @@
 import { StyledLink } from '@/components/atoms/StyledLink/StyledLink';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import { TypographyH1, TypographyP } from '@/components/ui/typography';
-import Link from 'next/link';
 
 const About = () => {
 	return (
