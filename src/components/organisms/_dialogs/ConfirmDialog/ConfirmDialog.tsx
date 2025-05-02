@@ -19,7 +19,7 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Form } from 'react-hook-form';
+import { FormProvider } from 'react-hook-form';
 
 export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 	const {
@@ -58,7 +58,7 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 					{text ? text : children}
 				</DialogDescription>
 				{confirmWithInput ? (
-					<Form {...form}>
+					<FormProvider {...form}>
 						<form onSubmit={form.handleSubmit(onSubmit)}>
 							<div className="space-y-4">
 								<FormField
@@ -100,7 +100,7 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 								</Button>
 							</DialogFooter>
 						</form>
-					</Form>
+					</FormProvider>
 				) : (
 					<DialogFooter>
 						<Button type="button" onClick={() => onOpenChange(false)} variant="outline">

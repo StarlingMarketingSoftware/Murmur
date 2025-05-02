@@ -41,7 +41,7 @@ export default async function HomePage() {
 						<div className="h-[20vh] -translate-y-[15%] flex items-center justify-center">
 							<TypographyH1>Murmur</TypographyH1>
 						</div>
-						<h2 className="!text-5xl font-extralight mt-10">
+						<h2 className="!text-5xl font-extralight mt-10 mx-4">
 							Email Marketing Made Personalized
 						</h2>
 						<div className="flex flex-col md:flex-row justify-center mt-8 w-full md:max-h-[500px]">

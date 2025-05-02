@@ -2,10 +2,16 @@ import { SubscriptionTierData } from '@/constants/types';
 import { getSubscriptionTierWithPriceId } from '@/lib/utils';
 import { useAuth } from '@clerk/nextjs';
 import { User } from '@prisma/client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
 export const useMe = () => {
 	const { userId: clerkUserId, isLoaded, isSignedIn } = useAuth();
+	const queryClient = useQueryClient();
+
+	useEffect(() => {
+		queryClient.invalidateQueries({ queryKey: ['user'] });
+	}, [isSignedIn, queryClient]);
 
 	const { data: user, isPending: isPendingUser } = useQuery<User>({
 		queryKey: ['user'],

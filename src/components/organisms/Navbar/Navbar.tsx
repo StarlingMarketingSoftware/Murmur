@@ -1,5 +1,5 @@
 'use client';
-import { SignUpButton, UserButton } from '@clerk/nextjs';
+import { SignUpButton, useAuth, UserButton } from '@clerk/nextjs';
 import { SignInButton } from '@clerk/nextjs';
 import { urls } from '@/constants/urls';
 import AiCredits from '../AiCredits/AiCredits';
@@ -22,6 +22,8 @@ import { forwardRef, useState } from 'react';
 
 export const Navbar = () => {
 	const { user } = useMe();
+	const { isSignedIn } = useAuth();
+
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const urlList = [
 		urls.home,
@@ -33,17 +35,20 @@ export const Navbar = () => {
 
 	return (
 		<>
-			<div className="sticky top-0 z-10 bg-background shadow-sm">
-				<div className="flex h-16 items-center justify-center px-4 container mx-auto">
+			<div className="sticky top-0 z-10 bg-background shadow-sm dark:shadow-accent">
+				<div className="flex h-16 items-center justify-center">
 					<Link
 						href={urls.home.path}
 						className="ml-4 hidden lg:flex absolute h-6/10 left-0 justify-center items-center space-x-2"
 					>
 						<Logo pathClassName="fill-foreground stroke-foreground" />
 					</Link>
-					<div className="ml-4 absolute h-6/10 left-0 flex lg:hidden justify-center items-center space-x-2">
-						<LogoIcon pathClassName="fill-foreground stroke-foreground" />
-					</div>
+					<Link
+						href={urls.home.path}
+						className="ml-2 absolute h-6/10 w-[200px] left-0 flex lg:hidden  items-center"
+					>
+						<LogoIcon size="150px" pathClassName="fill-foreground stroke-foreground" />
+					</Link>
 					<div className="hidden lg:block">
 						<NavigationMenu>
 							<NavigationMenuList>
@@ -65,7 +70,7 @@ export const Navbar = () => {
 					<div className="absolute right-5 ml-auto flex items-center space-x-4">
 						<AiCredits />
 						<DarkModeToggle />
-						{!!user ? (
+						{isSignedIn ? (
 							<UserButton />
 						) : (
 							<>
