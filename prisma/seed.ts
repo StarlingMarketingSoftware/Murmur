@@ -160,11 +160,11 @@ const importCSVWithSubcategories = async (
 			where: { name: categoryName.toLowerCase() },
 			create: {
 				name: categoryName,
-				count: categoryToCount[categoryName],
+				// count: categoryToCount[categoryName],
 			},
 			update: {
 				name: categoryName,
-				count: categoryToCount[categoryName],
+				// count: categoryToCount[categoryName],
 			},
 		});
 	}
@@ -212,7 +212,7 @@ const importCSVWithSubcategories = async (
 };
 async function main() {
 	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoReduced.csv', 'Music Venues');
-	importCSVWithSubcategories('demoCsvs/testListWithRealEmails.csv', 'Test List');
+	importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
 
 	return;
 }

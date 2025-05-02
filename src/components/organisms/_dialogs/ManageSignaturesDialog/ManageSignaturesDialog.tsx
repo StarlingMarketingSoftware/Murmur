@@ -9,7 +9,10 @@ import {
 	DialogTrigger,
 } from '@/components/ui/dialog';
 import { FC } from 'react';
-import { useManageSignaturesDialog } from './useManageSignaturesDialog';
+import {
+	ManageSignaturesDialogProps,
+	useManageSignaturesDialog,
+} from './useManageSignaturesDialog';
 import {
 	Form,
 	FormControl,
@@ -40,7 +43,7 @@ import {
 } from '@/components/ui/select';
 import { SelectLabel } from '@radix-ui/react-select';
 
-export const ManageSignaturesDialog: FC = () => {
+export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) => {
 	const {
 		signatures,
 		isPendingSignatures,
@@ -55,7 +58,7 @@ export const ManageSignaturesDialog: FC = () => {
 		isPendingCreateSignature,
 		isPendingSaveSignatureToCampaign,
 		handleSaveSignatureToCampaign,
-	} = useManageSignaturesDialog();
+	} = useManageSignaturesDialog(props);
 
 	return (
 		<Dialog>

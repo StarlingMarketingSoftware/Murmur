@@ -7,10 +7,10 @@ const LogoIcon: FC<CommonIconProps> = (props) => {
 		<svg
 			width={size}
 			height={size}
-			id="Layer_1"
-			data-name="Layer 1"
-			xmlns="http://www.w3.org/2000/svg"
 			viewBox="0 0 467.68 138.25"
+			xmlns="http://www.w3.org/2000/svg"
+			preserveAspectRatio="xMidYMid meet"
+			style={{ display: 'block' }}
 		>
 			<path
 				className={pathClassName}
