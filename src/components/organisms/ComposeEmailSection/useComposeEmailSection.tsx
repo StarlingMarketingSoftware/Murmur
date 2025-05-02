@@ -161,29 +161,45 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 				return;
 			}
 
-			try {
+			let isSuccess = false;
+			let attempts = 0;
+
+			while (!isSuccess) {
+				if (attempts > 5) {
+					toast.error('Failed to generate test email.');
+					break;
+				}
 				const res: AiResponse = await draftEmailAsync({
 					generateSubject: isAiSubject,
 					model: values.aiModel,
 					recipient: campaign.contacts[0],
 					prompt: values.message,
 				});
-				await saveTestEmail({
-					campaignId: campaign.id,
-					data: {
-						testMessage: `${res.message}<p></p><div>${campaign.signature?.content}</div>`,
-						testSubject: isAiSubject ? res.subject : values.subject,
-					},
-				});
-				queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id.toString()] });
-				toast.success('Test email generated successfully!');
-				if (user && aiTestCredits) {
-					editUser({
-						clerkId: user.clerkId,
-						data: { aiTestCredits: aiTestCredits - 1 },
+				if (res.message && res.subject) {
+					await saveTestEmail({
+						campaignId: campaign.id,
+						data: {
+							subject: values.subject,
+							message: values.message,
+							testMessage: `${res.message}<p></p><div>${campaign.signature?.content}</div>`,
+							testSubject: isAiSubject ? res.subject : values.subject,
+						},
 					});
+					queryClient.invalidateQueries({
+						queryKey: ['campaign', campaign.id.toString()],
+					});
+					toast.success('Test email generated successfully!');
+					isSuccess = true;
+				} else {
+					attempts++;
 				}
-			} catch {}
+			}
+			if (user && aiTestCredits) {
+				editUser({
+					clerkId: user.clerkId,
+					data: { aiTestCredits: aiTestCredits - 1 },
+				});
+			}
 			setIsTest(false);
 		} else if (isAiDraft) {
 			let remainingCredits = aiDraftCredits || 0;
