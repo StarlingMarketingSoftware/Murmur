@@ -29,6 +29,7 @@ import { twMerge } from 'tailwind-merge';
 import { Input } from '@/components/ui/input';
 import {
 	ArrowDownNarrowWideIcon,
+	CopyXIcon,
 	SaveIcon,
 	SignatureIcon,
 	SquareCheckIcon,
@@ -227,7 +228,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 											onClick={(e) => handleRemoveSignatureFromCampaign(e)}
 											isLoading={isPendingSaveSignatureToCampaign}
 										>
-											<ArrowDownNarrowWideIcon /> Remove Signature from Campaign
+											<CopyXIcon /> Remove Signature from Campaign
 										</Button>
 									) : (
 										<Button

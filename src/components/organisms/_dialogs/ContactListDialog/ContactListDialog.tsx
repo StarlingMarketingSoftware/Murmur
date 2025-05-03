@@ -11,6 +11,7 @@ import { FC } from 'react';
 import Spinner from '@/components/ui/spinner';
 import { ContactListDialogProps, useContactListDialog } from './useContactListDialog';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
+import { SaveIcon } from 'lucide-react';
 
 const ContactListDialog: FC<ContactListDialogProps> = (props) => {
 	const {
@@ -47,7 +48,10 @@ const ContactListDialog: FC<ContactListDialogProps> = (props) => {
 							noDataMessage="All contacts in this list have been added to your campaign already!"
 						/>
 						<DialogFooter>
-							<Button onClick={saveSelectedRecipients}>Save Selected Recipients</Button>
+							<Button onClick={saveSelectedRecipients}>
+								<SaveIcon />
+								Save Selected Recipients
+							</Button>
 						</DialogFooter>
 					</>
 				)}
