@@ -36,7 +36,7 @@ const buttonVariants = cva(
 
 function Button({
 	className,
-	variant,
+	variant = 'default',
 	size,
 	asChild = false,
 	children,
@@ -56,7 +56,11 @@ function Button({
 			disabled={isLoading}
 			{...props}
 		>
-			{isLoading && <Spinner />}
+			{isLoading && (
+				<div className="absolute flex items-center justify-center">
+					<Spinner color={variant === 'default' ? 'background' : 'foreground'} />
+				</div>
+			)}
 			{children}
 		</Comp>
 	);

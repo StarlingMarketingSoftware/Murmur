@@ -48,6 +48,7 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
 		const body = await req.json();
 		const validatedData = updateCampaignSchema.parse(body);
 
+		console.log(validatedData.signatureId);
 		const updatedCampaign = await prisma.campaign.update({
 			where: {
 				id: parseInt(campaignId),
@@ -71,7 +72,10 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
 					senderName: validatedData.senderName,
 				}),
 				...(validatedData.signatureId !== undefined && {
-					signatureId: validatedData.signatureId,
+					signature:
+						validatedData.signatureId === null
+							? { disconnect: true }
+							: { connect: { id: validatedData.signatureId } },
 				}),
 				...(validatedData.contactOperation && {
 					contacts: {
@@ -93,7 +97,13 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
 		return NextResponse.json(updatedCampaign);
 	} catch (error) {
 		if (error instanceof z.ZodError) {
-			return new NextResponse('Invalid request data', { status: 400 });
+			return NextResponse.json(
+				{
+					error: 'Invalid request data',
+					details: error.errors,
+				},
+				{ status: 400 }
+			);
 		}
 		console.error('[CAMPAIGN_PATCH]', error);
 		return new NextResponse('Internal error', { status: 500 });

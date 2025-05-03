@@ -13,6 +13,7 @@ import {
 	useManageContactListDialog,
 } from './useManageContactListDialog';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
+import { SaveIcon } from 'lucide-react';
 
 export const ManageContactListDialog: FC<ManageContactListDialogProps> = (props) => {
 	const {
@@ -41,7 +42,10 @@ export const ManageContactListDialog: FC<ManageContactListDialogProps> = (props)
 							noDataMessage="There are no contacts in this contact list."
 						/>
 						<DialogFooter>
-							<Button onClick={saveSelectedRecipients}>Save Selected Recipients</Button>
+							<Button onClick={saveSelectedRecipients}>
+								<SaveIcon />
+								Save Selected Recipients
+							</Button>
 						</DialogFooter>
 					</>
 				)}
