@@ -153,6 +153,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		if (!isValid) return;
 
 		const values = getValues();
+		const signatureContent = campaign.signature?.content || '';
 
 		if (action === 'test') {
 			setIsTest(true);
@@ -181,12 +182,15 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 						data: {
 							subject: values.subject,
 							message: values.message,
-							testMessage: `${res.message}<p></p><div>${campaign.signature?.content}</div>`,
+							testMessage: `${res.message}<p></p><div>${signatureContent}</div>`,
 							testSubject: isAiSubject ? res.subject : values.subject,
 						},
 					});
 					queryClient.invalidateQueries({
 						queryKey: ['campaign', campaign.id.toString()],
+					});
+					queryClient.invalidateQueries({
+						queryKey: ['user'],
 					});
 					toast.success('Test email generated successfully!');
 					isSuccess = true;
@@ -232,7 +236,7 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 						}
 						await createEmail({
 							subject: newDraft.subject,
-							message: `${newDraft.message}<p></p><div>${campaign.signature?.content}</div>`,
+							message: `${newDraft.message}<p></p><div>${signatureContent}</div>`,
 							campaignId: campaign.id,
 							status: 'draft' as EmailStatus,
 							contactId: recipient.id,

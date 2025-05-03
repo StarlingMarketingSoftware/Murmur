@@ -1,12 +1,14 @@
 import { Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { twMerge } from 'tailwind-merge';
 
 interface SpinnerProps {
 	className?: string;
 	size?: 'small' | 'medium' | 'large' | 'xl' | number;
+	color?: 'foreground' | 'background';
 }
 
-export function Spinner({ className, size = 'xl' }: SpinnerProps) {
+export function Spinner({ className, size = 'xl', color = 'foreground' }: SpinnerProps) {
+	const cn = [className, 'animate-spin mx-auto'];
 	const sizeValue = (): number => {
 		if (typeof size === 'number') {
 			return size;
@@ -25,12 +27,15 @@ export function Spinner({ className, size = 'xl' }: SpinnerProps) {
 		}
 	};
 
-	return (
-		<Loader2
-			size={sizeValue()}
-			className={cn('animate-spin text-muted-foreground mx-auto', className)}
-		/>
-	);
+	switch (color) {
+		case 'foreground':
+			cn.push('text-foreground');
+			break;
+		case 'background':
+			cn.push('text-b');
+	}
+
+	return <Loader2 size={sizeValue()} className={twMerge(cn)} />;
 }
 
 export default Spinner;
