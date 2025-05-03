@@ -61,6 +61,7 @@ export const useEditCampaign = (options: CustomMutationOptions = {}) => {
 			return response.json();
 		},
 		onSuccess: () => {
+			console.log('edit campaign on success', suppressToasts);
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}
