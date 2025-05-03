@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { useEditCampaign } from '@/hooks/useCampaigns';
 import { useParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
+import { CampaignWithRelations } from '@/constants/types';
 
 const signatureSchema = z.object({
 	name: z.string().min(1, { message: 'Signature name is required.' }),
@@ -20,6 +21,7 @@ const signatureSchema = z.object({
 });
 
 export interface ManageSignaturesDialogProps {
+	campaign: CampaignWithRelations;
 	handleSavePrompt?: () => Promise<void>;
 }
 
@@ -31,18 +33,24 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 	const [currentSignature, setCurrentSignature] = useState<Signature | null>(null);
 
 	const { data: signatures, isPending: isPendingSignatures } = useGetUserSignatures();
+
 	const { mutateAsync: saveSignature, isPending: isPendingSaveSignature } =
-		useEditSignature({});
+		useEditSignature({ suppressToasts: true });
+
 	const { mutate: deleteSignature, isPending: isPendingDeleteSignature } =
 		useDeleteSignature({});
+
 	const { mutate: createSignature, isPending: isPendingCreateSignature } =
-		useCreateSignature({});
+		useCreateSignature({ suppressToasts: true });
+
 	const {
 		mutateAsync: saveSignatureToCampaign,
 		isPending: isPendingSaveSignatureToCampaign,
 	} = useEditCampaign({
-		successMessage: 'Signature saved to campaign.',
+		suppressToasts: true,
+		successMessage: 'Signature saved!',
 	});
+
 	const form = useForm<z.infer<typeof signatureSchema>>({
 		resolver: zodResolver(signatureSchema),
 		defaultValues: {
@@ -79,10 +87,12 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 			signatureId: currentSignature.id,
 			data,
 		});
+		toast.success('Signature saved!');
 		queryClient.invalidateQueries({ queryKey: ['campaign', campaignId.toString()] });
 	};
 
 	const queryClient = useQueryClient();
+
 	const handleSaveSignatureToCampaign = async (e: MouseEvent) => {
 		e.preventDefault();
 		if (!currentSignature) {
@@ -105,6 +115,19 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 				signatureId: currentSignature?.id,
 			},
 		});
+		toast.success('Signature saved to campaign!');
+		queryClient.invalidateQueries({ queryKey: ['campaign', campaignId.toString()] });
+	};
+
+	const handleRemoveSignatureFromCampaign = async (e: MouseEvent) => {
+		e.preventDefault();
+		await saveSignatureToCampaign({
+			campaignId: parseInt(campaignId),
+			data: {
+				signatureId: null,
+			},
+		});
+		toast.success('Signature removed from campaign!');
 		queryClient.invalidateQueries({ queryKey: ['campaign', campaignId.toString()] });
 	};
 
@@ -126,6 +149,7 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 		isPendingSaveSignatureToCampaign,
 		campaignId,
 		handleSaveSignatureToCampaign,
+		handleRemoveSignatureFromCampaign,
 		...props,
 	};
 };

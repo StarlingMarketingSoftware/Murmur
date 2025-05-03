@@ -191,7 +191,10 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 								<div className="flex flex-row gap-4 w-full">
 									<div className="w-full sm:w-fit">
 										<FormLabel>Signatures</FormLabel>
-										<ManageSignaturesDialog handleSavePrompt={handleSavePrompt} />
+										<ManageSignaturesDialog
+											campaign={campaign}
+											handleSavePrompt={() => handleSavePrompt(true)}
+										/>
 									</div>
 									<div className="w-full sm:w-fit">
 										<FormLabel>Selected Signature</FormLabel>
@@ -258,7 +261,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 									</Button>
 									<Button
 										type="button"
-										onClick={handleSavePrompt}
+										onClick={() => handleSavePrompt(false)}
 										variant="default"
 										isLoading={isPendingSavePrompt}
 									>

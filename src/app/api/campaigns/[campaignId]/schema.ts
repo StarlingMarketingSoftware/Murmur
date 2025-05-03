@@ -9,7 +9,7 @@ export const updateCampaignSchema = z.object({
 	senderEmail: z.string().nullable().optional(),
 	senderName: z.string().nullable().optional(),
 	aiModel: z.enum(['sonar', 'sonar_pro']).nullable().optional(),
-	signatureId: z.number().optional(),
+	signatureId: z.number().optional().nullable(),
 	contactOperation: z
 		.object({
 			action: z.enum(['connect', 'disconnect']),

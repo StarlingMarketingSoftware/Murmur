@@ -31,6 +31,7 @@ import {
 	ArrowDownNarrowWideIcon,
 	SaveIcon,
 	SignatureIcon,
+	SquareCheckIcon,
 	TrashIcon,
 } from 'lucide-react';
 import {
@@ -58,6 +59,8 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 		isPendingCreateSignature,
 		isPendingSaveSignatureToCampaign,
 		handleSaveSignatureToCampaign,
+		handleRemoveSignatureFromCampaign,
+		campaign,
 	} = useManageSignaturesDialog(props);
 
 	return (
@@ -106,6 +109,8 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 														isSelected && 'pointer-events-none'
 													)}
 												>
+													{campaign.signatureId === signature.id && <SquareCheckIcon />}
+
 													<div className="text-sm">{signature.name}</div>
 												</SelectItem>
 											</div>
@@ -142,6 +147,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 														isSelected && 'pointer-events-none'
 													)}
 												>
+													{campaign.signatureId === signature.id && <SquareCheckIcon />}
 													<div className="text-sm">{signature.name}</div>
 												</Button>
 												<Separator className="my-2" />
@@ -213,14 +219,27 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 										<TrashIcon />
 										Delete
 									</Button>
-									<Button
-										type="button"
-										variant="outline"
-										onClick={(e) => handleSaveSignatureToCampaign(e)}
-										isLoading={isPendingSaveSignatureToCampaign}
-									>
-										<ArrowDownNarrowWideIcon /> Assign Signature to Campaign
-									</Button>
+
+									{campaign.signatureId === currentSignature?.id ? (
+										<Button
+											type="button"
+											variant="outline"
+											onClick={(e) => handleRemoveSignatureFromCampaign(e)}
+											isLoading={isPendingSaveSignatureToCampaign}
+										>
+											<ArrowDownNarrowWideIcon /> Remove Signature from Campaign
+										</Button>
+									) : (
+										<Button
+											type="button"
+											variant="outline"
+											onClick={(e) => handleSaveSignatureToCampaign(e)}
+											isLoading={isPendingSaveSignatureToCampaign}
+										>
+											<ArrowDownNarrowWideIcon /> Assign Signature to Campaign
+										</Button>
+									)}
+
 									<Button
 										isLoading={isPendingSaveSignature}
 										variant="default"

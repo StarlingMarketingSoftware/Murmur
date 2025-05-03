@@ -118,6 +118,12 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id.toString()] });
 		},
 	});
+	const { mutateAsync: saveCampaignNoToast } = useEditCampaign({
+		suppressToasts: true,
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id.toString()] });
+		},
+	});
 
 	const { mutateAsync: saveTestEmail } = useEditCampaign({
 		suppressToasts: true,
@@ -276,8 +282,15 @@ const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 		};
 	}, []);
 
-	const handleSavePrompt = async () => {
-		await savePrompt({ data: { ...form.getValues() }, campaignId: campaign.id });
+	const handleSavePrompt = async (suppressToasts: boolean) => {
+		if (suppressToasts) {
+			await saveCampaignNoToast({
+				data: { ...form.getValues() },
+				campaignId: campaign.id,
+			});
+		} else {
+			await savePrompt({ data: { ...form.getValues() }, campaignId: campaign.id });
+		}
 		queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id.toString()] });
 	};
 
