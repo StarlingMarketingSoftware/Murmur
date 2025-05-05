@@ -154,7 +154,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 													<SelectLabel>Font</SelectLabel>
 													{FontOptions.map((font) => (
 														<SelectItem key={font} value={font}>
-															{font}
+															<span style={{ fontFamily: font }}>{font}</span>
 														</SelectItem>
 													))}
 												</SelectGroup>
@@ -175,10 +175,16 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 							</div>
 							<div className="w-full sm:w-fit">
 								<FormLabel>Selected Signature</FormLabel>
-								<Button className="w-full max-w-[150px]" variant="outline" disabled>
-									{selectedSignature
-										? ellipsesText(selectedSignature.name, 18)
-										: 'No Signature Selected'}
+								<Button
+									className="w-full max-w-[150px] truncate" // Change this line
+									variant="outline"
+									disabled
+								>
+									<span className="truncate">
+										{selectedSignature
+											? ellipsesText(selectedSignature.name, 15)
+											: 'No Signature Selected'}
+									</span>
 								</Button>
 							</div>
 						</div>

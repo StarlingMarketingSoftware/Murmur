@@ -1,3 +1,4 @@
+import { convertAiResponseToRichTextEmail } from '@/app/utils/htmlFormatting';
 import { CampaignWithRelations, Draft } from '@/constants/types';
 import { useEditCampaign } from '@/hooks/useCampaigns';
 import { useCreateEmail } from '@/hooks/useEmails';
@@ -91,6 +92,7 @@ const useAiCompose = (props: AiComposeProps) => {
 				subject: campaign.subject ?? '',
 				message: campaign.message ?? '',
 				aiModel: campaign.aiModel ?? AiModel.sonar,
+				font: campaign.font,
 			});
 		}
 	}, [campaign, form]);
@@ -117,20 +119,20 @@ const useAiCompose = (props: AiComposeProps) => {
 
 	const { isPending: isPendingSavePrompt, mutateAsync: savePrompt } = useEditCampaign({
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id.toString()] });
+			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id as number] });
 		},
 	});
 	const { mutateAsync: saveCampaignNoToast } = useEditCampaign({
 		suppressToasts: true,
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id.toString()] });
+			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id as number] });
 		},
 	});
 
 	const { mutateAsync: saveTestEmail } = useEditCampaign({
 		suppressToasts: true,
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id.toString()] });
+			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id as number] });
 		},
 	});
 
@@ -159,9 +161,7 @@ const useAiCompose = (props: AiComposeProps) => {
 	const handleFormAction = async (action: 'test' | 'submit') => {
 		const isValid = await trigger();
 		if (!isValid) return;
-
 		const values = getValues();
-		const signatureContent = campaign.signature?.content || '';
 
 		if (action === 'test') {
 			setIsTest(true);
@@ -174,38 +174,50 @@ const useAiCompose = (props: AiComposeProps) => {
 			let attempts = 0;
 
 			while (!isSuccess) {
-				if (attempts > 5) {
-					toast.error('Failed to generate test email.');
-					break;
-				}
-				const res: AiResponse = await draftEmailAsync({
-					generateSubject: isAiSubject,
-					model: values.aiModel,
-					recipient: campaign.contacts[0],
-					prompt: values.message,
-				});
-				if (res.message && res.subject) {
-					await saveTestEmail({
-						campaignId: campaign.id,
-						data: {
-							subject: values.subject,
-							message: values.message,
-							testMessage: `${res.message}<p></p><div>${signatureContent}</div>`,
-							testSubject: isAiSubject ? res.subject : values.subject,
-						},
+				try {
+					if (attempts > 5) {
+						toast.error('Failed to generate test email.');
+						break;
+					}
+					const res: AiResponse = await draftEmailAsync({
+						generateSubject: isAiSubject,
+						model: values.aiModel,
+						recipient: campaign.contacts[0],
+						prompt: values.message,
 					});
-					queryClient.invalidateQueries({
-						queryKey: ['campaign', campaign.id.toString()],
-					});
-					queryClient.invalidateQueries({
-						queryKey: ['user'],
-					});
-					toast.success('Test email generated successfully!');
-					isSuccess = true;
-				} else {
+					if (res.message && res.subject) {
+						console.log('🚀 ~ handleFormAction ~ res.message:', res.message);
+						await saveTestEmail({
+							campaignId: campaign.id,
+							data: {
+								subject: values.subject,
+								message: values.message,
+								testMessage: convertAiResponseToRichTextEmail(
+									res.message,
+									values.font,
+									campaign.signature
+								),
+								testSubject: isAiSubject ? res.subject : values.subject,
+								font: values.font,
+							},
+						});
+						queryClient.invalidateQueries({
+							queryKey: ['campaign', campaign.id as number],
+						});
+						queryClient.invalidateQueries({
+							queryKey: ['user'],
+						});
+						toast.success('Test email generated successfully!');
+						isSuccess = true;
+					} else {
+						attempts++;
+					}
+				} catch {
 					attempts++;
+					continue;
 				}
 			}
+
 			if (user && aiTestCredits) {
 				editUser({
 					clerkId: user.clerkId,
@@ -244,7 +256,11 @@ const useAiCompose = (props: AiComposeProps) => {
 						}
 						await createEmail({
 							subject: newDraft.subject,
-							message: `${newDraft.message}<p></p><div>${signatureContent}</div>`,
+							message: convertAiResponseToRichTextEmail(
+								newDraft.message,
+								values.font,
+								campaign.signature
+							),
 							campaignId: campaign.id,
 							status: 'draft' as EmailStatus,
 							contactId: recipient.id,
@@ -283,11 +299,10 @@ const useAiCompose = (props: AiComposeProps) => {
 				campaignId: campaign.id,
 			});
 		} else {
-			console.log('handle save prompt with toasts');
 			await savePrompt({ data: { ...form.getValues() }, campaignId: campaign.id });
 		}
 		queryClient.invalidateQueries({
-			queryKey: ['campaign', campaign.id.toString()],
+			queryKey: ['campaign', campaign.id as number],
 		});
 	};
 

@@ -22,6 +22,7 @@ export const PrepareSendingTable: FC<PrepareSendingTableProps> = (props) => {
 					emails={draftEmails}
 					isPending={isPending}
 					noDataMessage="No draft emails were found."
+					isEditable
 				/>
 				<ConfirmSendDialog
 					setSendingProgress={setSendingProgress}

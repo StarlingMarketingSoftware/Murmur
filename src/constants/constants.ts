@@ -8,6 +8,8 @@ export enum LocalStorageKeys {
 	GoogleExpiresAt = 'googleExpiresAt',
 }
 
+export const DefaultFont = 'Times New Roman';
+
 export enum GoogleScopes {
 	ContactsReadOnly = 'https://www.googleapis.com/auth/contacts.readonly',
 	GmailSend = 'https://www.googleapis.com/auth/gmail.send',

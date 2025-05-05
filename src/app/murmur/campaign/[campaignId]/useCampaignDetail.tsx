@@ -1,6 +1,5 @@
 import { LocalStorageKeys, requestedPeopleScopes } from '@/constants/constants';
-import { CampaignWithRelations } from '@/constants/types';
-import { useQuery } from '@tanstack/react-query';
+import { useGetCampaign } from '@/hooks/useCampaigns';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -8,7 +7,7 @@ import { toast } from 'sonner';
 
 export const useCampaignDetail = () => {
 	const params = useParams();
-	const campaignId = params.campaignId;
+	const campaignId = params.campaignId as string;
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const tab = searchParams.get('tab') ?? 'murmur';
@@ -71,21 +70,7 @@ export const useCampaignDetail = () => {
 		router.push(`/murmur?${params.toString()}`);
 	};
 
-	const { data, isPending } = useQuery({
-		queryKey: ['campaign', campaignId],
-		queryFn: async (): Promise<CampaignWithRelations> => {
-			const response = await fetch(`/api/campaigns/${campaignId}`, {
-				method: 'GET',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-			});
-			if (!response.ok) {
-				throw new Error('Network response was not ok');
-			}
-			return response.json();
-		},
-	});
+	const { data, isPending } = useGetCampaign(parseInt(campaignId));
 
 	return {
 		tab,
