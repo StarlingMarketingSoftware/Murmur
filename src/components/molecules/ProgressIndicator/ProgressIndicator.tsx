@@ -40,7 +40,7 @@ const ProgressIndicator: FC<ProgressIndicatorProps> = (props) => {
 					<CheckCircle2 size="20px" className="text-success animate-pulse" />
 				) : (
 					<>
-						<Spinner size="small" className="mx-0 min-h-[20px]" />
+						<Spinner size="small" className="!m-0 min-h-[20px]" />
 						{cancelAction && (
 							<Button onClick={cancelAction} variant="ghost">
 								<BanIcon className="text-destructive" /> Cancel

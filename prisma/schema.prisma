@@ -113,6 +113,7 @@ model Campaign {
   subject     String?
   message     String?    @db.Text
   aiModel     AiModel?
+  font        String     @default("Times New Roman")
   testMessage String?    @db.Text
   testSubject String?
   emails      Email[]

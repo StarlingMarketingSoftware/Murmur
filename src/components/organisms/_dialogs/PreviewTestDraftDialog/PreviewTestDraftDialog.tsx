@@ -72,6 +72,7 @@ const PreviewTestDraftDialog: FC<PreviewTestDraftDialogProps> = (props) => {
 						<RichTextEditor
 							className="!h-full grow max-h-[200px] overflow-y-auto"
 							isEdit={false}
+							hideMenuBar
 							value={draftEmail.message}
 						/>
 					</div>

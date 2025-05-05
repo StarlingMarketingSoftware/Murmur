@@ -1,5 +1,5 @@
-import { getTestEmailCount } from '@/app/utils/functions';
-import { AiSelectValues, SubscriptionTierData } from './types';
+import { getTestEmailCount } from '@/app/utils/calculations';
+import { AiSelectValues, Font, SubscriptionTierData } from './types';
 
 export enum LocalStorageKeys {
 	GoogleAuthState = 'googleAuthState',
@@ -7,6 +7,8 @@ export enum LocalStorageKeys {
 	GoogleScopes = 'googleScopes',
 	GoogleExpiresAt = 'googleExpiresAt',
 }
+
+export const DefaultFont = 'Times New Roman';
 
 export enum GoogleScopes {
 	ContactsReadOnly = 'https://www.googleapis.com/auth/contacts.readonly',
@@ -28,6 +30,14 @@ export const AiModelOptions: AiSelectValues[] = [
 	// 	value: 'sonar_pro',
 	// 	type: 'perplexity',
 	// },
+];
+
+export const FontOptions: Font[] = [
+	'Times New Roman',
+	'Arial',
+	'Calibri',
+	'Georgia',
+	'Courier New',
 ];
 
 export const subscriptionTierDataList: Record<string, SubscriptionTierData> = {

@@ -60,52 +60,6 @@ export const STRIPE_SUBSCRIPTION_STATUS: Record<string, StripeSubscriptionStatus
 	PAUSED: 'paused',
 } as const;
 
-// use zod for schema types
-
-export type Contact = {
-	name: string;
-	email: string;
-	category: ContactCategories;
-	company: string;
-};
-
-export type ContactCategories =
-	| 'music'
-	| 'lawyer'
-	| 'doctor'
-	| 'business'
-	| 'hospitality'
-	| 'finance'
-	| 'teacher'
-	| 'engineer'
-	| 'architect'
-	| 'accountant'
-	| 'dentist'
-	| 'nurse'
-	| 'pharmacist'
-	| 'veterinarian'
-	| 'psychologist'
-	| 'journalist'
-	| 'chef'
-	| 'realtor'
-	| 'developer'
-	| 'designer'
-	| 'consultant'
-	| 'photographer'
-	| 'electrician'
-	| 'plumber'
-	| 'mechanic'
-	| 'scientist'
-	| 'pilot'
-	| 'optometrist'
-	| 'therapist'
-	| 'surgeon'
-	| 'police'
-	| 'firefighter'
-	| 'paramedic'
-	| 'professor'
-	| 'marketer';
-
 export type Draft = {
 	subject: string;
 	message: string;
@@ -138,3 +92,5 @@ export interface CustomMutationOptions {
 	errorMessage?: string;
 	onSuccess?: () => void;
 }
+
+export type Font = 'Times New Roman' | 'Arial' | 'Calibri' | 'Georgia' | 'Courier New';

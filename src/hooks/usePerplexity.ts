@@ -159,8 +159,7 @@ export const usePerplexityDraftEmail = () => {
 				}
 
 				return parsedDraft;
-			} catch (error) {
-				console.error('Failed to parse AI response:', error);
+			} catch {
 				throw new Error('Failed to parse AI response. Please try again.');
 			}
 		},

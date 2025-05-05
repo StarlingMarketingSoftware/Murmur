@@ -18,7 +18,7 @@ export const useGetCampaigns = () => {
 
 export const useGetCampaign = (campaignId: number) => {
 	return useQuery<CampaignWithRelations>({
-		queryKey: ['campaign', campaignId],
+		queryKey: ['campaign', campaignId], // campaignId is a number
 		queryFn: async () => {
 			const response = await fetch(`/api/campaigns/${campaignId}`);
 			if (!response.ok) {
@@ -61,11 +61,9 @@ export const useEditCampaign = (options: CustomMutationOptions = {}) => {
 			return response.json();
 		},
 		onSuccess: () => {
-			console.log('edit campaign on success', suppressToasts);
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}
-			// queryClient.invalidateQueries({ queryKey: ['campaigns', 'campaign'] });
 			onSuccessCallback?.();
 		},
 		onError: () => {
