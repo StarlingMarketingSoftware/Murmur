@@ -20,7 +20,10 @@ export interface ConfirmSendDialogProps {
 
 const addSenderInfoSchema = z.object({
 	senderName: z.string().min(1, { message: 'Sender name is required.' }),
-	senderEmail: z.string().min(1, { message: 'Sender email is required.' }),
+	senderEmail: z
+		.string()
+		.email({ message: 'Please enter a valid email address.' })
+		.min(1, { message: 'Email address is required.' }),
 });
 
 export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
