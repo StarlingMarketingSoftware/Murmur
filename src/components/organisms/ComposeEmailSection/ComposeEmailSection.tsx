@@ -36,7 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { ManageSignaturesDialog } from '../_dialogs/ManageSignaturesDialog/ManageSignaturesDialog';
 import ProgressIndicator from '../../molecules/ProgressIndicator/ProgressIndicator';
 import { ConfirmDialog } from '../_dialogs/ConfirmDialog/ConfirmDialog';
-import { ellipsesText } from '@/app/utils/functions';
+import { ellipsesText } from '@/app/utils/string';
 
 const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 	const {

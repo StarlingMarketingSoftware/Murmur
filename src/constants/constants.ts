@@ -1,4 +1,4 @@
-import { getTestEmailCount } from '@/app/utils/functions';
+import { getTestEmailCount } from '@/app/utils/calculations';
 import { AiSelectValues, SubscriptionTierData } from './types';
 
 export enum LocalStorageKeys {

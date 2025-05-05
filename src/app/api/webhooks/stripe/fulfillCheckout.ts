@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
 import { getSubscriptionTierWithPriceId } from '@/lib/utils';
 import { calcAiCredits } from './calcAiCredits';
-import { getTestEmailCount } from '@/app/utils/functions';
+import { getTestEmailCount } from '@/app/utils/calculations';
 
 const prisma = new PrismaClient();
 type StripeSubscription = Stripe.Subscription;
