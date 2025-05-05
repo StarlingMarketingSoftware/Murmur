@@ -45,7 +45,6 @@ export const useEditCampaign = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async ({ data, campaignId }: EditCampaignData) => {
-			console.log('🚀 ~ !!!!mutationFn: ~ data:', data);
 			const response = await fetch(`/api/campaigns/${campaignId}`, {
 				method: 'PATCH',
 				headers: {

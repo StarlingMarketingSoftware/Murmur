@@ -20,7 +20,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
-import { AiModelOptions, FontOptions } from '@/constants/constants';
+import { FontOptions } from '@/constants/constants';
 import PreviewTestDraftDialog from '../../_dialogs/PreviewTestDraftDialog/PreviewTestDraftDialog';
 import { FC } from 'react';
 import useAiCompose, { AiComposeProps } from './useAiCompose';
@@ -111,7 +111,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 						)}
 					/>
 					<div className="flex flex-col sm:flex-row gap-4">
-						<FormField
+						{/* <FormField
 							control={form.control}
 							name="aiModel"
 							render={({ field }) => (
@@ -137,7 +137,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 									<FormMessage />
 								</FormItem>
 							)}
-						/>
+						/> */}
 						<FormField
 							control={form.control}
 							name="font"
