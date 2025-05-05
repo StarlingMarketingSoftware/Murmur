@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { CustomMutationOptions } from '@/constants/types';
+import { addFontToHtml } from '@/app/utils/htmlFormatting';
+import { DefaultFont } from '@/constants/constants';
 
 export const useGetUserSignatures = () => {
 	return useQuery({
@@ -35,12 +37,17 @@ export const useEditSignature = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async ({ data, signatureId }: EditSignatureData) => {
+			let formattedContent = data.content;
+			if (!data.content.includes('<span style="font-family')) {
+				formattedContent = addFontToHtml(data.content, DefaultFont);
+			}
+
 			const response = await fetch(`/api/signatures/${signatureId}`, {
 				method: 'PATCH',
 				headers: {
 					'Content-Type': 'application/json',
 				},
-				body: JSON.stringify(data),
+				body: JSON.stringify({ ...data, content: formattedContent }),
 			});
 
 			if (!response.ok) {

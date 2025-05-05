@@ -6,19 +6,27 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FC } from 'react';
 import { dark } from '@clerk/themes';
 
+const queryClient = new QueryClient({
+	defaultOptions: {
+		queries: {
+			refetchOnMount: true,
+			refetchOnWindowFocus: true,
+			refetchOnReconnect: true,
+			retry: 1,
+		},
+	},
+});
+
 interface SubLayoutProps {
 	children: React.ReactNode;
 }
 const SubLayout: FC<SubLayoutProps> = ({ children }) => {
-	const queryClient = new QueryClient();
 	const { theme } = useTheme();
 
 	return (
-		<QueryClientProvider client={queryClient}>
-			<ClerkProvider appearance={{ baseTheme: theme === 'dark' ? dark : undefined }}>
-				{children}
-			</ClerkProvider>
-		</QueryClientProvider>
+		<ClerkProvider appearance={{ baseTheme: theme === 'dark' ? dark : undefined }}>
+			<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+		</ClerkProvider>
 	);
 };
 

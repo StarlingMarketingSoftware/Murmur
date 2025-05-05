@@ -85,7 +85,7 @@ export const useManageContactListDialog = (props: ManageContactListDialogProps) 
 	const [selectedRows, setSelectedRows] = useState<Contact[]>([]);
 
 	const params = useParams();
-	const { campaignId } = params;
+	const campaignId = params.campaignId as string;
 
 	const {
 		data,
@@ -126,7 +126,7 @@ export const useManageContactListDialog = (props: ManageContactListDialogProps) 
 		onSuccess: () => {
 			toast.success('Recipients saved successfully!');
 			setIsOpen(false);
-			queryClient.invalidateQueries({ queryKey: ['campaign', campaignId?.toString()] });
+			queryClient.invalidateQueries({ queryKey: ['campaign', parseInt(campaignId)] });
 		},
 		onError: () => {
 			toast.error('Failed to save recipients. Please try again.');

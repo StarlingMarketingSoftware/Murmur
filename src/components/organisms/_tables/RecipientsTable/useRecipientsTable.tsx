@@ -23,7 +23,7 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 
 	const queryClient = useQueryClient();
 	const params = useParams();
-	const { campaignId } = params;
+	const campaignId = params.campaignId as string;
 
 	const { isPending: isPendingRemoveContacts, mutate: removeRecipients } = useMutation({
 		mutationFn: async (campaign: z.infer<typeof updateCampaignSchema>) => {
@@ -41,7 +41,7 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 		},
 		onSuccess: () => {
 			toast.success('Recipient successfully removed from campaign.');
-			queryClient.invalidateQueries({ queryKey: ['campaign', campaignId?.toString()] });
+			queryClient.invalidateQueries({ queryKey: ['campaign', parseInt(campaignId)] });
 		},
 		onError: () => {
 			toast.error('Failed to remove recipient from campaign. Please try again.');

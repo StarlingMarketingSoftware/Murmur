@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import FormData from 'form-data';
 import Mailgun from 'mailgun.js';
-import { replacePTagsInSignature } from '@/app/utils/functions';
+import { replacePTagsInSignature } from '@/app/utils/htmlFormatting';
 
 export async function POST(request: Request) {
 	const { recipientEmail, subject, message, senderEmail, senderName } =

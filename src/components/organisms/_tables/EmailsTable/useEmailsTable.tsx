@@ -5,11 +5,12 @@ import { EmailWithRelations } from '@/constants/types';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { TrashIcon } from 'lucide-react';
-import { ellipsesText, stripHtmlTags } from '@/app/utils/functions';
+import { ellipsesText } from '@/app/utils/string';
 import { useMe } from '@/hooks/useMe';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
 import { restrictedFeatureMessages } from '@/constants/constants';
 import { useDeleteEmail } from '@/hooks/useEmails';
+import { stripHtmlTags } from '@/app/utils/htmlFormatting';
 
 export interface EmailsTableProps {
 	emails: EmailWithRelations[];

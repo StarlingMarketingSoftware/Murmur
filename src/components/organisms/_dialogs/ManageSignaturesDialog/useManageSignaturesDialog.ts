@@ -88,7 +88,7 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 			data,
 		});
 		toast.success('Signature saved!');
-		queryClient.invalidateQueries({ queryKey: ['campaign', campaignId.toString()] });
+		queryClient.invalidateQueries({ queryKey: ['campaign', parseInt(campaignId)] });
 	};
 
 	const queryClient = useQueryClient();
@@ -116,7 +116,7 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 			},
 		});
 		toast.success('Signature saved to campaign!');
-		queryClient.invalidateQueries({ queryKey: ['campaign', campaignId.toString()] });
+		queryClient.invalidateQueries({ queryKey: ['campaign', parseInt(campaignId)] });
 	};
 
 	const handleRemoveSignatureFromCampaign = async (e: MouseEvent) => {
@@ -128,7 +128,7 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 			},
 		});
 		toast.success('Signature removed from campaign!');
-		queryClient.invalidateQueries({ queryKey: ['campaign', campaignId.toString()] });
+		queryClient.invalidateQueries({ queryKey: ['campaign', parseInt(campaignId)] });
 	};
 
 	return {
