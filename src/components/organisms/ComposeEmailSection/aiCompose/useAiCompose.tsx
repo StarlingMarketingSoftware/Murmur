@@ -21,6 +21,7 @@ const getEmailDraftSchema = (isAiSubject: boolean) => {
 		aiModel: z.nativeEnum(AiModel, {
 			required_error: 'AI model is required.',
 		}),
+		font: z.string().min(1, { message: 'Font is required.' }),
 	});
 };
 
@@ -30,6 +31,7 @@ export interface AiComposeProps {
 
 const useAiCompose = (props: AiComposeProps) => {
 	const { campaign } = props;
+	console.log('🚀 ~ useAiCompose ~ campaign:', campaign);
 	const { user } = useMe();
 
 	const [generationProgress, setGenerationProgress] = useState(-1);
@@ -78,6 +80,7 @@ const useAiCompose = (props: AiComposeProps) => {
 			subject: campaign.subject ?? '',
 			message: campaign.message ?? '',
 			aiModel: campaign.aiModel ?? AiModel.sonar,
+			font: campaign.font,
 		},
 		mode: 'onChange',
 	});

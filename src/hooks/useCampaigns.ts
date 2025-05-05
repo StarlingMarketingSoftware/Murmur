@@ -45,6 +45,7 @@ export const useEditCampaign = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async ({ data, campaignId }: EditCampaignData) => {
+			console.log('🚀 ~ !!!!mutationFn: ~ data:', data);
 			const response = await fetch(`/api/campaigns/${campaignId}`, {
 				method: 'PATCH',
 				headers: {
@@ -61,11 +62,9 @@ export const useEditCampaign = (options: CustomMutationOptions = {}) => {
 			return response.json();
 		},
 		onSuccess: () => {
-			console.log('edit campaign on success', suppressToasts);
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}
-			// queryClient.invalidateQueries({ queryKey: ['campaigns', 'campaign'] });
 			onSuccessCallback?.();
 		},
 		onError: () => {

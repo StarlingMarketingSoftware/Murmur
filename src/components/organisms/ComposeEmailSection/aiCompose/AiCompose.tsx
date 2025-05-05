@@ -20,7 +20,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
-import { AiModelOptions } from '@/constants/constants';
+import { AiModelOptions, FontOptions } from '@/constants/constants';
 import PreviewTestDraftDialog from '../../_dialogs/PreviewTestDraftDialog/PreviewTestDraftDialog';
 import { FC } from 'react';
 import useAiCompose, { AiComposeProps } from './useAiCompose';
@@ -128,6 +128,33 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 													{AiModelOptions.map((model) => (
 														<SelectItem key={model.value} value={model.value}>
 															{model.name}
+														</SelectItem>
+													))}
+												</SelectGroup>
+											</SelectContent>
+										</Select>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+						<FormField
+							control={form.control}
+							name="font"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>Font</FormLabel>
+									<FormControl>
+										<Select onValueChange={field.onChange} defaultValue={field.value}>
+											<SelectTrigger className="w-[180px]">
+												<SelectValue />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectGroup>
+													<SelectLabel>Font</SelectLabel>
+													{FontOptions.map((font) => (
+														<SelectItem key={font} value={font}>
+															{font}
 														</SelectItem>
 													))}
 												</SelectGroup>

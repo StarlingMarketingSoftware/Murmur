@@ -59,6 +59,7 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
 				...(validatedData.subject !== undefined && { subject: validatedData.subject }),
 				...(validatedData.message !== undefined && { message: validatedData.message }),
 				...(validatedData.aiModel !== undefined && { aiModel: validatedData.aiModel }),
+				...(validatedData.font !== undefined && { font: validatedData.font }),
 				...(validatedData.testMessage !== undefined && {
 					testMessage: validatedData.testMessage,
 				}),
