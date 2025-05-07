@@ -25,10 +25,14 @@ export async function POST(req: Request) {
 
 		const baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
 
+		if (!user.stripeCustomerId) {
+			throw new Error('User does not have a Stripe customer ID');
+		}
+
 		const session: Stripe.Response<Stripe.Checkout.Session> =
 			await stripe.checkout.sessions.create({
 				payment_method_types: ['card'],
-				customer: user.stripeCustomerId || undefined,
+				customer: user.stripeCustomerId,
 				line_items: [
 					{
 						price: priceId,
@@ -38,9 +42,6 @@ export async function POST(req: Request) {
 				mode: 'subscription',
 				success_url: `${baseUrl}/pricing?success=true`,
 				cancel_url: `${baseUrl}/pricing?canceled=true`,
-				metadata: {
-					userId,
-				},
 			});
 
 		return NextResponse.json({ url: session.url });

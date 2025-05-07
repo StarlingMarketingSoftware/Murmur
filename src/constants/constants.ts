@@ -1,6 +1,10 @@
 import { getTestEmailCount } from '@/app/utils/calculations';
 import { AiSelectValues, Font, SubscriptionTierData } from './types';
 
+export const baseUrl =
+	process.env.NEXT_PUBLIC_SITE_URL ??
+	(typeof window !== 'undefined' ? window.location.origin : '');
+
 export enum LocalStorageKeys {
 	GoogleAuthState = 'googleAuthState',
 	GoogleAccessToken = 'googleAccessToken',
@@ -84,7 +88,7 @@ export const subscriptionTierDataList: Record<string, SubscriptionTierData> = {
 	[process.env.NEXT_PUBLIC_ADMIN_LITE_PRICE_ID as string]: {
 		name: 'Prophet',
 		aiEmailCount: 100000,
-		viewEmailAddresses: true,
+		viewEmailAddresses: false,
 		get testEmailCount() {
 			return getTestEmailCount(this.aiEmailCount);
 		},

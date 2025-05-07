@@ -12,16 +12,13 @@ export async function fulfillCheckout(
 	sessionId: string
 ) {
 	try {
-		// Retrieve the Checkout Session from the API with line_items expanded
 		const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId, {
-			expand: ['line_items', 'subscription'],
+			expand: ['line_items', 'subscription', 'metadata'],
 		});
 
 		if (!checkoutSession) {
 			throw Error('Checkout session could not be retrieved.');
 		}
-
-		// if checkoutSession.metadata.userId does not exist, look in the product for the userId
 
 		const priceId = subscription.items.data[0].price.id;
 		const subscriptionTier = getSubscriptionTierWithPriceId(priceId);
@@ -33,7 +30,7 @@ export async function fulfillCheckout(
 
 			const customer = await prisma.user.update({
 				where: {
-					clerkId: checkoutSession?.metadata?.userId,
+					stripeCustomerId: customerId,
 				},
 				data: {
 					stripeCustomerId: customerId,

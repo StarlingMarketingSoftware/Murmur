@@ -54,22 +54,9 @@ export async function POST(req: Request) {
 						quantity: 1,
 					},
 				],
-				// subscription_data: {
-				// 	billing_cycle_anchor: 'now',
-				// 	proration_behavior: 'create_prorations',
-				// 	items: [
-				// 		{
-				// 			id: currentSubscription.items.data[0].id,
-				// 			price: priceId,
-				// 		},
-				// 	],
-				// },
 				mode: 'subscription',
 				success_url: `${baseUrl}/pricing?success=true`,
 				cancel_url: `${baseUrl}/pricing?canceled=true`,
-				metadata: {
-					userId,
-				},
 			});
 
 		return NextResponse.json({ url: session.url });

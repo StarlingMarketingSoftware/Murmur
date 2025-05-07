@@ -25,8 +25,7 @@ const timesNewRoman = localFont({
 
 export const metadata: Metadata = {
 	title: 'Murmur',
-	description:
-		'A Next.js 14 application with Clerk, Prisma, Tailwind, shadcn, and Stripe',
+	description: 'Email marketing made personalized.',
 };
 
 export default function RootLayout({
