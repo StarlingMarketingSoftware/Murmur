@@ -2,6 +2,7 @@ import { Webhook } from 'svix';
 import { headers } from 'next/headers';
 import { WebhookEvent } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
+import { stripe } from '@/stripe/client';
 export async function POST(req: Request) {
 	const SIGNING_SECRET = process.env.CLERK_SIGNING_SECRET;
 
@@ -59,12 +60,18 @@ export async function POST(req: Request) {
 				status: 400,
 			});
 		}
+		const email = evt.data.email_addresses[0].email_address;
+		const stripeCustomer = await stripe.customers.create({
+			email: email,
+			name: `${first_name} ${last_name}`,
+		});
 
 		try {
 			await prisma.user.create({
 				data: {
 					clerkId: id,
-					email: evt.data.email_addresses[0].email_address,
+					stripeCustomerId: stripeCustomer.id,
+					email: email,
 					firstName: first_name,
 					lastName: last_name,
 				},
@@ -103,7 +110,6 @@ export async function POST(req: Request) {
 		const { id } = evt.data;
 
 		try {
-			// Delete user from database
 			await prisma.user.delete({
 				where: {
 					clerkId: id,

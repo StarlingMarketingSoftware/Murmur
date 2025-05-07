@@ -12,7 +12,6 @@ interface PortalRequest {
 export async function POST(
 	req: NextRequest
 ): Promise<NextResponse<{ url: string }> | NextResponse<{ error: string }>> {
-	console.log('portal route');
 	try {
 		const body = (await req.json()) as PortalRequest;
 

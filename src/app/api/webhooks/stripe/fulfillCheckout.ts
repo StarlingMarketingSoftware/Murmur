@@ -14,7 +14,7 @@ export async function fulfillCheckout(
 	try {
 		// Retrieve the Checkout Session from the API with line_items expanded
 		const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId, {
-			expand: ['line_items', 'subscription'],
+			expand: ['line_items', 'subscription', 'metadata'],
 		});
 
 		if (!checkoutSession) {
