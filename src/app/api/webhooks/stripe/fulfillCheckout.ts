@@ -13,7 +13,7 @@ export async function fulfillCheckout(
 ) {
 	try {
 		const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId, {
-			expand: ['line_items', 'subscription', 'metadata'],
+			expand: ['line_items', 'subscription'],
 		});
 
 		if (!checkoutSession) {
@@ -45,8 +45,6 @@ export async function fulfillCheckout(
 					},
 				},
 			});
-
-			console.log(`Successfully fulfilled checkout session ${sessionId}`);
 			return customer;
 		} else {
 			console.log(
