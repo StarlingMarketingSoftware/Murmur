@@ -12,13 +12,14 @@ export async function POST(req: Request) {
 	const body = await req.text();
 	const headersList = await headers();
 	const signature = headersList.get('stripe-signature') || '';
+	let event: Stripe.Event;
 
 	if (!process.env.STRIPE_WEBHOOK_SECRET) {
-		console.error('Missing STRIPE_WEBHOOK_SECRET');
-		return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+		return NextResponse.json(
+			{ error: 'Missing Stripe webhook secret.' },
+			{ status: 500 }
+		);
 	}
-
-	let event: Stripe.Event;
 
 	try {
 		event = stripe.webhooks.constructEvent(
@@ -26,18 +27,15 @@ export async function POST(req: Request) {
 			signature,
 			process.env.STRIPE_WEBHOOK_SECRET
 		);
-	} catch (error) {
-		if (error instanceof Error) {
-			console.error(`Webhook signature verification failed: ${error.message}`);
-		}
-		return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+	} catch {
+		return NextResponse.json(
+			{ error: 'Invalid stripe webhook signature.' },
+			{ status: 400 }
+		);
 	}
-
-	console.log(`Event type: ${event.type}`);
 
 	try {
 		if (event.type === 'checkout.session.completed') {
-			console.log('checkout.session.completed');
 			const session = event.data.object as Stripe.Checkout.Session;
 			const newSubscription = await stripe.subscriptions.retrieve(
 				session.subscription as string
@@ -46,13 +44,10 @@ export async function POST(req: Request) {
 			const customer = await fulfillCheckout(newSubscription, session.id);
 			return NextResponse.json({ customer }, { status: 200 });
 		} else if (event.type === 'customer.subscription.updated') {
-			console.log('subscription updated');
 			const subscription: Stripe.Subscription = event.data.object;
 			const priceId = subscription.items.data[0].price.id;
 			const subscriptionTier = getSubscriptionTierWithPriceId(priceId);
-
 			const aiDraftCredits = await calcAiCredits(subscriptionTier, priceId);
-
 			try {
 				const res = await prisma.user.update({
 					where: {
@@ -70,16 +65,12 @@ export async function POST(req: Request) {
 						},
 					},
 				});
-
 				return NextResponse.json({ res }, { status: 200 });
-			} catch (error) {
-				console.error('Error updating user:', error);
+			} catch {
 				return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
 			}
 		} else if (event.type === 'customer.subscription.deleted') {
-			console.log('subscription deleted');
 			const subscription: Stripe.Subscription = event.data.object;
-
 			try {
 				const res = await prisma.user.update({
 					where: {
@@ -95,8 +86,7 @@ export async function POST(req: Request) {
 				});
 
 				return NextResponse.json({ res }, { status: 200 });
-			} catch (error) {
-				console.error('Error updating user subscription deletion:', error);
+			} catch {
 				return NextResponse.json(
 					{ error: 'Failed to update user subscription status' },
 					{ status: 500 }
@@ -105,8 +95,7 @@ export async function POST(req: Request) {
 		} else {
 			return NextResponse.json({ error: 'Unhandled event type' }, { status: 400 });
 		}
-	} catch (error) {
-		console.error(`Error processing webhook: ${error}`);
+	} catch {
 		return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
 	}
 }
