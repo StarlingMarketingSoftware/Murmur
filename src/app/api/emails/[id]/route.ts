@@ -1,9 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
+import {
+	apiNoContent,
+	apiNotFound,
+	apiResponse,
+	apiUnauthorized,
+	apiUnauthorizedResource,
+	handleApiError,
+} from '@/app/utils/api';
+import { ApiRouteParams } from '@/constants/types';
 
-// Input validation schema for updating an email
 const updateEmailSchema = z.object({
 	subject: z.string().min(1, 'Subject is required').optional(),
 	message: z.string().min(1, 'Message is required').optional(),
@@ -11,21 +19,17 @@ const updateEmailSchema = z.object({
 	sentAt: z.string().datetime().nullable().optional(),
 });
 
-type Params = Promise<{ id: string }>;
-
-export async function PATCH(req: NextRequest, { params }: { params: Params }) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
-	const { id } = await params;
-
+export async function PATCH(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const { id } = await params;
 		const body = await req.json();
 		const validatedData = updateEmailSchema.parse(body);
 
-		// Update the email with validated data
 		const updatedEmail = await prisma.email.update({
 			where: {
 				id: parseInt(id),
@@ -44,32 +48,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Params }) {
 			},
 		});
 
-		return NextResponse.json(updatedEmail);
+		return apiResponse(updatedEmail);
 	} catch (error) {
-		if (error instanceof z.ZodError) {
-			return NextResponse.json(
-				{ error: `Validation error: ${error.message}` },
-				{ status: 400 }
-			);
-		}
-		console.error('EMAIL_UPDATE_ERROR:', error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }
 
-export async function GET(req: NextRequest, { params }: { params: Params }) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
-	const { id } = await params;
-
+export async function GET(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const { id } = await params;
 		const email = await prisma.email.findUnique({
 			where: {
 				id: parseInt(id),
-				userId,
 			},
 			include: {
 				contact: true,
@@ -77,53 +72,47 @@ export async function GET(req: NextRequest, { params }: { params: Params }) {
 		});
 
 		if (!email) {
-			return NextResponse.json(
-				{ error: 'Email not found or unauthorized' },
-				{ status: 404 }
-			);
+			return apiNotFound();
 		}
 
-		return NextResponse.json(email);
+		if (email.userId !== userId) {
+			return apiUnauthorizedResource();
+		}
+
+		return apiResponse(email);
 	} catch (error) {
-		console.error('GET_EMAIL_ERROR:', error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Params }) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
-	const { id } = await params;
-
+export async function DELETE(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
-		// Validate that the email exists and belongs to the user
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const { id } = await params;
 		const existingEmail = await prisma.email.findUnique({
-			where: {
-				id: parseInt(id),
-				userId,
-			},
+			where: { id: parseInt(id) },
 		});
 
 		if (!existingEmail) {
-			return NextResponse.json(
-				{ error: 'Email not found or unauthorized' },
-				{ status: 404 }
-			);
+			return apiNotFound();
 		}
 
-		// Delete the email
+		if (existingEmail.userId !== userId) {
+			return apiUnauthorizedResource();
+		}
+
 		await prisma.email.delete({
 			where: {
 				id: parseInt(id),
 			},
 		});
 
-		return NextResponse.json({ success: true, message: 'Email deleted successfully' });
+		return apiNoContent();
 	} catch (error) {
-		console.error('EMAIL_DELETE_ERROR:', error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }

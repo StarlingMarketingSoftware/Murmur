@@ -1,20 +1,27 @@
-import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
+import {
+	apiNoContent,
+	apiNotFound,
+	apiResponse,
+	apiUnauthorized,
+	apiUnauthorizedResource,
+	handleApiError,
+} from '@/app/utils/api';
+import { ApiRouteParams } from '@/constants/types';
+import { NextRequest } from 'next/server';
 
 const updateSignatureSchema = z.object({
 	name: z.string(),
 	content: z.string().min(1, 'Signature content is required'),
 });
 
-type Params = Promise<{ id: string }>;
-
-export async function PATCH(req: Request, { params }: { params: Params }) {
+export async function PATCH(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
 		const { userId } = await auth();
 		if (!userId) {
-			return new NextResponse('Unauthorized', { status: 401 });
+			return apiUnauthorized();
 		}
 
 		const { id } = await params;
@@ -30,7 +37,11 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
 		});
 
 		if (!signature) {
-			return new NextResponse('Signature not found', { status: 404 });
+			return apiNotFound();
+		}
+
+		if (signature.userId !== userId) {
+			return apiUnauthorizedResource();
 		}
 
 		const updatedSignature = await prisma.signature.update({
@@ -44,21 +55,17 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
 			},
 		});
 
-		return NextResponse.json(updatedSignature);
+		return apiResponse(updatedSignature);
 	} catch (error) {
-		if (error instanceof z.ZodError) {
-			return new NextResponse('Invalid request data', { status: 400 });
-		}
-		console.error('[SIGNATURE_PATCH]', error);
-		return new NextResponse('Internal error', { status: 500 });
+		return handleApiError(error);
 	}
 }
 
-export async function DELETE(req: Request, { params }: { params: Params }) {
+export async function DELETE(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
 		const { userId } = await auth();
 		if (!userId) {
-			return new NextResponse('Unauthorized', { status: 401 });
+			return apiUnauthorized();
 		}
 
 		const { id } = await params;
@@ -71,19 +78,22 @@ export async function DELETE(req: Request, { params }: { params: Params }) {
 		});
 
 		if (!signature) {
-			return new NextResponse('Signature not found', { status: 404 });
+			return apiNotFound();
 		}
 
-		const deletedSignature = await prisma.signature.delete({
+		if (signature.userId !== userId) {
+			return apiUnauthorizedResource();
+		}
+
+		await prisma.signature.delete({
 			where: {
 				id: parseInt(id),
 				userId,
 			},
 		});
 
-		return NextResponse.json(deletedSignature);
+		return apiNoContent();
 	} catch (error) {
-		console.error('[SIGNATURE_DELETE]', error);
-		return new NextResponse('Internal error', { status: 500 });
+		return handleApiError(error);
 	}
 }

@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { useMe } from '@/hooks/useMe';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
 import { restrictedFeatureMessages } from '@/constants/constants';
-import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/schema';
+import { updateCampaignSchema } from '@/app/api/campaigns/[id]/schema';
 import {
 	NoDataCell,
 	TableSortingButton,

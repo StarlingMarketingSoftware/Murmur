@@ -1,19 +1,24 @@
-import { NextResponse } from 'next/server';
 import FormData from 'form-data';
 import Mailgun from 'mailgun.js';
 import { replacePTagsInSignature } from '@/app/utils/htmlFormatting';
+import { auth } from '@clerk/nextjs/server';
+import { apiResponse, apiUnauthorized, handleApiError } from '@/app/utils/api';
 
 export async function POST(request: Request) {
-	const { recipientEmail, subject, message, senderEmail, senderName } =
-		await request.json();
-
-	const mailgun = new Mailgun(FormData);
-	const mg = mailgun.client({
-		username: 'api',
-		key: process.env.MAILGUN_API_KEY || '',
-	});
-
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const { recipientEmail, subject, message, senderEmail, senderName } =
+			await request.json();
+
+		const mailgun = new Mailgun(FormData);
+		const mg = mailgun.client({
+			username: 'api',
+			key: process.env.MAILGUN_API_KEY || '',
+		});
 		const data = await mg.messages.create('murmurmailbox.com', {
 			from: `${senderName} <postmaster@murmurmailbox.com>`,
 			to: [recipientEmail],
@@ -23,9 +28,8 @@ export async function POST(request: Request) {
 			'h:Reply-To': senderEmail,
 		});
 
-		return NextResponse.json({ success: true, data });
+		return apiResponse({ success: true, data });
 	} catch (error) {
-		console.error(error);
-		return NextResponse.json({ success: false, error }, { status: 500 });
+		return handleApiError(error);
 	}
 }

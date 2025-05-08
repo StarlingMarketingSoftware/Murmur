@@ -1,23 +1,30 @@
-import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
-import { z } from 'zod';
+import {
+	apiNoContent,
+	apiNotFound,
+	apiResponse,
+	apiUnauthorized,
+	apiUnauthorizedResource,
+	handleApiError,
+} from '@/app/utils/api';
+import { Status } from '@prisma/client';
+
+import { ApiRouteParams } from '@/constants/types';
+import { NextRequest } from 'next/server';
 import { updateCampaignSchema } from './schema';
 
-type Params = Promise<{ campaignId: string }>;
-
-export async function GET(request: Request, { params }: { params: Params }) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
-	const { campaignId } = await params;
-
+export async function GET(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const { id } = await params;
 		const campaign = await prisma.campaign.findUniqueOrThrow({
 			where: {
-				id: parseInt(campaignId),
+				id: parseInt(id),
 				userId,
 			},
 			include: {
@@ -27,31 +34,27 @@ export async function GET(request: Request, { params }: { params: Params }) {
 			},
 		});
 
-		return NextResponse.json(campaign);
+		return apiResponse(campaign);
 	} catch (error) {
-		console.error(error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }
 
-// Input validation schema
-
-export async function PATCH(req: Request, { params }: { params: Params }) {
+export async function PATCH(req: Request, { params }: { params: ApiRouteParams }) {
 	try {
 		const { userId } = await auth();
 		if (!userId) {
-			return new NextResponse('Unauthorized', { status: 401 });
+			return apiUnauthorized();
 		}
 
-		const { campaignId } = await params;
+		const { id } = await params;
 
 		const body = await req.json();
 		const validatedData = updateCampaignSchema.parse(body);
 
-		console.log(validatedData.signatureId);
 		const updatedCampaign = await prisma.campaign.update({
 			where: {
-				id: parseInt(campaignId),
+				id: parseInt(id),
 				userId,
 			},
 			data: {
@@ -82,9 +85,6 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
 					contacts: {
 						[validatedData.contactOperation.action]:
 							validatedData.contactOperation.contactIds.map((id: number) => {
-								console.log(
-									`Attempting to ${validatedData.contactOperation?.action} contact ID: ${id}`
-								);
 								return { id };
 							}),
 					},
@@ -95,56 +95,45 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
 			},
 		});
 
-		return NextResponse.json(updatedCampaign);
+		return apiResponse(updatedCampaign);
 	} catch (error) {
-		if (error instanceof z.ZodError) {
-			return NextResponse.json(
-				{
-					error: 'Invalid request data',
-					details: error.errors,
-				},
-				{ status: 400 }
-			);
-		}
-		console.error('[CAMPAIGN_PATCH]', error);
-		return new NextResponse('Internal error', { status: 500 });
+		return handleApiError(error);
 	}
 }
 
-export async function DELETE(req: Request, { params }: { params: Params }) {
+export async function DELETE(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
 		const { userId } = await auth();
 		if (!userId) {
-			return new NextResponse('Unauthorized', { status: 401 });
+			return apiUnauthorized();
 		}
 
-		const { campaignId } = await params;
-
-		// Verify campaign exists and belongs to user
+		const { id } = await params;
 		const campaign = await prisma.campaign.findUnique({
 			where: {
-				id: parseInt(campaignId),
-				userId: userId,
+				id: parseInt(id),
 			},
 		});
 
 		if (!campaign) {
-			return new NextResponse('Campaign not found', { status: 404 });
+			return apiNotFound();
 		}
 
-		// Soft delete by updating status
-		const deletedCampaign = await prisma.campaign.update({
+		if (campaign.userId !== userId) {
+			return apiUnauthorizedResource();
+		}
+
+		await prisma.campaign.update({
 			where: {
-				id: parseInt(campaignId),
+				id: parseInt(id),
 			},
 			data: {
-				status: 'deleted',
+				status: Status.deleted,
 			},
 		});
 
-		return NextResponse.json(deletedCampaign);
+		return apiNoContent();
 	} catch (error) {
-		console.error('[CAMPAIGN_DELETE]', error);
-		return new NextResponse('Internal error', { status: 500 });
+		return handleApiError(error);
 	}
 }

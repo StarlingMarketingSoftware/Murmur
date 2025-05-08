@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
+import { apiCreated, apiUnauthorized, handleApiError } from '@/app/utils/api';
 
 const batchCreateContactSchema = z.object({
 	contacts: z.array(
@@ -19,17 +20,16 @@ const batchCreateContactSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
 		const body = await req.json();
 		const { contacts, contactListId } = batchCreateContactSchema.parse(body);
 
 		const result = await prisma.$transaction(async (prisma) => {
-			// First, find existing contacts that would violate the constraint
 			const existingContacts = await prisma.contact.findMany({
 				where: {
 					AND: [
@@ -45,15 +45,10 @@ export async function POST(req: NextRequest) {
 				},
 			});
 
-			// Get list of emails that already exist
 			const existingEmails = new Set(existingContacts.map((c) => c.email));
-
-			// Filter out contacts that would violate the constraint
 			const newContacts = contacts.filter(
 				(contact) => !existingEmails.has(contact.email)
 			);
-
-			// Create the filtered contacts
 			const results = await prisma.contact.createMany({
 				data: newContacts.map((contact) => ({
 					...contact,
@@ -70,15 +65,8 @@ export async function POST(req: NextRequest) {
 			};
 		});
 
-		return NextResponse.json(result, { status: 201 });
+		return apiCreated(result);
 	} catch (error) {
-		if (error instanceof z.ZodError) {
-			return NextResponse.json(
-				{ error: `Validation error: ${error.message}` },
-				{ status: 400 }
-			);
-		}
-		console.error('BATCH_CONTACT_CREATE_ERROR:', error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }

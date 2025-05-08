@@ -1,7 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { apiResponse, apiUnauthorized, handleApiError } from '@/app/utils/api';
+import { auth } from '@clerk/nextjs/server';
+import { NextRequest } from 'next/server';
 
 export async function POST(request: NextRequest) {
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
 		const body = await request.json();
 
 		const response = await fetch('https://api.perplexity.ai/chat/completions', {
@@ -19,9 +26,8 @@ export async function POST(request: NextRequest) {
 			throw new Error(data.error?.message || 'Failed to generate email');
 		}
 
-		return NextResponse.json(data);
+		return apiResponse(data);
 	} catch (error) {
-		console.error('Perplexity API error:', error);
-		return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
+		return handleApiError(error);
 	}
 }

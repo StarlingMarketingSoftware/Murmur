@@ -10,7 +10,7 @@ import { useMe } from '@/hooks/useMe';
 import { TypographyMuted } from '@/components/ui/typography';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
 import { restrictedFeatureMessages } from '@/constants/constants';
-import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/schema';
+import { updateCampaignSchema } from '@/app/api/campaigns/[id]/schema';
 import { TableSortingButton } from '@/components/molecules/CustomTable/CustomTable';
 
 export interface RecipientsTableProps {

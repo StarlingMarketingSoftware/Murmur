@@ -1,7 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { AiModel, Status } from '@prisma/client';
+import {
+	apiCreated,
+	apiResponse,
+	apiUnauthorized,
+	handleApiError,
+} from '@/app/utils/api';
 
 export type CreateCampaignBody = {
 	name: string;
@@ -13,15 +19,16 @@ export type CreateCampaignBody = {
 	testSubject?: string;
 	senderEmail?: string;
 	senderName?: string;
-	contacts?: number[]; // Array of contact IDs
+	contacts?: number[];
 };
 
 export async function POST(req: NextRequest) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
 		const body: CreateCampaignBody = await req.json();
 		const { name, contacts, ...restOfBody } = body;
 
@@ -41,20 +48,19 @@ export async function POST(req: NextRequest) {
 			},
 		});
 
-		return NextResponse.json(campaign);
+		return apiCreated(campaign);
 	} catch (error) {
-		console.error(error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }
 
 export async function GET() {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
 		const campaigns = await prisma.campaign.findMany({
 			where: {
 				userId: userId,
@@ -65,9 +71,8 @@ export async function GET() {
 			},
 		});
 
-		return NextResponse.json(campaigns);
+		return apiResponse(campaigns);
 	} catch (error) {
-		console.error(error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }

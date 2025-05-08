@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
+import { apiCreated, apiUnauthorized, handleApiError } from '@/app/utils/api';
 
-// Input validation schema for creating a contact
 const createContactSchema = z.object({
 	name: z.string().optional(),
 	email: z.string().email('Invalid email address'),
@@ -16,16 +16,15 @@ const createContactSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
 		const body = await req.json();
 		const validatedData = createContactSchema.parse(body);
 
-		// Destructure contactListId from the validated data
 		const { contactListId, ...contactData } = validatedData;
 
 		const contact = await prisma.contact.create({
@@ -35,15 +34,8 @@ export async function POST(req: NextRequest) {
 			},
 		});
 
-		return NextResponse.json(contact, { status: 201 });
+		return apiCreated(contact);
 	} catch (error) {
-		if (error instanceof z.ZodError) {
-			return NextResponse.json(
-				{ error: `Validation error: ${error.message}` },
-				{ status: 400 }
-			);
-		}
-		console.error('CONTACT_CREATE_ERROR:', error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }

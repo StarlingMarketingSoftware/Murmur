@@ -1,7 +1,8 @@
+import { apiResponse, handleApiError } from '@/app/utils/api';
 import { baseUrl } from '@/constants/constants';
 import { urls } from '@/constants/urls';
 import { stripe } from '@/stripe/client';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
 interface UpdateSubscriptionPortalRequest {
 	customerId: string;
@@ -9,9 +10,7 @@ interface UpdateSubscriptionPortalRequest {
 	priceId: string;
 }
 
-export async function POST(
-	req: NextRequest
-): Promise<NextResponse<{ url: string }> | NextResponse<{ error: string }>> {
+export async function POST(req: NextRequest) {
 	const body = (await req.json()) as UpdateSubscriptionPortalRequest;
 	const { customerId, productId, priceId } = body;
 
@@ -34,7 +33,6 @@ export async function POST(
 				payment_method_update: {
 					enabled: true,
 				},
-
 				invoice_history: {
 					enabled: true,
 				},
@@ -47,9 +45,8 @@ export async function POST(
 			return_url: `${baseUrl}${urls.pricing.path}/${productId}`,
 		});
 
-		return NextResponse.json({ url: portalSession.url });
-	} catch (err) {
-		console.error(err);
-		return NextResponse.json({ error: 'Failed to create portal session' });
+		return apiResponse({ url: portalSession.url });
+	} catch (error) {
+		return handleApiError(error);
 	}
 }

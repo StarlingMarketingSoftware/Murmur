@@ -9,12 +9,12 @@ import { z } from 'zod';
 import { useMe } from '@/hooks/useMe';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
 import { restrictedFeatureMessages } from '@/constants/constants';
-import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/schema';
 import {
 	NoDataCell,
 	TableSortingButton,
 } from '@/components/molecules/CustomTable/CustomTable';
 import { useGetContactsByCategory } from '@/hooks/useContacts';
+import { updateCampaignSchema } from '@/app/api/campaigns/[id]/schema';
 
 export interface ContactListDialogProps {
 	isOpen: boolean;

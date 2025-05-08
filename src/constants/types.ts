@@ -94,3 +94,5 @@ export interface CustomMutationOptions {
 }
 
 export type Font = 'Times New Roman' | 'Arial' | 'Calibri' | 'Georgia' | 'Courier New';
+
+export type ApiRouteParams = Promise<{ id: string }>;

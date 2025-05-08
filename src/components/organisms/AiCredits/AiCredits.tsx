@@ -12,6 +12,7 @@ import { useClerk } from '@clerk/nextjs';
 
 const AiCredits = () => {
 	const { user, isPendingUser } = useMe();
+	console.log('🚀 ~ AiCredits ~ user:', user);
 	const { isSignedIn } = useClerk();
 
 	if (!isSignedIn) return null;

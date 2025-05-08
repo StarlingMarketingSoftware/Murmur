@@ -1,34 +1,37 @@
-import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { stripe } from '../../../../stripe/client';
 import Stripe from 'stripe';
 import { getUser } from '@/app/utils/data/users/getUser';
+import {
+	apiBadRequest,
+	apiNotFound,
+	apiResponse,
+	apiServerError,
+	apiUnauthorized,
+	handleApiError,
+} from '@/app/utils/api';
 
 export async function POST(req: Request) {
 	try {
 		const { userId } = await auth();
-		const { priceId } = await req.json();
-
 		if (!userId) {
-			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+			return apiUnauthorized();
 		}
 
+		const { priceId } = await req.json();
 		if (!priceId) {
-			return NextResponse.json({ error: 'Price ID is required' }, { status: 400 });
+			return apiBadRequest('Price ID is required');
 		}
 
 		const user = await getUser();
-
 		if (!user) {
-			return NextResponse.json({ error: 'User not found' }, { status: 404 });
+			return apiNotFound('User not found');
+		}
+		if (!user.stripeCustomerId) {
+			return apiServerError('User does not have a Stripe customer ID');
 		}
 
 		const baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
-
-		if (!user.stripeCustomerId) {
-			throw new Error('User does not have a Stripe customer ID');
-		}
-
 		const session: Stripe.Response<Stripe.Checkout.Session> =
 			await stripe.checkout.sessions.create({
 				payment_method_types: ['card'],
@@ -44,9 +47,8 @@ export async function POST(req: Request) {
 				cancel_url: `${baseUrl}/pricing?canceled=true`,
 			});
 
-		return NextResponse.json({ url: session.url });
+		return apiResponse({ url: session.url });
 	} catch (error) {
-		console.error('Error creating checkout session:', error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }

@@ -1,14 +1,19 @@
+import {
+	apiCreated,
+	apiResponse,
+	apiUnauthorized,
+	handleApiError,
+} from '@/app/utils/api';
 import prisma from '@/lib/prisma';
 import { auth } from '@clerk/nextjs/server';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
 export async function GET() {
 	try {
 		const { userId } = await auth();
-
 		if (!userId) {
-			return new NextResponse('Unauthorized', { status: 401 });
+			return apiUnauthorized();
 		}
 
 		const signatures = await prisma.signature.findMany({
@@ -20,10 +25,9 @@ export async function GET() {
 			},
 		});
 
-		return NextResponse.json(signatures);
+		return apiResponse(signatures);
 	} catch (error) {
-		console.error('[SIGNATURES_GET]', error);
-		return new NextResponse('Internal Error', { status: 500 });
+		return handleApiError(error);
 	}
 }
 
@@ -33,16 +37,16 @@ const createSignatureSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-	const { userId } = await auth();
-	if (!userId) {
-		return new NextResponse('Unauthorized', { status: 401 });
-	}
-
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
 		const body = await req.json();
 		const validatedData = createSignatureSchema.parse(body);
 
-		await prisma.signature.create({
+		const signature = await prisma.signature.create({
 			data: {
 				name: validatedData.name,
 				content: validatedData.content,
@@ -50,9 +54,8 @@ export async function POST(req: NextRequest) {
 			},
 		});
 
-		return NextResponse.json({ message: 'Signature saved successfully' });
+		return apiCreated(signature);
 	} catch (error) {
-		console.error('[SIGNATURES_POST]', error);
-		return new NextResponse('Internal Error', { status: 500 });
+		return handleApiError(error);
 	}
 }
