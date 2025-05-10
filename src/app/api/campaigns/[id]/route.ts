@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import {
+	apiBadRequest,
 	apiNoContent,
 	apiNotFound,
 	apiResponse,
@@ -8,11 +9,31 @@ import {
 	apiUnauthorizedResource,
 	handleApiError,
 } from '@/app/utils/api';
-import { Status } from '@prisma/client';
-
+import { AiModel, Status } from '@prisma/client';
 import { ApiRouteParams } from '@/constants/types';
 import { NextRequest } from 'next/server';
-import { updateCampaignSchema } from './schema';
+
+import { z } from 'zod';
+
+const patchCampaignSchema = z.object({
+	name: z.string().optional(),
+	subject: z.string().nullable().optional(),
+	message: z.string().nullable().optional(),
+	testSubject: z.string().nullable().optional(),
+	testMessage: z.string().nullable().optional(),
+	senderEmail: z.string().nullable().optional(),
+	senderName: z.string().nullable().optional(),
+	aiModel: z.nativeEnum(AiModel).nullable().optional(),
+	font: z.string().optional(),
+	signatureId: z.number().optional().nullable(),
+	contactOperation: z
+		.object({
+			action: z.enum(['connect', 'disconnect']),
+			contactIds: z.array(z.number()),
+		})
+		.optional(),
+});
+export type PatchCampaignData = z.infer<typeof patchCampaignSchema>;
 
 export async function GET(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
@@ -50,7 +71,12 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 		const { id } = await params;
 
 		const body = await req.json();
-		const validatedData = updateCampaignSchema.parse(body);
+		const validatedData = patchCampaignSchema.safeParse(body);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
+
+		const { signatureId, contactOperation, ...updateData } = validatedData.data;
 
 		const updatedCampaign = await prisma.campaign.update({
 			where: {
@@ -58,35 +84,18 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 				userId,
 			},
 			data: {
-				...(validatedData.name && { name: validatedData.name }),
-				...(validatedData.subject !== undefined && { subject: validatedData.subject }),
-				...(validatedData.message !== undefined && { message: validatedData.message }),
-				...(validatedData.aiModel !== undefined && { aiModel: validatedData.aiModel }),
-				...(validatedData.font !== undefined && { font: validatedData.font }),
-				...(validatedData.testMessage !== undefined && {
-					testMessage: validatedData.testMessage,
-				}),
-				...(validatedData.testSubject !== undefined && {
-					testSubject: validatedData.testSubject,
-				}),
-				...(validatedData.senderEmail !== undefined && {
-					senderEmail: validatedData.senderEmail,
-				}),
-				...(validatedData.senderName !== undefined && {
-					senderName: validatedData.senderName,
-				}),
-				...(validatedData.signatureId !== undefined && {
-					signature:
-						validatedData.signatureId === null
-							? { disconnect: true }
-							: { connect: { id: validatedData.signatureId } },
-				}),
-				...(validatedData.contactOperation && {
+				...updateData,
+				signature:
+					signatureId === undefined
+						? undefined
+						: signatureId === null
+						? { disconnect: true }
+						: { connect: { id: signatureId } },
+				...(contactOperation && {
 					contacts: {
-						[validatedData.contactOperation.action]:
-							validatedData.contactOperation.contactIds.map((id: number) => {
-								return { id };
-							}),
+						[contactOperation.action]: contactOperation.contactIds.map((id: number) => {
+							return { id };
+						}),
 					},
 				}),
 			},

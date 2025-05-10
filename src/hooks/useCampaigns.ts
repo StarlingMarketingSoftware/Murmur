@@ -1,4 +1,5 @@
-import { CreateCampaignBody } from '@/app/api/campaigns/route';
+import { PatchCampaignData } from '@/app/api/campaigns/[id]/route';
+import { PostCampaignData } from '@/app/api/campaigns/route';
 import { CampaignWithRelations, CustomMutationOptions } from '@/constants/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -32,7 +33,7 @@ export const useGetCampaign = (campaignId: number) => {
 
 interface EditCampaignData {
 	campaignId: number;
-	data: Partial<CampaignWithRelations>;
+	data: PatchCampaignData;
 }
 
 export const useEditCampaign = (options: CustomMutationOptions = {}) => {
@@ -85,7 +86,7 @@ export const useCreateCampaign = (options: CustomMutationOptions = {}) => {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async (data: CreateCampaignBody) => {
+		mutationFn: async (data: PostCampaignData) => {
 			const response = await fetch('/api/campaigns', {
 				method: 'POST',
 				headers: {
@@ -136,8 +137,6 @@ export const useDeleteCampaign = (options: CustomMutationOptions = {}) => {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to delete campaign');
 			}
-
-			return response.json();
 		},
 		onSuccess: () => {
 			if (!suppressToasts) {

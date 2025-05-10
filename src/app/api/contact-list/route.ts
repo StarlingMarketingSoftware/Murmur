@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
 import {
+	apiBadRequest,
 	apiCreated,
 	apiNotFound,
 	apiResponse,
@@ -26,10 +27,11 @@ export const GET = async function GET() {
 };
 
 const createContactListSchema = z.object({
-	name: z.string().min(1, 'Category is required'),
+	name: z.string().min(1),
 	count: z.number().int().default(0).optional(),
 	userIds: z.array(z.string()).optional(),
 });
+export type PostContactListData = z.infer<typeof createContactListSchema>;
 
 export async function POST(req: NextRequest) {
 	try {
@@ -38,15 +40,18 @@ export async function POST(req: NextRequest) {
 			return apiUnauthorized();
 		}
 		const body = await req.json();
-		const validatedData = createContactListSchema.parse(body);
+		const validatedData = createContactListSchema.safeParse(body);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
+		const { userIds } = validatedData.data;
 
 		const contactList = await prisma.contactList.create({
 			data: {
-				name: validatedData.name,
-				count: validatedData.count,
-				user: validatedData.userIds
+				...validatedData.data,
+				user: userIds
 					? {
-							connect: validatedData.userIds.map((id) => ({ clerkId: id })),
+							connect: userIds.map((id) => ({ clerkId: id })),
 					  }
 					: undefined,
 			},

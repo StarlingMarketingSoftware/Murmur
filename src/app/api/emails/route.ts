@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
 import {
+	apiBadRequest,
 	apiCreated,
 	apiNotFound,
 	apiResponse,
@@ -10,6 +11,7 @@ import {
 	apiUnauthorizedResource,
 	handleApiError,
 } from '@/app/utils/api';
+import { EmailStatus } from '@prisma/client';
 
 export async function GET(req: NextRequest) {
 	try {
@@ -39,14 +41,15 @@ export async function GET(req: NextRequest) {
 	}
 }
 
-const createEmailSchema = z.object({
-	subject: z.string().min(1, 'Subject is required'),
-	message: z.string().min(1, 'Message is required'),
-	campaignId: z.number().int().positive('Campaign ID is required'),
-	status: z.enum(['draft', 'scheduled', 'sent', 'failed']).default('draft'),
+const postEmailSchema = z.object({
+	subject: z.string().min(1),
+	message: z.string().min(1),
+	campaignId: z.number().int().positive(),
+	status: z.nativeEnum(EmailStatus).default(EmailStatus.draft),
 	sentAt: z.string().datetime().nullable().optional(),
-	contactId: z.number().int().positive('Contact ID is required'),
+	contactId: z.number().int().positive(),
 });
+export type PostEmailData = z.infer<typeof postEmailSchema>;
 
 export async function POST(req: NextRequest) {
 	try {
@@ -56,12 +59,14 @@ export async function POST(req: NextRequest) {
 		}
 
 		const body = await req.json();
-		const validatedData = createEmailSchema.parse(body);
+		const validatedData = postEmailSchema.safeParse(body);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
 
 		const campaign = await prisma.campaign.findUnique({
 			where: {
-				id: validatedData.campaignId,
-				userId,
+				id: validatedData.data.campaignId,
 			},
 		});
 
@@ -74,15 +79,7 @@ export async function POST(req: NextRequest) {
 		}
 
 		const email = await prisma.email.create({
-			data: {
-				subject: validatedData.subject,
-				message: validatedData.message,
-				status: validatedData.status,
-				sentAt: validatedData.sentAt ? new Date(validatedData.sentAt) : null,
-				userId,
-				campaignId: validatedData.campaignId,
-				contactId: validatedData.contactId,
-			},
+			data: { ...validatedData.data, userId },
 		});
 
 		return apiCreated(email);

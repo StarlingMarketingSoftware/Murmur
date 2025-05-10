@@ -53,4 +53,21 @@ export const urls = {
 		path: '/sign-up',
 		label: 'Sign Up',
 	},
+	api: {
+		auth: {
+			path: '/api/auth',
+		},
+		campaigns: {
+			path: '/api/campaigns',
+		},
+		'contact-list': {
+			path: '/api/contact-list',
+		},
+		contacts: {
+			path: '/api/contacts',
+		},
+		emails: {
+			path: '/api/emails',
+		},
+	},
 };

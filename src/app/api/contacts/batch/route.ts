@@ -2,22 +2,28 @@ import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
-import { apiCreated, apiUnauthorized, handleApiError } from '@/app/utils/api';
+import {
+	apiBadRequest,
+	apiCreated,
+	apiUnauthorized,
+	handleApiError,
+} from '@/app/utils/api';
 
 const batchCreateContactSchema = z.object({
 	contacts: z.array(
 		z.object({
-			name: z.string().optional(),
-			email: z.string().email('Invalid email address'),
-			company: z.string().optional(),
+			name: z.string().optional().nullable(),
+			email: z.string().email(),
+			company: z.string().optional().nullable(),
 			website: z.string().optional().nullable(),
-			state: z.string().optional(),
-			country: z.string().optional(),
-			phone: z.string().optional(),
+			state: z.string().optional().nullable(),
+			country: z.string().optional().nullable(),
+			phone: z.string().optional().nullable(),
 		})
 	),
 	contactListId: z.number().optional(),
 });
+export type PostBatchContactData = z.infer<typeof batchCreateContactSchema>;
 
 export async function POST(req: NextRequest) {
 	try {
@@ -26,8 +32,13 @@ export async function POST(req: NextRequest) {
 			return apiUnauthorized();
 		}
 
-		const body = await req.json();
-		const { contacts, contactListId } = batchCreateContactSchema.parse(body);
+		const data = await req.json();
+		const validatedData = batchCreateContactSchema.safeParse(data);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
+
+		const { contacts, contactListId } = validatedData.data;
 
 		const result = await prisma.$transaction(async (prisma) => {
 			const existingContacts = await prisma.contact.findMany({
@@ -39,7 +50,7 @@ export async function POST(req: NextRequest) {
 							},
 						},
 						{
-							contactListId: contactListId,
+							contactListId,
 						},
 					],
 				},
@@ -52,7 +63,7 @@ export async function POST(req: NextRequest) {
 			const results = await prisma.contact.createMany({
 				data: newContacts.map((contact) => ({
 					...contact,
-					contactListId: contactListId,
+					contactListId,
 				})),
 			});
 

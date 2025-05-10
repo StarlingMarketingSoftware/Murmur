@@ -1,14 +1,7 @@
+import { PostMailgunData } from '@/app/api/mailgun/route';
 import { CustomMutationOptions } from '@/constants/types';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-
-interface MailgunMessageData {
-	recipientEmail: string;
-	subject: string;
-	message: string;
-	senderEmail: string;
-	senderName: string;
-}
 
 export const useSendMailgunMessage = (options: CustomMutationOptions = {}) => {
 	const {
@@ -19,7 +12,7 @@ export const useSendMailgunMessage = (options: CustomMutationOptions = {}) => {
 	} = options;
 
 	return useMutation({
-		mutationFn: async (data: MailgunMessageData) => {
+		mutationFn: async (data: PostMailgunData) => {
 			const response = await fetch('/api/mailgun/', {
 				method: 'POST',
 				headers: {

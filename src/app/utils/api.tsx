@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 
 export const API_MESSAGES = {
 	SUCCESS: {
@@ -41,9 +41,13 @@ export const apiNoContent = (): NextResponse => {
 
 /* Error Responses */
 export const apiBadRequest = (
-	message: string = API_MESSAGES.ERROR.BAD_REQUEST
+	message: string | ZodError = API_MESSAGES.ERROR.BAD_REQUEST
 ): NextResponse => {
-	return NextResponse.json({ success: false, error: message }, { status: 400 });
+	let _message = message;
+	if (message instanceof ZodError) {
+		_message = message.errors.toString();
+	}
+	return NextResponse.json({ success: false, error: _message }, { status: 400 });
 };
 
 export const apiUnauthorized = (

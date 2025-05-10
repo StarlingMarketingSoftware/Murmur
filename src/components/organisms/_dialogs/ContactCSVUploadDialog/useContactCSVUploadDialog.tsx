@@ -8,6 +8,7 @@ import {
 } from '@/components/molecules/CustomTable/CustomTable';
 import { useBatchCreateContacts } from '@/hooks/useContacts';
 import { useParams } from 'next/navigation';
+import { toast } from 'sonner';
 
 export const useContactCSVUploadDialog = () => {
 	const params = useParams<{ id: string }>();
@@ -57,6 +58,10 @@ export const useContactCSVUploadDialog = () => {
 	};
 
 	const handleSave = async () => {
+		if (!csvData || csvData.length === 0) {
+			toast.error('No data to upload');
+			return;
+		}
 		await createContacts({ contacts: csvData, contactListId });
 		setCsvData([]);
 		setOpen(false);

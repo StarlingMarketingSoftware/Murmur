@@ -10,6 +10,11 @@ import {
 	apiUnauthorized,
 	handleApiError,
 } from '@/app/utils/api';
+import { z } from 'zod';
+
+const stripeCheckoutRequestSchema = z.object({
+	priceId: z.string().min(1),
+});
 
 export async function POST(req: Request) {
 	try {
@@ -18,7 +23,14 @@ export async function POST(req: Request) {
 			return apiUnauthorized();
 		}
 
-		const { priceId } = await req.json();
+		const data = await req.json();
+		const validatedData = stripeCheckoutRequestSchema.safeParse(data);
+
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
+
+		const { priceId } = validatedData.data;
 		if (!priceId) {
 			return apiBadRequest('Price ID is required');
 		}

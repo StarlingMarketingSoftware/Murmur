@@ -1,18 +1,25 @@
-import { apiResponse, handleApiError } from '@/app/utils/api';
+import { apiBadRequest, apiResponse, handleApiError } from '@/app/utils/api';
 import { baseUrl } from '@/constants/constants';
 import { urls } from '@/constants/urls';
 import { stripe } from '@/stripe/client';
 import { NextRequest } from 'next/server';
+import { z } from 'zod';
 
-interface UpdateSubscriptionPortalRequest {
-	customerId: string;
-	productId: string;
-	priceId: string;
-}
+const customProductPortalRequestSchema = z.object({
+	customerId: z.string().min(1),
+	productId: z.string().min(1),
+	priceId: z.string().min(1),
+});
 
 export async function POST(req: NextRequest) {
-	const body = (await req.json()) as UpdateSubscriptionPortalRequest;
-	const { customerId, productId, priceId } = body;
+	const data = await req.json();
+	const validatedData = customProductPortalRequestSchema.safeParse(data);
+
+	if (!validatedData.success) {
+		return apiBadRequest(validatedData.error);
+	}
+
+	const { customerId, productId, priceId } = validatedData.data;
 
 	try {
 		const portalConfig = await stripe.billingPortal.configurations.create({

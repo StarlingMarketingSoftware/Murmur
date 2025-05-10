@@ -3,6 +3,8 @@ import { toast } from 'sonner';
 import { CustomMutationOptions } from '@/constants/types';
 import { addFontToHtml } from '@/app/utils/htmlFormatting';
 import { DefaultFont } from '@/constants/constants';
+import { CreateSignatureData } from '@/app/api/signatures/route';
+import { UpdateSignatureData } from '@/app/api/signatures/[id]/route';
 
 export const useGetUserSignatures = () => {
 	return useQuery({
@@ -19,10 +21,7 @@ export const useGetUserSignatures = () => {
 
 interface EditSignatureData {
 	signatureId: number;
-	data: {
-		name: string;
-		content: string;
-	};
+	data: UpdateSignatureData;
 }
 
 export const useEditSignature = (options: CustomMutationOptions = {}) => {
@@ -71,11 +70,6 @@ export const useEditSignature = (options: CustomMutationOptions = {}) => {
 		},
 	});
 };
-
-interface CreateSignatureData {
-	name: string;
-	content: string;
-}
 
 export const useCreateSignature = (options: CustomMutationOptions = {}) => {
 	const {
@@ -139,8 +133,6 @@ export const useDeleteSignature = (options: CustomMutationOptions = {}) => {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to delete signature');
 			}
-
-			return response.json();
 		},
 		onSuccess: () => {
 			if (!suppressToasts) {

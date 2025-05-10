@@ -1,3 +1,5 @@
+import { PatchContactListData } from '@/app/api/contact-list/[id]/route';
+import { PostContactListData } from '@/app/api/contact-list/route';
 import { CustomMutationOptions } from '@/constants/types';
 import { ContactList } from '@prisma/client';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
@@ -5,13 +7,7 @@ import { toast } from 'sonner';
 
 interface EditContactListData {
 	listId: number;
-	data: Partial<ContactList>;
-}
-
-interface CreateContactListBody {
-	name: string;
-	count?: number;
-	userIds?: string[];
+	data: PatchContactListData;
 }
 
 export const useGetContactLists = () => {
@@ -51,7 +47,7 @@ export const useCreateContactList = (options: CustomMutationOptions = {}) => {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async (data: CreateContactListBody) => {
+		mutationFn: async (data: PostContactListData) => {
 			const response = await fetch('/api/contact-list', {
 				method: 'POST',
 				headers: {
@@ -144,8 +140,6 @@ export const useDeleteContactList = (options: CustomMutationOptions = {}) => {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to delete contact list');
 			}
-
-			return response.json();
 		},
 		onSuccess: () => {
 			if (!suppressToasts) {

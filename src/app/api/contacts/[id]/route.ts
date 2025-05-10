@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
 import {
+	apiBadRequest,
 	apiNoContent,
 	apiNotFound,
 	apiResponse,
@@ -13,13 +14,14 @@ import { ApiRouteParams } from '@/constants/types';
 
 const updateContactSchema = z.object({
 	name: z.string().optional(),
-	email: z.string().email('Invalid email address').optional(),
+	email: z.string().email().optional(),
 	company: z.string().optional(),
 	website: z.string().optional(),
 	state: z.string().optional(),
 	country: z.string().optional(),
 	phone: z.string().optional(),
 });
+export type PatchContactData = z.infer<typeof updateContactSchema>;
 
 export async function PATCH(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
@@ -30,13 +32,16 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 
 		const { id } = await params;
 		const body = await req.json();
-		const validatedData = updateContactSchema.parse(body);
+		const validatedData = updateContactSchema.safeParse(body);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
 
 		const updatedContact = await prisma.contact.update({
 			where: {
 				id: parseInt(id),
 			},
-			data: validatedData,
+			data: validatedData.data,
 		});
 
 		return apiResponse(updatedContact);

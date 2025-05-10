@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
 import {
+	apiBadRequest,
 	apiNoContent,
 	apiNotFound,
 	apiResponse,
@@ -14,8 +15,9 @@ import { NextRequest } from 'next/server';
 
 const updateSignatureSchema = z.object({
 	name: z.string(),
-	content: z.string().min(1, 'Signature content is required'),
+	content: z.string().min(1),
 });
+export type UpdateSignatureData = z.infer<typeof updateSignatureSchema>;
 
 export async function PATCH(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
@@ -27,7 +29,11 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 		const { id } = await params;
 
 		const body = await req.json();
-		const validatedData = updateSignatureSchema.parse(body);
+		const validatedData = updateSignatureSchema.safeParse(body);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
+		const { name, content } = validatedData.data;
 
 		const signature = await prisma.signature.findUnique({
 			where: {
@@ -50,8 +56,8 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 				userId,
 			},
 			data: {
-				name: validatedData.name,
-				content: validatedData.content,
+				name,
+				content,
 			},
 		});
 

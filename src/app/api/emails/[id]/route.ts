@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
 import {
+	apiBadRequest,
 	apiNoContent,
 	apiNotFound,
 	apiResponse,
@@ -11,13 +12,15 @@ import {
 	handleApiError,
 } from '@/app/utils/api';
 import { ApiRouteParams } from '@/constants/types';
+import { EmailStatus } from '@prisma/client';
 
-const updateEmailSchema = z.object({
-	subject: z.string().min(1, 'Subject is required').optional(),
-	message: z.string().min(1, 'Message is required').optional(),
-	status: z.enum(['draft', 'scheduled', 'sent', 'failed']).optional(),
-	sentAt: z.string().datetime().nullable().optional(),
+const patchEmailSchema = z.object({
+	subject: z.string().min(1).optional(),
+	message: z.string().min(1).optional(),
+	status: z.nativeEnum(EmailStatus).optional(),
+	sentAt: z.union([z.date(), z.string().datetime()]).optional(),
 });
+export type PatchEmailData = z.infer<typeof patchEmailSchema>;
 
 export async function PATCH(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
@@ -28,24 +31,17 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 
 		const { id } = await params;
 		const body = await req.json();
-		const validatedData = updateEmailSchema.parse(body);
+		const validatedData = patchEmailSchema.safeParse(body);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
 
 		const updatedEmail = await prisma.email.update({
 			where: {
 				id: parseInt(id),
 				userId,
 			},
-			data: {
-				...(validatedData.subject !== undefined && { subject: validatedData.subject }),
-				...(validatedData.message !== undefined && { message: validatedData.message }),
-				...(validatedData.status !== undefined && { status: validatedData.status }),
-				...(validatedData.sentAt !== undefined && {
-					sentAt: validatedData.sentAt ? new Date(validatedData.sentAt) : null,
-				}),
-			},
-			include: {
-				contact: true,
-			},
+			data: validatedData.data,
 		});
 
 		return apiResponse(updatedEmail);

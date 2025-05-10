@@ -11,6 +11,19 @@ import {
 import { ApiRouteParams } from '@/constants/types';
 import { NextRequest } from 'next/server';
 
+const patchUserSchema = z.object({
+	firstName: z.string().optional(),
+	lastName: z.string().optional(),
+	aiDraftCredits: z.number().int().optional(),
+	aiTestCredits: z.number().int().optional(),
+	stripeCustomerId: z.string().optional().nullable(),
+	stripeSubscriptionId: z.string().optional().nullable(),
+	stripeSubscriptionStatus: z.string().optional().nullable(),
+	stripePriceId: z.string().optional().nullable(),
+	emailSendCredits: z.number().int().optional(),
+});
+export type PatchUserData = z.infer<typeof patchUserSchema>;
+
 export const GET = async function GET(
 	req: NextRequest,
 	{ params }: { params: ApiRouteParams }
@@ -35,18 +48,6 @@ export const GET = async function GET(
 	}
 };
 
-const updateUserSchema = z.object({
-	firstName: z.string().optional(),
-	lastName: z.string().optional(),
-	aiDraftCredits: z.number().int().optional(),
-	aiTestCredits: z.number().int().optional(),
-	stripeCustomerId: z.string().optional().nullable(),
-	stripeSubscriptionId: z.string().optional().nullable(),
-	stripeSubscriptionStatus: z.string().optional().nullable(),
-	stripePriceId: z.string().optional().nullable(),
-	emailSendCredits: z.number().int().optional(),
-});
-
 export const PATCH = async function PATCH(request: Request) {
 	try {
 		const { userId } = await auth();
@@ -55,7 +56,7 @@ export const PATCH = async function PATCH(request: Request) {
 		}
 
 		const data = await request.json();
-		const validatedData = updateUserSchema.safeParse(data);
+		const validatedData = patchUserSchema.safeParse(data);
 
 		if (!validatedData.success) {
 			return apiBadRequest();

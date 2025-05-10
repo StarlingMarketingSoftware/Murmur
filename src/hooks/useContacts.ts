@@ -1,15 +1,23 @@
 import { Contact } from '@prisma/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CustomMutationOptions } from '@/constants/types';
+import { CustomMutationOptions, CustomQueryOptions } from '@/constants/types';
 import { toast } from 'sonner';
+import { ContactFilterData, PostContactData } from '@/app/api/contacts/route';
+import { appendQueryParamsToUrl } from '@/app/utils/url';
+import { PostBatchContactData } from '@/app/api/contacts/batch/route';
+import { PatchContactData } from '@/app/api/contacts/[id]/route';
 
-export const useGetContactsByCategory = (contactListId?: number) => {
+export interface ContactQueryOptions extends CustomQueryOptions {
+	filters?: ContactFilterData;
+}
+
+export const useGetContacts = (options: ContactQueryOptions) => {
 	return useQuery({
-		queryKey: ['contacts', 'by-category', contactListId],
+		queryKey: ['contacts', options.filters],
 		queryFn: async () => {
-			if (!contactListId) return [];
+			const url = appendQueryParamsToUrl('/api/contacts', options.filters);
 
-			const response = await fetch(`/api/contacts/get-by-category/${contactListId}`, {
+			const response = await fetch(url, {
 				method: 'GET',
 			});
 
@@ -20,20 +28,8 @@ export const useGetContactsByCategory = (contactListId?: number) => {
 
 			return response.json() as Promise<Contact[]>;
 		},
-		enabled: !!contactListId,
 	});
 };
-
-interface CreateContactBody {
-	name?: string;
-	email: string;
-	company?: string;
-	website?: string | null;
-	state?: string;
-	country?: string;
-	phone?: string;
-	contactListId?: number;
-}
 
 export const useCreateContact = (options: CustomMutationOptions = {}) => {
 	const {
@@ -46,7 +42,7 @@ export const useCreateContact = (options: CustomMutationOptions = {}) => {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async (data: CreateContactBody) => {
+		mutationFn: async (data: PostContactData) => {
 			const response = await fetch('/api/contacts', {
 				method: 'POST',
 				headers: {
@@ -79,7 +75,7 @@ export const useCreateContact = (options: CustomMutationOptions = {}) => {
 
 interface EditContactData {
 	contactId: number;
-	data: Partial<Contact>;
+	data: PatchContactData;
 }
 
 export const useEditContact = (options: CustomMutationOptions = {}) => {
@@ -139,8 +135,6 @@ export const useDeleteContact = (options: CustomMutationOptions = {}) => {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to delete contact');
 			}
-
-			return response.json();
 		},
 		onSuccess: () => {
 			if (!suppressToasts) {
@@ -156,19 +150,6 @@ export const useDeleteContact = (options: CustomMutationOptions = {}) => {
 	});
 };
 
-interface BatchCreateContactBody {
-	contacts: Array<{
-		name?: string | null;
-		email: string;
-		company?: string | null;
-		website?: string | null;
-		state?: string | null;
-		country?: string | null;
-		phone?: string | null;
-	}>;
-	contactListId?: number;
-}
-
 export const useBatchCreateContacts = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
@@ -180,7 +161,7 @@ export const useBatchCreateContacts = (options: CustomMutationOptions = {}) => {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async (data: BatchCreateContactBody) => {
+		mutationFn: async (data: PostBatchContactData) => {
 			const response = await fetch('/api/contacts/batch', {
 				method: 'POST',
 				headers: {

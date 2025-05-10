@@ -26,10 +26,8 @@ export const useEmailsTable = (props: EmailsTableProps) => {
 	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
 
 	const handleDeleteEmail = async (emailId: number) => {
-		const res = await deleteEmail(emailId);
-		if (res) {
-			queryClient.invalidateQueries({ queryKey: ['drafts'] });
-		}
+		await deleteEmail(emailId);
+		queryClient.invalidateQueries({ queryKey: ['drafts'] });
 	};
 
 	const columns: (

@@ -1,4 +1,5 @@
 import {
+	apiBadRequest,
 	apiCreated,
 	apiResponse,
 	apiUnauthorized,
@@ -8,6 +9,12 @@ import prisma from '@/lib/prisma';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
+
+const createSignatureSchema = z.object({
+	name: z.string().min(1),
+	content: z.string(),
+});
+export type CreateSignatureData = z.infer<typeof createSignatureSchema>;
 
 export async function GET() {
 	try {
@@ -31,11 +38,6 @@ export async function GET() {
 	}
 }
 
-const createSignatureSchema = z.object({
-	name: z.string().min(1, 'Signature name is required'),
-	content: z.string(),
-});
-
 export async function POST(req: NextRequest) {
 	try {
 		const { userId } = await auth();
@@ -43,13 +45,17 @@ export async function POST(req: NextRequest) {
 			return apiUnauthorized();
 		}
 
-		const body = await req.json();
-		const validatedData = createSignatureSchema.parse(body);
+		const data = await req.json();
+		const validatedData = createSignatureSchema.safeParse(data);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
+		const { name, content } = validatedData.data;
 
 		const signature = await prisma.signature.create({
 			data: {
-				name: validatedData.name,
-				content: validatedData.content,
+				name: name,
+				content: content,
 				userId: userId,
 			},
 		});
