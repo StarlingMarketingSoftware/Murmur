@@ -6,7 +6,7 @@ import {
 	NoDataCell,
 	TableSortingButton,
 } from '@/components/molecules/CustomTable/CustomTable';
-import { useBatchCreateContacts } from '@/hooks/useContacts';
+import { useBatchCreateContacts } from '@/hooks/queryHooks/useContacts';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
 

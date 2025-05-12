@@ -6,67 +6,26 @@ import { DefaultFont } from '@/constants/constants';
 import { CreateSignatureData } from '@/app/api/signatures/route';
 import { UpdateSignatureData } from '@/app/api/signatures/[id]/route';
 
-export const useGetUserSignatures = () => {
+const QUERY_KEYS = {
+	all: ['signatures'] as const,
+	list: () => [...QUERY_KEYS.all, 'list'] as const,
+	detail: (id: number) => [...QUERY_KEYS.all, 'detail', id] as const,
+} as const;
+
+interface EditSignatureData {
+	id: number;
+	data: UpdateSignatureData;
+}
+
+export const useGetSignatures = () => {
 	return useQuery({
-		queryKey: ['signatures'],
+		queryKey: QUERY_KEYS.list(),
 		queryFn: async () => {
 			const response = await fetch('/api/signatures');
 			if (!response.ok) {
 				throw new Error('Failed to fetch signatures');
 			}
 			return response.json();
-		},
-	});
-};
-
-interface EditSignatureData {
-	signatureId: number;
-	data: UpdateSignatureData;
-}
-
-export const useEditSignature = (options: CustomMutationOptions = {}) => {
-	const {
-		suppressToasts = false,
-		successMessage = 'Signature updated successfully',
-		errorMessage = 'Failed to update signature',
-		onSuccess: onSuccessCallback,
-	} = options;
-
-	const queryClient = useQueryClient();
-
-	return useMutation({
-		mutationFn: async ({ data, signatureId }: EditSignatureData) => {
-			let formattedContent = data.content;
-			if (!data.content.includes('<span style="font-family')) {
-				formattedContent = addFontToHtml(data.content, DefaultFont);
-			}
-
-			const response = await fetch(`/api/signatures/${signatureId}`, {
-				method: 'PATCH',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({ ...data, content: formattedContent }),
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to update signature');
-			}
-
-			return response.json();
-		},
-		onSuccess: () => {
-			if (!suppressToasts) {
-				toast.success(successMessage);
-			}
-			queryClient.invalidateQueries({ queryKey: ['signatures'] });
-			onSuccessCallback?.();
-		},
-		onError: () => {
-			if (!suppressToasts) {
-				toast.error(errorMessage);
-			}
 		},
 	});
 };
@@ -78,7 +37,6 @@ export const useCreateSignature = (options: CustomMutationOptions = {}) => {
 		errorMessage = 'Failed to create signature',
 		onSuccess: onSuccessCallback,
 	} = options;
-
 	const queryClient = useQueryClient();
 
 	return useMutation({
@@ -99,10 +57,60 @@ export const useCreateSignature = (options: CustomMutationOptions = {}) => {
 			return response.json();
 		},
 		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}
-			queryClient.invalidateQueries({ queryKey: ['signatures'] });
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
+};
+
+export const useEditSignature = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Signature updated successfully',
+		errorMessage = 'Failed to update signature',
+		onSuccess: onSuccessCallback,
+	} = options;
+
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async ({ data, id }: EditSignatureData) => {
+			let formattedContent = data.content;
+			if (!data.content.includes('<span style="font-family')) {
+				formattedContent = addFontToHtml(data.content, DefaultFont);
+			}
+
+			const response = await fetch(`/api/signatures/${id}`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ ...data, content: formattedContent }),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to update signature');
+			}
+
+			return response.json();
+		},
+		onSuccess: (variables) => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
+			queryClient.invalidateQueries({
+				queryKey: QUERY_KEYS.detail(variables.id),
+			});
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
 			onSuccessCallback?.();
 		},
 		onError: () => {
@@ -120,12 +128,11 @@ export const useDeleteSignature = (options: CustomMutationOptions = {}) => {
 		errorMessage = 'Failed to delete signature',
 		onSuccess: onSuccessCallback,
 	} = options;
-
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async (signatureId: number) => {
-			const response = await fetch(`/api/signatures/${signatureId}`, {
+		mutationFn: async (id: number) => {
+			const response = await fetch(`/api/signatures/${id}`, {
 				method: 'DELETE',
 			});
 
@@ -135,10 +142,10 @@ export const useDeleteSignature = (options: CustomMutationOptions = {}) => {
 			}
 		},
 		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.all });
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}
-			queryClient.invalidateQueries({ queryKey: ['signatures'] });
 			onSuccessCallback?.();
 		},
 		onError: () => {

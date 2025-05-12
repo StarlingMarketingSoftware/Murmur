@@ -9,7 +9,7 @@ import { ellipsesText } from '@/app/utils/string';
 import { useMe } from '@/hooks/useMe';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
 import { restrictedFeatureMessages } from '@/constants/constants';
-import { useDeleteEmail } from '@/hooks/useEmails';
+import { useDeleteEmail } from '@/hooks/queryHooks/useEmails';
 import { stripHtmlTags } from '@/app/utils/htmlFormatting';
 
 export interface EmailsTableProps {

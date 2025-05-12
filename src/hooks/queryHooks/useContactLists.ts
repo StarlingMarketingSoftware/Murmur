@@ -5,14 +5,20 @@ import { ContactList } from '@prisma/client';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+const QUERY_KEYS = {
+	all: ['contactLists'] as const,
+	list: () => [...QUERY_KEYS.all, 'list'] as const,
+	detail: (id: number) => [...QUERY_KEYS.all, 'detail', id] as const,
+} as const;
+
 interface EditContactListData {
-	listId: number;
+	id: number;
 	data: PatchContactListData;
 }
 
 export const useGetContactLists = () => {
 	return useQuery({
-		queryKey: ['contactLists'],
+		queryKey: QUERY_KEYS.list(),
 		queryFn: async () => {
 			const response = await fetch('/api/contact-list');
 			if (!response.ok) {
@@ -25,7 +31,7 @@ export const useGetContactLists = () => {
 
 export const useGetContactList = (id: number) => {
 	return useQuery<ContactList>({
-		queryKey: ['contactList', id],
+		queryKey: QUERY_KEYS.detail(id),
 		queryFn: async () => {
 			const response = await fetch(`/api/contact-list/${id}`);
 			if (!response.ok) {
@@ -43,7 +49,6 @@ export const useCreateContactList = (options: CustomMutationOptions = {}) => {
 		errorMessage = 'Failed to create contact list',
 		onSuccess: onSuccessCallback,
 	} = options;
-
 	const queryClient = useQueryClient();
 
 	return useMutation({
@@ -64,10 +69,10 @@ export const useCreateContactList = (options: CustomMutationOptions = {}) => {
 			return response.json();
 		},
 		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}
-			queryClient.invalidateQueries({ queryKey: ['contactLists'] });
 			onSuccessCallback?.();
 		},
 		onError: () => {
@@ -85,12 +90,11 @@ export const useEditContactList = (options: CustomMutationOptions = {}) => {
 		errorMessage = 'Failed to update contact list',
 		onSuccess: onSuccessCallback,
 	} = options;
-
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async ({ data, listId }: EditContactListData) => {
-			const response = await fetch(`/api/contact-list/${listId}`, {
+		mutationFn: async ({ data, id }: EditContactListData) => {
+			const response = await fetch(`/api/contact-list/${id}`, {
 				method: 'PATCH',
 				headers: {
 					'Content-Type': 'application/json',
@@ -105,12 +109,15 @@ export const useEditContactList = (options: CustomMutationOptions = {}) => {
 
 			return response.json();
 		},
-		onSuccess: () => {
+		onSuccess: (variables) => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
+			queryClient.invalidateQueries({
+				queryKey: QUERY_KEYS.detail(variables.id),
+			});
+			onSuccessCallback?.();
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}
-			queryClient.invalidateQueries({ queryKey: ['contactLists'] });
-			onSuccessCallback?.();
 		},
 		onError: () => {
 			if (!suppressToasts) {
@@ -127,7 +134,6 @@ export const useDeleteContactList = (options: CustomMutationOptions = {}) => {
 		errorMessage = 'Failed to delete contact list',
 		onSuccess: onSuccessCallback,
 	} = options;
-
 	const queryClient = useQueryClient();
 
 	return useMutation({
@@ -145,7 +151,7 @@ export const useDeleteContactList = (options: CustomMutationOptions = {}) => {
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}
-			queryClient.invalidateQueries({ queryKey: ['contactLists'] });
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.all });
 			onSuccessCallback?.();
 		},
 		onError: () => {

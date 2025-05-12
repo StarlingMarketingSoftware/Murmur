@@ -1,0 +1,136 @@
+import { PatchEmailData } from '@/app/api/emails/[id]/route';
+import { PostEmailData } from '@/app/api/emails/route';
+import { CustomMutationOptions } from '@/constants/types';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+
+const QUERY_KEYS = {
+	all: ['emails'] as const,
+	list: () => [...QUERY_KEYS.all, 'list'] as const,
+	detail: (id: number) => [...QUERY_KEYS.all, 'detail', id] as const,
+} as const;
+
+interface EditEmailData {
+	id: number;
+	data: PatchEmailData;
+}
+
+export const useCreateEmail = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Email created successfully',
+		errorMessage = 'Failed to create email',
+		onSuccess: onSuccessCallback,
+	} = options;
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (data: PostEmailData) => {
+			const response = await fetch('/api/emails', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(data),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to create email');
+			}
+
+			return response.json();
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
+};
+
+export const useEditEmail = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Email updated successfully',
+		errorMessage = 'Failed to update email',
+		onSuccess: onSuccessCallback,
+	} = options;
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: async ({ data, id }: EditEmailData) => {
+			const response = await fetch(`/api/emails/${id}`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(data),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to update email');
+			}
+
+			return response.json();
+		},
+		onSuccess: (variables) => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
+			queryClient.invalidateQueries({
+				queryKey: QUERY_KEYS.detail(variables.id),
+			});
+
+			if (!suppressToasts) {
+				toast.success(successMessage || 'Email updated successfully');
+			}
+
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage || 'Failed to update email. Please try again.');
+			}
+		},
+	});
+};
+
+export const useDeleteEmail = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Email deleted successfully',
+		errorMessage = 'Failed to delete email',
+		onSuccess: onSuccessCallback,
+	} = options;
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: async (id: number) => {
+			const response = await fetch(`/api/emails/${id}`, {
+				method: 'DELETE',
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to delete email');
+			}
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.all });
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
+};

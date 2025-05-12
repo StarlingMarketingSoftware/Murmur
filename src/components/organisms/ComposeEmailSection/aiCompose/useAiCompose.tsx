@@ -1,10 +1,10 @@
 import { convertAiResponseToRichTextEmail } from '@/app/utils/htmlFormatting';
 import { CampaignWithRelations, Draft } from '@/constants/types';
-import { useEditCampaign } from '@/hooks/useCampaigns';
-import { useCreateEmail } from '@/hooks/useEmails';
+import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
+import { useCreateEmail } from '@/hooks/queryHooks/useEmails';
 import { useMe } from '@/hooks/useMe';
 import { AiResponse, usePerplexityDraftEmail } from '@/hooks/usePerplexity';
-import { useEditUser } from '@/hooks/useUsers';
+import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AiModel, EmailStatus } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -186,7 +186,7 @@ const useAiCompose = (props: AiComposeProps) => {
 					});
 					if (res.message && res.subject) {
 						await saveTestEmail({
-							campaignId: campaign.id,
+							id: campaign.id,
 							data: {
 								subject: values.subject,
 								message: values.message,
@@ -294,10 +294,10 @@ const useAiCompose = (props: AiComposeProps) => {
 		if (suppressToasts) {
 			await saveCampaignNoToast({
 				data: { ...form.getValues() },
-				campaignId: campaign.id,
+				id: campaign.id,
 			});
 		} else {
-			await savePrompt({ data: { ...form.getValues() }, campaignId: campaign.id });
+			await savePrompt({ data: { ...form.getValues() }, id: campaign.id });
 		}
 		queryClient.invalidateQueries({
 			queryKey: ['campaign', campaign.id as number],

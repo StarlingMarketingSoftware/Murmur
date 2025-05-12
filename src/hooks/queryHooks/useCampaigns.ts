@@ -4,9 +4,20 @@ import { CampaignWithRelations, CustomMutationOptions } from '@/constants/types'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+const QUERY_KEYS = {
+	all: ['campaigns'] as const,
+	list: () => [...QUERY_KEYS.all, 'list'] as const,
+	detail: (id: number) => [...QUERY_KEYS.all, 'detail', id] as const,
+} as const;
+
+interface EditCampaignData {
+	id: number;
+	data: PatchCampaignData;
+}
+
 export const useGetCampaigns = () => {
 	return useQuery({
-		queryKey: ['campaigns'],
+		queryKey: QUERY_KEYS.list(),
 		queryFn: async () => {
 			const response = await fetch('/api/campaigns');
 			if (!response.ok) {
@@ -17,61 +28,17 @@ export const useGetCampaigns = () => {
 	});
 };
 
-export const useGetCampaign = (campaignId: number) => {
+export const useGetCampaign = (id: number) => {
 	return useQuery<CampaignWithRelations>({
-		queryKey: ['campaign', campaignId], // campaignId is a number
+		queryKey: QUERY_KEYS.detail(id), // campaignId is a number
 		queryFn: async () => {
-			const response = await fetch(`/api/campaigns/${campaignId}`);
+			const response = await fetch(`/api/campaigns/${id}`);
 			if (!response.ok) {
 				throw new Error('Failed to fetch campaign');
 			}
 			return response.json();
 		},
-		enabled: !!campaignId,
-	});
-};
-
-interface EditCampaignData {
-	campaignId: number;
-	data: PatchCampaignData;
-}
-
-export const useEditCampaign = (options: CustomMutationOptions = {}) => {
-	const {
-		suppressToasts = false,
-		successMessage = 'Campaign updated successfully',
-		errorMessage = 'Failed to update campaign',
-		onSuccess: onSuccessCallback,
-	} = options;
-
-	return useMutation({
-		mutationFn: async ({ data, campaignId }: EditCampaignData) => {
-			const response = await fetch(`/api/campaigns/${campaignId}`, {
-				method: 'PATCH',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(data),
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to update campaign');
-			}
-
-			return response.json();
-		},
-		onSuccess: () => {
-			if (!suppressToasts) {
-				toast.success(successMessage);
-			}
-			onSuccessCallback?.();
-		},
-		onError: () => {
-			if (!suppressToasts) {
-				toast.error(errorMessage);
-			}
-		},
+		enabled: !!id,
 	});
 };
 
@@ -82,7 +49,6 @@ export const useCreateCampaign = (options: CustomMutationOptions = {}) => {
 		errorMessage = 'Failed to create campaign',
 		onSuccess: onSuccessCallback,
 	} = options;
-
 	const queryClient = useQueryClient();
 
 	return useMutation({
@@ -103,10 +69,55 @@ export const useCreateCampaign = (options: CustomMutationOptions = {}) => {
 			return response.json();
 		},
 		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}
-			queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
+};
+
+export const useEditCampaign = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Campaign updated successfully',
+		errorMessage = 'Failed to update campaign',
+		onSuccess: onSuccessCallback,
+	} = options;
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async ({ data, id }: EditCampaignData) => {
+			const response = await fetch(`/api/campaigns/${id}`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(data),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to update campaign');
+			}
+
+			return response.json();
+		},
+		onSuccess: (variables) => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
+			queryClient.invalidateQueries({
+				queryKey: QUERY_KEYS.detail(variables.id),
+			});
+
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
 			onSuccessCallback?.();
 		},
 		onError: () => {
@@ -124,12 +135,11 @@ export const useDeleteCampaign = (options: CustomMutationOptions = {}) => {
 		errorMessage = 'Failed to delete campaign',
 		onSuccess: onSuccessCallback,
 	} = options;
-
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async (campaignId: number) => {
-			const response = await fetch(`/api/campaigns/${campaignId}`, {
+		mutationFn: async (id: number) => {
+			const response = await fetch(`/api/campaigns/${id}`, {
 				method: 'DELETE',
 			});
 
@@ -139,10 +149,10 @@ export const useDeleteCampaign = (options: CustomMutationOptions = {}) => {
 			}
 		},
 		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.all });
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}
-			queryClient.invalidateQueries({ queryKey: ['campaigns'] });
 			onSuccessCallback?.();
 		},
 		onError: () => {

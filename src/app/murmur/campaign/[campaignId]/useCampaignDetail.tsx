@@ -1,5 +1,5 @@
 import { LocalStorageKeys, requestedPeopleScopes } from '@/constants/constants';
-import { useGetCampaign } from '@/hooks/useCampaigns';
+import { useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';

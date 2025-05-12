@@ -6,11 +6,11 @@ import {
 	useCreateSignature,
 	useDeleteSignature,
 	useEditSignature,
-	useGetUserSignatures,
-} from '@/hooks/useSignatures';
+	useGetSignatures,
+} from '@/hooks/queryHooks/useSignatures';
 import { Signature } from '@prisma/client';
 import { toast } from 'sonner';
-import { useEditCampaign } from '@/hooks/useCampaigns';
+import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { CampaignWithRelations } from '@/constants/types';
@@ -32,7 +32,7 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 	const [isEdit, setIsEdit] = useState(false);
 	const [currentSignature, setCurrentSignature] = useState<Signature | null>(null);
 
-	const { data: signatures, isPending: isPendingSignatures } = useGetUserSignatures();
+	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
 
 	const { mutateAsync: saveSignature, isPending: isPendingSaveSignature } =
 		useEditSignature({ suppressToasts: true });
@@ -110,7 +110,7 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 			},
 		});
 		await saveSignatureToCampaign({
-			campaignId: parseInt(campaignId),
+			id: parseInt(campaignId),
 			data: {
 				signatureId: currentSignature?.id,
 			},
@@ -122,7 +122,7 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 	const handleRemoveSignatureFromCampaign = async (e: MouseEvent) => {
 		e.preventDefault();
 		await saveSignatureToCampaign({
-			campaignId: parseInt(campaignId),
+			id: parseInt(campaignId),
 			data: {
 				signatureId: null,
 			},

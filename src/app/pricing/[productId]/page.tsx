@@ -3,7 +3,7 @@
 import { ProductCard } from '@/components/organisms/ProductCard/ProductCard';
 import { useMe } from '@/hooks/useMe';
 import { useParams } from 'next/navigation';
-import { useStripeProduct } from '@/hooks/useStripeProduct';
+import { useStripeProduct } from '@/hooks/queryHooks/useStripeProduct';
 import { FC } from 'react';
 
 const AdminProducts: FC = () => {

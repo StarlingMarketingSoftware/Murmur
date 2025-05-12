@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Contact, ContactList } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
-import { toast } from 'sonner';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useParams } from 'next/navigation';
 import { useMe } from '@/hooks/useMe';
@@ -12,8 +10,8 @@ import {
 	NoDataCell,
 	TableSortingButton,
 } from '@/components/molecules/CustomTable/CustomTable';
-import { useGetContacts } from '@/hooks/useContacts';
-import { PatchCampaignData } from '@/app/api/campaigns/[id]/route';
+import { useGetContacts } from '@/hooks/queryHooks/useContacts';
+import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 
 export interface ContactListDialogProps {
 	isOpen: boolean;
@@ -23,7 +21,49 @@ export interface ContactListDialogProps {
 }
 
 export const useContactListDialog = (props: ContactListDialogProps) => {
+	const params = useParams();
+	const campaignId = params.campaignId as string;
+	const { selectedContactList, isOpen, setIsOpen, selectedRecipients } = props;
+
+	const [selectedRows, setSelectedRows] = useState<Contact[]>([]);
+
 	const { subscriptionTier } = useMe();
+	const { data, isPending } = useGetContacts({
+		filters: {
+			contactListId: selectedContactList?.id,
+		},
+	});
+	const { mutate: updateCampaign } = useEditCampaign({
+		onSuccess: () => {
+			setIsOpen(false);
+		},
+		successMessage: 'Recipients saved successfully!',
+		errorMessage: 'Failed to save recipients. Please try again.',
+	});
+
+	const filteredData = useMemo(() => {
+		if (!data) return [];
+
+		return data.filter((contact: Contact) => {
+			return !selectedRecipients.some(
+				(selectedContact) => selectedContact.id === contact.id
+			);
+		});
+	}, [data, selectedRecipients]);
+
+	const saveSelectedRecipients = async () => {
+		if (selectedContactList && !!campaignId) {
+			updateCampaign({
+				id: parseInt(campaignId),
+				data: {
+					contactOperation: {
+						action: 'connect',
+						contactIds: selectedRows.map((row) => row.id),
+					},
+				},
+			});
+		}
+	};
 
 	const columns: ColumnDef<Contact>[] = [
 		{
@@ -71,7 +111,6 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 				);
 			},
 		},
-
 		{
 			accessorKey: 'company',
 			header: ({ column }) => {
@@ -82,64 +121,6 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 			},
 		},
 	];
-	const { selectedContactList, isOpen, setIsOpen, selectedRecipients } = props;
-	const [selectedRows, setSelectedRows] = useState<Contact[]>([]);
-
-	const params = useParams();
-	const campaignId = params.campaignId as string;
-
-	const { data, isPending } = useGetContacts({
-		filters: {
-			contactListId: selectedContactList?.id,
-		},
-	});
-
-	const filteredData = useMemo(() => {
-		if (!data) return [];
-
-		return data.filter((contact: Contact) => {
-			return !selectedRecipients.some(
-				(selectedContact) => selectedContact.id === contact.id
-			);
-		});
-	}, [data, selectedRecipients]);
-
-	const queryClient = useQueryClient();
-
-	const { mutate: updateCampaign } = useMutation({
-		mutationFn: async (campaign: PatchCampaignData) => {
-			const response = await fetch(`/api/campaigns/${campaignId}`, {
-				method: 'PATCH',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(campaign),
-			});
-			if (!response.ok) {
-				throw new Error('Network response was not ok');
-			}
-			return response.json();
-		},
-		onSuccess: () => {
-			toast.success('Recipients saved successfully!');
-			setIsOpen(false);
-			queryClient.invalidateQueries({ queryKey: ['campaign', parseInt(campaignId)] });
-		},
-		onError: () => {
-			toast.error('Failed to save recipients. Please try again.');
-		},
-	});
-
-	const saveSelectedRecipients = async () => {
-		if (selectedContactList && !!campaignId) {
-			updateCampaign({
-				contactOperation: {
-					action: 'connect',
-					contactIds: selectedRows.map((row) => row.id),
-				},
-			});
-		}
-	};
 
 	return {
 		data,

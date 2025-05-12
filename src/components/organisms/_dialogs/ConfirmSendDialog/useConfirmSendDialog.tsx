@@ -1,8 +1,8 @@
 import { CampaignWithRelations, EmailWithRelations } from '@/constants/types';
-import { useEditCampaign, useGetCampaign } from '@/hooks/useCampaigns';
-import { useEditEmail } from '@/hooks/useEmails';
+import { useEditCampaign, useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
+import { useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { useMe } from '@/hooks/useMe';
-import { useEditUser } from '@/hooks/useUsers';
+import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { EmailStatus } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -100,7 +100,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		if (!campaign) {
 			return null;
 		}
-		editCampaign({ campaignId: campaign.id, data: form.getValues() });
+		editCampaign({ id: campaign.id, data: form.getValues() });
 		let currentEmailSendCredits = user?.emailSendCredits || 0;
 
 		for (const email of draftEmails) {
@@ -117,7 +117,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 			);
 			if (res?.status === 200) {
 				await updateEmail({
-					emailId: email.id,
+					id: email.id,
 					data: {
 						...email,
 						status: EmailStatus.sent,
