@@ -1,60 +1,70 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { AiModel, Status } from '@prisma/client';
+import {
+	apiBadRequest,
+	apiCreated,
+	apiResponse,
+	apiUnauthorized,
+	handleApiError,
+} from '@/app/utils/api';
+import { z } from 'zod';
 
-export type CreateCampaignBody = {
-	name: string;
-	status?: Status;
-	subject?: string;
-	message?: string;
-	aiModel?: AiModel;
-	testMessage?: string;
-	testSubject?: string;
-	senderEmail?: string;
-	senderName?: string;
-	contacts?: number[]; // Array of contact IDs
-};
+const postCampaignSchema = z.object({
+	name: z.string().min(1),
+	status: z.nativeEnum(Status).optional(),
+	subject: z.string().optional(),
+	message: z.string().optional(),
+	aiModel: z.nativeEnum(AiModel).optional(),
+	testMessage: z.string().optional(),
+	testSubject: z.string().optional(),
+	senderEmail: z.string().email().optional(),
+	senderName: z.string().optional(),
+	contacts: z.array(z.number()).optional(),
+});
+export type PostCampaignData = z.infer<typeof postCampaignSchema>;
 
 export async function POST(req: NextRequest) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
 	try {
-		const body: CreateCampaignBody = await req.json();
-		const { name, contacts, ...restOfBody } = body;
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const data = await req.json();
+		const validatedData = postCampaignSchema.safeParse(data);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
+		const { contacts } = validatedData.data;
 
 		const campaign = await prisma.campaign.create({
 			data: {
-				name,
+				...validatedData.data,
 				userId,
-				...restOfBody,
-				...(contacts && {
-					contacts: {
-						connect: contacts.map((id) => ({ id })),
-					},
-				}),
+				contacts: {
+					connect: contacts?.map((id) => ({ id })),
+				},
 			},
 			include: {
 				contacts: true,
 			},
 		});
 
-		return NextResponse.json(campaign);
+		return apiCreated(campaign);
 	} catch (error) {
-		console.error(error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }
 
 export async function GET() {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
 		const campaigns = await prisma.campaign.findMany({
 			where: {
 				userId: userId,
@@ -65,9 +75,8 @@ export async function GET() {
 			},
 		});
 
-		return NextResponse.json(campaigns);
+		return apiResponse(campaigns);
 	} catch (error) {
-		console.error(error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }

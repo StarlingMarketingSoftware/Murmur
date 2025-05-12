@@ -99,7 +99,7 @@ export const usePerplexityDraftEmail = () => {
 		generateSubject: boolean;
 		recipient: Contact;
 		prompt: string;
-		signal?: AbortSignal; // Add this line
+		signal?: AbortSignal;
 	}
 
 	const {
@@ -116,7 +116,7 @@ export const usePerplexityDraftEmail = () => {
 
 			try {
 				response = await fetch(perplexityEndpoint, {
-					signal: params.signal, // Use the passed signal instead of creating new one
+					signal: params.signal,
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json',

@@ -32,7 +32,6 @@ export interface AiComposeProps {
 
 const useAiCompose = (props: AiComposeProps) => {
 	const { campaign } = props;
-	console.log('🚀 ~ useAiCompose ~ campaign:', campaign);
 	const { user } = useMe();
 
 	const [generationProgress, setGenerationProgress] = useState(-1);
@@ -186,7 +185,6 @@ const useAiCompose = (props: AiComposeProps) => {
 						prompt: values.message,
 					});
 					if (res.message && res.subject) {
-						console.log('🚀 ~ handleFormAction ~ res.message:', res.message);
 						await saveTestEmail({
 							campaignId: campaign.id,
 							data: {

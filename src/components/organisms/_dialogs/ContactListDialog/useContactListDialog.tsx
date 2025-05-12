@@ -5,16 +5,15 @@ import { toast } from 'sonner';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useParams } from 'next/navigation';
-import { z } from 'zod';
 import { useMe } from '@/hooks/useMe';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
 import { restrictedFeatureMessages } from '@/constants/constants';
-import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/schema';
 import {
 	NoDataCell,
 	TableSortingButton,
 } from '@/components/molecules/CustomTable/CustomTable';
-import { useGetContactsByCategory } from '@/hooks/useContacts';
+import { useGetContacts } from '@/hooks/useContacts';
+import { PatchCampaignData } from '@/app/api/campaigns/[id]/route';
 
 export interface ContactListDialogProps {
 	isOpen: boolean;
@@ -89,7 +88,11 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 	const params = useParams();
 	const campaignId = params.campaignId as string;
 
-	const { data, isPending } = useGetContactsByCategory(selectedContactList?.id);
+	const { data, isPending } = useGetContacts({
+		filters: {
+			contactListId: selectedContactList?.id,
+		},
+	});
 
 	const filteredData = useMemo(() => {
 		if (!data) return [];
@@ -104,7 +107,7 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 	const queryClient = useQueryClient();
 
 	const { mutate: updateCampaign } = useMutation({
-		mutationFn: async (campaign: z.infer<typeof updateCampaignSchema>) => {
+		mutationFn: async (campaign: PatchCampaignData) => {
 			const response = await fetch(`/api/campaigns/${campaignId}`, {
 				method: 'PATCH',
 				headers: {
@@ -128,7 +131,6 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 	});
 
 	const saveSelectedRecipients = async () => {
-		console.log('were updating campaign');
 		if (selectedContactList && !!campaignId) {
 			updateCampaign({
 				contactOperation: {

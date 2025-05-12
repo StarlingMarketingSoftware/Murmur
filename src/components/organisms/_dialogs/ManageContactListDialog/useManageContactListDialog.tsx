@@ -5,15 +5,14 @@ import { toast } from 'sonner';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useParams } from 'next/navigation';
-import { z } from 'zod';
 import { useMe } from '@/hooks/useMe';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
 import { restrictedFeatureMessages } from '@/constants/constants';
-import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/schema';
 import {
 	NoDataCell,
 	TableSortingButton,
 } from '@/components/molecules/CustomTable/CustomTable';
+import { PatchCampaignData } from '@/app/api/campaigns/[id]/route';
 
 export interface ManageContactListDialogProps {
 	isOpen: boolean;
@@ -110,7 +109,7 @@ export const useManageContactListDialog = (props: ManageContactListDialogProps) 
 	const queryClient = useQueryClient();
 
 	const { mutate: updateCampaign } = useMutation({
-		mutationFn: async (campaign: z.infer<typeof updateCampaignSchema>) => {
+		mutationFn: async (campaign: PatchCampaignData) => {
 			const response = await fetch(`/api/campaigns/${campaignId}`, {
 				method: 'PATCH',
 				headers: {

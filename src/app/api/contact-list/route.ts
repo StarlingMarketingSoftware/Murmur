@@ -1,45 +1,57 @@
-import { NextResponse, NextRequest } from 'next/server';
+import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
+import {
+	apiBadRequest,
+	apiCreated,
+	apiNotFound,
+	apiResponse,
+	apiUnauthorized,
+	handleApiError,
+} from '@/app/utils/api';
 
 export const GET = async function GET() {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'User not found' }, { status: 404 });
-	}
-
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
 		const result = await prisma.contactList.findMany({});
-		return NextResponse.json(result);
+
+		return apiResponse(result);
 	} catch {
-		return NextResponse.json({ error: 'Error fetching contact lists.' }, { status: 404 });
+		return apiNotFound();
 	}
 };
 
 const createContactListSchema = z.object({
-	name: z.string().min(1, 'Category is required'),
+	name: z.string().min(1),
 	count: z.number().int().default(0).optional(),
 	userIds: z.array(z.string()).optional(),
 });
+export type PostContactListData = z.infer<typeof createContactListSchema>;
 
 export async function POST(req: NextRequest) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
 		const body = await req.json();
-		const validatedData = createContactListSchema.parse(body);
+		const validatedData = createContactListSchema.safeParse(body);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
+		const { userIds } = validatedData.data;
 
 		const contactList = await prisma.contactList.create({
 			data: {
-				name: validatedData.name,
-				count: validatedData.count,
-				user: validatedData.userIds
+				...validatedData.data,
+				user: userIds
 					? {
-							connect: validatedData.userIds.map((id) => ({ clerkId: id })),
+							connect: userIds.map((id) => ({ clerkId: id })),
 					  }
 					: undefined,
 			},
@@ -48,15 +60,8 @@ export async function POST(req: NextRequest) {
 			},
 		});
 
-		return NextResponse.json(contactList, { status: 201 });
+		return apiCreated(contactList);
 	} catch (error) {
-		if (error instanceof z.ZodError) {
-			return NextResponse.json(
-				{ error: `Validation error: ${error.message}` },
-				{ status: 400 }
-			);
-		}
-		console.error('CONTACT_LIST_CREATE_ERROR:', error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }

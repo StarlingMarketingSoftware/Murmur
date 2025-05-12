@@ -1,19 +1,27 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
+import {
+	apiBadRequest,
+	apiCreated,
+	apiNotFound,
+	apiResponse,
+	apiUnauthorized,
+	apiUnauthorizedResource,
+	handleApiError,
+} from '@/app/utils/api';
+import { EmailStatus } from '@prisma/client';
 
 export async function GET(req: NextRequest) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
 		const url = new URL(req.url);
 		const campaignId = url.searchParams.get('campaignId');
 
-		// Get emails with potential campaignId filter
 		const emails = await prisma.email.findMany({
 			where: {
 				userId,
@@ -27,68 +35,55 @@ export async function GET(req: NextRequest) {
 			},
 		});
 
-		return NextResponse.json(emails);
+		return apiResponse(emails);
 	} catch (error) {
-		console.error('GET_EMAILS_ERROR:', error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }
 
-const createEmailSchema = z.object({
-	subject: z.string().min(1, 'Subject is required'),
-	message: z.string().min(1, 'Message is required'),
-	campaignId: z.number().int().positive('Campaign ID is required'),
-	status: z.enum(['draft', 'scheduled', 'sent', 'failed']).default('draft'),
+const postEmailSchema = z.object({
+	subject: z.string().min(1),
+	message: z.string().min(1),
+	campaignId: z.number().int().positive(),
+	status: z.nativeEnum(EmailStatus).default(EmailStatus.draft),
 	sentAt: z.string().datetime().nullable().optional(),
-	contactId: z.number().int().positive('Contact ID is required'),
+	contactId: z.number().int().positive(),
 });
+export type PostEmailData = z.infer<typeof postEmailSchema>;
 
 export async function POST(req: NextRequest) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
 	try {
-		const body = await req.json();
-		const validatedData = createEmailSchema.parse(body);
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
 
-		// Validate that the campaign exists and belongs to the user
+		const body = await req.json();
+		const validatedData = postEmailSchema.safeParse(body);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
+
 		const campaign = await prisma.campaign.findUnique({
 			where: {
-				id: validatedData.campaignId,
-				userId,
+				id: validatedData.data.campaignId,
 			},
 		});
 
 		if (!campaign) {
-			return NextResponse.json(
-				{ error: 'Campaign not found or unauthorized' },
-				{ status: 404 }
-			);
+			return apiNotFound();
+		}
+
+		if (campaign.userId !== userId) {
+			return apiUnauthorizedResource();
 		}
 
 		const email = await prisma.email.create({
-			data: {
-				subject: validatedData.subject,
-				message: validatedData.message,
-				status: validatedData.status,
-				sentAt: validatedData.sentAt ? new Date(validatedData.sentAt) : null,
-				userId,
-				campaignId: validatedData.campaignId,
-				contactId: validatedData.contactId,
-			},
+			data: { ...validatedData.data, userId },
 		});
 
-		return NextResponse.json(email, { status: 201 });
+		return apiCreated(email);
 	} catch (error) {
-		if (error instanceof z.ZodError) {
-			return NextResponse.json(
-				{ error: `Validation error: ${error.message}` },
-				{ status: 400 }
-			);
-		}
-		console.error('EMAIL_CREATE_ERROR:', error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }

@@ -5,13 +5,12 @@ import { TrashIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
-import { z } from 'zod';
 import { useMe } from '@/hooks/useMe';
 import { TypographyMuted } from '@/components/ui/typography';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
 import { restrictedFeatureMessages } from '@/constants/constants';
-import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/schema';
 import { TableSortingButton } from '@/components/molecules/CustomTable/CustomTable';
+import { PatchCampaignData } from '@/app/api/campaigns/[id]/route';
 
 export interface RecipientsTableProps {
 	contacts: Contact[];
@@ -26,7 +25,7 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 	const campaignId = params.campaignId as string;
 
 	const { isPending: isPendingRemoveContacts, mutate: removeRecipients } = useMutation({
-		mutationFn: async (campaign: z.infer<typeof updateCampaignSchema>) => {
+		mutationFn: async (campaign: PatchCampaignData) => {
 			const response = await fetch(`/api/campaigns/${campaignId}`, {
 				method: 'PATCH',
 				headers: {

@@ -1,31 +1,28 @@
+import { apiResponse, handleApiError, apiBadRequest } from '@/app/utils/api';
 import { stripe } from '../../../../stripe/client';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { z } from 'zod';
 
-interface PortalRequest {
-	customerId: string;
-}
+const portalRequestSchema = z.object({
+	customerId: z.string().min(1),
+});
 
-interface PortalRequest {
-	customerId: string;
-}
-
-export async function POST(
-	req: NextRequest
-): Promise<NextResponse<{ url: string }> | NextResponse<{ error: string }>> {
+export async function POST(req: NextRequest) {
 	try {
-		const body = (await req.json()) as PortalRequest;
+		const body = await req.json();
+		const validatedData = portalRequestSchema.safeParse(body);
+
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
 
 		const session = await stripe.billingPortal.sessions.create({
-			customer: body.customerId,
+			customer: validatedData.data.customerId,
 			return_url: `${process.env.NEXT_PUBLIC_SITE_URL}/pricing`,
 		});
 
-		return NextResponse.json({ url: session.url });
+		return apiResponse({ url: session.url });
 	} catch (error) {
-		console.error('Error creating portal session:', error);
-		return NextResponse.json(
-			{ error: 'Failed to create portal session' },
-			{ status: 500 }
-		);
+		return handleApiError(error);
 	}
 }

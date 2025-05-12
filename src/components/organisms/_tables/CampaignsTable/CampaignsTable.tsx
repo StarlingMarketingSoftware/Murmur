@@ -9,7 +9,6 @@ import {
 import Spinner from '@/components/ui/spinner';
 import CustomTable from '../../../molecules/CustomTable/CustomTable';
 import { useCampaignsTable } from './useCampaignsTable';
-import { Status } from '@prisma/client';
 import { ConfirmDialog } from '../../_dialogs/ConfirmDialog/ConfirmDialog';
 
 export const CampaignsTable: FC = () => {
@@ -52,10 +51,8 @@ export const CampaignsTable: FC = () => {
 				title="Confirm Campaign Deletion"
 				confirmAction={async () => {
 					if (currentRow) {
-						const res = await deleteCampaign(currentRow.id);
-						if (res.status === Status.deleted) {
-							setIsConfirmDialogOpen(false);
-						}
+						await deleteCampaign(currentRow.id);
+						setIsConfirmDialogOpen(false);
 					}
 				}}
 				text={`Are you sure you want to delete the campaign "${currentRow?.name}"? You will no longer be able to access the drafts and sent emails associated with this campaign.`}

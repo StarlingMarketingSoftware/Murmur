@@ -1,10 +1,10 @@
-import { User } from '@prisma/client';
+import { PatchUserData } from '@/app/api/users/[id]/route';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 interface EditUserData {
 	clerkId: string;
-	data: Partial<User>;
+	data: PatchUserData;
 }
 
 interface EditUserOptions {

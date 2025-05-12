@@ -1,11 +1,12 @@
+import { PatchEmailData } from '@/app/api/emails/[id]/route';
+import { PostEmailData } from '@/app/api/emails/route';
 import { CustomMutationOptions } from '@/constants/types';
-import { Email } from '@prisma/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 interface EditEmailData {
 	emailId: number;
-	data: Email;
+	data: PatchEmailData;
 }
 
 export const useEditEmail = (options: CustomMutationOptions = {}) => {
@@ -66,8 +67,6 @@ export const useDeleteEmail = (options: CustomMutationOptions = {}) => {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to delete email');
 			}
-
-			return response.json();
 		},
 		onSuccess: () => {
 			if (!suppressToasts) {
@@ -84,15 +83,6 @@ export const useDeleteEmail = (options: CustomMutationOptions = {}) => {
 	});
 };
 
-export interface CreateEmailBody {
-	subject: string;
-	message: string;
-	campaignId: number;
-	status?: 'draft' | 'scheduled' | 'sent' | 'failed';
-	sentAt?: string | null;
-	contactId: number;
-}
-
 export const useCreateEmail = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
@@ -104,7 +94,7 @@ export const useCreateEmail = (options: CustomMutationOptions = {}) => {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async (data: CreateEmailBody) => {
+		mutationFn: async (data: PostEmailData) => {
 			const response = await fetch('/api/emails', {
 				method: 'POST',
 				headers: {
