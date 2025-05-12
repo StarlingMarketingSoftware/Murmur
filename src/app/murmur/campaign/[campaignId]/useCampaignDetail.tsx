@@ -70,7 +70,7 @@ export const useCampaignDetail = () => {
 		router.push(`/murmur?${params.toString()}`);
 	};
 
-	const { data, isPending } = useGetCampaign(Number(campaignId));
+	const { data, isPending } = useGetCampaign(campaignId);
 
 	return {
 		tab,

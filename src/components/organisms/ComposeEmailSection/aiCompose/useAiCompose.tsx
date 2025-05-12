@@ -138,7 +138,6 @@ const useAiCompose = (props: AiComposeProps) => {
 	const { isPending: isPendingCreateEmail, mutateAsync: createEmail } = useCreateEmail({
 		suppressToasts: true,
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['drafts'] });
 			if (user && aiDraftCredits) {
 				editUser({
 					clerkId: user.clerkId,

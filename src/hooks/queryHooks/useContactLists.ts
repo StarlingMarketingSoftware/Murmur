@@ -8,11 +8,11 @@ import { toast } from 'sonner';
 const QUERY_KEYS = {
 	all: ['contactLists'] as const,
 	list: () => [...QUERY_KEYS.all, 'list'] as const,
-	detail: (id: number) => [...QUERY_KEYS.all, 'detail', id] as const,
+	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
 } as const;
 
 interface EditContactListData {
-	id: number;
+	id: string | number;
 	data: PatchContactListData;
 }
 
@@ -29,7 +29,7 @@ export const useGetContactLists = () => {
 	});
 };
 
-export const useGetContactList = (id: number) => {
+export const useGetContactList = (id: string) => {
 	return useQuery<ContactList>({
 		queryKey: QUERY_KEYS.detail(id),
 		queryFn: async () => {

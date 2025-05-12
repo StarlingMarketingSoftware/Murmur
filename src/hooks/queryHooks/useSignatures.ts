@@ -9,11 +9,11 @@ import { UpdateSignatureData } from '@/app/api/signatures/[id]/route';
 const QUERY_KEYS = {
 	all: ['signatures'] as const,
 	list: () => [...QUERY_KEYS.all, 'list'] as const,
-	detail: (id: number) => [...QUERY_KEYS.all, 'detail', id] as const,
+	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
 } as const;
 
 interface EditSignatureData {
-	id: number;
+	id: string | number;
 	data: UpdateSignatureData;
 }
 

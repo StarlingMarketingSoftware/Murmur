@@ -1,5 +1,4 @@
 import { AccessorFnColumnDef, ColumnDef } from '@tanstack/react-table';
-import { useQueryClient } from '@tanstack/react-query';
 import { TableSortingButton } from '../../../molecules/CustomTable/CustomTable';
 import { EmailWithRelations } from '@/constants/types';
 import { useState } from 'react';
@@ -20,14 +19,12 @@ export interface EmailsTableProps {
 }
 
 export const useEmailsTable = (props: EmailsTableProps) => {
-	const queryClient = useQueryClient();
 	const { subscriptionTier } = useMe();
 
 	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
 
 	const handleDeleteEmail = async (emailId: number) => {
 		await deleteEmail(emailId);
-		queryClient.invalidateQueries({ queryKey: ['drafts'] });
 	};
 
 	const columns: (

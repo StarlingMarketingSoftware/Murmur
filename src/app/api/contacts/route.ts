@@ -19,10 +19,10 @@ const createContactSchema = z.object({
 	state: z.string().optional(),
 	country: z.string().optional(),
 	phone: z.string().optional(),
-	contactListId: z.number().optional(),
+	contactListId: z.coerce.number().optional(),
 });
 const contactFilterSchema = z.object({
-	contactListId: z.coerce.number().optional(),
+	contactListId: z.union([z.string(), z.number()]).optional(),
 });
 export type PostContactData = z.infer<typeof createContactSchema>;
 export type ContactFilterData = z.infer<typeof contactFilterSchema>;
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
 
 		const contacts = await prisma.contact.findMany({
 			where: {
-				contactListId,
+				contactListId: Number(contactListId),
 			},
 			orderBy: {
 				name: 'desc',

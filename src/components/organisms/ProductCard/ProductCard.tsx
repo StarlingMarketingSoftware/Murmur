@@ -7,7 +7,7 @@ import {
 	TypographyList,
 } from '@/components/ui/typography';
 import { twMerge } from 'tailwind-merge';
-import { useStripePrice } from '@/hooks/queryHooks/useStripePrice';
+import { useGetStripePrice } from '@/hooks/queryHooks/useStripePrice';
 import { Stripe } from 'stripe';
 import { CheckoutButton } from '../CheckoutButton/CheckoutButton';
 import { User } from '@prisma/client';
@@ -30,7 +30,7 @@ export function ProductCard({
 	user,
 	isLink = false,
 }: ProductCardProps) {
-	const { data: prices, isLoading } = useStripePrice(Number(product.id));
+	const { data: prices, isLoading } = useGetStripePrice(product.id);
 
 	const formatPrice = (price: number, currency: string) => {
 		return new Intl.NumberFormat('en-US', {

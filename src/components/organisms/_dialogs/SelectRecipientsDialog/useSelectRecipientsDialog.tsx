@@ -13,14 +13,14 @@ import {
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 
-export interface ContactListDialogProps {
+export interface SelectRecipientsDialogProps {
 	isOpen: boolean;
 	setIsOpen: (isOpen: boolean) => void;
 	selectedContactList: ContactList | null;
 	selectedRecipients: Contact[];
 }
 
-export const useContactListDialog = (props: ContactListDialogProps) => {
+export const useSelectRecipientsDialog = (props: SelectRecipientsDialogProps) => {
 	const params = useParams();
 	const campaignId = params.campaignId as string;
 	const { selectedContactList, isOpen, setIsOpen, selectedRecipients } = props;
@@ -54,7 +54,7 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 	const saveSelectedRecipients = async () => {
 		if (selectedContactList && !!campaignId) {
 			updateCampaign({
-				id: Number(campaignId),
+				id: campaignId,
 				data: {
 					contactOperation: {
 						action: 'connect',

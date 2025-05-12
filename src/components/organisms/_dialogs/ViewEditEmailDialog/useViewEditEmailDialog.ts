@@ -3,8 +3,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Dispatch, SetStateAction, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useEditEmail } from '@/hooks/queryHooks/useEmails';
 
 export interface ViewEditEmailDialogProps {
 	email: EmailWithRelations | null;
@@ -21,7 +21,6 @@ const editEmailSchema = z.object({
 export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 	const { email, setIsOpen } = props;
 	const [isEdit, setIsEdit] = useState(false);
-	const queryClient = useQueryClient();
 
 	const form = useForm<z.infer<typeof editEmailSchema>>({
 		resolver: zodResolver(editEmailSchema),
@@ -42,41 +41,17 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 		resetFormToCurrentEmail();
 	}, [email, form]);
 
-	// Mutation for updating emails
-	const { isPending: isPendingEditEmail, mutateAsync: editEmail } = useMutation({
-		mutationFn: async (data: z.infer<typeof editEmailSchema>) => {
-			if (!email?.id) {
-				throw new Error('Email ID is required');
-			}
-
-			const response = await fetch(`/api/emails/${email.id}`, {
-				method: 'PATCH',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(data),
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to update email');
-			}
-
-			return response.json();
-		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['drafts'] });
-
-			toast.success('Email updated successfully');
-			setIsEdit(false);
-		},
-		onError: () => {
-			toast.error(`Failed to update email.`);
-		},
-	});
+	const { isPending: isPendingEditEmail, mutateAsync: editEmail } = useEditEmail({});
 
 	const handleSave = async (data: z.infer<typeof editEmailSchema>) => {
-		await editEmail(data);
+		if (!email) {
+			toast.error('No email selected.');
+			return;
+		}
+		await editEmail({
+			id: email.id,
+			data,
+		});
 		setIsOpen(false);
 	};
 

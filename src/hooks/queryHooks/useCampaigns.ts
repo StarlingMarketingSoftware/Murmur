@@ -7,11 +7,11 @@ import { toast } from 'sonner';
 const QUERY_KEYS = {
 	all: ['campaigns'] as const,
 	list: () => [...QUERY_KEYS.all, 'list'] as const,
-	detail: (id: number) => [...QUERY_KEYS.all, 'detail', id] as const,
+	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
 } as const;
 
 interface EditCampaignData {
-	id: number;
+	id: string | number;
 	data: PatchCampaignData;
 }
 
@@ -28,9 +28,9 @@ export const useGetCampaigns = () => {
 	});
 };
 
-export const useGetCampaign = (id: number) => {
+export const useGetCampaign = (id: string) => {
 	return useQuery<CampaignWithRelations>({
-		queryKey: QUERY_KEYS.detail(id), // campaignId is a number
+		queryKey: QUERY_KEYS.detail(id),
 		queryFn: async () => {
 			const response = await fetch(`/api/campaigns/${id}`);
 			if (!response.ok) {

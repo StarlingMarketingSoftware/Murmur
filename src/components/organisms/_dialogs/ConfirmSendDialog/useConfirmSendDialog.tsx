@@ -29,7 +29,7 @@ const addSenderInfoSchema = z.object({
 export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 	const { draftEmails } = props;
 	const { campaignId } = useParams() as { campaignId: string };
-	const { data: campaign } = useGetCampaign(Number(campaignId));
+	const { data: campaign } = useGetCampaign(campaignId);
 
 	const { subscriptionTier, user } = useMe();
 	const [isOpen, setIsOpen] = useState(false);
@@ -87,9 +87,6 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 
 	const { mutateAsync: updateEmail } = useEditEmail({
 		suppressToasts: true,
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['drafts'] });
-		},
 	});
 
 	const { mutateAsync: updateEmailSendCredits } = useEditUser({ suppressToasts: true });
@@ -100,7 +97,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		if (!campaign) {
 			return null;
 		}
-		editCampaign({ id: campaign.id, data: form.getValues() });
+		editCampaign({ id: campaign.id.toString(), data: form.getValues() });
 		let currentEmailSendCredits = user?.emailSendCredits || 0;
 
 		for (const email of draftEmails) {
@@ -117,7 +114,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 			);
 			if (res?.status === 200) {
 				await updateEmail({
-					id: email.id,
+					id: email.id.toString(),
 					data: {
 						...email,
 						status: EmailStatus.sent,

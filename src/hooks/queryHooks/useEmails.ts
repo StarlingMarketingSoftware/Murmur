@@ -1,19 +1,48 @@
 import { PatchEmailData } from '@/app/api/emails/[id]/route';
-import { PostEmailData } from '@/app/api/emails/route';
-import { CustomMutationOptions } from '@/constants/types';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { EmailFilterData, PostEmailData } from '@/app/api/emails/route';
+import { appendQueryParamsToUrl } from '@/app/utils/url';
+import {
+	CustomMutationOptions,
+	CustomQueryOptions,
+	EmailWithRelations,
+} from '@/constants/types';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-const QUERY_KEYS = {
+export const EMAIL_QUERY_KEYS = {
 	all: ['emails'] as const,
-	list: () => [...QUERY_KEYS.all, 'list'] as const,
-	detail: (id: number) => [...QUERY_KEYS.all, 'detail', id] as const,
+	list: () => [...EMAIL_QUERY_KEYS.all, 'list'] as const,
+	detail: (id: string | number) =>
+		[...EMAIL_QUERY_KEYS.all, 'detail', id.toString()] as const,
 } as const;
 
+export interface EmailQueryOptions extends CustomQueryOptions {
+	filters?: EmailFilterData;
+}
+
 interface EditEmailData {
-	id: number;
+	id: string | number;
 	data: PatchEmailData;
 }
+
+export const useGetEmails = (options: EmailQueryOptions) => {
+	return useQuery({
+		queryKey: [...EMAIL_QUERY_KEYS.list()],
+		queryFn: async () => {
+			const url = appendQueryParamsToUrl('/api/emails', options.filters);
+			const response = await fetch(url, {
+				method: 'GET',
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to fetch emails');
+			}
+
+			return response.json() as Promise<EmailWithRelations[]>;
+		},
+	});
+};
 
 export const useCreateEmail = (options: CustomMutationOptions = {}) => {
 	const {
@@ -42,7 +71,7 @@ export const useCreateEmail = (options: CustomMutationOptions = {}) => {
 			return response.json();
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
+			queryClient.invalidateQueries({ queryKey: EMAIL_QUERY_KEYS.list() });
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}
@@ -82,9 +111,9 @@ export const useEditEmail = (options: CustomMutationOptions = {}) => {
 			return response.json();
 		},
 		onSuccess: (variables) => {
-			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
+			queryClient.invalidateQueries({ queryKey: EMAIL_QUERY_KEYS.list() });
 			queryClient.invalidateQueries({
-				queryKey: QUERY_KEYS.detail(variables.id),
+				queryKey: EMAIL_QUERY_KEYS.detail(variables.id),
 			});
 
 			if (!suppressToasts) {
@@ -121,7 +150,7 @@ export const useDeleteEmail = (options: CustomMutationOptions = {}) => {
 			}
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.all });
+			queryClient.invalidateQueries({ queryKey: EMAIL_QUERY_KEYS.all });
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}

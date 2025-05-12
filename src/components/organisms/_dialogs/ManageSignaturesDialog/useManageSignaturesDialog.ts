@@ -110,7 +110,7 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 			},
 		});
 		await saveSignatureToCampaign({
-			id: Number(campaignId),
+			id: campaignId,
 			data: {
 				signatureId: currentSignature?.id,
 			},
@@ -122,7 +122,7 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 	const handleRemoveSignatureFromCampaign = async (e: MouseEvent) => {
 		e.preventDefault();
 		await saveSignatureToCampaign({
-			id: Number(campaignId),
+			id: campaignId,
 			data: {
 				signatureId: null,
 			},

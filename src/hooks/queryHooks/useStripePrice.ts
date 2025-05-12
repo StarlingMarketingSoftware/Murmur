@@ -2,12 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import { Stripe } from 'stripe';
 
 const QUERY_KEYS = {
-	all: ['stripePrice'] as const,
+	all: ['stripePrices'] as const,
 	list: () => [...QUERY_KEYS.all, 'list'] as const,
-	detail: (id: number) => [...QUERY_KEYS.all, 'detail', id] as const,
+	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
 } as const;
 
-export const useStripePrice = (productId: number) => {
+export const useGetStripePrice = (productId: string) => {
 	return useQuery({
 		queryKey: QUERY_KEYS.detail(productId),
 		queryFn: async (): Promise<Stripe.Price[]> => {

@@ -10,7 +10,7 @@ import { PatchContactData } from '@/app/api/contacts/[id]/route';
 const QUERY_KEYS = {
 	all: ['contacts'] as const,
 	list: () => [...QUERY_KEYS.all, 'list'] as const,
-	detail: (id: number) => [...QUERY_KEYS.all, 'detail', id] as const,
+	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
 } as const;
 
 export interface ContactQueryOptions extends CustomQueryOptions {
@@ -18,16 +18,15 @@ export interface ContactQueryOptions extends CustomQueryOptions {
 }
 
 interface EditContactData {
-	id: number;
+	id: string | number;
 	data: PatchContactData;
 }
 
 export const useGetContacts = (options: ContactQueryOptions) => {
 	return useQuery({
-		queryKey: QUERY_KEYS.list(),
+		queryKey: [...QUERY_KEYS.list(), options.filters],
 		queryFn: async () => {
 			const url = appendQueryParamsToUrl('/api/contacts', options.filters);
-
 			const response = await fetch(url, {
 				method: 'GET',
 			});

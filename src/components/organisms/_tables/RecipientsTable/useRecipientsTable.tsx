@@ -91,7 +91,7 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 						e.stopPropagation();
 						const contactId = row.original.id;
 						removeRecipients({
-							id: Number(campaignId),
+							id: campaignId,
 							data: {
 								contactOperation: {
 									action: 'disconnect',
