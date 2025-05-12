@@ -84,11 +84,11 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 			await handleSavePrompt();
 		}
 		await saveSignature({
-			signatureId: currentSignature.id,
+			id: currentSignature.id,
 			data,
 		});
 		toast.success('Signature saved!');
-		queryClient.invalidateQueries({ queryKey: ['campaign', parseInt(campaignId)] });
+		queryClient.invalidateQueries({ queryKey: ['campaign', Number(campaignId)] });
 	};
 
 	const queryClient = useQueryClient();
@@ -103,32 +103,32 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 			await handleSavePrompt();
 		}
 		await saveSignature({
-			signatureId: currentSignature?.id,
+			id: currentSignature?.id,
 			data: {
 				name: form.getValues('name'),
 				content: form.getValues('content'),
 			},
 		});
 		await saveSignatureToCampaign({
-			id: parseInt(campaignId),
+			id: Number(campaignId),
 			data: {
 				signatureId: currentSignature?.id,
 			},
 		});
 		toast.success('Signature saved to campaign!');
-		queryClient.invalidateQueries({ queryKey: ['campaign', parseInt(campaignId)] });
+		queryClient.invalidateQueries({ queryKey: ['campaign', Number(campaignId)] });
 	};
 
 	const handleRemoveSignatureFromCampaign = async (e: MouseEvent) => {
 		e.preventDefault();
 		await saveSignatureToCampaign({
-			id: parseInt(campaignId),
+			id: Number(campaignId),
 			data: {
 				signatureId: null,
 			},
 		});
 		toast.success('Signature removed from campaign!');
-		queryClient.invalidateQueries({ queryKey: ['campaign', parseInt(campaignId)] });
+		queryClient.invalidateQueries({ queryKey: ['campaign', Number(campaignId)] });
 	};
 
 	return {

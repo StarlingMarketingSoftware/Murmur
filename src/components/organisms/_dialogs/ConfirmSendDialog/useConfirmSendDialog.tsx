@@ -29,7 +29,7 @@ const addSenderInfoSchema = z.object({
 export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 	const { draftEmails } = props;
 	const { campaignId } = useParams() as { campaignId: string };
-	const { data: campaign } = useGetCampaign(parseInt(campaignId));
+	const { data: campaign } = useGetCampaign(Number(campaignId));
 
 	const { subscriptionTier, user } = useMe();
 	const [isOpen, setIsOpen] = useState(false);
@@ -125,7 +125,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 					},
 				});
 				setSendingProgress((prev) => prev + 1);
-				queryClient.invalidateQueries({ queryKey: ['campaign', parseInt(campaignId)] });
+				queryClient.invalidateQueries({ queryKey: ['campaign', Number(campaignId)] });
 				if (!subscriptionTier && user) {
 					await updateEmailSendCredits({
 						clerkId: user.clerkId,

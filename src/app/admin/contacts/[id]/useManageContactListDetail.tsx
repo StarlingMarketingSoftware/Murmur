@@ -17,7 +17,7 @@ import { useGetContactList } from '@/hooks/queryHooks/useContactLists';
 export const useManageContactListDetail = () => {
 	const { subscriptionTier } = useMe();
 	const params = useParams<{ id: string }>();
-	const contactListId = parseInt(params.id);
+	const contactListId = Number(params.id);
 
 	const queryClient = useQueryClient();
 	const { data, isPending } = useGetContacts({ filters: { contactListId } });

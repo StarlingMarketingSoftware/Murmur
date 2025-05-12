@@ -30,7 +30,7 @@ export function ProductCard({
 	user,
 	isLink = false,
 }: ProductCardProps) {
-	const { data: prices, isLoading } = useStripePrice(parseInt(product.id));
+	const { data: prices, isLoading } = useStripePrice(Number(product.id));
 
 	const formatPrice = (price: number, currency: string) => {
 		return new Intl.NumberFormat('en-US', {

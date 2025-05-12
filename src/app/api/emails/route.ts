@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 		const emails = await prisma.email.findMany({
 			where: {
 				userId,
-				...(campaignId && { campaignId: parseInt(campaignId, 10) }),
+				...(campaignId && { campaignId: Number(campaignId) }),
 			},
 			include: {
 				contact: true,

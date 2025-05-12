@@ -54,7 +54,7 @@ export const useContactListDialog = (props: ContactListDialogProps) => {
 	const saveSelectedRecipients = async () => {
 		if (selectedContactList && !!campaignId) {
 			updateCampaign({
-				id: parseInt(campaignId),
+				id: Number(campaignId),
 				data: {
 					contactOperation: {
 						action: 'connect',

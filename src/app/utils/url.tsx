@@ -8,7 +8,7 @@ import queryString from 'query-string';
 export const getNumberUrlParam = (url: string, param: string): number | null => {
 	const value = new URL(url).searchParams.get(param);
 	if (!value) return null;
-	const num = parseInt(value, 10);
+	const num = Number(value);
 	return isNaN(num) ? null : num;
 };
 

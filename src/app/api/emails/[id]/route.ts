@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 
 		const updatedEmail = await prisma.email.update({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 				userId,
 			},
 			data: validatedData.data,
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest, { params }: { params: ApiRouteParams
 		const { id } = await params;
 		const email = await prisma.email.findUnique({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
 			include: {
 				contact: true,
@@ -90,7 +90,7 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 
 		const { id } = await params;
 		const existingEmail = await prisma.email.findUnique({
-			where: { id: parseInt(id) },
+			where: { id: Number(id) },
 		});
 
 		if (!existingEmail) {
@@ -103,7 +103,7 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 
 		await prisma.email.delete({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
 		});
 

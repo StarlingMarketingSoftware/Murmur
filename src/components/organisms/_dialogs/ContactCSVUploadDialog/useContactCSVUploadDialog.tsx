@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 
 export const useContactCSVUploadDialog = () => {
 	const params = useParams<{ id: string }>();
-	const contactListId = parseInt(params.id);
+	const contactListId = Number(params.id);
 	const [open, setOpen] = useState(false);
 	const [csvData, setCsvData] = useState<Contact[]>([]);
 	const fileInputRef = useRef<HTMLInputElement>(null);
