@@ -25,7 +25,7 @@ const FeatureLockedButton: FC<FeatureLockedButtonProps> = ({
 					<Button
 						onClick={(e: MouseEvent) => {
 							e.stopPropagation();
-							router.push(urls.pricing.path);
+							router.push(urls.pricing.index);
 						}}
 						variant="ghost"
 					>

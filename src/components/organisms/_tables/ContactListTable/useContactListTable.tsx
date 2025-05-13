@@ -57,7 +57,6 @@ export const useContactListTable = (props: ContactListTableProps) => {
 	// 			}
 
 	// 			const data = await response.json();
-	// 			console.log('🚀 ~ handleImportGoogleContacts ~ data:', data);
 	// 			// TODO set state
 	// 		} catch (error) {
 	// 			if (error instanceof Error) {

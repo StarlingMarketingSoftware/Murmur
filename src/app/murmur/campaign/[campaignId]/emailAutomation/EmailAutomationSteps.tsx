@@ -36,7 +36,7 @@ const EmailAutomationSteps: FC<EmailAutomationStepsProps> = (props) => {
 				))}
 			</Tabs>
 			<div className="flex sm:flex-row flex-col-reverse mx-auto justify-center items-center gap-4 mt-4">
-				<Link href={urls.murmur.dashboard.path}>
+				<Link href={urls.murmur.dashboard.index}>
 					<Button variant="ghost">
 						<SquareChevronLeft />
 						Back to Dashboard

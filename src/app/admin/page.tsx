@@ -13,10 +13,10 @@ const AdminHome = () => {
 			</CardHeader>
 			<CardContent>
 				<div className="flex flex-col gap-4 items-center">
-					<Link href={urls.admin.contacts.path}>
+					<Link href={urls.admin.contacts.index}>
 						<Button>Contact Management</Button>
 					</Link>
-					<Link href={urls.admin.products.path}>
+					<Link href={urls.admin.products.index}>
 						<Button> Product Management</Button>
 					</Link>
 				</div>

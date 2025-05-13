@@ -1,5 +1,6 @@
 import { _fetch } from '@/app/utils/api';
 import { CustomMutationOptions } from '@/constants/types';
+import { urls } from '@/constants/urls';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -64,7 +65,7 @@ export const useCreateCustomerPortal = (options: CustomMutationOptions = {}) => 
 	return useMutation({
 		mutationFn: async (data: PostCustomerPortalData) => {
 			const response = await _fetch(
-				'/api/stripe/stripe-portal/custom-product',
+				urls.api.stripe.portal.customProduct.index,
 				'POST',
 				data
 			);

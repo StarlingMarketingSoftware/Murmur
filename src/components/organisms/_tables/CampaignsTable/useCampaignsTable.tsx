@@ -19,7 +19,7 @@ export const useCampaignsTable = () => {
 	const { mutateAsync: deleteCampaign, isPending: isPendingDelete } = useDeleteCampaign();
 
 	const handleRowClick = (rowData: Campaign) => {
-		router.push(`${urls.murmur.campaign.path}/${rowData.id}`);
+		router.push(urls.murmur.campaign.detail(rowData.id));
 	};
 	const columns: ColumnDef<Campaign>[] = [
 		{

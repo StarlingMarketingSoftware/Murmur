@@ -25,12 +25,16 @@ export const Navbar = () => {
 	const { isSignedIn } = useAuth();
 
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
-	const urlList = [
-		urls.home,
-		urls.about,
-		urls.murmur.dashboard,
-		urls.contact,
-		urls.admin,
+	type UrlList = {
+		path: string;
+		label: string;
+	};
+	const urlList: UrlList[] = [
+		{ path: urls.home.index, label: 'Home' },
+		{ path: urls.about.index, label: 'About Us' },
+		{ path: urls.murmur.dashboard.index, label: 'Murmur' },
+		{ path: urls.contact.index, label: 'Contact' },
+		{ path: urls.admin.index, label: 'Admin' },
 	].filter((url) => !(user?.role !== 'admin' && url.path === '/admin'));
 
 	return (
@@ -38,13 +42,13 @@ export const Navbar = () => {
 			<div className="sticky top-0 z-10 bg-background shadow-sm dark:shadow-accent">
 				<div className="flex h-16 items-center justify-center">
 					<Link
-						href={urls.home.path}
+						href={urls.home.index}
 						className="ml-4 hidden lg:flex absolute h-6/10 left-0 justify-center items-center space-x-2"
 					>
 						<Logo pathClassName="fill-foreground stroke-foreground" />
 					</Link>
 					<Link
-						href={urls.home.path}
+						href={urls.home.index}
 						className="ml-2 absolute h-6/10 w-[200px] left-0 flex lg:hidden  items-center"
 					>
 						<LogoIcon size="150px" pathClassName="fill-foreground stroke-foreground" />
