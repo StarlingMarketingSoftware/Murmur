@@ -1,4 +1,5 @@
 import { PostMailgunData } from '@/app/api/mailgun/route';
+import { _fetch } from '@/app/utils/api';
 import { CustomMutationOptions } from '@/constants/types';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -13,14 +14,7 @@ export const useSendMailgunMessage = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async (data: PostMailgunData) => {
-			const response = await fetch('/api/mailgun/', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(data),
-			});
-
+			const response = await _fetch('/api/mailgun/', 'POST', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to send email');

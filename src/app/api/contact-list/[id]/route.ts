@@ -34,7 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 
 		const existingList = await prisma.contactList.findFirst({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
 		});
 
@@ -44,7 +44,7 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 
 		const updatedContactList = await prisma.contactList.update({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
 			data: validatedData.data,
 			include: {
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest, { params }: { params: ApiRouteParams
 		const { id } = await params;
 		const contactList = await prisma.contactList.findFirst({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
 			include: {
 				contacts: true,
@@ -95,7 +95,7 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 		const { id } = await params;
 		const existingList = await prisma.contactList.findFirst({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
 		});
 
@@ -105,7 +105,7 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 
 		await prisma.contactList.delete({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
 		});
 

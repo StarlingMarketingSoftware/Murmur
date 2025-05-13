@@ -9,15 +9,15 @@ import {
 	NoDataCell,
 	TableSortingButton,
 } from '@/components/molecules/CustomTable/CustomTable';
-import { useDeleteContact, useGetContacts } from '@/hooks/useContacts';
+import { useDeleteContact, useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { useQueryClient } from '@tanstack/react-query';
 import { TableDeleteRowButton } from '@/components/molecules/TableDeleteRowButton/TableDeleteRowButton';
-import { useGetContactList } from '@/hooks/useContactLists';
+import { useGetContactList } from '@/hooks/queryHooks/useContactLists';
 
 export const useManageContactListDetail = () => {
 	const { subscriptionTier } = useMe();
 	const params = useParams<{ id: string }>();
-	const contactListId = parseInt(params.id);
+	const contactListId = params.id;
 
 	const queryClient = useQueryClient();
 	const { data, isPending } = useGetContacts({ filters: { contactListId } });

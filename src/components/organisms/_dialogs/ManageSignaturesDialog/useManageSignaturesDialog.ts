@@ -6,11 +6,11 @@ import {
 	useCreateSignature,
 	useDeleteSignature,
 	useEditSignature,
-	useGetUserSignatures,
-} from '@/hooks/useSignatures';
+	useGetSignatures,
+} from '@/hooks/queryHooks/useSignatures';
 import { Signature } from '@prisma/client';
 import { toast } from 'sonner';
-import { useEditCampaign } from '@/hooks/useCampaigns';
+import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { CampaignWithRelations } from '@/constants/types';
@@ -32,7 +32,7 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 	const [isEdit, setIsEdit] = useState(false);
 	const [currentSignature, setCurrentSignature] = useState<Signature | null>(null);
 
-	const { data: signatures, isPending: isPendingSignatures } = useGetUserSignatures();
+	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
 
 	const { mutateAsync: saveSignature, isPending: isPendingSaveSignature } =
 		useEditSignature({ suppressToasts: true });
@@ -84,11 +84,11 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 			await handleSavePrompt();
 		}
 		await saveSignature({
-			signatureId: currentSignature.id,
+			id: currentSignature.id,
 			data,
 		});
 		toast.success('Signature saved!');
-		queryClient.invalidateQueries({ queryKey: ['campaign', parseInt(campaignId)] });
+		queryClient.invalidateQueries({ queryKey: ['campaign', Number(campaignId)] });
 	};
 
 	const queryClient = useQueryClient();
@@ -103,32 +103,32 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 			await handleSavePrompt();
 		}
 		await saveSignature({
-			signatureId: currentSignature?.id,
+			id: currentSignature?.id,
 			data: {
 				name: form.getValues('name'),
 				content: form.getValues('content'),
 			},
 		});
 		await saveSignatureToCampaign({
-			campaignId: parseInt(campaignId),
+			id: campaignId,
 			data: {
 				signatureId: currentSignature?.id,
 			},
 		});
 		toast.success('Signature saved to campaign!');
-		queryClient.invalidateQueries({ queryKey: ['campaign', parseInt(campaignId)] });
+		queryClient.invalidateQueries({ queryKey: ['campaign', Number(campaignId)] });
 	};
 
 	const handleRemoveSignatureFromCampaign = async (e: MouseEvent) => {
 		e.preventDefault();
 		await saveSignatureToCampaign({
-			campaignId: parseInt(campaignId),
+			id: campaignId,
 			data: {
 				signatureId: null,
 			},
 		});
 		toast.success('Signature removed from campaign!');
-		queryClient.invalidateQueries({ queryKey: ['campaign', parseInt(campaignId)] });
+		queryClient.invalidateQueries({ queryKey: ['campaign', Number(campaignId)] });
 	};
 
 	return {

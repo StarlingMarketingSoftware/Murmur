@@ -1,5 +1,6 @@
-import { CampaignWithRelations, EmailWithRelations } from '@/constants/types';
-import { useQuery } from '@tanstack/react-query';
+import { CampaignWithRelations } from '@/constants/types';
+import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { EmailStatus } from '@prisma/client';
 
 export interface DraftsPageProps {
 	campaign: CampaignWithRelations;
@@ -9,19 +10,13 @@ export const useDraftPage = (props: DraftsPageProps) => {
 	const { campaign } = props;
 	const campaignId = campaign.id;
 
-	const { data, isPending } = useQuery({
-		queryKey: ['drafts', campaignId],
-		queryFn: async (): Promise<EmailWithRelations[]> => {
-			const response = await fetch(`/api/emails?campaignId=${campaignId}`);
-			if (!response.ok) {
-				throw new Error('Failed to fetch drafts');
-			}
-			return response.json();
+	const { data, isPending } = useGetEmails({
+		filters: {
+			campaignId,
 		},
-		enabled: !!campaignId,
 	});
 
-	const draftEmails = data?.filter((email) => email.status === 'draft') || [];
+	const draftEmails = data?.filter((email) => email.status === EmailStatus.draft) || [];
 
 	return {
 		...props,

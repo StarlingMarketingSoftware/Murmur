@@ -45,7 +45,7 @@ export async function GET(req: NextRequest, { params }: { params: ApiRouteParams
 		const { id } = await params;
 		const campaign = await prisma.campaign.findUniqueOrThrow({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 				userId,
 			},
 			include: {
@@ -80,7 +80,7 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 
 		const updatedCampaign = await prisma.campaign.update({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 				userId,
 			},
 			data: {
@@ -120,7 +120,7 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 		const { id } = await params;
 		const campaign = await prisma.campaign.findUnique({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
 		});
 
@@ -134,7 +134,7 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 
 		await prisma.campaign.update({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
 			data: {
 				status: Status.deleted,

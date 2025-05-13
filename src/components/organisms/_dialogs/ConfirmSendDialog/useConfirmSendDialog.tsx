@@ -1,8 +1,8 @@
 import { CampaignWithRelations, EmailWithRelations } from '@/constants/types';
-import { useEditCampaign, useGetCampaign } from '@/hooks/useCampaigns';
-import { useEditEmail } from '@/hooks/useEmails';
+import { useEditCampaign, useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
+import { useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { useMe } from '@/hooks/useMe';
-import { useEditUser } from '@/hooks/useUsers';
+import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { EmailStatus } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -29,7 +29,7 @@ const addSenderInfoSchema = z.object({
 export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 	const { draftEmails } = props;
 	const { campaignId } = useParams() as { campaignId: string };
-	const { data: campaign } = useGetCampaign(parseInt(campaignId));
+	const { data: campaign } = useGetCampaign(campaignId);
 
 	const { subscriptionTier, user } = useMe();
 	const [isOpen, setIsOpen] = useState(false);
@@ -87,9 +87,6 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 
 	const { mutateAsync: updateEmail } = useEditEmail({
 		suppressToasts: true,
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['drafts'] });
-		},
 	});
 
 	const { mutateAsync: updateEmailSendCredits } = useEditUser({ suppressToasts: true });
@@ -100,7 +97,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		if (!campaign) {
 			return null;
 		}
-		editCampaign({ campaignId: campaign.id, data: form.getValues() });
+		editCampaign({ id: campaign.id.toString(), data: form.getValues() });
 		let currentEmailSendCredits = user?.emailSendCredits || 0;
 
 		for (const email of draftEmails) {
@@ -117,7 +114,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 			);
 			if (res?.status === 200) {
 				await updateEmail({
-					emailId: email.id,
+					id: email.id.toString(),
 					data: {
 						...email,
 						status: EmailStatus.sent,
@@ -125,7 +122,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 					},
 				});
 				setSendingProgress((prev) => prev + 1);
-				queryClient.invalidateQueries({ queryKey: ['campaign', parseInt(campaignId)] });
+				queryClient.invalidateQueries({ queryKey: ['campaign', Number(campaignId)] });
 				if (!subscriptionTier && user) {
 					await updateEmailSendCredits({
 						clerkId: user.clerkId,

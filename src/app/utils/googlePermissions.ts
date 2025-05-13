@@ -6,7 +6,7 @@ export const hasGoogleAccessToken = (): boolean => {
 
 export const isGoogleAccessTokenValid = (): boolean => {
 	const expiresAt = localStorage.getItem(LocalStorageKeys.GoogleExpiresAt);
-	return !!expiresAt && Date.now() < parseInt(expiresAt);
+	return !!expiresAt && Date.now() < Number(expiresAt);
 };
 
 export const hasContactsReadOnlyPermission = (): boolean => {

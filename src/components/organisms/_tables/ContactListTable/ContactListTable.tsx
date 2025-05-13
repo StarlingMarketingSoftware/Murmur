@@ -9,7 +9,7 @@ import {
 import CustomTable from '../../../molecules/CustomTable/CustomTable';
 import { ContactListTableProps, useContactListTable } from './useContactListTable';
 import Spinner from '@/components/ui/spinner';
-import ContactListDialog from '../../_dialogs/ContactListDialog/ContactListDialog';
+import SelectRecipientsDialog from '../../_dialogs/SelectRecipientsDialog/SelectRecipientsDialog';
 
 const ContactListTable: FC<ContactListTableProps> = (props) => {
 	const {
@@ -42,7 +42,7 @@ const ContactListTable: FC<ContactListTableProps> = (props) => {
 					handleRowClick={handleRowClick}
 				/>
 			</CardContent>
-			<ContactListDialog
+			<SelectRecipientsDialog
 				isOpen={isContactListDialogOpen}
 				setIsOpen={setIsContactListDialogOpen}
 				selectedContactList={selectedContactList}

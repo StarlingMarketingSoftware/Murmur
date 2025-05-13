@@ -9,11 +9,14 @@ import {
 } from '@/components/ui/dialog';
 import { FC } from 'react';
 import Spinner from '@/components/ui/spinner';
-import { ContactListDialogProps, useContactListDialog } from './useContactListDialog';
+import {
+	SelectRecipientsDialogProps,
+	useSelectRecipientsDialog,
+} from './useSelectRecipientsDialog';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import { SaveIcon } from 'lucide-react';
 
-const ContactListDialog: FC<ContactListDialogProps> = (props) => {
+const SelectRecipientsDialog: FC<SelectRecipientsDialogProps> = (props) => {
 	const {
 		isPending,
 		isOpen,
@@ -23,7 +26,7 @@ const ContactListDialog: FC<ContactListDialogProps> = (props) => {
 		selectedContactList,
 		saveSelectedRecipients,
 		filteredData,
-	} = useContactListDialog(props);
+	} = useSelectRecipientsDialog(props);
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen}>
 			<DialogContent className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px]">
@@ -60,4 +63,4 @@ const ContactListDialog: FC<ContactListDialogProps> = (props) => {
 	);
 };
 
-export default ContactListDialog;
+export default SelectRecipientsDialog;

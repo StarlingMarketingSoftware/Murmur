@@ -1,5 +1,5 @@
 import { LocalStorageKeys, requestedPeopleScopes } from '@/constants/constants';
-import { useGetCampaign } from '@/hooks/useCampaigns';
+import { useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -57,7 +57,7 @@ export const useCampaignDetail = () => {
 			localStorage.setItem(LocalStorageKeys.GoogleScopes, JSON.stringify(grantedScopes));
 			localStorage.setItem(
 				LocalStorageKeys.GoogleExpiresAt,
-				`${Date.now() + parseInt(urlExpiresIn) * 1000}`
+				`${Date.now() + Number(urlExpiresIn) * 1000}`
 			);
 
 			toast.success('Google authentication successful!');
@@ -70,7 +70,7 @@ export const useCampaignDetail = () => {
 		router.push(`/murmur?${params.toString()}`);
 	};
 
-	const { data, isPending } = useGetCampaign(parseInt(campaignId));
+	const { data, isPending } = useGetCampaign(campaignId);
 
 	return {
 		tab,

@@ -6,24 +6,33 @@ import { ContactFilterData, PostContactData } from '@/app/api/contacts/route';
 import { appendQueryParamsToUrl } from '@/app/utils/url';
 import { PostBatchContactData } from '@/app/api/contacts/batch/route';
 import { PatchContactData } from '@/app/api/contacts/[id]/route';
+import { _fetch } from '@/app/utils/api';
+
+const QUERY_KEYS = {
+	all: ['contacts'] as const,
+	list: () => [...QUERY_KEYS.all, 'list'] as const,
+	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
+} as const;
 
 export interface ContactQueryOptions extends CustomQueryOptions {
 	filters?: ContactFilterData;
 }
 
+interface EditContactData {
+	id: string | number;
+	data: PatchContactData;
+}
+
 export const useGetContacts = (options: ContactQueryOptions) => {
 	return useQuery({
-		queryKey: ['contacts', options.filters],
+		queryKey: [...QUERY_KEYS.list(), options.filters],
 		queryFn: async () => {
 			const url = appendQueryParamsToUrl('/api/contacts', options.filters);
-
-			const response = await fetch(url, {
-				method: 'GET',
-			});
+			const response = await _fetch(url);
 
 			if (!response.ok) {
 				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to fetch contacts');
+				throw new Error(errorData.error || 'Failed to _fetch contacts');
 			}
 
 			return response.json() as Promise<Contact[]>;
@@ -43,14 +52,7 @@ export const useCreateContact = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async (data: PostContactData) => {
-			const response = await fetch('/api/contacts', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(data),
-			});
-
+			const response = await _fetch('/api/contacts', 'POST', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to create contact');
@@ -59,84 +61,7 @@ export const useCreateContact = (options: CustomMutationOptions = {}) => {
 			return response.json();
 		},
 		onSuccess: () => {
-			if (!suppressToasts) {
-				toast.success(successMessage);
-			}
-			queryClient.invalidateQueries({ queryKey: ['contacts'] });
-			onSuccessCallback?.();
-		},
-		onError: () => {
-			if (!suppressToasts) {
-				toast.error(errorMessage);
-			}
-		},
-	});
-};
-
-interface EditContactData {
-	contactId: number;
-	data: PatchContactData;
-}
-
-export const useEditContact = (options: CustomMutationOptions = {}) => {
-	const {
-		suppressToasts = false,
-		successMessage = 'Contact updated successfully',
-		errorMessage = 'Failed to update contact',
-		onSuccess: onSuccessCallback,
-	} = options;
-
-	return useMutation({
-		mutationFn: async ({ data, contactId }: EditContactData) => {
-			const response = await fetch(`/api/contacts/${contactId}`, {
-				method: 'PATCH',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(data),
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to update contact');
-			}
-
-			return response.json();
-		},
-		onSuccess: () => {
-			if (!suppressToasts) {
-				toast.success(successMessage);
-			}
-			onSuccessCallback?.();
-		},
-		onError: () => {
-			if (!suppressToasts) {
-				toast.error(errorMessage);
-			}
-		},
-	});
-};
-
-export const useDeleteContact = (options: CustomMutationOptions = {}) => {
-	const {
-		suppressToasts = false,
-		successMessage = 'Contact deleted successfully',
-		errorMessage = 'Failed to delete contact',
-		onSuccess: onSuccessCallback,
-	} = options;
-
-	return useMutation({
-		mutationFn: async (contactId: number) => {
-			const response = await fetch(`/api/contacts/${contactId}`, {
-				method: 'DELETE',
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to delete contact');
-			}
-		},
-		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}
@@ -162,14 +87,7 @@ export const useBatchCreateContacts = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async (data: PostBatchContactData) => {
-			const response = await fetch('/api/contacts/batch', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(data),
-			});
-
+			const response = await _fetch('/api/contacts/batch', 'POST', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to create contacts');
@@ -178,13 +96,80 @@ export const useBatchCreateContacts = (options: CustomMutationOptions = {}) => {
 			return response.json();
 		},
 		onSuccess: (data) => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
 			if (!suppressToasts) {
 				toast.success(
 					`${successMessage}! ${data.created} contacts created. ${data.skipped} duplicate contacts skipped.`
 				);
 			}
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
+};
 
-			queryClient.invalidateQueries({ queryKey: ['contacts'] });
+export const useEditContact = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Contact updated successfully',
+		errorMessage = 'Failed to update contact',
+		onSuccess: onSuccessCallback,
+	} = options;
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: async ({ data, id }: EditContactData) => {
+			const response = await _fetch(`/api/contacts/${id}`, 'PATCH', data);
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to update contact');
+			}
+
+			return response.json();
+		},
+		onSuccess: (variables) => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
+			queryClient.invalidateQueries({
+				queryKey: QUERY_KEYS.detail(variables.id),
+			});
+
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
+};
+
+export const useDeleteContact = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Contact deleted successfully',
+		errorMessage = 'Failed to delete contact',
+		onSuccess: onSuccessCallback,
+	} = options;
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: async (id: number) => {
+			const response = await _fetch(`/api/contacts/${id}`, 'DELETE');
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to delete contact');
+			}
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.all });
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
 			onSuccessCallback?.();
 		},
 		onError: () => {

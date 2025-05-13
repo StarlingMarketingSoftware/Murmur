@@ -12,6 +12,21 @@ import {
 	handleApiError,
 } from '@/app/utils/api';
 import { EmailStatus } from '@prisma/client';
+import { getValidatedParamsFromUrl } from '@/app/utils/url';
+
+const postEmailSchema = z.object({
+	subject: z.string().min(1),
+	message: z.string().min(1),
+	campaignId: z.number().int().positive(),
+	status: z.nativeEnum(EmailStatus).default(EmailStatus.draft),
+	sentAt: z.string().datetime().nullable().optional(),
+	contactId: z.number().int().positive(),
+});
+const emailFilterSchema = z.object({
+	campaignId: z.union([z.string(), z.number()]).optional(),
+});
+export type PostEmailData = z.infer<typeof postEmailSchema>;
+export type EmailFilterData = z.infer<typeof emailFilterSchema>;
 
 export async function GET(req: NextRequest) {
 	try {
@@ -19,13 +34,17 @@ export async function GET(req: NextRequest) {
 		if (!userId) {
 			return apiUnauthorized();
 		}
-		const url = new URL(req.url);
-		const campaignId = url.searchParams.get('campaignId');
+		const validatedFilters = getValidatedParamsFromUrl(req.url, emailFilterSchema);
+
+		if (!validatedFilters.success) {
+			return apiBadRequest(validatedFilters.error);
+		}
+		const { campaignId } = validatedFilters.data;
 
 		const emails = await prisma.email.findMany({
 			where: {
 				userId,
-				...(campaignId && { campaignId: parseInt(campaignId, 10) }),
+				campaignId: Number(campaignId),
 			},
 			include: {
 				contact: true,
@@ -40,16 +59,6 @@ export async function GET(req: NextRequest) {
 		return handleApiError(error);
 	}
 }
-
-const postEmailSchema = z.object({
-	subject: z.string().min(1),
-	message: z.string().min(1),
-	campaignId: z.number().int().positive(),
-	status: z.nativeEnum(EmailStatus).default(EmailStatus.draft),
-	sentAt: z.string().datetime().nullable().optional(),
-	contactId: z.number().int().positive(),
-});
-export type PostEmailData = z.infer<typeof postEmailSchema>;
 
 export async function POST(req: NextRequest) {
 	try {

@@ -2,8 +2,8 @@ import { CampaignWithRelations } from '@/constants/types';
 import { useState } from 'react';
 import { ContactList } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
-import { useQuery } from '@tanstack/react-query';
 import { TableSortingButton } from '../../../molecules/CustomTable/CustomTable';
+import { useGetContactLists } from '@/hooks/queryHooks/useContactLists';
 
 export interface ContactListTableProps {
 	campaign: CampaignWithRelations;
@@ -81,19 +81,8 @@ export const useContactListTable = (props: ContactListTableProps) => {
 		setSelectedContactList(rowData);
 	};
 
-	const { data: dataContactLists, isPending: isPendingContactLists } = useQuery<
-		ContactList[]
-	>({
-		queryKey: ['contact-list'],
-		queryFn: async () => {
-			const response = await fetch(`/api/contact-list/`);
-			if (!response.ok) {
-				const error = await response.json();
-				throw new Error(error.message);
-			}
-			return await response.json();
-		},
-	});
+	const { data: dataContactLists, isPending: isPendingContactLists } =
+		useGetContactLists();
 
 	return {
 		columns,

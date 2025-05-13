@@ -37,7 +37,7 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 
 		const signature = await prisma.signature.findUnique({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 				userId: userId,
 			},
 		});
@@ -52,7 +52,7 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 
 		const updatedSignature = await prisma.signature.update({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 				userId,
 			},
 			data: {
@@ -78,7 +78,7 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 
 		const signature = await prisma.signature.findUnique({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 				userId: userId,
 			},
 		});
@@ -93,7 +93,7 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 
 		await prisma.signature.delete({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 				userId,
 			},
 		});
