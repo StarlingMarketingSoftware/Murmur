@@ -7,7 +7,7 @@ import {
 	TypographyList,
 } from '@/components/ui/typography';
 import { twMerge } from 'tailwind-merge';
-import { useGetStripePrice } from '@/hooks/queryHooks/useStripePrice';
+import { useGetStripePrice } from '@/hooks/queryHooks/useStripePrices';
 import { Stripe } from 'stripe';
 import { CheckoutButton } from '../CheckoutButton/CheckoutButton';
 import { User } from '@prisma/client';

@@ -5,6 +5,7 @@ import { addFontToHtml } from '@/app/utils/htmlFormatting';
 import { DefaultFont } from '@/constants/constants';
 import { CreateSignatureData } from '@/app/api/signatures/route';
 import { UpdateSignatureData } from '@/app/api/signatures/[id]/route';
+import { _fetch } from '@/app/utils/api';
 
 const QUERY_KEYS = {
 	all: ['signatures'] as const,
@@ -21,9 +22,9 @@ export const useGetSignatures = () => {
 	return useQuery({
 		queryKey: QUERY_KEYS.list(),
 		queryFn: async () => {
-			const response = await fetch('/api/signatures');
+			const response = await _fetch('/api/signatures');
 			if (!response.ok) {
-				throw new Error('Failed to fetch signatures');
+				throw new Error('Failed to _fetch signatures');
 			}
 			return response.json();
 		},
@@ -41,14 +42,7 @@ export const useCreateSignature = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async (data: CreateSignatureData) => {
-			const response = await fetch('/api/signatures', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(data),
-			});
-
+			const response = await _fetch('/api/signatures', 'POST', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to create signature');
@@ -87,15 +81,10 @@ export const useEditSignature = (options: CustomMutationOptions = {}) => {
 			if (!data.content.includes('<span style="font-family')) {
 				formattedContent = addFontToHtml(data.content, DefaultFont);
 			}
-
-			const response = await fetch(`/api/signatures/${id}`, {
-				method: 'PATCH',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({ ...data, content: formattedContent }),
+			const response = await _fetch(`/api/signatures/${id}`, 'PATCH', {
+				...data,
+				content: formattedContent,
 			});
-
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to update signature');
@@ -132,10 +121,7 @@ export const useDeleteSignature = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async (id: number) => {
-			const response = await fetch(`/api/signatures/${id}`, {
-				method: 'DELETE',
-			});
-
+			const response = await _fetch(`/api/signatures/${id}`, 'DELETE');
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to delete signature');

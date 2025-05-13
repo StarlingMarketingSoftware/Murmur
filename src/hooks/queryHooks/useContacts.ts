@@ -6,6 +6,7 @@ import { ContactFilterData, PostContactData } from '@/app/api/contacts/route';
 import { appendQueryParamsToUrl } from '@/app/utils/url';
 import { PostBatchContactData } from '@/app/api/contacts/batch/route';
 import { PatchContactData } from '@/app/api/contacts/[id]/route';
+import { _fetch } from '@/app/utils/api';
 
 const QUERY_KEYS = {
 	all: ['contacts'] as const,
@@ -27,13 +28,11 @@ export const useGetContacts = (options: ContactQueryOptions) => {
 		queryKey: [...QUERY_KEYS.list(), options.filters],
 		queryFn: async () => {
 			const url = appendQueryParamsToUrl('/api/contacts', options.filters);
-			const response = await fetch(url, {
-				method: 'GET',
-			});
+			const response = await _fetch(url);
 
 			if (!response.ok) {
 				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to fetch contacts');
+				throw new Error(errorData.error || 'Failed to _fetch contacts');
 			}
 
 			return response.json() as Promise<Contact[]>;
@@ -53,14 +52,7 @@ export const useCreateContact = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async (data: PostContactData) => {
-			const response = await fetch('/api/contacts', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(data),
-			});
-
+			const response = await _fetch('/api/contacts', 'POST', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to create contact');
@@ -95,14 +87,7 @@ export const useBatchCreateContacts = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async (data: PostBatchContactData) => {
-			const response = await fetch('/api/contacts/batch', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(data),
-			});
-
+			const response = await _fetch('/api/contacts/batch', 'POST', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to create contacts');
@@ -137,14 +122,7 @@ export const useEditContact = (options: CustomMutationOptions = {}) => {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: async ({ data, id }: EditContactData) => {
-			const response = await fetch(`/api/contacts/${id}`, {
-				method: 'PATCH',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(data),
-			});
-
+			const response = await _fetch(`/api/contacts/${id}`, 'PATCH', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to update contact');
@@ -181,10 +159,7 @@ export const useDeleteContact = (options: CustomMutationOptions = {}) => {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: async (id: number) => {
-			const response = await fetch(`/api/contacts/${id}`, {
-				method: 'DELETE',
-			});
-
+			const response = await _fetch(`/api/contacts/${id}`, 'DELETE');
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to delete contact');

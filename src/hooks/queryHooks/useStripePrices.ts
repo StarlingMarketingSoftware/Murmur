@@ -1,3 +1,4 @@
+import { _fetch } from '@/app/utils/api';
 import { useQuery } from '@tanstack/react-query';
 import { Stripe } from 'stripe';
 
@@ -11,7 +12,7 @@ export const useGetStripePrice = (productId: string) => {
 	return useQuery({
 		queryKey: QUERY_KEYS.detail(productId),
 		queryFn: async (): Promise<Stripe.Price[]> => {
-			const response = await fetch(`/api/stripe/prices/${productId}`);
+			const response = await _fetch(`/api/stripe/prices/${productId}`);
 			if (!response.ok) {
 				throw new Error('Failed to fetch price');
 			}

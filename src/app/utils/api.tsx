@@ -47,34 +47,43 @@ export const apiBadRequest = (
 	if (message instanceof ZodError) {
 		_message = message.errors.toString();
 	}
+	console.error(message);
 	return NextResponse.json({ success: false, error: _message }, { status: 400 });
 };
 
 export const apiUnauthorized = (
 	message: string = API_MESSAGES.AUTH.UNAUTHORIZED
 ): NextResponse => {
+	console.error(message);
+
 	return NextResponse.json({ success: false, error: message }, { status: 401 });
 };
 
 export const apiUnauthorizedResource = (
 	message: string = API_MESSAGES.AUTH.UNAUTHORIZED_FOR_RESOURCE
 ): NextResponse => {
+	console.error(message);
+
 	return NextResponse.json({ success: false, error: message }, { status: 401 });
 };
 
 export const apiForbidden = (message: string = API_MESSAGES.AUTH.ADMIN): NextResponse => {
+	console.error(message);
+
 	return NextResponse.json({ success: false, error: message }, { status: 403 });
 };
 
 export const apiNotFound = (
 	message: string = API_MESSAGES.ERROR.NOT_FOUND
 ): NextResponse => {
+	console.error(message);
 	return NextResponse.json({ success: false, error: message }, { status: 404 });
 };
 
 export const apiServerError = (
 	message: string = API_MESSAGES.ERROR.DEFAULT
 ): NextResponse => {
+	console.error(message);
 	return NextResponse.json({ success: false, error: message }, { status: 500 });
 };
 
@@ -90,3 +99,34 @@ export const handleApiError = (error: Error | unknown): NextResponse => {
 };
 
 /* General Functions */
+type FetchMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+
+export const _fetch = async <TBody = unknown,>(
+	url: string,
+	method?: FetchMethod,
+	body?: TBody
+): Promise<Response> => {
+	switch (method) {
+		case 'POST':
+			return fetch(url, {
+				method,
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(body),
+			});
+		case 'PATCH':
+			return fetch(url, {
+				method,
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(body),
+			});
+		case 'DELETE':
+			return fetch(url, { method });
+		case 'GET':
+		default:
+			return fetch(url);
+	}
+};

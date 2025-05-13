@@ -1,5 +1,6 @@
 import { PatchEmailData } from '@/app/api/emails/[id]/route';
 import { EmailFilterData, PostEmailData } from '@/app/api/emails/route';
+import { _fetch } from '@/app/utils/api';
 import { appendQueryParamsToUrl } from '@/app/utils/url';
 import {
 	CustomMutationOptions,
@@ -30,13 +31,11 @@ export const useGetEmails = (options: EmailQueryOptions) => {
 		queryKey: [...EMAIL_QUERY_KEYS.list()],
 		queryFn: async () => {
 			const url = appendQueryParamsToUrl('/api/emails', options.filters);
-			const response = await fetch(url, {
-				method: 'GET',
-			});
+			const response = await _fetch(url);
 
 			if (!response.ok) {
 				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to fetch emails');
+				throw new Error(errorData.error || 'Failed to _fetch emails');
 			}
 
 			return response.json() as Promise<EmailWithRelations[]>;
@@ -55,14 +54,7 @@ export const useCreateEmail = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async (data: PostEmailData) => {
-			const response = await fetch('/api/emails', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(data),
-			});
-
+			const response = await _fetch('/api/emails', 'POST', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to create email');
@@ -95,14 +87,7 @@ export const useEditEmail = (options: CustomMutationOptions = {}) => {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: async ({ data, id }: EditEmailData) => {
-			const response = await fetch(`/api/emails/${id}`, {
-				method: 'PATCH',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(data),
-			});
-
+			const response = await _fetch(`/api/emails/${id}`, 'PATCH', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to update email');
@@ -140,10 +125,7 @@ export const useDeleteEmail = (options: CustomMutationOptions = {}) => {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: async (id: number) => {
-			const response = await fetch(`/api/emails/${id}`, {
-				method: 'DELETE',
-			});
-
+			const response = await _fetch(`/api/emails/${id}`, 'DELETE');
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to delete email');

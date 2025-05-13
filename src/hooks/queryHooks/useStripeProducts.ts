@@ -1,6 +1,7 @@
 import { StripeProduct } from '@/app/utils/data/stripe/products';
 import { useQuery } from '@tanstack/react-query';
 import { getStripeProduct } from '@/services/stripe';
+import { _fetch } from '@/app/utils/api';
 
 const QUERY_KEYS = {
 	all: ['stripeProducts'] as const,
@@ -12,7 +13,7 @@ export const useStripeProducts = () => {
 	return useQuery({
 		queryKey: ['stripeProducts'],
 		queryFn: async (): Promise<StripeProduct[]> => {
-			const response = await fetch('/api/stripe/products');
+			const response = await _fetch('/api/stripe/products');
 			if (!response.ok) {
 				throw new Error('Failed to fetch products');
 			}
