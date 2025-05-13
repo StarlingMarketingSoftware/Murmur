@@ -2,6 +2,7 @@ import { PatchCampaignData } from '@/app/api/campaigns/[id]/route';
 import { PostCampaignData } from '@/app/api/campaigns/route';
 import { _fetch } from '@/app/utils/api';
 import { CampaignWithRelations, CustomMutationOptions } from '@/constants/types';
+import { urls } from '@/constants/urls';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -20,7 +21,7 @@ export const useGetCampaigns = () => {
 	return useQuery({
 		queryKey: QUERY_KEYS.list(),
 		queryFn: async () => {
-			const response = await _fetch('/api/campaigns');
+			const response = await _fetch(urls.api.campaigns.index);
 			if (!response.ok) {
 				throw new Error('Failed to fetch campaigns');
 			}
@@ -33,7 +34,7 @@ export const useGetCampaign = (id: string) => {
 	return useQuery<CampaignWithRelations>({
 		queryKey: QUERY_KEYS.detail(id),
 		queryFn: async () => {
-			const response = await _fetch(`/api/campaigns/${id}`);
+			const response = await _fetch(urls.api.campaigns.detail(id));
 			if (!response.ok) {
 				throw new Error('Failed to fetch campaign');
 			}
@@ -54,7 +55,7 @@ export const useCreateCampaign = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async (data: PostCampaignData) => {
-			const response = await _fetch('/api/campaigns', 'POST', data);
+			const response = await _fetch(urls.api.campaigns.index, 'POST', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to create campaign');
@@ -88,7 +89,7 @@ export const useEditCampaign = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async ({ data, id }: EditCampaignData) => {
-			const response = await _fetch(`/api/campaigns/${id}`, 'PATCH', data);
+			const response = await _fetch(urls.api.campaigns.detail(id), 'PATCH', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to update campaign');

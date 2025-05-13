@@ -1,5 +1,6 @@
 import { PatchUserData } from '@/app/api/users/[id]/route';
 import { _fetch } from '@/app/utils/api';
+import { urls } from '@/constants/urls';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -25,7 +26,7 @@ export const useGetUsers = () => {
 	return useQuery({
 		queryKey: QUERY_KEYS.list(),
 		queryFn: async () => {
-			const response = await _fetch('/api/users');
+			const response = await _fetch(urls.api.users.index);
 			if (!response.ok) {
 				throw new Error('Failed to _fetch users');
 			}
@@ -38,7 +39,10 @@ export const useGetUser = (clerkId: string | undefined | null) => {
 	return useQuery({
 		queryKey: QUERY_KEYS.detail(clerkId || ''),
 		queryFn: async () => {
-			const response = await _fetch(`/api/users/${clerkId}`);
+			if (!clerkId) {
+				throw new Error('Clerk ID is required');
+			}
+			const response = await _fetch(urls.api.users.detail(clerkId));
 			if (!response.ok) {
 				throw new Error('Failed to fetch user');
 			}
@@ -60,7 +64,7 @@ export const useEditUser = (options: EditUserOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async ({ data, clerkId }: EditUserData) => {
-			const response = await _fetch(`/api/users/${clerkId}`, 'PATCH', data);
+			const response = await _fetch(urls.api.users.detail(clerkId), 'PATCH', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to update user');

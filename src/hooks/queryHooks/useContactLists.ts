@@ -2,6 +2,7 @@ import { PatchContactListData } from '@/app/api/contact-list/[id]/route';
 import { PostContactListData } from '@/app/api/contact-list/route';
 import { _fetch } from '@/app/utils/api';
 import { CustomMutationOptions } from '@/constants/types';
+import { urls } from '@/constants/urls';
 import { ContactList } from '@prisma/client';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -21,7 +22,7 @@ export const useGetContactLists = () => {
 	return useQuery({
 		queryKey: QUERY_KEYS.list(),
 		queryFn: async () => {
-			const response = await _fetch('/api/contact-list');
+			const response = await _fetch(urls.api.contactList.index);
 			if (!response.ok) {
 				throw new Error('Failed to _fetch contact lists');
 			}
@@ -34,7 +35,7 @@ export const useGetContactList = (id: string) => {
 	return useQuery<ContactList>({
 		queryKey: QUERY_KEYS.detail(id),
 		queryFn: async () => {
-			const response = await _fetch(`/api/contact-list/${id}`);
+			const response = await _fetch(urls.api.contactList.detail(id));
 			if (!response.ok) {
 				throw new Error('Failed to _fetch contact list');
 			}
@@ -54,7 +55,7 @@ export const useCreateContactList = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async (data: PostContactListData) => {
-			const response = await _fetch('/api/contact-list', 'POST', data);
+			const response = await _fetch(urls.api.contactList.index, 'POST', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to create contact list');
@@ -88,7 +89,7 @@ export const useEditContactList = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async ({ data, id }: EditContactListData) => {
-			const response = await _fetch(`/api/contact-list/${id}`, 'PATCH', data);
+			const response = await _fetch(urls.api.contactList.detail(id), 'PATCH', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to update contact list');
@@ -124,8 +125,8 @@ export const useDeleteContactList = (options: CustomMutationOptions = {}) => {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async (listId: number) => {
-			const response = await _fetch(`/api/contact-list/${listId}`, 'DELETE');
+		mutationFn: async (id: number) => {
+			const response = await _fetch(urls.api.contactList.detail(id), 'DELETE');
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to delete contact list');

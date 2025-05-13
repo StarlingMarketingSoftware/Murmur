@@ -7,6 +7,7 @@ import {
 	CustomQueryOptions,
 	EmailWithRelations,
 } from '@/constants/types';
+import { urls } from '@/constants/urls';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -30,7 +31,7 @@ export const useGetEmails = (options: EmailQueryOptions) => {
 	return useQuery({
 		queryKey: [...EMAIL_QUERY_KEYS.list()],
 		queryFn: async () => {
-			const url = appendQueryParamsToUrl('/api/emails', options.filters);
+			const url = appendQueryParamsToUrl(urls.api.emails.index, options.filters);
 			const response = await _fetch(url);
 
 			if (!response.ok) {
@@ -54,7 +55,7 @@ export const useCreateEmail = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async (data: PostEmailData) => {
-			const response = await _fetch('/api/emails', 'POST', data);
+			const response = await _fetch(urls.api.emails.index, 'POST', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to create email');
@@ -87,7 +88,7 @@ export const useEditEmail = (options: CustomMutationOptions = {}) => {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: async ({ data, id }: EditEmailData) => {
-			const response = await _fetch(`/api/emails/${id}`, 'PATCH', data);
+			const response = await _fetch(urls.api.emails.detail(id), 'PATCH', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to update email');
@@ -125,7 +126,7 @@ export const useDeleteEmail = (options: CustomMutationOptions = {}) => {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: async (id: number) => {
-			const response = await _fetch(`/api/emails/${id}`, 'DELETE');
+			const response = await _fetch(urls.api.emails.detail(id), 'DELETE');
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to delete email');
