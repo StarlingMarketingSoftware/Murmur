@@ -71,7 +71,6 @@ export async function getPublicFiles(directory: string = 'demoCsvs'): Promise<st
 // 			const filePath = path.join(csvPath, fileName);
 // 			const fileContent = await fs.readFile(filePath, 'utf-8');
 // 			const categoryName = fileName.substring(0, fileName.indexOf('.csv'));
-// 			console.log('🚀 ~ processCSVFiles ~ categoryName:', categoryName);
 // 			const records: ContactCSVFormat[] = parse(fileContent, {
 // 				columns: true,
 // 				skip_empty_lines: true,
