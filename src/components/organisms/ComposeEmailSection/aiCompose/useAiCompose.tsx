@@ -3,15 +3,18 @@ import { CampaignWithRelations, Draft } from '@/constants/types';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useCreateEmail } from '@/hooks/queryHooks/useEmails';
 import { useMe } from '@/hooks/useMe';
-import { AiResponse, usePerplexityDraftEmail } from '@/hooks/usePerplexity';
+import { DraftEmailResponse, usePerplexityDraftEmail } from '@/hooks/usePerplexity';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AiModel, EmailStatus } from '@prisma/client';
+import { AiModel, Contact, EmailStatus } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { useOpenAi } from '@/hooks/useOpenAi';
+import { OPEN_AI_MODEL_OPTIONS } from '@/constants/constants';
+import { CLEAN_EMAIL_PROMPT } from '@/constants/ai';
 
 const getEmailDraftSchema = (isAiSubject: boolean) => {
 	return z.object({
@@ -53,66 +56,13 @@ const useAiCompose = (props: AiComposeProps) => {
 	const {
 		dataDraftEmail: rawDataDraftEmail,
 		isPendingDraftEmail,
-		draftEmail,
 		draftEmailAsync,
 	} = usePerplexityDraftEmail();
-
-	let dataDraftEmail: Draft = {
-		subject: '',
-		message: '',
-		contactEmail: campaign.contacts[0]?.email || '',
-	};
-
-	if (!rawDataDraftEmail && campaign.testMessage && campaign.testMessage.length > 0) {
-		dataDraftEmail = {
-			subject: campaign.testSubject || '',
-			message: campaign.testMessage,
-			contactEmail: campaign.contacts[0].email,
-		};
-	} else {
-		dataDraftEmail.subject = campaign.testSubject || '';
-		dataDraftEmail.message = campaign.testMessage || '';
-	}
-
-	const form = useForm<z.infer<ReturnType<typeof getEmailDraftSchema>>>({
-		resolver: zodResolver(getEmailDraftSchema(isAiSubject)),
-		defaultValues: {
-			subject: campaign.subject ?? '',
-			message: campaign.message ?? '',
-			aiModel: campaign.aiModel ?? AiModel.sonar,
-			font: campaign.font,
-		},
-		mode: 'onChange',
-	});
-
-	useEffect(() => {
-		if (campaign) {
-			form.reset({
-				subject: campaign.subject ?? '',
-				message: campaign.message ?? '',
-				aiModel: campaign.aiModel ?? AiModel.sonar,
-				font: campaign.font,
-			});
+	const { mutateAsync: cleanDraftEmail, isPending: isPendingCleanDraftEmail } = useOpenAi(
+		{
+			suppressToasts: true,
 		}
-	}, [campaign, form]);
-
-	const {
-		trigger,
-		getValues,
-		formState: { errors, isValid, isDirty },
-	} = form;
-
-	useEffect(() => {
-		if (isFirstLoad) {
-			setIsFirstLoad(false);
-		} else {
-			if (isAiSubject) {
-				trigger('subject');
-			}
-		}
-	}, [isAiSubject, trigger, setIsFirstLoad, isFirstLoad]);
-
-	const queryClient = useQueryClient();
+	);
 
 	const { mutate: editUser } = useEditUser({ suppressToasts: true });
 
@@ -147,6 +97,94 @@ const useAiCompose = (props: AiComposeProps) => {
 		},
 	});
 
+	const isPendingGeneration =
+		isPendingDraftEmail || isPendingCleanDraftEmail || isPendingCreateEmail;
+
+	let dataDraftEmail: Draft = {
+		subject: '',
+		message: '',
+		contactEmail: campaign.contacts[0]?.email || '',
+	};
+
+	if (!rawDataDraftEmail && campaign.testMessage && campaign.testMessage.length > 0) {
+		dataDraftEmail = {
+			subject: campaign.testSubject || '',
+			message: campaign.testMessage,
+			contactEmail: campaign.contacts[0].email,
+		};
+	} else {
+		dataDraftEmail.subject = campaign.testSubject || '';
+		dataDraftEmail.message = campaign.testMessage || '';
+	}
+
+	const form = useForm<z.infer<ReturnType<typeof getEmailDraftSchema>>>({
+		resolver: zodResolver(getEmailDraftSchema(isAiSubject)),
+		defaultValues: {
+			subject: campaign.subject ?? '',
+			message: campaign.message ?? '',
+			aiModel: campaign.aiModel ?? AiModel.sonar,
+			font: campaign.font,
+		},
+		mode: 'onChange',
+	});
+
+	const draftEmailChain = async (
+		aiModel: AiModel,
+		recipient: Contact,
+		message: string,
+		signal?: AbortSignal
+	) => {
+		const newDraft = await draftEmailAsync({
+			generateSubject: isAiSubject,
+			model: aiModel,
+			recipient,
+			prompt: message,
+			signal: signal,
+		});
+
+		const cleanedDraftEmail = await cleanDraftEmail({
+			model: OPEN_AI_MODEL_OPTIONS.gpt4,
+			prompt: CLEAN_EMAIL_PROMPT,
+			content: newDraft,
+			signal: signal,
+		});
+
+		const parsedDraft = JSON.parse(cleanedDraftEmail);
+		if (parsedDraft.message.length < 50) {
+			throw new Error('Generated email was too short. Please try again.');
+		}
+		return parsedDraft;
+	};
+
+	useEffect(() => {
+		if (campaign) {
+			form.reset({
+				subject: campaign.subject ?? '',
+				message: campaign.message ?? '',
+				aiModel: campaign.aiModel ?? AiModel.sonar,
+				font: campaign.font,
+			});
+		}
+	}, [campaign, form]);
+
+	const {
+		trigger,
+		getValues,
+		formState: { isDirty },
+	} = form;
+
+	useEffect(() => {
+		if (isFirstLoad) {
+			setIsFirstLoad(false);
+		} else {
+			if (isAiSubject) {
+				trigger('subject');
+			}
+		}
+	}, [isAiSubject, trigger, setIsFirstLoad, isFirstLoad]);
+
+	const queryClient = useQueryClient();
+
 	const cancelGeneration = () => {
 		isGenerationCancelledRef.current = true;
 		setGenerationProgress(-1);
@@ -177,24 +215,24 @@ const useAiCompose = (props: AiComposeProps) => {
 						toast.error('Failed to generate test email.');
 						break;
 					}
-					const res: AiResponse = await draftEmailAsync({
-						generateSubject: isAiSubject,
-						model: values.aiModel,
-						recipient: campaign.contacts[0],
-						prompt: values.message,
-					});
-					if (res.message && res.subject) {
+					const parsedRes: DraftEmailResponse = await draftEmailChain(
+						values.aiModel,
+						campaign.contacts[0],
+						values.message
+					);
+
+					if (parsedRes.message && parsedRes.subject) {
 						await saveTestEmail({
 							id: campaign.id,
 							data: {
 								subject: values.subject,
 								message: values.message,
 								testMessage: convertAiResponseToRichTextEmail(
-									res.message,
+									parsedRes.message,
 									values.font,
 									campaign.signature
 								),
-								testSubject: isAiSubject ? res.subject : values.subject,
+								testSubject: isAiSubject ? parsedRes.subject : values.subject,
 								font: values.font,
 							},
 						});
@@ -239,22 +277,21 @@ const useAiCompose = (props: AiComposeProps) => {
 				}
 
 				try {
-					const newDraft = await draftEmailAsync({
-						generateSubject: isAiSubject,
-						model: values.aiModel,
+					const parsedDraft = await draftEmailChain(
+						values.aiModel,
 						recipient,
-						prompt: values.message,
-						signal: controller.signal,
-					});
+						values.message,
+						controller.signal
+					);
 
-					if (newDraft) {
+					if (parsedDraft) {
 						if (!isAiSubject) {
-							newDraft.subject = values.subject ? values.subject : newDraft.subject;
+							parsedDraft.subject = values.subject ? values.subject : parsedDraft.subject;
 						}
 						await createEmail({
-							subject: newDraft.subject,
+							subject: parsedDraft.subject,
 							message: convertAiResponseToRichTextEmail(
-								newDraft.message,
+								parsedDraft.message,
 								values.font,
 								campaign.signature
 							),
@@ -269,6 +306,9 @@ const useAiCompose = (props: AiComposeProps) => {
 				} catch (error) {
 					if (error instanceof Error && error.message === 'Request cancelled.') {
 						break;
+					}
+					if (error instanceof Error) {
+						console.error('Error generating email:', error.message);
 					}
 					continue;
 				}
@@ -304,23 +344,16 @@ const useAiCompose = (props: AiComposeProps) => {
 	};
 
 	return {
+		form,
 		isAiSubject,
 		setIsAiSubject,
-		isTest,
 		handleFormAction,
-		form,
+		isTest,
+		isPendingGeneration,
 		dataDraftEmail,
-		isPendingDraftEmail,
-		draftEmail,
-		draftEmailAsync,
 		trigger,
-		errors,
-		isValid,
-		savePrompt,
-		isPendingSavePrompt,
 		handleSavePrompt,
-		createEmail,
-		isPendingCreateEmail,
+		isPendingSavePrompt,
 		aiDraftCredits,
 		aiTestCredits,
 		isConfirmDialogOpen,
@@ -330,7 +363,7 @@ const useAiCompose = (props: AiComposeProps) => {
 		generationProgress,
 		setGenerationProgress,
 		cancelGeneration,
-		...props,
+		campaign,
 	};
 };
 

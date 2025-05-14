@@ -37,7 +37,6 @@ export const useManageContactListDialog = (props: ManageContactListDialogProps) 
 		successMessage: 'Recipients saved successfully!',
 		errorMessage: 'Failed to save recipients. Please try again.',
 		onSuccess: () => {
-			console.log('Recipients saved successfully!');
 			setIsOpen(false);
 		},
 	});

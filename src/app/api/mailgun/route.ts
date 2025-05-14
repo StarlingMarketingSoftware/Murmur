@@ -1,6 +1,9 @@
 import FormData from 'form-data';
 import Mailgun from 'mailgun.js';
-import { replacePTagsInSignature } from '@/app/utils/htmlFormatting';
+import {
+	formatHTMLForEmailClients,
+	replacePTagsInSignature,
+} from '@/app/utils/htmlFormatting';
 import { auth } from '@clerk/nextjs/server';
 import {
 	apiBadRequest,
@@ -39,11 +42,14 @@ export async function POST(request: Request) {
 			username: 'api',
 			key: process.env.MAILGUN_API_KEY || '',
 		});
+
+		const messageNoMargin = formatHTMLForEmailClients(message);
+
 		const mailgunData = await mg.messages.create('murmurmailbox.com', {
 			from: `${senderName} <postmaster@murmurmailbox.com>`,
 			to: [recipientEmail],
 			subject: subject,
-			html: replacePTagsInSignature(message),
+			html: replacePTagsInSignature(messageNoMargin),
 			text: message,
 			'h:Reply-To': senderEmail,
 		});
