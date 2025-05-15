@@ -1,4 +1,4 @@
-import { CampaignWithRelations } from '@/constants/types';
+import { CampaignWithRelations } from '@/types/types';
 import { useState } from 'react';
 import { ContactList } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';

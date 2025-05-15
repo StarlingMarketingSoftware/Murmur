@@ -6,7 +6,7 @@ import {
 	CustomMutationOptions,
 	CustomQueryOptions,
 	EmailWithRelations,
-} from '@/constants/types';
+} from '@/types/types';
 import { urls } from '@/constants/urls';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';

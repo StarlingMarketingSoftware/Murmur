@@ -1,4 +1,4 @@
-import { Draft } from '@/constants/types';
+import { Draft } from '@/types/types';
 import { useMe } from '@/hooks/useMe';
 
 export interface PreviewTestDraftDialogProps {

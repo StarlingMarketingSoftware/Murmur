@@ -1,4 +1,4 @@
-import { ContactCSVFormat } from '@/constants/types';
+import { ContactCSVFormat } from '@/types/types';
 import prisma from '../src/lib/prisma';
 import { parse } from 'csv-parse/sync';
 import { promises as fs } from 'fs';

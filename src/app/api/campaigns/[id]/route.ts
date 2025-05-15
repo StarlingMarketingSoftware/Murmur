@@ -10,7 +10,7 @@ import {
 	handleApiError,
 } from '@/app/utils/api';
 import { AiModel, Status } from '@prisma/client';
-import { ApiRouteParams } from '@/constants/types';
+import { ApiRouteParams } from '@/types/types';
 import { NextRequest } from 'next/server';
 
 import { z } from 'zod';

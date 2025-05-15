@@ -1,5 +1,5 @@
 import { calcAiCreditsFromPrice } from '@/app/utils/calculations';
-import { SubscriptionTierData } from '@/constants/types';
+import { SubscriptionTierData } from '@/types/types';
 import { stripe } from '@/stripe/client';
 
 export const calcAiCredits = async (

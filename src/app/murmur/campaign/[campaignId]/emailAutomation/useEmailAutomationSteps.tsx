@@ -1,4 +1,4 @@
-import { CampaignWithRelations } from '@/constants/types';
+import { CampaignWithRelations } from '@/types/types';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import SendPage from './send/SendPage';
 import DraftPage from './draft/DraftPage';

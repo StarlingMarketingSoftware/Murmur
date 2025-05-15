@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { CampaignWithRelations } from '@/constants/types';
+import { CampaignWithRelations } from '@/types/types';
 
 const signatureSchema = z.object({
 	name: z.string().min(1, { message: 'Signature name is required.' }),

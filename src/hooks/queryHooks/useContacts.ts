@@ -1,6 +1,6 @@
 import { Contact } from '@prisma/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CustomMutationOptions, CustomQueryOptions } from '@/constants/types';
+import { CustomMutationOptions, CustomQueryOptions } from '@/types/types';
 import { toast } from 'sonner';
 import { ContactFilterData, PostContactData } from '@/app/api/contacts/route';
 import { appendQueryParamsToUrl } from '@/app/utils/url';
