@@ -143,7 +143,7 @@ const useAiCompose = (props: AiComposeProps) => {
 		});
 
 		const cleanedDraftEmail = await cleanDraftEmail({
-			model: OPEN_AI_MODEL_OPTIONS.gpt4,
+			model: OPEN_AI_MODEL_OPTIONS.o4mini,
 			prompt: CLEAN_EMAIL_PROMPT,
 			content: newDraft,
 			signal: signal,

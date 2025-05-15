@@ -45,7 +45,6 @@ export async function POST(request: NextRequest) {
 						content,
 					},
 				],
-				temperature: 0.7,
 			}),
 		});
 
