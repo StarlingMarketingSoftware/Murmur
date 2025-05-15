@@ -108,3 +108,8 @@ export const restrictedFeatureMessages = {
 	freePlanSendingLimit:
 		'You have reached the sending limit on the free plan. Please sign up for a subscription to send more emails.',
 };
+
+export const OPEN_AI_MODEL_OPTIONS = {
+	o4mini: 'o4-mini-2025-04-16',
+	gpt4: 'gpt-4-0613',
+};
