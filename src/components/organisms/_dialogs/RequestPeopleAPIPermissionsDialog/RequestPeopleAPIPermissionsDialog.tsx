@@ -7,7 +7,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@/components/ui/dialog';
-import { LocalStorageKeys } from '@/constants/constants';
+import { LOCAL_STORAGE_KEYS } from '@/constants';
 import { Dispatch, FC, SetStateAction } from 'react';
 
 interface RequestPeopleAPIPermissionsDialogProps {
@@ -20,7 +20,7 @@ const RequestPeopleAPIPermissionsDialog: FC<RequestPeopleAPIPermissionsDialogPro
 }) => {
 	const authorizeGoogle = () => {
 		const googleAuthState = Math.random().toString(36).substring(7);
-		localStorage.setItem(LocalStorageKeys.GoogleAuthState, googleAuthState);
+		localStorage.setItem(LOCAL_STORAGE_KEYS.GoogleAuthState, googleAuthState);
 
 		const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 		const redirectUri = process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI;

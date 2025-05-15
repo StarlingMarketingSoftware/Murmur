@@ -1,5 +1,5 @@
 import { _fetch } from '@/app/utils/api';
-import { CustomMutationOptions } from '@/constants/types';
+import { CustomMutationOptions } from '@/types/types';
 import { urls } from '@/constants/urls';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';

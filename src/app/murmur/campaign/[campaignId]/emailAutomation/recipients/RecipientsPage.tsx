@@ -1,7 +1,7 @@
 'use client';
 
 import { FC } from 'react';
-import { CampaignWithRelations } from '@/constants/types';
+import { CampaignWithRelations } from '@/types/types';
 import RecipientsTable from '@/components/organisms/_tables/RecipientsTable/RecipientsTable';
 import ContactListTable from '@/components/organisms/_tables/ContactListTable/ContactListTable';
 

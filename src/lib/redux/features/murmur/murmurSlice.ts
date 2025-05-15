@@ -1,4 +1,4 @@
-import { Draft } from '@/constants/types';
+import { Draft } from '@/types/types';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export interface CampaignState {

@@ -1,5 +1,5 @@
 import { convertAiResponseToRichTextEmail } from '@/app/utils/htmlFormatting';
-import { CampaignWithRelations, Draft } from '@/constants/types';
+import { CampaignWithRelations, Draft } from '@/types/types';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useCreateEmail } from '@/hooks/queryHooks/useEmails';
 import { useMe } from '@/hooks/useMe';

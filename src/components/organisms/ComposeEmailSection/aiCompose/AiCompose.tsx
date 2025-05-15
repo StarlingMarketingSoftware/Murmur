@@ -20,7 +20,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
-import { FontOptions } from '@/constants/constants';
+import { FONT_OPTIONS } from '@/constants';
 import PreviewTestDraftDialog from '../../_dialogs/PreviewTestDraftDialog/PreviewTestDraftDialog';
 import { FC } from 'react';
 import useAiCompose, { AiComposeProps } from './useAiCompose';
@@ -152,7 +152,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 											<SelectContent>
 												<SelectGroup>
 													<SelectLabel>Font</SelectLabel>
-													{FontOptions.map((font) => (
+													{FONT_OPTIONS.map((font) => (
 														<SelectItem key={font} value={font}>
 															<span style={{ fontFamily: font }}>{font}</span>
 														</SelectItem>

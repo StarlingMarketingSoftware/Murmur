@@ -1,10 +1,4 @@
-import { AiModel, Prisma } from '@prisma/client';
-
-export type Url = {
-	path: string;
-	label: string;
-	category?: UrlCategory;
-};
+import { Prisma } from '@prisma/client';
 
 export type Logo = {
 	fileName: string;
@@ -64,14 +58,6 @@ export type Draft = {
 	subject: string;
 	message: string;
 	contactEmail: string;
-};
-
-export type AiType = 'perplexity' | 'openai';
-
-export type AiSelectValues = {
-	name: string;
-	value: AiModel;
-	type: AiType;
 };
 
 export enum PerplexityModelEnum {

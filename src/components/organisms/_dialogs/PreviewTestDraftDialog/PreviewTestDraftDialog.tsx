@@ -15,7 +15,7 @@ import {
 	usePreviewTestDraftDialog,
 } from './usePreviewTestDraftDialog';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
-import { restrictedFeatureMessages } from '@/constants/constants';
+import { RESTRICTED_FEATURE_MESSAGES } from '@/constants';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { EyeIcon } from 'lucide-react';
 
@@ -53,7 +53,7 @@ const PreviewTestDraftDialog: FC<PreviewTestDraftDialogProps> = (props) => {
 							/>
 							{!canViewEmailAddress && (
 								<div className="absolute right-1 top-1/2 -translate-y-1/2">
-									<FeatureLockedButton message={restrictedFeatureMessages.viewEmails} />
+									<FeatureLockedButton message={RESTRICTED_FEATURE_MESSAGES.viewEmails} />
 								</div>
 							)}
 						</div>

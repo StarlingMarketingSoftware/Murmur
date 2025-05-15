@@ -1,4 +1,4 @@
-import { CampaignWithRelations } from '@/constants/types';
+import { CampaignWithRelations } from '@/types/types';
 import { useState } from 'react';
 
 export interface ComposeEmailSectionProps {

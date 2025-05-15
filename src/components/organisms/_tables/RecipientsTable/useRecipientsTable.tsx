@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation';
 import { useMe } from '@/hooks/useMe';
 import { TypographyMuted } from '@/components/ui/typography';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
-import { restrictedFeatureMessages } from '@/constants/constants';
+import { RESTRICTED_FEATURE_MESSAGES } from '@/constants';
 import { TableSortingButton } from '@/components/molecules/CustomTable/CustomTable';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 
@@ -50,7 +50,7 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 				return subscriptionTier?.viewEmailAddresses ? (
 					<div className="text-left">{row.getValue('email')}</div>
 				) : (
-					<FeatureLockedButton message={restrictedFeatureMessages.viewEmails} />
+					<FeatureLockedButton message={RESTRICTED_FEATURE_MESSAGES.viewEmails} />
 				);
 			},
 		},

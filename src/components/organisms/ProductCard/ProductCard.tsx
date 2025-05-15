@@ -11,7 +11,7 @@ import { useGetStripePrice } from '@/hooks/queryHooks/useStripePrices';
 import { Stripe } from 'stripe';
 import { CheckoutButton } from '../CheckoutButton/CheckoutButton';
 import { User } from '@prisma/client';
-import { STRIPE_SUBSCRIPTION_STATUS } from '@/constants/types';
+import { STRIPE_SUBSCRIPTION_STATUS } from '@/types/types';
 import ManageSubscriptionButton from '@/components/organisms/ManageSubscriptionButton/ManageSubscriptionButton';
 import Spinner from '@/components/ui/spinner';
 import { ReactNode } from 'react';
