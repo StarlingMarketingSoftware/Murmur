@@ -21,26 +21,26 @@ export function Footer() {
 						<ul className="space-y-2">
 							<li>
 								<Link
-									href={urls.home.path}
+									href={urls.home.index}
 									className="text-muted-foreground hover:text-foreground transition-colors"
 								>
-									{urls.home.label}
+									Home
 								</Link>
 							</li>
 							<li>
 								<Link
-									href={urls.about.path}
+									href={urls.about.index}
 									className="text-muted-foreground hover:text-foreground transition-colors"
 								>
-									{urls.about.label}
+									About Us
 								</Link>
 							</li>
 							<li>
 								<Link
-									href={urls.contact.path}
+									href={urls.contact.index}
 									className="text-muted-foreground hover:text-foreground transition-colors"
 								>
-									{urls.contact.label}
+									Contact
 								</Link>
 							</li>
 						</ul>

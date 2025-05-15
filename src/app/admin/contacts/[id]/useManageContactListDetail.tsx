@@ -9,18 +9,18 @@ import {
 	NoDataCell,
 	TableSortingButton,
 } from '@/components/molecules/CustomTable/CustomTable';
-import { useDeleteContact, useGetContactsByCategory } from '@/hooks/useContacts';
+import { useDeleteContact, useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { useQueryClient } from '@tanstack/react-query';
 import { TableDeleteRowButton } from '@/components/molecules/TableDeleteRowButton/TableDeleteRowButton';
-import { useGetContactList } from '@/hooks/useContactLists';
+import { useGetContactList } from '@/hooks/queryHooks/useContactLists';
 
 export const useManageContactListDetail = () => {
 	const { subscriptionTier } = useMe();
 	const params = useParams<{ id: string }>();
-	const contactListId = parseInt(params.id);
+	const contactListId = params.id;
 
 	const queryClient = useQueryClient();
-	const { data, isPending } = useGetContactsByCategory(contactListId);
+	const { data, isPending } = useGetContacts({ filters: { contactListId } });
 	const { data: contactListData, isPending: isPendingContactList } =
 		useGetContactList(contactListId);
 	const { mutateAsync: deleteContact, isPending: isPendingDeleteContact } =
@@ -116,7 +116,7 @@ export const useManageContactListDetail = () => {
 					onClick={async () => {
 						await deleteContact(row.original.id);
 						queryClient.invalidateQueries({
-							queryKey: ['contacts', 'by-category', contactListId],
+							queryKey: ['contacts'],
 						});
 					}}
 				/>

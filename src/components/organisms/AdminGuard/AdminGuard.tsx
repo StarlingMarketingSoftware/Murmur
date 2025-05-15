@@ -17,9 +17,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
 					return;
 				}
 				setIsAuthorized(true);
-			} catch (error) {
-				console.log('🚀 ~ checkAdminStatus ~ error:', error);
-				// router.replace('/');
+			} catch {
 			} finally {
 				setIsLoading(false);
 			}

@@ -4,7 +4,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { TrashIcon } from 'lucide-react';
 import { TypographyMuted } from '@/components/ui/typography';
 import { TableSortingButton } from '../../../molecules/CustomTable/CustomTable';
-import { useDeleteCampaign, useGetCampaigns } from '@/hooks/useCampaigns';
+import { useDeleteCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { MMddyyyyHHmm } from '@/app/utils/date';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
@@ -19,7 +19,7 @@ export const useCampaignsTable = () => {
 	const { mutateAsync: deleteCampaign, isPending: isPendingDelete } = useDeleteCampaign();
 
 	const handleRowClick = (rowData: Campaign) => {
-		router.push(`${urls.murmur.campaign.path}/${rowData.id}`);
+		router.push(urls.murmur.campaign.detail(rowData.id));
 	};
 	const columns: ColumnDef<Campaign>[] = [
 		{

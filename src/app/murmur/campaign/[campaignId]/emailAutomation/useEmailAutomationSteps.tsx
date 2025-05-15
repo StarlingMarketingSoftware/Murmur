@@ -33,12 +33,12 @@ export const useEmailAutomationSteps = (props: EmailAutomationStepsProps) => {
 
 	const advanceToNextStep = () => {
 		const params = new URLSearchParams(searchParams);
-		params.set('step', (parseInt(stepParam) + 1).toString());
+		params.set('step', (Number(stepParam) + 1).toString());
 		router.push(`${pathname}?${params.toString()}`);
 	};
 	const returnToPreviousStep = () => {
 		const params = new URLSearchParams(searchParams);
-		params.set('step', (parseInt(stepParam) - 1).toString());
+		params.set('step', (Number(stepParam) - 1).toString());
 		router.push(`${pathname}?${params.toString()}`);
 	};
 

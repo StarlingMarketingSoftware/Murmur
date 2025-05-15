@@ -1,27 +1,26 @@
 import { CustomMutationOptions } from '@/constants/types';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { urls } from '@/constants/urls';
+import { PostOpenAiData } from '@/app/api/openai/route';
 
-interface MailgunMessageData {
-	recipientEmail: string;
-	subject: string;
-	message: string;
-	senderEmail: string;
-	senderName: string;
+export interface PostOpenAiDataWithSignal extends PostOpenAiData {
+	signal?: AbortSignal;
 }
 
-export const useSendMailgunMessage = (options: CustomMutationOptions = {}) => {
+export const useOpenAi = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
-		successMessage = 'Email sent successfully',
-		errorMessage = 'Failed to send email',
+		successMessage = 'API call successful',
+		errorMessage = 'Failed to get a response from the API',
 		onSuccess: onSuccessCallback,
 	} = options;
 
 	return useMutation({
-		mutationFn: async (data: MailgunMessageData) => {
-			const response = await fetch('/api/mailgun/', {
+		mutationFn: async (data: PostOpenAiDataWithSignal): Promise<string> => {
+			const response = await fetch(urls.api.openai.index, {
 				method: 'POST',
+				signal: data.signal,
 				headers: {
 					'Content-Type': 'application/json',
 				},
@@ -30,10 +29,11 @@ export const useSendMailgunMessage = (options: CustomMutationOptions = {}) => {
 
 			if (!response.ok) {
 				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to send email');
+				throw new Error(errorData.error?.message || 'Failed to clean email');
 			}
 
-			return response.json();
+			const res = await response.json();
+			return res;
 		},
 		onSuccess: () => {
 			if (!suppressToasts) {

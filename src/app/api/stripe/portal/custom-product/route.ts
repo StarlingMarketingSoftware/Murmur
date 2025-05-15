@@ -1,19 +1,25 @@
+import { apiBadRequest, apiResponse, handleApiError } from '@/app/utils/api';
 import { baseUrl } from '@/constants/constants';
 import { urls } from '@/constants/urls';
 import { stripe } from '@/stripe/client';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { z } from 'zod';
 
-interface UpdateSubscriptionPortalRequest {
-	customerId: string;
-	productId: string;
-	priceId: string;
-}
+const customProductPortalRequestSchema = z.object({
+	customerId: z.string().min(1),
+	productId: z.string().min(1),
+	priceId: z.string().min(1),
+});
 
-export async function POST(
-	req: NextRequest
-): Promise<NextResponse<{ url: string }> | NextResponse<{ error: string }>> {
-	const body = (await req.json()) as UpdateSubscriptionPortalRequest;
-	const { customerId, productId, priceId } = body;
+export async function POST(req: NextRequest) {
+	const data = await req.json();
+	const validatedData = customProductPortalRequestSchema.safeParse(data);
+
+	if (!validatedData.success) {
+		return apiBadRequest(validatedData.error);
+	}
+
+	const { customerId, productId, priceId } = validatedData.data;
 
 	try {
 		const portalConfig = await stripe.billingPortal.configurations.create({
@@ -34,7 +40,6 @@ export async function POST(
 				payment_method_update: {
 					enabled: true,
 				},
-
 				invoice_history: {
 					enabled: true,
 				},
@@ -44,12 +49,11 @@ export async function POST(
 		const portalSession = await stripe.billingPortal.sessions.create({
 			customer: customerId,
 			configuration: portalConfig.id,
-			return_url: `${baseUrl}${urls.pricing.path}/${productId}`,
+			return_url: `${baseUrl}${urls.pricing.detail(productId)}`,
 		});
 
-		return NextResponse.json({ url: portalSession.url });
-	} catch (err) {
-		console.error(err);
-		return NextResponse.json({ error: 'Failed to create portal session' });
+		return apiResponse({ url: portalSession.url });
+	} catch (error) {
+		return handleApiError(error);
 	}
 }

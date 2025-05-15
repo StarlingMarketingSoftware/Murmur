@@ -1,5 +1,5 @@
-import { CampaignWithRelations, EmailWithRelations } from '@/constants/types';
-import { useQuery } from '@tanstack/react-query';
+import { CampaignWithRelations } from '@/constants/types';
+import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 
 export interface SendPageProps {
 	campaign: CampaignWithRelations;
@@ -8,16 +8,10 @@ export interface SendPageProps {
 export const useSendPage = (props: SendPageProps) => {
 	const { campaign } = props;
 	const campaignId = campaign.id;
-	const { data: dataEmails, isPending: isPendingEmails } = useQuery({
-		queryKey: ['drafts', campaignId],
-		queryFn: async (): Promise<EmailWithRelations[]> => {
-			const response = await fetch(`/api/emails?campaignId=${campaignId}`);
-			if (!response.ok) {
-				throw new Error('Failed to fetch drafts');
-			}
-			return response.json();
+	const { data: dataEmails, isPending: isPendingEmails } = useGetEmails({
+		filters: {
+			campaignId,
 		},
-		enabled: !!campaignId,
 	});
 
 	return {

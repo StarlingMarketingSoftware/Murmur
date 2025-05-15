@@ -109,7 +109,7 @@ export default async function HomePage() {
 									</button>
 								</SignUpButton>
 							) : (
-								<Link href={urls.murmur.dashboard.path}>
+								<Link href={urls.murmur.dashboard.index}>
 									<Button variant="default" size="lg" className="py-7 w-[250px]">
 										Get Started
 									</Button>

@@ -1,5 +1,5 @@
+import { apiResponse, handleApiError } from '@/app/utils/api';
 import { stripe } from '@/stripe/client';
-import { NextResponse } from 'next/server';
 
 export async function GET() {
 	try {
@@ -7,9 +7,8 @@ export async function GET() {
 			active: true,
 		});
 
-		return NextResponse.json(products.data);
+		return apiResponse(products.data);
 	} catch (error) {
-		console.error('Error fetching Stripe products:', error);
-		return NextResponse.json([], { status: 500 });
+		return handleApiError(error);
 	}
 }

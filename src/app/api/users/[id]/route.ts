@@ -1,10 +1,17 @@
-import { NextResponse } from 'next/server';
 import { User } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
 import { auth } from '@clerk/nextjs/server';
+import {
+	apiBadRequest,
+	apiResponse,
+	apiUnauthorized,
+	handleApiError,
+} from '@/app/utils/api';
+import { ApiRouteParams } from '@/constants/types';
+import { NextRequest } from 'next/server';
 
-const updateUserSchema = z.object({
+const patchUserSchema = z.object({
 	firstName: z.string().optional(),
 	lastName: z.string().optional(),
 	aiDraftCredits: z.number().int().optional(),
@@ -15,42 +22,44 @@ const updateUserSchema = z.object({
 	stripePriceId: z.string().optional().nullable(),
 	emailSendCredits: z.number().int().optional(),
 });
+export type PatchUserData = z.infer<typeof patchUserSchema>;
 
-type Params = Promise<{ clerkId: string }>;
-
-export const GET = async function GET(request: Request, { params }: { params: Params }) {
+export const GET = async function GET(
+	req: NextRequest,
+	{ params }: { params: ApiRouteParams }
+) {
 	try {
-		const { clerkId } = await params;
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const { id } = await params;
 
 		const user: User = await prisma.user.findUniqueOrThrow({
 			where: {
-				clerkId: clerkId,
+				clerkId: id,
 			},
 		});
 
-		return NextResponse.json(user);
-	} catch {
-		return NextResponse.json({ error: 'User not found' }, { status: 404 });
+		return apiResponse(user);
+	} catch (error) {
+		return handleApiError(error);
 	}
 };
 
 export const PATCH = async function PATCH(request: Request) {
 	try {
 		const { userId } = await auth();
-
 		if (!userId) {
-			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+			return apiUnauthorized();
 		}
-		const data = await request.json();
 
-		// Validate the input data
-		const validatedData = updateUserSchema.safeParse(data);
+		const data = await request.json();
+		const validatedData = patchUserSchema.safeParse(data);
 
 		if (!validatedData.success) {
-			return NextResponse.json(
-				{ error: 'Invalid input', details: validatedData.error.format() },
-				{ status: 400 }
-			);
+			return apiBadRequest();
 		}
 
 		const updatedUser = await prisma.user.update({
@@ -58,8 +67,8 @@ export const PATCH = async function PATCH(request: Request) {
 			data: validatedData.data,
 		});
 
-		return NextResponse.json(updatedUser);
-	} catch {
-		return NextResponse.json({ error: 'Failed to update user' }, { status: 400 });
+		return apiResponse(updatedUser);
+	} catch (error) {
+		return handleApiError(error);
 	}
 };

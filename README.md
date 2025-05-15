@@ -47,6 +47,14 @@ For Stripe subscription functionality, set up a webhook:
 5. The api URL is therefore https://marmot-modest-prawn.ngrok-free.app/api/webhooks/clerk
 6. Test directly via clerk or on localhost:3000. localhost:3000 works because this connects to Clerk, then Clerk sends the webhook to the ngrok static url.
 
+## Versioning
+
+Murmur uses Semantic Versioning (SemVer) – (MAJOR.MINOR.PATCH). In this system:
+
+- A major version change (e.g., 9.x → 10.0) happens when there are backward-incompatible changes.
+- A minor version change (e.g., 9.4 → 9.5) includes new features but remains backward-compatible.
+- A patch version change (e.g., 9.4.1 → 9.4.2) contains bug fixes and security updates.
+
 ## License
 
 This project is licensed under the MIT License.
