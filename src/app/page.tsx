@@ -98,8 +98,8 @@ export default async function HomePage() {
 									we’ll grow together to provide you more valuable features.
 								</TypographyP>
 							</div>
-							<TypographyH1 className="mt-12">Starling Has Worked With</TypographyH1>
-							<PromotionLogos />
+							{/* <TypographyH1 className="mt-12">Starling Has Worked With</TypographyH1>
+							<PromotionLogos /> */}
 						</AppLayout>
 						<div className="mt-14 flex justify-center">
 							{!isSignedIn ? (
