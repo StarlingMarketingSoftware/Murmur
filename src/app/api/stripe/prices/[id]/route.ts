@@ -1,5 +1,5 @@
 import { apiResponse, handleApiError } from '@/app/utils/api';
-import { ApiRouteParams } from '@/types/types';
+import { ApiRouteParams } from '@/types';
 import { stripe } from '@/stripe/client';
 import { NextRequest } from 'next/server';
 

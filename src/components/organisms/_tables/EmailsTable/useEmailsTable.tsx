@@ -1,6 +1,6 @@
 import { AccessorFnColumnDef, ColumnDef } from '@tanstack/react-table';
 import { TableSortingButton } from '../../../molecules/CustomTable/CustomTable';
-import { EmailWithRelations } from '@/types/types';
+import { EmailWithRelations } from '@/types';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { TrashIcon } from 'lucide-react';

@@ -1,7 +1,7 @@
 import { PatchCampaignData } from '@/app/api/campaigns/[id]/route';
 import { PostCampaignData } from '@/app/api/campaigns/route';
 import { _fetch } from '@/app/utils/api';
-import { CampaignWithRelations, CustomMutationOptions } from '@/types/types';
+import { CampaignWithRelations, CustomMutationOptions } from '@/types';
 import { urls } from '@/constants/urls';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';

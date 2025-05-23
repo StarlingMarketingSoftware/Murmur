@@ -11,7 +11,7 @@ import {
 	apiUnauthorizedResource,
 	handleApiError,
 } from '@/app/utils/api';
-import { ApiRouteParams } from '@/types/types';
+import { ApiRouteParams } from '@/types';
 import { EmailStatus } from '@prisma/client';
 
 const patchEmailSchema = z.object({

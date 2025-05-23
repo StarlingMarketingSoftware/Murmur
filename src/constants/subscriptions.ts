@@ -1,5 +1,5 @@
 import { getTestEmailCount } from '@/app/utils/calculations';
-import { SubscriptionTierData } from '../types/types';
+import { SubscriptionTierData } from '@/types';
 
 export const SUBSCRIPTION_TIER_DATA_LIST: Record<string, SubscriptionTierData> = {
 	[process.env.NEXT_PUBLIC_ESSENTIALS_PRICE_ID as string]: {

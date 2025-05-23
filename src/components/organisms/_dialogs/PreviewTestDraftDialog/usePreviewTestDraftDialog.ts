@@ -1,8 +1,8 @@
-import { Draft } from '@/types/types';
+import { TestDraftEmail } from '@/types';
 import { useMe } from '@/hooks/useMe';
 
 export interface PreviewTestDraftDialogProps {
-	draftEmail: Draft;
+	draftEmail: TestDraftEmail;
 }
 
 export const usePreviewTestDraftDialog = (props: PreviewTestDraftDialogProps) => {

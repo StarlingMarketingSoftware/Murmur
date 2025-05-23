@@ -1,4 +1,4 @@
-import { CampaignWithRelations, EmailWithRelations } from '@/types/types';
+import { CampaignWithRelations, EmailWithRelations } from '@/types';
 import { useEditCampaign, useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { useMe } from '@/hooks/useMe';

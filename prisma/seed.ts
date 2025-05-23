@@ -1,8 +1,19 @@
-import { ContactCSVFormat } from '@/types/types';
 import prisma from '../src/lib/prisma';
 import { parse } from 'csv-parse/sync';
 import { promises as fs } from 'fs';
 import * as path from 'path';
+
+export type ContactCSVFormat = {
+	//seeding
+	name: string;
+	company: string;
+	email: string;
+	address: string;
+	country: string;
+	state: string;
+	website: string;
+	phone: string;
+};
 
 export async function getPublicFiles(directory: string = 'demoCsvs'): Promise<string[]> {
 	try {

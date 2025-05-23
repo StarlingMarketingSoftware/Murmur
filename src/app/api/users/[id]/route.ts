@@ -8,7 +8,7 @@ import {
 	apiUnauthorized,
 	handleApiError,
 } from '@/app/utils/api';
-import { ApiRouteParams } from '@/types/types';
+import { ApiRouteParams } from '@/types';
 import { NextRequest } from 'next/server';
 
 const patchUserSchema = z.object({

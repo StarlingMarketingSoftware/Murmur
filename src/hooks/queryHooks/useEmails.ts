@@ -2,11 +2,7 @@ import { PatchEmailData } from '@/app/api/emails/[id]/route';
 import { EmailFilterData, PostEmailData } from '@/app/api/emails/route';
 import { _fetch } from '@/app/utils/api';
 import { appendQueryParamsToUrl } from '@/app/utils/url';
-import {
-	CustomMutationOptions,
-	CustomQueryOptions,
-	EmailWithRelations,
-} from '@/types/types';
+import { CustomMutationOptions, CustomQueryOptions, EmailWithRelations } from '@/types';
 import { urls } from '@/constants/urls';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';

@@ -1,4 +1,4 @@
-import { Font } from '../types/types';
+import { Font } from '@/types';
 
 export const FONT_OPTIONS: Font[] = [
 	'Times New Roman',

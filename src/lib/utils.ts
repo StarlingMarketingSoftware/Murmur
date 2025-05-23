@@ -1,5 +1,5 @@
 import { SUBSCRIPTION_TIER_DATA_LIST } from '@/constants';
-import { SubscriptionTierData } from '@/types/types';
+import { SubscriptionTierData } from '@/types';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 

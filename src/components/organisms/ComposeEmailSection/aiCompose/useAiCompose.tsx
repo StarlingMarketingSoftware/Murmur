@@ -1,5 +1,5 @@
 import { convertAiResponseToRichTextEmail } from '@/app/utils/htmlFormatting';
-import { CampaignWithRelations, Draft } from '@/types/types';
+import { CampaignWithRelations, TestDraftEmail } from '@/types';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useCreateEmail } from '@/hooks/queryHooks/useEmails';
 import { useMe } from '@/hooks/useMe';
@@ -13,7 +13,7 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { useOpenAi } from '@/hooks/useOpenAi';
-import { OPEN_AI_MODEL_OPTIONS } from '@/constants/constants';
+import { OPEN_AI_MODEL_OPTIONS } from '@/constants';
 import { CLEAN_EMAIL_PROMPT } from '@/constants/ai';
 
 const getEmailDraftSchema = (isAiSubject: boolean) => {
@@ -100,7 +100,7 @@ const useAiCompose = (props: AiComposeProps) => {
 	const isPendingGeneration =
 		isPendingDraftEmail || isPendingCleanDraftEmail || isPendingCreateEmail;
 
-	let dataDraftEmail: Draft = {
+	let dataDraftEmail: TestDraftEmail = {
 		subject: '',
 		message: '',
 		contactEmail: campaign.contacts[0]?.email || '',
