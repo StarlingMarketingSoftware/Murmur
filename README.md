@@ -2,6 +2,21 @@
 
 AI-powered marketing automation platform that helps you create, manage, and optimize your email campaigns effortlessly.
 
+## Initial Setup
+
+- Install Node version 20 or above. Using nvm (Node Version Manager) is recommended in case you eventually having to handle multiple versions locally for different applications.
+- In the folder where you want to clone the repo, run `git clone https://github.com/StarlingMarketingSoftware/Murmur.git`
+- cd into the murmur folder.
+- Get localhost environment variables from a team member and paste it into .env file in the root directory.
+- Run `npm i` to install packages.
+- Install PostgreSQL https://www.postgresql.org/download/ and create a new database.
+- Make sure that the POSTGRES_PRISMA_URL environment variable matches the user, password, host, port information of the database you just created.
+- Run `npx prisma migrate dev`
+- Run `npx prisma db seed` Requires .csv file with contact seed information to be in the /public folder. Ask a team member.
+- Run `npm run dev` and access the server on localhost:3000.
+- Make sure the Clerk webhook is running, and create a user in the application. If you have an existing user on Clerk and are installing on a new computer, copy the user data from the old computer's local database for consistency.
+- The local database can be managed using Prisma Studio `npx prisma studio` or with your preferred database manager, such as DBeaver or pgAdmin.
+
 ## Stripe Webhook Setup
 
 For Stripe subscription functionality, set up a webhook:
