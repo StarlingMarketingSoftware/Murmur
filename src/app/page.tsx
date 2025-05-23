@@ -1,5 +1,4 @@
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
-import { PromotionLogos } from '@/components/molecules/PromotionLogos/PromotionLogos';
 import { Button } from '@/components/ui/button';
 import { TypographyH1, TypographyP } from '@/components/ui/typography';
 import { urls } from '@/constants/urls';
