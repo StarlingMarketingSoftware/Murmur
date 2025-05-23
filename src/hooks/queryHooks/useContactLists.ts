@@ -1,7 +1,7 @@
 import { PatchContactListData } from '@/app/api/contact-list/[id]/route';
 import { PostContactListData } from '@/app/api/contact-list/route';
 import { _fetch } from '@/app/utils/api';
-import { CustomMutationOptions } from '@/constants/types';
+import { CustomMutationOptions } from '@/types';
 import { urls } from '@/constants/urls';
 import { ContactList } from '@prisma/client';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';

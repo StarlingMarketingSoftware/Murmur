@@ -1,5 +1,5 @@
 'use client';
-import { Logo } from '@/constants/types';
+import { Logo } from '@/types';
 import { useTheme } from 'next-themes';
 import Image from 'next/image';
 

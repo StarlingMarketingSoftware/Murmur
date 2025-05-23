@@ -1,50 +1,7 @@
 import { getTestEmailCount } from '@/app/utils/calculations';
-import { AiSelectValues, Font, SubscriptionTierData } from './types';
+import { SubscriptionTierData } from '@/types';
 
-export const baseUrl =
-	process.env.NEXT_PUBLIC_SITE_URL ??
-	(typeof window !== 'undefined' ? window.location.origin : '');
-
-export enum LocalStorageKeys {
-	GoogleAuthState = 'googleAuthState',
-	GoogleAccessToken = 'googleAccessToken',
-	GoogleScopes = 'googleScopes',
-	GoogleExpiresAt = 'googleExpiresAt',
-}
-
-export const DefaultFont = 'Times New Roman';
-
-export enum GoogleScopes {
-	ContactsReadOnly = 'https://www.googleapis.com/auth/contacts.readonly',
-	GmailSend = 'https://www.googleapis.com/auth/gmail.send',
-}
-
-export const requestedPeopleScopes = [GoogleScopes.ContactsReadOnly];
-
-export const requestedGmailScopes = ['https://www.googleapis.com/auth/gmail.send'];
-
-export const AiModelOptions: AiSelectValues[] = [
-	{
-		name: 'Murmur AI',
-		value: 'sonar',
-		type: 'perplexity',
-	},
-	// {
-	// 	name: 'Murmur AI Pro',
-	// 	value: 'sonar_pro',
-	// 	type: 'perplexity',
-	// },
-];
-
-export const FontOptions: Font[] = [
-	'Times New Roman',
-	'Arial',
-	'Calibri',
-	'Georgia',
-	'Courier New',
-];
-
-export const subscriptionTierDataList: Record<string, SubscriptionTierData> = {
+export const SUBSCRIPTION_TIER_DATA_LIST: Record<string, SubscriptionTierData> = {
 	[process.env.NEXT_PUBLIC_ESSENTIALS_PRICE_ID as string]: {
 		name: 'Essentials',
 		aiEmailCount: 500,
@@ -101,15 +58,4 @@ export const subscriptionTierDataList: Record<string, SubscriptionTierData> = {
 			return getTestEmailCount(this.aiEmailCount);
 		},
 	},
-};
-
-export const restrictedFeatureMessages = {
-	viewEmails: 'Upgrade your subscription to view recipient emails.',
-	freePlanSendingLimit:
-		'You have reached the sending limit on the free plan. Please sign up for a subscription to send more emails.',
-};
-
-export const OPEN_AI_MODEL_OPTIONS = {
-	o4mini: 'o4-mini-2025-04-16',
-	gpt4: 'gpt-4-0613',
 };

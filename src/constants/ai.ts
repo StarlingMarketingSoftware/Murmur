@@ -16,3 +16,8 @@ Please return your response in JSON with the following format:
   "message": "cleanedMessage"
 }
 `;
+
+export const OPEN_AI_MODEL_OPTIONS = {
+	o4mini: 'o4-mini-2025-04-16',
+	gpt4: 'gpt-4-0613',
+};

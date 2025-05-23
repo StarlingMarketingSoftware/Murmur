@@ -10,7 +10,7 @@ import {
 	apiUnauthorized,
 	handleApiError,
 } from '@/app/utils/api';
-import { ApiRouteParams } from '@/constants/types';
+import { ApiRouteParams } from '@/types';
 
 const updateContactListSchema = z.object({
 	name: z.string().min(1).optional(),

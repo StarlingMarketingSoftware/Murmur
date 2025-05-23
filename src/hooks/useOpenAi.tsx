@@ -1,4 +1,4 @@
-import { CustomMutationOptions } from '@/constants/types';
+import { CustomMutationOptions } from '@/types';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { urls } from '@/constants/urls';

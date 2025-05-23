@@ -1,4 +1,4 @@
-import { SubscriptionTierData } from '@/constants/types';
+import { SubscriptionTierData } from '@/types';
 import { getSubscriptionTierWithPriceId } from '@/lib/utils';
 import { useAuth } from '@clerk/nextjs';
 import { useGetUser } from './queryHooks/useUsers';
