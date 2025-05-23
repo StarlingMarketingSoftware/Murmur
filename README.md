@@ -16,6 +16,12 @@ AI-powered marketing automation platform that helps you create, manage, and opti
 - Run `npm run dev` and access the server on localhost:3000.
 - Make sure the Clerk webhook is running, and create a user in the application. If you have an existing user on Clerk and are installing on a new computer, copy the user data from the old computer's local database for consistency.
 - The local database can be managed using Prisma Studio `npx prisma studio` or with your preferred database manager, such as DBeaver or pgAdmin.
+- If working from China, your VPN must be configured as follows:
+  - Use Astrill's StealthVPN or similar VPN with protocol/port selection
+  - Configure to use TCP protocol instead of UDP for more reliable connection
+  - Try different ports (443, 8443, 80) if experiencing connection issues
+  - Connect to servers in nearby countries (Japan, South Korea, Singapore) for better latency
+  - Test API connectivity before starting development work
 
 ## Stripe Webhook Setup
 
