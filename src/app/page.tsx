@@ -1,5 +1,4 @@
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
-import { PromotionLogos } from '@/components/molecules/PromotionLogos/PromotionLogos';
 import { Button } from '@/components/ui/button';
 import { TypographyH1, TypographyP } from '@/components/ui/typography';
 import { urls } from '@/constants/urls';
@@ -98,8 +97,8 @@ export default async function HomePage() {
 									we’ll grow together to provide you more valuable features.
 								</TypographyP>
 							</div>
-							<TypographyH1 className="mt-12">Starling Has Worked With</TypographyH1>
-							<PromotionLogos />
+							{/* <TypographyH1 className="mt-12">Starling Has Worked With</TypographyH1>
+							<PromotionLogos /> */}
 						</AppLayout>
 						<div className="mt-14 flex justify-center">
 							{!isSignedIn ? (
