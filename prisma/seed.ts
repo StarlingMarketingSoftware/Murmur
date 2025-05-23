@@ -4,7 +4,6 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 
 export type ContactCSVFormat = {
-	//seeding
 	name: string;
 	company: string;
 	email: string;
