@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 			return apiBadRequest(validatedFilters.error);
 		}
 		const { query, limit } = validatedFilters.data;
-		const searchTerms = query
+		const searchTerms: string[] = query
 			.toLowerCase()
 			.split(/\s+/)
 			.filter((term) => term.length > 0);
@@ -104,7 +104,7 @@ export async function GET(req: NextRequest) {
 		});
 		if (localContacts.length < limit) {
 			const remainingCount = limit - localContacts.length;
-			const apolloContacts = await fetchApolloContacts(query, remainingCount);
+			const apolloContacts = await fetchApolloContacts(searchTerms, remainingCount);
 			const combinedResults = [...localContacts, ...apolloContacts];
 
 			return apiResponse(combinedResults);
@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
 	}
 }
 
-const fetchApolloContacts = async (query: string, limit: number = 20) => {
+const fetchApolloContacts = async (searchTerms: string[], limit: number = 20) => {
 	const apolloApiKey = process.env.APOLLO_API_KEY;
 	if (!apolloApiKey) {
 		console.error('Apollo API key not found');
@@ -134,8 +134,9 @@ const fetchApolloContacts = async (query: string, limit: number = 20) => {
 			body: JSON.stringify({
 				api_key: apolloApiKey,
 				// page_size: limit,
-				q_keywords: query,
-				// person_titles: ['marketing'],
+				// q_keywords: query,
+				include_similar_titles: true,
+				person_titles: searchTerms,
 				// contact_email_status: ['verified'],
 			}),
 		});
@@ -146,8 +147,8 @@ const fetchApolloContacts = async (query: string, limit: number = 20) => {
 		}
 
 		const data = await response.json();
-		// console.log('peoples data');
-		// console.log(data);
+		console.log('peoples data');
+		console.log(data);
 		// First get the basic search results
 		const searchResults = data.people || [];
 
