@@ -199,7 +199,7 @@ const importCSVWithSubcategories = async (
 				},
 			},
 			create: {
-				name: record.name,
+				lastName: record.name,
 				email: record.email,
 				company: record.company,
 				website: record.website,
@@ -209,7 +209,7 @@ const importCSVWithSubcategories = async (
 				contactListId: recordContactListId,
 			},
 			update: {
-				name: record.name,
+				lastName: record.name,
 				company: record.company,
 				website: record.website,
 				state: record.state,

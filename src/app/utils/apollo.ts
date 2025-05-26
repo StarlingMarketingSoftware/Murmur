@@ -50,15 +50,9 @@ export async function enrichApolloContacts(
 
 			const data = await response.json();
 			const matches = data.matches || [];
+			console.log('🚀 ~ matches:', matches);
 
-			console.log('matches', matches);
-
-			// Add successful matches to our results
-			matches.forEach((match: any) => {
-				if (match.matched_person) {
-					enrichedPeople.push(match.matched_person);
-				}
-			});
+			enrichedPeople.push(...matches);
 
 			// Rate limiting - Apollo recommends 600 requests per minute
 			if (i + BATCH_SIZE < people.length) {
@@ -73,14 +67,26 @@ export async function enrichApolloContacts(
 	}
 }
 
-export function transformApolloContact(person: ApolloPerson): Partial<Contact> {
+type ContactWithRequiredEmail = Partial<Contact> & {
+	email: string;
+};
+
+export function transformApolloContact(person: ApolloPerson): ContactWithRequiredEmail {
 	return {
-		name: person.name || '',
-		email: person.email || '',
-		company: person.organization?.name || '',
-		website: person.organization?.website_url || null,
-		state: person.state || '',
-		country: person.country || '',
-		phone: person.phone_numbers?.[0] || '',
+		apolloPersonId: person.id,
+		firstName: person.first_name || null,
+		lastName: person.last_name || null,
+		email: person.email,
+		emailStatus: person.email_status || 'unverified',
+		company: person.contact?.organization_name || null,
+		city: person.city || null,
+		state: person.state || null,
+		country: person.country || null,
+		address: person.contact?.present_raw_address || null,
+		phone: person.contact?.phone_numbers?.[0].sanitized_number || '',
+		title: person.title || null,
+		headline: person.headline || null,
+		linkedInUrl: person.linkedin_url || null,
+		photoUrl: person.photo_url || null,
 	};
 }
