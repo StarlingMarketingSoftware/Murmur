@@ -15,9 +15,13 @@ enum EmailStatus {
 }
 
 enum EmailVerificationStatus {
-  unverified
-  verified
-  unavailable
+  valid
+  invalid
+  catch_all
+  spamtrap
+  abuse
+  do_not_mail
+  unknown
 }
 
 enum AiModel {
@@ -60,12 +64,11 @@ model User {
 }
 
 model Contact {
-  id             Int                     @id @default(autoincrement())
-  apolloPersonId String?                 @unique
+  id             Int     @id @default(autoincrement())
+  apolloPersonId String? @unique
   firstName      String?
   lastName       String?
   email          String
-  emailStatus    EmailVerificationStatus @default(unverified)
   company        String?
   city           String?
   state          String?
@@ -77,6 +80,11 @@ model Contact {
   headline       String?
   linkedInUrl    String?
   photoUrl       String?
+
+  emailValidationStatus    EmailVerificationStatus @default(unknown)
+  emailValidationSubStatus String?
+  emailValidationScore     Int?
+  emailValidatedAt         DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
