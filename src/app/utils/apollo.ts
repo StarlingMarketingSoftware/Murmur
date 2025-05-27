@@ -6,7 +6,6 @@ export async function enrichApolloContacts(
 ): Promise<ApolloPerson[]> {
 	const apolloApiKey = process.env.APOLLO_API_KEY;
 	if (!apolloApiKey || people.length === 0) {
-		console.log('no data or api');
 		return [];
 	}
 
@@ -27,7 +26,6 @@ export async function enrichApolloContacts(
 			const requestBody = JSON.stringify({
 				details: personIds,
 			});
-			console.log('request body', requestBody);
 
 			const response = await fetch(
 				'https://api.apollo.io/api/v1/people/bulk_match?reveal_personal_emails=false&reveal_phone_number=false',
@@ -50,7 +48,6 @@ export async function enrichApolloContacts(
 
 			const data = await response.json();
 			const matches = data.matches || [];
-			console.log('🚀 ~ matches:', matches);
 
 			enrichedPeople.push(...matches);
 

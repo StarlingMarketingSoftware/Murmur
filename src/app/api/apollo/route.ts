@@ -14,6 +14,8 @@ import { enrichApolloContacts, transformApolloContact } from '@/app/utils/apollo
 import { OPEN_AI_MODEL_OPTIONS } from '@/constants';
 import { fetchOpenAi } from '../openai/route';
 import { stripUntilBrace } from '@/app/utils/string';
+import { ApolloPerson } from '@/types/apollo';
+import { Contact } from '@prisma/client';
 
 const getApolloContactsSchema = z.object({
 	query: z.string(),
@@ -21,22 +23,10 @@ const getApolloContactsSchema = z.object({
 });
 export type GetApolloContactsData = z.infer<typeof getApolloContactsSchema>;
 
-// type ApolloPeopleSearch = {
-// 	person_titles?: string[]; // the more you add, the more results you get
-// 	include_similar_titles?: boolean; // if true, Apollo will return results that are similar to the titles you provide
-// 	person_locations?: string[]; // cities, countries, and US states are supported
-// 	person_seniorities?: string[]; // ONLY the following values are supported: owner, founder, c_suite, partner, vp, head, director, manager, senior, entry, intern
-// 	organization_locations?: string[]; // The location of the company headquarters for a person's current employer. Cities, US states, and countries are supported
-// 	contact_email_status?: string[]; // verified, unverified, likely to engage, unavailable, Set this to ['verified', 'likely to engage']
-// 	organization_num_employees_ranges?: string[]; // The number of employees at a person's current employer. Each range consists of two numbers separated by a comma. Examples: 1,10; 250,500; 10000,20000
-// 	q_keywords?: string; // Keywords to search for in a person's profile. This only searches for exact matches, so use it sparingly
-// };
-
 const PROMPT = `You are an expert in Apollo.io's People Search API and are tasked with converting a search query in string format into a valid Apollo People Search object. Use the following guidelines:
 	1. The returned object should match this Typescript type definition:
 		type ApolloPeopleSearch = {
 			person_titles?: string[]; // the more you add, the more results you get
-			include_similar_titles?: boolean; // if true, Apollo will return results that are similar to the titles you provide
 			person_locations?: string[]; // cities, countries, and US states are supported
 			person_seniorities?: string[]; // ONLY the following values are supported: owner, founder, c_suite, partner, vp, head, director, manager, senior, entry, intern
 			organization_locations?: string[]; // The location of the company headquarters for a person's current employer. Cities, US states, and countries are supported
@@ -44,7 +34,7 @@ const PROMPT = `You are an expert in Apollo.io's People Search API and are taske
 			organization_num_employees_ranges?: string[]; // The number of employees at a person's current employer. Each range consists of two numbers separated by a comma. Examples: 1,10; 250,500; 10000,20000
 		}
 	2. Here is an example of a valid Apollo People Search object in JSON string format. This is in response to the search query "senior level machine learning software engineer in San Francisco, CA or New York City in a small company based in the United States":
-	{"person_titles": ["Software Engineer", "Data Scientist"],"include_similar_titles": true,"person_locations": ["San Francisco", "New York City"],"person_seniorities": ["senior"],"organization_locations": ["United States"],"contact_email_status": ["verified", "likely to engage"],"organization_num_employees_ranges": ["1,10", "250,500"],"q_keywords": ""}
+	{"person_titles": ["Software Engineer", "Data Scientist"],"person_locations": ["San Francisco", "New York City"],"person_seniorities": ["senior"],"organization_locations": ["United States"],"contact_email_status": ["verified", "likely to engage"],"organization_num_employees_ranges": ["1,10", "250,500"],"q_keywords": ""}
 	3. For "contact_email_status", always use this value: ["verified", "likely to engage"]
 	4. Ensure that your response is a valid JSON string that can be parsed by JSON.parse() in JavaScript.
 	`;
@@ -119,7 +109,7 @@ export async function GET(req: NextRequest) {
 				  }
 				: {};
 
-		const localContacts = await prisma.contact.findMany({
+		const localContacts: Contact[] = await prisma.contact.findMany({
 			where: whereConditions,
 			take: limit,
 			orderBy: {
@@ -129,13 +119,53 @@ export async function GET(req: NextRequest) {
 
 		if (localContacts.length < limit) {
 			const remainingCount = limit - localContacts.length;
-			const apolloContacts = await fetchApolloContacts(query, remainingCount);
-			console.log('🚀 ~ GET ~ apolloContacts:', apolloContacts);
-			// verify emails with zerobounce...this could be disasterously slow....
-			const combinedResults = [...localContacts, ...apolloContacts];
+			const apolloContacts: ApolloPerson[] = await fetchApolloContacts(
+				query,
+				remainingCount
+			);
 
-			// don't await to this to save time?
-			await prisma.contact.createMany({ data: apolloContacts });
+			// check for duplicates before enrichment, via apollo id
+			const existingContacts: Contact[] = await prisma.contact.findMany({
+				where: {
+					apolloPersonId: {
+						in: apolloContacts.map((person: ApolloPerson) => person.id),
+					},
+				},
+			});
+
+			// remove existing contacts from apolloContacts
+			const filteredApolloContacts = apolloContacts.filter(
+				(contact: ApolloPerson) =>
+					!existingContacts.some(
+						(existingContact) => existingContact.apolloPersonId === contact.id
+					)
+			);
+
+			// loop through existingContacts...
+			for (const existingContact of existingContacts) {
+				// oadd the existing contact to localContacts
+				const contactExistsInLocalSearch = localContacts.find(
+					(contact) => contact.apolloPersonId === existingContact.apolloPersonId
+				);
+				if (!contactExistsInLocalSearch) {
+					localContacts.push(existingContact);
+				}
+			}
+
+			// for remaining apolloContacts, enrich them, and transform them
+			const enrichedPeople = await enrichApolloContacts(filteredApolloContacts);
+			const transformedContacts = enrichedPeople.map(transformApolloContact);
+
+			// verify emails with zerobounce
+			// const verifiedContacts = await verifyEmailsWithZeroBounce(transformedContacts);
+
+			//  save to database
+			const createdContacts: Contact[] = await prisma.contact.createManyAndReturn({
+				data: transformedContacts,
+			});
+
+			//and MERGE with localContacts (wait until after saving, because you want the local id)
+			const combinedResults = [...localContacts, ...createdContacts];
 
 			return apiResponse(combinedResults);
 		}
@@ -145,7 +175,10 @@ export async function GET(req: NextRequest) {
 	}
 }
 
-const fetchApolloContacts = async (query: string, limit: number = 20) => {
+const fetchApolloContacts = async (
+	query: string,
+	limit: number = 20
+): Promise<ApolloPerson[]> => {
 	const apolloApiKey = process.env.APOLLO_API_KEY;
 	if (!apolloApiKey) {
 		console.error('Apollo API key not found');
@@ -159,7 +192,6 @@ const fetchApolloContacts = async (query: string, limit: number = 20) => {
 	);
 	console.log('🚀 ~ fetchApolloContacts ~ response:', openAiResponse);
 	const openAiResponseJson = JSON.parse(stripUntilBrace(openAiResponse));
-	// return apolloSearchObject
 
 	try {
 		const response = await fetch('https://api.apollo.io/v1/mixed_people/search', {
@@ -179,24 +211,7 @@ const fetchApolloContacts = async (query: string, limit: number = 20) => {
 		}
 
 		const data = await response.json();
-		const searchResults = data.people || [];
-
-		// check for duplicates before enrichment, via apollo id
-		const existingContacts = await prisma.contact.findMany({
-			where: {
-				apolloPersonId: {
-					in: searchResults.map((person: any) => person.id),
-				},
-			},
-			select: { apolloPersonId: true },
-		});
-
-		// if they exist in the database, but they were not found in the local search results, we need to add them to the search results
-
-		const enrichedPeople = await enrichApolloContacts(searchResults);
-
-		const transformedContacts = enrichedPeople.map(transformApolloContact);
-		return transformedContacts;
+		return data.people || [];
 	} catch (error) {
 		console.error('Error fetching Apollo contacts:', error);
 		return [];
