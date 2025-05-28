@@ -199,7 +199,6 @@ export async function GET(req: NextRequest) {
 					'⚠️ No ZeroBounce file ID received, proceeding without email validation'
 				);
 			}
-			return apiResponse(finalContacts);
 
 			// save to database with validation results
 			const createdContacts: Contact[] = await prisma.contact.createManyAndReturn({
@@ -396,29 +395,71 @@ const processZeroBounceResults = async (
 		console.log('🔄 Fetching ZeroBounce validation results...');
 		console.log('🚀 ~ fileId:', fileId);
 		console.log('🚀 ~ zeroBounceApiKey:', zeroBounceApiKey);
-		const results: string = await getZeroBounceFileResults(fileId, zeroBounceApiKey);
+		const csvResults: string = await getZeroBounceFileResults(fileId, zeroBounceApiKey);
 
-		// convert
-		if (!results || !Array.isArray(results)) {
+		// Check if we received CSV data
+		if (!csvResults || typeof csvResults !== 'string') {
 			console.warn('No validation results received, returning original contacts');
 			return contacts;
 		}
 
-		console.log(`📊 Processing ${results.length} validation results`);
+		console.log('📊 Parsing CSV validation results...');
+
+		// Parse CSV data - split into lines and process each row
+		const csvLines = csvResults.trim().split('\n');
+		console.log(`Found ${csvLines.length} result lines`);
+
+		// Parse CSV rows into structured data
+		const parsedResults: ZeroBounceResult[] = [];
+
+		csvLines.forEach((line, index) => {
+			if (line.trim()) {
+				try {
+					// Parse CSV line - handle quoted values
+					const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+					const cleanValues = values.map((val) => val.replace(/^"|"$/g, ''));
+
+					if (cleanValues.length >= 3) {
+						const result: ZeroBounceResult = {
+							email_address: cleanValues[0] || '',
+							status: cleanValues[1] || '',
+							sub_status: cleanValues[2] || undefined,
+							// Additional fields from ZeroBounce CSV format
+							account: cleanValues[3] || '',
+							domain: cleanValues[4] || '',
+							first_name: cleanValues[5] || '',
+							last_name: cleanValues[6] || '',
+							gender: cleanValues[7] || '',
+							free_email: cleanValues[8] === 'True',
+							mx_found: cleanValues[9] === 'true',
+							mx_record: cleanValues[10] || '',
+							smtp_provider: cleanValues[11] || '',
+							zbscore: cleanValues[12] || undefined,
+						};
+
+						parsedResults.push(result);
+					}
+				} catch (parseError) {
+					console.warn(`Failed to parse CSV line ${index + 1}:`, line, parseError);
+				}
+			}
+		});
+
+		console.log(`📊 Successfully parsed ${parsedResults.length} validation results`);
 
 		// Log a sample result to see what data ZeroBounce provides
-		if (results.length > 0) {
+		if (parsedResults.length > 0) {
 			console.log('Sample ZeroBounce result fields:', {
-				email_address: results[0].email_address,
-				status: results[0].status,
-				sub_status: results[0].sub_status,
-				zbscore: results[0].zbscore,
+				email_address: parsedResults[0].email_address,
+				status: parsedResults[0].status,
+				sub_status: parsedResults[0].sub_status,
+				zbscore: parsedResults[0].zbscore,
 			});
 		}
 
 		// Create a map of email to validation result for quick lookup
 		const validationMap = new Map<string, ZeroBounceResult>();
-		results.forEach((result: ZeroBounceResult) => {
+		parsedResults.forEach((result: ZeroBounceResult) => {
 			if (result.email_address) {
 				validationMap.set(result.email_address.toLowerCase(), result);
 			}
@@ -428,9 +469,15 @@ const processZeroBounceResults = async (
 		const updatedContacts = contacts.map((contact) => {
 			const validationResult = validationMap.get(contact.email?.toLowerCase());
 
+			// Safe type checking using the Prisma enum
 			const getValidEmailStatus = (status: string): EmailVerificationStatus => {
-				if (status in EmailVerificationStatus) {
-					return EmailVerificationStatus[status as keyof typeof EmailVerificationStatus];
+				const normalizedStatus = status
+					.toLowerCase()
+					.replace(/-/g, '_') as keyof typeof EmailVerificationStatus;
+
+				// Check if the status exists in the enum
+				if (normalizedStatus in EmailVerificationStatus) {
+					return EmailVerificationStatus[normalizedStatus];
 				}
 
 				return EmailVerificationStatus.unknown;
