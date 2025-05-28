@@ -1,5 +1,5 @@
 import { ApolloPerson } from '@/types/apollo';
-import { Contact } from '@prisma/client';
+import { Contact, EmailVerificationStatus } from '@prisma/client';
 
 export async function enrichApolloContacts(
 	people: ApolloPerson[]
@@ -74,7 +74,7 @@ export function transformApolloContact(person: ApolloPerson): ContactWithRequire
 		firstName: person.first_name || null,
 		lastName: person.last_name || null,
 		email: person.email,
-		emailStatus: person.email_status || 'unverified',
+		emailValidationStatus: EmailVerificationStatus.unknown,
 		company: person.contact?.organization_name || null,
 		city: person.city || null,
 		state: person.state || null,

@@ -187,7 +187,7 @@ export async function GET(req: NextRequest) {
 						zeroBounceFileId,
 						transformedContacts
 					);
-					console.log('🚀 ~ GET ~ finalContacts:', finalContacts);
+					// console.log('🚀 ~ GET ~ finalContacts:', finalContacts);
 					console.log('✅ Email validation completed and results processed');
 				} else {
 					console.warn(
@@ -199,7 +199,7 @@ export async function GET(req: NextRequest) {
 					'⚠️ No ZeroBounce file ID received, proceeding without email validation'
 				);
 			}
-			return apiResponse(transformedContacts);
+			return apiResponse(finalContacts);
 
 			// save to database with validation results
 			const createdContacts: Contact[] = await prisma.contact.createManyAndReturn({
@@ -327,7 +327,7 @@ const waitForZeroBounceCompletion = async (
 
 	const startTime = Date.now();
 	const timeoutMs = timeoutMinutes * 60 * 1000; // Convert minutes to milliseconds
-	const pollIntervalMs = 10000; // Poll every 10 seconds
+	const pollIntervalMs = 3000; // Poll every 10 seconds
 
 	console.log(`Starting ZeroBounce validation polling for file ID: ${fileId}`);
 	console.log(`Timeout set to ${timeoutMinutes} minutes`);
@@ -394,8 +394,11 @@ const processZeroBounceResults = async (
 
 	try {
 		console.log('🔄 Fetching ZeroBounce validation results...');
-		const results = await getZeroBounceFileResults(fileId, zeroBounceApiKey);
+		console.log('🚀 ~ fileId:', fileId);
+		console.log('🚀 ~ zeroBounceApiKey:', zeroBounceApiKey);
+		const results: string = await getZeroBounceFileResults(fileId, zeroBounceApiKey);
 
+		// convert
 		if (!results || !Array.isArray(results)) {
 			console.warn('No validation results received, returning original contacts');
 			return contacts;
@@ -425,12 +428,18 @@ const processZeroBounceResults = async (
 		const updatedContacts = contacts.map((contact) => {
 			const validationResult = validationMap.get(contact.email?.toLowerCase());
 
+			const getValidEmailStatus = (status: string): EmailVerificationStatus => {
+				if (status in EmailVerificationStatus) {
+					return EmailVerificationStatus[status as keyof typeof EmailVerificationStatus];
+				}
+
+				return EmailVerificationStatus.unknown;
+			};
+
 			if (validationResult) {
 				return {
 					...contact,
-					emailValidationStatus:
-						(validationResult.status as EmailVerificationStatus) ||
-						EmailVerificationStatus.unknown,
+					emailValidationStatus: getValidEmailStatus(validationResult.status),
 					emailValidationSubStatus: validationResult.sub_status || null,
 					emailValidationScore:
 						validationResult.zbscore !== undefined
@@ -460,7 +469,9 @@ const processZeroBounceResults = async (
 
 		return updatedContacts;
 	} catch (error) {
-		console.error('Error processing ZeroBounce results:', error);
+		if (error instanceof Error) {
+			console.error('Error processing ZeroBounce results:', error.message);
+		}
 		return contacts; // Return original contacts on error
 	}
 };

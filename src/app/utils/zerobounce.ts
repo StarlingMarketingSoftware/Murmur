@@ -195,7 +195,7 @@ export async function getZeroBounceFileResults(
 
 	try {
 		const response = await fetch(
-			`https://api.zerobounce.net/v2/getfile?api_key=${encodeURIComponent(
+			`https://bulkapi.zerobounce.net/v2/getfile?api_key=${encodeURIComponent(
 				apiKey
 			)}&file_id=${encodeURIComponent(fileId)}`,
 			{
@@ -208,8 +208,11 @@ export async function getZeroBounceFileResults(
 			throw new Error(`ZeroBounce API error: ${response.status} - ${errorText}`);
 		}
 
+		const res = await response.text();
+		console.log('🚀 ~ res:', res);
+
 		// Return the CSV content as text
-		return await response.text();
+		return res;
 	} catch (error) {
 		console.error('Error getting ZeroBounce file results:', error);
 		throw error;
