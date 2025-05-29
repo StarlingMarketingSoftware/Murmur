@@ -1,5 +1,5 @@
-import { subscriptionTierDataList } from '@/constants/constants';
-import { SubscriptionTierData } from '@/constants/types';
+import { SUBSCRIPTION_TIER_DATA_LIST } from '@/constants';
+import { SubscriptionTierData } from '@/types';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -13,10 +13,10 @@ export const getSubscriptionTierWithPriceId = (
 	if (!priceId) {
 		return null;
 	}
-	const tier = subscriptionTierDataList[priceId];
+	const tier = SUBSCRIPTION_TIER_DATA_LIST[priceId];
 
 	if (!tier) {
-		return subscriptionTierDataList.custom;
+		return SUBSCRIPTION_TIER_DATA_LIST.custom;
 	}
 	return tier;
 };

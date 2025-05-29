@@ -13,8 +13,6 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import PageHeading from '@/components/text/PageHeading';
 import {
 	Card,
 	CardContent,
@@ -22,17 +20,20 @@ import {
 	CardHeader,
 	CardTitle,
 } from '@/components/ui/card';
-import MutedSubtext from '@/components/text/MutedSubtext';
-import { toast } from 'sonner';
-
-export const contactFormSchema = z.object({
-	name: z.string().min(1, { message: 'Name is required.' }),
-	email: z.string().email({ message: 'Invalid email address.' }),
-	subject: z.string().min(1, { message: 'Subject is required.' }),
-	message: z.string().min(1, { message: 'Message is required.' }),
-});
+import PageHeading from '@/components/atoms/_text/PageHeading';
+import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
+import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
+import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
+import { TypographyP } from '@/components/ui/typography';
 
 const Contact = () => {
+	const contactFormSchema = z.object({
+		name: z.string().min(1, { message: 'Name is required.' }),
+		email: z.string().email({ message: 'Invalid email address.' }),
+		subject: z.string().min(1, { message: 'Subject is required.' }),
+		message: z.string().min(1, { message: 'Message is required.' }),
+	});
+
 	const form = useForm<z.infer<typeof contactFormSchema>>({
 		resolver: zodResolver(contactFormSchema),
 		defaultValues: {
@@ -43,40 +44,45 @@ const Contact = () => {
 		},
 	});
 
-	const onSubmit = async (values: z.infer<typeof contactFormSchema>) => {
-		const res = await fetch('/api/contact', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify(values),
-		});
-		if (res.status === 200) {
+	const { isPending, mutate } = useSendMailgunMessage({
+		onSuccess: () => {
 			form.reset();
-			toast.success('Message sent successfully!');
-		} else {
-			const { error } = await res.json();
-			toast.error(error);
-		}
+		},
+	});
+
+	const onSubmit = (values: z.infer<typeof contactFormSchema>) => {
+		const emailBody: string = `<p>Name: ${values.name}</p><p></p><p>Email: ${values.email}</p><p></p><p>Message: ${values.message}</p>`;
+
+		mutate({
+			recipientEmail: process.env.NEXT_PUBLIC_CONTACT_FORM_RECIPIENT!,
+			...values,
+			senderEmail: values.email,
+			senderName: `Murmur Inquiry from ${values.name}`,
+			message: emailBody,
+		});
 	};
 
 	return (
-		<div className="max-w-[900px] mx-auto">
+		<AppLayout>
 			<PageHeading>Contact Us</PageHeading>
-			<MutedSubtext>{`We're here to help with any questions you may have`}.</MutedSubtext>
-			<Card className="max-w-[750px] mx-auto">
+			<TypographyP>
+				You can reach us at any time, on any day, and we will get back to you immediately.
+				We run this business to the highest degree of excellence we possibly can, and we
+				seek to serve you to the best of our ability, according to the task at hand.
+			</TypographyP>{' '}
+			<Card>
 				<CardHeader className="">
 					<CardTitle>Send us a message</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<Form {...form}>
 						<form onSubmit={form.handleSubmit(onSubmit)} className="">
-							<div className="flex flex-row items-center w-full gap-4 m-0">
+							<div className="flex sm:flex-row flex-col items-center w-full gap-0 sm:gap-4 m-0">
 								<FormField
 									control={form.control}
 									name="name"
 									render={({ field }) => (
-										<FormItem className="w-1/2">
+										<FormItem className="w-full sm:w-1/2">
 											<FormLabel>Name</FormLabel>
 											<FormControl>
 												<Input {...field} />
@@ -89,7 +95,7 @@ const Contact = () => {
 									control={form.control}
 									name="email"
 									render={({ field }) => (
-										<FormItem className="w-1/2">
+										<FormItem className="w-full sm:w-1/2">
 											<FormLabel>Email</FormLabel>
 											<FormControl>
 												<Input {...field} />
@@ -120,13 +126,17 @@ const Contact = () => {
 									<FormItem>
 										<FormLabel>Message</FormLabel>
 										<FormControl>
-											<Textarea className="h-44" {...field} />
+											<RichTextEditor
+												hideMenuBar
+												value={field.value}
+												onChange={field.onChange}
+											/>
 										</FormControl>
 										<FormMessage />
 									</FormItem>
 								)}
 							/>
-							<Button size="lg" type="submit">
+							<Button size="lg" type="submit" isLoading={isPending}>
 								Submit
 							</Button>
 						</form>
@@ -134,12 +144,10 @@ const Contact = () => {
 				</CardContent>
 				<CardFooter></CardFooter>
 			</Card>
-
 			<div className="flex flex-row justify-center items-center">
 				<div></div>
 			</div>
-			<MutedSubtext>We typically respond within 24 hours.</MutedSubtext>
-		</div>
+		</AppLayout>
 	);
 };
 

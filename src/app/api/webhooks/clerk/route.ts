@@ -2,11 +2,21 @@ import { Webhook } from 'svix';
 import { headers } from 'next/headers';
 import { WebhookEvent } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
+import { stripe } from '@/stripe/client';
+import {
+	apiAccepted,
+	apiBadRequest,
+	apiNoContent,
+	apiResponse,
+	apiServerError,
+	handleApiError,
+} from '@/app/utils/api';
+
 export async function POST(req: Request) {
 	const SIGNING_SECRET = process.env.CLERK_SIGNING_SECRET;
 
 	if (!SIGNING_SECRET) {
-		throw new Error(
+		return apiServerError(
 			'Error: Please add SIGNING_SECRET from Clerk Dashboard to .env or .env'
 		);
 	}
@@ -22,9 +32,7 @@ export async function POST(req: Request) {
 
 	// If there are no headers, error out
 	if (!svix_id || !svix_timestamp || !svix_signature) {
-		return new Response('Error: Missing Svix headers', {
-			status: 400,
-		});
+		return apiBadRequest('Error: Missing Svix headers');
 	}
 
 	// Get body
@@ -39,11 +47,8 @@ export async function POST(req: Request) {
 			'svix-timestamp': svix_timestamp,
 			'svix-signature': svix_signature,
 		}) as WebhookEvent;
-	} catch (err) {
-		console.error('Error: Could not verify webhook:', err);
-		return new Response('Error: Verification error', {
-			status: 400,
-		});
+	} catch {
+		return apiServerError('Error: Svix verification error');
 	}
 
 	if (evt.type === 'user.created') {
@@ -55,32 +60,33 @@ export async function POST(req: Request) {
 			!last_name ||
 			!first_name
 		) {
-			return new Response('Error: Missing required fields', {
-				status: 400,
-			});
+			return apiBadRequest('Error: Missing required fields');
 		}
+		const email = evt.data.email_addresses[0].email_address;
+		const stripeCustomer = await stripe.customers.create({
+			email: email,
+			name: `${first_name} ${last_name}`,
+		});
 
 		try {
 			await prisma.user.create({
 				data: {
 					clerkId: id,
-					email: evt.data.email_addresses[0].email_address,
+					stripeCustomerId: stripeCustomer.id,
+					email: email,
 					firstName: first_name,
 					lastName: last_name,
 				},
 			});
-		} catch (err) {
-			console.error('Error: Could not verify webhook:', err);
-			return new Response('Error: User creation error', {
-				status: 500,
-			});
+		} catch (error) {
+			return handleApiError(error);
 		}
 	} else if (evt.type === 'user.updated') {
 		const { id, email_addresses, first_name, last_name } = evt.data;
 
 		try {
 			// Update user data in database
-			await prisma.user.update({
+			const updatedUser = await prisma.user.update({
 				where: {
 					clerkId: id,
 				},
@@ -91,36 +97,24 @@ export async function POST(req: Request) {
 				},
 			});
 
-			console.log(`User updated: ${id}`);
-			return new Response('User updated successfully', { status: 200 });
-		} catch (err) {
-			console.error('Error: Could not update user:', err);
-			return new Response('Error: User update error', {
-				status: 500,
-			});
+			return apiResponse(updatedUser);
+		} catch (error) {
+			return handleApiError(error);
 		}
 	} else if (evt.type === 'user.deleted') {
 		const { id } = evt.data;
 
 		try {
-			// Delete user from database
 			await prisma.user.delete({
 				where: {
 					clerkId: id,
 				},
 			});
 
-			console.log(`User deleted: ${id}`);
-			return new Response('User deleted successfully', { status: 200 });
+			return apiNoContent();
 		} catch (error) {
-			if (error instanceof Error) {
-				console.error('Error: Could not delete user:', error);
-				return new Response(error.message, {
-					status: 500,
-				});
-			}
+			return handleApiError(error);
 		}
 	}
-
-	return new Response('Webhook received', { status: 200 });
+	return apiAccepted('Webhook received');
 }

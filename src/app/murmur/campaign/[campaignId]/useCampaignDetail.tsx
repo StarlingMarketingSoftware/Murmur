@@ -1,6 +1,5 @@
-import { LocalStorageKeys, requestedPeopleScopes } from '@/constants/constants';
-import { CampaignWithRelations } from '@/constants/types';
-import { useQuery } from '@tanstack/react-query';
+import { LOCAL_STORAGE_KEYS, REQUESTED_PEOPLE_SCOPES } from '@/constants';
+import { useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -8,7 +7,7 @@ import { toast } from 'sonner';
 
 export const useCampaignDetail = () => {
 	const params = useParams();
-	const campaignId = params.campaignId;
+	const campaignId = params.campaignId as string;
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const tab = searchParams.get('tab') ?? 'murmur';
@@ -35,7 +34,7 @@ export const useCampaignDetail = () => {
 			return;
 		}
 		if (urlGoogleAccessToken && urlScope && urlExpiresIn) {
-			const localAuthState = localStorage.getItem(LocalStorageKeys.GoogleAuthState);
+			const localAuthState = localStorage.getItem(LOCAL_STORAGE_KEYS.GoogleAuthState);
 
 			if (localAuthState !== googleAuthState) {
 				toast.error('Google authentication failed - client state mismatch.');
@@ -43,7 +42,7 @@ export const useCampaignDetail = () => {
 			}
 
 			const grantedScopes = urlScope.split(' ');
-			const hasAllRequestedScopes = requestedPeopleScopes.every((scope) =>
+			const hasAllRequestedScopes = REQUESTED_PEOPLE_SCOPES.every((scope) =>
 				grantedScopes.includes(scope)
 			);
 
@@ -54,11 +53,14 @@ export const useCampaignDetail = () => {
 				return;
 			}
 
-			localStorage.setItem(LocalStorageKeys.GoogleAccessToken, urlGoogleAccessToken);
-			localStorage.setItem(LocalStorageKeys.GoogleScopes, JSON.stringify(grantedScopes));
+			localStorage.setItem(LOCAL_STORAGE_KEYS.GoogleAccessToken, urlGoogleAccessToken);
 			localStorage.setItem(
-				LocalStorageKeys.GoogleExpiresAt,
-				`${Date.now() + parseInt(urlExpiresIn) * 1000}`
+				LOCAL_STORAGE_KEYS.GoogleScopes,
+				JSON.stringify(grantedScopes)
+			);
+			localStorage.setItem(
+				LOCAL_STORAGE_KEYS.GoogleExpiresAt,
+				`${Date.now() + Number(urlExpiresIn) * 1000}`
 			);
 
 			toast.success('Google authentication successful!');
@@ -71,21 +73,7 @@ export const useCampaignDetail = () => {
 		router.push(`/murmur?${params.toString()}`);
 	};
 
-	const { data, isPending } = useQuery({
-		queryKey: ['campaign', campaignId],
-		queryFn: async (): Promise<CampaignWithRelations> => {
-			const response = await fetch(`/api/campaigns/${campaignId}`, {
-				method: 'GET',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-			});
-			if (!response.ok) {
-				throw new Error('Network response was not ok');
-			}
-			return response.json();
-		},
-	});
+	const { data, isPending } = useGetCampaign(campaignId);
 
 	return {
 		tab,

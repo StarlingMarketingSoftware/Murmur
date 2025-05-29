@@ -1,5 +1,5 @@
-import { calcAiCreditsFromPrice } from '@/app/utils/functions';
-import { SubscriptionTierData } from '@/constants/types';
+import { calcAiCreditsFromPrice } from '@/app/utils/calculations';
+import { SubscriptionTierData } from '@/types';
 import { stripe } from '@/stripe/client';
 
 export const calcAiCredits = async (
@@ -10,7 +10,6 @@ export const calcAiCredits = async (
 		return 0;
 	}
 	if (subscriptionTier.name === 'Custom') {
-		console.log('custom product');
 		const price = await stripe.prices.retrieve(priceId);
 		if (!price) {
 			return 0;
@@ -18,7 +17,6 @@ export const calcAiCredits = async (
 		const priceAmount = price.unit_amount ? price.unit_amount : 0;
 		return calcAiCreditsFromPrice(priceAmount);
 	} else {
-		console.log('non custom product');
 		return subscriptionTier.aiEmailCount;
 	}
 };

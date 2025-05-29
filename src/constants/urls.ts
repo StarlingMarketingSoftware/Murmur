@@ -1,38 +1,109 @@
+type DetailRoute = <T extends string | number>(id: T) => string;
+
 export const urls = {
 	home: {
-		path: '/',
-		label: 'Home',
-		category: 'mainMenu',
+		index: '/',
+	},
+	about: {
+		index: '/about',
 	},
 	murmur: {
-		path: '/murmur',
-		label: 'Murmur',
-		category: 'protected',
+		index: '/murmur',
 		dashboard: {
-			path: '/murmur/dashboard',
-			label: 'Murmur',
-			category: 'protected',
+			index: '/murmur/dashboard',
 		},
 		campaign: {
-			path: '/murmur/campaign',
+			index: '/murmur/campaign',
+			detail: ((id) => `/murmur/campaign/${id}`) as DetailRoute,
+		},
+	},
+	admin: {
+		index: '/admin',
+		contacts: {
+			index: '/admin/contacts',
+			detail: ((id) => `/admin/contacts/${id}`) as DetailRoute,
+		},
+		products: {
+			index: '/admin/products',
 		},
 	},
 	pricing: {
-		path: '/pricing',
-		label: 'Pricing',
-		category: 'mainMenu',
+		index: '/pricing',
+		detail: ((id) => `/pricing/${id}`) as DetailRoute,
 	},
 	contact: {
-		path: '/contact',
-		label: 'Contact',
-		category: 'mainMenu',
+		index: '/contact',
 	},
 	signIn: {
-		path: '/sign-in',
-		label: 'Sign In',
+		index: '/sign-in',
 	},
 	signUp: {
-		path: '/sign-up',
-		label: 'Sign Up',
+		index: '/sign-up',
+	},
+	api: {
+		auth: {
+			index: '/api/auth',
+			checkAdmin: {
+				index: '/api/auth/check-admin',
+			},
+		},
+		campaigns: {
+			index: '/api/campaigns',
+			detail: ((id) => `/api/campaigns/${id}`) as DetailRoute,
+		},
+		contactList: {
+			index: '/api/contact-list',
+			detail: ((id) => `/api/contact-list/${id}`) as DetailRoute,
+		},
+		contacts: {
+			index: '/api/contacts',
+			batch: {
+				index: '/api/contacts/batch',
+			},
+			detail: ((id) => `/api/contacts/${id}`) as DetailRoute,
+		},
+		emails: {
+			index: '/api/emails',
+			detail: ((id) => `/api/emails/${id}`) as DetailRoute,
+		},
+		mailgun: {
+			index: '/api/mailgun',
+		},
+		openai: {
+			index: '/api/openai',
+		},
+		perplexity: {
+			index: '/api/perplexity',
+		},
+		signatures: {
+			index: '/api/signatures',
+			detail: ((id) => `/api/signatures/${id}`) as DetailRoute,
+		},
+		stripe: {
+			checkout: {
+				index: '/api/stripe/checkout',
+			},
+			portal: {
+				index: '/api/stripe/portal',
+				customProduct: {
+					index: '/api/stripe/portal/custom-product',
+				},
+			},
+			prices: {
+				index: '/api/stripe/prices',
+				detail: ((id) => `/api/stripe/prices/${id}`) as DetailRoute,
+			},
+			products: {
+				index: '/api/stripe/products',
+				detail: ((id) => `/api/stripe/products/${id}`) as DetailRoute,
+			},
+			updateSubscription: {
+				index: '/api/stripe/update-subscription',
+			},
+		},
+		users: {
+			index: '/api/users',
+			detail: ((id) => `/api/users/${id}`) as DetailRoute,
+		},
 	},
 };

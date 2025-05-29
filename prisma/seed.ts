@@ -1,12 +1,18 @@
-import { ContactCSVFormat } from '@/constants/types';
 import prisma from '../src/lib/prisma';
-import { extraContacts } from './seedData/extraContacts';
-import { lawyerContacts } from './seedData/lawyerContacts';
-import { musicContacts } from './seedData/musicContacts';
 import { parse } from 'csv-parse/sync';
 import { promises as fs } from 'fs';
 import * as path from 'path';
-const contactList = [...lawyerContacts, ...musicContacts, ...extraContacts];
+
+export type ContactCSVFormat = {
+	name: string;
+	company: string;
+	email: string;
+	address: string;
+	country: string;
+	state: string;
+	website: string;
+	phone: string;
+};
 
 export async function getPublicFiles(directory: string = 'demoCsvs'): Promise<string[]> {
 	try {
@@ -65,70 +71,68 @@ export async function getPublicFiles(directory: string = 'demoCsvs'): Promise<st
 // 	}
 // };
 
-async function processCSVFiles() {
-	const csvPath = path.join(process.cwd(), 'public', 'demoCsvs');
-	const fileNames = await getPublicFiles();
+// async function processCSVFiles() {
+// 	const csvPath = path.join(process.cwd(), 'public', 'demoCsvs');
+// 	const fileNames = await getPublicFiles();
 
-	for (const fileName of fileNames) {
-		try {
-			// Read and parse CSV file
-			const filePath = path.join(csvPath, fileName);
-			const fileContent = await fs.readFile(filePath, 'utf-8');
-			const categoryName = fileName.substring(0, fileName.indexOf('.csv'));
-			console.log('🚀 ~ processCSVFiles ~ categoryName:', categoryName);
-			const records: ContactCSVFormat[] = parse(fileContent, {
-				columns: true,
-				skip_empty_lines: true,
-			});
+// 	for (const fileName of fileNames) {
+// 		try {
+// 			// Read and parse CSV file
+// 			const filePath = path.join(csvPath, fileName);
+// 			const fileContent = await fs.readFile(filePath, 'utf-8');
+// 			const categoryName = fileName.substring(0, fileName.indexOf('.csv'));
+// 			const records: ContactCSVFormat[] = parse(fileContent, {
+// 				columns: true,
+// 				skip_empty_lines: true,
+// 			});
 
-			// Create or update ContactList
-			const newContactList = await prisma.contactList.upsert({
-				where: { identifier: categoryName },
-				create: {
-					category: categoryName,
-					count: records.length,
-					identifier: categoryName,
-				},
-				update: {
-					category: categoryName,
-					count: records.length,
-				},
-			});
+// 			// Create or update ContactList
+// 			const newContactList = await prisma.contactList.upsert({
+// 				where: { name: categoryName.toLowerCase() },
+// 				create: {
+// 					name: categoryName,
+// 					count: records.length,
+// 				},
+// 				update: {
+// 					name: categoryName,
+// 					count: records.length,
+// 				},
+// 			});
 
-			// Process each record
-			for (const record of records) {
-				await prisma.contact.upsert({
-					where: {
-						email_contactListId: {
-							email: record['email'],
-							contactListId: newContactList.id,
-						},
-					},
-					create: {
-						name: record.name,
-						email: record.email,
-						company: record.company,
-						website: record.website,
-						state: record.state,
-						country: record.country,
-						phone: record.phone,
-						contactListId: newContactList.id,
-					},
-					update: {
-						name: record.name,
-						website: record.website,
-						state: record.state,
-						phone: record.phone,
-					},
-				});
-			}
+// 			// Process each record
+// 			for (const record of records) {
+// 				await prisma.contact.upsert({
+// 					where: {
+// 						email_contactListId: {
+// 							email: record['email'],
+// 							contactListId: newContactList.id,
+// 						},
+// 					},
+// 					create: {
+// 						name: record.name,
+// 						email: record.email,
+// 						company: record.company,
+// 						website: record.website,
+// 						state: record.state,
+// 						country: record.country,
+// 						phone: record.phone,
+// 						contactListId: newContactList.id,
+// 					},
+// 					update: {
+// 						name: record.name,
+// 						website: record.website,
+// 						state: record.state,
+// 						phone: record.phone,
+// 					},
+// 				});
+// 			}
 
-			console.log(`Processed ${records.length} contacts from ${fileName}`);
-		} catch (error) {
-			console.error(`Error processing ${fileName}:`, error);
-		}
-	}
-}
+// 			console.log(`Processed ${records.length} contacts from ${fileName}`);
+// 		} catch (error) {
+// 			console.error(`Error processing ${fileName}:`, error);
+// 		}
+// 	}
+// }
 
 const generateCategoryName = (categoryName: string, secondaryIdentifier: string) => {
 	return `${categoryName} ${secondaryIdentifier}`;
@@ -160,19 +164,16 @@ const importCSVWithSubcategories = async (
 		categoryToCount[finalCategoryName] += 1;
 	}
 
-	console.log('🚀 ~ categorySet:', categoryToCount);
-
 	for (const categoryName of Object.keys(categoryToCount)) {
 		await prisma.contactList.upsert({
-			where: { identifier: categoryName },
+			where: { name: categoryName.toLowerCase() },
 			create: {
-				category: categoryName,
-				count: categoryToCount[categoryName],
-				identifier: categoryName,
+				name: categoryName,
+				// count: categoryToCount[categoryName],
 			},
 			update: {
-				category: categoryName,
-				count: categoryToCount[categoryName],
+				name: categoryName,
+				// count: categoryToCount[categoryName],
 			},
 		});
 	}
@@ -182,7 +183,7 @@ const importCSVWithSubcategories = async (
 	for (const record of records) {
 		const recordCategoryName = generateCategoryName(categoryName, record.state);
 		const recordContactListId = allContactLists.find(
-			(contactList) => contactList.category === recordCategoryName
+			(contactList) => contactList.name === recordCategoryName
 		)?.id;
 
 		if (!recordContactListId) {
@@ -220,7 +221,7 @@ const importCSVWithSubcategories = async (
 };
 async function main() {
 	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoReduced.csv', 'Music Venues');
-	importCSVWithSubcategories('demoCsvs/testListWithRealEmails.csv', 'Test List');
+	importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
 
 	return;
 }
