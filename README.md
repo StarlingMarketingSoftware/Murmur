@@ -23,7 +23,18 @@ AI-powered marketing automation platform that helps you create, manage, and opti
   - Connect to servers in nearby countries (Japan, South Korea, Singapore) for better latency
   - Test API connectivity before starting development work
 
-## Stripe Webhook Setup
+## Vercel
+
+- Staging and other preview deployments are protected by Vercel authentication. The user must be logged into the Starling Vercel account to access these deployments.
+- It is possible to get around this authentication with a URL param for webhooks as follows: https://staging.murmurpro.com?x-vercel-protection-bypass=VERCEL_AUTOMATION_BYPASS_SECRET
+- This key can be found in /settings/deployment-protection VERCEL_AUTOMATION_BYPASS_SECRET. It is necessary to append this to the URL for any webhooks that need access to preview environments.
+- Staging database: https://console.neon.tech/app/projects/crimson-leaf-81578145/branches/br-red-bonus-a4v2bw9y/tables?database=neondb
+
+## Stripe
+
+- For each deployment, in order for users to be able to use "Manage Your Subscription" button, the Stripe billing portal must be set up via /settings/billing/portal https://dashboard.stripe.com/test/settings/billing/portal. Products you want to be displayed must be manually added.
+
+### Stripe Webhook Setup
 
 For Stripe subscription functionality, set up a webhook:
 
@@ -79,3 +90,17 @@ Murmur uses Semantic Versioning (SemVer) – (MAJOR.MINOR.PATCH). In this system
 ## License
 
 This project is licensed under the MIT License.
+
+## Code Style
+
+- When possible, write descriptions of functions in the following style:
+
+````/**
+ * Extracts email addresses from transformed contacts
+ */
+export function extractEmailsFromContacts(contacts: Partial<Contact>[]): string[] {
+	return contacts
+		.map((contact) => contact.email)
+		.filter((email): email is string => email !== null && email !== undefined);
+}```
+````

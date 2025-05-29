@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 				contactListId: Number(contactListId),
 			},
 			orderBy: {
-				name: 'desc',
+				email: 'desc',
 			},
 		});
 
