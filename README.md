@@ -82,7 +82,7 @@ This project is licensed under the MIT License.
 
 ## Code Style
 
-- When possible, write decsriptions of functions in the following style:
+- When possible, write descriptions of functions in the following style:
 
 ````/**
  * Extracts email addresses from transformed contacts

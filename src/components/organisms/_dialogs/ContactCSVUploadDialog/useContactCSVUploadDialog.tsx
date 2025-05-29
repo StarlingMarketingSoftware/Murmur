@@ -36,7 +36,7 @@ export const useContactCSVUploadDialog = () => {
 					const values = line.split(',').map((value) => value.trim());
 					const contact: Partial<Contact> = {
 						id: index,
-						name: values[headers.indexOf('name')] || '',
+						lastName: values[headers.indexOf('name')] || '',
 						email: values[headers.indexOf('email')] || '',
 						company: values[headers.indexOf('company')] || '',
 						country: values[headers.indexOf('country')] || '',

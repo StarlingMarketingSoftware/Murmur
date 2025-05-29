@@ -86,7 +86,11 @@ export async function POST(req: Request) {
 				});
 
 				return apiResponse(res);
-			} catch {
+			} catch (e) {
+				if (e instanceof Error) {
+					console.error('Error updating user subscription status:', e.message);
+				}
+
 				return apiServerError('Failed to update user subscription status');
 			}
 		} else {
