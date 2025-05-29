@@ -90,3 +90,17 @@ Murmur uses Semantic Versioning (SemVer) – (MAJOR.MINOR.PATCH). In this system
 ## License
 
 This project is licensed under the MIT License.
+
+## Code Style
+
+- When possible, write descriptions of functions in the following style:
+
+````/**
+ * Extracts email addresses from transformed contacts
+ */
+export function extractEmailsFromContacts(contacts: Partial<Contact>[]): string[] {
+	return contacts
+		.map((contact) => contact.email)
+		.filter((email): email is string => email !== null && email !== undefined);
+}```
+````

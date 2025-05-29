@@ -4,3 +4,8 @@ export const ellipsesText = (text: string, maxLength: number): string => {
 	}
 	return text;
 };
+
+export const stripUntilBrace = (text: string): string => {
+	const braceIndex = text.indexOf('{');
+	return braceIndex >= 0 ? text.substring(braceIndex) : text;
+};
