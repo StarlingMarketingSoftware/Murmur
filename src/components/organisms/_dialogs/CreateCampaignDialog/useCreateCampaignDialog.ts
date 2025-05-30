@@ -1,4 +1,4 @@
-import { useCreateCampaign } from '@/hooks/useCampaigns';
+import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';

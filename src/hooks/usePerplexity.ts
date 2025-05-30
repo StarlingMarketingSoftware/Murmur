@@ -3,11 +3,11 @@ import { useMutation } from '@tanstack/react-query';
 
 const rolePrompt = `Write a personalized email to {first_name} who works at {company}. If there is no recipient name provided, start the email with "Hello!"
 
-Here are some templates:
+Here is a template to follow:
 
 1. "Hi {first_name},
 
-I'm reaching out again regarding an interest in how I could help {company}. [insert knowledge about the company in a way that feels anecdotal and not like you're reiterating their own sales pitches]
+I'm reaching out regarding an interest in how I could help {company}. [insert knowledge about the company in a way that feels anecdotal and not like you're reiterating their own sales pitches]
 
 I'm a local business owner
 
@@ -23,7 +23,7 @@ Overview:
 3. Make it oriented toward helping them rather than just selling or securing work for us
 
 
-The third paragraph needs to prompt scheduling a phone call. Please talke politely about how we can work with them and ask if they have any time in the coming week.
+The third paragraph needs to prompt scheduling a phone call. Please talk politely about how we can work with them and ask if they have any time in the coming week.
 
 Please really make sure the third paragraph is less forceful. It seems like it's assuming a phone call. be more humble in paragraph 3.
 
@@ -32,7 +32,7 @@ in Paragraph 3, try to keep the first sentence shorter and focus more on if they
 
 Do not include a subject line or signature - just the body text.
 
-Notes:
+Rules:
 0. No passive sentences, only active sentences
 1.Don't include "hope you're doing well"
 2. keep it very succinct
@@ -68,47 +68,27 @@ const messageAndSubjectFormat = `Return the message and the subject line, withou
 
 const perplexityEndpoint = '/api/perplexity';
 
-export type AiResponse = {
+export type DraftEmailResponse = {
 	message: string;
 	subject: string;
 };
 
-const extractJsonFromPseudoHTML = (
-	pseudoHTML: string
-): { subject: string; message: string } => {
-	const subjectMatch = pseudoHTML.match(/<SUBJECT>(.*?)<\/SUBJECT>/);
-	const subject = subjectMatch ? subjectMatch[1] : '';
-
-	const messageMatch = pseudoHTML.match(/<MESSAGE>(.*?)<\/MESSAGE>/);
-	const message = messageMatch ? messageMatch[1] : '';
-	const cleanedMessage = cleanLineBreakCharacters(message);
-	return {
-		subject,
-		message: cleanedMessage,
-	};
-};
-
-const cleanLineBreakCharacters = (text: string): string => {
-	const lineBreakRegex = /(\r\n|\r|\n|\u2028|\u2029|\v|\f)/g;
-	return text.replace(lineBreakRegex, '');
-};
+interface DraftEmailParams {
+	model: AiModel;
+	generateSubject: boolean;
+	recipient: Contact;
+	prompt: string;
+	signal?: AbortSignal;
+}
 
 export const usePerplexityDraftEmail = () => {
-	interface DraftEmailParams {
-		model: AiModel;
-		generateSubject: boolean;
-		recipient: Contact;
-		prompt: string;
-		signal?: AbortSignal; // Add this line
-	}
-
 	const {
 		data: dataDraftEmail,
 		isPending: isPendingDraftEmail,
 		mutate: draftEmail,
 		mutateAsync: draftEmailAsync,
 	} = useMutation({
-		mutationFn: async (params: DraftEmailParams): Promise<AiResponse> => {
+		mutationFn: async (params: DraftEmailParams): Promise<string> => {
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -116,7 +96,7 @@ export const usePerplexityDraftEmail = () => {
 
 			try {
 				response = await fetch(perplexityEndpoint, {
-					signal: params.signal, // Use the passed signal instead of creating new one
+					signal: params.signal,
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json',
@@ -152,13 +132,8 @@ export const usePerplexityDraftEmail = () => {
 			const data = await response.json();
 
 			try {
-				const jsonString = data.choices[0].message.content;
-				const parsedDraft = extractJsonFromPseudoHTML(jsonString);
-				if (parsedDraft.message.length < 50) {
-					throw new Error('Generated email was too short. Please try again.');
-				}
-
-				return parsedDraft;
+				const jsonString: string = data.choices[0].message.content;
+				return jsonString;
 			} catch {
 				throw new Error('Failed to parse AI response. Please try again.');
 			}

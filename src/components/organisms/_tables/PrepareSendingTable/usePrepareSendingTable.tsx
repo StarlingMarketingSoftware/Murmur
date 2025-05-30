@@ -1,4 +1,4 @@
-import { CampaignWithRelations, EmailWithRelations } from '@/constants/types';
+import { CampaignWithRelations, EmailWithRelations } from '@/types';
 import { useState } from 'react';
 
 export interface PrepareSendingTableProps {

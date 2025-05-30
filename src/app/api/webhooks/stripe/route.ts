@@ -1,5 +1,4 @@
 import { headers } from 'next/headers';
-import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { stripe } from '../../../../stripe/client';
 import prisma from '@/lib/prisma';
@@ -7,6 +6,12 @@ import { fulfillCheckout } from '@/app/api/webhooks/stripe/fulfillCheckout';
 import { getSubscriptionTierWithPriceId } from '@/lib/utils';
 import { getTestEmailCount } from '@/app/utils/calculations';
 import { calcAiCredits } from './calcAiCredits';
+import {
+	apiBadRequest,
+	apiResponse,
+	apiServerError,
+	handleApiError,
+} from '@/app/utils/api';
 
 export async function POST(req: Request) {
 	const body = await req.text();
@@ -15,10 +20,7 @@ export async function POST(req: Request) {
 	let event: Stripe.Event;
 
 	if (!process.env.STRIPE_WEBHOOK_SECRET) {
-		return NextResponse.json(
-			{ error: 'Missing Stripe webhook secret.' },
-			{ status: 500 }
-		);
+		return apiServerError('Missing Stripe webhook secret.');
 	}
 
 	try {
@@ -28,10 +30,7 @@ export async function POST(req: Request) {
 			process.env.STRIPE_WEBHOOK_SECRET
 		);
 	} catch {
-		return NextResponse.json(
-			{ error: 'Invalid stripe webhook signature.' },
-			{ status: 400 }
-		);
+		return apiBadRequest('Invalid stripe webhook signature.');
 	}
 
 	try {
@@ -40,15 +39,16 @@ export async function POST(req: Request) {
 			const newSubscription = await stripe.subscriptions.retrieve(
 				session.subscription as string
 			);
-
 			const customer = await fulfillCheckout(newSubscription, session.id);
-			return NextResponse.json({ customer }, { status: 200 });
+
+			return apiResponse(customer);
 		} else if (event.type === 'customer.subscription.updated') {
-			const subscription: Stripe.Subscription = event.data.object;
-			const priceId = subscription.items.data[0].price.id;
-			const subscriptionTier = getSubscriptionTierWithPriceId(priceId);
-			const aiDraftCredits = await calcAiCredits(subscriptionTier, priceId);
 			try {
+				const subscription: Stripe.Subscription = event.data.object;
+				const priceId = subscription.items.data[0].price.id;
+				const subscriptionTier = getSubscriptionTierWithPriceId(priceId);
+				const aiDraftCredits = await calcAiCredits(subscriptionTier, priceId);
+
 				const res = await prisma.user.update({
 					where: {
 						stripeCustomerId: subscription.customer as string,
@@ -65,9 +65,9 @@ export async function POST(req: Request) {
 						},
 					},
 				});
-				return NextResponse.json({ res }, { status: 200 });
+				return apiResponse(res);
 			} catch {
-				return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
+				return apiServerError('Failed to update user');
 			}
 		} else if (event.type === 'customer.subscription.deleted') {
 			const subscription: Stripe.Subscription = event.data.object;
@@ -85,17 +85,18 @@ export async function POST(req: Request) {
 					},
 				});
 
-				return NextResponse.json({ res }, { status: 200 });
-			} catch {
-				return NextResponse.json(
-					{ error: 'Failed to update user subscription status' },
-					{ status: 500 }
-				);
+				return apiResponse(res);
+			} catch (e) {
+				if (e instanceof Error) {
+					console.error('Error updating user subscription status:', e.message);
+				}
+
+				return apiServerError('Failed to update user subscription status');
 			}
 		} else {
-			return NextResponse.json({ error: 'Unhandled event type' }, { status: 400 });
+			return apiBadRequest('Unhandled event type');
 		}
-	} catch {
-		return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+	} catch (error) {
+		return handleApiError(error);
 	}
 }

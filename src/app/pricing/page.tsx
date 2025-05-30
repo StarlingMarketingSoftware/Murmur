@@ -26,7 +26,7 @@ export default function Products() {
 	// const filteredProducts = products.filter((product) => product.metadata.main === '1');
 
 	// const sortedProducts = filteredProducts.sort(
-	// 	(a, b) => parseInt(a.metadata.order) - parseInt(b.metadata.order)
+	// 	(a, b) => Number(a.metadata.order) - Number(b.metadata.order)
 	// );
 
 	return (

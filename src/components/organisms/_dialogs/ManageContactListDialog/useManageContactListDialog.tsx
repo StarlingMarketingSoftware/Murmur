@@ -1,19 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Contact, ContactList } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
-import { toast } from 'sonner';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useParams } from 'next/navigation';
-import { z } from 'zod';
 import { useMe } from '@/hooks/useMe';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
-import { restrictedFeatureMessages } from '@/constants/constants';
-import { updateCampaignSchema } from '@/app/api/campaigns/[campaignId]/schema';
+import { RESTRICTED_FEATURE_MESSAGES } from '@/constants';
 import {
 	NoDataCell,
 	TableSortingButton,
 } from '@/components/molecules/CustomTable/CustomTable';
+import { useGetContacts } from '@/hooks/queryHooks/useContacts';
+import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 
 export interface ManageContactListDialogProps {
 	isOpen: boolean;
@@ -23,6 +21,39 @@ export interface ManageContactListDialogProps {
 
 export const useManageContactListDialog = (props: ManageContactListDialogProps) => {
 	const { subscriptionTier } = useMe();
+	const params = useParams();
+	const { selectedContactList, isOpen, setIsOpen } = props;
+	const [selectedRows, setSelectedRows] = useState<Contact[]>([]);
+
+	const campaignId = params.campaignId as string;
+
+	const { data, isPending } = useGetContacts({
+		filters: {
+			contactListId: selectedContactList?.id,
+		},
+	});
+
+	const { mutate: updateCampaign } = useEditCampaign({
+		successMessage: 'Recipients saved successfully!',
+		errorMessage: 'Failed to save recipients. Please try again.',
+		onSuccess: () => {
+			setIsOpen(false);
+		},
+	});
+
+	const saveSelectedRecipients = async () => {
+		if (selectedContactList && !!campaignId) {
+			updateCampaign({
+				id: campaignId,
+				data: {
+					contactOperation: {
+						action: 'connect',
+						contactIds: selectedRows.map((row) => row.id),
+					},
+				},
+			});
+		}
+	};
 
 	const columns: ColumnDef<Contact>[] = [
 		{
@@ -66,7 +97,7 @@ export const useManageContactListDialog = (props: ManageContactListDialogProps) 
 				return subscriptionTier?.viewEmailAddresses ? (
 					<div className="text-left">{row.getValue('email')}</div>
 				) : (
-					<FeatureLockedButton message={restrictedFeatureMessages.viewEmails} />
+					<FeatureLockedButton message={RESTRICTED_FEATURE_MESSAGES.viewEmails} />
 				);
 			},
 		},
@@ -81,80 +112,10 @@ export const useManageContactListDialog = (props: ManageContactListDialogProps) 
 			},
 		},
 	];
-	const { selectedContactList, isOpen, setIsOpen } = props;
-	const [selectedRows, setSelectedRows] = useState<Contact[]>([]);
-
-	const params = useParams();
-	const campaignId = params.campaignId as string;
-
-	const {
-		data,
-		isPending,
-		mutate: fetchContacts,
-	} = useMutation({
-		mutationFn: async (contactListIds: number[]) => {
-			const response = await fetch('/api/contacts/get-by-category', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({ contactListIds }),
-			});
-			if (!response.ok) {
-				throw new Error('Network response was not ok');
-			}
-			return response.json();
-		},
-	});
-
-	const queryClient = useQueryClient();
-
-	const { mutate: updateCampaign } = useMutation({
-		mutationFn: async (campaign: z.infer<typeof updateCampaignSchema>) => {
-			const response = await fetch(`/api/campaigns/${campaignId}`, {
-				method: 'PATCH',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(campaign),
-			});
-			if (!response.ok) {
-				throw new Error('Network response was not ok');
-			}
-			return response.json();
-		},
-		onSuccess: () => {
-			toast.success('Recipients saved successfully!');
-			setIsOpen(false);
-			queryClient.invalidateQueries({ queryKey: ['campaign', parseInt(campaignId)] });
-		},
-		onError: () => {
-			toast.error('Failed to save recipients. Please try again.');
-		},
-	});
-
-	useEffect(() => {
-		if (selectedContactList) {
-			fetchContacts([selectedContactList.id]);
-		}
-	}, [selectedContactList, fetchContacts]);
-
-	const saveSelectedRecipients = async () => {
-		console.log('were updating campaign');
-		if (selectedContactList && !!campaignId) {
-			updateCampaign({
-				contactOperation: {
-					action: 'connect',
-					contactIds: selectedRows.map((row) => row.id),
-				},
-			});
-		}
-	};
 
 	return {
 		data,
 		isPending,
-		fetchContacts,
 		isOpen,
 		setIsOpen,
 		columns,

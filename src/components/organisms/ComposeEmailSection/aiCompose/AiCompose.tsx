@@ -20,7 +20,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
-import { FontOptions } from '@/constants/constants';
+import { FONT_OPTIONS } from '@/constants';
 import PreviewTestDraftDialog from '../../_dialogs/PreviewTestDraftDialog/PreviewTestDraftDialog';
 import { FC } from 'react';
 import useAiCompose, { AiComposeProps } from './useAiCompose';
@@ -38,7 +38,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 		setIsAiSubject,
 		handleFormAction,
 		isTest,
-		isPendingDraftEmail,
+		isPendingGeneration,
 		dataDraftEmail,
 		trigger,
 		handleSavePrompt,
@@ -49,10 +49,10 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 		setIsConfirmDialogOpen,
 		selectedSignature,
 		isDirty,
-		campaign,
 		generationProgress,
 		setGenerationProgress,
 		cancelGeneration,
+		campaign,
 	} = useAiCompose(props);
 
 	return (
@@ -152,7 +152,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 											<SelectContent>
 												<SelectGroup>
 													<SelectLabel>Font</SelectLabel>
-													{FontOptions.map((font) => (
+													{FONT_OPTIONS.map((font) => (
 														<SelectItem key={font} value={font}>
 															<span style={{ fontFamily: font }}>{font}</span>
 														</SelectItem>
@@ -198,10 +198,10 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 									className="w-full sm:w-fit"
 									onClick={() => handleFormAction('test')}
 									variant="outline"
-									isLoading={isTest && isPendingDraftEmail}
+									isLoading={isTest && isPendingGeneration}
 									disabled={
 										campaign?.contacts.length === 0 ||
-										isPendingDraftEmail ||
+										isPendingGeneration ||
 										aiTestCredits === 0
 									}
 								>
@@ -228,10 +228,10 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 									}
 									setIsConfirmDialogOpen(true);
 								}}
-								isLoading={isPendingDraftEmail && !isTest}
+								isLoading={isPendingGeneration && !isTest}
 								disabled={
 									campaign?.contacts.length === 0 ||
-									isPendingDraftEmail ||
+									isPendingGeneration ||
 									aiDraftCredits === 0
 								}
 							>

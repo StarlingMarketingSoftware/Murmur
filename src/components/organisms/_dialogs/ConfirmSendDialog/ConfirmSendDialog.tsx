@@ -20,7 +20,7 @@ import { FC } from 'react';
 import { ConfirmSendDialogProps, useConfirmSendDialog } from './useConfirmSendDialog';
 import { Input } from '@/components/ui/input';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
-import { restrictedFeatureMessages } from '@/constants/constants';
+import { RESTRICTED_FEATURE_MESSAGES } from '@/constants';
 import { CheckIcon, SendIcon } from 'lucide-react';
 
 export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
@@ -81,7 +81,7 @@ export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
 								</Button>
 								{hasReachedSendingLimit && (
 									<FeatureLockedButton
-										message={restrictedFeatureMessages.freePlanSendingLimit}
+										message={RESTRICTED_FEATURE_MESSAGES.freePlanSendingLimit}
 									/>
 								)}
 							</div>

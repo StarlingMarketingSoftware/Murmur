@@ -1,17 +1,20 @@
 import { convertAiResponseToRichTextEmail } from '@/app/utils/htmlFormatting';
-import { CampaignWithRelations, Draft } from '@/constants/types';
-import { useEditCampaign } from '@/hooks/useCampaigns';
-import { useCreateEmail } from '@/hooks/useEmails';
+import { CampaignWithRelations, TestDraftEmail } from '@/types';
+import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
+import { useCreateEmail } from '@/hooks/queryHooks/useEmails';
 import { useMe } from '@/hooks/useMe';
-import { AiResponse, usePerplexityDraftEmail } from '@/hooks/usePerplexity';
-import { useEditUser } from '@/hooks/useUsers';
+import { DraftEmailResponse, usePerplexityDraftEmail } from '@/hooks/usePerplexity';
+import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AiModel, EmailStatus } from '@prisma/client';
+import { AiModel, Contact, EmailStatus } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { useOpenAi } from '@/hooks/useOpenAi';
+import { OPEN_AI_MODEL_OPTIONS } from '@/constants';
+import { CLEAN_EMAIL_PROMPT } from '@/constants/ai';
 
 const getEmailDraftSchema = (isAiSubject: boolean) => {
 	return z.object({
@@ -32,7 +35,6 @@ export interface AiComposeProps {
 
 const useAiCompose = (props: AiComposeProps) => {
 	const { campaign } = props;
-	console.log('🚀 ~ useAiCompose ~ campaign:', campaign);
 	const { user } = useMe();
 
 	const [generationProgress, setGenerationProgress] = useState(-1);
@@ -54,11 +56,51 @@ const useAiCompose = (props: AiComposeProps) => {
 	const {
 		dataDraftEmail: rawDataDraftEmail,
 		isPendingDraftEmail,
-		draftEmail,
 		draftEmailAsync,
 	} = usePerplexityDraftEmail();
+	const { mutateAsync: cleanDraftEmail, isPending: isPendingCleanDraftEmail } = useOpenAi(
+		{
+			suppressToasts: true,
+		}
+	);
 
-	let dataDraftEmail: Draft = {
+	const { mutate: editUser } = useEditUser({ suppressToasts: true });
+
+	const { isPending: isPendingSavePrompt, mutateAsync: savePrompt } = useEditCampaign({
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id as number] });
+		},
+	});
+	const { mutateAsync: saveCampaignNoToast } = useEditCampaign({
+		suppressToasts: true,
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id as number] });
+		},
+	});
+
+	const { mutateAsync: saveTestEmail } = useEditCampaign({
+		suppressToasts: true,
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id as number] });
+		},
+	});
+
+	const { isPending: isPendingCreateEmail, mutateAsync: createEmail } = useCreateEmail({
+		suppressToasts: true,
+		onSuccess: () => {
+			if (user && aiDraftCredits) {
+				editUser({
+					clerkId: user.clerkId,
+					data: { aiDraftCredits: aiDraftCredits - 1 },
+				});
+			}
+		},
+	});
+
+	const isPendingGeneration =
+		isPendingDraftEmail || isPendingCleanDraftEmail || isPendingCreateEmail;
+
+	let dataDraftEmail: TestDraftEmail = {
 		subject: '',
 		message: '',
 		contactEmail: campaign.contacts[0]?.email || '',
@@ -86,6 +128,34 @@ const useAiCompose = (props: AiComposeProps) => {
 		mode: 'onChange',
 	});
 
+	const draftEmailChain = async (
+		aiModel: AiModel,
+		recipient: Contact,
+		message: string,
+		signal?: AbortSignal
+	) => {
+		const newDraft = await draftEmailAsync({
+			generateSubject: isAiSubject,
+			model: aiModel,
+			recipient,
+			prompt: message,
+			signal: signal,
+		});
+
+		const cleanedDraftEmail = await cleanDraftEmail({
+			model: OPEN_AI_MODEL_OPTIONS.o4mini,
+			prompt: CLEAN_EMAIL_PROMPT,
+			content: newDraft,
+			signal: signal,
+		});
+
+		const parsedDraft = JSON.parse(cleanedDraftEmail);
+		if (parsedDraft.message.length < 50) {
+			throw new Error('Generated email was too short. Please try again.');
+		}
+		return parsedDraft;
+	};
+
 	useEffect(() => {
 		if (campaign) {
 			form.reset({
@@ -100,7 +170,7 @@ const useAiCompose = (props: AiComposeProps) => {
 	const {
 		trigger,
 		getValues,
-		formState: { errors, isValid, isDirty },
+		formState: { isDirty },
 	} = form;
 
 	useEffect(() => {
@@ -114,40 +184,6 @@ const useAiCompose = (props: AiComposeProps) => {
 	}, [isAiSubject, trigger, setIsFirstLoad, isFirstLoad]);
 
 	const queryClient = useQueryClient();
-
-	const { mutate: editUser } = useEditUser({ suppressToasts: true });
-
-	const { isPending: isPendingSavePrompt, mutateAsync: savePrompt } = useEditCampaign({
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id as number] });
-		},
-	});
-	const { mutateAsync: saveCampaignNoToast } = useEditCampaign({
-		suppressToasts: true,
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id as number] });
-		},
-	});
-
-	const { mutateAsync: saveTestEmail } = useEditCampaign({
-		suppressToasts: true,
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id as number] });
-		},
-	});
-
-	const { isPending: isPendingCreateEmail, mutateAsync: createEmail } = useCreateEmail({
-		suppressToasts: true,
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['drafts'] });
-			if (user && aiDraftCredits) {
-				editUser({
-					clerkId: user.clerkId,
-					data: { aiDraftCredits: aiDraftCredits - 1 },
-				});
-			}
-		},
-	});
 
 	const cancelGeneration = () => {
 		isGenerationCancelledRef.current = true;
@@ -179,25 +215,24 @@ const useAiCompose = (props: AiComposeProps) => {
 						toast.error('Failed to generate test email.');
 						break;
 					}
-					const res: AiResponse = await draftEmailAsync({
-						generateSubject: isAiSubject,
-						model: values.aiModel,
-						recipient: campaign.contacts[0],
-						prompt: values.message,
-					});
-					if (res.message && res.subject) {
-						console.log('🚀 ~ handleFormAction ~ res.message:', res.message);
+					const parsedRes: DraftEmailResponse = await draftEmailChain(
+						values.aiModel,
+						campaign.contacts[0],
+						values.message
+					);
+
+					if (parsedRes.message && parsedRes.subject) {
 						await saveTestEmail({
-							campaignId: campaign.id,
+							id: campaign.id,
 							data: {
 								subject: values.subject,
 								message: values.message,
 								testMessage: convertAiResponseToRichTextEmail(
-									res.message,
+									parsedRes.message,
 									values.font,
 									campaign.signature
 								),
-								testSubject: isAiSubject ? res.subject : values.subject,
+								testSubject: isAiSubject ? parsedRes.subject : values.subject,
 								font: values.font,
 							},
 						});
@@ -242,22 +277,21 @@ const useAiCompose = (props: AiComposeProps) => {
 				}
 
 				try {
-					const newDraft = await draftEmailAsync({
-						generateSubject: isAiSubject,
-						model: values.aiModel,
+					const parsedDraft = await draftEmailChain(
+						values.aiModel,
 						recipient,
-						prompt: values.message,
-						signal: controller.signal,
-					});
+						values.message,
+						controller.signal
+					);
 
-					if (newDraft) {
+					if (parsedDraft) {
 						if (!isAiSubject) {
-							newDraft.subject = values.subject ? values.subject : newDraft.subject;
+							parsedDraft.subject = values.subject ? values.subject : parsedDraft.subject;
 						}
 						await createEmail({
-							subject: newDraft.subject,
+							subject: parsedDraft.subject,
 							message: convertAiResponseToRichTextEmail(
-								newDraft.message,
+								parsedDraft.message,
 								values.font,
 								campaign.signature
 							),
@@ -272,6 +306,9 @@ const useAiCompose = (props: AiComposeProps) => {
 				} catch (error) {
 					if (error instanceof Error && error.message === 'Request cancelled.') {
 						break;
+					}
+					if (error instanceof Error) {
+						console.error('Error generating email:', error.message);
 					}
 					continue;
 				}
@@ -296,10 +333,10 @@ const useAiCompose = (props: AiComposeProps) => {
 		if (suppressToasts) {
 			await saveCampaignNoToast({
 				data: { ...form.getValues() },
-				campaignId: campaign.id,
+				id: campaign.id,
 			});
 		} else {
-			await savePrompt({ data: { ...form.getValues() }, campaignId: campaign.id });
+			await savePrompt({ data: { ...form.getValues() }, id: campaign.id });
 		}
 		queryClient.invalidateQueries({
 			queryKey: ['campaign', campaign.id as number],
@@ -307,23 +344,16 @@ const useAiCompose = (props: AiComposeProps) => {
 	};
 
 	return {
+		form,
 		isAiSubject,
 		setIsAiSubject,
-		isTest,
 		handleFormAction,
-		form,
+		isTest,
+		isPendingGeneration,
 		dataDraftEmail,
-		isPendingDraftEmail,
-		draftEmail,
-		draftEmailAsync,
 		trigger,
-		errors,
-		isValid,
-		savePrompt,
-		isPendingSavePrompt,
 		handleSavePrompt,
-		createEmail,
-		isPendingCreateEmail,
+		isPendingSavePrompt,
 		aiDraftCredits,
 		aiTestCredits,
 		isConfirmDialogOpen,
@@ -333,7 +363,7 @@ const useAiCompose = (props: AiComposeProps) => {
 		generationProgress,
 		setGenerationProgress,
 		cancelGeneration,
-		...props,
+		campaign,
 	};
 };
 

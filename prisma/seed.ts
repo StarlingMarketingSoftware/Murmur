@@ -1,8 +1,18 @@
-import { ContactCSVFormat } from '@/constants/types';
 import prisma from '../src/lib/prisma';
 import { parse } from 'csv-parse/sync';
 import { promises as fs } from 'fs';
 import * as path from 'path';
+
+export type ContactCSVFormat = {
+	name: string;
+	company: string;
+	email: string;
+	address: string;
+	country: string;
+	state: string;
+	website: string;
+	phone: string;
+};
 
 export async function getPublicFiles(directory: string = 'demoCsvs'): Promise<string[]> {
 	try {
@@ -71,7 +81,6 @@ export async function getPublicFiles(directory: string = 'demoCsvs'): Promise<st
 // 			const filePath = path.join(csvPath, fileName);
 // 			const fileContent = await fs.readFile(filePath, 'utf-8');
 // 			const categoryName = fileName.substring(0, fileName.indexOf('.csv'));
-// 			console.log('🚀 ~ processCSVFiles ~ categoryName:', categoryName);
 // 			const records: ContactCSVFormat[] = parse(fileContent, {
 // 				columns: true,
 // 				skip_empty_lines: true,
@@ -190,7 +199,7 @@ const importCSVWithSubcategories = async (
 				},
 			},
 			create: {
-				name: record.name,
+				lastName: record.name,
 				email: record.email,
 				company: record.company,
 				website: record.website,
@@ -200,7 +209,7 @@ const importCSVWithSubcategories = async (
 				contactListId: recordContactListId,
 			},
 			update: {
-				name: record.name,
+				lastName: record.name,
 				company: record.company,
 				website: record.website,
 				state: record.state,
@@ -211,8 +220,8 @@ const importCSVWithSubcategories = async (
 	}
 };
 async function main() {
-	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoReduced.csv', 'Music Venues');
-	importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
+	importCSVWithSubcategories('musicVenuesDemoFullTRANSFER.csv', 'Music Venues');
+	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
 
 	return;
 }

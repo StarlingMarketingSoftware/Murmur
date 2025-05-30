@@ -1,84 +1,81 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
+import {
+	apiBadRequest,
+	apiNoContent,
+	apiNotFound,
+	apiResponse,
+	apiUnauthorized,
+	handleApiError,
+} from '@/app/utils/api';
+import { ApiRouteParams } from '@/types';
 
-// Input validation schema for updating a contact
 const updateContactSchema = z.object({
 	name: z.string().optional(),
-	email: z.string().email('Invalid email address').optional(),
+	email: z.string().email().optional(),
 	company: z.string().optional(),
 	website: z.string().optional(),
 	state: z.string().optional(),
 	country: z.string().optional(),
 	phone: z.string().optional(),
 });
+export type PatchContactData = z.infer<typeof updateContactSchema>;
 
-type Params = Promise<{ id: string }>;
-
-export async function PATCH(req: NextRequest, { params }: { params: Params }) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
-	const { id } = await params;
-
+export async function PATCH(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
-		const body = await req.json();
-		const validatedData = updateContactSchema.parse(body);
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
 
-		// Update the contact with validated data
+		const { id } = await params;
+		const body = await req.json();
+		const validatedData = updateContactSchema.safeParse(body);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
+
 		const updatedContact = await prisma.contact.update({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
-			data: validatedData,
+			data: validatedData.data,
 		});
 
-		return NextResponse.json(updatedContact);
+		return apiResponse(updatedContact);
 	} catch (error) {
-		if (error instanceof z.ZodError) {
-			return NextResponse.json(
-				{ error: `Validation error: ${error.message}` },
-				{ status: 400 }
-			);
-		}
-		console.error('CONTACT_UPDATE_ERROR:', error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Params }) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
-	const { id } = await params;
-
+export async function DELETE(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
-		// Validate that the contact exists
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const { id } = await params;
 		const existingContact = await prisma.contact.findUnique({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
 		});
 
 		if (!existingContact) {
-			return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+			return apiNotFound();
 		}
 
-		// Delete the contact
 		await prisma.contact.delete({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
 		});
 
-		return NextResponse.json({ success: true, message: 'Contact deleted successfully' });
+		return apiNoContent();
 	} catch (error) {
-		console.error('CONTACT_DELETE_ERROR:', error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }

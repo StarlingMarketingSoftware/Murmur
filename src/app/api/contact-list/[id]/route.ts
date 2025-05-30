@@ -1,77 +1,74 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
+import {
+	apiBadRequest,
+	apiNoContent,
+	apiNotFound,
+	apiResponse,
+	apiUnauthorized,
+	handleApiError,
+} from '@/app/utils/api';
+import { ApiRouteParams } from '@/types';
 
-// Input validation schema for updating a contact list
 const updateContactListSchema = z.object({
-	name: z.string().min(1, 'Name is required').optional(),
+	name: z.string().min(1).optional(),
 	count: z.number().optional(),
 });
+export type PatchContactListData = z.infer<typeof updateContactListSchema>;
 
-type Params = Promise<{ id: string }>;
-
-export async function PATCH(req: NextRequest, { params }: { params: Params }) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
-	const { id } = await params;
-
+export async function PATCH(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const { id } = await params;
 		const body = await req.json();
-		const validatedData = updateContactListSchema.parse(body);
+		const validatedData = updateContactListSchema.safeParse(body);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
 
 		const existingList = await prisma.contactList.findFirst({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
 		});
 
 		if (!existingList) {
-			return NextResponse.json({ error: 'Contact list not found.' }, { status: 404 });
+			return apiNotFound();
 		}
 
-		// Update the contact list with validated data
 		const updatedContactList = await prisma.contactList.update({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
-			data: {
-				...(validatedData.name !== undefined && { name: validatedData.name }),
-				...(validatedData.count !== undefined && { count: validatedData.count }),
-			},
+			data: validatedData.data,
 			include: {
 				contacts: true,
 			},
 		});
 
-		return NextResponse.json(updatedContactList);
+		return apiResponse(updatedContactList);
 	} catch (error) {
-		if (error instanceof z.ZodError) {
-			return NextResponse.json(
-				{ error: `Validation error: ${error.message}` },
-				{ status: 400 }
-			);
-		}
-		console.error('CONTACT_LIST_UPDATE_ERROR:', error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }
 
-export async function GET(req: NextRequest, { params }: { params: Params }) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
-	const { id } = await params;
-
+export async function GET(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const { id } = await params;
 		const contactList = await prisma.contactList.findFirst({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
 			include: {
 				contacts: true,
@@ -79,49 +76,41 @@ export async function GET(req: NextRequest, { params }: { params: Params }) {
 		});
 
 		if (!contactList) {
-			return NextResponse.json({ error: 'Contact list not found.' }, { status: 404 });
+			return apiNotFound();
 		}
 
-		return NextResponse.json(contactList);
+		return apiResponse(contactList);
 	} catch (error) {
-		console.error('GET_CONTACT_LIST_ERROR:', error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Params }) {
-	const { userId } = await auth();
-	if (!userId) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
-	const { id } = await params;
-
+export async function DELETE(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
-		// Validate that the contact list exists and belongs to the user
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const { id } = await params;
 		const existingList = await prisma.contactList.findFirst({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
 		});
 
 		if (!existingList) {
-			return NextResponse.json({ error: 'Contact list not found.' }, { status: 404 });
+			return apiNotFound();
 		}
 
-		// Delete the contact list
 		await prisma.contactList.delete({
 			where: {
-				id: parseInt(id),
+				id: Number(id),
 			},
 		});
 
-		return NextResponse.json({
-			success: true,
-			message: 'Contact list deleted successfully.',
-		});
+		return apiNoContent();
 	} catch (error) {
-		console.error('CONTACT_LIST_DELETE_ERROR:', error);
-		return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+		return handleApiError(error);
 	}
 }

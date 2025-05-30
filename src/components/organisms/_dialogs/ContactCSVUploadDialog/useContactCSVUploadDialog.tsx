@@ -6,12 +6,13 @@ import {
 	NoDataCell,
 	TableSortingButton,
 } from '@/components/molecules/CustomTable/CustomTable';
-import { useBatchCreateContacts } from '@/hooks/useContacts';
+import { useBatchCreateContacts } from '@/hooks/queryHooks/useContacts';
 import { useParams } from 'next/navigation';
+import { toast } from 'sonner';
 
 export const useContactCSVUploadDialog = () => {
 	const params = useParams<{ id: string }>();
-	const contactListId = parseInt(params.id);
+	const contactListId = Number(params.id);
 	const [open, setOpen] = useState(false);
 	const [csvData, setCsvData] = useState<Contact[]>([]);
 	const fileInputRef = useRef<HTMLInputElement>(null);
@@ -35,7 +36,7 @@ export const useContactCSVUploadDialog = () => {
 					const values = line.split(',').map((value) => value.trim());
 					const contact: Partial<Contact> = {
 						id: index,
-						name: values[headers.indexOf('name')] || '',
+						lastName: values[headers.indexOf('name')] || '',
 						email: values[headers.indexOf('email')] || '',
 						company: values[headers.indexOf('company')] || '',
 						country: values[headers.indexOf('country')] || '',
@@ -57,6 +58,10 @@ export const useContactCSVUploadDialog = () => {
 	};
 
 	const handleSave = async () => {
+		if (!csvData || csvData.length === 0) {
+			toast.error('No data to upload');
+			return;
+		}
 		await createContacts({ contacts: csvData, contactListId });
 		setCsvData([]);
 		setOpen(false);

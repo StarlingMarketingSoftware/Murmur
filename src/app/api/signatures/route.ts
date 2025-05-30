@@ -1,14 +1,26 @@
+import {
+	apiBadRequest,
+	apiCreated,
+	apiResponse,
+	apiUnauthorized,
+	handleApiError,
+} from '@/app/utils/api';
 import prisma from '@/lib/prisma';
 import { auth } from '@clerk/nextjs/server';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
+
+const createSignatureSchema = z.object({
+	name: z.string().min(1),
+	content: z.string(),
+});
+export type CreateSignatureData = z.infer<typeof createSignatureSchema>;
 
 export async function GET() {
 	try {
 		const { userId } = await auth();
-
 		if (!userId) {
-			return new NextResponse('Unauthorized', { status: 401 });
+			return apiUnauthorized();
 		}
 
 		const signatures = await prisma.signature.findMany({
@@ -20,39 +32,36 @@ export async function GET() {
 			},
 		});
 
-		return NextResponse.json(signatures);
+		return apiResponse(signatures);
 	} catch (error) {
-		console.error('[SIGNATURES_GET]', error);
-		return new NextResponse('Internal Error', { status: 500 });
+		return handleApiError(error);
 	}
 }
 
-const createSignatureSchema = z.object({
-	name: z.string().min(1, 'Signature name is required'),
-	content: z.string(),
-});
-
 export async function POST(req: NextRequest) {
-	const { userId } = await auth();
-	if (!userId) {
-		return new NextResponse('Unauthorized', { status: 401 });
-	}
-
 	try {
-		const body = await req.json();
-		const validatedData = createSignatureSchema.parse(body);
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
 
-		await prisma.signature.create({
+		const data = await req.json();
+		const validatedData = createSignatureSchema.safeParse(data);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
+		const { name, content } = validatedData.data;
+
+		const signature = await prisma.signature.create({
 			data: {
-				name: validatedData.name,
-				content: validatedData.content,
+				name: name,
+				content: content,
 				userId: userId,
 			},
 		});
 
-		return NextResponse.json({ message: 'Signature saved successfully' });
+		return apiCreated(signature);
 	} catch (error) {
-		console.error('[SIGNATURES_POST]', error);
-		return new NextResponse('Internal Error', { status: 500 });
+		return handleApiError(error);
 	}
 }

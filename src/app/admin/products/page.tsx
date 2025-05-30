@@ -1,7 +1,7 @@
 'use client';
 
 import { ProductCard } from '@/components/organisms/ProductCard/ProductCard';
-import { useStripeProducts } from '@/hooks/useStripeProducts';
+import { useStripeProducts } from '@/hooks/queryHooks/useStripeProducts';
 import { useMe } from '@/hooks/useMe';
 import Spinner from '@/components/ui/spinner';
 import { UserRole } from '@prisma/client';

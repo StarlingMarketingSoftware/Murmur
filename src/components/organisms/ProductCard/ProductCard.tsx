@@ -7,15 +7,15 @@ import {
 	TypographyList,
 } from '@/components/ui/typography';
 import { twMerge } from 'tailwind-merge';
-import { useStripePrice } from '@/hooks/useStripePrice';
+import { useGetStripePrice } from '@/hooks/queryHooks/useStripePrices';
 import { Stripe } from 'stripe';
 import { CheckoutButton } from '../CheckoutButton/CheckoutButton';
 import { User } from '@prisma/client';
-import { STRIPE_SUBSCRIPTION_STATUS } from '@/constants/types';
 import ManageSubscriptionButton from '@/components/organisms/ManageSubscriptionButton/ManageSubscriptionButton';
 import Spinner from '@/components/ui/spinner';
 import { ReactNode } from 'react';
 import UpdateSubscriptionButton from '@/components/organisms/UpdateSubscriptionButton/UpdateSubscriptionButton';
+import { StripeSubscriptionStatus } from '@/types';
 
 interface ProductCardProps {
 	product: Stripe.Product;
@@ -30,7 +30,7 @@ export function ProductCard({
 	user,
 	isLink = false,
 }: ProductCardProps) {
-	const { data: prices, isLoading } = useStripePrice(product.id);
+	const { data: prices, isLoading } = useGetStripePrice(product.id);
 
 	const formatPrice = (price: number, currency: string) => {
 		return new Intl.NumberFormat('en-US', {
@@ -55,7 +55,7 @@ export function ProductCard({
 			return checkoutButton;
 		} else if (
 			user.stripePriceId === price.id &&
-			user.stripeSubscriptionStatus === STRIPE_SUBSCRIPTION_STATUS.ACTIVE
+			user.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE
 		) {
 			return <ManageSubscriptionButton className="mx-auto" />;
 		} else if (user.stripeSubscriptionId) {

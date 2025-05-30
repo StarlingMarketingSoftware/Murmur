@@ -21,7 +21,7 @@ import {
 	CardTitle,
 } from '@/components/ui/card';
 import PageHeading from '@/components/atoms/_text/PageHeading';
-import { useSendMailgunMessage } from '@/hooks/useMailgun';
+import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import { TypographyP } from '@/components/ui/typography';

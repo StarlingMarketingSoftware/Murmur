@@ -1,7 +1,10 @@
 'use client';
 import { TableSortingButton } from '@/components/molecules/CustomTable/CustomTable';
 import { TableDeleteRowButton } from '@/components/molecules/TableDeleteRowButton/TableDeleteRowButton';
-import { useDeleteContactList, useGetContactLists } from '@/hooks/useContactLists';
+import {
+	useDeleteContactList,
+	useGetContactLists,
+} from '@/hooks/queryHooks/useContactLists';
 import { ContactList } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { ColumnDef } from '@tanstack/react-table';

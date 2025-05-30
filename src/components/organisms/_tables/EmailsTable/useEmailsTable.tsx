@@ -1,15 +1,14 @@
 import { AccessorFnColumnDef, ColumnDef } from '@tanstack/react-table';
-import { useQueryClient } from '@tanstack/react-query';
 import { TableSortingButton } from '../../../molecules/CustomTable/CustomTable';
-import { EmailWithRelations } from '@/constants/types';
+import { EmailWithRelations } from '@/types';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { TrashIcon } from 'lucide-react';
 import { ellipsesText } from '@/app/utils/string';
 import { useMe } from '@/hooks/useMe';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
-import { restrictedFeatureMessages } from '@/constants/constants';
-import { useDeleteEmail } from '@/hooks/useEmails';
+import { RESTRICTED_FEATURE_MESSAGES } from '@/constants';
+import { useDeleteEmail } from '@/hooks/queryHooks/useEmails';
 import { stripHtmlTags } from '@/app/utils/htmlFormatting';
 
 export interface EmailsTableProps {
@@ -20,16 +19,12 @@ export interface EmailsTableProps {
 }
 
 export const useEmailsTable = (props: EmailsTableProps) => {
-	const queryClient = useQueryClient();
 	const { subscriptionTier } = useMe();
 
 	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
 
 	const handleDeleteEmail = async (emailId: number) => {
-		const res = await deleteEmail(emailId);
-		if (res) {
-			queryClient.invalidateQueries({ queryKey: ['drafts'] });
-		}
+		await deleteEmail(emailId);
 	};
 
 	const columns: (
@@ -46,7 +41,7 @@ export const useEmailsTable = (props: EmailsTableProps) => {
 				return subscriptionTier?.viewEmailAddresses ? (
 					<div className="text-left">{row.getValue('contactEmail')}</div>
 				) : (
-					<FeatureLockedButton message={restrictedFeatureMessages.viewEmails} />
+					<FeatureLockedButton message={RESTRICTED_FEATURE_MESSAGES.viewEmails} />
 				);
 			},
 		},
