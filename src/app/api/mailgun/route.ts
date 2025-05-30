@@ -7,11 +7,13 @@ import {
 import { auth } from '@clerk/nextjs/server';
 import {
 	apiBadRequest,
+	apiNotFound,
 	apiResponse,
 	apiUnauthorized,
 	handleApiError,
 } from '@/app/utils/api';
 import { z } from 'zod';
+import prisma from '@/lib/prisma';
 
 const postMailgunSchema = z.object({
 	recipientEmail: z.string().email(),
@@ -45,13 +47,26 @@ export async function POST(request: Request) {
 
 		const messageNoMargin = formatHTMLForEmailClients(message);
 
+		const user = await prisma.user.findUnique({
+			where: { clerkId: userId },
+		});
+
+		if (!user) {
+			return apiNotFound('User not found or Murmur email not set');
+		}
+		if (!user.murmurEmail) {
+			return apiNotFound('User does not have a Murmur email set');
+		}
+
 		const mailgunData = await mg.messages.create('murmurmailbox.com', {
-			from: `${senderName} <postmaster@murmurmailbox.com>`,
+			from: `${senderName} <${user.murmurEmail}>`,
 			to: [recipientEmail],
 			subject: subject,
 			html: replacePTagsInSignature(messageNoMargin),
 			text: message,
 			'h:Reply-To': senderEmail,
+			'h:X-Mailgun-Dkim-Signature': 'yes',
+			'h:Message-ID': `<${Date.now()}@${1}>`,
 		});
 
 		return apiResponse({ success: true, data: mailgunData });
