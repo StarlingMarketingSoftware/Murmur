@@ -315,7 +315,7 @@ const useAiCompose = (props: AiComposeProps) => {
 										status: 'draft' as EmailStatus,
 										contactId: recipient.id,
 									});
-
+									setGenerationProgress((prev) => prev + 1);
 									return { success: true, contactId: recipient.id, retries: retryCount };
 								} else {
 									throw new Error('No draft generated - empty response');
@@ -376,11 +376,6 @@ const useAiCompose = (props: AiComposeProps) => {
 						}
 					}
 					remainingCredits -= batchToProcess.length;
-					if (!isGenerationCancelledRef.current) {
-						setGenerationProgress(successfulEmails);
-					}
-
-					// Show progress update
 
 					// Small delay between batches to prevent API rate limiting
 					if (i + BATCH_SIZE < contacts.length && !isGenerationCancelledRef.current) {
