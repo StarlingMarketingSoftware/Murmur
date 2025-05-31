@@ -282,7 +282,11 @@ const useAiCompose = (props: AiComposeProps) => {
 						const MAX_RETRIES = 5;
 						let lastError: Error | null = null;
 
-						for (let retryCount = 0; retryCount <= MAX_RETRIES; retryCount++) {
+						for (
+							let retryCount = 0;
+							retryCount <= MAX_RETRIES && !isGenerationCancelledRef.current;
+							retryCount++
+						) {
 							try {
 								// Exponential backoff: 0ms, 1s, 2s, 4s
 								if (retryCount > 0) {
@@ -388,7 +392,9 @@ const useAiCompose = (props: AiComposeProps) => {
 					} // Update credits and progress
 					remainingCredits -= batchToProcess.length;
 					totalProcessed += batchToProcess.length;
-					setGenerationProgress(successfulEmails);
+					if (!isGenerationCancelledRef.current) {
+						setGenerationProgress(successfulEmails);
+					}
 
 					// Show progress update
 					const progressPercentage = Math.round((totalProcessed / contacts.length) * 100);
@@ -406,7 +412,6 @@ const useAiCompose = (props: AiComposeProps) => {
 				} // Final success message
 
 				if (user && aiDraftCredits && successfulEmails > 0) {
-					console.log('Deducting AI draft credits...');
 					const newCreditBalance = Math.max(0, aiDraftCredits - successfulEmails);
 					editUser({
 						clerkId: user.clerkId,
