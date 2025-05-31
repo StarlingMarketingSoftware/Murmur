@@ -74,7 +74,6 @@ export const useEditUser = (options: EditUserOptions = {}) => {
 			return response.json();
 		},
 		onSuccess: (data: User) => {
-			console.log('🚀 ~ useEditUser success ~ data:', data);
 			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.detail(data.clerkId) });
 			if (!suppressToasts) {
 				toast.success(successMessage);

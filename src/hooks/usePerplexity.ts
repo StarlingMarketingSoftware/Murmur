@@ -61,8 +61,8 @@ Rules:
 Write this how you think Jensen Huang would write an email. This should feel like it's written by a top CEO
 	`;
 
-const RESPONSE_FORMAT_INSTRUCTIONS = `IMPORTANT: Format your entire response in the following pseudo-HTML format. Within the <MESSAGE>, use an extra <p></p> to create line breaks between paragraphs as follows:
-<SUBJECT>generatedSubject</SUBJECT><MESSAGE><p>Hi Josh,</p><p></p><p>Paragraph 1 content</p><p></p><p>Paragraph 2 content</p><p></p><p>Paragraph 3 content</p></MESSAGE>`;
+const RESPONSE_FORMAT_INSTRUCTIONS = `Within the message, use an extra <p></p> to create line breaks between paragraphs as follows:
+{subject: generatedSubject,message: <p>Hi Josh,</p><p></p><p>Paragraph 1 content</p><p></p><p>Paragraph 2 content</p><p></p><p>Paragraph 3 content</p>}`;
 
 const MESSAGE_AND_SUBJECT_FORMAT = `Return the message and the subject line, without any signature or other text.`;
 

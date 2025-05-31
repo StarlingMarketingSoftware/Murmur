@@ -256,11 +256,9 @@ const useAiCompose = (props: AiComposeProps) => {
 			const controller = new AbortController();
 			setAbortController(controller);
 
-			// Batch processing with concurrency control
-			const BATCH_SIZE = 1;
+			const BATCH_SIZE = 5;
 			const BATCH_DELAY = 1000;
 			const contacts = campaign.contacts;
-			let totalProcessed = 0;
 			let successfulEmails = 0;
 
 			try {
@@ -269,15 +267,15 @@ const useAiCompose = (props: AiComposeProps) => {
 					i < contacts.length && !isGenerationCancelledRef.current;
 					i += BATCH_SIZE
 				) {
-					// Check if we have enough credits for this batch
 					if (remainingCredits <= 0) {
 						toast.error('You have run out of AI draft credits!');
+						cancelGeneration();
 						break;
 					}
 
 					const batch = contacts.slice(i, Math.min(i + BATCH_SIZE, contacts.length));
 					const availableCreditsForBatch = Math.min(batch.length, remainingCredits);
-					const batchToProcess = batch.slice(0, availableCreditsForBatch); // Process batch concurrently with retry mechanism
+					const batchToProcess = batch.slice(0, availableCreditsForBatch);
 					const batchPromises = batchToProcess.map(async (recipient) => {
 						const MAX_RETRIES = 5;
 						let lastError: Error | null = null;
@@ -291,9 +289,6 @@ const useAiCompose = (props: AiComposeProps) => {
 								// Exponential backoff: 0ms, 1s, 2s, 4s
 								if (retryCount > 0) {
 									const delay = Math.pow(2, retryCount - 1) * 1000;
-									console.log(
-										`Retry ${retryCount}/${MAX_RETRIES} for contact ${recipient.id} after ${delay}ms delay`
-									);
 									await new Promise((resolve) => setTimeout(resolve, delay));
 								}
 
@@ -321,12 +316,6 @@ const useAiCompose = (props: AiComposeProps) => {
 										contactId: recipient.id,
 									});
 
-									// Success - log retry info if this wasn't the first attempt
-									if (retryCount > 0) {
-										console.log(
-											`✅ Contact ${recipient.id} succeeded on retry ${retryCount}/${MAX_RETRIES}`
-										);
-									}
 									return { success: true, contactId: recipient.id, retries: retryCount };
 								} else {
 									throw new Error('No draft generated - empty response');
@@ -338,7 +327,6 @@ const useAiCompose = (props: AiComposeProps) => {
 
 								lastError = error instanceof Error ? error : new Error('Unknown error');
 
-								// Don't retry on the last attempt
 								if (retryCount === MAX_RETRIES) {
 									break;
 								} // Log retry attempts for specific error types (skip if cancelled)
@@ -377,33 +365,22 @@ const useAiCompose = (props: AiComposeProps) => {
 					});
 
 					// Wait for current batch to complete
-					const batchResults = await Promise.allSettled(batchPromises); // Process results and update progress
-					let batchSuccessCount = 0;
+					const batchResults = await Promise.allSettled(batchPromises);
 					for (const result of batchResults) {
 						if (result.status === 'fulfilled' && result.value.success) {
-							batchSuccessCount++;
 							successfulEmails++;
 						} else if (result.status === 'rejected') {
-							// Handle cancellation
 							if (result.reason?.message === 'Request cancelled.') {
 								throw result.reason;
 							}
 						}
-					} // Update credits and progress
+					}
 					remainingCredits -= batchToProcess.length;
-					totalProcessed += batchToProcess.length;
 					if (!isGenerationCancelledRef.current) {
 						setGenerationProgress(successfulEmails);
 					}
 
 					// Show progress update
-					const progressPercentage = Math.round((totalProcessed / contacts.length) * 100);
-					const successPercentage = Math.round(
-						(successfulEmails / contacts.length) * 100
-					);
-					console.log(
-						`Batch completed: ${batchSuccessCount}/${batchToProcess.length} successful. Processing progress: ${progressPercentage}% (${totalProcessed}/${contacts.length}), Emails generated: ${successPercentage}% (${successfulEmails}/${contacts.length})`
-					);
 
 					// Small delay between batches to prevent API rate limiting
 					if (i + BATCH_SIZE < contacts.length && !isGenerationCancelledRef.current) {
@@ -417,14 +394,9 @@ const useAiCompose = (props: AiComposeProps) => {
 						clerkId: user.clerkId,
 						data: { aiDraftCredits: newCreditBalance },
 					});
-					console.log(
-						`Deducted ${successfulEmails} AI draft credits. New balance: ${newCreditBalance}`
-					);
 				}
 
 				if (!isGenerationCancelledRef.current) {
-					// Deduct credits based on actual successful emails generated
-
 					if (successfulEmails === contacts.length) {
 						toast.success('All emails generated successfully!');
 					} else if (successfulEmails > 0) {
