@@ -1,5 +1,5 @@
+import { CommonIconProps, defaultPathClassName } from '@/utils';
 import { FC } from 'react';
-import { CommonIconProps, defaultPathClassName } from './utils';
 
 const LogoIcon: FC<CommonIconProps> = (props) => {
 	const { size = '100%', pathClassName = defaultPathClassName } = props;

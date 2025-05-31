@@ -10,8 +10,8 @@ import {
 	apiResponse,
 	apiServerError,
 	handleApiError,
-} from '@/app/utils/api';
-import { generateMurmurEmail } from '@/app/utils/email';
+} from '@/app/api/_utils';
+import { generateMurmurEmail } from '@/utils';
 
 export async function POST(req: Request) {
 	const SIGNING_SECRET = process.env.CLERK_SIGNING_SECRET;

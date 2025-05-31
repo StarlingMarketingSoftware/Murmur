@@ -10,7 +10,7 @@ import LogoIcon from '@/components/atoms/_svg/LogoIcon';
 import { MenuIcon } from 'lucide-react';
 import { useMe } from '@/hooks/useMe';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
+import { cn } from '@/utils';
 import {
 	NavigationMenu,
 	NavigationMenuItem,

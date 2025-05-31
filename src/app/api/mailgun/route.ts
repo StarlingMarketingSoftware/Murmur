@@ -1,16 +1,13 @@
 import FormData from 'form-data';
 import Mailgun from 'mailgun.js';
-import {
-	formatHTMLForEmailClients,
-	replacePTagsInSignature,
-} from '@/app/utils/htmlFormatting';
+import { formatHTMLForEmailClients, replacePTagsInSignature } from '@/utils';
 import { auth } from '@clerk/nextjs/server';
 import {
 	apiBadRequest,
 	apiResponse,
 	apiUnauthorized,
 	handleApiError,
-} from '@/app/utils/api';
+} from '@/app/api/_utils';
 import { z } from 'zod';
 
 const postMailgunSchema = z.object({

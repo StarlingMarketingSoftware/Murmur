@@ -1,11 +1,5 @@
 import { SUBSCRIPTION_TIER_DATA_LIST } from '@/constants';
 import { SubscriptionTierData } from '@/types';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-export function cn(...inputs: ClassValue[]) {
-	return twMerge(clsx(inputs));
-}
 
 export const getSubscriptionTierWithPriceId = (
 	priceId: string | null | undefined

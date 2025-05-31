@@ -1,5 +1,5 @@
 import { PostMailgunData } from '@/app/api/mailgun/route';
-import { _fetch } from '@/app/utils/api';
+import { _fetch } from '@/utils';
 import { CustomMutationOptions } from '@/types';
 import { urls } from '@/constants/urls';
 import { useMutation } from '@tanstack/react-query';

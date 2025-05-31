@@ -1,4 +1,4 @@
-import { apiBadRequest, apiResponse, handleApiError } from '@/app/utils/api';
+import { apiBadRequest, apiResponse, handleApiError } from '@/app/api/_utils';
 import { BASE_URL } from '@/constants';
 import { urls } from '@/constants/urls';
 import { stripe } from '@/stripe/client';

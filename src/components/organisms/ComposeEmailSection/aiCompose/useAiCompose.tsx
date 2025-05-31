@@ -1,4 +1,4 @@
-import { convertAiResponseToRichTextEmail } from '@/app/utils/htmlFormatting';
+import { convertAiResponseToRichTextEmail } from '@/utils';
 import { CampaignWithRelations, TestDraftEmail } from '@/types';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useCreateEmail } from '@/hooks/queryHooks/useEmails';
@@ -327,6 +327,7 @@ const useAiCompose = (props: AiComposeProps) => {
 				abortController.abort();
 			}
 		};
+		/* eslint-disable-next-line react-hooks/exhaustive-deps */
 	}, []);
 
 	const handleSavePrompt = async (suppressToasts: boolean) => {

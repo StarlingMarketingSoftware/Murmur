@@ -1,4 +1,4 @@
-import { apiResponse, handleApiError } from '@/app/utils/api';
+import { apiResponse, handleApiError } from '@/app/api/_utils';
 import { stripe } from '@/stripe/client';
 
 export async function GET() {
