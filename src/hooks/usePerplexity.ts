@@ -1,7 +1,7 @@
 import { AiModel, Contact } from '@prisma/client';
 import { useMutation } from '@tanstack/react-query';
 
-const rolePrompt = `Write a personalized email to {first_name} who works at {company}. If there is no recipient name provided, start the email with "Hello!"
+const ROLE_PROMPT = `Write a personalized email to {first_name} who works at {company}. If there is no recipient name provided, start the email with "Hello!"
 
 Here is a template to follow:
 
@@ -61,12 +61,12 @@ Rules:
 Write this how you think Jensen Huang would write an email. This should feel like it's written by a top CEO
 	`;
 
-const responseFormatInstructions = `IMPORTANT: Format your entire response in the following pseudo-HTML format. Within the <MESSAGE>, use an extra <p></p> to create line breaks between paragraphs as follows:
+const RESPONSE_FORMAT_INSTRUCTIONS = `IMPORTANT: Format your entire response in the following pseudo-HTML format. Within the <MESSAGE>, use an extra <p></p> to create line breaks between paragraphs as follows:
 <SUBJECT>generatedSubject</SUBJECT><MESSAGE><p>Hi Josh,</p><p></p><p>Paragraph 1 content</p><p></p><p>Paragraph 2 content</p><p></p><p>Paragraph 3 content</p></MESSAGE>`;
 
-const messageAndSubjectFormat = `Return the message and the subject line, without any signature or other text.`;
+const MESSAGE_AND_SUBJECT_FORMAT = `Return the message and the subject line, without any signature or other text.`;
 
-const perplexityEndpoint = '/api/perplexity';
+const PERPLEXITY_ENDPOINT = '/api/perplexity';
 
 export type DraftEmailResponse = {
 	message: string;
@@ -95,7 +95,7 @@ export const usePerplexityDraftEmail = () => {
 			let response;
 
 			try {
-				response = await fetch(perplexityEndpoint, {
+				response = await fetch(PERPLEXITY_ENDPOINT, {
 					signal: params.signal,
 					method: 'POST',
 					headers: {
@@ -106,7 +106,7 @@ export const usePerplexityDraftEmail = () => {
 						messages: [
 							{
 								role: 'system',
-								content: `${responseFormatInstructions}\n\nInstructions for email content:\n${rolePrompt}\n\nOutput format:\n${messageAndSubjectFormat}`,
+								content: `${RESPONSE_FORMAT_INSTRUCTIONS}\n\nInstructions for email content:\n${ROLE_PROMPT}\n\nOutput format:\n${MESSAGE_AND_SUBJECT_FORMAT}`,
 							},
 							{
 								role: 'user',

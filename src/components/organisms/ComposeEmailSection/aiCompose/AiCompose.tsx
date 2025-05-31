@@ -230,6 +230,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 								}}
 								isLoading={isPendingGeneration && !isTest}
 								disabled={
+									generationProgress > -1 ||
 									campaign?.contacts.length === 0 ||
 									isPendingGeneration ||
 									aiDraftCredits === 0

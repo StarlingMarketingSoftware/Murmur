@@ -63,9 +63,7 @@ const useAiCompose = (props: AiComposeProps) => {
 			suppressToasts: true,
 		}
 	);
-
 	const { mutate: editUser } = useEditUser({ suppressToasts: true });
-
 	const { isPending: isPendingSavePrompt, mutateAsync: savePrompt } = useEditCampaign({
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id as number] });
@@ -77,24 +75,14 @@ const useAiCompose = (props: AiComposeProps) => {
 			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id as number] });
 		},
 	});
-
 	const { mutateAsync: saveTestEmail } = useEditCampaign({
 		suppressToasts: true,
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id as number] });
 		},
 	});
-
 	const { isPending: isPendingCreateEmail, mutateAsync: createEmail } = useCreateEmail({
 		suppressToasts: true,
-		onSuccess: () => {
-			if (user && aiDraftCredits) {
-				editUser({
-					clerkId: user.clerkId,
-					data: { aiDraftCredits: aiDraftCredits - 1 },
-				});
-			}
-		},
 	});
 
 	const isPendingGeneration =
@@ -289,59 +277,103 @@ const useAiCompose = (props: AiComposeProps) => {
 
 					const batch = contacts.slice(i, Math.min(i + BATCH_SIZE, contacts.length));
 					const availableCreditsForBatch = Math.min(batch.length, remainingCredits);
-					const batchToProcess = batch.slice(0, availableCreditsForBatch);
-
-					// Process batch concurrently
+					const batchToProcess = batch.slice(0, availableCreditsForBatch); // Process batch concurrently with retry mechanism
 					const batchPromises = batchToProcess.map(async (recipient) => {
-						try {
-							const parsedDraft = await draftEmailChain(
-								values.aiModel,
-								recipient,
-								values.message,
-								controller.signal
-							);
+						const MAX_RETRIES = 5;
+						let lastError: Error | null = null;
 
-							if (parsedDraft) {
-								if (!isAiSubject) {
-									parsedDraft.subject = values.subject || parsedDraft.subject;
+						for (let retryCount = 0; retryCount <= MAX_RETRIES; retryCount++) {
+							try {
+								// Exponential backoff: 0ms, 1s, 2s, 4s
+								if (retryCount > 0) {
+									const delay = Math.pow(2, retryCount - 1) * 1000;
+									console.log(
+										`Retry ${retryCount}/${MAX_RETRIES} for contact ${recipient.id} after ${delay}ms delay`
+									);
+									await new Promise((resolve) => setTimeout(resolve, delay));
 								}
 
-								await createEmail({
-									subject: parsedDraft.subject,
-									message: convertAiResponseToRichTextEmail(
-										parsedDraft.message,
-										values.font,
-										campaign.signature
-									),
-									campaignId: campaign.id,
-									status: 'draft' as EmailStatus,
-									contactId: recipient.id,
-								});
+								const parsedDraft = await draftEmailChain(
+									values.aiModel,
+									recipient,
+									values.message,
+									controller.signal
+								);
 
-								return { success: true, contactId: recipient.id };
+								if (parsedDraft) {
+									if (!isAiSubject) {
+										parsedDraft.subject = values.subject || parsedDraft.subject;
+									}
+
+									await createEmail({
+										subject: parsedDraft.subject,
+										message: convertAiResponseToRichTextEmail(
+											parsedDraft.message,
+											values.font,
+											campaign.signature
+										),
+										campaignId: campaign.id,
+										status: 'draft' as EmailStatus,
+										contactId: recipient.id,
+									});
+
+									// Success - log retry info if this wasn't the first attempt
+									if (retryCount > 0) {
+										console.log(
+											`✅ Contact ${recipient.id} succeeded on retry ${retryCount}/${MAX_RETRIES}`
+										);
+									}
+									return { success: true, contactId: recipient.id, retries: retryCount };
+								} else {
+									throw new Error('No draft generated - empty response');
+								}
+							} catch (error) {
+								if (error instanceof Error && error.message === 'Request cancelled.') {
+									throw error; // Re-throw cancellation errors immediately
+								}
+
+								lastError = error instanceof Error ? error : new Error('Unknown error');
+
+								// Don't retry on the last attempt
+								if (retryCount === MAX_RETRIES) {
+									break;
+								}
+
+								// Log retry attempts for specific error types
+								if (
+									lastError.message.includes('JSON') ||
+									lastError.message.includes('parse') ||
+									lastError.message.includes('too short')
+								) {
+									console.warn(
+										`Retry ${retryCount + 1}/${MAX_RETRIES} for contact ${
+											recipient.id
+										} - ${lastError.message}`
+									);
+								} else {
+									console.error(
+										`Error for contact ${recipient.id} (attempt ${retryCount + 1}):`,
+										lastError.message
+									);
+								}
 							}
-							return {
-								success: false,
-								contactId: recipient.id,
-								error: 'No draft generated',
-							};
-						} catch (error) {
-							if (error instanceof Error && error.message === 'Request cancelled.') {
-								throw error; // Re-throw cancellation errors
-							}
-							console.error(`Error generating email for contact ${recipient.id}:`, error);
-							return {
-								success: false,
-								contactId: recipient.id,
-								error: error instanceof Error ? error.message : 'Unknown error',
-							};
 						}
+
+						// All retries exhausted
+						console.error(
+							`❌ Contact ${recipient.id} failed after ${MAX_RETRIES} retries. Final error:`,
+							lastError?.message
+						);
+						return {
+							success: false,
+							contactId: recipient.id,
+							error: lastError?.message || 'Unknown error',
+							retries: MAX_RETRIES,
+						};
 					});
 
 					// Wait for current batch to complete
-					const batchResults = await Promise.allSettled(batchPromises);
-
-					// Process results and update progress
+					const batchResults = await Promise.allSettled(batchPromises); // Process results and update progress
 					let batchSuccessCount = 0;
 					for (const result of batchResults) {
 						if (result.status === 'fulfilled' && result.value.success) {
@@ -353,27 +385,38 @@ const useAiCompose = (props: AiComposeProps) => {
 								throw result.reason;
 							}
 						}
-					}
-
-					// Update credits and progress
+					} // Update credits and progress
 					remainingCredits -= batchToProcess.length;
 					totalProcessed += batchToProcess.length;
-					setGenerationProgress(totalProcessed);
+					setGenerationProgress(successfulEmails);
 
 					// Show progress update
 					const progressPercentage = Math.round((totalProcessed / contacts.length) * 100);
+					const successPercentage = Math.round(
+						(successfulEmails / contacts.length) * 100
+					);
 					console.log(
-						`Batch completed: ${batchSuccessCount}/${batchToProcess.length} successful. Overall progress: ${progressPercentage}% (${totalProcessed}/${contacts.length})`
+						`Batch completed: ${batchSuccessCount}/${batchToProcess.length} successful. Processing progress: ${progressPercentage}% (${totalProcessed}/${contacts.length}), Emails generated: ${successPercentage}% (${successfulEmails}/${contacts.length})`
 					);
 
 					// Small delay between batches to prevent API rate limiting
 					if (i + BATCH_SIZE < contacts.length && !isGenerationCancelledRef.current) {
 						await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY));
 					}
-				}
-
-				// Final success message
+				} // Final success message
 				if (!isGenerationCancelledRef.current) {
+					// Deduct credits based on actual successful emails generated
+					if (user && aiDraftCredits && successfulEmails > 0) {
+						const newCreditBalance = Math.max(0, aiDraftCredits - successfulEmails);
+						editUser({
+							clerkId: user.clerkId,
+							data: { aiDraftCredits: newCreditBalance },
+						});
+						console.log(
+							`Deducted ${successfulEmails} AI draft credits. New balance: ${newCreditBalance}`
+						);
+					}
+
 					if (successfulEmails === contacts.length) {
 						toast.success('All emails generated successfully!');
 					} else if (successfulEmails > 0) {
