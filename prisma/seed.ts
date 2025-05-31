@@ -220,7 +220,7 @@ const importCSVWithSubcategories = async (
 	}
 };
 async function main() {
-	importCSVWithSubcategories('musicVenuesDemoFullTRANSFER.csv', 'Music Venues');
+	importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
 	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
 
 	return;

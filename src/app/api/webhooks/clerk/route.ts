@@ -11,6 +11,7 @@ import {
 	apiServerError,
 	handleApiError,
 } from '@/app/utils/api';
+import { generateMurmurEmail } from '@/app/utils/email';
 
 export async function POST(req: Request) {
 	const SIGNING_SECRET = process.env.CLERK_SIGNING_SECRET;
@@ -67,9 +68,8 @@ export async function POST(req: Request) {
 			email: email,
 			name: `${first_name} ${last_name}`,
 		});
-
 		try {
-			await prisma.user.create({
+			const newUser = await prisma.user.create({
 				data: {
 					clerkId: id,
 					stripeCustomerId: stripeCustomer.id,
@@ -78,6 +78,12 @@ export async function POST(req: Request) {
 					lastName: last_name,
 				},
 			});
+
+			const murmurEmail = generateMurmurEmail(first_name, last_name, newUser.id);
+			await prisma.user.update({
+				where: { id: newUser.id },
+				data: { murmurEmail },
+			});
 		} catch (error) {
 			return handleApiError(error);
 		}
@@ -85,7 +91,6 @@ export async function POST(req: Request) {
 		const { id, email_addresses, first_name, last_name } = evt.data;
 
 		try {
-			// Update user data in database
 			const updatedUser = await prisma.user.update({
 				where: {
 					clerkId: id,
@@ -96,6 +101,15 @@ export async function POST(req: Request) {
 					lastName: last_name,
 				},
 			});
+
+			// Regenerate murmurEmail if name changed
+			const newMurmurEmail = generateMurmurEmail(first_name, last_name, updatedUser.id);
+			if (updatedUser.murmurEmail !== newMurmurEmail) {
+				await prisma.user.update({
+					where: { id: updatedUser.id },
+					data: { murmurEmail: newMurmurEmail },
+				});
+			}
 
 			return apiResponse(updatedUser);
 		} catch (error) {
