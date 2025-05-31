@@ -268,55 +268,131 @@ const useAiCompose = (props: AiComposeProps) => {
 			const controller = new AbortController();
 			setAbortController(controller);
 
-			let i = 0;
-			while (i < campaign.contacts.length && !isGenerationCancelledRef.current) {
-				const recipient = campaign.contacts[i];
-				if (remainingCredits <= 0) {
-					toast.error('You have run out of AI draft credits!');
-					break;
-				}
+			// Batch processing with concurrency control
+			const BATCH_SIZE = 5; // Process 5 emails concurrently
+			const BATCH_DELAY = 1000; // 1 second delay between batches to respect API limits
+			const contacts = campaign.contacts;
+			let totalProcessed = 0;
+			let successfulEmails = 0;
 
-				try {
-					const parsedDraft = await draftEmailChain(
-						values.aiModel,
-						recipient,
-						values.message,
-						controller.signal
-					);
-
-					if (parsedDraft) {
-						if (!isAiSubject) {
-							parsedDraft.subject = values.subject ? values.subject : parsedDraft.subject;
-						}
-						await createEmail({
-							subject: parsedDraft.subject,
-							message: convertAiResponseToRichTextEmail(
-								parsedDraft.message,
-								values.font,
-								campaign.signature
-							),
-							campaignId: campaign.id,
-							status: 'draft' as EmailStatus,
-							contactId: recipient.id,
-						});
-						setGenerationProgress((prev) => prev + 1);
-						remainingCredits--;
-						i++;
-					}
-				} catch (error) {
-					if (error instanceof Error && error.message === 'Request cancelled.') {
+			try {
+				for (
+					let i = 0;
+					i < contacts.length && !isGenerationCancelledRef.current;
+					i += BATCH_SIZE
+				) {
+					// Check if we have enough credits for this batch
+					if (remainingCredits <= 0) {
+						toast.error('You have run out of AI draft credits!');
 						break;
 					}
-					if (error instanceof Error) {
-						console.error('Error generating email:', error.message);
-					}
-					continue;
-				}
-			}
 
-			setAbortController(null);
-			if (i === campaign.contacts.length) {
-				toast.success('Email generation completed!');
+					const batch = contacts.slice(i, Math.min(i + BATCH_SIZE, contacts.length));
+					const availableCreditsForBatch = Math.min(batch.length, remainingCredits);
+					const batchToProcess = batch.slice(0, availableCreditsForBatch);
+
+					// Process batch concurrently
+					const batchPromises = batchToProcess.map(async (recipient) => {
+						try {
+							const parsedDraft = await draftEmailChain(
+								values.aiModel,
+								recipient,
+								values.message,
+								controller.signal
+							);
+
+							if (parsedDraft) {
+								if (!isAiSubject) {
+									parsedDraft.subject = values.subject || parsedDraft.subject;
+								}
+
+								await createEmail({
+									subject: parsedDraft.subject,
+									message: convertAiResponseToRichTextEmail(
+										parsedDraft.message,
+										values.font,
+										campaign.signature
+									),
+									campaignId: campaign.id,
+									status: 'draft' as EmailStatus,
+									contactId: recipient.id,
+								});
+
+								return { success: true, contactId: recipient.id };
+							}
+							return {
+								success: false,
+								contactId: recipient.id,
+								error: 'No draft generated',
+							};
+						} catch (error) {
+							if (error instanceof Error && error.message === 'Request cancelled.') {
+								throw error; // Re-throw cancellation errors
+							}
+							console.error(`Error generating email for contact ${recipient.id}:`, error);
+							return {
+								success: false,
+								contactId: recipient.id,
+								error: error instanceof Error ? error.message : 'Unknown error',
+							};
+						}
+					});
+
+					// Wait for current batch to complete
+					const batchResults = await Promise.allSettled(batchPromises);
+
+					// Process results and update progress
+					let batchSuccessCount = 0;
+					for (const result of batchResults) {
+						if (result.status === 'fulfilled' && result.value.success) {
+							batchSuccessCount++;
+							successfulEmails++;
+						} else if (result.status === 'rejected') {
+							// Handle cancellation
+							if (result.reason?.message === 'Request cancelled.') {
+								throw result.reason;
+							}
+						}
+					}
+
+					// Update credits and progress
+					remainingCredits -= batchToProcess.length;
+					totalProcessed += batchToProcess.length;
+					setGenerationProgress(totalProcessed);
+
+					// Show progress update
+					const progressPercentage = Math.round((totalProcessed / contacts.length) * 100);
+					console.log(
+						`Batch completed: ${batchSuccessCount}/${batchToProcess.length} successful. Overall progress: ${progressPercentage}% (${totalProcessed}/${contacts.length})`
+					);
+
+					// Small delay between batches to prevent API rate limiting
+					if (i + BATCH_SIZE < contacts.length && !isGenerationCancelledRef.current) {
+						await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY));
+					}
+				}
+
+				// Final success message
+				if (!isGenerationCancelledRef.current) {
+					if (successfulEmails === contacts.length) {
+						toast.success('All emails generated successfully!');
+					} else if (successfulEmails > 0) {
+						toast.success(
+							`Email generation completed! ${successfulEmails}/${contacts.length} emails generated successfully.`
+						);
+					} else {
+						toast.error('Email generation failed. Please try again.');
+					}
+				}
+			} catch (error) {
+				if (error instanceof Error && error.message === 'Request cancelled.') {
+					console.log('Email generation was cancelled by user');
+				} else {
+					console.error('Unexpected error during batch processing:', error);
+					toast.error('An error occurred during email generation.');
+				}
+			} finally {
+				setAbortController(null);
 			}
 		}
 	};
