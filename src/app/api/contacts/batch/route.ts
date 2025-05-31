@@ -7,7 +7,7 @@ import {
 	apiCreated,
 	apiUnauthorized,
 	handleApiError,
-} from '@/app/utils/api';
+} from '@/app/api/_utils';
 
 const batchCreateContactSchema = z.object({
 	contacts: z.array(

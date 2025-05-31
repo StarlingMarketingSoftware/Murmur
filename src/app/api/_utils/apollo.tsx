@@ -1,7 +1,7 @@
 import { ApolloPerson } from '@/types/apollo';
 import { Contact, EmailVerificationStatus } from '@prisma/client';
 import { OPEN_AI_MODEL_OPTIONS } from '@/constants';
-import { stripUntilBrace } from '@/app/utils/string';
+import { stripUntilBrace } from '@/utils';
 import { fetchOpenAi } from './openai';
 
 const PROMPT = `You are an expert in Apollo.io's People Search API and are tasked with converting a search query in string format into a valid Apollo People Search object. Use the following guidelines:

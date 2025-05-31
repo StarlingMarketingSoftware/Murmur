@@ -1,4 +1,4 @@
-import { getTestEmailCount } from '@/app/utils/calculations';
+import { getTestEmailCount } from '@/utils';
 import { SubscriptionTierData } from '@/types';
 
 export const SUBSCRIPTION_TIER_DATA_LIST: Record<string, SubscriptionTierData> = {

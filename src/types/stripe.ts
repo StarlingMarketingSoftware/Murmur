@@ -1,3 +1,5 @@
+import Stripe from 'stripe';
+
 export enum StripeSubscriptionStatus {
 	ACTIVE = 'active',
 	PAST_DUE = 'past_due',
@@ -7,6 +9,10 @@ export enum StripeSubscriptionStatus {
 	INCOMPLETE_EXPIRED = 'incomplete_expired',
 	TRIALING = 'trialing',
 	PAUSED = 'paused',
+}
+
+export interface StripeProduct extends Stripe.Product {
+	default_price: Stripe.Price;
 }
 
 export type SubscriptionTierData = {

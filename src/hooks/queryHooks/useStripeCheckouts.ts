@@ -1,4 +1,4 @@
-import { _fetch } from '@/app/utils/api';
+import { _fetch } from '@/utils';
 import { CustomMutationOptions } from '@/types';
 import { urls } from '@/constants/urls';
 import { useMutation, useQueryClient } from '@tanstack/react-query';

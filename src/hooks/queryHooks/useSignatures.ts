@@ -1,10 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { CustomMutationOptions } from '@/types';
-import { addFontToHtml } from '@/app/utils/htmlFormatting';
+import { addFontToHtml } from '@/utils';
 import { CreateSignatureData } from '@/app/api/signatures/route';
 import { UpdateSignatureData } from '@/app/api/signatures/[id]/route';
-import { _fetch } from '@/app/utils/api';
+import { _fetch } from '@/utils';
 import { urls } from '@/constants/urls';
 import { DEFAULT_FONT } from '@/constants';
 
