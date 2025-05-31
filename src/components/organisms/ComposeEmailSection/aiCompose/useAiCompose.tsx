@@ -35,8 +35,8 @@ export interface AiComposeProps {
 
 const useAiCompose = (props: AiComposeProps) => {
 	const { campaign } = props;
-	const { user } = useMe();
 
+	const { user } = useMe();
 	const [generationProgress, setGenerationProgress] = useState(-1);
 	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
@@ -341,33 +341,33 @@ const useAiCompose = (props: AiComposeProps) => {
 								// Don't retry on the last attempt
 								if (retryCount === MAX_RETRIES) {
 									break;
-								}
-
-								// Log retry attempts for specific error types
-								if (
-									lastError.message.includes('JSON') ||
-									lastError.message.includes('parse') ||
-									lastError.message.includes('too short')
-								) {
-									console.warn(
-										`Retry ${retryCount + 1}/${MAX_RETRIES} for contact ${
-											recipient.id
-										} - ${lastError.message}`
-									);
-								} else {
-									console.error(
-										`Error for contact ${recipient.id} (attempt ${retryCount + 1}):`,
-										lastError.message
-									);
+								} // Log retry attempts for specific error types (skip if cancelled)
+								if (!isGenerationCancelledRef.current) {
+									if (
+										lastError.message.includes('JSON') ||
+										lastError.message.includes('parse') ||
+										lastError.message.includes('too short')
+									) {
+										console.warn(
+											`Retry ${retryCount + 1}/${MAX_RETRIES} for contact ${
+												recipient.id
+											} - ${lastError.message}`
+										);
+									} else {
+										console.error(
+											`Error for contact ${recipient.id} (attempt ${retryCount + 1}):`,
+											lastError.message
+										);
+									}
 								}
 							}
+						} // All retries exhausted (skip if cancelled)
+						if (!isGenerationCancelledRef.current) {
+							console.error(
+								`❌ Contact ${recipient.id} failed after ${MAX_RETRIES} retries. Final error:`,
+								lastError?.message
+							);
 						}
-
-						// All retries exhausted
-						console.error(
-							`❌ Contact ${recipient.id} failed after ${MAX_RETRIES} retries. Final error:`,
-							lastError?.message
-						);
 						return {
 							success: false,
 							contactId: recipient.id,
