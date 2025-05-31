@@ -3,6 +3,7 @@ import { _fetch } from '@/utils';
 import { urls } from '@/constants/urls';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { User } from '@prisma/client';
 
 const QUERY_KEYS = {
 	all: ['users'] as const,
@@ -72,8 +73,9 @@ export const useEditUser = (options: EditUserOptions = {}) => {
 
 			return response.json();
 		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['user'] });
+		onSuccess: (data: User) => {
+			console.log('🚀 ~ useEditUser success ~ data:', data);
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.detail(data.clerkId) });
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}

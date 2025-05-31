@@ -257,8 +257,8 @@ const useAiCompose = (props: AiComposeProps) => {
 			setAbortController(controller);
 
 			// Batch processing with concurrency control
-			const BATCH_SIZE = 5; // Process 5 emails concurrently
-			const BATCH_DELAY = 1000; // 1 second delay between batches to respect API limits
+			const BATCH_SIZE = 1;
+			const BATCH_DELAY = 1000;
 			const contacts = campaign.contacts;
 			let totalProcessed = 0;
 			let successfulEmails = 0;
@@ -404,18 +404,21 @@ const useAiCompose = (props: AiComposeProps) => {
 						await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY));
 					}
 				} // Final success message
+
+				if (user && aiDraftCredits && successfulEmails > 0) {
+					console.log('Deducting AI draft credits...');
+					const newCreditBalance = Math.max(0, aiDraftCredits - successfulEmails);
+					editUser({
+						clerkId: user.clerkId,
+						data: { aiDraftCredits: newCreditBalance },
+					});
+					console.log(
+						`Deducted ${successfulEmails} AI draft credits. New balance: ${newCreditBalance}`
+					);
+				}
+
 				if (!isGenerationCancelledRef.current) {
 					// Deduct credits based on actual successful emails generated
-					if (user && aiDraftCredits && successfulEmails > 0) {
-						const newCreditBalance = Math.max(0, aiDraftCredits - successfulEmails);
-						editUser({
-							clerkId: user.clerkId,
-							data: { aiDraftCredits: newCreditBalance },
-						});
-						console.log(
-							`Deducted ${successfulEmails} AI draft credits. New balance: ${newCreditBalance}`
-						);
-					}
 
 					if (successfulEmails === contacts.length) {
 						toast.success('All emails generated successfully!');
