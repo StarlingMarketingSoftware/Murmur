@@ -1,8 +1,7 @@
 export const CLEAN_EMAIL_PROMPT = `I will send an an email subject (plain text format) and message (RichText format). 
 
 Here are directions about formatting:
-1. Do not modify the RichText HTML formatting or the pseudo-HTML formatting like the <SUBJECT> and <MESSAGE> tags.
-2. There are empty <p> tags for a reason, do not remove them.
+1. There are empty <p> tags for a reason, do not remove them.
 
 Perform the following tasks to the subject and message:
 1. Remove all text in brackets [] and recompose the email to make sense.

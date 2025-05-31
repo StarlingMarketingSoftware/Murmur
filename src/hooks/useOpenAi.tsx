@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { urls } from '@/constants/urls';
 import { PostOpenAiData } from '@/app/api/openai/route';
+import { removeMarkdownCodeBlocks } from '@/utils';
 
 export interface PostOpenAiDataWithSignal extends PostOpenAiData {
 	signal?: AbortSignal;
@@ -31,9 +32,9 @@ export const useOpenAi = (options: CustomMutationOptions = {}) => {
 				const errorData = await response.json();
 				throw new Error(errorData.error?.message || 'Failed to clean email');
 			}
-
 			const res = await response.json();
-			return res;
+
+			return removeMarkdownCodeBlocks(res);
 		},
 		onSuccess: () => {
 			if (!suppressToasts) {
