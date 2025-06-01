@@ -7,15 +7,14 @@ Here is a template to follow:
 
 1. "Hi {first_name},
 
-I'm reaching out regarding an interest in how I could help {company}. [insert knowledge about the company in a way that feels anecdotal and not like you're reiterating their own sales pitches]
-
-I'm a local business owner
+I'm reaching out regarding how I could help {company}. [insert knowledge about the company in a way that feels anecdotal and not like you're reiterating their own sales pitches]
 
 If you’re available next week…”
-something like “Do you have any time next week? Id love to hop on a call and go over everything…"
+something like “Do you have any time next week? I'd love to hop on a call and go over everything…"
 
 "I've been following Acme Corp's innovative work in sustainable packaging solutions, particularly your recent launch of biodegradable containers for the food industry. It's impressive how you're revolutionizing eco-friendly packaging without compromising on durability." as an example first paragraph tone is great.
 
+the "I've been following" part can come somewhere in the middle of the paragraph. 
 
 Overview:
 1. make sure it's positive and friendly in tone
@@ -32,6 +31,8 @@ in Paragraph 3, try to keep the first sentence shorter and focus more on if they
 
 Do not include a subject line or signature - just the body text.
 
+Do not keep to too strict a formula, we want this to feel human.
+
 Rules:
 0. No passive sentences, only active sentences
 1.Don't include "hope you're doing well"
@@ -47,7 +48,7 @@ Rules:
 11. Avoid "Amplify your sustainability message"
 12. Avoid "Potential opportunities"
 13. In the third paragraph the key work is "help"
-14. instead of "let me know your availability" try "When you have a change, let me know if there's a good time that works for you"
+14. instead of "let me know your availability" try "When you have a chance, let me know if there's a good time that works for you"
 15. stop using the word "amplify"
 16. instead of "I believe we can contribute significantly" try "I'd love to speak and find how we could best help"
 17. don't say "brief call" say "call" instead
@@ -57,6 +58,19 @@ Rules:
 21. Avoid referencing specific numerical figures in the first paragraph like "80,000-150,000 patients annually." or "6,000 case victories"
 22. Avoid the phrase "truly commendable"
 23. avoid the word "innovative"
+24. Vary sentence structure - mix short and long sentences for natural rhythm
+25. Include minor conversational elements like "Actually," "In fact," or "Interestingly,"
+26. Use specific examples rather than generic statements
+27. Add subtle personality touches - slight enthusiasm, genuine curiosity
+28. Reference current events or seasons when relevant (e.g., "With the new year approaching...")
+29. Use contractions occasionally (I'd, we're, you'll) for warmth
+30. Include one unique, memorable detail that shows genuine interest
+31. Avoid robotic transitions - use natural connectors like "Speaking of which," or "On that note,"
+32. Add slight imperfections - occasional parenthetical thoughts or em dashes
+33. Reference shared experiences or common challenges in their industry
+34. Use active voice and strong verbs to create energy
+35. Include a subtle compliment that feels genuine, not forced
+36. End with a specific, actionable next step rather than generic "let me know"
 
 Write this how you think Jensen Huang would write an email. This should feel like it's written by a top CEO
 	`;
