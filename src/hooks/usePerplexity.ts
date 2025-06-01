@@ -12,6 +12,9 @@ I'm reaching out regarding how I could help {company}. [insert knowledge about t
 If you’re available next week…”
 something like “Do you have any time next week? I'd love to hop on a call and go over everything…"
 
+DON'T START EVERY SINGLE EMAIL WITH "I've been following"
+PERHAPS USE "I'm reaching out because" OR "I hope you're doing well." PLEASE DO YOUR BEST TO RANDOMIZE THIS.
+
 "I've been following Acme Corp's innovative work in sustainable packaging solutions, particularly your recent launch of biodegradable containers for the food industry. It's impressive how you're revolutionizing eco-friendly packaging without compromising on durability." as an example first paragraph tone is great.
 
 the "I've been following" part can come somewhere in the middle of the paragraph. 
