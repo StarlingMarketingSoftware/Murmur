@@ -16,7 +16,7 @@ const postMailgunSchema = z.object({
 	message: z.string().min(1),
 	senderEmail: z.string().email(),
 	senderName: z.string().min(1),
-	userMurmurEmail: z.string().email().optional(),
+	userMurmurEmail: z.string().email().optional().nullable(),
 });
 export type PostMailgunData = z.infer<typeof postMailgunSchema>;
 
