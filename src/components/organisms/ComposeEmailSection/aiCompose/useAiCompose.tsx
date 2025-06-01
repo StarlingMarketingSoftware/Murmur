@@ -12,9 +12,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { useOpenAi } from '@/hooks/useOpenAi';
-import { OPEN_AI_MODEL_OPTIONS } from '@/constants';
 import { CLEAN_EMAIL_PROMPT } from '@/constants/ai';
+import { useMistral } from '@/hooks/useMistral';
 
 const getEmailDraftSchema = (isAiSubject: boolean) => {
 	return z.object({
@@ -63,11 +62,10 @@ const useAiCompose = (props: AiComposeProps) => {
 		isPendingDraftEmail,
 		draftEmailAsync,
 	} = usePerplexityDraftEmail();
-	const { mutateAsync: cleanDraftEmail, isPending: isPendingCleanDraftEmail } = useOpenAi(
-		{
+	const { mutateAsync: cleanDraftEmail, isPending: isPendingCleanDraftEmail } =
+		useMistral({
 			suppressToasts: true,
-		}
-	);
+		});
 	const { mutate: editUser } = useEditUser({ suppressToasts: true });
 	const { isPending: isPendingSavePrompt, mutateAsync: savePrompt } = useEditCampaign();
 	const { mutateAsync: saveCampaignNoToast } = useEditCampaign({
@@ -164,7 +162,6 @@ const useAiCompose = (props: AiComposeProps) => {
 		});
 
 		const cleanedDraftEmail = await cleanDraftEmail({
-			model: OPEN_AI_MODEL_OPTIONS.o4mini,
 			prompt: CLEAN_EMAIL_PROMPT,
 			content: newDraft,
 			signal: signal,

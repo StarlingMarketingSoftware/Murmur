@@ -69,6 +69,9 @@ export const urls = {
 		mailgun: {
 			index: '/api/mailgun',
 		},
+		mistral: {
+			index: '/api/mistral',
+		},
 		openai: {
 			index: '/api/openai',
 		},
