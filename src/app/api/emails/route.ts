@@ -10,9 +10,9 @@ import {
 	apiUnauthorized,
 	apiUnauthorizedResource,
 	handleApiError,
-} from '@/app/utils/api';
+} from '@/app/api/_utils';
 import { EmailStatus } from '@prisma/client';
-import { getValidatedParamsFromUrl } from '@/app/utils/url';
+import { getValidatedParamsFromUrl } from '@/utils';
 
 const postEmailSchema = z.object({
 	subject: z.string().min(1),

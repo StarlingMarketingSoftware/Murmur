@@ -7,7 +7,7 @@ import {
 	apiResponse,
 	apiUnauthorized,
 	handleApiError,
-} from '@/app/utils/api';
+} from '@/app/api/_utils';
 import { ApiRouteParams } from '@/types';
 import { NextRequest } from 'next/server';
 

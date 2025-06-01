@@ -3,15 +3,14 @@ import Stripe from 'stripe';
 import { stripe } from '../../../../stripe/client';
 import prisma from '@/lib/prisma';
 import { fulfillCheckout } from '@/app/api/webhooks/stripe/fulfillCheckout';
-import { getSubscriptionTierWithPriceId } from '@/lib/utils';
-import { getTestEmailCount } from '@/app/utils/calculations';
+import { getSubscriptionTierWithPriceId, getTestEmailCount } from '@/utils';
 import { calcAiCredits } from './calcAiCredits';
 import {
 	apiBadRequest,
 	apiResponse,
 	apiServerError,
 	handleApiError,
-} from '@/app/utils/api';
+} from '@/app/api/_utils';
 
 export async function POST(req: Request) {
 	const body = await req.text();

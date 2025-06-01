@@ -87,6 +87,7 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 				recipientEmail: email.contact.email,
 				senderEmail: form.getValues().senderEmail,
 				senderName: form.getValues().senderName,
+				userMurmurEmail: user?.murmurEmail,
 			});
 			if (res.success) {
 				await updateEmail({

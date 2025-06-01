@@ -44,7 +44,7 @@ interface TableSortingButtonProps<TData> {
 	label: string;
 }
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/utils';
 
 interface NoDataCellProps {
 	className?: string;
@@ -166,6 +166,7 @@ export function CustomTable<TData, TValue>({
 		} else if (!isInitialMount) {
 			updateSelectedRows();
 		}
+		/* eslint-disable-next-line react-hooks/exhaustive-deps */
 	}, [
 		setSelectedRows,
 		rowSelection,

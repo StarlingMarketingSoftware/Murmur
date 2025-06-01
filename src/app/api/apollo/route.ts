@@ -7,21 +7,19 @@ import {
 	apiResponse,
 	apiUnauthorized,
 	handleApiError,
-} from '@/app/utils/api';
-import { getValidatedParamsFromUrl } from '@/app/utils/url';
+	processZeroBounceResults,
+	verifyEmailsWithZeroBounce,
+	waitForZeroBounceCompletion,
+} from '@/app/api/_utils';
+import { getValidatedParamsFromUrl } from '@/utils';
 import {
 	enrichApolloContacts,
 	fetchApolloContacts,
 	transformApolloContact,
-} from '@/app/utils/apollo';
+} from '@/app/api/_utils';
 
 import { ApolloPerson } from '@/types/apollo';
 import { Contact, EmailVerificationStatus } from '@prisma/client';
-import {
-	processZeroBounceResults,
-	verifyEmailsWithZeroBounce,
-	waitForZeroBounceCompletion,
-} from '@/app/utils/zerobounce';
 
 const getApolloContactsSchema = z.object({
 	query: z.string(),

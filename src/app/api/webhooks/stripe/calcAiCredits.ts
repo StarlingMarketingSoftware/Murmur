@@ -1,4 +1,4 @@
-import { calcAiCreditsFromPrice } from '@/app/utils/calculations';
+import { calcAiCreditsFromPrice } from '@/utils';
 import { SubscriptionTierData } from '@/types';
 import { stripe } from '@/stripe/client';
 

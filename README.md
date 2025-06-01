@@ -33,6 +33,7 @@ AI-powered marketing automation platform that helps you create, manage, and opti
 ## Stripe
 
 - For each deployment, in order for users to be able to use "Manage Your Subscription" button, the Stripe billing portal must be set up via /settings/billing/portal https://dashboard.stripe.com/test/settings/billing/portal. Products you want to be displayed must be manually added.
+- For testing subscription payments use Stripe's designated testing credit card numbers: https://docs.stripe.com/testing
 
 ### Stripe Webhook Setup
 

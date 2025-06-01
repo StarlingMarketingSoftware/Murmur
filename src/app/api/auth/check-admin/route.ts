@@ -5,7 +5,7 @@ import {
 	apiResponse,
 	apiUnauthorized,
 	apiForbidden,
-} from '@/app/utils/api';
+} from '@/app/api/_utils';
 import { UserRole } from '@prisma/client';
 
 export async function GET() {

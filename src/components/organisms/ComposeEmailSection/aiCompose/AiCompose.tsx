@@ -29,7 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { ManageSignaturesDialog } from '../../_dialogs/ManageSignaturesDialog/ManageSignaturesDialog';
 import ProgressIndicator from '../../../molecules/ProgressIndicator/ProgressIndicator';
 import { ConfirmDialog } from '../../_dialogs/ConfirmDialog/ConfirmDialog';
-import { ellipsesText } from '@/app/utils/string';
+import { ellipsesText } from '@/utils';
 
 const AiCompose: FC<AiComposeProps> = (props) => {
 	const {
@@ -230,6 +230,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 								}}
 								isLoading={isPendingGeneration && !isTest}
 								disabled={
+									generationProgress > -1 ||
 									campaign?.contacts.length === 0 ||
 									isPendingGeneration ||
 									aiDraftCredits === 0

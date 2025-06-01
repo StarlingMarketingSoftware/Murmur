@@ -8,7 +8,7 @@ import {
 	apiResponse,
 	apiUnauthorized,
 	handleApiError,
-} from '@/app/utils/api';
+} from '@/app/api/_utils';
 import { z } from 'zod';
 
 const postCampaignSchema = z.object({

@@ -3,10 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CustomMutationOptions, CustomQueryOptions } from '@/types';
 import { toast } from 'sonner';
 import { ContactFilterData, PostContactData } from '@/app/api/contacts/route';
-import { appendQueryParamsToUrl } from '@/app/utils/url';
+import { appendQueryParamsToUrl } from '@/utils';
 import { PostBatchContactData } from '@/app/api/contacts/batch/route';
 import { PatchContactData } from '@/app/api/contacts/[id]/route';
-import { _fetch } from '@/app/utils/api';
+import { _fetch } from '@/utils';
 import { urls } from '@/constants/urls';
 
 const QUERY_KEYS = {

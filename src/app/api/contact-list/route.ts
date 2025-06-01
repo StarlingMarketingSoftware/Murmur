@@ -9,7 +9,7 @@ import {
 	apiResponse,
 	apiUnauthorized,
 	handleApiError,
-} from '@/app/utils/api';
+} from '@/app/api/_utils';
 
 export const GET = async function GET() {
 	try {
