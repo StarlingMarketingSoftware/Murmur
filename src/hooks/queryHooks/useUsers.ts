@@ -37,7 +37,7 @@ export const useGetUsers = () => {
 };
 
 export const useGetUser = (clerkId: string | undefined | null) => {
-	return useQuery({
+	return useQuery<User>({
 		queryKey: QUERY_KEYS.detail(clerkId || ''),
 		queryFn: async () => {
 			if (!clerkId) {
