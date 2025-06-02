@@ -184,3 +184,16 @@ model Signature {
 
   @@index([userId])
 }
+
+model EmailVerificationCode {
+  id        Int      @id @default(autoincrement())
+  email     String
+  code      String
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([email, code])
+  @@index([email])
+  @@index([expiresAt])
+}
