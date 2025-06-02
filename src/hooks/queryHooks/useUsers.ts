@@ -29,7 +29,7 @@ export const useGetUsers = () => {
 		queryFn: async () => {
 			const response = await _fetch(urls.api.users.index);
 			if (!response.ok) {
-				throw new Error('Failed to _fetch users');
+				throw new Error('Failed to fetch users');
 			}
 			return response.json();
 		},
