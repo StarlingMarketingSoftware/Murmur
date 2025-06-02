@@ -62,6 +62,7 @@ model User {
   campaigns                Campaign[]
   signatures               Signature[]
   contactLists             ContactList[]
+  identities               Identity[]
 }
 
 model Contact {
@@ -146,9 +147,26 @@ model Campaign {
   senderName  String?
   signatureId Int?
   signature   Signature? @relation(fields: [signatureId], references: [id], onDelete: Cascade)
+  identityId  Int?
+  identity    Identity?  @relation(fields: [identityId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Identity {
+  id      Int     @id @default(autoincrement())
+  name    String
+  website String?
+  email   String
+
+  userId    String
+  user      User       @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  campaigns Campaign[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   @@index([userId])
 }
