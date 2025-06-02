@@ -97,3 +97,13 @@ export const handleApiError = (error: Error | unknown): NextResponse => {
 	}
 	return apiServerError();
 };
+
+export const connectOrDisconnectId = (
+	id: number | string | undefined | null
+): undefined | { disconnect: true } | { connect: { id: number } } => {
+	return id === undefined
+		? undefined
+		: id === null
+		? { disconnect: true }
+		: { connect: { id: Number(id) } };
+};
