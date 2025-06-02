@@ -26,7 +26,7 @@ const ManageContactListDetail: FC = () => {
 						>
 							Generate Free Trial Code
 						</Button>
-						{freeTrialCode && <Input contentEditable value={freeTrialCode} />}
+						{freeTrialCode && <Input value={freeTrialCode} readOnly />}
 					</CardContent>
 				</Card>
 			)}
