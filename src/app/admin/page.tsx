@@ -19,6 +19,9 @@ const AdminHome = () => {
 					<Link href={urls.admin.products.index}>
 						<Button> Product Management</Button>
 					</Link>
+					<Link href={urls.admin.users.index}>
+						<Button> User Management</Button>
+					</Link>
 				</div>
 			</CardContent>
 		</Card>
