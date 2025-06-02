@@ -4,7 +4,7 @@ import {
 	apiResponse,
 	apiUnauthorized,
 	handleApiError,
-} from '@/app/utils/api';
+} from '@/app/api/_utils';
 import prisma from '@/lib/prisma';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest } from 'next/server';

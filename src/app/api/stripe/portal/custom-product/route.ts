@@ -1,5 +1,5 @@
-import { apiBadRequest, apiResponse, handleApiError } from '@/app/utils/api';
-import { baseUrl } from '@/constants/constants';
+import { apiBadRequest, apiResponse, handleApiError } from '@/app/api/_utils';
+import { BASE_URL } from '@/constants';
 import { urls } from '@/constants/urls';
 import { stripe } from '@/stripe/client';
 import { NextRequest } from 'next/server';
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 		const portalSession = await stripe.billingPortal.sessions.create({
 			customer: customerId,
 			configuration: portalConfig.id,
-			return_url: `${baseUrl}${urls.pricing.detail(productId)}`,
+			return_url: `${BASE_URL}${urls.pricing.detail(productId)}`,
 		});
 
 		return apiResponse({ url: portalSession.url });

@@ -1,4 +1,4 @@
-import { CampaignWithRelations } from '@/constants/types';
+import { CampaignWithRelations } from '@/types';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus } from '@prisma/client';
 

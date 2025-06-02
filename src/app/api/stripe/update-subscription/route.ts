@@ -1,7 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { stripe } from '../../../../stripe/client';
 import Stripe from 'stripe';
-import { getUser } from '@/app/utils/data/users/getUser';
 import {
 	apiBadRequest,
 	apiNotFound,
@@ -9,7 +8,8 @@ import {
 	apiServerError,
 	apiUnauthorized,
 	handleApiError,
-} from '@/app/utils/api';
+} from '@/app/api/_utils';
+import { getUser } from '../../_utils';
 
 export async function POST(req: Request) {
 	try {

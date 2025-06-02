@@ -1,9 +1,8 @@
 import { stripe } from '../../../../stripe/client';
 import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
-import { getSubscriptionTierWithPriceId } from '@/lib/utils';
+import { getSubscriptionTierWithPriceId, getTestEmailCount } from '@/utils';
 import { calcAiCredits } from './calcAiCredits';
-import { getTestEmailCount } from '@/app/utils/calculations';
 
 const prisma = new PrismaClient();
 type StripeSubscription = Stripe.Subscription;

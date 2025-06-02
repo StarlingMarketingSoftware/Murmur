@@ -9,8 +9,8 @@ import {
 	apiUnauthorized,
 	apiUnauthorizedResource,
 	handleApiError,
-} from '@/app/utils/api';
-import { ApiRouteParams } from '@/constants/types';
+} from '@/app/api/_utils';
+import { ApiRouteParams } from '@/types';
 import { NextRequest } from 'next/server';
 
 const updateSignatureSchema = z.object({

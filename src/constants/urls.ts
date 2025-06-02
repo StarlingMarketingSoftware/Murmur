@@ -26,6 +26,10 @@ export const urls = {
 		products: {
 			index: '/admin/products',
 		},
+		users: {
+			index: '/admin/users',
+			detail: ((id) => `/admin/users/${id}`) as DetailRoute,
+		},
 	},
 	pricing: {
 		index: '/pricing',
@@ -68,6 +72,9 @@ export const urls = {
 		},
 		mailgun: {
 			index: '/api/mailgun',
+		},
+		mistral: {
+			index: '/api/mistral',
 		},
 		openai: {
 			index: '/api/openai',

@@ -1,4 +1,4 @@
-import { EmailWithRelations } from '@/constants/types';
+import { EmailWithRelations } from '@/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Dispatch, SetStateAction, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -39,6 +39,7 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 
 	useEffect(() => {
 		resetFormToCurrentEmail();
+		/* eslint-disable-next-line react-hooks/exhaustive-deps */
 	}, [email, form]);
 
 	const { isPending: isPendingEditEmail, mutateAsync: editEmail } = useEditEmail({});

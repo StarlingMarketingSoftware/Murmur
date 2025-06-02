@@ -20,7 +20,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
-import { FontOptions } from '@/constants/constants';
+import { FONT_OPTIONS } from '@/constants';
 import PreviewTestDraftDialog from '../../_dialogs/PreviewTestDraftDialog/PreviewTestDraftDialog';
 import { FC } from 'react';
 import useAiCompose, { AiComposeProps } from './useAiCompose';
@@ -29,7 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { ManageSignaturesDialog } from '../../_dialogs/ManageSignaturesDialog/ManageSignaturesDialog';
 import ProgressIndicator from '../../../molecules/ProgressIndicator/ProgressIndicator';
 import { ConfirmDialog } from '../../_dialogs/ConfirmDialog/ConfirmDialog';
-import { ellipsesText } from '@/app/utils/string';
+import { ellipsesText } from '@/utils';
 
 const AiCompose: FC<AiComposeProps> = (props) => {
 	const {
@@ -152,7 +152,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 											<SelectContent>
 												<SelectGroup>
 													<SelectLabel>Font</SelectLabel>
-													{FontOptions.map((font) => (
+													{FONT_OPTIONS.map((font) => (
 														<SelectItem key={font} value={font}>
 															<span style={{ fontFamily: font }}>{font}</span>
 														</SelectItem>
@@ -230,6 +230,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 								}}
 								isLoading={isPendingGeneration && !isTest}
 								disabled={
+									generationProgress > -1 ||
 									campaign?.contacts.length === 0 ||
 									isPendingGeneration ||
 									aiDraftCredits === 0

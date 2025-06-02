@@ -1,4 +1,4 @@
-import { _fetch } from '@/app/utils/api';
+import { _fetch } from '@/utils';
 import { urls } from '@/constants/urls';
 import { useQuery } from '@tanstack/react-query';
 import { Stripe } from 'stripe';

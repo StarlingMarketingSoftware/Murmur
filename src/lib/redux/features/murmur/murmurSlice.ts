@@ -1,4 +1,4 @@
-import { Draft } from '@/constants/types';
+import { TestDraftEmail } from '@/types';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export interface CampaignState {
@@ -9,8 +9,8 @@ export interface CampaignState {
 		step2: boolean;
 		selectedRecipients: string[]; // Contact ids only
 	};
-	currentTestDraft: Draft | null;
-	completedDrafts: Draft[];
+	currentTestDraft: TestDraftEmail | null;
+	completedDrafts: TestDraftEmail[];
 }
 
 const initialState: CampaignState = {
@@ -29,13 +29,13 @@ export const murmurSlice = createSlice({
 	name: 'murmur',
 	initialState,
 	reducers: {
-		setCompletedDrafts: (state, action: PayloadAction<Draft[]>) => {
+		setCompletedDrafts: (state, action: PayloadAction<TestDraftEmail[]>) => {
 			state.completedDrafts = action.payload;
 		},
-		setCurrentTestDraft: (state, action: PayloadAction<Draft | null>) => {
+		setCurrentTestDraft: (state, action: PayloadAction<TestDraftEmail | null>) => {
 			state.currentTestDraft = action.payload;
 		},
-		addCompletedDrafts: (state, action: PayloadAction<Draft>) => {
+		addCompletedDrafts: (state, action: PayloadAction<TestDraftEmail>) => {
 			state.completedDrafts.push(action.payload);
 		},
 	},

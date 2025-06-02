@@ -1,15 +1,15 @@
 import { AccessorFnColumnDef, ColumnDef } from '@tanstack/react-table';
 import { TableSortingButton } from '../../../molecules/CustomTable/CustomTable';
-import { EmailWithRelations } from '@/constants/types';
+import { EmailWithRelations } from '@/types';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { TrashIcon } from 'lucide-react';
-import { ellipsesText } from '@/app/utils/string';
+import { ellipsesText } from '@/utils';
 import { useMe } from '@/hooks/useMe';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
-import { restrictedFeatureMessages } from '@/constants/constants';
+import { RESTRICTED_FEATURE_MESSAGES } from '@/constants';
 import { useDeleteEmail } from '@/hooks/queryHooks/useEmails';
-import { stripHtmlTags } from '@/app/utils/htmlFormatting';
+import { stripHtmlTags } from '@/utils';
 
 export interface EmailsTableProps {
 	emails: EmailWithRelations[];
@@ -41,7 +41,7 @@ export const useEmailsTable = (props: EmailsTableProps) => {
 				return subscriptionTier?.viewEmailAddresses ? (
 					<div className="text-left">{row.getValue('contactEmail')}</div>
 				) : (
-					<FeatureLockedButton message={restrictedFeatureMessages.viewEmails} />
+					<FeatureLockedButton message={RESTRICTED_FEATURE_MESSAGES.viewEmails} />
 				);
 			},
 		},

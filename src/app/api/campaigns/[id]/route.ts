@@ -8,9 +8,9 @@ import {
 	apiUnauthorized,
 	apiUnauthorizedResource,
 	handleApiError,
-} from '@/app/utils/api';
+} from '@/app/api/_utils';
 import { AiModel, Status } from '@prisma/client';
-import { ApiRouteParams } from '@/constants/types';
+import { ApiRouteParams } from '@/types';
 import { NextRequest } from 'next/server';
 
 import { z } from 'zod';

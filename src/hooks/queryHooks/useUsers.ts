@@ -1,8 +1,9 @@
 import { PatchUserData } from '@/app/api/users/[id]/route';
-import { _fetch } from '@/app/utils/api';
+import { _fetch } from '@/utils';
 import { urls } from '@/constants/urls';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { User } from '@prisma/client';
 
 const QUERY_KEYS = {
 	all: ['users'] as const,
@@ -28,7 +29,7 @@ export const useGetUsers = () => {
 		queryFn: async () => {
 			const response = await _fetch(urls.api.users.index);
 			if (!response.ok) {
-				throw new Error('Failed to _fetch users');
+				throw new Error('Failed to fetch users');
 			}
 			return response.json();
 		},
@@ -36,7 +37,7 @@ export const useGetUsers = () => {
 };
 
 export const useGetUser = (clerkId: string | undefined | null) => {
-	return useQuery({
+	return useQuery<User>({
 		queryKey: QUERY_KEYS.detail(clerkId || ''),
 		queryFn: async () => {
 			if (!clerkId) {
@@ -72,8 +73,8 @@ export const useEditUser = (options: EditUserOptions = {}) => {
 
 			return response.json();
 		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['user'] });
+		onSuccess: (data: User) => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.detail(data.clerkId) });
 			if (!suppressToasts) {
 				toast.success(successMessage);
 			}

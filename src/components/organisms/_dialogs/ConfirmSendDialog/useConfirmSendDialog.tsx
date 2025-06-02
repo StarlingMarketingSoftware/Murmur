@@ -1,4 +1,8 @@
-import { CampaignWithRelations, EmailWithRelations } from '@/constants/types';
+import {
+	CampaignWithRelations,
+	EmailWithRelations,
+	StripeSubscriptionStatus,
+} from '@/types';
 import { useEditCampaign, useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { useMe } from '@/hooks/useMe';
@@ -67,26 +71,27 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 
 	const handleSend = async () => {
 		setIsOpen(false);
+		if (
+			!subscriptionTier &&
+			user?.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING
+		) {
+			toast.error('Please upgrade to a paid plan to send emails.');
+			return;
+		}
 		setSendingProgress(0);
 		if (!campaign) {
 			return null;
 		}
 		editCampaign({ id: campaign.id.toString(), data: form.getValues() });
-		let currentEmailSendCredits = user?.emailSendCredits || 0;
 
 		for (const email of draftEmails) {
-			if (currentEmailSendCredits <= 0 && !subscriptionTier) {
-				toast.error(
-					'You have reached the sending limit of the free tier. Please upgrade to a paid plan to send more emails.'
-				);
-				return;
-			}
 			const res = await sendMailgunMessage({
 				subject: email.subject,
 				message: email.message,
 				recipientEmail: email.contact.email,
 				senderEmail: form.getValues().senderEmail,
 				senderName: form.getValues().senderName,
+				userMurmurEmail: user?.murmurEmail,
 			});
 			if (res.success) {
 				await updateEmail({
@@ -104,7 +109,6 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 						clerkId: user.clerkId,
 						data: { emailSendCredits: user.emailSendCredits - 1 },
 					});
-					currentEmailSendCredits--;
 				}
 			}
 		}

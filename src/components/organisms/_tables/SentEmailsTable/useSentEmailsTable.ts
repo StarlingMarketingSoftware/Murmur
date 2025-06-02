@@ -1,4 +1,4 @@
-import { EmailWithRelations } from '@/constants/types';
+import { EmailWithRelations } from '@/types';
 
 export interface SentEmailsTableProps {
 	emails: EmailWithRelations[];

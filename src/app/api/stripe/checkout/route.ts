@@ -1,7 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { stripe } from '../../../../stripe/client';
 import Stripe from 'stripe';
-import { getUser } from '@/app/utils/data/users/getUser';
 import {
 	apiBadRequest,
 	apiNotFound,
@@ -9,8 +8,9 @@ import {
 	apiServerError,
 	apiUnauthorized,
 	handleApiError,
-} from '@/app/utils/api';
+} from '@/app/api/_utils';
 import { z } from 'zod';
+import { getUser } from '../../_utils';
 
 const stripeCheckoutRequestSchema = z.object({
 	priceId: z.string().min(1),

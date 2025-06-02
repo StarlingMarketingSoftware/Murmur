@@ -1,6 +1,6 @@
 import { PostMailgunData } from '@/app/api/mailgun/route';
-import { _fetch } from '@/app/utils/api';
-import { CustomMutationOptions } from '@/constants/types';
+import { _fetch } from '@/utils';
+import { CustomMutationOptions } from '@/types';
 import { urls } from '@/constants/urls';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';

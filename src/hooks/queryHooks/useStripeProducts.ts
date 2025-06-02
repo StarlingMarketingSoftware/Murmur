@@ -1,8 +1,8 @@
-import { StripeProduct } from '@/app/utils/data/stripe/products';
 import { useQuery } from '@tanstack/react-query';
 import { getStripeProduct } from '@/services/stripe';
-import { _fetch } from '@/app/utils/api';
+import { _fetch } from '@/utils';
 import { urls } from '@/constants/urls';
+import { StripeProduct } from '@/types';
 
 const QUERY_KEYS = {
 	all: ['stripeProducts'] as const,

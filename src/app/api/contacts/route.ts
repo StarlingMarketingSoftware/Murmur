@@ -8,8 +8,8 @@ import {
 	apiResponse,
 	apiUnauthorized,
 	handleApiError,
-} from '@/app/utils/api';
-import { getValidatedParamsFromUrl } from '@/app/utils/url';
+} from '@/app/api/_utils';
+import { getValidatedParamsFromUrl } from '@/utils';
 
 const createContactSchema = z.object({
 	name: z.string().optional(),
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 				contactListId: Number(contactListId),
 			},
 			orderBy: {
-				name: 'desc',
+				email: 'desc',
 			},
 		});
 
