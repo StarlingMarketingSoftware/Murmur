@@ -14,7 +14,7 @@ const QUERY_KEYS = {
 	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
 } as const;
 
-export const useCreateIdentity = (options: CustomMutationOptions = {}) => {
+export const useCreateEmailVerificationCode = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
 		successMessage = 'Verification code created successfully',
@@ -48,7 +48,7 @@ export const useCreateIdentity = (options: CustomMutationOptions = {}) => {
 	});
 };
 
-export const useEditIdentity = (options: CustomMutationOptions = {}) => {
+export const useEditEmailVerificationCode = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
 		successMessage = 'Verification code updated successfully',
