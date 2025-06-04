@@ -9,24 +9,39 @@ import {
 	apiUnauthorized,
 	handleApiError,
 } from '@/app/api/_utils';
+import { getValidatedParamsFromUrl } from '@/utils';
 
 const postIdentitySchema = z.object({
 	name: z.string().min(1),
 	website: z.string().min(1).optional(),
 	email: z.string().email(),
 });
-export type PostIdentityData = z.infer<typeof postIdentitySchema>;
+const getIdentityFilterSchema = z.object({
+	email: z.string().email().optional(),
+});
 
-export async function GET() {
+export type PostIdentityData = z.infer<typeof postIdentitySchema>;
+export type IdentityFilterData = z.infer<typeof getIdentityFilterSchema>;
+
+export async function GET(req: NextRequest) {
 	try {
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
 		}
 
+		const validatedFilters = getValidatedParamsFromUrl(req.url, getIdentityFilterSchema);
+
+		if (!validatedFilters.success) {
+			return apiBadRequest(validatedFilters.error);
+		}
+
+		const { email } = validatedFilters.data;
+
 		const identities = await prisma.identity.findMany({
 			where: {
 				userId,
+				email,
 			},
 			orderBy: {
 				updatedAt: 'desc' as const,
