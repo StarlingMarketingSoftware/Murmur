@@ -8,6 +8,7 @@ import {
 	apiUnauthorized,
 	apiUnauthorizedResource,
 	handleApiError,
+	connectOrDisconnectId,
 } from '@/app/api/_utils';
 import { AiModel, Status } from '@prisma/client';
 import { ApiRouteParams } from '@/types';
@@ -26,6 +27,7 @@ const patchCampaignSchema = z.object({
 	aiModel: z.nativeEnum(AiModel).nullable().optional(),
 	font: z.string().optional(),
 	signatureId: z.number().optional().nullable(),
+	identityId: z.number().optional().nullable(),
 	contactOperation: z
 		.object({
 			action: z.enum(['connect', 'disconnect']),
@@ -76,7 +78,8 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 			return apiBadRequest(validatedData.error);
 		}
 
-		const { signatureId, contactOperation, ...updateData } = validatedData.data;
+		const { signatureId, identityId, contactOperation, ...updateData } =
+			validatedData.data;
 
 		const updatedCampaign = await prisma.campaign.update({
 			where: {
@@ -85,12 +88,8 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 			},
 			data: {
 				...updateData,
-				signature:
-					signatureId === undefined
-						? undefined
-						: signatureId === null
-						? { disconnect: true }
-						: { connect: { id: signatureId } },
+				signature: connectOrDisconnectId(signatureId),
+				identity: connectOrDisconnectId(identityId),
 				...(contactOperation && {
 					contacts: {
 						[contactOperation.action]: contactOperation.contactIds.map((id: number) => {
