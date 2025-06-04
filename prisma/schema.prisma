@@ -41,16 +41,15 @@ enum Status {
 }
 
 model User {
-  id               Int      @id @default(autoincrement())
-  clerkId          String   @unique
-  email            String   @unique
-  murmurEmail      String?  @unique
-  firstName        String?
-  lastName         String?
-  role             UserRole @default(user)
-  aiDraftCredits   Int      @default(5)
-  aiTestCredits    Int      @default(2)
-  emailSendCredits Int      @default(1)
+  id             Int      @id @default(autoincrement())
+  clerkId        String   @unique
+  email          String   @unique
+  murmurEmail    String?  @unique
+  firstName      String?
+  lastName       String?
+  role           UserRole @default(user)
+  aiDraftCredits Int      @default(5)
+  aiTestCredits  Int      @default(2)
 
   stripeCustomerId         String?       @unique
   stripeSubscriptionId     String?
