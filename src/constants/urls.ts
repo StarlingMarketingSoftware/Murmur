@@ -70,6 +70,10 @@ export const urls = {
 			index: '/api/emails',
 			detail: ((id) => `/api/emails/${id}`) as DetailRoute,
 		},
+		identities: {
+			index: '/api/identities',
+			detail: ((id) => `/api/identities/${id}`) as DetailRoute,
+		},
 		mailgun: {
 			index: '/api/mailgun',
 		},

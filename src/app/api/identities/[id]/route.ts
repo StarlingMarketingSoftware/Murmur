@@ -17,7 +17,29 @@ const updateIdentitySchema = z.object({
 	website: z.string().min(1).optional(),
 	email: z.string().email().optional(),
 });
-export type PatchContactData = z.infer<typeof updateIdentitySchema>;
+
+export type PatchIdentityData = z.infer<typeof updateIdentitySchema>;
+
+export async function GET(req: NextRequest, { params }: { params: ApiRouteParams }) {
+	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const { id } = await params;
+		const identity = await prisma.identity.findUniqueOrThrow({
+			where: {
+				id: Number(id),
+				userId,
+			},
+		});
+
+		return apiResponse(identity);
+	} catch (error) {
+		return handleApiError(error);
+	}
+}
 
 export async function PATCH(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
