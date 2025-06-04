@@ -93,7 +93,7 @@ export async function POST(req: Request) {
 				return apiServerError('Failed to update user subscription status');
 			}
 		} else {
-			return apiBadRequest('Unhandled event type');
+			return apiBa;
 		}
 	} catch (error) {
 		return handleApiError(error);

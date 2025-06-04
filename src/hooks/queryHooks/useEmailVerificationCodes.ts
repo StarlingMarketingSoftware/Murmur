@@ -51,7 +51,7 @@ export const useCreateEmailVerificationCode = (options: CustomMutationOptions = 
 export const useEditEmailVerificationCode = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
-		successMessage = 'Verification code updated successfully',
+		successMessage = 'Verification code updated successfull',
 		errorMessage = 'Failed to update verification code',
 		onSuccess: onSuccessCallback,
 	} = options;
