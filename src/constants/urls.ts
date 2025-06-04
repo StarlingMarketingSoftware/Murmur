@@ -70,6 +70,9 @@ export const urls = {
 			index: '/api/emails',
 			detail: ((id) => `/api/emails/${id}`) as DetailRoute,
 		},
+		emailVerificationCodes: {
+			index: '/api/email-verification-codes',
+		},
 		identities: {
 			index: '/api/identities',
 			detail: ((id) => `/api/identities/${id}`) as DetailRoute,

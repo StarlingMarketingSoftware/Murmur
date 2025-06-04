@@ -6,25 +6,28 @@ import FormData from 'form-data';
 import Mailgun from 'mailgun.js';
 import {
 	apiBadRequest,
+	apiNotFound,
 	apiResponse,
 	apiUnauthorized,
 	handleApiError,
 } from '@/app/api/_utils';
 import prisma from '@/lib/prisma';
 
-// Schema for sending verification code
-const sendVerificationSchema = z.object({
+const postEmailVerificationCodeSchema = z.object({
 	email: z.string().email(),
 });
 
-// Schema for verifying code
-const verifyCodeSchema = z.object({
+const patchEmailVerificationCodeSchema = z.object({
 	email: z.string().email(),
 	code: z.string().length(6),
 });
 
-export type SendVerificationData = z.infer<typeof sendVerificationSchema>;
-export type VerifyCodeData = z.infer<typeof verifyCodeSchema>;
+export type PostEmailVerificationCodeData = z.infer<
+	typeof postEmailVerificationCodeSchema
+>;
+export type PatchEmailVerificationCodeData = z.infer<
+	typeof patchEmailVerificationCodeSchema
+>;
 
 // Generate and send verification code
 export async function POST(request: NextRequest) {
@@ -35,7 +38,7 @@ export async function POST(request: NextRequest) {
 		}
 
 		const data = await request.json();
-		const validatedData = sendVerificationSchema.safeParse(data);
+		const validatedData = postEmailVerificationCodeSchema.safeParse(data);
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
@@ -57,7 +60,6 @@ export async function POST(request: NextRequest) {
 			},
 		});
 
-		// Send email via Mailgun
 		const mailgun = new Mailgun(FormData);
 		const mg = mailgun.client({
 			username: 'api',
@@ -84,7 +86,6 @@ export async function POST(request: NextRequest) {
                 <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <tr>
                         <td style="padding: 40px 30px; text-align: center;">
-                            <!-- Replace SVG with text logo or hosted image -->
                             <div style="margin-bottom: 30px;">
                                 <h1 style="color: #333; font-size: 28px; margin: 0; font-weight: bold;">MURMUR</h1>
                             </div>
@@ -154,8 +155,6 @@ If you didn't request this verification, please ignore this email.
 		});
 	} catch (error) {
 		return handleApiError(error);
-	} finally {
-		await prisma.$disconnect();
 	}
 }
 
@@ -168,7 +167,7 @@ export async function PATCH(request: NextRequest) {
 		}
 
 		const data = await request.json();
-		const validatedData = verifyCodeSchema.safeParse(data);
+		const validatedData = patchEmailVerificationCodeSchema.safeParse(data);
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
@@ -192,13 +191,8 @@ export async function PATCH(request: NextRequest) {
 				where: { id: verificationRecord.id },
 			});
 
-			return apiBadRequest('Verification code has expired');
+			return apiNotFound('Verification code has expired');
 		}
-
-		await prisma.emailVerificationCode.update({
-			where: { id: verificationRecord.id },
-			data: { verified: true },
-		});
 
 		await prisma.emailVerificationCode.deleteMany({
 			where: { email },
@@ -210,7 +204,5 @@ export async function PATCH(request: NextRequest) {
 		});
 	} catch (error) {
 		return handleApiError(error);
-	} finally {
-		await prisma.$disconnect();
 	}
 }

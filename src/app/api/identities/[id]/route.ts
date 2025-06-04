@@ -59,9 +59,7 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 			where: {
 				id: Number(id),
 			},
-			data: {
-				...validatedData.data,
-			},
+			data: validatedData.data,
 		});
 
 		return apiResponse(updatedIdentity);
