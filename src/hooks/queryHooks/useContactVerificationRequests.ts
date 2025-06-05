@@ -91,11 +91,8 @@ export const useCheckContactVerificationRequest = (
 				'PATCH',
 				data
 			);
-			console.log('🚀 ~ mutationFn: ~ response:', response);
-			console.log(response.ok);
 			if (!response.ok) {
 				const errorData = await response.json();
-				console.log('not ok');
 				throw new Error(errorData.error);
 			}
 
