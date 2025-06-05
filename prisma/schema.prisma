@@ -212,4 +212,7 @@ model ContactVerificationRequest {
   limit                     Int?
   onlyUnverified            Boolean?
   notVerifiedSince          DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

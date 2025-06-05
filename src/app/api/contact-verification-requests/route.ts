@@ -13,20 +13,26 @@ import {
 } from '@/app/api/_utils';
 import { z } from 'zod';
 
-const postContactVerificationSchema = z.object({
+const postContactVerificationRequestSchema = z.object({
 	query: z.string().optional(),
 	limit: z.coerce.number().optional(),
 	onlyUnverified: z.coerce.boolean().optional().default(false),
 	notVerifiedSince: z.coerce.date().optional(),
 });
-const patchContactVerificationSchema = z.object({
+const patchContactVerificationRequestSchema = z.object({
 	fileId: z.string(),
 });
 
-export type PostVerifyContactsData = z.infer<typeof postContactVerificationSchema>;
-export type PatchVerifyContactsData = z.infer<typeof patchContactVerificationSchema>;
+export type PostContactVerificationRequestData = z.infer<
+	typeof postContactVerificationRequestSchema
+>;
+export type PatchContactVerificationRequestData = z.infer<
+	typeof patchContactVerificationRequestSchema
+>;
 
-const generateWhereClause = (data: PostVerifyContactsData): Prisma.ContactWhereInput => {
+const generateWhereClause = (
+	data: PostContactVerificationRequestData
+): Prisma.ContactWhereInput => {
 	const { query, onlyUnverified, notVerifiedSince } = data;
 	const whereClause: Prisma.ContactWhereInput = {};
 	if (query) {
@@ -47,6 +53,25 @@ const generateWhereClause = (data: PostVerifyContactsData): Prisma.ContactWhereI
 	return whereClause;
 };
 
+export async function GET() {
+	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const contactVerificationRequests = await prisma.contactVerificationRequest.findMany({
+			orderBy: {
+				createdAt: 'desc',
+			},
+		});
+
+		return apiResponse(contactVerificationRequests);
+	} catch (error) {
+		return handleApiError(error);
+	}
+}
+
 export async function POST(req: Request) {
 	try {
 		const { userId } = await auth();
@@ -55,7 +80,7 @@ export async function POST(req: Request) {
 		}
 
 		const body = await req.json();
-		const validatedData = postContactVerificationSchema.safeParse(body);
+		const validatedData = postContactVerificationRequestSchema.safeParse(body);
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
@@ -112,7 +137,7 @@ export async function PATCH(req: Request) {
 		}
 
 		const body = await req.json();
-		const validatedData = patchContactVerificationSchema.safeParse(body);
+		const validatedData = patchContactVerificationRequestSchema.safeParse(body);
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
