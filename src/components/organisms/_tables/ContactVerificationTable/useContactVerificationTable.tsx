@@ -82,7 +82,7 @@ export const useContactVerificationTable = () => {
 	} = useCheckContactVerificationRequest();
 
 	const handleVerifyAllContacts = () => {
-		verifyContacts({ onlyUnverified: true, limit: 1 });
+		verifyContacts({ onlyUnverified: true });
 	};
 
 	return {
