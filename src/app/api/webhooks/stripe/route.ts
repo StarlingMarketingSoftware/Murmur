@@ -7,6 +7,7 @@ import { getSubscriptionTierWithPriceId, getTestEmailCount } from '@/utils';
 import { calcAiCredits } from './calcAiCredits';
 import {
 	apiBadRequest,
+	apiNotFound,
 	apiResponse,
 	apiServerError,
 	handleApiError,
@@ -48,6 +49,18 @@ export async function POST(req: Request) {
 				const subscriptionTier = getSubscriptionTierWithPriceId(priceId);
 				const aiDraftCredits = await calcAiCredits(subscriptionTier, priceId);
 
+				const user = await prisma.user.findFirst({
+					where: {
+						stripeCustomerId: subscription.customer as string,
+					},
+				});
+
+				if (!user) {
+					return apiNotFound(
+						'Subscription failed to update. Stripe customer ID does not exist in the database.'
+					);
+				}
+
 				const res = await prisma.user.update({
 					where: {
 						stripeCustomerId: subscription.customer as string,
@@ -71,6 +84,16 @@ export async function POST(req: Request) {
 		} else if (event.type === 'customer.subscription.deleted') {
 			const subscription: Stripe.Subscription = event.data.object;
 			try {
+				const user = await prisma.user.findFirst({
+					where: {
+						stripeCustomerId: subscription.customer as string,
+					},
+				});
+
+				if (!user) {
+					return apiResponse('User not found for the given Stripe customer ID');
+				}
+
 				const res = await prisma.user.update({
 					where: {
 						stripeCustomerId: subscription.customer as string,
@@ -93,7 +116,7 @@ export async function POST(req: Request) {
 				return apiServerError('Failed to update user subscription status');
 			}
 		} else {
-			return apiBadRequest('Unhandled event type');
+			return apiResponse('Unhandled event type');
 		}
 	} catch (error) {
 		return handleApiError(error);
