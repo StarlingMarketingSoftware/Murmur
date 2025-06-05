@@ -39,7 +39,7 @@ export const useCreateContactVerificationRequest = (
 	const {
 		suppressToasts = false,
 		successMessage = 'Contacts successfully sent for verification',
-		errorMessage = 'Failed to sent contacts for verification',
+		errorMessage = 'Failed to send contacts for verification',
 		onSuccess: onSuccessCallback,
 	} = options;
 
