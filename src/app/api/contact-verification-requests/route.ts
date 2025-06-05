@@ -159,7 +159,7 @@ export async function PATCH(req: Request) {
 		const isVerificationComplete = await getZeroBounceFileStatus(fileId);
 
 		if (!isVerificationComplete) {
-			apiResponse({
+			return apiResponse({
 				status: 'processing',
 				message: 'Verification is still in progress. Please wait for completion.',
 			});
