@@ -24,6 +24,12 @@ enum EmailVerificationStatus {
   unknown
 }
 
+enum ContactVerificationRequestStatus {
+  processing
+  completed
+  failed
+}
+
 enum AiModel {
   sonar
   sonar_pro @map("sonar-pro")
@@ -195,4 +201,15 @@ model EmailVerificationCode {
   @@unique([email, code])
   @@index([email])
   @@index([expiresAt])
+}
+
+model ContactVerificationRequest {
+  id                        Int                              @id @default(autoincrement())
+  fileId                    String                           @unique
+  estimatedTimeOfCompletion DateTime
+  status                    ContactVerificationRequestStatus @default(processing)
+  query                     String?
+  limit                     Int?
+  onlyUnverified            Boolean?
+  notVerifiedSince          DateTime?
 }
