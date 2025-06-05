@@ -59,6 +59,10 @@ export const urls = {
 			index: '/api/contact-list',
 			detail: ((id) => `/api/contact-list/${id}`) as DetailRoute,
 		},
+		contactVerificationRequests: {
+			index: '/api/contact-verification-requests',
+			detail: ((id) => `/api/contact-verification-requests/${id}`) as DetailRoute,
+		},
 		contacts: {
 			index: '/api/contacts',
 			batch: {
