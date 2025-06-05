@@ -20,7 +20,6 @@ const patchUserSchema = z.object({
 	stripeSubscriptionId: z.string().optional().nullable(),
 	stripeSubscriptionStatus: z.string().optional().nullable(),
 	stripePriceId: z.string().optional().nullable(),
-	emailSendCredits: z.number().int().optional(),
 });
 export type PatchUserData = z.infer<typeof patchUserSchema>;
 

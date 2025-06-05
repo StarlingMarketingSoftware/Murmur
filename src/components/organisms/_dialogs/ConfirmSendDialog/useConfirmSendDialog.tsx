@@ -6,7 +6,6 @@ import {
 import { useEditCampaign, useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { useMe } from '@/hooks/useMe';
-import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { EmailStatus } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -42,7 +41,6 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 
 	const queryClient = useQueryClient();
 	const draftEmailCount = draftEmails.length;
-	const hasReachedSendingLimit = !subscriptionTier && user && user?.emailSendCredits <= 0;
 
 	const form = useForm<z.infer<typeof addSenderInfoSchema>>({
 		resolver: zodResolver(addSenderInfoSchema),
@@ -66,8 +64,6 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 	const { mutateAsync: updateEmail } = useEditEmail({
 		suppressToasts: true,
 	});
-
-	const { mutateAsync: updateEmailSendCredits } = useEditUser({ suppressToasts: true });
 
 	const handleSend = async () => {
 		setIsOpen(false);
@@ -104,12 +100,6 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 				});
 				setSendingProgress((prev) => prev + 1);
 				queryClient.invalidateQueries({ queryKey: ['campaign', Number(campaignId)] });
-				if (!subscriptionTier && user) {
-					await updateEmailSendCredits({
-						clerkId: user.clerkId,
-						data: { emailSendCredits: user.emailSendCredits - 1 },
-					});
-				}
 			}
 		}
 	};
@@ -118,7 +108,6 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		handleSend,
 		form,
 		draftEmailCount,
-		hasReachedSendingLimit,
 		isOpen,
 		setIsOpen,
 	};

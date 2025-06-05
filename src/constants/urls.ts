@@ -59,6 +59,10 @@ export const urls = {
 			index: '/api/contact-list',
 			detail: ((id) => `/api/contact-list/${id}`) as DetailRoute,
 		},
+		contactVerificationRequests: {
+			index: '/api/contact-verification-requests',
+			detail: ((id) => `/api/contact-verification-requests/${id}`) as DetailRoute,
+		},
 		contacts: {
 			index: '/api/contacts',
 			batch: {
@@ -69,6 +73,13 @@ export const urls = {
 		emails: {
 			index: '/api/emails',
 			detail: ((id) => `/api/emails/${id}`) as DetailRoute,
+		},
+		emailVerificationCodes: {
+			index: '/api/email-verification-codes',
+		},
+		identities: {
+			index: '/api/identities',
+			detail: ((id) => `/api/identities/${id}`) as DetailRoute,
 		},
 		mailgun: {
 			index: '/api/mailgun',

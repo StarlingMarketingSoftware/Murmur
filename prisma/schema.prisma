@@ -24,6 +24,12 @@ enum EmailVerificationStatus {
   unknown
 }
 
+enum ContactVerificationRequestStatus {
+  processing
+  completed
+  failed
+}
+
 enum AiModel {
   sonar
   sonar_pro @map("sonar-pro")
@@ -41,16 +47,15 @@ enum Status {
 }
 
 model User {
-  id               Int      @id @default(autoincrement())
-  clerkId          String   @unique
-  email            String   @unique
-  murmurEmail      String?  @unique
-  firstName        String?
-  lastName         String?
-  role             UserRole @default(user)
-  aiDraftCredits   Int      @default(5)
-  aiTestCredits    Int      @default(2)
-  emailSendCredits Int      @default(1)
+  id             Int      @id @default(autoincrement())
+  clerkId        String   @unique
+  email          String   @unique
+  murmurEmail    String?  @unique
+  firstName      String?
+  lastName       String?
+  role           UserRole @default(user)
+  aiDraftCredits Int      @default(5)
+  aiTestCredits  Int      @default(2)
 
   stripeCustomerId         String?       @unique
   stripeSubscriptionId     String?
@@ -62,6 +67,7 @@ model User {
   campaigns                Campaign[]
   signatures               Signature[]
   contactLists             ContactList[]
+  identities               Identity[]
 }
 
 model Contact {
@@ -146,9 +152,26 @@ model Campaign {
   senderName  String?
   signatureId Int?
   signature   Signature? @relation(fields: [signatureId], references: [id], onDelete: Cascade)
+  identityId  Int?
+  identity    Identity?  @relation(fields: [identityId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Identity {
+  id      Int     @id @default(autoincrement())
+  name    String
+  website String?
+  email   String
+
+  userId    String
+  user      User       @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  campaigns Campaign[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   @@index([userId])
 }
@@ -165,4 +188,31 @@ model Signature {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+model EmailVerificationCode {
+  id        Int      @id @default(autoincrement())
+  email     String
+  code      String
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([email, code])
+  @@index([email])
+  @@index([expiresAt])
+}
+
+model ContactVerificationRequest {
+  id                        Int                              @id @default(autoincrement())
+  fileId                    String                           @unique
+  estimatedTimeOfCompletion DateTime
+  status                    ContactVerificationRequestStatus @default(processing)
+  query                     String?
+  limit                     Int?
+  onlyUnverified            Boolean?
+  notVerifiedSince          DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
