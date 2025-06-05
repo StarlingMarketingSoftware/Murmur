@@ -128,12 +128,11 @@ export async function sendFileToZeroBounce(
  * Checks the status of a file validation job
  */
 export async function getZeroBounceFileStatus(
-	fileId: string
+	fileId: string,
+	apiKey: string
 ): Promise<ZeroBounceFileResponse> {
-	const apiKey = process.env.ZERO_BOUNCE_API_KEY_MURMUR;
-
-	if (!apiKey) {
-		throw new Error('API key not found in environment');
+	if (!apiKey || !fileId) {
+		throw new Error('API key and file ID are required');
 	}
 
 	try {
@@ -263,7 +262,7 @@ export const waitForZeroBounceCompletion = async (
 
 	while (Date.now() - startTime < timeoutMs) {
 		try {
-			const statusResult = await getZeroBounceFileStatus(fileId);
+			const statusResult = await getZeroBounceFileStatus(fileId, zeroBounceApiKey);
 
 			console.log(
 				`ZeroBounce file status: ${statusResult.file_status} (${Math.round(
