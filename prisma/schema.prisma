@@ -90,7 +90,6 @@ model Contact {
 
   emailValidationStatus    EmailVerificationStatus @default(unknown)
   emailValidationSubStatus String?
-  emailValidationScore     Int?
   emailValidatedAt         DateTime?
 
   createdAt DateTime @default(now())

@@ -384,12 +384,6 @@ export const processZeroBounceResults = async (
 					...contact,
 					emailValidationStatus: getValidEmailStatus(validationResult.status),
 					emailValidationSubStatus: validationResult.sub_status || null,
-					emailValidationScore:
-						validationResult.zbscore !== undefined
-							? typeof validationResult.zbscore === 'string'
-								? parseInt(validationResult.zbscore, 10)
-								: validationResult.zbscore
-							: null,
 					emailValidatedAt: new Date(),
 				};
 			}
