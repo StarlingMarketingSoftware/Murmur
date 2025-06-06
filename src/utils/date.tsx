@@ -13,5 +13,5 @@ export const yyyyMMddHHmm = (date: Date | undefined): string | undefined | null 
 	return _format(date, 'yyyy/MM/dd HH:mm');
 };
 export const MMddyyyyHHmm = (date: Date | undefined): string | undefined | null => {
-	return _format(date, 'MM/dd/yyyy HH:mm');
+	return _format(date, 'MM/dd/yyyy h:mm a');
 };
