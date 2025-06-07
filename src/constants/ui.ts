@@ -11,7 +11,7 @@ export const FONT_OPTIONS: Font[] = [
 export const DEFAULT_FONT = 'Times New Roman';
 
 export const RESTRICTED_FEATURE_MESSAGES = {
-	viewEmails: 'Upgrade your subscription to view recipient emails.',
+	viewEmails: 'Upgrade your subscription to view recipient emails before sending.',
 	freePlanSendingLimit:
 		'You have reached the sending limit on the free plan. Please sign up for a subscription to send more emails.',
 };
