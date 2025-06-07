@@ -15,7 +15,6 @@ export interface ViewEditEmailDialogProps {
 }
 
 const editEmailSchema = z.object({
-	email: z.string(),
 	subject: z.string().min(1, { message: 'Subject is required.' }),
 	message: z.string().min(1, { message: 'Message is required.' }),
 });
@@ -26,7 +25,6 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 	const form = useForm<z.infer<typeof editEmailSchema>>({
 		resolver: zodResolver(editEmailSchema),
 		defaultValues: {
-			email: email?.contact.email,
 			subject: email?.subject || '',
 			message: email?.message || '',
 		},
@@ -34,7 +32,6 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 
 	const resetFormToCurrentEmail = () => {
 		if (email) {
-			form.setValue('email', email.contact.email);
 			form.setValue('subject', email.subject);
 			form.setValue('message', email.message);
 		}

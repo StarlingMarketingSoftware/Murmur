@@ -8,7 +8,7 @@ export interface RecipientAddressLockableInputProps {
 export const useRecipientAddressLockableInput = (
 	props: RecipientAddressLockableInputProps
 ) => {
-	const { overrideTierShowEmail = false, email } = props;
+	const { overrideTierShowEmail, email } = props;
 	const { subscriptionTier } = useMe();
 	const isEmailVisibleOnTier = subscriptionTier?.viewEmailAddresses;
 	const displayEmail = isEmailVisibleOnTier || overrideTierShowEmail;

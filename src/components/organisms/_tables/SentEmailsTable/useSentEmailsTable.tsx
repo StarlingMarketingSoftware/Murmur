@@ -62,7 +62,7 @@ export const useSentEmailsTable = (props: SentEmailsTableProps) => {
 			id: 'sentAt',
 			accessorFn: (row) => row.sentAt,
 			header: ({ column }) => {
-				return <TableSortingButton column={column} label="sentAt" />;
+				return <TableSortingButton column={column} label="Sent At" />;
 			},
 			cell: ({ row }) => {
 				const value = new Date(row.getValue('sentAt'));
