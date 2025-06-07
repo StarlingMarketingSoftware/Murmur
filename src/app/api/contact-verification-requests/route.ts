@@ -188,19 +188,23 @@ export async function PATCH(req: Request) {
 
 		const verifiedContacts = await processZeroBounceResults(fileId, contacts);
 
-		const res = await prisma.$transaction(
-			verifiedContacts.map((contact) =>
-				prisma.contact.update({
+		for (const contact of verifiedContacts) {
+			try {
+				await prisma.contact.update({
 					where: { id: contact.id },
 					data: {
 						emailValidationStatus: contact.emailValidationStatus,
 						emailValidationSubStatus: contact.emailValidationSubStatus,
-						emailValidationScore: contact.emailValidationScore,
 						emailValidatedAt: contact.emailValidatedAt,
 					},
-				})
-			)
-		);
+				});
+				console.log(
+					`Contact ${contact.id} updated successfully. Status: ${contact.emailValidationStatus}`
+				);
+			} catch (error) {
+				console.error(`Failed to update contact ${contact.id}:`, error);
+			}
+		}
 
 		await prisma.contactVerificationRequest.update({
 			where: {
@@ -213,7 +217,6 @@ export async function PATCH(req: Request) {
 
 		return apiResponse({
 			message: 'Verification completed for all contacts ',
-			data: res,
 		});
 	} catch (error) {
 		return handleApiError(error);

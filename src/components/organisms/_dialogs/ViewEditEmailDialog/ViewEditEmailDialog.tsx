@@ -24,6 +24,7 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
+import { RecipientAddressLockableInput } from '@/components/atoms/RecipientAddressLockableInput/RecipientAddressLockableInput';
 
 export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 	const {
@@ -37,6 +38,7 @@ export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 		isPendingEditEmail,
 		resetFormToCurrentEmail,
 		isEditable,
+		showRecipientEmail,
 	} = useViewEditEmailDialog(props);
 
 	return (
@@ -58,6 +60,10 @@ export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 						<Form {...form}>
 							<form onSubmit={form.handleSubmit(handleSave)}>
 								<div className="space-y-4">
+									<RecipientAddressLockableInput
+										email={email.contact.email}
+										overrideTierShowEmail={showRecipientEmail}
+									/>
 									<FormField
 										control={form.control}
 										name="subject"

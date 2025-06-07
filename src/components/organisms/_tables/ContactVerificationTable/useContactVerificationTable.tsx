@@ -12,8 +12,35 @@ import {
 	ContactVerificationRequestStatus,
 } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+const verificationFormSchema = z.object({
+	limit: z
+		.number({
+			invalid_type_error: 'Limit must be a number',
+		})
+		.int('Limit must be a whole number')
+		.positive('Limit must be greater than 0')
+		.max(10000, 'Limit cannot exceed 10,000 contacts')
+		.optional(),
+	onlyUnverified: z.boolean().default(true),
+	query: z.string().email('Must be a valid email address').optional().or(z.literal('')),
+});
+
+type VerificationFormData = z.infer<typeof verificationFormSchema>;
 
 export const useContactVerificationTable = () => {
+	const form = useForm<VerificationFormData>({
+		resolver: zodResolver(verificationFormSchema),
+		defaultValues: {
+			limit: 1,
+			onlyUnverified: true,
+			query: '',
+		},
+	});
+
 	const columns: ColumnDef<ContactVerificationRequest>[] = [
 		{
 			accessorKey: 'estimatedTimeOfCompletion',
@@ -84,6 +111,13 @@ export const useContactVerificationTable = () => {
 	const handleVerifyAllContacts = () => {
 		verifyContacts({ onlyUnverified: true });
 	};
+	const onSubmit = (data: VerificationFormData) => {
+		verifyContacts({
+			onlyUnverified: data.onlyUnverified,
+			limit: data.limit,
+			query: data.query && data.query.trim() !== '' ? data.query : undefined,
+		});
+	};
 
 	return {
 		columns,
@@ -94,5 +128,7 @@ export const useContactVerificationTable = () => {
 		checkVerificationRequest,
 		isPendingCheckVerificationRequest,
 		handleVerifyAllContacts,
+		form,
+		onSubmit,
 	};
 };
