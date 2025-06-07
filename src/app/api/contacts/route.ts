@@ -10,6 +10,7 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { getValidatedParamsFromUrl } from '@/utils';
+import { EmailVerificationStatus } from '@prisma/client';
 
 const createContactSchema = z.object({
 	name: z.string().optional(),
@@ -44,9 +45,12 @@ export async function GET(req: NextRequest) {
 		const contacts = await prisma.contact.findMany({
 			where: {
 				contactListId: Number(contactListId),
+				emailValidationStatus: {
+					equals: EmailVerificationStatus.valid,
+				},
 			},
 			orderBy: {
-				email: 'desc',
+				company: 'asc',
 			},
 		});
 

@@ -195,7 +195,6 @@ export async function PATCH(req: Request) {
 					data: {
 						emailValidationStatus: contact.emailValidationStatus,
 						emailValidationSubStatus: contact.emailValidationSubStatus,
-						emailValidationScore: contact.emailValidationScore,
 						emailValidatedAt: contact.emailValidatedAt,
 					},
 				});

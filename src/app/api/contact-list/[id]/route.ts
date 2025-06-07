@@ -11,6 +11,7 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { ApiRouteParams } from '@/types';
+import { EmailVerificationStatus } from '@prisma/client';
 
 const updateContactListSchema = z.object({
 	name: z.string().min(1).optional(),
@@ -71,7 +72,11 @@ export async function GET(req: NextRequest, { params }: { params: ApiRouteParams
 				id: Number(id),
 			},
 			include: {
-				contacts: true,
+				contacts: {
+					where: {
+						emailValidationStatus: EmailVerificationStatus.valid,
+					},
+				},
 			},
 		});
 
