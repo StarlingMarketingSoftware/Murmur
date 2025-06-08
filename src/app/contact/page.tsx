@@ -69,7 +69,7 @@ const Contact = () => {
 				You can reach us at any time, on any day, and we will get back to you immediately.
 				We run this business to the highest degree of excellence we possibly can, and we
 				seek to serve you to the best of our ability, according to the task at hand.
-			</TypographyP>{' '}
+			</TypographyP>
 			<Card>
 				<CardHeader className="">
 					<CardTitle>Send us a message</CardTitle>
