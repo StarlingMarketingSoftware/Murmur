@@ -1,16 +1,21 @@
 import { CommonIconProps, defaultPathClassName } from '@/utils';
 import { FC } from 'react';
 export const StarlingLogo: FC<CommonIconProps> = (props) => {
-	const { size = '100%', className, pathClassName = defaultPathClassName } = props;
+	const {
+		width = '100%',
+		height = '100%',
+		className,
+		pathClassName = defaultPathClassName,
+	} = props;
 	return (
 		<svg
+			height={height}
 			id="Layer_2"
 			data-name="Layer 2"
 			xmlns="http://www.w3.org/2000/svg"
 			viewBox="0 0 844.64 287.31"
 			className={className}
-			width={size}
-			height={size}
+			width={width}
 		>
 			<g id="Layer_1-2" data-name="Layer 1-2">
 				<g id="TEST_6" data-name="TEST 6">

@@ -66,6 +66,7 @@
 		"react-hook-form": "^7.55.0",
 		"react-icons": "^5.5.0",
 		"react-infinite-logo-slider": "^1.1.4",
+		"react-player": "^2.16.0",
 		"react-redux": "^9.2.0",
 		"sonner": "^2.0.1",
 		"string-similarity": "^4.0.4",

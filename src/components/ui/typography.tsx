@@ -22,10 +22,7 @@ export function TypographyH1({ children, className }: TypographyProps) {
 export function TypographyH2({ children, className }: TypographyProps) {
 	return (
 		<h2
-			className={twMerge(
-				'scroll-m-20 pb-2 text-3xl font-semibold  first:mt-0',
-				className
-			)}
+			className={twMerge('scroll-m-20 pb-2 text-3xl font-normal first:mt-0', className)}
 		>
 			{children}
 		</h2>
@@ -50,7 +47,7 @@ export function TypographyH4({ children, className }: TypographyProps) {
 
 export function TypographyP({ children, className }: TypographyProps) {
 	return (
-		<p className={twMerge('leading-7 [&:not(:first-child)]:mt-6 text-xl', className)}>
+		<p className={twMerge('leading-7 [&:not(:first-child)]:mt-6 text-[26px]', className)}>
 			{children}
 		</p>
 	);

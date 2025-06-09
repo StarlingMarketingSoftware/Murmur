@@ -1,12 +1,17 @@
 import { CommonIconProps, defaultPathClassName } from '@/utils';
 import { FC } from 'react';
 export const Birds: FC<CommonIconProps> = (props) => {
-	const { size = '100%', className, pathClassName = defaultPathClassName } = props;
+	const {
+		width = '100%',
+		height = '100%',
+		className,
+		pathClassName = defaultPathClassName,
+	} = props;
 	return (
 		<svg
 			className={className}
-			width={size}
-			height={size}
+			width={width}
+			height={height}
 			id="BIRDS_1"
 			xmlns="http://www.w3.org/2000/svg"
 			viewBox="0 0 2078.36 1645.64"

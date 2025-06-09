@@ -1,11 +1,17 @@
 import { CommonIconProps, defaultPathClassName } from '@/utils';
 import { FC } from 'react';
 const Logo: FC<CommonIconProps> = (props) => {
-	const { size = '100%', pathClassName = defaultPathClassName } = props;
+	const {
+		width = '100%',
+		height = '100%',
+		className,
+		pathClassName = defaultPathClassName,
+	} = props;
 	return (
 		<svg
-			width={size}
-			height={size}
+			className={className}
+			width={width}
+			height={height}
 			id="Layer_1"
 			data-name="Layer 1"
 			xmlns="http://www.w3.org/2000/svg"
