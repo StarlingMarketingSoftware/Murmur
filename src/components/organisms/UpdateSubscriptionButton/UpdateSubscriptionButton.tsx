@@ -43,8 +43,10 @@ const UpdateSubscriptionButton: FC<UpdateSubscriptionButtonProps> = ({
 			onClick={handleClick}
 			disabled={isPending}
 			isLoading={isPending}
+			size="xl"
+			variant="light"
 		>
-			{'Switch to This Plan'}
+			Buy Now
 		</Button>
 	);
 };

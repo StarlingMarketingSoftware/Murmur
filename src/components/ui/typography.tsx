@@ -31,7 +31,7 @@ export function TypographyH2({ children, className }: TypographyProps) {
 
 export function TypographyH3({ children, className }: TypographyProps) {
 	return (
-		<h3 className={twMerge('scroll-m-20 text-2xl font-semibold ', className)}>
+		<h3 className={twMerge('scroll-m-20 text-2xl font-normal ', className)}>
 			{children}
 		</h3>
 	);
@@ -39,15 +39,18 @@ export function TypographyH3({ children, className }: TypographyProps) {
 
 export function TypographyH4({ children, className }: TypographyProps) {
 	return (
-		<h4 className={twMerge('scroll-m-20 text-xl font-semibold ', className)}>
-			{children}
-		</h4>
+		<h4 className={twMerge('scroll-m-20 text-xl font-normal ', className)}>{children}</h4>
 	);
 }
 
 export function TypographyP({ children, className }: TypographyProps) {
 	return (
-		<p className={twMerge('leading-7 [&:not(:first-child)]:mt-6 text-[26px]', className)}>
+		<p
+			className={twMerge(
+				'leading-7 [&:not(:first-child)]:mt-6 text-[26px] font-normal',
+				className
+			)}
+		>
 			{children}
 		</p>
 	);
@@ -108,6 +111,8 @@ export function TypographySmall({ children, className }: TypographyProps) {
 
 export function TypographyMuted({ children, className }: TypographyProps) {
 	return (
-		<p className={twMerge('text-lg text-muted-foreground', className)}>{children}</p>
+		<p className={twMerge('text-lg text-muted-foreground font-normal', className)}>
+			{children}
+		</p>
 	);
 }

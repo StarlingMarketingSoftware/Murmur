@@ -7,34 +7,16 @@ import { TypographyH2, TypographyH3, TypographyP } from '@/components/ui/typogra
 import { urls } from '@/constants/urls';
 import { SignUpButton, useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
-import { LogoList } from '@/components/molecules/PromotionLogos/LogoList';
 import { PromotionLogos } from '@/components/molecules/PromotionLogos/PromotionLogos';
+import ReactPlayer from 'react-player';
+import { twMerge } from 'tailwind-merge';
+import { ReviewCard } from '@/components/molecules/ReviewCard/ReviewCard';
+import { FAQ, Review } from '@/types';
+import Image from 'next/image';
+import { ProductList } from '@/components/organisms/ProductList/ProductList';
+import { FaqSection } from '@/components/molecules/FaqSection/FaqSection';
 
-const ReactPlayer = dynamic(() => import('react-player/youtube'), {});
-
-// const imageData = [
-// 	{
-// 		url: '/frontPhoto1.jpg',
-// 		alt: 'Automated email marketing campaign user.',
-// 		width: 4583,
-// 		height: 3055,
-// 	},
-// 	{
-// 		url: '/frontPhoto2.jpg',
-// 		alt: 'Automated email marketing campaign user',
-// 		width: 5353,
-// 		height: 3569,
-// 	},
-// 	{
-// 		url: '/frontPhoto3.jpg',
-// 		alt: 'Automated email marketing campaign user.',
-// 		width: 3180,
-// 		height: 2120,
-// 	},
-// ];
-
-const emailStats = [
+const EMAIL_STATS = [
 	{
 		value: '115%',
 		label: 'More Responses',
@@ -45,7 +27,60 @@ const emailStats = [
 	},
 	{
 		value: '10x',
-		label: 'More Connection',
+		label: 'More Connections',
+	},
+];
+
+const REVIEWS: Review[] = [
+	{
+		text: 'When I was at Columbia founding Lotreck Music, a tool like Murmur would have been an absolute game changer!”',
+		fullName: 'Robert Lotreck',
+		company: 'Lotreck Music LLC',
+		photoUrl: '/photos/jeremyAvatar.jpg',
+	},
+	{
+		text: 'Talking to new folks is one of the biggest challenges to overcome as a small business owner. When my husband and I started using Murmur to help us book more events for our catering business, it brought us our busiest month to date!',
+		fullName: 'Julia Bennett',
+		company: 'Wilmington Catering',
+		photoUrl: '/photos/jeremyAvatar.jpg',
+	},
+	{
+		text: `It's nuts! So we use a bunch of AI related tools. We've even used tools that automate parts of email sending process. Starling's Murmur does this with a lot of precision and a lot of detail.`,
+		fullName: 'Jeremy Ben-Meir',
+		company: 'PointOne Technologies',
+		photoUrl: '/photos/jeremyAvatar.jpg',
+	},
+	{
+		text: `I was able to get done in a day what it took weeks to do in the past! It used to be a chore to get our emails out. We've alleviated a significant time constraint.`,
+		fullName: 'Jack Carter',
+		company: 'Radiance Pharmaceuticals',
+		photoUrl: '/photos/jeremyAvatar.jpg',
+	},
+	{
+		text: `After exhausting every marketing tool on the market, we found Murmur delivers exactly what we needed. The team is intelligent and responsive.`,
+		fullName: 'Suki Lee',
+		company: 'Nexora Solutions',
+		photoUrl: '/photos/jeremyAvatar.jpg',
+	},
+];
+
+const FAQS: FAQ[] = [
+	{
+		question: 'What are my email sending limits?',
+		answer:
+			'You can send different amounts of emails based on your subscription tier (see pricing). Most users opt for the “Essentials” tier which allows for 500 outbound emails per month.',
+	},
+	{
+		question: 'How does Murmur personalize emails?',
+		answer: `Murmur utilizes a large number of AI models to aid in search; in other words, when you want to reach a recipient, Murmur is doing a series of web searches on their company to allow you, the user, to better address who you're reaching out to. This approach has been shown to radically increase open rates.`,
+	},
+	{
+		question: 'How many email addresses can I gather in Murmur?',
+		answer: `Each user can make as many searches as needed to find their desired targeted audience with extensive limits. Each search provides approximately <110 results with contacts that have been extensively validated/verified to ensure you're not reaching out to bounced emails. `,
+	},
+	{
+		question: 'How does Murmur never end up in the spam folder?',
+		answer: `We've worked hard to ensure all of the emails sent out from murmur are of a high quality where they seldom will be in a spam folder. We have done extensive development work to ensure this outcome.`,
 	},
 ];
 
@@ -128,58 +163,137 @@ export default function HomePage() {
 					your campaign, no matter the size. Paired with state of the art list-generation,
 					we have made outreach truly seamless.
 				</TypographyP>
-			</div>{' '}
+			</div>
+
 			{/* Video Section */}
 			<div className="py-16">
 				<div className="mx-auto max-w-4xl px-8">
 					<div className="relative w-full pb-[56%]">
 						<ReactPlayer
-							url="https://www.youtube.com/watch?v=M6sXcpvGoqk&rel=0&modestbranding=1&showinfo=0"
+							url="https://www.youtube.com/embed/p79hZlIlFD0?si=i1chgb0viWy7KKsv"
 							width="100%"
 							height="100%"
 							style={{ position: 'absolute', top: 0, left: 0 }}
 							controls={true}
 						/>
-					</div>{' '}
+					</div>
 					<div className="flex justify-center mt-12">
 						<Button variant="light" size="lg">
 							Book a demo
 						</Button>
 					</div>
-					<div className="h-[250px] w-full bg-gradient-to-r from-white via-gray-100 to-white max-w-[569px] mx-auto mt-24 flex justify-center items-center">
-						<TypographyH2 className="text-center text-[60px] leading-18">
-							Get the competitive edge you’ve been looking for
-						</TypographyH2>
-					</div>
-					<div className="h-[200px] w-full mx-auto mt-24">
-						<div className="flex items-center justify-center gap-40">
-							{emailStats.map((stat, index) => (
-								<div key={index} className="text-center flex flex-col">
-									<TypographyH2 className="text-[60px] font-extrabold tracking-wide p-0">
-										{stat.value}
-									</TypographyH2>
-									<TypographyP className="text-lg font-bold !mt-0">
-										{stat.label}
-									</TypographyP>
-								</div>
-							))}
+				</div>
+			</div>
+
+			<div className="h-[250px] w-full bg-gradient-to-r from-white via-gray-100 to-white max-w-[569px] mx-auto mt-24 flex justify-center items-center">
+				<TypographyH2 className="text-center text-[60px] leading-18">
+					Get the competitive edge you’ve been looking for
+				</TypographyH2>
+			</div>
+			<div className="h-[200px] w-full mx-auto mt-36">
+				<div className="flex items-center justify-center gap-40">
+					{EMAIL_STATS.map((stat, index) => (
+						<div key={index} className="text-center flex flex-col">
+							<TypographyH2 className="text-[60px] font-extrabold tracking-wide p-0">
+								{stat.value}
+							</TypographyH2>
+							<TypographyP className="text-lg font-bold !mt-0">{stat.label}</TypographyP>
 						</div>
-					</div>
-					<TypographyH3>Trusted by countless businesses</TypographyH3>
-					<div className="bg-gradient-to-b from-gray-100 to-white py-16 rounded-md w-[966px]">
-						<div
-							style={{
-								maskImage:
-									'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)',
-								WebkitMaskImage:
-									'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
-							}}
-						>
-							<PromotionLogos />
-						</div>
+					))}
+				</div>
+			</div>
+			<div className="max-w-[966px] mx-auto mt-24">
+				<TypographyH3 className="text-center text-[34px]">
+					Trusted by countless businesses
+				</TypographyH3>
+				<div className="bg-gradient-to-b from-gray-100 to-white py-16 rounded-md w-full mt-14">
+					<div
+						style={{
+							maskImage:
+								'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)',
+							WebkitMaskImage:
+								'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
+						}}
+					>
+						<PromotionLogos />
 					</div>
 				</div>
 			</div>
+
+			<div className="mx-auto mt-50 w-full bg-gradient-to-b from-gray-200 to-white py-28">
+				<TypographyH2 className="text-center text-[60px] max-w-[662px] mx-auto ">
+					Build a campaign that is truly simple.
+				</TypographyH2>
+				<div
+					className={twMerge(
+						'relative w-[1179px] aspect-video mx-auto mt-32',
+						'[&_.ytp-chrome-top-buttons]:!bg-red-500',
+						'[&_.ytp-gradient-top]:!hidden'
+					)}
+				>
+					<ReactPlayer
+						url="https://www.youtube.com/embed/p79hZlIlFD0?si=i1chgb0viWy7KKsv"
+						width="100%"
+						height="100%"
+						controls={false}
+					/>
+				</div>
+				<TypographyP className="w-[1130px] mx-auto !mt-32 text-center">
+					{`Streamlined at every step, you can leave behind the days of cluttered
+					interfaces, and complicated workflows of traditional mass-email tools. We worked
+					hard to make Murmur simple and easy to use. No longer is it frustrating to
+					manage a campaign, with Murmur it's just a few clicks and we do the rest. Giving
+					you more time to do what you love, and less busywork.`}
+				</TypographyP>
+			</div>
+
+			<div className="w-full flex gap-24 pt-17 pb-11">
+				{REVIEWS.map((review, index) => (
+					<div key={index}>
+						<ReviewCard review={review} />
+					</div>
+				))}
+			</div>
+
+			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-25">
+				<TypographyH2 className="text-center text-[60px] mx-auto">
+					Every email is personalized.
+				</TypographyH2>
+				<Image
+					src="/photos/frontPhoto1.jpg"
+					alt="Personalized Email"
+					width={942}
+					height={628}
+					className="mx-auto mt-24 rounded-sm"
+				/>
+				<TypographyP className="w-8/10 max-w-[1233px] mx-auto !mt-32 text-center">
+					{`Our technological approach to email marketing allows us to build your campaigns so that every email in the campaign is differentiated from the last. Let Murmur AI gather information about the companies and recipients you're writing to and help you craft the perfect email.`}
+				</TypographyP>
+			</div>
+
+			<div className="relative w-full bg-gradient-to-r from-transparent via-gray-200 to-transparent overflow-hidden">
+				<div className="absolute z-10 w-full h-full bg-gradient-to-r from-white via-transparent to-white pointer-events-none" />
+				<TypographyH2 className="text-center text-[60px] mx-auto py-12">
+					{`Find the plan that's right for`} <span className="italic">you</span>
+				</TypographyH2>
+			</div>
+
+			<div className="mt-28">
+				<ProductList />
+			</div>
+
+			<div className="mt-41 flex justify-center">
+				<Button variant="muted" size="lg">
+					Learn More
+				</Button>
+			</div>
+
+			<FaqSection
+				faqs={FAQS}
+				header="Support"
+				title="FAQs"
+				description="Everything you need to know about Murmur!"
+			/>
 		</main>
 	);
 }
