@@ -8,7 +8,12 @@ interface TypographyProps {
 
 export function TypographyH1({ children, className }: TypographyProps) {
 	return (
-		<h1 className={twMerge('scroll-m-20 text-4xl font-extrabold lg:text-7xl', className)}>
+		<h1
+			className={twMerge(
+				'scroll-m-20 text-4xl font-medium lg:text-7xl tracking-wide',
+				className
+			)}
+		>
 			{children}
 		</h1>
 	);
@@ -17,10 +22,7 @@ export function TypographyH1({ children, className }: TypographyProps) {
 export function TypographyH2({ children, className }: TypographyProps) {
 	return (
 		<h2
-			className={twMerge(
-				'scroll-m-20 pb-2 text-3xl font-semibold  first:mt-0',
-				className
-			)}
+			className={twMerge('scroll-m-20 pb-2 text-3xl font-normal first:mt-0', className)}
 		>
 			{children}
 		</h2>
@@ -29,7 +31,7 @@ export function TypographyH2({ children, className }: TypographyProps) {
 
 export function TypographyH3({ children, className }: TypographyProps) {
 	return (
-		<h3 className={twMerge('scroll-m-20 text-2xl font-semibold ', className)}>
+		<h3 className={twMerge('scroll-m-20 text-2xl font-normal ', className)}>
 			{children}
 		</h3>
 	);
@@ -37,15 +39,18 @@ export function TypographyH3({ children, className }: TypographyProps) {
 
 export function TypographyH4({ children, className }: TypographyProps) {
 	return (
-		<h4 className={twMerge('scroll-m-20 text-xl font-semibold ', className)}>
-			{children}
-		</h4>
+		<h4 className={twMerge('scroll-m-20 text-xl font-normal ', className)}>{children}</h4>
 	);
 }
 
 export function TypographyP({ children, className }: TypographyProps) {
 	return (
-		<p className={twMerge('leading-7 [&:not(:first-child)]:mt-6 text-xl', className)}>
+		<p
+			className={twMerge(
+				'leading-7 [&:not(:first-child)]:mt-6 text-[26px] font-normal',
+				className
+			)}
+		>
 			{children}
 		</p>
 	);
@@ -106,6 +111,8 @@ export function TypographySmall({ children, className }: TypographyProps) {
 
 export function TypographyMuted({ children, className }: TypographyProps) {
 	return (
-		<p className={twMerge('text-lg text-muted-foreground', className)}>{children}</p>
+		<p className={twMerge('text-lg text-muted-foreground font-normal', className)}>
+			{children}
+		</p>
 	);
 }

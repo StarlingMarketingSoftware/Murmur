@@ -40,8 +40,9 @@ const ManageSubscriptionButton: FC<ManageSubscriptionButtonProps> = ({
 			onClick={() => accessPortal()}
 			disabled={isPending}
 			isLoading={isPending}
+			size="xl"
 		>
-			{isUpdateSubscription ? 'Switch to This Plan' : 'Manage Your Subscription'}
+			{isUpdateSubscription ? 'Buy Now' : 'Purchased'}
 		</Button>
 	);
 };

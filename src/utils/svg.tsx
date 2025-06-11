@@ -1,7 +1,8 @@
 export const defaultPathClassName = 'fill-black';
 
 export interface CommonIconProps {
-	size?: string;
+	width?: string;
+	height?: string;
 	className?: string;
 	pathClassName?: string;
 	strokePathClassName?: string;

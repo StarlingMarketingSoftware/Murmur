@@ -38,8 +38,8 @@ export const Navbar = () => {
 	].filter((url) => !(user?.role !== 'admin' && url.path === '/admin'));
 
 	return (
-		<>
-			<div className="sticky top-0 z-10 bg-background shadow-sm dark:shadow-accent">
+		<div className="sticky top-0 z-10 bg-background shadow-sm dark:shadow-accent z-50">
+			<div className="">
 				<div className="flex h-16 items-center justify-center">
 					<Link
 						href={urls.home.index}
@@ -120,7 +120,7 @@ export const Navbar = () => {
 					})}
 				</nav>
 			</div>
-		</>
+		</div>
 	);
 };
 

@@ -1,107 +1,57 @@
 'use client';
-import { Card, CardContent, CardTitle, CardFooter } from '@/components/ui/card';
-import {
-	TypographyH1,
-	TypographyH4,
-	TypographyMuted,
-	TypographyList,
-} from '@/components/ui/typography';
+import { Card, CardContent, CardTitle } from '@/components/ui/card';
+import { TypographyH4, TypographyH3, TypographyP } from '@/components/ui/typography';
 import { twMerge } from 'tailwind-merge';
-import { useGetStripePrice } from '@/hooks/queryHooks/useStripePrices';
 import { Stripe } from 'stripe';
-import { CheckoutButton } from '../CheckoutButton/CheckoutButton';
-import { User } from '@prisma/client';
-import ManageSubscriptionButton from '@/components/organisms/ManageSubscriptionButton/ManageSubscriptionButton';
-import Spinner from '@/components/ui/spinner';
-import { ReactNode } from 'react';
-import UpdateSubscriptionButton from '@/components/organisms/UpdateSubscriptionButton/UpdateSubscriptionButton';
-import { StripeSubscriptionStatus } from '@/types';
+import { FC } from 'react';
+import { ProductCardProps, useProductCard } from './useProductCard';
+import { CheckIcon } from 'lucide-react';
 
-interface ProductCardProps {
-	product: Stripe.Product;
-	className?: string;
-	user: User | null | undefined;
-	isLink?: boolean;
-}
+export const ProductCard: FC<ProductCardProps> = (props) => {
+	const {
+		product,
+		formattedPrice,
+		period,
+		getButton,
+		handleClick,
+		marketingFeatures,
+		isLink,
+		className,
+	} = useProductCard(props);
 
-export function ProductCard({
-	product,
-	className,
-	user,
-	isLink = false,
-}: ProductCardProps) {
-	const { data: prices, isLoading } = useGetStripePrice(product.id);
-
-	const formatPrice = (price: number, currency: string) => {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: currency.toUpperCase(),
-			minimumFractionDigits: 0,
-		}).format(price / 100);
-	};
-
-	if (isLoading) return <Spinner />;
-	if (!prices || prices.length === 0) return null;
-
-	const price = prices[0];
-	const formattedPrice = formatPrice(price.unit_amount || 0, price.currency || 'usd');
-	const period = price?.recurring?.interval ? `per ${price.recurring.interval}` : '';
-
-	const getButton = (): ReactNode => {
-		const checkoutButton = (
-			<CheckoutButton user={user} priceId={price.id} buttonText="Get Started" />
-		);
-		if (!user) {
-			return checkoutButton;
-		} else if (
-			user.stripePriceId === price.id &&
-			user.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE
-		) {
-			return <ManageSubscriptionButton className="mx-auto" />;
-		} else if (user.stripeSubscriptionId) {
-			return (
-				<UpdateSubscriptionButton
-					priceId={price.id}
-					user={user}
-					productId={product.id}
-					className="mx-auto"
-				/>
-			);
-		} else {
-			return checkoutButton;
-		}
-	};
-
-	const handleClick = () => {
-		window.location.href = `/pricing/${product.id}`;
-	};
-
-	const marketingFeatures: Stripe.Product.MarketingFeature[] = product.marketing_features;
 	return (
 		<Card
 			onClick={isLink ? handleClick : undefined}
 			className={twMerge(
-				'w-[325px] p-6 flex flex-col justify-between',
+				'w-[302px] h-[715px] bg-gradient-to-b from-white to-gray-100',
 				isLink && 'cursor-pointer',
 				className
 			)}
 		>
 			<div className="">
 				<CardTitle>
-					<TypographyH4 className="text-center">{product.name}</TypographyH4>
-					<TypographyH1 className="text-8xl text-center">{formattedPrice}</TypographyH1>
-					<TypographyMuted className="text-center">{period}</TypographyMuted>
+					<TypographyH3 className="text-[30px]">{product.name}</TypographyH3>
 				</CardTitle>
+				<div className="flex gap-3 mt-9">
+					<TypographyH4 className="text-[59px] font-bold">{formattedPrice}</TypographyH4>
+					<TypographyP className="text-[27px] translate-y-2">{period}</TypographyP>
+				</div>
 				<CardContent>
-					<TypographyH4 className="text-center">What you get:</TypographyH4>
-					<TypographyList>
-						{marketingFeatures.map((feature: Stripe.Product.MarketingFeature, index) => (
-							<li key={index}>{feature.name}</li>
-						))}
-					</TypographyList>
+					<TypographyH4 className="text-[16px]">per month, billed annually</TypographyH4>
+					<div className="mt-7">{!isLink && <>{getButton()}</>}</div>
+					<div className="my-7">
+						<TypographyH4 className="">Everything in Standard</TypographyH4>
+					</div>
+					{marketingFeatures.map(
+						(feature: Stripe.Product.MarketingFeature, index: number) => (
+							<div key={index} className="flex gap-2 items-center mb-4">
+								<CheckIcon className="stroke-success shrink-0" size="20px" />
+								<p className="text-[14px]">{feature.name}</p>
+							</div>
+						)
+					)}
 				</CardContent>
 			</div>
-			{!isLink && <CardFooter>{getButton()}</CardFooter>}
 		</Card>
 	);
-}
+};
