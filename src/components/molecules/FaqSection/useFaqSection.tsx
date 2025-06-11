@@ -8,9 +8,12 @@ export interface FaqSectionProps {
 }
 
 export const useFaqSection = (props: FaqSectionProps) => {
-	const { faqs } = props;
+	const { faqs, header, title, description } = props;
 
 	return {
 		faqs,
+		header,
+		title,
+		description,
 	};
 };
