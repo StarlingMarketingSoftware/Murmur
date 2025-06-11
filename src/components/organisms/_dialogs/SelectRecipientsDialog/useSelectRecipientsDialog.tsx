@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Contact, ContactList } from '@prisma/client';
+import { Contact, ContactList, EmailVerificationStatus } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useParams } from 'next/navigation';
@@ -31,6 +31,7 @@ export const useSelectRecipientsDialog = (props: SelectRecipientsDialogProps) =>
 	const { data, isPending } = useGetContacts({
 		filters: {
 			contactListId: selectedContactList?.id,
+			verificationStatus: EmailVerificationStatus.valid,
 		},
 	});
 	const { mutate: updateCampaign } = useEditCampaign({
