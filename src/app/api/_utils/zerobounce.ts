@@ -11,6 +11,14 @@ export interface ZeroBounceFileResponse {
 	error_reason?: string;
 }
 
+export interface ZeroBounceFileUploadResponse {
+	success: boolean;
+	message?: string;
+	file_name?: string;
+	file_id?: string;
+	error_message?: string;
+}
+
 export interface ZeroBounceConfig {
 	apiKey: string;
 	returnUrl?: string;
@@ -222,9 +230,10 @@ export const verifyEmailsWithZeroBounce = async (
 
 		console.log(`Sending ${emails.length} emails to ZeroBounce for validation`);
 
-		const result = await sendFileToZeroBounce(emails, {
+		const result: ZeroBounceFileUploadResponse = await sendFileToZeroBounce(emails, {
 			apiKey: zeroBounceApiKey,
 			hasHeaderRow: true,
+
 			// You can add a return URL if you want to be notified when validation is complete
 			// returnUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/api/webhooks/zerobounce`,
 		});
@@ -233,12 +242,11 @@ export const verifyEmailsWithZeroBounce = async (
 			console.log(`ZeroBounce file uploaded successfully. File ID: ${result.file_id}`);
 			return result.file_id;
 		} else {
-			console.error('ZeroBounce file upload failed:', result.error);
+			console.error('ZeroBounce file upload failed:', result.error_message);
 			return null;
 		}
 	} catch (error) {
 		console.error('Error verifying emails with ZeroBounce:', error);
-		// Don't throw the error - we don't want email verification failure to break the contact creation
 		return null;
 	}
 };

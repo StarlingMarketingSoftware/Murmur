@@ -161,7 +161,6 @@ export async function PATCH(req: Request) {
 			fileId
 		);
 		if (zeroBounceFileResponse.file_status !== 'Complete') {
-			console.log('verification not complete');
 			return apiResponse({
 				status: 'processing',
 				message: `Verification is ${zeroBounceFileResponse.complete_percentage} of the way there. Please wait for completion.`,
