@@ -12,8 +12,9 @@ import {
 const batchCreateContactSchema = z.object({
 	contacts: z.array(
 		z.object({
-			name: z.string().optional().nullable(),
-			email: z.string().email(),
+			firstname: z.string().optional().nullable(),
+			lastname: z.string().optional().nullable(),
+			email: z.string(),
 			company: z.string().optional().nullable(),
 			website: z.string().optional().nullable(),
 			state: z.string().optional().nullable(),
@@ -37,8 +38,17 @@ export async function POST(req: NextRequest) {
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
-
 		const { contacts, contactListId } = validatedData.data;
+
+		// Remove duplicate email addresses, keeping only the first occurrence of each email
+		const uniqueContacts = contacts.filter((contact, index, arr) => {
+			return (
+				arr.findIndex((c) => c.email.toLowerCase() === contact.email.toLowerCase()) ===
+				index
+			);
+		});
+
+		const duplicatesRemoved = contacts.length - uniqueContacts.length;
 
 		const result = await prisma.$transaction(async (prisma) => {
 			const existingContacts = await prisma.contact.findMany({
@@ -46,7 +56,7 @@ export async function POST(req: NextRequest) {
 					AND: [
 						{
 							email: {
-								in: contacts.map((c) => c.email),
+								in: uniqueContacts.map((c) => c.email),
 							},
 						},
 						{
@@ -57,7 +67,7 @@ export async function POST(req: NextRequest) {
 			});
 
 			const existingEmails = new Set(existingContacts.map((c) => c.email));
-			const newContacts = contacts.filter(
+			const newContacts = uniqueContacts.filter(
 				(contact) => !existingEmails.has(contact.email)
 			);
 			const results = await prisma.contact.createMany({
@@ -66,11 +76,11 @@ export async function POST(req: NextRequest) {
 					contactListId,
 				})),
 			});
-
 			return {
 				created: results.count,
-				skipped: contacts.length - results.count,
-				skippedEmails: contacts
+				skipped: uniqueContacts.length - results.count,
+				duplicatesRemoved,
+				skippedEmails: uniqueContacts
 					.filter((contact) => existingEmails.has(contact.email))
 					.map((contact) => contact.email),
 			};
