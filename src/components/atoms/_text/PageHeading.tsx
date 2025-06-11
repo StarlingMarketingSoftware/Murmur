@@ -1,4 +1,4 @@
-import { TypographyH1 } from '@/components/ui/typography';
+import { Typography } from '@/components/ui/typography';
 import { FC, ReactNode } from 'react';
 
 interface PageHeadingProps {
@@ -6,7 +6,7 @@ interface PageHeadingProps {
 }
 
 const PageHeading: FC<PageHeadingProps> = ({ children }) => {
-	return <TypographyH1 className="text-center my-8">{children}</TypographyH1>;
+	return <Typography className="text-center my-8">{children}</Typography>;
 };
 
 export default PageHeading;

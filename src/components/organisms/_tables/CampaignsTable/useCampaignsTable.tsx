@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Campaign } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
 import { TrashIcon } from 'lucide-react';
-import { TypographyMuted } from '@/components/ui/typography';
+import { Typography } from '@/components/ui/typography';
 import { TableSortingButton } from '../../../molecules/CustomTable/CustomTable';
 import { useDeleteCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { MMddyyyyHHmm } from '@/utils';
@@ -32,7 +32,9 @@ export const useCampaignsTable = () => {
 				return name ? (
 					<div className="text-left">{name}</div>
 				) : (
-					<TypographyMuted className="text-sm">No Data</TypographyMuted>
+					<Typography variant="muted" className="text-sm">
+						No Data
+					</Typography>
 				);
 			},
 		},
@@ -46,7 +48,9 @@ export const useCampaignsTable = () => {
 				return date ? (
 					<div className="text-left">{MMddyyyyHHmm(date)}</div>
 				) : (
-					<TypographyMuted className="text-sm">No Data</TypographyMuted>
+					<Typography variant="muted" className="text-sm">
+						No Data
+					</Typography>
 				);
 			},
 		},
@@ -60,7 +64,9 @@ export const useCampaignsTable = () => {
 				return date ? (
 					<div className="text-left">{MMddyyyyHHmm(date)}</div>
 				) : (
-					<TypographyMuted className="text-sm">No Data</TypographyMuted>
+					<Typography variant="muted" className="text-sm">
+						No Data
+					</Typography>
 				);
 			},
 		},

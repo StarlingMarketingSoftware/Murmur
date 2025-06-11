@@ -1,4 +1,4 @@
-import { TypographyMuted } from '@/components/ui/typography';
+import { Typography } from '@/components/ui/typography';
 import { FC, ReactNode } from 'react';
 
 interface MutedSubtextProps {
@@ -6,7 +6,11 @@ interface MutedSubtextProps {
 }
 
 const MutedSubtext: FC<MutedSubtextProps> = ({ children }) => {
-	return <TypographyMuted className="text-center my-5">{children}</TypographyMuted>;
+	return (
+		<Typography variant="muted" className="text-center my-5">
+			{children}
+		</Typography>
+	);
 };
 
 export default MutedSubtext;

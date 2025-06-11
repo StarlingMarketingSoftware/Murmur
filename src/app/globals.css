@@ -21,8 +21,8 @@
 	--color-secondary-light: var(--secondary-light);
 	--color-secondary-light-foreground: var(--secondary-light-foreground);
 
-	--color-light: var(--light);
-	--color-light-foreground: var(--light-foreground);
+	--color-info: var(--info);
+	--color-info-foreground: var(--info-foreground);
 
 	--color-accent-foreground: var(--accent-foreground);
 	--color-accent: var(--accent);
@@ -61,8 +61,8 @@
 	--color-sidebar-foreground: var(--sidebar-foreground);
 	--color-sidebar: var(--sidebar);
 
-	--font-sans: var(--font-geist-sans);
-	--font-mono: var(--font-geist-mono);
+	--font-primary: var(--font-times);
+	--font-secondary: var(--font-inter);
 }
 
 :root {
@@ -77,8 +77,8 @@
 	--secondary-foreground: oklch(1 0 0);
 	--secondary-light: oklch(0.7906 0.1089 252.45);
 	--secondary-light-foreground: oklch(0 0 0);
-	--light: oklch(0.8853 0 0);
-	--light-foreground: oklch(0 0 0);
+	--info: oklch(0.8853 0 0);
+	--info-foreground: oklch(0 0 0);
 	--muted: oklch(0.97 0 0);
 	--muted-foreground: oklch(0.556 0 0);
 	--muted-dark: oklch(0.3715 0 0);

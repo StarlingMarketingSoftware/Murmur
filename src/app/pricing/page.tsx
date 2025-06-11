@@ -3,7 +3,7 @@
 import ManageSubscriptionButton from '@/components/organisms/ManageSubscriptionButton/ManageSubscriptionButton';
 import { useMe } from '@/hooks/useMe';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
-import { TypographyH1, TypographyP } from '@/components/ui/typography';
+import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
 
 export default function Products() {
@@ -36,11 +36,11 @@ export default function Products() {
 					<ProductCard key={product.id} product={product} user={user} />
 				))}
 			</div> */}
-			<TypographyH1>Pricing</TypographyH1>
-			<TypographyP>
+			<Typography>Pricing</Typography>
+			<Typography variant="p">
 				Standard pricing plans are coming soon. In the meantime, you can manage your
 				subscription below. For upgrades, please contact us for a custom plan.
-			</TypographyP>
+			</Typography>
 			<div className="w-full flex items-center justify-center">
 				{user?.stripeSubscriptionId ? (
 					<ManageSubscriptionButton className="mx-auto my-8" />

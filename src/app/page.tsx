@@ -3,7 +3,7 @@ import { Birds } from '@/components/atoms/_svg/Birds';
 import LogoIcon from '@/components/atoms/_svg/LogoIcon';
 import { StarlingLogo } from '@/components/atoms/_svg/StarlingLogo';
 import { Button } from '@/components/ui/button';
-import { TypographyH2, TypographyH3, TypographyP } from '@/components/ui/typography';
+import { Typography } from '@/components/ui/typography';
 import { urls } from '@/constants/urls';
 import { SignUpButton, useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
@@ -128,13 +128,15 @@ export default function HomePage() {
 						Murmur
 					</h1>
 					<div className="row-span-1 flex items-center gap-14">
-						<TypographyP className="text-sm">by</TypographyP>
+						<Typography variant="p" className="text-sm">
+							by
+						</Typography>
 						<StarlingLogo width="150px" />
 					</div>
 					<div className="row-span1" />
-					<TypographyH2 className="row-span-3 text-center text-[46px]">
+					<Typography variant="h2" className="row-span-3 text-center text-[46px]">
 						Email Campaigns Reimagined.<br></br> AI Personalization. No Contacts Required.
-					</TypographyH2>
+					</Typography>
 					<div className="row-span-2">
 						{!isSignedIn ? (
 							<SignUpButton mode="modal">
@@ -154,15 +156,15 @@ export default function HomePage() {
 			</div>
 			{/* Explanation */}
 			<div className="mx-auto max-w-[1059px] text-center mb-[121px]">
-				<TypographyH2 className="row-span-3 text-center text-[46px]">
+				<Typography variant="h2" className="row-span-3 text-center text-[46px]">
 					A dedicated AI-Integrated email tool.
-				</TypographyH2>
-				<TypographyP>
+				</Typography>
+				<Typography variant="p">
 					Murmur is an email marketing tool that utilizes the most cutting-edge Machine
 					Learning and AI technology to help you put your personal touch on every email in
 					your campaign, no matter the size. Paired with state of the art list-generation,
 					we have made outreach truly seamless.
-				</TypographyP>
+				</Typography>
 			</div>
 
 			{/* Video Section */}
@@ -186,26 +188,31 @@ export default function HomePage() {
 			</div>
 
 			<div className="h-[250px] w-full bg-gradient-to-r from-white via-gray-100 to-white max-w-[569px] mx-auto mt-24 flex justify-center items-center">
-				<TypographyH2 className="text-center text-[60px] leading-18">
+				<Typography variant="h2" className="text-center text-[60px] leading-18">
 					Get the competitive edge you’ve been looking for
-				</TypographyH2>
+				</Typography>
 			</div>
 			<div className="h-[200px] w-full mx-auto mt-36">
 				<div className="flex items-center justify-center gap-40">
 					{EMAIL_STATS.map((stat, index) => (
 						<div key={index} className="text-center flex flex-col">
-							<TypographyH2 className="text-[60px] font-extrabold tracking-wide p-0">
+							<Typography
+								variant="h2"
+								className="text-[60px] font-extrabold tracking-wide p-0"
+							>
 								{stat.value}
-							</TypographyH2>
-							<TypographyP className="text-lg font-bold !mt-0">{stat.label}</TypographyP>
+							</Typography>
+							<Typography variant="p" className="text-lg font-bold !mt-0">
+								{stat.label}
+							</Typography>
 						</div>
 					))}
 				</div>
 			</div>
 			<div className="max-w-[966px] mx-auto mt-24">
-				<TypographyH3 className="text-center text-[34px]">
+				<Typography variant="h3" className="text-center text-[34px]">
 					Trusted by countless businesses
-				</TypographyH3>
+				</Typography>
 				<div className="bg-gradient-to-b from-gray-100 to-white py-16 rounded-md w-full mt-14">
 					<div
 						style={{
@@ -221,9 +228,12 @@ export default function HomePage() {
 			</div>
 
 			<div className="mx-auto mt-50 w-full bg-gradient-to-b from-gray-200 to-white py-28">
-				<TypographyH2 className="text-center text-[60px] max-w-[662px] mx-auto ">
+				<Typography
+					variant="h2"
+					className="text-center text-[60px] max-w-[662px] mx-auto "
+				>
 					Build a campaign that is truly simple.
-				</TypographyH2>
+				</Typography>
 				<div
 					className={twMerge(
 						'relative w-[1179px] aspect-video mx-auto mt-32',
@@ -238,13 +248,13 @@ export default function HomePage() {
 						controls={false}
 					/>
 				</div>
-				<TypographyP className="w-[1130px] mx-auto !mt-32 text-center">
+				<Typography variant="p" className="w-[1130px] mx-auto !mt-32 text-center">
 					{`Streamlined at every step, you can leave behind the days of cluttered
 					interfaces, and complicated workflows of traditional mass-email tools. We worked
 					hard to make Murmur simple and easy to use. No longer is it frustrating to
 					manage a campaign, with Murmur it's just a few clicks and we do the rest. Giving
 					you more time to do what you love, and less busywork.`}
-				</TypographyP>
+				</Typography>
 			</div>
 
 			<div className="w-full flex gap-24 pt-17 pb-11">
@@ -256,9 +266,9 @@ export default function HomePage() {
 			</div>
 
 			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-25">
-				<TypographyH2 className="text-center text-[60px] mx-auto">
+				<Typography variant="p" className="text-center text-[60px] mx-auto">
 					Every email is personalized.
-				</TypographyH2>
+				</Typography>
 				<Image
 					src="/photos/frontPhoto1.jpg"
 					alt="Personalized Email"
@@ -266,16 +276,19 @@ export default function HomePage() {
 					height={628}
 					className="mx-auto mt-24 rounded-sm"
 				/>
-				<TypographyP className="w-8/10 max-w-[1233px] mx-auto !mt-32 text-center">
+				<Typography
+					variant="p"
+					className="w-8/10 max-w-[1233px] mx-auto !mt-32 text-center"
+				>
 					{`Our technological approach to email marketing allows us to build your campaigns so that every email in the campaign is differentiated from the last. Let Murmur AI gather information about the companies and recipients you're writing to and help you craft the perfect email.`}
-				</TypographyP>
+				</Typography>
 			</div>
 
 			<div className="relative w-full bg-gradient-to-r from-transparent via-gray-200 to-transparent overflow-hidden">
 				<div className="absolute z-10 w-full h-full bg-gradient-to-r from-white via-transparent to-white pointer-events-none" />
-				<TypographyH2 className="text-center text-[60px] mx-auto py-12">
+				<Typography variant="h2" className="text-center text-[60px] mx-auto py-12">
 					{`Find the plan that's right for`} <span className="italic">you</span>
-				</TypographyH2>
+				</Typography>
 			</div>
 
 			<div className="mt-28">

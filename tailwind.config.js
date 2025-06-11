@@ -10,10 +10,8 @@ module.exports = {
 	theme: {
 		extend: {
 			fontFamily: {
-				header: ['var(--font-francois)'],
-				paragraph: ['var(--font-spartan)'],
-				'header-jp': ['var(--font-zen)'],
-				'paragraph-jp': ['var(--font-noto)'],
+				primary: ['var(--font-times)'],
+				secondary: ['var(--font-inter)'],
 			},
 			colors: {
 				'ui-01': {

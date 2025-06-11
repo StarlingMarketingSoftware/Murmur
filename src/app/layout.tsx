@@ -16,6 +16,7 @@ const inter = Inter({
 
 const timesNewRoman = localFont({
 	src: '../../public/timesNewRoman.ttf',
+	variable: '--font-times',
 });
 
 export const metadata: Metadata = {
@@ -30,9 +31,12 @@ export default function RootLayout({
 }>) {
 	return (
 		<StoreProvider>
-			<html lang="en" className={timesNewRoman.className} suppressHydrationWarning>
-				{/* <html lang="en" suppressHydrationWarning> */}
-				<body className={`${inter.variable} antialiased min-h-screen flex flex-col`}>
+			<html
+				lang="en"
+				className={`${inter.variable} ${timesNewRoman.variable}`}
+				suppressHydrationWarning
+			>
+				<body className={`antialiased min-h-screen flex flex-col`}>
 					<ThemeProvider attribute="class" defaultTheme="light">
 						<SubLayout>
 							<Navbar />

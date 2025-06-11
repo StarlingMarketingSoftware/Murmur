@@ -24,7 +24,7 @@ import PageHeading from '@/components/atoms/_text/PageHeading';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
-import { TypographyP } from '@/components/ui/typography';
+import { Typography } from '@/components/ui/typography';
 
 const Contact = () => {
 	const contactFormSchema = z.object({
@@ -65,11 +65,11 @@ const Contact = () => {
 	return (
 		<AppLayout>
 			<PageHeading>Contact Us</PageHeading>
-			<TypographyP>
+			<Typography variant="p">
 				You can reach us at any time, on any day, and we will get back to you immediately.
 				We run this business to the highest degree of excellence we possibly can, and we
 				seek to serve you to the best of our ability, according to the task at hand.
-			</TypographyP>{' '}
+			</Typography>{' '}
 			<Card>
 				<CardHeader className="">
 					<CardTitle>Send us a message</CardTitle>

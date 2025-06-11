@@ -1,6 +1,6 @@
 'use client';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
-import { TypographyH4, TypographyH3, TypographyP } from '@/components/ui/typography';
+import { Typography } from '@/components/ui/typography';
 import { twMerge } from 'tailwind-merge';
 import { Stripe } from 'stripe';
 import { FC } from 'react';
@@ -30,17 +30,27 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 		>
 			<div className="">
 				<CardTitle>
-					<TypographyH3 className="text-[30px]">{product.name}</TypographyH3>
+					<Typography variant="h3" className="text-[30px] !font-primary ">
+						{product.name}
+					</Typography>
 				</CardTitle>
 				<div className="flex gap-3 mt-9">
-					<TypographyH4 className="text-[59px] font-bold">{formattedPrice}</TypographyH4>
-					<TypographyP className="text-[27px] translate-y-2">{period}</TypographyP>
+					<Typography variant="h4" className="text-[59px] font-bold">
+						{formattedPrice}
+					</Typography>
+					<Typography variant="p" className="text-[27px] translate-y-2">
+						{period}
+					</Typography>
 				</div>
 				<CardContent>
-					<TypographyH4 className="text-[16px]">per month, billed annually</TypographyH4>
+					<Typography variant="h4" className="text-[16px]">
+						per month, billed annually
+					</Typography>
 					<div className="mt-7">{!isLink && <>{getButton()}</>}</div>
 					<div className="my-7">
-						<TypographyH4 className="">Everything in Standard</TypographyH4>
+						<Typography variant="h4" className="">
+							Everything in Standard
+						</Typography>
 					</div>
 					{marketingFeatures.map(
 						(feature: Stripe.Product.MarketingFeature, index: number) => (
