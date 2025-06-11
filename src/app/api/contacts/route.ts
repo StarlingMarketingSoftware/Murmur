@@ -23,6 +23,7 @@ const createContactSchema = z.object({
 	contactListId: z.coerce.number().optional(),
 });
 const contactFilterSchema = z.object({
+	verificationStatus: z.nativeEnum(EmailVerificationStatus).optional(),
 	contactListId: z.union([z.string(), z.number()]).optional(),
 });
 export type PostContactData = z.infer<typeof createContactSchema>;
@@ -40,13 +41,13 @@ export async function GET(req: NextRequest) {
 		if (!validatedFilters.success) {
 			return apiBadRequest(validatedFilters.error);
 		}
-		const { contactListId } = validatedFilters.data;
+		const { contactListId, verificationStatus } = validatedFilters.data;
 
 		const contacts = await prisma.contact.findMany({
 			where: {
 				contactListId: Number(contactListId),
 				emailValidationStatus: {
-					equals: EmailVerificationStatus.valid,
+					equals: verificationStatus,
 				},
 			},
 			orderBy: {
