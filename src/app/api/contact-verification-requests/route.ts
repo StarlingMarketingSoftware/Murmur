@@ -10,6 +10,7 @@ import {
 	handleApiError,
 	processZeroBounceResults,
 	verifyEmailsWithZeroBounce,
+	ZeroBounceFileResponse,
 } from '@/app/api/_utils';
 import { z } from 'zod';
 
@@ -156,12 +157,14 @@ export async function PATCH(req: Request) {
 			return apiUnauthorized('Admin permission required');
 		}
 
-		const isVerificationComplete = await getZeroBounceFileStatus(fileId);
-
-		if (!isVerificationComplete) {
+		const zeroBounceFileResponse: ZeroBounceFileResponse = await getZeroBounceFileStatus(
+			fileId
+		);
+		if (zeroBounceFileResponse.file_status !== 'Complete') {
+			console.log('verification not complete');
 			return apiResponse({
 				status: 'processing',
-				message: 'Verification is still in progress. Please wait for completion.',
+				message: `Verification is ${zeroBounceFileResponse.complete_percentage} of the way there. Please wait for completion.`,
 			});
 		}
 
@@ -174,7 +177,6 @@ export async function PATCH(req: Request) {
 		if (!contactVerificationRequest) {
 			return apiBadRequest('No verification request found for the provided file ID.');
 		}
-
 		const { query, limit, onlyUnverified, notVerifiedSince } = contactVerificationRequest;
 
 		const contacts = await prisma.contact.findMany({
@@ -185,9 +187,7 @@ export async function PATCH(req: Request) {
 			}),
 			...(limit && { take: limit }),
 		});
-
 		const verifiedContacts = await processZeroBounceResults(fileId, contacts);
-
 		for (const contact of verifiedContacts) {
 			try {
 				await prisma.contact.update({
@@ -205,7 +205,6 @@ export async function PATCH(req: Request) {
 				console.error(`Failed to update contact ${contact.id}:`, error);
 			}
 		}
-
 		await prisma.contactVerificationRequest.update({
 			where: {
 				fileId,
@@ -214,7 +213,6 @@ export async function PATCH(req: Request) {
 				status: 'completed',
 			},
 		});
-
 		return apiResponse({
 			message: 'Verification completed for all contacts ',
 		});

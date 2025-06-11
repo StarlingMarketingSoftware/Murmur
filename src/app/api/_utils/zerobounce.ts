@@ -4,11 +4,11 @@ export interface ZeroBounceFileResponse {
 	success: boolean;
 	file_id?: string;
 	file_name?: string;
-	file_status?: string;
 	upload_date?: string;
-	complete_date?: string;
+	file_status?: string;
+	complete_percentage?: string;
 	return_url?: string;
-	error?: string;
+	error_reason?: string;
 }
 
 export interface ZeroBounceConfig {
