@@ -110,6 +110,18 @@ export const useManageContactListDetail = () => {
 			},
 		},
 		{
+			accessorKey: 'emailValidationStatus',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Validation" />;
+			},
+			cell: ({ row }) => {
+				const website: string = row.getValue('emailValidationStatus');
+				if (!website) return <NoDataCell />;
+
+				return <div className="text-left">{row.getValue('emailValidationStatus')}</div>;
+			},
+		},
+		{
 			id: 'action',
 			cell: ({ row }) => (
 				<TableDeleteRowButton

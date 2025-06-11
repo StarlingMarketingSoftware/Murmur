@@ -98,11 +98,11 @@ export const useCheckContactVerificationRequest = (
 
 			return response.json();
 		},
-		onSuccess: () => {
+		onSuccess: (response) => {
 			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
 
 			if (!suppressToasts) {
-				toast.success(successMessage);
+				toast.success(response.message || successMessage);
 			}
 			onSuccessCallback?.();
 		},
