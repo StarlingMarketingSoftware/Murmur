@@ -56,7 +56,7 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 						(feature: Stripe.Product.MarketingFeature, index: number) => (
 							<div key={index} className="flex gap-2 items-center mb-4">
 								<CheckIcon className="stroke-success shrink-0" size="20px" />
-								<p className="text-[14px]">{feature.name}</p>
+								<Typography variant="label">{feature.name}</Typography>
 							</div>
 						)
 					)}

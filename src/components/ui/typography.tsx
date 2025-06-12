@@ -6,15 +6,16 @@ const typographyVariants = cva('', {
 	variants: {
 		variant: {
 			h1: 'scroll-m-20 text-4xl font-medium lg:text-7xl tracking-wide',
-			h2: 'scroll-m-20 pb-2 text-3xl font-normal first:mt-0',
+			h2: 'scroll-m-20 text-3xl font-normal',
 			h3: 'scroll-m-20 text-2xl font-normal',
 			h4: 'scroll-m-20 text-xl font-normal',
 			p: 'leading-7 [&:not(:first-child)]:mt-6 text-[26px] font-normal',
-			blockquote: 'mt-6 border-l-2 pl-6 italic',
+			label: 'text-[14px]',
+			blockquote: 'border-l-2 pl-6 italic',
 			table: 'my-6 w-full overflow-y-auto',
 			list: 'my-6 ml-6 list-disc [&>li]:mt-2 text-lg',
 			inlineCode:
-				'relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold',
+				'relative rounded bg-muted px-[0.3rem] py-[0.2rem]text-sm font-semibold',
 			lead: 'text-xl text-muted-foreground',
 			muted: 'text-lg text-muted-foreground font-normal',
 		},
@@ -25,6 +26,7 @@ const typographyVariants = cva('', {
 			xl: 'text-xl',
 		},
 		color: {
+			foreground: 'text-foreground',
 			primary: 'text-primary',
 			secondary: 'text-secondary',
 			success: 'text-success',
@@ -41,7 +43,7 @@ const typographyVariants = cva('', {
 	defaultVariants: {
 		variant: 'p',
 		size: 'default',
-		color: 'primary',
+		color: 'foreground',
 		font: 'primary',
 	},
 });
@@ -52,6 +54,7 @@ const elementMap = {
 	h3: 'h3',
 	h4: 'h4',
 	p: 'p',
+	label: 'span',
 	blockquote: 'blockquote',
 	table: 'div',
 	list: 'ul',
@@ -70,6 +73,9 @@ interface TypographyProps
 function Typography({
 	className,
 	variant = 'p',
+	size,
+	color,
+	font,
 	children,
 	asChild = false,
 	...props
@@ -83,7 +89,7 @@ function Typography({
 	return React.createElement(
 		Comp,
 		{
-			className: cn(typographyVariants({ variant, className })),
+			className: cn(typographyVariants({ variant, size, color, font, className })),
 			...props,
 		},
 		children

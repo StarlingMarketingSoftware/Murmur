@@ -8,14 +8,18 @@ import { urls } from '@/constants/urls';
 import { SignUpButton, useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { PromotionLogos } from '@/components/molecules/PromotionLogos/PromotionLogos';
-import ReactPlayer from 'react-player';
 import { twMerge } from 'tailwind-merge';
 import { ReviewCard } from '@/components/molecules/ReviewCard/ReviewCard';
 import { FAQ, Review } from '@/types';
 import Image from 'next/image';
 import { ProductList } from '@/components/organisms/ProductList/ProductList';
 import { FaqSection } from '@/components/molecules/FaqSection/FaqSection';
+import dynamic from 'next/dynamic';
 
+// Add this at the top of your file
+const ReactPlayer = dynamic(() => import('react-player'), {
+	ssr: false,
+});
 const EMAIL_STATS = [
 	{
 		value: '115%',
@@ -87,6 +91,16 @@ const FAQS: FAQ[] = [
 export default function HomePage() {
 	const { isSignedIn } = useClerk();
 
+	// const [mounted, setMounted] = useState(false);
+
+	// useEffect(() => {
+	// 	setMounted(true);
+	// }, []);
+
+	// if (!mounted) {
+	// 	return <Spinner />; // or a loading spinner
+	// }
+
 	return (
 		<main className="min-h-screen overflow-hidden">
 			<div className="relative h-screen w-screen overflow-hidden">
@@ -124,9 +138,12 @@ export default function HomePage() {
 				<div className="relative z-20 grid grid-rows-12 justify-items-center h-full gap-0">
 					<div className="row-span-2" />
 					<LogoIcon className="row-span-1" width="106px" height="84px" />
-					<h1 className="row-span-1 !text-[100px] font-normal tracking-wide leading-[0.8]">
+					<Typography
+						variant="h1"
+						className="row-span-1 !text-[100px] font-normal tracking-wide leading-[0.8]"
+					>
 						Murmur
-					</h1>
+					</Typography>
 					<div className="row-span-1 flex items-center gap-14">
 						<Typography variant="p" className="text-sm">
 							by
@@ -140,13 +157,18 @@ export default function HomePage() {
 					<div className="row-span-2">
 						{!isSignedIn ? (
 							<SignUpButton mode="modal">
-								<Button className="bg-black text-white px-6 py-3 rounded-md text-lg font-medium hover:bg-gray-800">
+								<Button className="bg-black text-white px-6 py-3 rounded-md text-lg font-medium font-secondary hover:bg-gray-800">
 									START
 								</Button>
 							</SignUpButton>
 						) : (
 							<Link href={urls.murmur.dashboard.index}>
-								<Button variant="default" size="lg">
+								<Button
+									variant="default"
+									size="lg"
+									font="secondary"
+									className="w-[194px]"
+								>
 									START
 								</Button>
 							</Link>
@@ -155,11 +177,11 @@ export default function HomePage() {
 				</div>
 			</div>
 			{/* Explanation */}
-			<div className="mx-auto max-w-[1059px] text-center mb-[121px]">
-				<Typography variant="h2" className="row-span-3 text-center text-[46px]">
+			<div className="mx-auto max-w-[1059px] text-center">
+				<Typography variant="h2" className="row-span-3 text-center text-[52px]">
 					A dedicated AI-Integrated email tool.
 				</Typography>
-				<Typography variant="p">
+				<Typography className="text-[26px] !mt-[42px]" variant="p">
 					Murmur is an email marketing tool that utilizes the most cutting-edge Machine
 					Learning and AI technology to help you put your personal touch on every email in
 					your campaign, no matter the size. Paired with state of the art list-generation,
@@ -168,26 +190,26 @@ export default function HomePage() {
 			</div>
 
 			{/* Video Section */}
-			<div className="py-16">
+			<div className="py-16 mt-[121px]">
 				<div className="mx-auto max-w-4xl px-8">
 					<div className="relative w-full pb-[56%]">
-						<ReactPlayer
+						{/* <ReactPlayer
 							url="https://www.youtube.com/embed/p79hZlIlFD0?si=i1chgb0viWy7KKsv"
 							width="100%"
 							height="100%"
 							style={{ position: 'absolute', top: 0, left: 0 }}
 							controls={true}
-						/>
+						/> */}
 					</div>
 					<div className="flex justify-center mt-12">
-						<Button variant="light" size="lg">
+						<Button variant="muted" size="lg">
 							Book a demo
 						</Button>
 					</div>
 				</div>
 			</div>
 
-			<div className="h-[250px] w-full bg-gradient-to-r from-white via-gray-100 to-white max-w-[569px] mx-auto mt-24 flex justify-center items-center">
+			<div className="h-[250px] w-full bg-gradient-to-r from-white via-gray-200 to-white max-w-[569px] mx-auto mt-24 flex justify-center items-center">
 				<Typography variant="h2" className="text-center text-[60px] leading-18">
 					Get the competitive edge you’ve been looking for
 				</Typography>
@@ -228,10 +250,7 @@ export default function HomePage() {
 			</div>
 
 			<div className="mx-auto mt-50 w-full bg-gradient-to-b from-gray-200 to-white py-28">
-				<Typography
-					variant="h2"
-					className="text-center text-[60px] max-w-[662px] mx-auto "
-				>
+				<Typography variant="h2" className="text-left text-[60px] max-w-[575px] mx-auto ">
 					Build a campaign that is truly simple.
 				</Typography>
 				<div
@@ -241,14 +260,17 @@ export default function HomePage() {
 						'[&_.ytp-gradient-top]:!hidden'
 					)}
 				>
-					<ReactPlayer
+					{/* <ReactPlayer
 						url="https://www.youtube.com/embed/p79hZlIlFD0?si=i1chgb0viWy7KKsv"
 						width="100%"
 						height="100%"
 						controls={false}
-					/>
+					/> */}
 				</div>
-				<Typography variant="p" className="w-[1130px] mx-auto !mt-32 text-center">
+				<Typography
+					variant="p"
+					className="w-[1130px] mx-auto !mt-32 text-center text-[26px]"
+				>
 					{`Streamlined at every step, you can leave behind the days of cluttered
 					interfaces, and complicated workflows of traditional mass-email tools. We worked
 					hard to make Murmur simple and easy to use. No longer is it frustrating to
@@ -278,7 +300,7 @@ export default function HomePage() {
 				/>
 				<Typography
 					variant="p"
-					className="w-8/10 max-w-[1233px] mx-auto !mt-32 text-center"
+					className="w-8/10 max-w-[1233px] mx-auto !mt-32 text-center text-[26px]"
 				>
 					{`Our technological approach to email marketing allows us to build your campaigns so that every email in the campaign is differentiated from the last. Let Murmur AI gather information about the companies and recipients you're writing to and help you craft the perfect email.`}
 				</Typography>
@@ -296,9 +318,11 @@ export default function HomePage() {
 			</div>
 
 			<div className="mt-41 flex justify-center">
-				<Button variant="muted" size="lg">
-					Learn More
-				</Button>
+				<Link href={urls.pricing.index}>
+					<Button variant="muted" size="lg">
+						Learn More
+					</Button>
+				</Link>
 			</div>
 
 			<FaqSection
