@@ -14,16 +14,17 @@ const buttonVariants = cva(
 				default: 'bg-primary text-primary-foreground hover:bg-primary/90',
 				destructive:
 					'bg-destructive text-white shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60',
-				muted: 'bg-muted-dark text-muted-dark-foreground hover:bg-muted-dark/80',
-				light: 'bg-info text-info-foreground hover:bg-info/80',
-				outline:
-					'border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
+				muted: 'bg-muted text-background hover:bg-muted/80',
+				light: 'bg-light text-foreground hover:bg-light/80',
+				// outline:
+				// 	'border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
 				secondary:
 					'bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80',
 				'secondary-light':
 					'bg-secondary-light text-secondary-light-foreground shadow-xs hover:bg-secondary-light/80',
 				ghost: 'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
 				link: 'text-primary underline-offset-4 hover:underline',
+				product: 'bg-medium hover:bg-medium/80 rounded-none !h-19 p-8 text-[30px] w-full',
 			},
 			size: {
 				default: 'h-9 px-4 py-2 has-[>svg]:px-3',
@@ -36,10 +37,15 @@ const buttonVariants = cva(
 				primary: 'font-primary',
 				secondary: 'font-secondary font-light ',
 			},
+			outline: {
+				true: '', // Base outline class, will be combined with variant
+				false: '',
+			},
 		},
 		defaultVariants: {
 			variant: 'default',
 			size: 'default',
+			outline: false,
 		},
 	}
 );
@@ -49,6 +55,7 @@ function Button({
 	variant = 'default',
 	size,
 	font,
+	outline,
 	asChild = false,
 	children,
 	isLoading = false,
@@ -60,10 +67,49 @@ function Button({
 	}) {
 	const Comp = asChild ? Slot : 'button';
 
+	const getOutlineClasses = () => {
+		if (!outline) return '';
+
+		let outlineClasses = 'border-2 border-solid';
+
+		switch (variant) {
+			case 'default':
+				outlineClasses += ' border-primary';
+				break;
+			case 'destructive':
+				outlineClasses += ' border-destructive';
+				break;
+			case 'secondary':
+				outlineClasses += ' border-secondary';
+				break;
+			case 'muted':
+				outlineClasses += ' border-muted';
+				break;
+			case 'light':
+				outlineClasses += ' border-muted';
+				break;
+			default:
+				outlineClasses += ' border-foreground';
+		}
+
+		return outlineClasses;
+	};
+
+	const outlineClasses = getOutlineClasses();
+
 	return (
 		<Comp
 			data-slot="button"
-			className={cn(buttonVariants({ variant, size, font, className }))}
+			className={cn(
+				buttonVariants({
+					variant,
+					size,
+					font,
+					outline,
+					className,
+				}),
+				outlineClasses
+			)}
 			disabled={isLoading}
 			{...props}
 		>

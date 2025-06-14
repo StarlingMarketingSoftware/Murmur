@@ -1,47 +1,85 @@
 'use client';
 
-import ManageSubscriptionButton from '@/components/organisms/ManageSubscriptionButton/ManageSubscriptionButton';
-import { useMe } from '@/hooks/useMe';
-import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
+import { ProductList } from '@/components/organisms/ProductList/ProductList';
+import { twMerge } from 'tailwind-merge';
+import { ArrowDown } from 'lucide-react';
+import { GradientBanner } from '@/components/molecules/GradientBanner/GradientBanner';
+import { StatBlock } from '@/components/molecules/StatBlock/StatBlock';
+import { usePricingPage } from './usePricingPage';
+import { FeaturesTable } from '@/components/molecules/FeaturesTable/FeaturesTable';
 
 export default function Products() {
-	// const { data: products, isLoading, error } = useStripeProducts();
-	const { user } = useMe();
-
-	// if (isLoading) {
-	// 	return <Spinner />;
-	// }
-
-	// if (error || !products || products.length === 0) {
-	// 	return (
-	// 		<div className="flex flex-col items-center justify-center p-8">
-	// 			<h2 className="text-2xl font-bold mb-4">No subscription plans available</h2>
-	// 			<p>Please check back later or contact support for assistance.</p>
-	// 		</div>
-	// 	);
-	// }
-
-	// const filteredProducts = products.filter((product) => product.metadata.main === '1');
-
-	// const sortedProducts = filteredProducts.sort(
-	// 	(a, b) => Number(a.metadata.order) - Number(b.metadata.order)
-	// );
+	const { billingCycle, setBillingCycle, tableRef } = usePricingPage();
 
 	return (
-		<AppLayout>
-			{/* <div className="flex flex-wrap gap-6 justify-center p-8">
-				{sortedProducts.map((product) => (
-					<ProductCard key={product.id} product={product} user={user} />
-				))}
-			</div> */}
-			<Typography>Pricing</Typography>
-			<Typography variant="p">
-				Standard pricing plans are coming soon. In the meantime, you can manage your
-				subscription below. For upgrades, please contact us for a custom plan.
+		<>
+			<Typography variant="h1" className="text-center mt-[156px]">
+				Pricing
 			</Typography>
-			<div className="w-full flex items-center justify-center">
+			<div className="w-fit mx-auto">
+				<div className="flex justify-end mb-30">
+					<Button
+						className={twMerge(
+							'h-[48px] w-[168px] text-[17px]',
+							billingCycle === 'monthly' ? 'pointer-events-none' : 'text-dark'
+						)}
+						variant={billingCycle === 'monthly' ? 'muted' : 'light'}
+						outline
+						onClick={() => setBillingCycle('monthly')}
+					>
+						Billed Monthly
+					</Button>
+					<Button
+						className={twMerge(
+							'h-[48px] w-[168px] text-[17px]',
+							billingCycle === 'annually' && 'pointer-events-none'
+						)}
+						variant={billingCycle === 'annually' ? 'muted' : 'light'}
+						onClick={() => setBillingCycle('annually')}
+						outline
+					>
+						Billed Annually
+					</Button>
+				</div>
+				<ProductList />
+				<div className="flex justify-center mt-40">
+					<Button variant="ghost" size="lg" className="relative group" outline>
+						Compare all plan features
+						<ArrowDown className="absolute right-3 size-5 group-hover:translate-y-1 transition duration-200" />
+					</Button>
+				</div>
+				<GradientBanner className="mt-10">
+					<Typography variant="h1" className="text-center">
+						Outpace the competition
+					</Typography>
+					<Typography variant="h2" className="text-center max-w-[407px] mx-auto mt-10">
+						Start Making Connections That Will Last a Lifetime
+					</Typography>
+				</GradientBanner>
+			</div>
+
+			<div className="mt-58">
+				<Typography
+					variant="h3"
+					className="text-center text-[30px] max-w-[400px] mx-auto font-bold"
+				>
+					More Cost Effective Than Other Email Platforms
+				</Typography>
+				<StatBlock
+					stat="267%"
+					description="More Opened Emails"
+					size="lg"
+					className="mt-12"
+				/>
+				<div className="flex justify-center items-center mt-10 gap-40">
+					<StatBlock stat="99%" description="Email List Accuracy" />
+					<StatBlock stat="5x" description="Verification Protocols" />
+				</div>
+			</div>
+			<FeaturesTable />
+			{/* <div className="w-full flex items-center justify-center">
 				{user?.stripeSubscriptionId ? (
 					<ManageSubscriptionButton className="mx-auto my-8" />
 				) : (
@@ -49,7 +87,7 @@ export default function Products() {
 						You are not subscribed yet.
 					</Button>
 				)}
-			</div>
-		</AppLayout>
+			</div> */}
+		</>
 	);
 }

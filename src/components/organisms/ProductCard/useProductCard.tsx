@@ -5,10 +5,12 @@ import { User } from '@prisma/client';
 import ManageSubscriptionButton from '@/components/organisms/ManageSubscriptionButton/ManageSubscriptionButton';
 import { ReactNode } from 'react';
 import UpdateSubscriptionButton from '@/components/organisms/UpdateSubscriptionButton/UpdateSubscriptionButton';
-import { StripeSubscriptionStatus } from '@/types';
+import { StripeProduct, StripeSubscriptionStatus } from '@/types';
+import { SUBSCRIPTION_TIER_DATA_LIST } from '@/constants';
+import { twMerge } from 'tailwind-merge';
 
 export interface ProductCardProps {
-	product: Stripe.Product;
+	product: StripeProduct;
 	className?: string;
 	user: User | null | undefined;
 	isLink?: boolean;
@@ -40,13 +42,18 @@ export const useProductCard = (props: ProductCardProps) => {
 		};
 	}
 
+	const isHighlighted =
+		SUBSCRIPTION_TIER_DATA_LIST[product.default_price.id]?.name === 'Essentials';
+
 	const formattedPrice = formatPrice(price.unit_amount || 0, price.currency || 'usd');
 	const period = price?.recurring?.interval ? `/ ${price.recurring.interval}` : '';
+
+	const HIGHLIGHTED_CLASS = 'bg-secondary-light hover:bg-secondary-light/80 hover:bg';
 
 	const getButton = (): ReactNode => {
 		const checkoutButton = (
 			<CheckoutButton
-				className="w-full !bg-secondary-light"
+				className={twMerge(isHighlighted && HIGHLIGHTED_CLASS)}
 				user={user}
 				priceId={price.id}
 				buttonText="Buy Now"
@@ -58,14 +65,16 @@ export const useProductCard = (props: ProductCardProps) => {
 			user.stripePriceId === price.id &&
 			user.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE
 		) {
-			return <ManageSubscriptionButton className="w-full" />;
+			return (
+				<ManageSubscriptionButton className="bg-primary hover:bg-primary/80 text-background" />
+			);
 		} else if (user.stripeSubscriptionId) {
 			return (
 				<UpdateSubscriptionButton
 					priceId={price.id}
 					user={user}
 					productId={product.id}
-					className="w-full"
+					className={twMerge(isHighlighted && HIGHLIGHTED_CLASS)}
 				/>
 			);
 		} else {
@@ -89,5 +98,6 @@ export const useProductCard = (props: ProductCardProps) => {
 		marketingFeatures,
 		className,
 		isLink,
+		isHighlighted,
 	};
 };

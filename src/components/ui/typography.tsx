@@ -5,7 +5,7 @@ import { cn } from '@/utils';
 const typographyVariants = cva('', {
 	variants: {
 		variant: {
-			h1: 'scroll-m-20 text-4xl font-medium lg:text-7xl tracking-wide',
+			h1: 'scroll-m-20 text-4xl font-normal lg:text-[63px] tracking-normal',
 			h2: 'scroll-m-20 text-3xl font-normal',
 			h3: 'scroll-m-20 text-2xl font-normal',
 			h4: 'scroll-m-20 text-xl font-normal',
@@ -18,12 +18,6 @@ const typographyVariants = cva('', {
 				'relative rounded bg-muted px-[0.3rem] py-[0.2rem]text-sm font-semibold',
 			lead: 'text-xl text-muted-foreground',
 			muted: 'text-lg text-muted-foreground font-normal',
-		},
-		size: {
-			default: 'text-base',
-			sm: 'text-sm',
-			lg: 'text-lg',
-			xl: 'text-xl',
 		},
 		color: {
 			foreground: 'text-foreground',
@@ -42,7 +36,6 @@ const typographyVariants = cva('', {
 	},
 	defaultVariants: {
 		variant: 'p',
-		size: 'default',
 		color: 'foreground',
 		font: 'primary',
 	},
@@ -73,7 +66,6 @@ interface TypographyProps
 function Typography({
 	className,
 	variant = 'p',
-	size,
 	color,
 	font,
 	children,
@@ -89,7 +81,7 @@ function Typography({
 	return React.createElement(
 		Comp,
 		{
-			className: cn(typographyVariants({ variant, size, color, font, className })),
+			className: cn(typographyVariants({ variant, color, font, className })),
 			...props,
 		},
 		children

@@ -16,8 +16,17 @@ export interface StripeProduct extends Stripe.Product {
 }
 
 export type SubscriptionTierData = {
-	name: string;
+	name: SubscriptionName;
 	aiEmailCount: number;
 	testEmailCount: number;
 	viewEmailAddresses: boolean;
 };
+
+export type SubscriptionName =
+	| 'Essentials'
+	| 'Custom'
+	| 'Professional'
+	| 'Elite'
+	| 'Prophet'
+	| 'Admin Lite'
+	| 'Admin Full';

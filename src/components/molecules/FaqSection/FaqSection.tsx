@@ -11,7 +11,7 @@ export const FaqSection: FC<FaqSectionProps> = (props) => {
 	const { faqs, header, title, description } = useFaqSection(props);
 
 	return (
-		<div className="mt-38 w-[1112px] mx-auto p-16 bg-muted">
+		<div className="mt-38 w-[1112px] mx-auto p-16 bg-light">
 			<Typography variant="h3" font="secondary" className="text-4 p-0">
 				{header}
 			</Typography>

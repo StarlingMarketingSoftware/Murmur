@@ -42,8 +42,8 @@ export function CheckoutButton({
 
 	return (
 		<Button
-			size="xl"
-			className={twMerge('mx-auto', className)}
+			variant="product"
+			className={twMerge('bg-info hover:bg-info/80', className)}
 			onClick={handleClick}
 			isLoading={isPending}
 		>

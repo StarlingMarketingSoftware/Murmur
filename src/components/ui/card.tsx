@@ -10,7 +10,7 @@ function Card({ className, size = 'none', ...props }: CardProps) {
 		<div
 			data-slot="card"
 			className={cn(
-				'bg-card text-card-foreground flex flex-col rounded-sm  border-[3px] border-solid border-black p-4 shadow-sm',
+				'bg-card text-card-foreground flex flex-col rounded-sm  border-[4px] border-solid border-black p-4 shadow-sm',
 				'my-4',
 				{
 					'': size === 'none',

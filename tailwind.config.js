@@ -9,10 +9,17 @@ module.exports = {
 	darkMode: 'selector',
 	theme: {
 		extend: {
+			fontSize: {
+				'8xl': '6rem', // 96px
+				'9xl': '8rem', // 128px
+				'10xl': '10rem', // 160px
+				xs: '0.65rem', // 10.4px - smaller than default xs
+			},
 			fontFamily: {
 				primary: ['var(--font-times)'],
 				secondary: ['var(--font-inter)'],
 			},
+
 			colors: {
 				'ui-01': {
 					DEFAULT: stone[50],

@@ -31,8 +31,7 @@ export const Navbar = () => {
 	};
 	const urlList: UrlList[] = [
 		{ path: urls.home.index, label: 'Home' },
-		{ path: urls.about.index, label: 'About Us' },
-		{ path: urls.murmur.dashboard.index, label: 'Murmur' },
+		{ path: urls.pricing.index, label: 'Pricing' },
 		{ path: urls.contact.index, label: 'Contact' },
 		{ path: urls.admin.index, label: 'Admin' },
 	].filter((url) => !(user?.role !== 'admin' && url.path === '/admin'));
@@ -51,7 +50,11 @@ export const Navbar = () => {
 						href={urls.home.index}
 						className="ml-2 absolute h-6/10 w-[200px] left-0 flex lg:hidden  items-center"
 					>
-						<LogoIcon size="150px" pathClassName="fill-foreground stroke-foreground" />
+						<LogoIcon
+							height="150px"
+							width="150px"
+							pathClassName="fill-foreground stroke-foreground"
+						/>
 					</Link>
 					<div className="hidden lg:block">
 						<NavigationMenu>
@@ -87,7 +90,7 @@ export const Navbar = () => {
 							</>
 						)}
 						<Button
-							variant="outline"
+							outline
 							size="icon"
 							className="lg:hidden"
 							onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}

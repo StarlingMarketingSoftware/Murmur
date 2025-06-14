@@ -14,12 +14,13 @@ import { FAQ, Review } from '@/types';
 import Image from 'next/image';
 import { ProductList } from '@/components/organisms/ProductList/ProductList';
 import { FaqSection } from '@/components/molecules/FaqSection/FaqSection';
-import dynamic from 'next/dynamic';
+import { GradientBanner } from '@/components/molecules/GradientBanner/GradientBanner';
+import { StatBlock } from '@/components/molecules/StatBlock/StatBlock';
 
 // Add this at the top of your file
-const ReactPlayer = dynamic(() => import('react-player'), {
-	ssr: false,
-});
+// const ReactPlayer = dynamic(() => import('react-player'), {
+// 	ssr: false,
+// });
 const EMAIL_STATS = [
 	{
 		value: '115%',
@@ -209,25 +210,19 @@ export default function HomePage() {
 				</div>
 			</div>
 
-			<div className="h-[250px] w-full bg-gradient-to-r from-white via-gray-200 to-white max-w-[569px] mx-auto mt-24 flex justify-center items-center">
-				<Typography variant="h2" className="text-center text-[60px] leading-18">
+			<GradientBanner className="  mx-auto mt-24 flex justify-center items-center">
+				<Typography
+					variant="h2"
+					className="max-w-[569px] text-center text-[60px] leading-18"
+				>
 					Get the competitive edge you’ve been looking for
 				</Typography>
-			</div>
+			</GradientBanner>
+
 			<div className="h-[200px] w-full mx-auto mt-36">
 				<div className="flex items-center justify-center gap-40">
 					{EMAIL_STATS.map((stat, index) => (
-						<div key={index} className="text-center flex flex-col">
-							<Typography
-								variant="h2"
-								className="text-[60px] font-extrabold tracking-wide p-0"
-							>
-								{stat.value}
-							</Typography>
-							<Typography variant="p" className="text-lg font-bold !mt-0">
-								{stat.label}
-							</Typography>
-						</div>
+						<StatBlock key={index} stat={stat.value} description={stat.label}></StatBlock>
 					))}
 				</div>
 			</div>
@@ -306,12 +301,11 @@ export default function HomePage() {
 				</Typography>
 			</div>
 
-			<div className="relative w-full bg-gradient-to-r from-transparent via-gray-200 to-transparent overflow-hidden">
-				<div className="absolute z-10 w-full h-full bg-gradient-to-r from-white via-transparent to-white pointer-events-none" />
-				<Typography variant="h2" className="text-center text-[60px] mx-auto py-12">
+			<GradientBanner gloss>
+				<Typography variant="h2" className="text-center text-[60px] mx-auto py-8">
 					{`Find the plan that's right for`} <span className="italic">you</span>
 				</Typography>
-			</div>
+			</GradientBanner>
 
 			<div className="mt-28">
 				<ProductList />
