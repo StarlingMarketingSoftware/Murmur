@@ -6,10 +6,10 @@ import {
 	TableHead,
 	TableHeader,
 	TableRow,
-	TableCaption,
-	TableFooter,
 } from '@/components/ui/table';
 import { CheckIcon } from 'lucide-react';
+import { Typography } from '@/components/ui/typography';
+import { twMerge } from 'tailwind-merge';
 
 type Feature = {
 	contactFeatures: {
@@ -125,151 +125,176 @@ const FEATURE_DATA: Record<Plan, Feature> = {
 	},
 };
 
+const FEATURE_LABELS: Record<keyof Feature, Record<string, string>> = {
+	contactFeatures: {
+		contactGeneration: 'Contact Generation',
+		additionalContactGeneration: 'Additional Contact Generation',
+		monthlyContactLimit: 'Monthly Contact Limit',
+		contactImportTools: 'Contact Import Tools',
+		automatedContactScrubbing: 'Automated Contact Scrubbing',
+	},
+	emailFeatures: {
+		customEmailsWithAI: 'Custom Emails with AI',
+		greaterAiPersonalization: 'Greater AI Personalization',
+		premiumEmailTemplates: 'Premium Email Templates',
+		advancedEmailAnalytics: 'Advanced Email Analytics',
+		abTesting: 'A/B Testing',
+	},
+	usageFeatures: {
+		entryLevelUsage: 'Entry Level Usage',
+		extensiveUsage: 'Extensive Usage',
+		mostUsage: 'Most Usage',
+		customDomains: 'Custom Domains',
+	},
+	supportFeatures: {
+		emailSupport: 'Email Support',
+		campaignConsultation: 'Campaign Consultation',
+		'1on1Consultation': '1-on-1 Consultation',
+	},
+};
+
+const SECTION_LABELS: Record<keyof Feature, string> = {
+	contactFeatures: 'Contact Features',
+	emailFeatures: 'Email Features',
+	usageFeatures: 'Usage Features',
+	supportFeatures: 'Support Features',
+};
+
 interface CheckCellProps {
 	checked: boolean;
 }
 const CheckCell: FC<CheckCellProps> = ({ checked }) => {
 	return (
 		<TableCell className="text-center">
-			{checked ? <CheckIcon className="h-4 w-4 text-green-500" /> : '—'}
+			<div className="w-full flex justify-center">
+				{checked && <CheckIcon className="h-4 w-4 text-center" />}
+			</div>
 		</TableCell>
 	);
 };
 
+interface FeatureCellProps {
+	value: boolean | string;
+}
+const FeatureCell: FC<FeatureCellProps> = ({ value }) => {
+	if (typeof value === 'boolean') {
+		return <CheckCell checked={value} />;
+	}
+	return (
+		<TableCell className="text-center">
+			<Typography className="text-center text-[16px]">{value}</Typography>
+		</TableCell>
+	);
+};
+
+interface FeatureRowProps<T extends keyof Feature> {
+	sectionKey: T;
+	featureKey: keyof Feature[T];
+}
+const FeatureRow = <T extends keyof Feature>({
+	sectionKey,
+	featureKey,
+}: FeatureRowProps<T>) => {
+	const featureLabel = FEATURE_LABELS[sectionKey][featureKey as string];
+
+	return (
+		<TableRow className="border-solid border-x-2 border-gray-200 !border-y-none">
+			<TableCell className="font-medium !pl-5 ">{featureLabel}</TableCell>
+			<FeatureCell
+				value={FEATURE_DATA.basic[sectionKey][featureKey] as boolean | string}
+			/>
+			<FeatureCell
+				value={FEATURE_DATA.standard[sectionKey][featureKey] as boolean | string}
+			/>
+			<FeatureCell value={FEATURE_DATA.pro[sectionKey][featureKey] as boolean | string} />
+		</TableRow>
+	);
+};
+
+// Helper component for section headers
+interface SectionHeaderProps {
+	title: string;
+}
+const SectionHeader: FC<SectionHeaderProps> = ({ title }) => (
+	<TableRow className="border-solid border-x-2 border-gray-200 !border-y-none">
+		<TableHead className="bg-gray-200 font-semibold text-foreground !pl-5">
+			<Typography className="text-[16px] font-bold italic">{title}</Typography>
+		</TableHead>
+		<TableHead className="bg-gray-200"></TableHead>
+		<TableHead className="bg-gray-200"></TableHead>
+		<TableHead className="bg-gray-200"></TableHead>
+	</TableRow>
+);
+
 export const FeaturesTable: FC = () => {
+	const renderSection = <T extends keyof Feature>(sectionKey: T) => {
+		const features = Object.keys(FEATURE_DATA.basic[sectionKey]) as Array<
+			keyof Feature[T]
+		>;
+
+		return (
+			<>
+				<SectionHeader title={SECTION_LABELS[sectionKey]} />
+				{features.map((featureKey) => (
+					<FeatureRow
+						key={`${sectionKey}-${String(featureKey)}`}
+						sectionKey={sectionKey}
+						featureKey={featureKey}
+					/>
+				))}
+			</>
+		);
+	};
+
+	const tableHeadingStyles =
+		'text-center text-[22px] font-bold italic tracking-wide pb-2';
+
 	return (
 		<Table className="max-w-[1395px] mx-auto">
-			<TableCaption>Features of our products</TableCaption>
-			<TableHeader>
-				<TableRow>
-					<TableHead></TableHead>
-					<TableHead>Basic</TableHead>
-					<TableHead>Standard</TableHead>
-					<TableHead>Pro</TableHead>
+			<TableHeader className="">
+				<TableRow className="border-none">
+					<TableHead className="w-1/3"></TableHead>
+					<TableHead className="">
+						<Typography className={tableHeadingStyles} variant="h3">
+							Basic
+						</Typography>
+					</TableHead>
+					<TableHead className="">
+						<Typography
+							className={twMerge(
+								tableHeadingStyles,
+								'border-b-solid border-b-2 border-secondary'
+							)}
+							variant="h3"
+						>
+							Standard
+						</Typography>
+					</TableHead>
+					<TableHead className="">
+						<Typography className={tableHeadingStyles} variant="h3">
+							Pro
+						</Typography>
+					</TableHead>
 				</TableRow>
 			</TableHeader>
 			<TableHeader>
-				<TableRow>
-					<TableHead>Features</TableHead>
-					<TableHead></TableHead>
-					<TableHead></TableHead>
-					<TableHead></TableHead>
-				</TableRow>
-			</TableHeader>
-			<TableHeader>
-				<TableRow>
-					<TableHead>Contact Features</TableHead>
-					<TableHead></TableHead>
-					<TableHead></TableHead>
-					<TableHead></TableHead>
+				<TableRow className={twMerge('border-solid border-x-2 border-gray-200')}>
+					<TableHead className="w-1/3">
+						<Typography variant="h4" className="font-bold italic text-[18px] ">
+							Features
+						</Typography>
+					</TableHead>
+					<TableHead className="text-center"></TableHead>
+					<TableHead className="text-center"></TableHead>
+					<TableHead className="text-center"></TableHead>
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				<TableRow>
-					<TableCell>Contact Generation</TableCell>
-					<CheckCell checked={FEATURE_DATA.basic.contactFeatures.contactGeneration} />
-					<CheckCell checked={FEATURE_DATA.standard.contactFeatures.contactGeneration} />
-					<CheckCell checked={FEATURE_DATA.pro.contactFeatures.contactGeneration} />
-				</TableRow>
-				<TableRow>
-					<TableCell>Additional Contact Generation</TableCell>
-					<CheckCell
-						checked={FEATURE_DATA.basic.contactFeatures.additionalContactGeneration}
-					/>
-					<CheckCell
-						checked={FEATURE_DATA.standard.contactFeatures.additionalContactGeneration}
-					/>
-					<CheckCell
-						checked={FEATURE_DATA.pro.contactFeatures.additionalContactGeneration}
-					/>
-				</TableRow>
-				<TableRow>
-					<TableCell>Monthly Contact Limit</TableCell>
-					<TableCell>{FEATURE_DATA.basic.contactFeatures.monthlyContactLimit}</TableCell>
-					<TableCell>
-						{FEATURE_DATA.standard.contactFeatures.monthlyContactLimit}
-					</TableCell>
-					<TableCell>{FEATURE_DATA.pro.contactFeatures.monthlyContactLimit}</TableCell>
-				</TableRow>
-				<TableRow>
-					<TableCell>Contact Import Tools</TableCell>
-					<TableCell>{FEATURE_DATA.basic.contactFeatures.contactImportTools}</TableCell>
-					<TableCell>
-						{FEATURE_DATA.standard.contactFeatures.contactImportTools}
-					</TableCell>
-					<TableCell>{FEATURE_DATA.pro.contactFeatures.contactImportTools}</TableCell>
-				</TableRow>
-				<TableRow>
-					<TableCell>Automated Contact Scrubbing</TableCell>
-					<CheckCell
-						checked={FEATURE_DATA.basic.contactFeatures.automatedContactScrubbing}
-					/>
-					<CheckCell
-						checked={FEATURE_DATA.standard.contactFeatures.automatedContactScrubbing}
-					/>
-					<CheckCell
-						checked={FEATURE_DATA.pro.contactFeatures.automatedContactScrubbing}
-					/>
-				</TableRow>
-
-				<TableRow>
-					<TableHead>Email Features</TableHead>
-					<TableHead></TableHead>
-					<TableHead></TableHead>
-					<TableHead></TableHead>
-				</TableRow>
-				<TableRow>
-					<TableCell>Contact Generation</TableCell>
-					<CheckCell checked={FEATURE_DATA.basic.contactFeatures.contactGeneration} />
-					<CheckCell checked={FEATURE_DATA.standard.contactFeatures.contactGeneration} />
-					<CheckCell checked={FEATURE_DATA.pro.contactFeatures.contactGeneration} />
-				</TableRow>
-				<TableRow>
-					<TableCell>Additional Contact Generation</TableCell>
-					<CheckCell
-						checked={FEATURE_DATA.basic.contactFeatures.additionalContactGeneration}
-					/>
-					<CheckCell
-						checked={FEATURE_DATA.standard.contactFeatures.additionalContactGeneration}
-					/>
-					<CheckCell
-						checked={FEATURE_DATA.pro.contactFeatures.additionalContactGeneration}
-					/>
-				</TableRow>
-				<TableRow>
-					<TableCell>Monthly Contact Limit</TableCell>
-					<TableCell>{FEATURE_DATA.basic.contactFeatures.monthlyContactLimit}</TableCell>
-					<TableCell>
-						{FEATURE_DATA.standard.contactFeatures.monthlyContactLimit}
-					</TableCell>
-					<TableCell>{FEATURE_DATA.pro.contactFeatures.monthlyContactLimit}</TableCell>
-				</TableRow>
-				<TableRow>
-					<TableCell>Contact Import Tools</TableCell>
-					<TableCell>{FEATURE_DATA.basic.contactFeatures.contactImportTools}</TableCell>
-					<TableCell>
-						{FEATURE_DATA.standard.contactFeatures.contactImportTools}
-					</TableCell>
-					<TableCell>{FEATURE_DATA.pro.contactFeatures.contactImportTools}</TableCell>
-				</TableRow>
-				<TableRow>
-					<TableCell>Automated Contact Scrubbing</TableCell>
-					<CheckCell
-						checked={FEATURE_DATA.basic.contactFeatures.automatedContactScrubbing}
-					/>
-					<CheckCell
-						checked={FEATURE_DATA.standard.contactFeatures.automatedContactScrubbing}
-					/>
-					<CheckCell
-						checked={FEATURE_DATA.pro.contactFeatures.automatedContactScrubbing}
-					/>
-				</TableRow>
+				{renderSection('contactFeatures')}
+				{renderSection('emailFeatures')}
+				{renderSection('usageFeatures')}
+				{renderSection('supportFeatures')}
 			</TableBody>
-			<TableFooter>
-				<TableRow>
-					<TableCell colSpan={2}>End of features list</TableCell>
-				</TableRow>
-			</TableFooter>
 		</Table>
 	);
 };

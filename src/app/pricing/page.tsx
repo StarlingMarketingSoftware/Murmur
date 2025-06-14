@@ -60,7 +60,7 @@ export default function Products() {
 				</GradientBanner>
 			</div>
 
-			<div className="mt-58">
+			<div className="mt-58 mb-48">
 				<Typography
 					variant="h3"
 					className="text-center text-[30px] max-w-[400px] mx-auto font-bold"
