@@ -16,7 +16,7 @@ const postMailgunSchema = z.object({
 	message: z.string().min(1),
 	senderEmail: z.string().email(),
 	senderName: z.string().min(1),
-	userMurmurEmail: z.string().email().optional().nullable(),
+	originEmail: z.string().email().optional().nullable(),
 });
 export type PostMailgunData = z.infer<typeof postMailgunSchema>;
 
@@ -32,8 +32,14 @@ export async function POST(request: Request) {
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
-		const { recipientEmail, subject, message, senderEmail, senderName, userMurmurEmail } =
-			validatedData.data;
+		const {
+			recipientEmail,
+			subject,
+			message,
+			senderEmail,
+			senderName,
+			originEmail: specifiedOriginEmail,
+		} = validatedData.data;
 
 		const mailgun = new Mailgun(FormData);
 		const mg = mailgun.client({
@@ -43,9 +49,7 @@ export async function POST(request: Request) {
 
 		const messageNoMargin = formatHTMLForEmailClients(message);
 
-		const originEmail = userMurmurEmail
-			? userMurmurEmail
-			: 'postmaster@murmurmailbox.com';
+		const originEmail = specifiedOriginEmail ?? 'postmaster@murmurmailbox.com';
 
 		const mailgunData = await mg.messages.create('murmurmailbox.com', {
 			'h:Reply-To': senderEmail,

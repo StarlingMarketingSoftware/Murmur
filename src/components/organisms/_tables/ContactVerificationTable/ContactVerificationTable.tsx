@@ -29,7 +29,7 @@ const ContactVerificationTable = () => {
 	return (
 		<>
 			<div className="mb-4 p-4 border rounded-md">
-				<h3 className="text-lg font-semibold mb-2">Start Contact Verification</h3>{' '}
+				<h3 className="text-lg font-semibold mb-2">Start Contact Verification</h3>
 				<p className="text-sm text-muted-foreground mb-4">
 					Verify email addresses using ZeroBounce. You can filter by a specific email,
 					limit the number of contacts to verify, and choose whether to only verify
