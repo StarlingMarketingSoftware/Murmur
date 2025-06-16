@@ -9,11 +9,15 @@ export const ProductList: FC<ProductListProps> = (props) => {
 	if (isPendingProducts) {
 		return <Spinner />;
 	}
-
 	return (
-		<div className="flex gap-23 w-full mx-auto items-center justify-center flex-wrap">
+		<div className="flex gap-23 w-full mx-auto items-center justify-center flex-wrap group">
 			{sortedProducts!.map((product) => (
-				<ProductCard key={product.id} product={product} user={user} />
+				<div
+					key={product.id}
+					className="transition duration-300 group-hover:opacity-50 group-hover:scale-99 hover:!opacity-100 hover:!scale-100"
+				>
+					<ProductCard product={product} user={user} />
+				</div>
 			))}
 		</div>
 	);

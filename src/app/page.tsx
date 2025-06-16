@@ -73,7 +73,7 @@ const FAQS: FAQ[] = [
 	{
 		question: 'What are my email sending limits?',
 		answer:
-			'You can send different amounts of emails based on your subscription tier (see pricing). Most users opt for the “Essentials” tier which allows for 500 outbound emails per month.',
+			'You can send different amounts of emails based on your subscription tier (see pricing). Most users opt for the "Standard" tier which allows for 500 outbound emails per month.',
 	},
 	{
 		question: 'How does Murmur personalize emails?',
@@ -139,10 +139,7 @@ export default function HomePage() {
 				<div className="relative z-20 grid grid-rows-12 justify-items-center h-full gap-0">
 					<div className="row-span-2" />
 					<LogoIcon className="row-span-1" width="106px" height="84px" />
-					<Typography
-						variant="h1"
-						className="row-span-1 !text-[100px] font-normal tracking-wide leading-[0.8]"
-					>
+					<Typography variant="h1" className="row-span-1 !text-[100px] leading-[0.8]">
 						Murmur
 					</Typography>
 					<div className="row-span-1 flex items-center gap-14">
@@ -174,7 +171,7 @@ export default function HomePage() {
 								</Button>
 							</Link>
 						)}
-					</div>{' '}
+					</div>
 				</div>
 			</div>
 			{/* Explanation */}

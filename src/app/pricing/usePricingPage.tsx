@@ -2,7 +2,11 @@ import { useRef, useState } from 'react';
 
 export const usePricingPage = () => {
 	const [billingCycle, setBillingCycle] = useState<'monthly' | 'annually'>('monthly');
-	const tableRef = useRef<HTMLElement>(null);
+	const tableRef = useRef<HTMLDivElement>(null);
+
+	const handleScrollToTable = () => {
+		tableRef.current?.scrollIntoView({ behavior: 'smooth' });
+	};
 
 	// const { data: products, isLoading, error } = useStripeProducts();
 	// if (isLoading) {
@@ -28,5 +32,6 @@ export const usePricingPage = () => {
 		billingCycle,
 		setBillingCycle,
 		tableRef,
+		handleScrollToTable,
 	};
 };

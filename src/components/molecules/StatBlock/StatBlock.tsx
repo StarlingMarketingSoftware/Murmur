@@ -19,11 +19,11 @@ export const StatBlock: FC<StatBlockProps> = ({ stat, description, size, classNa
 			cnDescription.push('text-sm');
 			break;
 		case 'md':
-			cnStat.push('text-[60px] font-extrabold tracking-wide');
+			cnStat.push('text-[60px] font-extrabold');
 			cnDescription.push('text-lg', 'font-bold');
 			break;
 		case 'lg':
-			cnStat.push('text-[90px] font-extrabold tracking-wide leading-[100px]');
+			cnStat.push('text-[90px] font-extrabold leading-[100px]');
 			cnDescription.push('text-[30px]');
 			break;
 		default:

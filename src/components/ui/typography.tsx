@@ -5,11 +5,11 @@ import { cn } from '@/utils';
 const typographyVariants = cva('', {
 	variants: {
 		variant: {
-			h1: 'scroll-m-20 text-4xl font-normal lg:text-[63px] tracking-normal',
+			h1: 'scroll-m-20 text-4xl font-normal lg:text-[63px]',
 			h2: 'scroll-m-20 text-3xl font-normal',
 			h3: 'scroll-m-20 text-2xl font-normal',
 			h4: 'scroll-m-20 text-xl font-normal',
-			p: 'leading-7 [&:not(:first-child)]:mt-6 text-[26px] font-normal',
+			p: 'leading-7 text-[26px] font-normal',
 			label: 'text-[14px]',
 			blockquote: 'border-l-2 pl-6 italic',
 			table: 'my-6 w-full overflow-y-auto',
@@ -33,11 +33,20 @@ const typographyVariants = cva('', {
 			primary: 'font-primary',
 			secondary: 'font-secondary',
 		},
+		bold: {
+			true: 'font-bold',
+			false: '',
+		},
+		margins: {
+			true: '[&:not(:first-child)]:mt-6',
+			false: '',
+		},
 	},
 	defaultVariants: {
 		variant: 'p',
 		color: 'foreground',
 		font: 'primary',
+		bold: false,
 	},
 });
 
@@ -68,6 +77,7 @@ function Typography({
 	variant = 'p',
 	color,
 	font,
+	bold,
 	children,
 	asChild = false,
 	...props
@@ -81,7 +91,7 @@ function Typography({
 	return React.createElement(
 		Comp,
 		{
-			className: cn(typographyVariants({ variant, color, font, className })),
+			className: cn(typographyVariants({ variant, bold, color, font, className })),
 			...props,
 		},
 		children

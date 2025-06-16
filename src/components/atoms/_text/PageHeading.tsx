@@ -6,7 +6,11 @@ interface PageHeadingProps {
 }
 
 const PageHeading: FC<PageHeadingProps> = ({ children }) => {
-	return <Typography className="text-center my-8">{children}</Typography>;
+	return (
+		<Typography variant="h1" className="text-center my-8">
+			{children}
+		</Typography>
+	);
 };
 
 export default PageHeading;

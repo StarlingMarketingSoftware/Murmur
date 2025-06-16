@@ -38,7 +38,7 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 					</Typography>
 				</CardTitle>
 				<div className="h-14 w-7/10">
-					{product.name === 'Professional' ? (
+					{product.name === 'Pro' ? (
 						<Typography variant="label" className="text-[14px] text-muted leading-1">
 							Make Campaigns with New Contacts and AI Customization
 						</Typography>
@@ -57,8 +57,8 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 						per month, billed annually
 					</Typography>
 					<div className="mt-7">{!isLink && <>{getButton()}</>}</div>
-					<div className="my-7">
-						<Typography variant="h4" className="text-[20px] font-semibold h-[30px]">
+					<div className="my-7 h-14 flex items-center">
+						<Typography variant="h4" className="text-[20px] font-semibold">
 							{product.metadata?.includes && product.metadata.includes + ' +'}
 						</Typography>
 					</div>

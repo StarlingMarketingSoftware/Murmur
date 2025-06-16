@@ -43,7 +43,7 @@ export const useProductCard = (props: ProductCardProps) => {
 	}
 
 	const isHighlighted =
-		SUBSCRIPTION_TIER_DATA_LIST[product.default_price.id]?.name === 'Essentials';
+		SUBSCRIPTION_TIER_DATA_LIST[product.default_price.id]?.name === 'Standard';
 
 	const formattedPrice = formatPrice(price.unit_amount || 0, price.currency || 'usd');
 	const period = price?.recurring?.interval ? `/ ${price.recurring.interval}` : '';

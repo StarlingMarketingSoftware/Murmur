@@ -15,7 +15,28 @@ const inter = Inter({
 });
 
 const timesNewRoman = localFont({
-	src: '../../public/timesNewRoman.ttf',
+	src: [
+		{
+			path: '../../public/fonts/times.ttf',
+			weight: '400',
+			style: 'normal',
+		},
+		{
+			path: '../../public/fonts/timesBold.ttf',
+			weight: '700',
+			style: 'normal',
+		},
+		{
+			path: '../../public/fonts/timesBoldItalic.ttf',
+			weight: '400',
+			style: 'italic',
+		},
+		{
+			path: '../../public/fonts/timesItalic.ttf',
+			weight: '700',
+			style: 'italic',
+		},
+	],
 	variable: '--font-times',
 });
 

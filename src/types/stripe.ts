@@ -23,9 +23,10 @@ export type SubscriptionTierData = {
 };
 
 export type SubscriptionName =
-	| 'Essentials'
+	| 'Basic'
+	| 'Standard'
+	| 'Pro'
 	| 'Custom'
-	| 'Professional'
 	| 'Elite'
 	| 'Prophet'
 	| 'Admin Lite'
