@@ -2,23 +2,16 @@ import { CommonIconProps, defaultPathClassName } from '@/utils';
 import { FC } from 'react';
 
 const LogoIcon: FC<CommonIconProps> = (props) => {
-	const {
-		width = '100%',
-		height = '100%',
-		className,
-		pathClassName = defaultPathClassName,
-	} = props;
+	const { width = '100%', height = '100%', pathClassName = defaultPathClassName } = props;
 	return (
-		<div
-			className={`flex items-center justify-center ${className || ''}`}
-			style={{ width, height }}
-		>
+		<div className="flex items-center justify-center">
 			<svg
-				height="100%"
-				viewBox="0 0 175 138.25"
+				width={width}
+				height={height}
+				viewBox="0 0 175 150"
 				xmlns="http://www.w3.org/2000/svg"
 				preserveAspectRatio="xMidYMid meet"
-				style={{ display: 'block', maxWidth: '100%', maxHeight: '100%' }}
+				style={{ display: 'block' }}
 			>
 				<path
 					className={pathClassName}

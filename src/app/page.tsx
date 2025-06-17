@@ -16,11 +16,11 @@ import { ProductList } from '@/components/organisms/ProductList/ProductList';
 import { FaqSection } from '@/components/molecules/FaqSection/FaqSection';
 import { GradientBanner } from '@/components/molecules/GradientBanner/GradientBanner';
 import { StatBlock } from '@/components/molecules/StatBlock/StatBlock';
+import dynamic from 'next/dynamic';
 
-// Add this at the top of your file
-// const ReactPlayer = dynamic(() => import('react-player'), {
-// 	ssr: false,
-// });
+const ReactPlayer = dynamic(() => import('react-player'), {
+	ssr: false,
+});
 const EMAIL_STATS = [
 	{
 		value: '115%',
@@ -91,16 +91,6 @@ const FAQS: FAQ[] = [
 
 export default function HomePage() {
 	const { isSignedIn } = useClerk();
-
-	// const [mounted, setMounted] = useState(false);
-
-	// useEffect(() => {
-	// 	setMounted(true);
-	// }, []);
-
-	// if (!mounted) {
-	// 	return <Spinner />; // or a loading spinner
-	// }
 
 	return (
 		<main className="min-h-screen overflow-hidden">
@@ -191,13 +181,13 @@ export default function HomePage() {
 			<div className="py-16 mt-[121px]">
 				<div className="mx-auto max-w-4xl px-8">
 					<div className="relative w-full pb-[56%]">
-						{/* <ReactPlayer
+						<ReactPlayer
 							url="https://www.youtube.com/embed/p79hZlIlFD0?si=i1chgb0viWy7KKsv"
 							width="100%"
 							height="100%"
 							style={{ position: 'absolute', top: 0, left: 0 }}
 							controls={true}
-						/> */}
+						/>
 					</div>
 					<div className="flex justify-center mt-12">
 						<Button variant="muted" size="lg">
@@ -249,15 +239,15 @@ export default function HomePage() {
 					className={twMerge(
 						'relative w-[1179px] aspect-video mx-auto mt-32',
 						'[&_.ytp-chrome-top-buttons]:!bg-red-500',
-						'[&_.ytp-gradient-top]:!hidden'
+						'[&_.ytp-gradient-top]:!hidden [&_.ytp-large-play-button]:!hidden'
 					)}
 				>
-					{/* <ReactPlayer
+					<ReactPlayer
 						url="https://www.youtube.com/embed/p79hZlIlFD0?si=i1chgb0viWy7KKsv"
 						width="100%"
 						height="100%"
 						controls={false}
-					/> */}
+					/>
 				</div>
 				<Typography
 					variant="p"
