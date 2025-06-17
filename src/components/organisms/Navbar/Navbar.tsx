@@ -2,7 +2,6 @@
 import { SignUpButton, useAuth, UserButton } from '@clerk/nextjs';
 import { SignInButton } from '@clerk/nextjs';
 import { urls } from '@/constants/urls';
-import { DarkModeToggle } from '@/components/atoms/DarkModeToggle/DarkModeToggle';
 import { Button } from '@/components/ui/button';
 import LogoIcon from '@/components/atoms/_svg/LogoIcon';
 import { MenuIcon } from 'lucide-react';
@@ -107,9 +106,9 @@ export const Navbar = () => {
 					</div>
 
 					<div className="absolute right-5 ml-auto flex items-center space-x-4 ">
-						<div className="[&_span]:bg-black">
+						{/* <div className="[&_span]:bg-black">
 							<DarkModeToggle />
-						</div>
+						</div> */}
 						{isSignedIn ? (
 							<UserButton />
 						) : (

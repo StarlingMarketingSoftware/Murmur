@@ -45,6 +45,9 @@ export const urls = {
 		index: '/sign-up',
 	},
 	api: {
+		apollo: {
+			index: '/api/apollo',
+		},
 		auth: {
 			index: '/api/auth',
 			checkAdmin: {

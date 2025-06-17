@@ -66,7 +66,7 @@ const Contact = () => {
 											<FormItem className="w-full sm:w-1/2">
 												<FormLabel>Full Name*</FormLabel>
 												<FormControl>
-													<Input {...field} />
+													<Input variant="light" rounded={false} {...field} />
 												</FormControl>
 												<FormMessage />
 											</FormItem>
@@ -79,7 +79,7 @@ const Contact = () => {
 											<FormItem className="w-full sm:w-1/2">
 												<FormLabel>Email Address*</FormLabel>
 												<FormControl>
-													<Input {...field} />
+													<Input variant="light" rounded={false} {...field} />
 												</FormControl>
 												<FormMessage />
 											</FormItem>
@@ -93,7 +93,7 @@ const Contact = () => {
 										<FormItem>
 											<FormLabel>Subject*</FormLabel>
 											<FormControl>
-												<Input {...field} />
+												<Input variant="light" rounded={false} {...field} />
 											</FormControl>
 											<FormMessage />
 										</FormItem>
