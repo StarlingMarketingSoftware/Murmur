@@ -80,6 +80,7 @@ const Dashboard = () => {
 					</form>
 				</Form>
 			</div>
+			<ContactListTable />
 			<CampaignsTable />
 		</AppLayout>
 	);

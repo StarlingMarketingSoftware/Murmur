@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useGetApollo } from '@/hooks/queryHooks/useApollo';
+import { useCreateContactList } from '@/hooks/queryHooks/useContactLists';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -33,11 +34,19 @@ export const useDashboard = () => {
 			limit: 5,
 		},
 	});
+
+	const { mutate: createContactList } = useCreateContactList({
+		suppressToasts: true,
+	});
+
 	console.log('🚀 ~ useDashboard ~ data:', contacts);
 
 	const onSubmit = async (data: FormData) => {
 		console.log(data);
 		await refetch();
+		createContactList({
+			name: data.searchText,
+		});
 	};
 
 	return {

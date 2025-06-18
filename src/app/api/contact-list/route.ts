@@ -5,7 +5,6 @@ import { z } from 'zod';
 import {
 	apiBadRequest,
 	apiCreated,
-	apiNotFound,
 	apiResponse,
 	apiUnauthorized,
 	handleApiError,
@@ -18,18 +17,29 @@ export const GET = async function GET() {
 			return apiUnauthorized();
 		}
 
-		const result = await prisma.contactList.findMany({});
+		const result = await prisma.contactList.findMany({
+			where: {
+				userId: userId,
+			},
+			include: {
+				user: true,
+				_count: {
+					select: {
+						contacts: true,
+					},
+				},
+			},
+		});
 
 		return apiResponse(result);
-	} catch {
-		return apiNotFound();
+	} catch (error) {
+		return handleApiError(error);
 	}
 };
 
 const createContactListSchema = z.object({
 	name: z.string().min(1),
 	count: z.number().int().default(0).optional(),
-	userIds: z.array(z.string()).optional(),
 });
 export type PostContactListData = z.infer<typeof createContactListSchema>;
 
@@ -44,16 +54,11 @@ export async function POST(req: NextRequest) {
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
-		const { userIds } = validatedData.data;
 
 		const contactList = await prisma.contactList.create({
 			data: {
 				...validatedData.data,
-				user: userIds
-					? {
-							connect: userIds.map((id) => ({ clerkId: id })),
-					  }
-					: undefined,
+				userId: userId, // Direct userId assignment
 			},
 			include: {
 				user: true,
