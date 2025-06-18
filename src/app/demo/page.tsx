@@ -24,7 +24,7 @@ const Demo = () => {
 			<TypographyP>
 				If you have received a trial code from us, please enter it below to activate your
 				trial.
-			</TypographyP>{' '}
+			</TypographyP>
 			<Card>
 				<CardHeader className="">
 					<CardTitle>Demo Signup</CardTitle>
