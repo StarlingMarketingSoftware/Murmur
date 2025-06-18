@@ -40,7 +40,9 @@ export const GET = async function GET() {
 const createContactListSchema = z.object({
 	name: z.string().min(1),
 	count: z.number().int().default(0).optional(),
+	contactIds: z.array(z.number()).optional(),
 });
+
 export type PostContactListData = z.infer<typeof createContactListSchema>;
 
 export async function POST(req: NextRequest) {
@@ -55,13 +57,15 @@ export async function POST(req: NextRequest) {
 			return apiBadRequest(validatedData.error);
 		}
 
+		const { contactIds, name } = validatedData.data;
+
 		const contactList = await prisma.contactList.create({
 			data: {
-				...validatedData.data,
-				userId: userId, // Direct userId assignment
-			},
-			include: {
-				user: true,
+				name,
+				userId: userId,
+				contacts: {
+					connect: contactIds?.map((id) => ({ id })),
+				},
 			},
 		});
 

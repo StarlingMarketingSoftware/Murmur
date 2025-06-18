@@ -46,6 +46,7 @@ export const useDashboard = () => {
 		await refetch();
 		createContactList({
 			name: data.searchText,
+			contactIds: contacts?.map((contact) => contact.id) || [],
 		});
 	};
 
