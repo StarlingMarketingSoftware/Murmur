@@ -169,6 +169,7 @@ const importCSVWithSubcategories = async (
 			where: { name: categoryName.toLowerCase() },
 			create: {
 				name: categoryName,
+
 				// count: categoryToCount[categoryName],
 			},
 			update: {

@@ -58,17 +58,26 @@ model User {
   aiTestCredits  Int      @default(2)
   customDomain   String?
 
-  stripeCustomerId         String?       @unique
+  stripeCustomerId         String?     @unique
   stripeSubscriptionId     String?
   stripeSubscriptionStatus String?
   stripePriceId            String?
-  createdAt                DateTime      @default(now())
-  updatedAt                DateTime      @updatedAt
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
   emails                   Email[]
   campaigns                Campaign[]
   signatures               Signature[]
   contactLists             ContactList[]
   identities               Identity[]
+}
+
+model ContactList {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  count     Int?      @default(0)
+  contacts  Contact[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 model Contact {
@@ -103,17 +112,6 @@ model Contact {
 
   @@unique([email, contactListId])
   @@index([contactListId])
-}
-
-// needs database trigger whenever a contact is added, update this table accordingly
-model ContactList {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  count     Int?      @default(0)
-  contacts  Contact[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  user      User[]
 }
 
 model Email {
