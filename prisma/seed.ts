@@ -166,17 +166,12 @@ const importCSVWithSubcategories = async (
 	}
 
 	for (const categoryName of Object.keys(categoryToCount)) {
-		await prisma.contactList.upsert({
-			where: { name: categoryName.toLowerCase() },
-			create: {
+		await prisma.contactList.create({
+			data: {
 				name: categoryName,
+			},
 
-				// count: categoryToCount[categoryName],
-			},
-			update: {
-				name: categoryName,
-				// count: categoryToCount[categoryName],
-			},
+			// count: categoryToCount[categoryName],
 		});
 	}
 
