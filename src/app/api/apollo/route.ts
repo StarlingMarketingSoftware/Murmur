@@ -45,7 +45,6 @@ export async function GET(req: NextRequest) {
 			.toLowerCase()
 			.split(/\s+/)
 			.filter((term) => term.length > 0);
-
 		const caseInsensitiveMode = 'insensitive' as const;
 		const whereConditions =
 			searchTerms.length > 0
@@ -56,10 +55,15 @@ export async function GET(req: NextRequest) {
 								OR: [
 									{ firstName: { contains: term, mode: caseInsensitiveMode } },
 									{ lastName: { contains: term, mode: caseInsensitiveMode } },
+									{ title: { contains: term, mode: caseInsensitiveMode } },
 									{ email: { contains: term, mode: caseInsensitiveMode } },
 									{ company: { contains: term, mode: caseInsensitiveMode } },
+									{ city: { contains: term, mode: caseInsensitiveMode } },
 									{ state: { contains: term, mode: caseInsensitiveMode } },
 									{ country: { contains: term, mode: caseInsensitiveMode } },
+									{ address: { contains: term, mode: caseInsensitiveMode } },
+									{ headline: { contains: term, mode: caseInsensitiveMode } },
+									{ linkedInUrl: { contains: term, mode: caseInsensitiveMode } },
 									{ website: { contains: term, mode: caseInsensitiveMode } },
 									{ phone: { contains: term, mode: caseInsensitiveMode } },
 								],

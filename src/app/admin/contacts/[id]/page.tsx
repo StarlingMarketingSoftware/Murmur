@@ -4,7 +4,7 @@ import Spinner from '@/components/ui/spinner';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import { useManageContactListDetail } from './useManageContactListDetail';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import ContactCSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactCSVUploadDialog';
+import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
 
 const ManageContactListDetail: FC = () => {
 	const { data, isPending, columns, contactListData, isPendingContactList } =
@@ -16,7 +16,7 @@ const ManageContactListDetail: FC = () => {
 			) : (
 				<Card size="lg">
 					<CardHeader>
-						<CardTitle>{contactListData?.name}</CardTitle>
+						<CardTitle>{contactListData?.title}</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<div className="flex flex-row gap-4">
@@ -24,7 +24,7 @@ const ManageContactListDetail: FC = () => {
 								<PlusIcon />
 								Add Contact
 							</Button> */}
-							<ContactCSVUploadDialog />
+							<ContactTSVUploadDialog />
 						</div>
 						<CustomTable
 							columns={columns}

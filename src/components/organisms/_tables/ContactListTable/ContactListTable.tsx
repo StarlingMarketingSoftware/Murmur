@@ -9,7 +9,6 @@ import {
 import CustomTable from '../../../molecules/CustomTable/CustomTable';
 import { ContactListTableProps, useContactListTable } from './useContactListTable';
 import Spinner from '@/components/ui/spinner';
-import SelectRecipientsDialog from '../../_dialogs/SelectRecipientsDialog/SelectRecipientsDialog';
 
 const ContactListTable: FC<ContactListTableProps> = (props) => {
 	const {
@@ -17,10 +16,10 @@ const ContactListTable: FC<ContactListTableProps> = (props) => {
 		dataContactLists,
 		isPendingContactLists,
 		handleRowClick,
-		isContactListDialogOpen,
-		setIsContactListDialogOpen,
-		selectedContactList,
-		campaign,
+		// isContactListDialogOpen,
+		// setIsContactListDialogOpen,
+		// selectedContactList,
+		setSelectedRows,
 	} = useContactListTable(props);
 
 	if (isPendingContactLists) {
@@ -40,33 +39,16 @@ const ContactListTable: FC<ContactListTableProps> = (props) => {
 					columns={columns}
 					data={dataContactLists}
 					handleRowClick={handleRowClick}
+					isSelectable
+					setSelectedRows={setSelectedRows}
 				/>
 			</CardContent>
-			<SelectRecipientsDialog
+			{/* <SelectRecipientsDialog
 				isOpen={isContactListDialogOpen}
 				setIsOpen={setIsContactListDialogOpen}
 				selectedContactList={selectedContactList}
 				selectedRecipients={campaign.contacts}
-			/>
-			{/* <Button
-    onClick={handleImportGoogleContacts}
-    variant="outline"
-    className="w-fit mx-auto flex items-center gap-2"
-  >
-    <FcGoogle />
-    Import your Google Contacts
-  </Button>
-  <Button
-    onClick={() => dispatch(setStep2(true))}
-    disabled={selectedContactLists.length === 0}
-    className="w-fit max-w-[500px] mx-auto"
-  >
-    Extract Contacts from Selected Lists
-  </Button>
-  <RequestPeopleAPIPermissionsDialog
-    isOpen={isPermissionsDialogOpen}
-    setIsOpen={setIsPermissionsDialogOpen}
-  /> */}
+			/> */}
 		</Card>
 	);
 };

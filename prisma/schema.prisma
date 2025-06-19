@@ -56,6 +56,7 @@ model User {
   role           UserRole @default(user)
   aiDraftCredits Int      @default(5)
   aiTestCredits  Int      @default(2)
+  customDomain   String?
 
   stripeCustomerId         String?       @unique
   stripeSubscriptionId     String?
@@ -66,8 +67,23 @@ model User {
   emails                   Email[]
   campaigns                Campaign[]
   signatures               Signature[]
-  contactLists             ContactList[]
   identities               Identity[]
+  contactLists             ContactList[]
+}
+
+model ContactList {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  title     String     @default("Untitled Contact List")
+  count     Int?       @default(0)
+  contacts  Contact[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  userId    String?
+  user      User?      @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  campaigns Campaign[]
+
+  @@index([userId])
 }
 
 model Contact {
@@ -104,17 +120,6 @@ model Contact {
   @@index([contactListId])
 }
 
-// needs database trigger whenever a contact is added, update this table accordingly
-model ContactList {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  count     Int?      @default(0)
-  contacts  Contact[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  user      User[]
-}
-
 model Email {
   id         Int         @id @default(autoincrement())
   subject    String
@@ -134,25 +139,26 @@ model Email {
 }
 
 model Campaign {
-  id          Int        @id @default(autoincrement())
-  name        String
-  status      Status     @default(active)
-  userId      String
-  user        User       @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
-  contacts    Contact[]
-  subject     String?
-  message     String?    @db.Text
-  aiModel     AiModel?
-  font        String     @default("Times New Roman")
-  testMessage String?    @db.Text
-  testSubject String?
-  emails      Email[]
-  senderEmail String?
-  senderName  String?
-  signatureId Int?
-  signature   Signature? @relation(fields: [signatureId], references: [id], onDelete: Cascade)
-  identityId  Int?
-  identity    Identity?  @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  id           Int           @id @default(autoincrement())
+  name         String
+  status       Status        @default(active)
+  userId       String
+  user         User          @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  contacts     Contact[]
+  subject      String?
+  message      String?       @db.Text
+  aiModel      AiModel?
+  font         String        @default("Times New Roman")
+  testMessage  String?       @db.Text
+  testSubject  String?
+  emails       Email[]
+  senderEmail  String?
+  senderName   String?
+  signatureId  Int?
+  signature    Signature?    @relation(fields: [signatureId], references: [id], onDelete: Cascade)
+  identityId   Int?
+  identity     Identity?     @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  contactLists ContactList[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

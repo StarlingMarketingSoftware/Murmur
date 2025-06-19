@@ -18,11 +18,24 @@ export const PromotionLogos = () => {
 	}
 	const logos: Logo[] = [
 		{
-			fileName: 'uPittsburgh.png',
-			width: 200,
+			fileName: 'nordstrom.png',
+			width: 400,
+			darkFileName: 'nordstromDark.png',
 		},
 		{
-			fileName: 'delawareValleyEagles.png',
+			fileName: 'cushman.png',
+			width: 400,
+		},
+		{
+			fileName: 'massMutual.png',
+			width: 400,
+		},
+		{
+			fileName: 'pennsylvaniaMedical.png',
+			width: 400,
+		},
+		{
+			fileName: 'uPittsburgh.png',
 			width: 200,
 		},
 		{
@@ -30,55 +43,55 @@ export const PromotionLogos = () => {
 			width: 200,
 		},
 		{
-			fileName: 'uPenn.png',
-			width: 200,
-		},
-		{
-			fileName: 'nordstrom.png',
-			width: 400,
-			darkFileName: 'nordstromDark.png',
-		},
-		{
-			fileName: 'pennsylvaniaMedical.png',
-			width: 400,
-		},
-		{
-			fileName: 'cushman.png',
-			width: 400,
-		},
-
-		{
 			fileName: 'illusion.png',
 			width: 400,
 		},
+
 		{
 			fileName: 'lutherCrest.png',
 			width: 400,
 			darkFileName: 'lutherCrestDark.png',
 		},
 		{
-			fileName: 'massMutual.png',
-			width: 400,
+			fileName: 'uPenn.png',
+			width: 200,
+		},
+		{
+			fileName: 'delawareValleyEagles.png',
+			width: 200,
 		},
 	];
-
-	return (
-		<div className="w-full overflow-hidden mt-10">
-			<div className="flex gap-12 items-center justify-center mb-10 w-full flex-wrap">
-				{logos.map((logo, index) => {
-					const fileName =
-						theme === 'dark' && logo.darkFileName ? logo.darkFileName : logo.fileName;
-					return (
+	const generateLogos = (logos: Logo[]) => {
+		const res = [];
+		for (let i = 0; i < logos.length - 1; i += 2) {
+			const logo1 = logos[i];
+			const logo2 = logos[i + 1];
+			const fileName1 =
+				theme === 'dark' && logo1.darkFileName ? logo1.darkFileName : logo1.fileName;
+			const fileName2 =
+				theme === 'dark' && logo2.darkFileName ? logo2.darkFileName : logo2.fileName;
+			res.push(
+				<div key={i} className="flex gap-38 justify-center items-center">
+					<div className="min-w-[280px]  flex justify-center items-center ga-6">
 						<Image
-							key={index}
-							src={`/logos/${fileName}`}
+							src={`/logos/${fileName1}`}
 							alt="Logo"
-							height={200}
-							width={logo.width / 1.2}
+							height={94}
+							width={logo1.width / 1.2}
 						/>
-					);
-				})}
-			</div>
-		</div>
-	);
+					</div>
+					<div className="min-w-[280px] flex justify-center items-center">
+						<Image
+							src={`/logos/${fileName2}`}
+							alt="Logo"
+							height={94}
+							width={logo2.width / 1.2}
+						/>
+					</div>
+				</div>
+			);
+		}
+		return res;
+	};
+	return <div className="flex flex-col gap-12">{generateLogos(logos)}</div>;
 };

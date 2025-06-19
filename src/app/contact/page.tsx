@@ -1,8 +1,5 @@
 'use client';
 
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import {
 	Form,
@@ -13,79 +10,90 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import {
-	Card,
-	CardContent,
-	CardFooter,
-	CardHeader,
-	CardTitle,
-} from '@/components/ui/card';
-import PageHeading from '@/components/atoms/_text/PageHeading';
-import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
+import { Card, CardContent } from '@/components/ui/card';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
-import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
-import { TypographyP } from '@/components/ui/typography';
+import { Birds } from '@/components/atoms/_svg/Birds';
+import { FAQS, useContactPage } from './useContactPage';
+import { Typography } from '@/components/ui/typography';
+import { FaqSection } from '@/components/molecules/FaqSection/FaqSection';
 
 const Contact = () => {
-	const contactFormSchema = z.object({
-		name: z.string().min(1, { message: 'Name is required.' }),
-		email: z.string().email({ message: 'Invalid email address.' }),
-		subject: z.string().min(1, { message: 'Subject is required.' }),
-		message: z.string().min(1, { message: 'Message is required.' }),
-	});
-
-	const form = useForm<z.infer<typeof contactFormSchema>>({
-		resolver: zodResolver(contactFormSchema),
-		defaultValues: {
-			name: '',
-			email: '',
-			subject: '',
-			message: '',
-		},
-	});
-
-	const { isPending, mutate } = useSendMailgunMessage({
-		onSuccess: () => {
-			form.reset();
-		},
-	});
-
-	const onSubmit = (values: z.infer<typeof contactFormSchema>) => {
-		const emailBody: string = `<p>Name: ${values.name}</p><p></p><p>Email: ${values.email}</p><p></p><p>Message: ${values.message}</p>`;
-
-		mutate({
-			recipientEmail: process.env.NEXT_PUBLIC_CONTACT_FORM_RECIPIENT!,
-			...values,
-			senderEmail: values.email,
-			senderName: `Murmur Inquiry from ${values.name}`,
-			message: emailBody,
-		});
-	};
+	const { isPending, onSubmit, form } = useContactPage();
 
 	return (
-		<AppLayout>
-			<PageHeading>Contact Us</PageHeading>
-			<TypographyP>
-				You can reach us at any time, on any day, and we will get back to you immediately.
-				We run this business to the highest degree of excellence we possibly can, and we
-				seek to serve you to the best of our ability, according to the task at hand.
-			</TypographyP>{' '}
-			<Card>
-				<CardHeader className="">
-					<CardTitle>Send us a message</CardTitle>
-				</CardHeader>
-				<CardContent>
-					<Form {...form}>
-						<form onSubmit={form.handleSubmit(onSubmit)} className="">
-							<div className="flex sm:flex-row flex-col items-center w-full gap-0 sm:gap-4 m-0">
+		<>
+			<div className="absolute inset-0 -z-20">
+				<div
+					className="absolute inset-0 overflow-hidden"
+					style={{
+						maskImage: 'linear-gradient(to left, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)',
+						WebkitMaskImage:
+							'linear-gradient(to left, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
+					}}
+				>
+					<Birds
+						width="200%"
+						height="200%"
+						className="-translate-y-75 md:-translate-y-65 lg:-translate-y-100 -translate-x-65 min-w-[1500px]"
+					/>
+				</div>
+			</div>
+			<div
+				className="absolute inset-0 backdrop-blur-lg -z-10"
+				style={{
+					maskImage:
+						'linear-gradient(to right, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.95) 50%)',
+					WebkitMaskImage:
+						'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 30%, rgba(0,0,0,0.9) 70%, rgba(0,0,0,0.9) 100%)',
+				}}
+			/>
+			<Typography variant="h1" className="text-center mt-32">
+				Having Trouble?
+			</Typography>
+			<Typography variant="h1" className="text-center mt-20">
+				Get Help
+			</Typography>
+			<div className="mt-39">
+				<Form {...form}>
+					<form onSubmit={form.handleSubmit(onSubmit)} className="">
+						<Card className="max-w-[1480px] mx-auto w-9/10 border-primary border-3 px-11 pb-15 pt-6">
+							<CardContent>
+								<div className="flex sm:flex-row flex-col items-center w-full gap-0 sm:gap-18 m-0">
+									<FormField
+										control={form.control}
+										name="name"
+										render={({ field }) => (
+											<FormItem className="w-full sm:w-1/2">
+												<FormLabel>Full Name*</FormLabel>
+												<FormControl>
+													<Input variant="light" rounded={false} {...field} />
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+									<FormField
+										control={form.control}
+										name="email"
+										render={({ field }) => (
+											<FormItem className="w-full sm:w-1/2">
+												<FormLabel>Email Address*</FormLabel>
+												<FormControl>
+													<Input variant="light" rounded={false} {...field} />
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+								</div>
 								<FormField
 									control={form.control}
-									name="name"
+									name="subject"
 									render={({ field }) => (
-										<FormItem className="w-full sm:w-1/2">
-											<FormLabel>Name</FormLabel>
+										<FormItem>
+											<FormLabel>Subject*</FormLabel>
 											<FormControl>
-												<Input {...field} />
+												<Input variant="light" rounded={false} {...field} />
 											</FormControl>
 											<FormMessage />
 										</FormItem>
@@ -93,61 +101,60 @@ const Contact = () => {
 								/>
 								<FormField
 									control={form.control}
-									name="email"
+									name="message"
 									render={({ field }) => (
-										<FormItem className="w-full sm:w-1/2">
-											<FormLabel>Email</FormLabel>
+										<FormItem>
+											<FormLabel>Message*</FormLabel>
 											<FormControl>
-												<Input {...field} />
+												<RichTextEditor
+													className="rounded-none"
+													hideMenuBar
+													value={field.value}
+													onChange={field.onChange}
+												/>
 											</FormControl>
 											<FormMessage />
 										</FormItem>
 									)}
 								/>
-							</div>
-
-							<FormField
-								control={form.control}
-								name="subject"
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>Subject</FormLabel>
-										<FormControl>
-											<Input {...field} />
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-							<FormField
-								control={form.control}
-								name="message"
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>Message</FormLabel>
-										<FormControl>
-											<RichTextEditor
-												hideMenuBar
-												value={field.value}
-												onChange={field.onChange}
-											/>
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-							<Button size="lg" type="submit" isLoading={isPending}>
+							</CardContent>
+						</Card>
+						<div className="flex justify-center mt-22">
+							<Button
+								font="secondary"
+								className="rounded-none w-[341px]"
+								size="lg"
+								type="submit"
+								isLoading={isPending}
+							>
 								Submit
 							</Button>
-						</form>
-					</Form>
-				</CardContent>
-				<CardFooter></CardFooter>
-			</Card>
-			<div className="flex flex-row justify-center items-center">
-				<div></div>
+						</div>
+					</form>
+				</Form>
 			</div>
-		</AppLayout>
+			<div className="mt-46 mx-auto w-fit">
+				<Typography bold className="text-[25px] text-center">
+					Other Ways to Reach Us
+				</Typography>
+				<div className="mt-12 flex gap-30 text-[23px]">
+					<Typography bold>Email:</Typography>
+					<Typography font="secondary">starlingmarketingagency@gmail.com</Typography>
+				</div>
+				<div className="mt-6 flex gap-30 text-[23px]">
+					<Typography bold>Hours:</Typography>
+					<Typography font="secondary">24/7</Typography>
+				</div>
+			</div>
+			<div className="w-full h-fit min-h-100 bg-gradient-to-b from-background from-0% to-light to-15% pt-4">
+				<FaqSection
+					header="Support"
+					title="Help"
+					description="Get your questions answered!"
+					faqs={FAQS}
+				/>
+			</div>
+		</>
 	);
 };
 

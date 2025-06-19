@@ -1,3 +1,4 @@
+import { User } from '@prisma/client';
 import prisma from '../src/lib/prisma';
 import { parse } from 'csv-parse/sync';
 import { promises as fs } from 'fs';
@@ -165,16 +166,12 @@ const importCSVWithSubcategories = async (
 	}
 
 	for (const categoryName of Object.keys(categoryToCount)) {
-		await prisma.contactList.upsert({
-			where: { name: categoryName.toLowerCase() },
-			create: {
+		await prisma.contactList.create({
+			data: {
 				name: categoryName,
-				// count: categoryToCount[categoryName],
 			},
-			update: {
-				name: categoryName,
-				// count: categoryToCount[categoryName],
-			},
+
+			// count: categoryToCount[categoryName],
 		});
 	}
 
@@ -207,6 +204,7 @@ const importCSVWithSubcategories = async (
 				country: record.country,
 				phone: record.phone,
 				contactListId: recordContactListId,
+				emailValidationStatus: 'valid',
 			},
 			update: {
 				lastName: record.name,
@@ -215,11 +213,64 @@ const importCSVWithSubcategories = async (
 				state: record.state,
 				country: record.country,
 				phone: record.phone,
+				emailValidationStatus: 'valid',
 			},
 		});
 	}
 };
+
+const userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
+	{
+		clerkId: 'user_2yfwTts2NJrPFiydjSimNx9HW4r',
+		email: 'mcrawford5376@gmail.com',
+		murmurEmail: 'michaelshingocrawford@1.murmurmailbox.com',
+		firstName: 'Michael Shingo',
+		lastName: 'Crawford',
+		role: 'admin',
+		aiDraftCredits: 1000,
+		aiTestCredits: 100,
+		customDomain: 'michaelshingo.com',
+		stripeCustomerId: 'cus_SWKynJjTpn1Taw',
+		stripeSubscriptionId: 'sub_1RbINU02Nskp21xSVq5hb7x6',
+		stripePriceId: 'price_1RB9Uw02Nskp21xSrRxsLDT3',
+		stripeSubscriptionStatus: 'active',
+	},
+	{
+		clerkId: 'user_2yfwfFMcWIho4NSUT25o8V1LYHu',
+		email: 'michaelshingotokyo@gmail.com',
+		murmurEmail: 'michaelshingocrawford@2.murmurmailbox.com',
+		firstName: 'Michael Shingo',
+		lastName: 'Crawford',
+		role: 'user',
+		aiDraftCredits: 1000,
+		aiTestCredits: 100,
+		customDomain: 'michaelshingo.com',
+
+		stripeCustomerId: 'cus_SPE3wRaFWOtqDF',
+		stripeSubscriptionId: 'sub_1RUPe302Nskp21xSWvvOiPGs',
+		stripePriceId: 'price_1RB9Uw02Nskp21xSrRxsLDT3',
+		stripeSubscriptionStatus: 'active',
+	},
+	{
+		clerkId: 'user_2yfwk3fV2eGnsat4Ph7GdSfpaQ5',
+		email: 'shingoalert@gmail.com',
+		murmurEmail: 'michaelshingo@3.murmurmailbox.com',
+		firstName: 'Michael',
+		lastName: 'Shingo',
+		role: 'user',
+		customDomain: 'michaelshingo.com',
+		aiDraftCredits: 1000,
+		aiTestCredits: 100,
+		stripeCustomerId: 'cus_SWL0AB6nMvD5qb',
+		stripeSubscriptionId: null,
+		stripePriceId: null,
+		stripeSubscriptionStatus: null,
+	},
+];
 async function main() {
+	await prisma.user.createMany({
+		data: userData,
+	});
 	importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
 	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
 

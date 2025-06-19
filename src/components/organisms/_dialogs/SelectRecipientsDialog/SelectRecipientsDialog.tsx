@@ -36,7 +36,7 @@ const SelectRecipientsDialog: FC<SelectRecipientsDialogProps> = (props) => {
 				) : (
 					<>
 						<DialogTitle className="capitalize">
-							{`${selectedContactList?.name}`}
+							{`${selectedContactList?.title}`}
 						</DialogTitle>
 						<DialogHeader>
 							<DialogDescription>

@@ -9,47 +9,59 @@ import {
 import { useBatchCreateContacts } from '@/hooks/queryHooks/useContacts';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
+import Papa from 'papaparse';
 
-export const useContactCSVUploadDialog = () => {
+export const useContactTSVUploadDialog = () => {
 	const params = useParams<{ id: string }>();
 	const contactListId = Number(params.id);
 	const [open, setOpen] = useState(false);
-	const [csvData, setCsvData] = useState<Contact[]>([]);
+	const [tsvData, setTsvData] = useState<Contact[]>([]);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const { mutateAsync: createContacts, isPending } = useBatchCreateContacts();
-
 	const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];
 		if (!file) return;
 
-		const reader = new FileReader();
-		reader.onload = (e) => {
-			const text = e.target?.result as string;
-			const lines = text.split('\n');
-			const headers = lines[0].split(',').map((header) => header.trim());
+		Papa.parse(file, {
+			header: true,
+			delimiter: '\t',
+			skipEmptyLines: true,
+			transformHeader: (header: string) => header.trim().toLowerCase(),
+			transform: (value: string) => value.trim(),
+			complete: (results) => {
+				if (results.errors.length > 0) {
+					console.error('TSV parsing errors:', results.errors);
+					toast.error('Error parsing TSV file. Please check the format.');
+					return;
+				}
 
-			const parsedData = lines
-				.slice(1)
-				.filter((line) => line.trim() !== '')
-				.map((line, index) => {
-					const values = line.split(',').map((value) => value.trim());
-					const contact: Partial<Contact> = {
-						id: index,
-						lastName: values[headers.indexOf('name')] || '',
-						email: values[headers.indexOf('email')] || '',
-						company: values[headers.indexOf('company')] || '',
-						country: values[headers.indexOf('country')] || '',
-						state: values[headers.indexOf('state')] || '',
-						website: values[headers.indexOf('website')] || '',
-						phone: values[headers.indexOf('phone')] || '',
-					};
-					return contact as Contact;
-				});
+				const parsedData = (results.data as Record<string, string>[])
+					.filter((row) => Object.values(row).some((value) => value !== ''))
+					.map((row) => {
+						const contact: Partial<Contact> = {
+							firstName: row.firstname || '',
+							lastName: row.lastname || '',
+							company: row.company || '',
+							email: row.email || '',
+							address: row.address,
+							country: row.country || '',
+							state: row.state || '',
+							website: row.website || '',
+							phone: row.phone || '',
+						};
+						return contact as Contact;
+					});
 
-			setCsvData(parsedData);
-		};
-		reader.readAsText(file);
+				setTsvData(parsedData);
+				toast.success(`Successfully parsed ${parsedData.length} contacts`);
+			},
+			error: (error) => {
+				console.error('TSV parsing failed:', error);
+				toast.error('Failed to parse TSV file');
+			},
+		});
+
 		event.target.value = ''; // Reset input
 	};
 
@@ -58,26 +70,38 @@ export const useContactCSVUploadDialog = () => {
 	};
 
 	const handleSave = async () => {
-		if (!csvData || csvData.length === 0) {
+		if (!tsvData || tsvData.length === 0) {
 			toast.error('No data to upload');
 			return;
 		}
-		await createContacts({ contacts: csvData, contactListId });
-		setCsvData([]);
+		await createContacts({ contacts: tsvData, contactListId });
+		setTsvData([]);
 		setOpen(false);
 	};
 
 	const columns: ColumnDef<Contact>[] = [
 		{
-			accessorKey: 'name',
+			accessorKey: 'firstName',
 			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Name" />;
+				return <TableSortingButton column={column} label="First Name" />;
 			},
 			cell: ({ row }) => {
-				const name: string = row.getValue('name');
+				const name: string = row.getValue('firstName');
 				if (!name) return <NoDataCell />;
 
-				return <div className="text-left">{row.getValue('name')}</div>;
+				return <div className="text-left">{row.getValue('firstName')}</div>;
+			},
+		},
+		{
+			accessorKey: 'lastName',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Last Name" />;
+			},
+			cell: ({ row }) => {
+				const name: string = row.getValue('lastName');
+				if (!name) return <NoDataCell />;
+
+				return <div className="text-left">{row.getValue('lastName')}</div>;
 			},
 		},
 		{
@@ -96,6 +120,15 @@ export const useContactCSVUploadDialog = () => {
 			},
 			cell: ({ row }) => {
 				return <div className="text-left">{row.getValue('company')}</div>;
+			},
+		},
+		{
+			accessorKey: 'address',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Address" />;
+			},
+			cell: ({ row }) => {
+				return <div className="text-left">{row.getValue('address')}</div>;
 			},
 		},
 		{
@@ -151,20 +184,23 @@ export const useContactCSVUploadDialog = () => {
 			cell: ({ row }) => (
 				<TableDeleteRowButton
 					onClick={() => {
-						setCsvData((prev) => prev.filter((_, index) => index !== row.index));
+						setTsvData((prev) => prev.filter((_, index) => index !== row.index));
 					}}
 				/>
 			),
 		},
 	];
-
 	const handleTemplateDownload = () => {
 		const link = document.createElement('a');
-		link.href = '/sampleContactListCSV.csv';
-		link.download = 'contact-template.csv';
+		link.href = '/sampleContactListTSV.txt';
+		link.download = 'sampleContactListTSV.txt';
 		document.body.appendChild(link);
 		link.click();
 		document.body.removeChild(link);
+	};
+
+	const handleClear = () => {
+		setTsvData([]);
 	};
 
 	return {
@@ -172,11 +208,12 @@ export const useContactCSVUploadDialog = () => {
 		open,
 		setOpen,
 		columns,
-		csvData,
+		tsvData,
 		handleTemplateDownload,
 		handleFileUpload,
 		handleUploadClick,
 		fileInputRef,
 		handleSave,
+		handleClear,
 	};
 };

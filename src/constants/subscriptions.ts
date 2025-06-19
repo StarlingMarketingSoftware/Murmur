@@ -3,7 +3,7 @@ import { SubscriptionTierData } from '@/types';
 
 export const SUBSCRIPTION_TIER_DATA_LIST: Record<string, SubscriptionTierData> = {
 	[process.env.NEXT_PUBLIC_ESSENTIALS_PRICE_ID as string]: {
-		name: 'Essentials',
+		name: 'Standard',
 		aiEmailCount: 500,
 		viewEmailAddresses: false,
 		get testEmailCount() {
@@ -19,7 +19,7 @@ export const SUBSCRIPTION_TIER_DATA_LIST: Record<string, SubscriptionTierData> =
 		},
 	},
 	[process.env.NEXT_PUBLIC_PROFESSIONAL_PRICE_ID as string]: {
-		name: 'Professional',
+		name: 'Pro',
 		aiEmailCount: 1500,
 		viewEmailAddresses: false,
 		get testEmailCount() {
@@ -43,7 +43,7 @@ export const SUBSCRIPTION_TIER_DATA_LIST: Record<string, SubscriptionTierData> =
 		},
 	},
 	[process.env.NEXT_PUBLIC_ADMIN_LITE_PRICE_ID as string]: {
-		name: 'Prophet',
+		name: 'Admin Lite',
 		aiEmailCount: 100000,
 		viewEmailAddresses: false,
 		get testEmailCount() {
@@ -51,7 +51,7 @@ export const SUBSCRIPTION_TIER_DATA_LIST: Record<string, SubscriptionTierData> =
 		},
 	},
 	[process.env.NEXT_PUBLIC_ADMIN_FULL_PRICE_ID as string]: {
-		name: 'Prophet',
+		name: 'Admin Full',
 		aiEmailCount: 500000,
 		viewEmailAddresses: true,
 		get testEmailCount() {

@@ -1,0 +1,4 @@
+firstname	lastname	company	email	address	country	state	website	phone
+John	Smith	Google	example1@example.com	"1234 W Side Street, Oakland, CA 10000"	United States	California	www.example.com	000-000-0000
+Jane	Reddy	Meta	example2@example.com	"3271 Redstone Drive, Spout Brook, NY 10052"	United States	New York	www.example2.com	000-000-0000
+Randy	Santos	Amazon	example3@example.com	"33 N Front St, Cleveland, OH 10002"	United States	California	www.example2.com	000-000-0000

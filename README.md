@@ -92,6 +92,14 @@ Murmur uses Semantic Versioning (SemVer) – (MAJOR.MINOR.PATCH). In this system
 
 This project is licensed under the MIT License.
 
+## PR Checklist
+
+- Create a branch based on an issue.
+-
+- run `npm run build`
+- Have your PR reviewed by Github Copilot.
+- Request a review from a team member before merging.
+
 ## Code Style
 
 - When possible, write descriptions of functions in the following style:
@@ -105,3 +113,26 @@ export function extractEmailsFromContacts(contacts: Partial<Contact>[]): string[
 		.filter((email): email is string => email !== null && email !== undefined);
 }```
 ````
+
+## Git Branching Workflow
+
+### main/production branch (current production code)
+
+- Only contains released, production-ready code
+- Hotfixes are merged here
+
+### develop branch (integration branch)
+
+- Where feature branches merge for testing
+- Your main development baseline
+
+###feature/your-feature branch (your long-running feature)
+
+- Create this off develop
+- Work here for several weeks
+- Regularly merge develop into this to stay current
+
+### hotfix/xxx branches (for production fixes)
+
+- Created from main
+- After fixing, merge to both main and develop
