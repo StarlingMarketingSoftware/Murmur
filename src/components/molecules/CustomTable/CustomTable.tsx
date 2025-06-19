@@ -62,13 +62,19 @@ export function TableSortingButton<TData>({
 }: TableSortingButtonProps<TData>) {
 	return (
 		<Button
+			noPadding
 			variant="ghost"
+			className="!max-w-fit !w-fit hover:opacity-70"
 			onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
 		>
 			{label}
 			<ArrowUpDown className="h-4 w-4" />
 		</Button>
 	);
+}
+
+interface CustomTableProps<TData, TValue> extends DataTableProps<TData, TValue> {
+	variant?: 'primary' | 'secondary';
 }
 
 export function CustomTable<TData, TValue>({
@@ -80,7 +86,8 @@ export function CustomTable<TData, TValue>({
 	isSelectable = false,
 	noDataMessage = 'No data was found.',
 	initialRowSelectionState,
-}: DataTableProps<TData, TValue>) {
+	variant = 'primary',
+}: CustomTableProps<TData, TValue>) {
 	const [pagination, setPagination] = useState({
 		pageIndex: 0,
 		pageSize: 10, // or whatever default page size you want
@@ -193,13 +200,13 @@ export function CustomTable<TData, TValue>({
 				/>
 			</div>
 			<div className="rounded-md border">
-				<Table>
-					<TableHeader>
+				<Table variant={variant}>
+					<TableHeader variant={variant}>
 						{table.getHeaderGroups().map((headerGroup) => (
-							<TableRow key={headerGroup.id}>
+							<TableRow key={headerGroup.id} variant={variant}>
 								{headerGroup.headers.map((header) => {
 									return (
-										<TableHead className={twMerge()} key={header.id}>
+										<TableHead className={twMerge()} key={header.id} variant={variant}>
 											{header.isPlaceholder
 												? null
 												: flexRender(header.column.columnDef.header, header.getContext())}
@@ -209,10 +216,11 @@ export function CustomTable<TData, TValue>({
 							</TableRow>
 						))}
 					</TableHeader>
-					<TableBody>
+					<TableBody variant={variant}>
 						{table.getRowModel().rows?.length ? (
 							table.getRowModel().rows.map((row) => (
 								<TableRow
+									variant={variant}
 									className={twMerge(
 										(handleRowClick || (setSelectedRows && isSelectable)) &&
 											'cursor-pointer'
@@ -229,15 +237,19 @@ export function CustomTable<TData, TValue>({
 									data-state={row.getIsSelected() && 'selected'}
 								>
 									{row.getVisibleCells().map((cell) => (
-										<TableCell key={cell.id}>
+										<TableCell key={cell.id} variant={variant}>
 											{flexRender(cell.column.columnDef.cell, cell.getContext())}
 										</TableCell>
 									))}
 								</TableRow>
 							))
 						) : (
-							<TableRow>
-								<TableCell colSpan={columns.length} className="h-24 text-center">
+							<TableRow variant={variant}>
+								<TableCell
+									variant={variant}
+									colSpan={columns.length}
+									className="h-24 text-center"
+								>
 									{noDataMessage}
 								</TableCell>
 							</TableRow>

@@ -44,7 +44,7 @@ const EmailAutomationSteps: FC<EmailAutomationStepsProps> = (props) => {
 				</Link>
 				<div className="flex flex-row justify-center items-center gap-4">
 					<Button
-						variant="outline"
+						variant="primary-light"
 						disabled={stepParam === '1'}
 						onClick={returnToPreviousStep}
 					>
@@ -52,7 +52,7 @@ const EmailAutomationSteps: FC<EmailAutomationStepsProps> = (props) => {
 						Previous Step
 					</Button>
 					<Button
-						variant="outline"
+						variant="primary-light"
 						disabled={stepParam === '3'}
 						onClick={advanceToNextStep}
 					>

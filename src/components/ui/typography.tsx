@@ -1,111 +1,102 @@
-import { ReactNode } from 'react';
-import { twMerge } from 'tailwind-merge';
+import * as React from 'react';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from '@/utils';
 
-interface TypographyProps {
-	children?: ReactNode;
-	className?: string;
+const typographyVariants = cva('', {
+	variants: {
+		variant: {
+			h1: 'scroll-m-20 text-4xl font-normal lg:text-[63px]',
+			h2: 'scroll-m-20 text-3xl font-normal',
+			h3: 'scroll-m-20 text-2xl font-normal',
+			h4: 'scroll-m-20 text-xl font-normal',
+			p: 'leading-7 text-[26px] font-normal',
+			label: 'text-[14px]',
+			blockquote: 'border-l-2 pl-6 italic',
+			table: 'my-6 w-full overflow-y-auto',
+			list: 'my-6 ml-6 list-disc [&>li]:mt-2 text-lg',
+			inlineCode:
+				'relative rounded bg-muted px-[0.3rem] py-[0.2rem]text-sm font-semibold',
+			lead: 'text-xl text-muted-foreground',
+			muted: 'text-lg text-muted-foreground font-normal',
+		},
+		color: {
+			foreground: 'text-foreground',
+			primary: 'text-primary',
+			secondary: 'text-secondary',
+			success: 'text-success',
+			warning: 'text-warning',
+			danger: 'text-destructive',
+			light: 'text-light-foreground',
+			muted: 'text-muted-foreground',
+			background: 'text-background',
+		},
+		font: {
+			primary: 'font-primary',
+			secondary: 'font-secondary',
+		},
+		bold: {
+			true: 'font-bold',
+			false: '',
+		},
+		margins: {
+			true: '[&:not(:first-child)]:mt-6',
+			false: '',
+		},
+	},
+	defaultVariants: {
+		variant: 'p',
+		color: 'foreground',
+		font: 'primary',
+		bold: false,
+	},
+});
+
+const elementMap = {
+	h1: 'h1',
+	h2: 'h2',
+	h3: 'h3',
+	h4: 'h4',
+	p: 'p',
+	label: 'span',
+	blockquote: 'blockquote',
+	table: 'div',
+	list: 'ul',
+	inlineCode: 'code',
+	lead: 'p',
+	muted: 'p',
+} as const;
+
+interface TypographyProps
+	extends Omit<React.HTMLAttributes<HTMLElement>, 'color'>,
+		VariantProps<typeof typographyVariants> {
+	children?: React.ReactNode;
+	asChild?: boolean;
 }
 
-export function TypographyH1({ children, className }: TypographyProps) {
-	return (
-		<h1 className={twMerge('scroll-m-20 text-4xl font-extrabold lg:text-7xl', className)}>
-			{children}
-		</h1>
+function Typography({
+	className,
+	variant = 'p',
+	color,
+	font,
+	bold,
+	children,
+	asChild = false,
+	...props
+}: TypographyProps) {
+	if (asChild) {
+		return <>{children}</>;
+	}
+
+	const Comp = elementMap[variant as keyof typeof elementMap];
+
+	return React.createElement(
+		Comp,
+		{
+			className: cn(typographyVariants({ variant, bold, color, font, className })),
+			...props,
+		},
+		children
 	);
 }
 
-export function TypographyH2({ children, className }: TypographyProps) {
-	return (
-		<h2
-			className={twMerge(
-				'scroll-m-20 pb-2 text-3xl font-semibold  first:mt-0',
-				className
-			)}
-		>
-			{children}
-		</h2>
-	);
-}
-
-export function TypographyH3({ children, className }: TypographyProps) {
-	return (
-		<h3 className={twMerge('scroll-m-20 text-2xl font-semibold ', className)}>
-			{children}
-		</h3>
-	);
-}
-
-export function TypographyH4({ children, className }: TypographyProps) {
-	return (
-		<h4 className={twMerge('scroll-m-20 text-xl font-semibold ', className)}>
-			{children}
-		</h4>
-	);
-}
-
-export function TypographyP({ children, className }: TypographyProps) {
-	return (
-		<p className={twMerge('leading-7 [&:not(:first-child)]:mt-6 text-xl', className)}>
-			{children}
-		</p>
-	);
-}
-
-export function TypographyBlockquote({ children, className }: TypographyProps) {
-	return (
-		<blockquote className={twMerge('mt-6 border-l-2 pl-6 italic ', className)}>
-			{children}
-		</blockquote>
-	);
-}
-
-export function TypographyTable({ children, className }: TypographyProps) {
-	return (
-		<div className={twMerge('my-6 w-full overflow-y-auto', className)}>{children}</div>
-	);
-}
-
-export function TypographyList({ children, className }: TypographyProps) {
-	return (
-		<ul className={twMerge('my-6 ml-6 list-disc [&>li]:mt-2  text-lg', className)}>
-			{children}
-		</ul>
-	);
-}
-
-export function TypographyInlineCode({ children, className }: TypographyProps) {
-	return (
-		<code
-			className={twMerge(
-				'relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold',
-				className
-			)}
-		>
-			{children}
-		</code>
-	);
-}
-
-export function TypographyLead({ children, className }: TypographyProps) {
-	return (
-		<p className={twMerge('text-xl text-muted-foreground', className)}>{children}</p>
-	);
-}
-
-export function TypographyLarge({ children, className }: TypographyProps) {
-	return <div className={twMerge('text-lg font-semibold', className)}>{children}</div>;
-}
-
-export function TypographySmall({ children, className }: TypographyProps) {
-	return (
-		<small className={twMerge('text-sm font-medium leading-none', className)}>
-			{children}
-		</small>
-	);
-}
-
-export function TypographyMuted({ children, className }: TypographyProps) {
-	return (
-		<p className={twMerge('text-lg text-muted-foreground', className)}>{children}</p>
-	);
-}
+export { Typography, typographyVariants };

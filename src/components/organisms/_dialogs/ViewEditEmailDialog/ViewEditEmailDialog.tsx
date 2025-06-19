@@ -102,7 +102,7 @@ export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 											<Button
 												type="button"
 												className="w-fit"
-												variant="outline"
+												variant="primary-light"
 												onClick={(e) => {
 													e.preventDefault();
 													setIsEdit(true);
@@ -115,7 +115,7 @@ export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 												<Button
 													type="button"
 													className="w-fit"
-													variant="outline"
+													variant="primary-light"
 													onClick={(e) => {
 														e.preventDefault();
 														setIsEdit(false);
@@ -127,7 +127,6 @@ export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 												<Button
 													isLoading={isPendingEditEmail}
 													className="w-fit"
-													variant="default"
 													type="submit"
 												>
 													Save

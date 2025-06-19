@@ -3,93 +3,225 @@
 import * as React from 'react';
 
 import { cn } from '@/utils';
+import { cva, VariantProps } from 'class-variance-authority';
 
-function Table({ className, ...props }: React.ComponentProps<'table'>) {
+const tableVariants = cva('w-full caption-bottom', {
+	variants: {
+		variant: {
+			primary: 'text-[15px] font-primary',
+			secondary: 'text-[15px] font-primary bg-primary',
+		},
+	},
+	defaultVariants: {
+		variant: 'primary',
+	},
+});
+
+function Table({
+	className,
+	variant,
+	...props
+}: React.ComponentProps<'table'> & VariantProps<typeof tableVariants>) {
 	return (
 		<div data-slot="table-container" className="relative w-full overflow-x-auto">
 			<table
 				data-slot="table"
-				className={cn('w-full caption-bottom text-sm', className)}
+				className={cn(tableVariants({ variant }), className)}
 				{...props}
 			/>
 		</div>
 	);
 }
 
-function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
+const tableHeaderVariants = cva('[&_tr]:border-b', {
+	variants: {
+		variant: {
+			primary: 'text-[15px] font-primary',
+			secondary: 'text-[15px] font-primary bg-primary',
+		},
+	},
+	defaultVariants: {
+		variant: 'primary',
+	},
+});
+
+function TableHeader({
+	className,
+	variant,
+	...props
+}: React.ComponentProps<'thead'> & VariantProps<typeof tableHeaderVariants>) {
 	return (
 		<thead
 			data-slot="table-header"
-			className={cn('[&_tr]:border-b', className)}
+			className={cn(tableHeaderVariants({ variant }), className)}
 			{...props}
 		/>
 	);
 }
 
-function TableBody({ className, ...props }: React.ComponentProps<'tbody'>) {
+const tableBodyVariants = cva('[&_tr:last-child]:border-0', {
+	variants: {
+		variant: {
+			primary: 'text-[15px] font-primary',
+			secondary: 'text-[15px] font-primary bg-primary',
+		},
+	},
+	defaultVariants: {
+		variant: 'primary',
+	},
+});
+
+function TableBody({
+	className,
+	variant,
+	...props
+}: React.ComponentProps<'tbody'> & VariantProps<typeof tableBodyVariants>) {
 	return (
 		<tbody
 			data-slot="table-body"
-			className={cn('[&_tr:last-child]:border-0', className)}
+			className={cn(tableBodyVariants({ variant }), className)}
 			{...props}
 		/>
 	);
 }
 
-function TableFooter({ className, ...props }: React.ComponentProps<'tfoot'>) {
+const tableFooterVariants = cva(
+	'bg-muted/50 border-t font-medium [&>tr]:last:border-b-0',
+	{
+		variants: {
+			variant: {
+				primary: 'text-[15px] font-primary',
+				secondary: 'text-[15px] font-primary bg-primary',
+			},
+		},
+		defaultVariants: {
+			variant: 'primary',
+		},
+	}
+);
+
+function TableFooter({
+	className,
+	variant,
+	...props
+}: React.ComponentProps<'tfoot'> & VariantProps<typeof tableFooterVariants>) {
 	return (
 		<tfoot
 			data-slot="table-footer"
-			className={cn('bg-muted/50 border-t font-medium [&>tr]:last:border-b-0', className)}
+			className={cn(tableFooterVariants({ variant }), className)}
 			{...props}
 		/>
 	);
 }
 
-function TableRow({ className, ...props }: React.ComponentProps<'tr'>) {
+const tableRowVariants = cva(
+	'hover:bg-primary/15 data-[state=selected]:bg-muted border-b transition-colors',
+	{
+		variants: {
+			variant: {
+				primary: 'font-bold text-[15px] odd:bg-gray-50 even:bg-white',
+				secondary: 'text-[15px] font-primary bg-primary',
+			},
+		},
+		defaultVariants: {
+			variant: 'primary',
+		},
+	}
+);
+
+function TableRow({
+	className,
+	variant,
+	...props
+}: React.ComponentProps<'tr'> & VariantProps<typeof tableRowVariants>) {
 	return (
 		<tr
 			data-slot="table-row"
-			className={cn(
-				'hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors',
-				className
-			)}
+			className={cn(tableRowVariants({ variant }), className)}
 			{...props}
 		/>
 	);
 }
 
-function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
+const tableHeadVariants = cva(
+	'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] bg-background rounded-md',
+	{
+		variants: {
+			variant: {
+				primary: '',
+				secondary: '',
+			},
+		},
+		defaultVariants: {
+			variant: 'primary',
+		},
+	}
+);
+
+function TableHead({
+	className,
+	variant,
+	...props
+}: React.ComponentProps<'th'> & VariantProps<typeof tableHeadVariants>) {
 	return (
 		<th
 			data-slot="table-head"
-			className={cn(
-				'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
-				className
-			)}
+			className={cn(tableHeadVariants({ variant }), className)}
 			{...props}
 		/>
 	);
 }
 
-function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
+const tableCellVariants = cva(
+	'p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+	{
+		variants: {
+			variant: {
+				primary: 'text-[15px] font-primary',
+				secondary: 'text-[15px] font-primary bg-primary',
+			},
+		},
+		defaultVariants: {
+			variant: 'primary',
+		},
+	}
+);
+
+function TableCell({
+	className,
+	variant,
+	...props
+}: React.ComponentProps<'td'> & VariantProps<typeof tableCellVariants>) {
 	return (
 		<td
 			data-slot="table-cell"
-			className={cn(
-				'p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
-				className
-			)}
+			className={cn(tableCellVariants({ variant }), className)}
 			{...props}
 		/>
 	);
 }
 
-function TableCaption({ className, ...props }: React.ComponentProps<'caption'>) {
+const tableCaptionVariants = cva('text-muted-foreground mt-4 text-sm', {
+	variants: {
+		variant: {
+			primary: 'text-[15px] font-primary',
+			secondary: 'text-[15px] font-primary bg-primary',
+		},
+	},
+	defaultVariants: {
+		variant: 'primary',
+	},
+});
+
+function TableCaption({
+	className,
+	variant,
+	...props
+}: React.ComponentProps<'caption'> & VariantProps<typeof tableCaptionVariants>) {
 	return (
 		<caption
 			data-slot="table-caption"
-			className={cn('text-muted-foreground mt-4 text-sm', className)}
+			className={cn(tableCaptionVariants({ variant }), className)}
 			{...props}
 		/>
 	);

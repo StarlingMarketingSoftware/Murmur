@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import PageHeading from '@/components/atoms/_text/PageHeading';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
-import { TypographyP } from '@/components/ui/typography';
+import { Typography } from '@/components/ui/typography';
 import { useDemo } from './useDemo';
 
 const Demo = () => {
@@ -21,10 +21,10 @@ const Demo = () => {
 	return (
 		<AppLayout>
 			<PageHeading>Sign up for a Demo</PageHeading>
-			<TypographyP>
+			<Typography variant="p">
 				If you have received a trial code from us, please enter it below to activate your
 				trial.
-			</TypographyP>
+			</Typography>
 			<Card>
 				<CardHeader className="">
 					<CardTitle>Demo Signup</CardTitle>

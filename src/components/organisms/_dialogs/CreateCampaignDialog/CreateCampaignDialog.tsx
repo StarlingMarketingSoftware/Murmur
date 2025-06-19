@@ -24,7 +24,7 @@ export const CreateCampaignDialog = () => {
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
-				<Button className="w-fit mx-auto" variant="outline">
+				<Button className="w-fit mx-auto" variant="primary-light">
 					Create New Campaign
 				</Button>
 			</DialogTrigger>

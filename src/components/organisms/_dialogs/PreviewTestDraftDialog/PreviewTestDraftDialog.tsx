@@ -23,7 +23,7 @@ const PreviewTestDraftDialog: FC<PreviewTestDraftDialogProps> = (props) => {
 	return (
 		<Dialog>
 			<DialogTrigger asChild>
-				<Button variant="outline">
+				<Button variant="primary-light">
 					<EyeIcon />
 					View Test Draft
 				</Button>

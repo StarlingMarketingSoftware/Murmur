@@ -30,7 +30,7 @@ export const ContactTSVUploadDialog = () => {
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
-				<Button variant="outline" className="w-fit">
+				<Button variant="primary-light" className="w-fit">
 					<PlusIcon />
 					Batch Create with TSV
 				</Button>
@@ -51,7 +51,7 @@ export const ContactTSVUploadDialog = () => {
 						<UploadIcon />
 						Upload TSV
 					</Button>
-					<Button variant="outline" onClick={handleTemplateDownload}>
+					<Button variant="primary-light" onClick={handleTemplateDownload}>
 						<DownloadIcon />
 						Download TSV Template
 					</Button>
@@ -67,7 +67,7 @@ export const ContactTSVUploadDialog = () => {
 							You have unsaved changes!
 						</Alert>
 					)}
-					<Button onClick={handleClear} type="button" variant="outline">
+					<Button onClick={handleClear} type="button" variant="primary-light">
 						Clear
 					</Button>
 					<Button onClick={handleSave} isLoading={isPending} type="submit">

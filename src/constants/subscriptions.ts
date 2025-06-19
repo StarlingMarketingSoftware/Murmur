@@ -3,7 +3,7 @@ import { SubscriptionTierData } from '@/types';
 
 export const SUBSCRIPTION_TIER_DATA_LIST: Record<string, SubscriptionTierData> = {
 	[process.env.NEXT_PUBLIC_ESSENTIALS_PRICE_ID as string]: {
-		name: 'Essentials',
+		name: 'Standard',
 		aiEmailCount: 500,
 		viewEmailAddresses: false,
 		get testEmailCount() {
@@ -19,7 +19,7 @@ export const SUBSCRIPTION_TIER_DATA_LIST: Record<string, SubscriptionTierData> =
 		},
 	},
 	[process.env.NEXT_PUBLIC_PROFESSIONAL_PRICE_ID as string]: {
-		name: 'Professional',
+		name: 'Pro',
 		aiEmailCount: 1500,
 		viewEmailAddresses: false,
 		get testEmailCount() {

@@ -67,7 +67,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 	return (
 		<Dialog>
 			<DialogTrigger asChild>
-				<Button className="w-full sm:w-fit" variant="outline">
+				<Button className="w-full sm:w-fit" variant="primary-light">
 					<SignatureIcon />
 					Manage Signatures
 				</Button>
@@ -208,7 +208,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 								<div className="flex flex-col sm:flex-row gap-4">
 									<Button
 										type="button"
-										variant="outline"
+										variant="primary-light"
 										isLoading={isPendingDeleteSignature}
 										onClick={(e) => {
 											if (!currentSignature) return;
@@ -224,7 +224,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 									{campaign.signatureId === currentSignature?.id ? (
 										<Button
 											type="button"
-											variant="outline"
+											variant="primary-light"
 											onClick={(e) => handleRemoveSignatureFromCampaign(e)}
 											isLoading={isPendingSaveSignatureToCampaign}
 										>
@@ -233,7 +233,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 									) : (
 										<Button
 											type="button"
-											variant="outline"
+											variant="primary-light"
 											onClick={(e) => handleSaveSignatureToCampaign(e)}
 											isLoading={isPendingSaveSignatureToCampaign}
 										>
@@ -241,11 +241,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 										</Button>
 									)}
 
-									<Button
-										isLoading={isPendingSaveSignature}
-										variant="default"
-										type="submit"
-									>
+									<Button isLoading={isPendingSaveSignature} type="submit">
 										<SaveIcon /> Save
 									</Button>
 								</div>
