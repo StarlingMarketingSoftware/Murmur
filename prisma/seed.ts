@@ -166,17 +166,12 @@ const importCSVWithSubcategories = async (
 	}
 
 	for (const categoryName of Object.keys(categoryToCount)) {
-		await prisma.contactList.upsert({
-			where: { name: categoryName.toLowerCase() },
-			create: {
+		await prisma.contactList.create({
+			data: {
 				name: categoryName,
+			},
 
-				// count: categoryToCount[categoryName],
-			},
-			update: {
-				name: categoryName,
-				// count: categoryToCount[categoryName],
-			},
+			// count: categoryToCount[categoryName],
 		});
 	}
 
@@ -273,9 +268,9 @@ const userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
 	},
 ];
 async function main() {
-	// await prisma.user.createMany({
-	// 	data: userData,
-	// });
+	await prisma.user.createMany({
+		data: userData,
+	});
 	importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
 	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
 
