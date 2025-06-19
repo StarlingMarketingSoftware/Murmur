@@ -26,7 +26,7 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 				<CardContent className="space-y-2">
 					{/* <ToggleGroup
 					// onClick={handleModeClick}
-					variant="outline"
+					variant="primary-light"
 					className="mx-auto"
 					type="single"
 					size="lg"

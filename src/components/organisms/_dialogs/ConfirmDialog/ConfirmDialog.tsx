@@ -87,7 +87,7 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 								<Button
 									type="button"
 									onClick={() => onOpenChange(false)}
-									variant="outline"
+									variant="primary-light"
 								>
 									Cancel
 								</Button>
@@ -103,7 +103,11 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 					</FormProvider>
 				) : (
 					<DialogFooter>
-						<Button type="button" onClick={() => onOpenChange(false)} variant="outline">
+						<Button
+							type="button"
+							onClick={() => onOpenChange(false)}
+							variant="primary-light"
+						>
 							Cancel
 						</Button>
 						<Button

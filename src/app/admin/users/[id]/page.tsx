@@ -13,7 +13,7 @@ import {
 	FormLabel,
 	FormMessage,
 } from '@/components/ui/form';
-import { TypographyMuted } from '@/components/ui/typography';
+import { Typography } from '@/components/ui/typography';
 
 const ManageContactListDetail: FC = () => {
 	const {
@@ -39,7 +39,7 @@ const ManageContactListDetail: FC = () => {
 							<Button
 								className="mb-2"
 								onClick={handleGenerateFreeTrialCode}
-								variant="default"
+								variant="primary"
 							>
 								Generate Free Trial Code
 							</Button>
@@ -52,9 +52,9 @@ const ManageContactListDetail: FC = () => {
 						</CardHeader>
 						<CardContent>
 							<div className="mb-4">
-								<TypographyMuted>
+								<Typography variant="muted">
 									Current Domain: {user?.customDomain || 'Not registered'}
-								</TypographyMuted>
+								</Typography>
 							</div>
 							<Form {...form}>
 								<form
@@ -77,12 +77,7 @@ const ManageContactListDetail: FC = () => {
 											</FormItem>
 										)}
 									/>
-									<Button
-										type="submit"
-										className="mb-2"
-										variant="default"
-										isLoading={isEditingUser}
-									>
+									<Button type="submit" className="mb-2" isLoading={isEditingUser}>
 										{isEditingUser ? 'Updating...' : 'Update Domain'}
 									</Button>
 								</form>

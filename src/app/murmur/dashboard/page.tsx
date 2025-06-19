@@ -1,6 +1,5 @@
 'use client';
 
-import { CreateCampaignDialog } from '../../../components/organisms/_dialogs/CreateCampaignDialog/CreateCampaignDialog';
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { useDashboard } from './useDashboard';
 
@@ -14,14 +13,11 @@ import {
 	FormControl,
 	FormField,
 	FormItem,
-	FormLabel,
 	FormMessage,
 } from '@/components/ui/form';
-import ContactListTable from '@/components/organisms/_tables/ContactListTable/ContactListTable';
 
 const Dashboard = () => {
-	const { form, onSubmit, isPendingContacts, contacts, isLoadingContacts } =
-		useDashboard();
+	const { form, onSubmit, isLoadingContacts } = useDashboard();
 
 	return (
 		<AppLayout>
@@ -80,7 +76,7 @@ const Dashboard = () => {
 					</form>
 				</Form>
 			</div>
-			<ContactListTable />
+			{/* <ContactListTable /> */}
 			<CampaignsTable />
 		</AppLayout>
 	);

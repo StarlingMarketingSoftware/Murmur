@@ -45,8 +45,6 @@ export async function GET(req: NextRequest) {
 			.toLowerCase()
 			.split(/\s+/)
 			.filter((term) => term.length > 0);
-		console.log('🚀 ~ GET ~ searchTerms:', searchTerms);
-
 		const caseInsensitiveMode = 'insensitive' as const;
 		const whereConditions =
 			searchTerms.length > 0
@@ -83,9 +81,6 @@ export async function GET(req: NextRequest) {
 				company: 'asc',
 			},
 		});
-		console.log('🚀 ~ GET ~ localContacts:', localContacts);
-
-		return apiResponse(localContacts);
 
 		if (localContacts.length < limit) {
 			const apolloContacts: ApolloPerson[] = await fetchApolloContacts(

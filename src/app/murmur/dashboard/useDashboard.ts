@@ -38,9 +38,6 @@ export const useDashboard = () => {
 	const { mutate: createContactList } = useCreateContactList({
 		suppressToasts: true,
 	});
-
-	console.log('🚀 ~ useDashboard ~ data:', contacts);
-
 	const onSubmit = async (data: FormData) => {
 		console.log(data);
 		await refetch();

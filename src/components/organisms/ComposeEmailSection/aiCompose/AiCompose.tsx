@@ -177,7 +177,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 								<FormLabel>Selected Signature</FormLabel>
 								<Button
 									className="w-full max-w-[150px] truncate" // Change this line
-									variant="outline"
+									variant="primary-light"
 									disabled
 								>
 									<span className="truncate">
@@ -197,7 +197,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 									type="button"
 									className="w-full sm:w-fit"
 									onClick={() => handleFormAction('test')}
-									variant="outline"
+									variant="primary-light"
 									isLoading={isTest && isPendingGeneration}
 									disabled={
 										campaign?.contacts.length === 0 ||
@@ -242,7 +242,6 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 							<Button
 								type="button"
 								onClick={() => handleSavePrompt(false)}
-								variant="default"
 								isLoading={isPendingSavePrompt}
 							>
 								<SaveIcon /> Save Section

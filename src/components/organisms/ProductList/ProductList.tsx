@@ -1,10 +1,10 @@
 import { FC } from 'react';
-import { ProductListProps, useProductList } from './useProductList';
+import { useProductList } from './useProductList';
 import { ProductCard } from '../ProductCard/ProductCard';
 import Spinner from '@/components/ui/spinner';
 
-export const ProductList: FC<ProductListProps> = (props) => {
-	const { sortedProducts, user, isPendingProducts } = useProductList(props);
+export const ProductList: FC = () => {
+	const { sortedProducts, user, isPendingProducts } = useProductList();
 
 	if (isPendingProducts) {
 		return <Spinner />;

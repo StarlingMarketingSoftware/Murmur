@@ -152,7 +152,7 @@ export default function HomePage() {
 						) : (
 							<Link href={urls.murmur.dashboard.index}>
 								<Button
-									variant="default"
+									variant="primary"
 									size="lg"
 									font="secondary"
 									className="w-[194px]"
