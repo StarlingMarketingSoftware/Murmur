@@ -33,7 +33,7 @@ export const ManageContactListDialog: FC<ManageContactListDialogProps> = (props)
 				) : (
 					<>
 						<DialogTitle className="capitalize">
-							{`Manage "${selectedContactList?.name}"`}
+							{`Manage "${selectedContactList?.title}"`}
 						</DialogTitle>
 						<DialogHeader></DialogHeader>
 						<CustomTable

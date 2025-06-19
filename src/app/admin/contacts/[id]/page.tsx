@@ -16,7 +16,7 @@ const ManageContactListDetail: FC = () => {
 			) : (
 				<Card size="lg">
 					<CardHeader>
-						<CardTitle>{contactListData?.name}</CardTitle>
+						<CardTitle>{contactListData?.title}</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<div className="flex flex-row gap-4">

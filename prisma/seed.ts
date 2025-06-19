@@ -268,9 +268,9 @@ const userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
 	},
 ];
 async function main() {
-	// await prisma.user.createMany({
-	// 	data: userData,
-	// });
+	await prisma.user.createMany({
+		data: userData,
+	});
 	importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
 	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
 
