@@ -57,6 +57,7 @@
 		"date-fns": "^4.1.0",
 		"form-data": "^4.0.2",
 		"google-api-javascript-client": "^0.1.0",
+		"input-otp": "^1.4.2",
 		"lodash": "^4.17.21",
 		"lucide-react": "^0.482.0",
 		"mailgun.js": "^12.0.1",

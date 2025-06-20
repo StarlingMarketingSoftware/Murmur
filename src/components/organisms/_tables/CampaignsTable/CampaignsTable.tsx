@@ -34,6 +34,7 @@ export const CampaignsTable: FC = () => {
 				</CardHeader>
 				<CardContent className="space-y-2">
 					<CustomTable
+						variant="secondary"
 						handleRowClick={handleRowClick}
 						columns={columns}
 						data={data}

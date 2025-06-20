@@ -6,16 +6,30 @@ import { useCampaignDetail } from './useCampaignDetail';
 import Spinner from '@/components/ui/spinner';
 import PageHeading from '@/components/atoms/_text/PageHeading';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
+import { IdentityDialog } from '@/components/organisms/_dialogs/IdentityDialog/IdentityDialog';
 
 const Murmur = () => {
-	const { tab, handleTabChange, data, isPending } = useCampaignDetail();
+	const {
+		tab,
+		handleTabChange,
+		campaign,
+		isPendingCampaign,
+		setIsIdentityDialogOpen,
+		isIdentityDialogOpen,
+	} = useCampaignDetail();
 
-	if (isPending || !data) {
+	if (isPendingCampaign || !campaign) {
 		return <Spinner />;
 	}
 	return (
 		<AppLayout>
-			<PageHeading>{data?.name}</PageHeading>
+			<IdentityDialog
+				campaign={campaign}
+				title="User Settings"
+				open={isIdentityDialogOpen}
+				onOpenChange={setIsIdentityDialogOpen}
+			/>
+			<PageHeading>{campaign?.name}</PageHeading>
 			<Tabs
 				defaultValue="murmur"
 				value={tab}
@@ -23,9 +37,8 @@ const Murmur = () => {
 				className="w-full"
 			>
 				<TabsContent value="murmur">
-					<EmailAutomationSteps campaign={data} />
+					<EmailAutomationSteps campaign={campaign} />
 				</TabsContent>
-				<TabsContent value="inbox"></TabsContent>
 			</Tabs>
 		</AppLayout>
 	);

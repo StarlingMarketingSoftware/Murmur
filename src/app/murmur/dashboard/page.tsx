@@ -15,9 +15,17 @@ import {
 	FormItem,
 	FormMessage,
 } from '@/components/ui/form';
+import ContactListTable from '@/components/organisms/_tables/ContactListTable/ContactListTable';
 
 const Dashboard = () => {
-	const { form, onSubmit, isLoadingContacts } = useDashboard();
+	const {
+		form,
+		onSubmit,
+		isLoadingContacts,
+		setSelectedRows,
+		handleCreateCampaign,
+		isPendingCreateCampaign,
+	} = useDashboard();
 
 	return (
 		<AppLayout>
@@ -76,7 +84,17 @@ const Dashboard = () => {
 					</form>
 				</Form>
 			</div>
-			{/* <ContactListTable /> */}
+			<ContactListTable setSelectedRows={setSelectedRows} />
+			<div className="flex items-center">
+				<Button
+					onClick={handleCreateCampaign}
+					isLoading={isPendingCreateCampaign}
+					variant="primary-light"
+					className="w-8/10 mx-auto mt-5"
+				>
+					Create Campaign
+				</Button>
+			</div>
 			<CampaignsTable />
 		</AppLayout>
 	);

@@ -52,13 +52,14 @@ export async function POST(request: NextRequest) {
 			where: { email },
 		});
 
-		await prisma.emailVerificationCode.create({
+		const code = await prisma.emailVerificationCode.create({
 			data: {
 				email,
 				code: verificationCode,
 				expiresAt,
 			},
 		});
+		console.log('🚀 ~ POST ~ code:', code);
 
 		const mailgun = new Mailgun(FormData);
 		const mg = mailgun.client({
@@ -181,12 +182,14 @@ export async function PATCH(request: NextRequest) {
 				verified: false,
 			},
 		});
+		console.log('🚀 ~ PATCH ~ verificationRecord:', verificationRecord);
 
 		if (!verificationRecord) {
 			return apiBadRequest('Invalid verification code');
 		}
 
 		if (verificationRecord.expiresAt < new Date()) {
+			console.log('expired');
 			await prisma.emailVerificationCode.delete({
 				where: { id: verificationRecord.id },
 			});
@@ -194,14 +197,11 @@ export async function PATCH(request: NextRequest) {
 			return apiNotFound('Verification code has expired');
 		}
 
-		await prisma.emailVerificationCode.deleteMany({
+		const verificationCode = await prisma.emailVerificationCode.deleteMany({
 			where: { email },
 		});
 
-		return apiResponse({
-			verified: true,
-			message: 'Email verified successfully',
-		});
+		return apiResponse(verificationCode.count);
 	} catch (error) {
 		return handleApiError(error);
 	}
