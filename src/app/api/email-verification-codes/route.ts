@@ -52,15 +52,13 @@ export async function POST(request: NextRequest) {
 			where: { email },
 		});
 
-		const code = await prisma.emailVerificationCode.create({
+		await prisma.emailVerificationCode.create({
 			data: {
 				email,
 				code: verificationCode,
 				expiresAt,
 			},
 		});
-		console.log('🚀 ~ POST ~ code:', code);
-
 		const mailgun = new Mailgun(FormData);
 		const mg = mailgun.client({
 			username: 'api',
@@ -182,14 +180,11 @@ export async function PATCH(request: NextRequest) {
 				verified: false,
 			},
 		});
-		console.log('🚀 ~ PATCH ~ verificationRecord:', verificationRecord);
-
 		if (!verificationRecord) {
 			return apiBadRequest('Invalid verification code');
 		}
 
 		if (verificationRecord.expiresAt < new Date()) {
-			console.log('expired');
 			await prisma.emailVerificationCode.delete({
 				where: { id: verificationRecord.id },
 			});

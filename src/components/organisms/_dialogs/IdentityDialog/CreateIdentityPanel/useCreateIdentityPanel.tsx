@@ -26,9 +26,13 @@ export interface CreateIdentityPanelProps {
 
 export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 	const { isEdit, selectedIdentity, setShowCreatePanel, showCreatePanel } = props;
+
 	const [countdown, setCountdown] = useState<number | null>(null);
 	const [isCodeVerified, setIsCodeVerified] = useState(false);
 	const countdownInterval = useRef<NodeJS.Timeout | null>(null);
+
+	const isCodeExpired = countdown === 0;
+
 	const form = useForm<z.infer<typeof identityFormSchema>>({
 		mode: 'onTouched',
 		resolver: zodResolver(identityFormSchema),
@@ -39,26 +43,6 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 			verificationCode: '',
 		},
 	});
-
-	useEffect(() => {
-		if (isEdit && selectedIdentity) {
-			setIsCodeVerified(true);
-			form.reset({
-				name: selectedIdentity.name,
-				email: selectedIdentity.email,
-				website: selectedIdentity.website || '',
-				verificationCode: '',
-			});
-		} else {
-			setIsCodeVerified(false);
-			form.reset({
-				name: '',
-				email: '',
-				website: '',
-				verificationCode: '',
-			});
-		}
-	}, [isEdit, selectedIdentity, form, setIsCodeVerified, showCreatePanel]);
 
 	const {
 		mutate: createEmailVerificationCode,
@@ -101,10 +85,73 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 		},
 	});
 
+	const isPendingSubmit = isPendingCreateIdentity || isPendingEditIdentity;
+
+	const formatCountdown = (seconds: number): string => {
+		const minutes = Math.floor(seconds / 60);
+		const remainingSeconds = seconds % 60;
+		return `${minutes.toString().padStart(2, '0')}:${remainingSeconds
+			.toString()
+			.padStart(2, '0')}`;
+	};
+
+	const countdownDisplay = countdown !== null ? formatCountdown(countdown) : null;
+
+	const handleSendEmailVerificationCode = () => {
+		if (!isCodeVerified) {
+			form.setValue('verificationCode', undefined);
+			setCountdown(null);
+			if (countdownInterval.current) {
+				clearInterval(countdownInterval.current);
+				countdownInterval.current = null;
+			}
+
+			createEmailVerificationCode({
+				email: form.getValues('email'),
+			});
+		} else {
+			resetCreateEmailVerificationCode();
+			resetEditEmailVerificationCode();
+			setIsCodeVerified(false);
+			form.setValue('verificationCode', undefined);
+			form.setValue('email', '');
+		}
+	};
+	const handleVerifyCode = (code: string) => {
+		if (code.length === 6) {
+			editEmailVerificationCode({
+				email: form.getValues('email'),
+				code,
+			});
+		}
+	};
+
+	const onSubmit = async (values: z.infer<typeof identityFormSchema>) => {
+		if (isEdit) {
+			if (!selectedIdentity) {
+				toast.error('No identity selected for editing.');
+				return;
+			}
+			editIdentity({
+				id: selectedIdentity?.id,
+				data: {
+					name: values.name,
+					email: values.email,
+					website: values.website,
+				},
+			});
+		} else {
+			createIdentity({
+				name: values.name,
+				email: values.email,
+				website: values.website,
+			});
+		}
+	};
+
 	// Start countdown when email verification code is sent
 	useEffect(() => {
 		if (isEmailVerificationCodeSent && !isCodeVerified) {
-			// Set countdown to 10 minutes (600 seconds)
 			setCountdown(600);
 
 			countdownInterval.current = setInterval(() => {
@@ -140,71 +187,25 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 		}
 	}, [open]);
 
-	const handleSendEmailVerificationCode = () => {
-		// Clear any existing countdown when sending a new code
-		if (!isCodeVerified) {
-			form.setValue('verificationCode', undefined);
-			setCountdown(null);
-			if (countdownInterval.current) {
-				clearInterval(countdownInterval.current);
-				countdownInterval.current = null;
-			}
-
-			createEmailVerificationCode({
-				email: form.getValues('email'),
+	useEffect(() => {
+		if (isEdit && selectedIdentity) {
+			setIsCodeVerified(true);
+			form.reset({
+				name: selectedIdentity.name,
+				email: selectedIdentity.email,
+				website: selectedIdentity.website || '',
+				verificationCode: '',
 			});
 		} else {
-			resetCreateEmailVerificationCode();
-			resetEditEmailVerificationCode();
 			setIsCodeVerified(false);
-			form.setValue('verificationCode', undefined);
-			form.setValue('email', '');
-		}
-	};
-	const handleVerifyCode = (code: string) => {
-		if (code.length === 6) {
-			editEmailVerificationCode({
-				email: form.getValues('email'),
-				code,
+			form.reset({
+				name: '',
+				email: '',
+				website: '',
+				verificationCode: '',
 			});
 		}
-	};
-
-	const formatCountdown = (seconds: number): string => {
-		const minutes = Math.floor(seconds / 60);
-		const remainingSeconds = seconds % 60;
-		return `${minutes.toString().padStart(2, '0')}:${remainingSeconds
-			.toString()
-			.padStart(2, '0')}`;
-	};
-
-	const countdownDisplay = countdown !== null ? formatCountdown(countdown) : null;
-	const isCodeExpired = countdown === 0;
-
-	const onSubmit = async (values: z.infer<typeof identityFormSchema>) => {
-		if (isEdit) {
-			if (!selectedIdentity) {
-				toast.error('No identity selected for editing.');
-				return;
-			}
-			editIdentity({
-				id: selectedIdentity?.id,
-				data: {
-					name: values.name,
-					email: values.email,
-					website: values.website,
-				},
-			});
-		} else {
-			createIdentity({
-				name: values.name,
-				email: values.email,
-				website: values.website,
-			});
-		}
-	};
-
-	const isPendingSubmit = isPendingCreateIdentity || isPendingEditIdentity;
+	}, [isEdit, selectedIdentity, form, setIsCodeVerified, showCreatePanel]);
 
 	return {
 		onSubmit,

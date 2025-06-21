@@ -60,7 +60,6 @@ export const useEditEmailVerificationCode = (options: CustomMutationOptions = {}
 	return useMutation({
 		mutationFn: async (data: PatchEmailVerificationCodeData) => {
 			const response = await _fetch(urls.api.emailVerificationCodes.index, 'PATCH', data);
-			console.log('🚀 ~ mutationFn: ~ response:', response);
 			if (!response.ok) {
 				console.log('response not ok');
 				const errorData = await response.json();
@@ -68,8 +67,7 @@ export const useEditEmailVerificationCode = (options: CustomMutationOptions = {}
 			}
 			return response.json();
 		},
-		onSuccess: (variables) => {
-			console.log('🚀 ~ useEditEmailVerificationCode ~ variables:', variables);
+		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
 
 			if (!suppressToasts) {

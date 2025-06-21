@@ -27,8 +27,6 @@ export const useDashboard = () => {
 	});
 
 	const [selectedRows, setSelectedRows] = useState<ContactList[]>([]);
-	console.log('🚀 ~ useDashboard ~ selectedRows:', selectedRows);
-
 	const searchText = form.watch('searchText');
 
 	const {

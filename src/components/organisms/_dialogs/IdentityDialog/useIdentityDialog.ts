@@ -23,11 +23,14 @@ const identityFormSchema = z.object({
 
 export const useIdentityDialog = (props: IdentityDialogProps) => {
 	const { title, onOpenChange, triggerButton, isLoading, campaign } = props;
-	const isClosable = !!campaign.identityId;
 
 	const [internalOpen, setInternalOpen] = useState(false);
 	const [showCreatePanel, setShowCreatePanel] = useState(false);
 	const [isEdit, setIsEdit] = useState(false);
+
+	const isClosable = !!campaign.identityId;
+	const isControlled = props.open !== undefined;
+	const open = isControlled ? props.open : internalOpen;
 
 	const form = useForm<z.infer<typeof identityFormSchema>>({
 		mode: 'onTouched',
@@ -38,11 +41,16 @@ export const useIdentityDialog = (props: IdentityDialogProps) => {
 	});
 
 	const { data: identities, isPending: isPendingIdentities } = useGetIdentities({});
+
 	const { mutate: assignIdentity, isPending: isPendingAssignIdentity } = useEditCampaign({
 		onSuccess: () => {
 			onOpenChange(false);
 		},
 	});
+
+	const selectedIdentity = identities?.find(
+		(identity) => identity.id === Number(form.watch('identityId'))
+	);
 
 	const handleOpenChange = (newOpen: boolean) => {
 		if (!isControlled) {
@@ -53,13 +61,6 @@ export const useIdentityDialog = (props: IdentityDialogProps) => {
 			props.onClose?.();
 		}
 	};
-
-	const isControlled = props.open !== undefined;
-	const open = isControlled ? props.open : internalOpen;
-
-	const selectedIdentity = identities?.find(
-		(identity) => identity.id === Number(form.watch('identityId'))
-	);
 
 	const handleAssignIdentity = () => {
 		if (selectedIdentity) {
