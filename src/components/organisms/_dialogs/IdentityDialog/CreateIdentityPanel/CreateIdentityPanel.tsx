@@ -1,4 +1,7 @@
-import { useCreateIdentityPanel } from './useCreateIdentityPanel';
+import {
+	CreateIdentityPanelProps,
+	useCreateIdentityPanel,
+} from './useCreateIdentityPanel';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -13,8 +16,9 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp
 import { FormProvider } from 'react-hook-form';
 import { CheckCircleIcon } from 'lucide-react';
 import { Typography } from '@/components/ui/typography';
+import { FC } from 'react';
 
-export const CreateIdentityPanel = () => {
+export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 	const {
 		onSubmit,
 		form,
@@ -26,8 +30,8 @@ export const CreateIdentityPanel = () => {
 		isCodeVerified,
 		countdownDisplay,
 		isCodeExpired,
-		isPendingCreateIdentity,
-	} = useCreateIdentityPanel();
+		isPendingSubmit,
+	} = useCreateIdentityPanel(props);
 
 	return (
 		<FormProvider {...form}>
@@ -67,8 +71,8 @@ export const CreateIdentityPanel = () => {
 								<FormLabel>Email Address</FormLabel>
 								<FormControl>
 									<div className="grid grid-cols-5 gap-2 items-center">
-										<div className="col-span-4">
-											<Input {...field} readOnly={isCodeVerified} />
+										<div className="col-span-4 relative">
+											<Input {...field} disabled={isCodeVerified} />
 											{isCodeVerified && (
 												<CheckCircleIcon className="absolute top-1/4 right-4 stroke-primary" />
 											)}
@@ -145,7 +149,7 @@ export const CreateIdentityPanel = () => {
 					)}
 					<Button
 						disabled={!isCodeVerified}
-						isLoading={isPendingCreateIdentity}
+						isLoading={isPendingSubmit}
 						type="submit"
 						className="w-full mt-3"
 					>

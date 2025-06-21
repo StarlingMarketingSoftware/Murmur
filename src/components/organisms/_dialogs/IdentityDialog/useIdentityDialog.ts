@@ -1,21 +1,48 @@
+import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
+import { useGetIdentities } from '@/hooks/queryHooks/useIdentities';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Campaign } from '@prisma/client';
 import { ReactNode, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 
 export interface IdentityDialogProps {
 	title: string;
 	open?: boolean;
-	text?: string;
 	onClose?: () => void;
-	children?: ReactNode;
 	isLoading?: boolean;
 	triggerButton?: ReactNode;
 	onOpenChange: (open: boolean) => void;
 	campaign: Campaign;
 }
 
+const identityFormSchema = z.object({
+	identityId: z.string(),
+});
+
 export const useIdentityDialog = (props: IdentityDialogProps) => {
+	const { title, onOpenChange, triggerButton, isLoading, campaign } = props;
+	const isClosable = !!campaign.identityId;
+
 	const [internalOpen, setInternalOpen] = useState(false);
-	const [showCreatePanel, setShowCreatePanel] = useState(true);
+	const [showCreatePanel, setShowCreatePanel] = useState(false);
+	const [isEdit, setIsEdit] = useState(false);
+
+	const form = useForm<z.infer<typeof identityFormSchema>>({
+		mode: 'onTouched',
+		resolver: zodResolver(identityFormSchema),
+		defaultValues: {
+			identityId: campaign.identityId ? String(campaign.identityId) : '',
+		},
+	});
+
+	const { data: identities, isPending: isPendingIdentities } = useGetIdentities({});
+	const { mutate: assignIdentity, isPending: isPendingAssignIdentity } = useEditCampaign({
+		onSuccess: () => {
+			onOpenChange(false);
+		},
+	});
 
 	const handleOpenChange = (newOpen: boolean) => {
 		if (!isControlled) {
@@ -23,35 +50,47 @@ export const useIdentityDialog = (props: IdentityDialogProps) => {
 		}
 		props.onOpenChange?.(newOpen);
 		if (!newOpen) {
-			// Reset countdown and clear interval when dialog closes
-			// setCountdown(null);
-			// if (countdownInterval.current) {
-			// 	clearInterval(countdownInterval.current);
-			// 	countdownInterval.current = null;
-			// }
-			// form.reset({
-			// 	name: '',
-			// 	email: '',
-			// 	website: '',
-			// 	verificationCode: '',
-			// });
 			props.onClose?.();
 		}
 	};
-	const { title, onOpenChange, text, children, triggerButton, isLoading } = props;
+
 	const isControlled = props.open !== undefined;
 	const open = isControlled ? props.open : internalOpen;
 
+	const selectedIdentity = identities?.find(
+		(identity) => identity.id === Number(form.watch('identityId'))
+	);
+
+	const handleAssignIdentity = () => {
+		if (selectedIdentity) {
+			assignIdentity({
+				id: campaign.id,
+				data: {
+					identityId: selectedIdentity.id,
+				},
+			});
+		} else {
+			toast.error('Please select an identity to assign.');
+		}
+	};
+
 	return {
 		title,
+		form,
+		isPendingIdentities,
+		identities,
 		onOpenChange,
-		text,
-		children,
 		triggerButton,
 		isLoading,
 		open,
 		handleOpenChange,
 		showCreatePanel,
 		setShowCreatePanel,
+		isEdit,
+		setIsEdit,
+		selectedIdentity,
+		isClosable,
+		handleAssignIdentity,
+		isPendingAssignIdentity,
 	};
 };
