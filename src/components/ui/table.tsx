@@ -5,7 +5,7 @@ import * as React from 'react';
 import { cn } from '@/utils';
 import { cva, VariantProps } from 'class-variance-authority';
 
-const tableVariants = cva('w-full caption-bottom', {
+const tableVariants = cva('w-full caption-bottom border-collapse', {
 	variants: {
 		variant: {
 			primary: 'text-[15px] font-primary',
@@ -33,17 +33,21 @@ function Table({
 	);
 }
 
-const tableHeaderVariants = cva('[&_tr]:border-b', {
-	variants: {
-		variant: {
-			primary: 'text-[15px] font-primary',
-			secondary: 'text-[15px] font-primary bg-primary',
+const tableHeaderVariants = cva(
+	'',
+	// '[&_tr]:border-b',
+	{
+		variants: {
+			variant: {
+				primary: 'text-[15px] font-primary',
+				secondary: 'text-[15px] font-primary bg-primary',
+			},
 		},
-	},
-	defaultVariants: {
-		variant: 'primary',
-	},
-});
+		defaultVariants: {
+			variant: 'primary',
+		},
+	}
+);
 
 function TableHeader({
 	className,
@@ -59,7 +63,7 @@ function TableHeader({
 	);
 }
 
-const tableBodyVariants = cva('[&_tr:last-child]:border-0', {
+const tableBodyVariants = cva('', {
 	variants: {
 		variant: {
 			primary: 'text-[15px] font-primary',
@@ -86,7 +90,8 @@ function TableBody({
 }
 
 const tableFooterVariants = cva(
-	'bg-muted/50 border-t font-medium [&>tr]:last:border-b-0',
+	'bg-muted/50 border-t font-medium ',
+	// '[&>tr]:last:border-b-0',
 	{
 		variants: {
 			variant: {
@@ -115,7 +120,7 @@ function TableFooter({
 }
 
 const tableRowVariants = cva(
-	'hover:bg-primary/15 data-[state=selected]:bg-muted border-b transition-colors',
+	'hover:bg-primary/15 transition-colors data-[state=selected]:bg-primary/50 border border-primary/20 border-t border-t-primary data-[state=selected]:border-primary data-[state=selected]:!border-t-primary',
 	{
 		variants: {
 			variant: {

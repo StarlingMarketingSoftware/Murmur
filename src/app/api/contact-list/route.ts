@@ -61,7 +61,8 @@ export async function POST(req: NextRequest) {
 
 		const contactList = await prisma.contactList.create({
 			data: {
-				name,
+				name: 'deprecated',
+				title: name,
 				userId: userId,
 				contacts: {
 					connect: contactIds?.map((id) => ({ id })),

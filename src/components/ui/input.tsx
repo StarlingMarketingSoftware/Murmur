@@ -7,9 +7,9 @@ const inputVariants = cva(
 	{
 		variants: {
 			variant: {
-				default: 'bg-gray-100 border-foreground',
+				default: 'bg-background border-gray-300',
 				light: 'bg-background border-input',
-				outlined: 'bg-background border-foreground',
+				outlined: 'bg-background border-gray-300',
 			},
 			rounded: {
 				true: 'rounded-lg',

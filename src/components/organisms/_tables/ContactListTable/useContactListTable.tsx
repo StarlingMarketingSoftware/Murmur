@@ -12,12 +12,12 @@ export const useContactListTable = (props: ContactListTableProps) => {
 	const { setSelectedRows } = props;
 	const columns: ColumnDef<ContactList>[] = [
 		{
-			accessorKey: 'name',
+			accessorKey: 'title',
 			header: ({ column }) => {
 				return <TableSortingButton column={column} label="Name" />;
 			},
 			cell: ({ row }) => {
-				return <div className="capitalize text-left">{row.getValue('name')}</div>;
+				return <div className="capitalize text-left">{row.getValue('title')}</div>;
 			},
 		},
 	];

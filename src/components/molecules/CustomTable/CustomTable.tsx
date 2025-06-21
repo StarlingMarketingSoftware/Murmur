@@ -226,10 +226,9 @@ export function CustomTable<TData, TValue>({
 											'cursor-pointer'
 									)}
 									onClick={() => {
-										if (!isSelectable && !handleRowClick) return;
-										if (!handleRowClick) {
+										if (isSelectable) {
 											row.toggleSelected();
-										} else {
+										} else if (handleRowClick) {
 											handleRowClick(row.original);
 										}
 									}}

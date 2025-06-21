@@ -17,8 +17,8 @@ const QUERY_KEYS = {
 export const useCreateEmailVerificationCode = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
-		successMessage = 'Verification code created successfully',
-		errorMessage = 'Failed to create verification code',
+		successMessage = 'Verification code sent successfully',
+		errorMessage = 'Failed to send verification code',
 		onSuccess: onSuccessCallback,
 	} = options;
 	const queryClient = useQueryClient();
@@ -51,8 +51,8 @@ export const useCreateEmailVerificationCode = (options: CustomMutationOptions = 
 export const useEditEmailVerificationCode = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
-		successMessage = 'Verification code updated successfully',
-		errorMessage = 'Failed to update verification code',
+		successMessage = 'Email was verified successfully',
+		errorMessage = 'Incorrect verification code',
 		onSuccess: onSuccessCallback,
 	} = options;
 	const queryClient = useQueryClient();
@@ -61,17 +61,14 @@ export const useEditEmailVerificationCode = (options: CustomMutationOptions = {}
 		mutationFn: async (data: PatchEmailVerificationCodeData) => {
 			const response = await _fetch(urls.api.emailVerificationCodes.index, 'PATCH', data);
 			if (!response.ok) {
+				console.log('response not ok');
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to update verification code');
 			}
-
 			return response.json();
 		},
-		onSuccess: (variables) => {
+		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
-			queryClient.invalidateQueries({
-				queryKey: QUERY_KEYS.detail(variables.id),
-			});
 
 			if (!suppressToasts) {
 				toast.success(successMessage);
