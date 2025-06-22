@@ -1,45 +1,72 @@
 'use client';
 
-import { Tabs, TabsContent } from '@/components/ui/tabs';
-import EmailAutomationSteps from './emailAutomation/EmailAutomationSteps';
 import { useCampaignDetail } from './useCampaignDetail';
 import Spinner from '@/components/ui/spinner';
-import PageHeading from '@/components/atoms/_text/PageHeading';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import { IdentityDialog } from '@/components/organisms/_dialogs/IdentityDialog/IdentityDialog';
+import { CampaignName } from '@/components/organisms/CampaignName/CampaignName';
+import { Card, CardContent } from '@/components/ui/card';
+import { Typography } from '@/components/ui/typography';
+import { Label } from '@radix-ui/react-label';
+import { twMerge } from 'tailwind-merge';
+import { Button } from '@/components/ui/button';
 
 const Murmur = () => {
-	const {
-		tab,
-		handleTabChange,
-		campaign,
-		isPendingCampaign,
-		setIsIdentityDialogOpen,
-		isIdentityDialogOpen,
-	} = useCampaignDetail();
+	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
+		useCampaignDetail();
 
 	if (isPendingCampaign || !campaign) {
 		return <Spinner />;
 	}
 	return (
 		<AppLayout>
-			<IdentityDialog
-				campaign={campaign}
-				title="User Settings"
-				open={isIdentityDialogOpen}
-				onOpenChange={setIsIdentityDialogOpen}
-			/>
-			<PageHeading>{campaign?.name}</PageHeading>
-			<Tabs
-				defaultValue="murmur"
-				value={tab}
-				onValueChange={handleTabChange}
-				className="w-full"
-			>
-				<TabsContent value="murmur">
-					<EmailAutomationSteps campaign={campaign} />
-				</TabsContent>
-			</Tabs>
+			<CampaignName campaign={campaign} />
+			<Card className="mt-38 border-border !border-2">
+				<CardContent>
+					<div className="flex gap-24">
+						<div className="">
+							<div className="flex gap-8 mb-6 items-center">
+								<Typography variant="h2" className="">
+									User Settings
+								</Typography>
+								<IdentityDialog
+									triggerButton={<Button variant="action-link">Change</Button>}
+									campaign={campaign}
+									title="User Settings"
+									open={isIdentityDialogOpen}
+									onOpenChange={setIsIdentityDialogOpen}
+								/>
+							</div>
+							<Typography className="font-bold text-[15px]">
+								{campaign?.identity?.name}
+							</Typography>
+							<Typography className="font-bold font-secondary text-[13px]">
+								{campaign?.identity?.email}
+							</Typography>
+							<Typography
+								className={twMerge(
+									'font-secondary text-[13px]',
+									!campaign?.identity?.website && '!text-muted italic'
+								)}
+							>
+								{campaign?.identity?.website || 'No website'}
+							</Typography>
+						</div>
+
+						<div className="flex flex-col">
+							<div className="flex gap-8 mb-6 items-center">
+								<Typography variant="h2">Lists Selected</Typography>
+								<Button variant="action-link">Change</Button>
+							</div>
+							{campaign?.contactLists?.map((contactList) => (
+								<Typography key={contactList.id} className="font-bold text-[15px]">
+									{contactList?.title}
+								</Typography>
+							))}
+						</div>
+					</div>
+				</CardContent>
+			</Card>
 		</AppLayout>
 	);
 };

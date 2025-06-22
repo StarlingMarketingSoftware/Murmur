@@ -1,4 +1,4 @@
-import { useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
+import { useEditCampaign, useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -19,8 +19,9 @@ export const useCampaignDetail = () => {
 	};
 
 	const { data: campaign, isPending: isPendingCampaign } = useGetCampaign(campaignId);
+	const { mutate: editCampaign, isPendingEditCampaign } = useEditCampaign();
 
-	useEffect(() => {
+	const handleEditCampaign = useEffect(() => {
 		if (!campaign) {
 			return;
 		}

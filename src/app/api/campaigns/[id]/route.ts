@@ -51,9 +51,9 @@ export async function GET(req: NextRequest, { params }: { params: ApiRouteParams
 				userId,
 			},
 			include: {
-				contacts: true,
-				emails: true,
 				signature: true,
+				contactLists: true,
+				identity: true,
 			},
 		});
 
