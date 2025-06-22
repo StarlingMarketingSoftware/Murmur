@@ -2,11 +2,11 @@ import { CampaignWithRelations } from '@/types';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus } from '@prisma/client';
 
-export interface DraftsPageProps {
+export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
 }
 
-export const useDraftPage = (props: DraftsPageProps) => {
+export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { campaign } = props;
 	const campaignId = campaign.id;
 

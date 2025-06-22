@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { CLEAN_EMAIL_PROMPT } from '@/constants/ai';
 import { useMistral } from '@/hooks/useMistral';
+import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 
 const getEmailDraftSchema = (isAiSubject: boolean) => {
 	return z.object({
@@ -41,6 +42,14 @@ export interface AiComposeProps {
 
 const useAiCompose = (props: AiComposeProps) => {
 	const { campaign } = props;
+
+	const { data: contacts } = useGetContacts({
+		filters: {
+			contactListIds: campaign.contactLists.map((list) => list.id),
+		},
+	});
+	console.log('🚀 ~ useAiCompose ~ contactLists:', campaign.contactLists);
+	console.log('🚀 ~ useAiCompose ~ contacts:', contacts);
 
 	const { user } = useMe();
 	const [generationProgress, setGenerationProgress] = useState(-1);
@@ -84,14 +93,14 @@ const useAiCompose = (props: AiComposeProps) => {
 	let dataDraftEmail: TestDraftEmail = {
 		subject: '',
 		message: '',
-		contactEmail: campaign.contacts[0]?.email || '',
+		contactEmail: contacts ? contacts[0].email : '',
 	};
 
 	if (!rawDataDraftEmail && campaign.testMessage && campaign.testMessage.length > 0) {
 		dataDraftEmail = {
 			subject: campaign.testSubject || '',
 			message: campaign.testMessage,
-			contactEmail: campaign.contacts[0].email,
+			contactEmail: contacts ? contacts[0].email : '',
 		};
 	} else {
 		dataDraftEmail.subject = campaign.testSubject || '';
@@ -201,9 +210,15 @@ const useAiCompose = (props: AiComposeProps) => {
 					toast.error('Failed to generate test email.');
 					break;
 				}
+
+				if (!contacts || contacts.length === 0) {
+					toast.error('No contacts available to send test email.');
+					break;
+				}
+
 				const parsedRes: DraftEmailResponse = await draftEmailChain(
 					values.aiModel,
-					campaign.contacts[0],
+					contacts[0],
 					values.message
 				);
 
@@ -356,11 +371,18 @@ const useAiCompose = (props: AiComposeProps) => {
 		const controller = new AbortController();
 		setAbortController(controller);
 
+		// you only need all the contacts when you batch generate emails...
+		// so can you fetch them here?
+		// or completely backend? But then it's an endpoint that runs too long
+
 		const BATCH_SIZE = 5;
 		const BATCH_DELAY = 1000;
-		const contacts = campaign.contacts;
 		let successfulEmails = 0;
 
+		if (!contacts || contacts.length === 0) {
+			toast.error('No contacts available to generate emails.');
+			return;
+		}
 		try {
 			for (
 				let i = 0;
@@ -477,6 +499,7 @@ const useAiCompose = (props: AiComposeProps) => {
 		setGenerationProgress,
 		cancelGeneration,
 		campaign,
+		contacts,
 	};
 };
 

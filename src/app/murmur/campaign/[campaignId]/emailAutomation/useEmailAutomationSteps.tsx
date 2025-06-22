@@ -1,7 +1,7 @@
 import { CampaignWithRelations } from '@/types';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import SendPage from './send/SendPage';
-import DraftPage from './draft/DraftPage';
+import DraftingSection from './draft/DraftingSection';
 import SelectRecipients from './recipients/RecipientsPage';
 import { ReactNode } from 'react';
 import { NotebookPenIcon, SendIcon, UserRoundPen } from 'lucide-react';
@@ -54,7 +54,7 @@ export const useEmailAutomationSteps = (props: EmailAutomationStepsProps) => {
 			step: 2,
 			value: 'draft',
 			label: 'Draft',
-			component: <DraftPage campaign={campaign} />,
+			component: <DraftingSection campaign={campaign} />,
 			icon: <NotebookPenIcon />,
 		},
 		{

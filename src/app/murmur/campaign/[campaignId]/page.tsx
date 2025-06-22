@@ -7,9 +7,10 @@ import { IdentityDialog } from '@/components/organisms/_dialogs/IdentityDialog/I
 import { CampaignName } from '@/components/organisms/CampaignName/CampaignName';
 import { Card, CardContent } from '@/components/ui/card';
 import { Typography } from '@/components/ui/typography';
-import { Label } from '@radix-ui/react-label';
 import { twMerge } from 'tailwind-merge';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { DraftingSection } from './emailAutomation/draft/DraftingSection';
 
 const Murmur = () => {
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
@@ -67,6 +68,21 @@ const Murmur = () => {
 					</div>
 				</CardContent>
 			</Card>
+
+			<Typography
+				variant="p"
+				font="secondary"
+				className="mt-13 text-[19px] text-center"
+				color="light"
+			>
+				What do you want to say?
+			</Typography>
+
+			<Typography variant="h2" className="mt-13">
+				Drafting
+			</Typography>
+			<Separator className="w-1/2" />
+			<DraftingSection campaign={campaign} />
 		</AppLayout>
 	);
 };

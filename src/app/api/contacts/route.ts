@@ -22,10 +22,12 @@ const createContactSchema = z.object({
 	phone: z.string().optional(),
 	contactListId: z.coerce.number().optional(),
 });
+
 const contactFilterSchema = z.object({
 	verificationStatus: z.nativeEnum(EmailVerificationStatus).optional(),
-	contactListId: z.union([z.string(), z.number()]).optional(),
+	contactListIds: z.array(z.number()).optional(),
 });
+
 export type PostContactData = z.infer<typeof createContactSchema>;
 export type ContactFilterData = z.infer<typeof contactFilterSchema>;
 
@@ -35,17 +37,25 @@ export async function GET(req: NextRequest) {
 		if (!userId) {
 			return apiUnauthorized();
 		}
+		console.log('🚀 ~ GET ~ req:', req.url);
 
 		const validatedFilters = getValidatedParamsFromUrl(req.url, contactFilterSchema);
+		console.log('🚀 ~ GET ~ validatedFilters:', validatedFilters.data);
 
 		if (!validatedFilters.success) {
 			return apiBadRequest(validatedFilters.error);
 		}
-		const { contactListId, verificationStatus } = validatedFilters.data;
+		const { contactListIds, verificationStatus } = validatedFilters.data;
+		console.log('🚀 ~ GET ~ contactListIds:', contactListIds);
+
+		const numberContactListIds =
+			contactListIds?.map((id) => Number(id)).filter((id) => !isNaN(id)) || [];
 
 		const contacts = await prisma.contact.findMany({
 			where: {
-				contactListId: Number(contactListId),
+				contactListId: {
+					in: numberContactListIds,
+				},
 				emailValidationStatus: {
 					equals: verificationStatus,
 				},

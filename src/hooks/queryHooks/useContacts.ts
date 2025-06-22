@@ -15,7 +15,7 @@ const QUERY_KEYS = {
 	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
 } as const;
 
-export interface ContactQueryOptions extends CustomQueryOptions {
+export interface ContactQueryOptions {
 	filters?: ContactFilterData;
 }
 
@@ -25,7 +25,7 @@ interface EditContactData {
 }
 
 export const useGetContacts = (options: ContactQueryOptions) => {
-	return useQuery({
+	return useQuery<Contact[]>({
 		queryKey: [...QUERY_KEYS.list(), options.filters],
 		queryFn: async () => {
 			const url = appendQueryParamsToUrl(urls.api.contacts.index, options.filters);

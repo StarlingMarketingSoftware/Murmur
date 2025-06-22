@@ -53,6 +53,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 		setGenerationProgress,
 		cancelGeneration,
 		campaign,
+		contacts,
 	} = useAiCompose(props);
 
 	return (
@@ -200,9 +201,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 									variant="primary-light"
 									isLoading={isTest && isPendingGeneration}
 									disabled={
-										campaign?.contacts.length === 0 ||
-										isPendingGeneration ||
-										aiTestCredits === 0
+										contacts?.length === 0 || isPendingGeneration || aiTestCredits === 0
 									}
 								>
 									<FlaskConical />
@@ -231,7 +230,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 								isLoading={isPendingGeneration && !isTest}
 								disabled={
 									generationProgress > -1 ||
-									campaign?.contacts.length === 0 ||
+									contacts?.length === 0 ||
 									isPendingGeneration ||
 									aiDraftCredits === 0
 								}
@@ -267,7 +266,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 			<ProgressIndicator
 				progress={generationProgress}
 				setProgress={setGenerationProgress}
-				total={campaign.contacts.length}
+				total={contacts?.length}
 				pendingMessage="Generating {{progress}} emails..."
 				completeMessage="Finished generating {{progress}} emails."
 				cancelAction={cancelGeneration}

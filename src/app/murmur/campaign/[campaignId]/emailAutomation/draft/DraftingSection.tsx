@@ -2,11 +2,11 @@ import { FC } from 'react';
 import EmailsTable from '../../../../../../components/organisms/_tables/EmailsTable/EmailsTable';
 import ComposeEmailSection from '../../../../../../components/organisms/ComposeEmailSection/ComposeEmailSection';
 import { Card, CardContent } from '@/components/ui/card';
-import { DraftsPageProps, useDraftPage } from './useDraftPage';
+import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
 import Spinner from '@/components/ui/spinner';
 
-const DraftPage: FC<DraftsPageProps> = (props) => {
-	const { draftEmails, isPending, campaign } = useDraftPage(props);
+export const DraftingSection: FC<DraftingSectionProps> = (props) => {
+	const { draftEmails, isPending, campaign } = useDraftingSection(props);
 
 	if (isPending) {
 		return <Spinner />;
@@ -28,5 +28,3 @@ const DraftPage: FC<DraftsPageProps> = (props) => {
 		</>
 	);
 };
-
-export default DraftPage;

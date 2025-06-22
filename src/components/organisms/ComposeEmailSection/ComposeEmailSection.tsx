@@ -12,13 +12,12 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 
 	return (
 		<>
-			{campaign?.contacts.length === 0 && (
+			{campaign?.contactLists.length === 0 && (
 				<Alert variant="warning">
 					<AlertCircle className="h-4 w-4" />
 					<AlertTitle>No Recipients</AlertTitle>
 					<AlertDescription>
-						You have not selected any recipients for this campaign. Please return to step
-						1 and select at least one before generating emails.
+						You have not selected any recipients for this campaign.
 					</AlertDescription>
 				</Alert>
 			)}
