@@ -167,7 +167,6 @@ model Campaign {
   message           String?       @db.Text
   hybridPrompt      String?       @db.Text
   handwrittenPrompt String?       @db.Text
-  aiModel           AiModel?
   font              String        @default("Times New Roman")
   testMessage       String?       @db.Text
   testSubject       String?
