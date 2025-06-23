@@ -16,6 +16,8 @@ const postMistralSchema = z.object({
 
 export type PostMistralData = z.infer<typeof postMistralSchema>;
 
+export const maxDuration = 30;
+
 export async function POST(request: NextRequest) {
 	try {
 		const { userId } = await auth();
@@ -31,6 +33,7 @@ export async function POST(request: NextRequest) {
 		const { prompt, content } = validatedData.data;
 
 		const parsed = await fetchMistral(prompt, content);
+
 		return apiResponse(parsed);
 	} catch (error) {
 		return handleApiError(error);
