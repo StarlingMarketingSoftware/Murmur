@@ -10,6 +10,10 @@ import { twMerge } from 'tailwind-merge';
 import { Button } from '@/components/ui/button';
 import { FlaskConicalIcon } from 'lucide-react';
 import { StepSlider } from '@/components/atoms/StepSlider/StepSlider';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
+import { RecipientAddressLockableInput } from '@/components/atoms/RecipientAddressLockableInput/RecipientAddressLockableInput';
 
 export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 	const {
@@ -18,6 +22,7 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 		setActiveTab,
 		modeOptions,
 		toneOptions,
+		draftEmail,
 		selectedTone,
 		setSelectedTone,
 	} = useDraftingRightPanel(props);
@@ -69,18 +74,44 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 							</Typography>
 							<StepSlider className="mt-6" defaultValue={[3]} max={5} step={1} min={0} />
 						</div>
-						<div className="flex justify-center mt-8">
-							<Button variant="primary-light">
-								<FlaskConicalIcon /> Test Your Prompt
-							</Button>
-						</div>
 					</>
 				)}
 				{activeTab === 'test' && (
-					<div>
-						<p>Test mode for campaign: {campaign.name}</p>
+					<div className="grid gap-4 py-4">
+						<div className="grid gap-2">
+							<Label htmlFor="email">Recipient</Label>
+							<div className="relative">
+								<RecipientAddressLockableInput
+									email={draftEmail.contactEmail}
+									overrideTierShowEmail
+								/>
+							</div>
+						</div>
+						<div className="grid gap-2">
+							<Label htmlFor="subject">Subject</Label>
+							<Input
+								id="subject"
+								defaultValue={draftEmail.subject}
+								readOnly
+								className="col-span-3 !cursor-text !pointer-events-auto"
+							/>
+						</div>
+						<div className="grid gap-2">
+							<Label htmlFor="message">Message</Label>
+							<RichTextEditor
+								className="!h-full grow max-h-[200px] overflow-y-auto"
+								isEdit={false}
+								hideMenuBar
+								value={draftEmail.message}
+							/>
+						</div>
 					</div>
 				)}
+				<div className="flex justify-center mt-8">
+					<Button variant="primary-light">
+						<FlaskConicalIcon /> Test Your Prompt
+					</Button>
+				</div>
 			</div>
 		</div>
 	);

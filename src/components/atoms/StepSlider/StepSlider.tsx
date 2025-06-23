@@ -1,9 +1,9 @@
 'use client';
 
-import * as React from 'react';
 import * as SliderPrimitive from '@radix-ui/react-slider';
 import { cn } from '@/utils/index';
 import { Typography } from '@/components/ui/typography';
+import { useMemo } from 'react';
 
 interface StepSliderProps extends React.ComponentProps<typeof SliderPrimitive.Root> {
 	showStepIndicators?: boolean;
@@ -18,7 +18,7 @@ export const StepSlider = ({
 	showStepIndicators = true,
 	...props
 }: StepSliderProps) => {
-	const _values = React.useMemo(
+	const _values = useMemo(
 		() =>
 			Array.isArray(value)
 				? value
@@ -27,7 +27,8 @@ export const StepSlider = ({
 				: [min, max],
 		[value, defaultValue, min, max]
 	); // Calculate step positions as percentages
-	const stepPositions = React.useMemo(() => {
+
+	const stepPositions = useMemo(() => {
 		if (!showStepIndicators) return [];
 
 		const positions = [];

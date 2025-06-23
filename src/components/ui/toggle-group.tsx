@@ -25,10 +25,7 @@ function ToggleGroup({
 			data-slot="toggle-group"
 			data-variant={variant}
 			data-size={size}
-			className={cn(
-				'group/toggle-group flex w-fit items-center rounded-md data-[variant=outline]:shadow-xs',
-				className
-			)}
+			className={cn('group/toggle-group flex w-fit items-center rounded-md', className)}
 			{...props}
 		>
 			<ToggleGroupContext.Provider value={{ variant, size }}>

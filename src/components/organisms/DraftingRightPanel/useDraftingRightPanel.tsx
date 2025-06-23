@@ -1,4 +1,4 @@
-import { CampaignWithRelations, OptionWithLabel } from '@/types';
+import { CampaignWithRelations, OptionWithLabel, TestDraftEmail } from '@/types';
 import { useState } from 'react';
 
 export interface DraftingRightPanelProps {
@@ -50,6 +50,12 @@ export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
 		},
 	];
 
+	const draftEmail: TestDraftEmail = {
+		subject: '',
+		message: '',
+		contactEmail: '',
+	};
+
 	return {
 		campaign,
 		activeTab,
@@ -58,5 +64,6 @@ export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
 		toneOptions,
 		selectedTone,
 		setSelectedTone,
+		draftEmail,
 	};
 };
