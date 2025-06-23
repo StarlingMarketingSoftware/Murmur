@@ -15,3 +15,8 @@ export type FAQ = {
 	question: string;
 	answer: string;
 };
+
+export type OptionWithLabel<T = string> = {
+	value: T;
+	label: string;
+};

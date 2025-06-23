@@ -1,0 +1,87 @@
+import { FC } from 'react';
+import {
+	DraftingRightPanelProps,
+	ToneOption,
+	useDraftingRightPanel,
+} from './useDraftingRightPanel';
+import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
+import { Typography } from '@/components/ui/typography';
+import { twMerge } from 'tailwind-merge';
+import { Button } from '@/components/ui/button';
+import { FlaskConicalIcon } from 'lucide-react';
+import { StepSlider } from '@/components/atoms/StepSlider/StepSlider';
+
+export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
+	const {
+		campaign,
+		activeTab,
+		setActiveTab,
+		modeOptions,
+		toneOptions,
+		selectedTone,
+		setSelectedTone,
+	} = useDraftingRightPanel(props);
+
+	return (
+		<div className="flex flex-col gap-4 mt-6 p-5">
+			<BlockTabs
+				activeValue={activeTab}
+				onValueChange={setActiveTab}
+				options={modeOptions}
+			/>
+			<div>
+				{activeTab === 'settings' && (
+					<>
+						<Typography variant="h3" bold className="text-[28px] text-center mt-5">
+							AI Prompt Settings
+						</Typography>
+
+						<div className="mx-auto w-fit mt-16">
+							<Typography variant="h3" bold className="text-[26px]">
+								Tone
+							</Typography>
+							<div className="grid grid-cols-2 gap-3 mt-2 w-fit">
+								{toneOptions.map((tone: ToneOption) => (
+									<div
+										key={tone.value}
+										className={twMerge(
+											'w-[194px] h-[78px] border-2 p-1 col-span-1 transition',
+											tone.value === selectedTone
+												? ' bg-gradient-to-br from-background to-primary/30 pointer-events-none border-primary'
+												: 'cursor-pointer hover:bg-primary/10 border-border'
+										)}
+										onClick={() => setSelectedTone(tone.value)}
+									>
+										<Typography variant="h4" className="text-[20px]" font="secondary">
+											{tone.label}
+										</Typography>
+										<Typography className="text-[12px]">{tone.description}</Typography>
+									</div>
+								))}
+							</div>
+						</div>
+						<div className="max-w-56 mx-auto mt-8">
+							<Typography variant="h3" bold className="text-[26px] mt-8">
+								Paragraphs
+							</Typography>
+							<Typography className="text-[12px] mt-2" color="light">
+								Select the number of paragraphs you want the AI to generate in your email
+							</Typography>
+							<StepSlider className="mt-6" defaultValue={[3]} max={5} step={1} min={0} />
+						</div>
+						<div className="flex justify-center mt-8">
+							<Button variant="primary-light">
+								<FlaskConicalIcon /> Test Your Prompt
+							</Button>
+						</div>
+					</>
+				)}
+				{activeTab === 'test' && (
+					<div>
+						<p>Test mode for campaign: {campaign.name}</p>
+					</div>
+				)}
+			</div>
+		</div>
+	);
+};

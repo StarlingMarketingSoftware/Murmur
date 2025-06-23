@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import queryString from 'query-string';
-import { EmailVerificationStatus } from '@prisma/client';
 
 /**
  * Get a number from URL search params

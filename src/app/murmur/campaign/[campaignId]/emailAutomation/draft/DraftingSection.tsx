@@ -4,6 +4,7 @@ import ComposeEmailSection from '../../../../../../components/organisms/ComposeE
 import { Card, CardContent } from '@/components/ui/card';
 import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
 import Spinner from '@/components/ui/spinner';
+import { DraftingRightPanel } from '@/components/organisms/DraftingRightPanel/DraftingRightPanel';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const { draftEmails, isPending, campaign } = useDraftingSection(props);
@@ -14,7 +15,14 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 
 	return (
 		<>
-			<ComposeEmailSection campaign={campaign} />
+			<div className="flex gap-4">
+				<div className="w-1/2">
+					<ComposeEmailSection campaign={campaign} />
+				</div>
+				<div className="w-1/2">
+					<DraftingRightPanel campaign={campaign} />
+				</div>
+			</div>
 			<Card className="relative">
 				<CardContent>
 					<EmailsTable

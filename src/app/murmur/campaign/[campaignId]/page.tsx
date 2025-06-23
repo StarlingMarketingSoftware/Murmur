@@ -81,7 +81,7 @@ const Murmur = () => {
 			<Typography variant="h2" className="mt-13">
 				Drafting
 			</Typography>
-			<Separator className="w-1/2" />
+			<Separator className="!w-1/2" />
 			<DraftingSection campaign={campaign} />
 		</AppLayout>
 	);

@@ -1,10 +1,10 @@
 import { CampaignWithRelations } from '@/types';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import SendPage from './send/SendPage';
-import DraftingSection from './draft/DraftingSection';
 import SelectRecipients from './recipients/RecipientsPage';
 import { ReactNode } from 'react';
 import { NotebookPenIcon, SendIcon, UserRoundPen } from 'lucide-react';
+import { DraftingSection } from './draft/DraftingSection';
 
 export interface EmailAutomationStepsProps {
 	campaign: CampaignWithRelations;

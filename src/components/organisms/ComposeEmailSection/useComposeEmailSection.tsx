@@ -5,12 +5,18 @@ export interface ComposeEmailSectionProps {
 	campaign: CampaignWithRelations;
 }
 
+type DraftingMode = 'ai' | 'hybrid' | 'handwritten';
+type ModeOption = {
+	value: DraftingMode;
+	label: string;
+};
+
 const useComposeEmailSection = (props: ComposeEmailSectionProps) => {
 	const { campaign } = props;
 	const [isAiDraft, setIsAiDraft] = useState<boolean>(true);
-	const [draftingMode, setDraftingMode] = useState<'ai' | 'hybrid' | 'handwritten'>('ai');
+	const [draftingMode, setDraftingMode] = useState<DraftingMode>('ai');
 
-	const modeOptions = [
+	const modeOptions: ModeOption[] = [
 		{ value: 'ai', label: 'Full AI' },
 		{ value: 'hybrid', label: 'Hybrid' },
 		{ value: 'handwritten', label: 'Handwritten' },

@@ -1,5 +1,5 @@
-import { CampaignWithRelations } from '@/types';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { CampaignWithRelations } from '@/types';
 import { EmailStatus } from '@prisma/client';
 
 export interface DraftingSectionProps {
