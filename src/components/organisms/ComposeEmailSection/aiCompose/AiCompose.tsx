@@ -10,7 +10,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Brain, SaveIcon, WandSparklesIcon } from 'lucide-react';
+import { SaveIcon, WandSparklesIcon } from 'lucide-react';
 import {
 	Select,
 	SelectContent,
@@ -29,7 +29,6 @@ import { ManageSignaturesDialog } from '../../_dialogs/ManageSignaturesDialog/Ma
 import ProgressIndicator from '../../../molecules/ProgressIndicator/ProgressIndicator';
 import { ConfirmDialog } from '../../_dialogs/ConfirmDialog/ConfirmDialog';
 import { ellipsesText } from '@/utils';
-import { Typography } from '@/components/ui/typography';
 
 const AiCompose: FC<AiComposeProps> = (props) => {
 	const {
@@ -39,12 +38,10 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 		handleFormAction,
 		isTest,
 		isPendingGeneration,
-		dataDraftEmail,
 		trigger,
 		handleSavePrompt,
 		isPendingSavePrompt,
 		aiDraftCredits,
-		aiTestCredits,
 		isConfirmDialogOpen,
 		setIsConfirmDialogOpen,
 		selectedSignature,
@@ -75,7 +72,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 										<Switch
 											checked={isAiSubject}
 											onCheckedChange={setIsAiSubject}
-											className="data-[state=checked]:bg-primary"
+											className="data-[state=checked]:bg-primary -translate-y-[2px]"
 										/>
 										<FormLabel className="">AI Subject</FormLabel>
 									</div>
@@ -102,7 +99,7 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 								<FormLabel>{'AI Prompt'}</FormLabel>
 								<FormControl>
 									<Textarea
-										className="h-[200px]"
+										className="h-[530px]"
 										placeholder={
 											'Write your prompt for the AI here. For example:\n"Draft an email to schedule a meeting with the marketing team to discuss our Q2 strategy."\nBased on this prompt, the AI will generate a custom email for each recipient.'
 										}

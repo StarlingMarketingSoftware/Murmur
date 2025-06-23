@@ -16,19 +16,6 @@ import { CLEAN_EMAIL_PROMPT } from '@/constants/ai';
 import { useMistral } from '@/hooks/useMistral';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 
-const getEmailDraftSchema = (isAiSubject: boolean) => {
-	return z.object({
-		subject: isAiSubject
-			? z.string().optional()
-			: z.string().min(1, { message: 'Subject is required.' }),
-		message: z.string().min(1, { message: 'Message is required.' }),
-		aiModel: z.nativeEnum(AiModel, {
-			required_error: 'AI model is required.',
-		}),
-		font: z.string().min(1, { message: 'Font is required.' }),
-	});
-};
-
 type BatchGenerationResult = {
 	contactId: number;
 	success: boolean;
@@ -60,7 +47,6 @@ const useAiCompose = (props: AiComposeProps) => {
 	const isGenerationCancelledRef = useRef(false);
 
 	const aiDraftCredits = user?.aiDraftCredits;
-	const aiTestCredits = user?.aiTestCredits;
 	const selectedSignature = campaign.signature;
 
 	const {
@@ -103,44 +89,6 @@ const useAiCompose = (props: AiComposeProps) => {
 		dataDraftEmail.subject = campaign.testSubject || '';
 		dataDraftEmail.message = campaign.testMessage || '';
 	}
-
-	const form = useForm<z.infer<ReturnType<typeof getEmailDraftSchema>>>({
-		resolver: zodResolver(getEmailDraftSchema(isAiSubject)),
-		defaultValues: {
-			subject: campaign.subject ?? '',
-			message: campaign.message ?? '',
-			aiModel: campaign.aiModel ?? AiModel.sonar,
-			font: campaign.font,
-		},
-		mode: 'onChange',
-	});
-
-	useEffect(() => {
-		if (campaign) {
-			form.reset({
-				subject: campaign.subject ?? '',
-				message: campaign.message ?? '',
-				aiModel: campaign.aiModel ?? AiModel.sonar,
-				font: campaign.font,
-			});
-		}
-	}, [campaign, form]);
-
-	const {
-		trigger,
-		getValues,
-		formState: { isDirty },
-	} = form;
-
-	useEffect(() => {
-		if (isFirstLoad) {
-			setIsFirstLoad(false);
-		} else {
-			if (isAiSubject) {
-				trigger('subject');
-			}
-		}
-	}, [isAiSubject, trigger, setIsFirstLoad, isFirstLoad]);
 
 	useEffect(() => {
 		return () => {
@@ -450,31 +398,6 @@ const useAiCompose = (props: AiComposeProps) => {
 		}
 	};
 
-	const handleFormAction = async (action: 'test' | 'submit') => {
-		const isValid = await trigger();
-		if (!isValid) return;
-
-		if (action === 'test') {
-			generateTestDraft();
-		} else {
-			batchGenerateEmails();
-		}
-	};
-
-	const handleSavePrompt = async (suppressToasts: boolean) => {
-		if (suppressToasts) {
-			await saveCampaignNoToast({
-				data: { ...form.getValues() },
-				id: campaign.id,
-			});
-		} else {
-			await savePrompt({ data: { ...form.getValues() }, id: campaign.id });
-		}
-		queryClient.invalidateQueries({
-			queryKey: ['campaign', campaign.id as number],
-		});
-	};
-
 	return {
 		form,
 		isAiSubject,
@@ -487,7 +410,6 @@ const useAiCompose = (props: AiComposeProps) => {
 		handleSavePrompt,
 		isPendingSavePrompt,
 		aiDraftCredits,
-		aiTestCredits,
 		isConfirmDialogOpen,
 		setIsConfirmDialogOpen,
 		selectedSignature,
