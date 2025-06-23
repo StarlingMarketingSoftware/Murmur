@@ -136,3 +136,19 @@ export function extractEmailsFromContacts(contacts: Partial<Contact>[]): string[
 
 - Created from main
 - After fixing, merge to both main and develop
+
+### Database Migrations
+
+- Renaming: Avoid migrations when possible when renaming a field is required. For example:
+
+```message String?  @db.Text
+
+```
+
+- Can be renamed to:
+
+```fullAiPrompt String?  @map("message") @db.Text
+
+```
+
+- By using @map without running any migrations.
