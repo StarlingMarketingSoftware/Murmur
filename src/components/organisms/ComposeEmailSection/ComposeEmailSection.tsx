@@ -1,14 +1,17 @@
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Brain, PenLine } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FC } from 'react';
 import useComposeEmailSection, {
 	ComposeEmailSectionProps,
 } from './useComposeEmailSection';
 import AiCompose from './aiCompose/AiCompose';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Typography } from '@/components/ui/typography';
 
 const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
-	const { campaign } = useComposeEmailSection(props);
+	const { campaign, draftingMode, setDraftingMode, modeOptions } =
+		useComposeEmailSection(props);
 
 	return (
 		<>
@@ -23,28 +26,21 @@ const ComposeEmailSection: FC<ComposeEmailSectionProps> = (props) => {
 			)}
 			<Card>
 				<CardContent className="space-y-2">
-					{/* <ToggleGroup
-					// onClick={handleModeClick}
-					variant="primary-light"
-					className="mx-auto"
-					type="single"
-					size="lg"
-					value={isAiDraft ? 'ai' : 'compose'}
-					onValueChange={(value) => {
-						setIsAiDraft(value === 'ai');
-						setIsAiSubject(value === 'ai');
-					}}
-				>
-					<ToggleGroupItem value="ai">
-						<Brain />
-						AI Draft
-					</ToggleGroupItem>
-
-					<ToggleGroupItem value="compose" disabled>
-						<PenLine />
-						Compose
-					</ToggleGroupItem>
-				</ToggleGroup> */}
+					<div className="flex gap-2">
+						{modeOptions.map((modeOption) => (
+							<div
+								key={modeOption.value}
+								className="h-8 border-2 border-primary bg-gradient-to-br from-background to-primary/20"
+								style={{
+									width: `${100 / modeOptions.length}%`,
+								}}
+							>
+								<Typography font="secondary" className="ml-2 text-[20px]">
+									{modeOption.label}
+								</Typography>
+							</div>
+						))}
+					</div>
 					<AiCompose campaign={campaign} />
 				</CardContent>
 			</Card>

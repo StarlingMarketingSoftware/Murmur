@@ -37,17 +37,11 @@ export async function GET(req: NextRequest) {
 		if (!userId) {
 			return apiUnauthorized();
 		}
-		console.log('🚀 ~ GET ~ req:', req.url);
-
 		const validatedFilters = getValidatedParamsFromUrl(req.url, contactFilterSchema);
-		console.log('🚀 ~ GET ~ validatedFilters:', validatedFilters.data);
-
 		if (!validatedFilters.success) {
 			return apiBadRequest(validatedFilters.error);
 		}
 		const { contactListIds, verificationStatus } = validatedFilters.data;
-		console.log('🚀 ~ GET ~ contactListIds:', contactListIds);
-
 		const numberContactListIds =
 			contactListIds?.map((id) => Number(id)).filter((id) => !isNaN(id)) || [];
 

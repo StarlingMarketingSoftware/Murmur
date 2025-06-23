@@ -48,9 +48,6 @@ const useAiCompose = (props: AiComposeProps) => {
 			contactListIds: campaign.contactLists.map((list) => list.id),
 		},
 	});
-	console.log('🚀 ~ useAiCompose ~ contactLists:', campaign.contactLists);
-	console.log('🚀 ~ useAiCompose ~ contacts:', contacts);
-
 	const { user } = useMe();
 	const [generationProgress, setGenerationProgress] = useState(-1);
 	const [isFirstLoad, setIsFirstLoad] = useState(true);
