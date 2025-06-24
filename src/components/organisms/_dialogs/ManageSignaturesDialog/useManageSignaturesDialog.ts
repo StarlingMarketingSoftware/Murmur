@@ -22,13 +22,13 @@ const signatureSchema = z.object({
 
 export interface ManageSignaturesDialogProps {
 	campaign: CampaignWithRelations;
-	handleSavePrompt?: () => Promise<void>;
+	open?: boolean;
+	onOpenChange?: (open: boolean) => void;
 }
 
 export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) => {
 	const params = useParams();
 	const { campaignId } = params as { campaignId: string };
-	const { handleSavePrompt } = props;
 	const [isEdit, setIsEdit] = useState(false);
 	const [currentSignature, setCurrentSignature] = useState<Signature | null>(null);
 
@@ -80,9 +80,6 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 			toast.error('No signature selected.');
 			return;
 		}
-		if (handleSavePrompt) {
-			await handleSavePrompt();
-		}
 		await saveSignature({
 			id: currentSignature.id,
 			data,
@@ -98,9 +95,6 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 		if (!currentSignature) {
 			toast.error('No signature selected.');
 			return;
-		}
-		if (handleSavePrompt) {
-			await handleSavePrompt();
 		}
 		await saveSignature({
 			id: currentSignature?.id,
@@ -130,7 +124,6 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 		toast.success('Signature removed from campaign!');
 		queryClient.invalidateQueries({ queryKey: ['campaign', Number(campaignId)] });
 	};
-
 	return {
 		signatures,
 		isPendingSignatures,
@@ -150,6 +143,8 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 		campaignId,
 		handleSaveSignatureToCampaign,
 		handleRemoveSignatureFromCampaign,
+		open: props.open,
+		onOpenChange: props.onOpenChange,
 		...props,
 	};
 };

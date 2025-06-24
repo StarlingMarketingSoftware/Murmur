@@ -9,12 +9,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { AiModel, Contact, EmailStatus } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFormContext, UseFormReturn } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { CLEAN_EMAIL_PROMPT } from '@/constants/ai';
 import { useMistral } from '@/hooks/useMistral';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
+import { draftingFormSchema } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 
 type BatchGenerationResult = {
 	contactId: number;
@@ -29,6 +30,7 @@ export interface AiComposeProps {
 
 const useAiCompose = (props: AiComposeProps) => {
 	const { campaign } = props;
+	const form = useFormContext();
 
 	const { data: contacts } = useGetContacts({
 		filters: {
@@ -137,265 +139,18 @@ const useAiCompose = (props: AiComposeProps) => {
 		}
 	};
 
-	const generateTestDraft = async () => {
-		const values = getValues();
-
-		setIsTest(true);
-		if (aiTestCredits === 0) {
-			toast.error('You have run out of AI test credits!');
-			return;
-		}
-
-		let isSuccess = false;
-		let attempts = 0;
-
-		while (!isSuccess) {
-			try {
-				if (attempts > 5) {
-					toast.error('Failed to generate test email.');
-					break;
-				}
-
-				if (!contacts || contacts.length === 0) {
-					toast.error('No contacts available to send test email.');
-					break;
-				}
-
-				const parsedRes: DraftEmailResponse = await draftEmailChain(
-					values.aiModel,
-					contacts[0],
-					values.message
-				);
-
-				if (parsedRes.message && parsedRes.subject) {
-					await saveTestEmail({
-						id: campaign.id,
-						data: {
-							subject: values.subject,
-							message: values.message,
-							testMessage: convertAiResponseToRichTextEmail(
-								parsedRes.message,
-								values.font,
-								campaign.signature
-							),
-							testSubject: isAiSubject ? parsedRes.subject : values.subject,
-							font: values.font,
-						},
-					});
-					queryClient.invalidateQueries({
-						queryKey: ['campaign', campaign.id as number],
-					});
-					queryClient.invalidateQueries({
-						queryKey: ['user'],
-					});
-					toast.success('Test email generated successfully!');
-					isSuccess = true;
-				} else {
-					attempts++;
-				}
-			} catch {
-				attempts++;
-				continue;
-			}
-		}
-
-		if (user && aiTestCredits) {
-			editUser({
-				clerkId: user.clerkId,
-				data: { aiTestCredits: aiTestCredits - 1 },
+	const handleSavePrompt = async (suppressToasts: boolean) => {
+		if (suppressToasts) {
+			await saveCampaignNoToast({
+				data: { ...form.getValues() },
+				id: campaign.id,
 			});
+		} else {
+			await savePrompt({ data: { ...form.getValues() }, id: campaign.id });
 		}
-		setIsTest(false);
-	};
-
-	const generateBatchPromises = (
-		batchToProcess: Contact[],
-		controller: AbortController
-	) => {
-		const values = getValues();
-
-		return batchToProcess.map(async (recipient: Contact) => {
-			const MAX_RETRIES = 5;
-			let lastError: Error | null = null;
-
-			for (
-				let retryCount = 0;
-				retryCount <= MAX_RETRIES && !isGenerationCancelledRef.current;
-				retryCount++
-			) {
-				try {
-					// Exponential backoff: 0ms, 1s, 2s, 4s
-					if (retryCount > 0) {
-						const delay = Math.pow(2, retryCount - 1) * 1000;
-						await new Promise((resolve) => setTimeout(resolve, delay));
-					}
-
-					const parsedDraft = await draftEmailChain(
-						values.aiModel,
-						recipient,
-						values.message,
-						controller.signal
-					);
-
-					if (parsedDraft) {
-						if (!isAiSubject) {
-							parsedDraft.subject = values.subject || parsedDraft.subject;
-						}
-
-						await createEmail({
-							subject: parsedDraft.subject,
-							message: convertAiResponseToRichTextEmail(
-								parsedDraft.message,
-								values.font,
-								campaign.signature
-							),
-							campaignId: campaign.id,
-							status: 'draft' as EmailStatus,
-							contactId: recipient.id,
-						});
-						setGenerationProgress((prev) => prev + 1);
-
-						return {
-							success: true,
-							contactId: recipient.id,
-							retries: retryCount,
-						};
-					} else {
-						throw new Error('No draft generated - empty response');
-					}
-				} catch (error) {
-					if (error instanceof Error && error.message === 'Request cancelled.') {
-						throw error; // Re-throw cancellation errors immediately
-					}
-
-					lastError = error instanceof Error ? error : new Error('Unknown error');
-
-					if (retryCount === MAX_RETRIES) {
-						break;
-					}
-					if (!isGenerationCancelledRef.current) {
-						if (
-							lastError.message.includes('JSON') ||
-							lastError.message.includes('parse') ||
-							lastError.message.includes('too short')
-						) {
-							console.warn(
-								`Retry ${retryCount + 1}/${MAX_RETRIES} for contact ${recipient.id} - ${
-									lastError.message
-								}`
-							);
-						} else {
-							console.error(
-								`Error for contact ${recipient.id} (attempt ${retryCount + 1}):`,
-								lastError.message
-							);
-						}
-					}
-				}
-			} // All retries exhausted (skip if cancelled)
-			if (!isGenerationCancelledRef.current) {
-				console.error(
-					`Contact ${recipient.id} failed after ${MAX_RETRIES} retries. Final error:`,
-					lastError?.message
-				);
-			}
-			return {
-				success: false,
-				contactId: recipient.id,
-				error: lastError?.message || 'Unknown error',
-				retries: MAX_RETRIES,
-			};
+		queryClient.invalidateQueries({
+			queryKey: ['campaign', campaign.id as number],
 		});
-	};
-
-	const batchGenerateEmails = async () => {
-		let remainingCredits = aiDraftCredits || 0;
-		setGenerationProgress(0);
-		isGenerationCancelledRef.current = false;
-
-		const controller = new AbortController();
-		setAbortController(controller);
-
-		// you only need all the contacts when you batch generate emails...
-		// so can you fetch them here?
-		// or completely backend? But then it's an endpoint that runs too long
-
-		const BATCH_SIZE = 5;
-		const BATCH_DELAY = 1000;
-		let successfulEmails = 0;
-
-		if (!contacts || contacts.length === 0) {
-			toast.error('No contacts available to generate emails.');
-			return;
-		}
-		try {
-			for (
-				let i = 0;
-				i < contacts.length && !isGenerationCancelledRef.current;
-				i += BATCH_SIZE
-			) {
-				if (remainingCredits <= 0) {
-					toast.error('You have run out of AI draft credits!');
-					cancelGeneration();
-					break;
-				}
-
-				const batch: Contact[] = contacts.slice(
-					i,
-					Math.min(i + BATCH_SIZE, contacts.length)
-				);
-				const availableCreditsForBatch = Math.min(batch.length, remainingCredits);
-				const batchToProcess: Contact[] = batch.slice(0, availableCreditsForBatch);
-
-				const currentBatchPromises: Promise<BatchGenerationResult>[] =
-					generateBatchPromises(batchToProcess, controller);
-
-				const batchResults = await Promise.allSettled(currentBatchPromises);
-				for (const result of batchResults) {
-					if (result.status === 'fulfilled' && result.value.success) {
-						remainingCredits--;
-						successfulEmails++;
-					} else if (result.status === 'rejected') {
-						if (result.reason?.message === 'Request cancelled.') {
-							throw result.reason;
-						}
-					}
-				}
-
-				if (i + BATCH_SIZE < contacts.length && !isGenerationCancelledRef.current) {
-					await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY));
-				}
-			}
-
-			if (user && aiDraftCredits && successfulEmails > 0) {
-				const newCreditBalance = Math.max(0, aiDraftCredits - successfulEmails);
-				editUser({
-					clerkId: user.clerkId,
-					data: { aiDraftCredits: newCreditBalance },
-				});
-			}
-
-			if (!isGenerationCancelledRef.current) {
-				if (successfulEmails === contacts.length) {
-					toast.success('All emails generated successfully!');
-				} else if (successfulEmails > 0) {
-					toast.success(
-						`Email generation completed! ${successfulEmails}/${contacts.length} emails generated successfully.`
-					);
-				} else {
-					toast.error('Email generation failed. Please try again.');
-				}
-			}
-		} catch (error) {
-			if (error instanceof Error && error.message === 'Request cancelled.') {
-				console.log('Email generation was cancelled by user');
-			} else {
-				console.error('Unexpected error during batch processing:', error);
-				toast.error('An error occurred during email generation.');
-			}
-		} finally {
-			setAbortController(null);
-		}
 	};
 
 	return {
@@ -406,14 +161,12 @@ const useAiCompose = (props: AiComposeProps) => {
 		isTest,
 		isPendingGeneration,
 		dataDraftEmail,
-		trigger,
 		handleSavePrompt,
 		isPendingSavePrompt,
 		aiDraftCredits,
 		isConfirmDialogOpen,
 		setIsConfirmDialogOpen,
 		selectedSignature,
-		isDirty,
 		generationProgress,
 		setGenerationProgress,
 		cancelGeneration,

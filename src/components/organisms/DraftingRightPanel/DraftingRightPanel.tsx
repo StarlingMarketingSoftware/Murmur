@@ -14,18 +14,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { RecipientAddressLockableInput } from '@/components/atoms/RecipientAddressLockableInput/RecipientAddressLockableInput';
+import { FormField, FormItem, FormControl } from '@/components/ui/form';
+import { useFormContext } from 'react-hook-form';
 
 export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
-	const {
-		campaign,
-		activeTab,
-		setActiveTab,
-		modeOptions,
-		toneOptions,
-		draftEmail,
-		selectedTone,
-		setSelectedTone,
-	} = useDraftingRightPanel(props);
+	const { activeTab, setActiveTab, modeOptions, toneOptions, draftEmail } =
+		useDraftingRightPanel(props);
+
+	const form = useFormContext();
 
 	return (
 		<div className="flex flex-col gap-4 mt-6 p-5">
@@ -45,25 +41,41 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 							<Typography variant="h3" bold className="text-[26px]">
 								Tone
 							</Typography>
-							<div className="grid grid-cols-2 gap-3 mt-2 w-fit">
-								{toneOptions.map((tone: ToneOption) => (
-									<div
-										key={tone.value}
-										className={twMerge(
-											'w-[194px] h-[78px] border-2 p-1 col-span-1 transition',
-											tone.value === selectedTone
-												? ' bg-gradient-to-br from-background to-primary/30 pointer-events-none border-primary'
-												: 'cursor-pointer hover:bg-primary/10 border-border'
-										)}
-										onClick={() => setSelectedTone(tone.value)}
-									>
-										<Typography variant="h4" className="text-[20px]" font="secondary">
-											{tone.label}
-										</Typography>
-										<Typography className="text-[12px]">{tone.description}</Typography>
-									</div>
-								))}
-							</div>
+							<FormField
+								control={form.control}
+								name="tone"
+								render={({ field }) => (
+									<FormItem>
+										<FormControl>
+											<div className="grid grid-cols-2 gap-3 mt-2 w-fit">
+												{toneOptions.map((tone: ToneOption) => (
+													<div
+														key={tone.value}
+														className={twMerge(
+															'w-[194px] h-[78px] border-2 p-1 col-span-1 transition',
+															tone.value === field.value
+																? ' bg-gradient-to-br from-background to-primary/30 pointer-events-none border-primary'
+																: 'cursor-pointer hover:bg-primary/10 border-border'
+														)}
+														onClick={() => field.onChange(tone.value)}
+													>
+														<Typography
+															variant="h4"
+															className="text-[20px]"
+															font="secondary"
+														>
+															{tone.label}
+														</Typography>
+														<Typography className="text-[12px]">
+															{tone.description}
+														</Typography>
+													</div>
+												))}
+											</div>
+										</FormControl>
+									</FormItem>
+								)}
+							/>
 						</div>
 						<div className="max-w-56 mx-auto mt-8">
 							<Typography variant="h3" bold className="text-[26px] mt-8">
@@ -72,7 +84,24 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 							<Typography className="text-[12px] mt-2" color="light">
 								Select the number of paragraphs you want the AI to generate in your email
 							</Typography>
-							<StepSlider className="mt-6" defaultValue={[3]} max={5} step={1} min={0} />
+							<FormField
+								control={form.control}
+								name="paragraphs"
+								render={({ field }) => (
+									<FormItem>
+										<FormControl>
+											<StepSlider
+												className="mt-6"
+												value={[field.value]}
+												onValueChange={(value) => field.onChange(value[0])}
+												max={5}
+												step={1}
+												min={0}
+											/>
+										</FormControl>
+									</FormItem>
+								)}
+							/>
 						</div>
 					</>
 				)}

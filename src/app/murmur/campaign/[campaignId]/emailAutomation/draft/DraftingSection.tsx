@@ -7,20 +7,68 @@ import { DraftingRightPanel } from '@/components/organisms/DraftingRightPanel/Dr
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
-import AiCompose from '@/components/organisms/ComposeEmailSection/aiCompose/AiCompose';
+import { Button } from '@/components/ui/button';
+import {
+	FormField,
+	FormItem,
+	FormLabel,
+	FormControl,
+	FormMessage,
+	Form,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { SaveIcon } from 'lucide-react';
+import {
+	Select,
+	SelectContent,
+	SelectGroup,
+	SelectItem,
+	SelectLabel,
+	SelectTrigger,
+	SelectValue,
+} from '@/components/ui/select';
+import { FONT_OPTIONS } from '@/constants';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { ManageSignaturesDialog } from '@/components/organisms/_dialogs/ManageSignaturesDialog/ManageSignaturesDialog';
+import { ConfirmDialog } from '@/components/organisms/_dialogs/ConfirmDialog/ConfirmDialog';
+import ProgressIndicator from '@/components/molecules/ProgressIndicator/ProgressIndicator';
+import { Signature } from '@prisma/client';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
 		draftEmails,
 		isPending,
 		campaign,
-
-		isAiDraft,
-		setIsAiDraft,
 		draftingMode,
 		setDraftingMode,
 		modeOptions,
+		handleFormAction,
+		form,
+		setIsConfirmDialogOpen,
+		cancelGeneration,
+		generationProgress,
+		setGenerationProgress,
+		contacts,
+		isConfirmDialogOpen,
+		isPendingGeneration,
+		isAiSubject,
+		isPendingSavePrompt,
+		handleSavePrompt,
+		aiDraftCredits,
+		isTest,
+		signatures,
+		isPendingSignatures,
+		isOpenSignaturesDialog,
+		setIsOpenSignaturesDialog,
 	} = useDraftingSection(props);
+
+	const {
+		trigger,
+		formState: { isDirty },
+	} = form;
 
 	if (isPending) {
 		return <Spinner />;
@@ -28,30 +76,234 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 
 	return (
 		<>
-			<div className="flex gap-4">
-				<div className="w-1/2">
-					<div className="mt-6">
-						{campaign?.contactLists.length === 0 && (
-							<Alert variant="warning">
-								<AlertCircle className="h-4 w-4" />
-								<AlertTitle>No Recipients</AlertTitle>
-								<AlertDescription>
-									You have not selected any recipients for this campaign.
-								</AlertDescription>
-							</Alert>
-						)}
-						<BlockTabs
-							options={modeOptions}
-							activeValue={draftingMode}
-							onValueChange={setDraftingMode}
-						/>
-						<AiCompose campaign={campaign} />
+			<Form {...form}>
+				<div className="flex gap-4">
+					<div className="w-1/2">
+						<div className="mt-6">
+							{campaign?.contactLists.length === 0 && (
+								<Alert variant="warning">
+									<AlertCircle className="h-4 w-4" />
+									<AlertTitle>No Recipients</AlertTitle>
+									<AlertDescription>
+										You have not selected any recipients for this campaign.
+									</AlertDescription>
+								</Alert>
+							)}
+							<BlockTabs
+								options={modeOptions}
+								activeValue={draftingMode}
+								onValueChange={setDraftingMode}
+							/>
+							<div className="m-0 grid grid-cols-12 gap-4 items-center mt-5">
+								<FormField
+									control={form.control}
+									name="subject"
+									rules={{
+										required: isAiSubject,
+									}}
+									render={({ field }) => (
+										<FormItem className="col-span-10 sm:col-span-11">
+											<div className="flex items-center gap-2">
+												<FormLabel>Subject</FormLabel>
+												<Separator orientation="vertical" className="!h-5" />
+												<Switch
+													checked={isAiSubject}
+													onCheckedChange={(val: boolean) =>
+														form.setValue('isAiSubject', val)
+													}
+													className="data-[state=checked]:bg-primary -translate-y-[2px]"
+												/>
+												<FormLabel className="">AI Subject</FormLabel>
+											</div>
+											<FormControl>
+												<Input
+													className="flex-grow"
+													placeholder={
+														isAiSubject ? 'AI-generated subject...' : 'Enter subject...'
+													}
+													disabled={isAiSubject}
+													{...field}
+												/>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+							</div>
+							<FormField
+								control={form.control}
+								name="fullAiPrompt"
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>{'AI Prompt'}</FormLabel>
+										<FormControl>
+											<Textarea
+												className="h-[530px]"
+												placeholder={
+													'Write your prompt for the AI here. For example:\n"Draft an email to schedule a meeting with the marketing team to discuss our Q2 strategy."\nBased on this prompt, the AI will generate a custom email for each recipient.'
+												}
+												{...field}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>{' '}
+							<div className="space-y-8">
+								<div className="flex flex-col sm:flex-row gap-4">
+									<FormField
+										control={form.control}
+										name="font"
+										render={({ field }) => (
+											<FormItem>
+												<FormLabel>Font</FormLabel>
+												<FormControl>
+													<Select
+														onValueChange={field.onChange}
+														defaultValue={field.value}
+													>
+														<SelectTrigger className="w-[180px]">
+															<SelectValue />
+														</SelectTrigger>
+														<SelectContent>
+															<SelectGroup>
+																<SelectLabel>Font</SelectLabel>
+																{FONT_OPTIONS.map((font) => (
+																	<SelectItem key={font} value={font}>
+																		<span style={{ fontFamily: font }}>{font}</span>
+																	</SelectItem>
+																))}
+															</SelectGroup>
+														</SelectContent>
+													</Select>
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>{' '}
+									<FormField
+										control={form.control}
+										name="signature"
+										render={({ field }) => (
+											<FormItem>
+												<FormLabel>Signature</FormLabel>
+												<FormControl>
+													<Select
+														onValueChange={(value) => {
+															if (value === 'manage-signatures') {
+																setIsOpenSignaturesDialog(true);
+																return;
+															}
+															field.onChange(parseInt(value));
+														}}
+														value={field.value?.toString()}
+													>
+														<SelectTrigger className="w-[200px]">
+															<SelectValue placeholder="Select signature" />
+														</SelectTrigger>
+														<SelectContent>
+															<SelectGroup>
+																<SelectLabel>Signatures</SelectLabel>
+																{isPendingSignatures ? (
+																	<SelectItem value="loading" disabled>
+																		Loading signatures...
+																	</SelectItem>
+																) : signatures && signatures.length > 0 ? (
+																	signatures.map((signature: Signature) => (
+																		<SelectItem
+																			key={signature.id}
+																			value={signature.id.toString()}
+																		>
+																			{signature.name}
+																		</SelectItem>
+																	))
+																) : (
+																	<SelectItem value="no-signatures" disabled>
+																		No signatures available
+																	</SelectItem>
+																)}
+																<Separator className="my-1" />{' '}
+															</SelectGroup>
+															<SelectGroup>
+																<SelectItem value="manage-signatures">
+																	Manage Signatures
+																</SelectItem>
+															</SelectGroup>
+														</SelectContent>
+													</Select>
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+								</div>
+
+								<div className="flex flex-col gap-4">
+									<Separator />
+									<div className="flex flex-col sm:flex-row gap-4">
+										<Button
+											type="button"
+											variant="secondary-light"
+											onClick={() => handleSavePrompt()}
+											isLoading={isPendingSavePrompt}
+										>
+											<SaveIcon /> Save Prompt
+										</Button>
+										<Button
+											type="button"
+											variant="primary-light"
+											onClick={async (e) => {
+												e.stopPropagation();
+												const isValid = await trigger();
+												if (!isValid) {
+													e.preventDefault(); // Prevent modal from opening
+													return;
+												}
+												setIsConfirmDialogOpen(true);
+											}}
+											isLoading={isPendingGeneration && !isTest}
+											disabled={
+												generationProgress > -1 ||
+												contacts?.length === 0 ||
+												isPendingGeneration ||
+												aiDraftCredits === 0
+											}
+										>
+											Generate Drafts
+										</Button>
+										{isDirty && <Badge variant="warning">You have unsaved changes</Badge>}
+									</div>
+								</div>
+								<ConfirmDialog
+									title="Confirm Batch Generation of Emails"
+									confirmAction={() => {
+										handleFormAction('submit');
+									}}
+									open={isConfirmDialogOpen}
+									onOpenChange={setIsConfirmDialogOpen}
+								>
+									Are you sure you want to generate emails for all selected recipients?
+									<br /> <br />
+									This action will have AI create a custom email for each recipient based
+									on the prompt you provided and will count towards your monthly usage
+									limits.
+								</ConfirmDialog>
+								<ProgressIndicator
+									progress={generationProgress}
+									setProgress={setGenerationProgress}
+									total={contacts?.length || 0}
+									pendingMessage="Generating {{progress}} emails..."
+									completeMessage="Finished generating {{progress}} emails."
+									cancelAction={cancelGeneration}
+								/>
+							</div>
+						</div>
+					</div>
+					<div className="w-1/2">
+						<DraftingRightPanel campaign={campaign} />
 					</div>
 				</div>
-				<div className="w-1/2">
-					<DraftingRightPanel campaign={campaign} />
-				</div>
-			</div>
+			</Form>
 			<Card className="relative">
 				<CardContent>
 					<EmailsTable
@@ -62,6 +314,11 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 					/>
 				</CardContent>
 			</Card>
+			<ManageSignaturesDialog
+				campaign={campaign}
+				open={isOpenSignaturesDialog}
+				onOpenChange={setIsOpenSignaturesDialog}
+			/>
 		</>
 	);
 };

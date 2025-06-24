@@ -91,7 +91,6 @@ export type DraftEmailResponse = {
 };
 
 interface DraftEmailParams {
-	model: AiModel;
 	generateSubject: boolean;
 	recipient: Contact;
 	prompt: string;
@@ -119,7 +118,7 @@ export const usePerplexityDraftEmail = () => {
 						'Content-Type': 'application/json',
 					},
 					body: JSON.stringify({
-						model: params.model,
+						model: AiModel.sonar,
 						messages: [
 							{
 								role: 'system',

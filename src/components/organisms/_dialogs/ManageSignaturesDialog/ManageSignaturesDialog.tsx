@@ -31,7 +31,6 @@ import {
 	ArrowDownNarrowWideIcon,
 	CopyXIcon,
 	SaveIcon,
-	SignatureIcon,
 	SquareCheckIcon,
 	TrashIcon,
 } from 'lucide-react';
@@ -62,16 +61,12 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 		handleSaveSignatureToCampaign,
 		handleRemoveSignatureFromCampaign,
 		campaign,
+		open,
+		onOpenChange,
 	} = useManageSignaturesDialog(props);
 
 	return (
-		<Dialog>
-			<DialogTrigger asChild>
-				<Button className="w-full sm:w-fit" variant="primary-light">
-					<SignatureIcon />
-					Manage Signatures
-				</Button>
-			</DialogTrigger>
+		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px]">
 				<DialogHeader>
 					<DialogTitle>Manage Signatures</DialogTitle>

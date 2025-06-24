@@ -38,14 +38,12 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 		handleFormAction,
 		isTest,
 		isPendingGeneration,
-		trigger,
 		handleSavePrompt,
 		isPendingSavePrompt,
 		aiDraftCredits,
 		isConfirmDialogOpen,
 		setIsConfirmDialogOpen,
 		selectedSignature,
-		isDirty,
 		generationProgress,
 		setGenerationProgress,
 		cancelGeneration,
@@ -53,176 +51,12 @@ const AiCompose: FC<AiComposeProps> = (props) => {
 		contacts,
 	} = useAiCompose(props);
 
-	return (
-		<>
-			<Form {...form}>
-				<form onSubmit={(e) => e.preventDefault()} className="space-y-8">
-					<div className="m-0 grid grid-cols-12 gap-4 items-center mt-5">
-						<FormField
-							control={form.control}
-							name="subject"
-							rules={{
-								required: isAiSubject,
-							}}
-							render={({ field }) => (
-								<FormItem className="col-span-10 sm:col-span-11">
-									<div className="flex items-center gap-2">
-										<FormLabel>Subject</FormLabel>
-										<Separator orientation="vertical" className="!h-5" />
-										<Switch
-											checked={isAiSubject}
-											onCheckedChange={setIsAiSubject}
-											className="data-[state=checked]:bg-primary -translate-y-[2px]"
-										/>
-										<FormLabel className="">AI Subject</FormLabel>
-									</div>
-									<FormControl>
-										<Input
-											className="flex-grow"
-											placeholder={
-												isAiSubject ? 'AI-generated subject...' : 'Enter subject...'
-											}
-											disabled={isAiSubject}
-											{...field}
-										/>
-									</FormControl>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
-					</div>
-					<FormField
-						control={form.control}
-						name="message"
-						render={({ field }) => (
-							<FormItem>
-								<FormLabel>{'AI Prompt'}</FormLabel>
-								<FormControl>
-									<Textarea
-										className="h-[530px]"
-										placeholder={
-											'Write your prompt for the AI here. For example:\n"Draft an email to schedule a meeting with the marketing team to discuss our Q2 strategy."\nBased on this prompt, the AI will generate a custom email for each recipient.'
-										}
-										{...field}
-									/>
-								</FormControl>
-								<FormMessage />
-							</FormItem>
-						)}
-					/>
-					<div className="flex flex-col sm:flex-row gap-4">
-						<FormField
-							control={form.control}
-							name="font"
-							render={({ field }) => (
-								<FormItem>
-									<FormLabel>Font</FormLabel>
-									<FormControl>
-										<Select onValueChange={field.onChange} defaultValue={field.value}>
-											<SelectTrigger className="w-[180px]">
-												<SelectValue />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectGroup>
-													<SelectLabel>Font</SelectLabel>
-													{FONT_OPTIONS.map((font) => (
-														<SelectItem key={font} value={font}>
-															<span style={{ fontFamily: font }}>{font}</span>
-														</SelectItem>
-													))}
-												</SelectGroup>
-											</SelectContent>
-										</Select>
-									</FormControl>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
-						<div className="flex flex-row gap-4 w-full">
-							<div className="w-full sm:w-fit">
-								<FormLabel>Signatures</FormLabel>
-								<ManageSignaturesDialog
-									campaign={campaign}
-									handleSavePrompt={() => handleSavePrompt(true)}
-								/>
-							</div>
-							<div className="w-full sm:w-fit">
-								<FormLabel>Selected Signature</FormLabel>
-								<Button
-									className="w-full max-w-[150px] truncate" // Change this line
-									variant="primary-light"
-									disabled
-								>
-									<span className="truncate">
-										{selectedSignature
-											? ellipsesText(selectedSignature.name, 15)
-											: 'No Signature Selected'}
-									</span>
-								</Button>
-							</div>
-						</div>
-					</div>
+	const {
+		trigger,
+		formState: { isDirty },
+	} = form;
 
-					<div className="flex flex-col gap-4">
-						<Separator />
-						<div className="flex flex-col sm:flex-row gap-4">
-							<Button
-								type="button"
-								onClick={async (e) => {
-									e.stopPropagation();
-									const isValid = await trigger();
-									if (!isValid) {
-										e.preventDefault(); // Prevent modal from opening
-										return;
-									}
-									setIsConfirmDialogOpen(true);
-								}}
-								isLoading={isPendingGeneration && !isTest}
-								disabled={
-									generationProgress > -1 ||
-									contacts?.length === 0 ||
-									isPendingGeneration ||
-									aiDraftCredits === 0
-								}
-							>
-								<WandSparklesIcon />
-								Generate Emails for All Recipients
-							</Button>
-							<Button
-								type="button"
-								onClick={() => handleSavePrompt(false)}
-								isLoading={isPendingSavePrompt}
-							>
-								<SaveIcon /> Save Section
-							</Button>
-							{isDirty && <Badge variant="warning">You have unsaved changes</Badge>}
-						</div>
-					</div>
-					<ConfirmDialog
-						title="Confirm Batch Generation of Emails"
-						confirmAction={() => {
-							handleFormAction('submit');
-						}}
-						open={isConfirmDialogOpen}
-						onOpenChange={setIsConfirmDialogOpen}
-					>
-						Are you sure you want to generate emails for all selected recipients?
-						<br /> <br />
-						This action will have AI create a custom email for each recipient based on the
-						prompt you provided and will count towards your monthly usage limits.
-					</ConfirmDialog>
-				</form>
-			</Form>{' '}
-			<ProgressIndicator
-				progress={generationProgress}
-				setProgress={setGenerationProgress}
-				total={contacts?.length || 0}
-				pendingMessage="Generating {{progress}} emails..."
-				completeMessage="Finished generating {{progress}} emails."
-				cancelAction={cancelGeneration}
-			/>
-		</>
-	);
+	return <></>;
 };
 
 export default AiCompose;
