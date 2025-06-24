@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { MouseEvent, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import {
@@ -10,7 +10,6 @@ import {
 } from '@/hooks/queryHooks/useSignatures';
 import { Signature } from '@prisma/client';
 import { toast } from 'sonner';
-import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { CampaignWithRelations } from '@/types';
@@ -42,14 +41,6 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 
 	const { mutate: createSignature, isPending: isPendingCreateSignature } =
 		useCreateSignature({ suppressToasts: true });
-
-	const {
-		mutateAsync: saveSignatureToCampaign,
-		isPending: isPendingSaveSignatureToCampaign,
-	} = useEditCampaign({
-		suppressToasts: true,
-		successMessage: 'Signature saved!',
-	});
 
 	const form = useForm<z.infer<typeof signatureSchema>>({
 		resolver: zodResolver(signatureSchema),
@@ -90,40 +81,6 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 
 	const queryClient = useQueryClient();
 
-	const handleSaveSignatureToCampaign = async (e: MouseEvent) => {
-		e.preventDefault();
-		if (!currentSignature) {
-			toast.error('No signature selected.');
-			return;
-		}
-		await saveSignature({
-			id: currentSignature?.id,
-			data: {
-				name: form.getValues('name'),
-				content: form.getValues('content'),
-			},
-		});
-		await saveSignatureToCampaign({
-			id: campaignId,
-			data: {
-				signatureId: currentSignature?.id,
-			},
-		});
-		toast.success('Signature saved to campaign!');
-		queryClient.invalidateQueries({ queryKey: ['campaign', Number(campaignId)] });
-	};
-
-	const handleRemoveSignatureFromCampaign = async (e: MouseEvent) => {
-		e.preventDefault();
-		await saveSignatureToCampaign({
-			id: campaignId,
-			data: {
-				signatureId: null,
-			},
-		});
-		toast.success('Signature removed from campaign!');
-		queryClient.invalidateQueries({ queryKey: ['campaign', Number(campaignId)] });
-	};
 	return {
 		signatures,
 		isPendingSignatures,
@@ -138,11 +95,7 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 		isPendingSaveSignature,
 		isPendingDeleteSignature,
 		isPendingCreateSignature,
-		saveSignatureToCampaign,
-		isPendingSaveSignatureToCampaign,
 		campaignId,
-		handleSaveSignatureToCampaign,
-		handleRemoveSignatureFromCampaign,
 		open: props.open,
 		onOpenChange: props.onOpenChange,
 		...props,

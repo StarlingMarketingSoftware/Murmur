@@ -6,7 +6,6 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-	DialogTrigger,
 } from '@/components/ui/dialog';
 import { FC } from 'react';
 import {
@@ -27,13 +26,7 @@ import { Signature } from '@prisma/client';
 import Spinner from '@/components/ui/spinner';
 import { twMerge } from 'tailwind-merge';
 import { Input } from '@/components/ui/input';
-import {
-	ArrowDownNarrowWideIcon,
-	CopyXIcon,
-	SaveIcon,
-	SquareCheckIcon,
-	TrashIcon,
-} from 'lucide-react';
+import { SaveIcon, SquareCheckIcon, TrashIcon } from 'lucide-react';
 import {
 	Select,
 	SelectContent,
@@ -57,9 +50,6 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 		isPendingSaveSignature,
 		isPendingDeleteSignature,
 		isPendingCreateSignature,
-		isPendingSaveSignatureToCampaign,
-		handleSaveSignatureToCampaign,
-		handleRemoveSignatureFromCampaign,
 		campaign,
 		open,
 		onOpenChange,
@@ -215,27 +205,6 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 										<TrashIcon />
 										Delete
 									</Button>
-
-									{campaign.signatureId === currentSignature?.id ? (
-										<Button
-											type="button"
-											variant="primary-light"
-											onClick={(e) => handleRemoveSignatureFromCampaign(e)}
-											isLoading={isPendingSaveSignatureToCampaign}
-										>
-											<CopyXIcon /> Remove Signature from Campaign
-										</Button>
-									) : (
-										<Button
-											type="button"
-											variant="primary-light"
-											onClick={(e) => handleSaveSignatureToCampaign(e)}
-											isLoading={isPendingSaveSignatureToCampaign}
-										>
-											<ArrowDownNarrowWideIcon /> Assign Signature to Campaign
-										</Button>
-									)}
-
 									<Button isLoading={isPendingSaveSignature} type="submit">
 										<SaveIcon /> Save
 									</Button>
