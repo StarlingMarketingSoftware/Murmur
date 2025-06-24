@@ -42,15 +42,15 @@ type ModeOption = {
 const FONT_VALUES: [Font, ...Font[]] = FONT_OPTIONS as [Font, ...Font[]];
 
 export const draftingFormSchema = z.object({
-	mode: z.nativeEnum(DraftingMode).default(DraftingMode.ai),
+	draftingMode: z.nativeEnum(DraftingMode).default(DraftingMode.ai),
 	isAiSubject: z.boolean().default(true),
-	subject: z.string().min(1, { message: 'Subject is required.' }),
-	fullAiPrompt: z.string().min(1, { message: 'Message is required.' }),
-	promptHybrid: z.string().min(1, { message: 'Message is required.' }),
-	promptHandwritten: z.string().min(1, { message: 'Message is required.' }),
+	subject: z.string(),
+	fullAiPrompt: z.string(),
+	hybridPrompt: z.string(),
+	handwrittenPrompt: z.string(),
 	font: z.enum(FONT_VALUES),
-	signature: z.number().min(1),
-	tone: z.nativeEnum(DraftingTone).default(DraftingTone.normal),
+	signatureId: z.number().min(1),
+	draftingTone: z.nativeEnum(DraftingTone).default(DraftingTone.normal),
 	paragraphs: z.number().min(0).max(5).default(3),
 });
 
@@ -63,43 +63,42 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const form = useForm<z.infer<typeof draftingFormSchema>>({
 		resolver: zodResolver(draftingFormSchema),
 		defaultValues: {
-			mode: DraftingMode.ai,
+			draftingMode: DraftingMode.ai,
 			isAiSubject: true,
 			subject: '',
 			fullAiPrompt: '',
-			promptHybrid: '',
-			promptHandwritten: '',
+			hybridPrompt: '',
+			handwrittenPrompt: '',
 			font: 'Arial',
-			signature: 0,
-			tone: DraftingTone.normal,
+			signatureId: 1,
+			draftingTone: DraftingTone.normal,
 			paragraphs: 3,
 		},
 		mode: 'onChange',
 	});
 
 	const isAiSubject = form.watch('isAiSubject');
+	const draftingMode = form.watch('draftingMode');
+	const { trigger, getValues, formState } = form;
 
-	const {
-		trigger,
-		getValues,
-		formState: { isDirty },
-	} = form;
+	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
 
 	useEffect(() => {
 		if (campaign) {
 			form.reset({
-				mode: campaign.draftingMode ?? DraftingMode.ai,
+				draftingMode: campaign.draftingMode ?? DraftingMode.ai,
+				isAiSubject: campaign.isAiSubject ?? true,
 				subject: campaign.subject ?? '',
 				fullAiPrompt: campaign.fullAiPrompt ?? '',
-				promptHybrid: campaign.hybridPrompt ?? '',
-				promptHandwritten: campaign.handwrittenPrompt ?? '',
+				hybridPrompt: campaign.hybridPrompt ?? '',
+				handwrittenPrompt: campaign.handwrittenPrompt ?? '',
 				font: (campaign.font as Font) ?? 'Arial',
-				signature: campaign.signatureId ?? 1,
-				tone: campaign.draftingTone ?? DraftingTone.normal,
+				signatureId: campaign.signatureId ?? (signatures?.[0]?.id || 1),
+				draftingTone: campaign.draftingTone ?? DraftingTone.normal,
 				paragraphs: campaign.paragraphs ?? 3,
 			});
 		}
-	}, [campaign, form]);
+	}, [campaign, form, signatures]);
 
 	const { data, isPending } = useGetEmails({
 		filters: {
@@ -115,8 +114,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		{ value: 'handwritten', label: 'Handwritten' },
 	];
 
-	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
-
 	const { data: contacts } = useGetContacts({
 		filters: {
 			contactListIds: campaign.contactLists.map((list) => list.id),
@@ -131,7 +128,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const aiDraftCredits = user?.aiDraftCredits;
 	const selectedSignature: Signature = signatures?.find(
-		(sig: Signature) => sig.id === form.watch('signature')
+		(sig: Signature) => sig.id === form.watch('signatureId')
 	);
 
 	const {
@@ -144,10 +141,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			suppressToasts: true,
 		});
 	const { mutate: editUser } = useEditUser({ suppressToasts: true });
-	const { isPending: isPendingSavePrompt, mutateAsync: savePrompt } = useEditCampaign();
-	const { mutateAsync: saveCampaignNoToast } = useEditCampaign({
-		suppressToasts: true,
-	});
+	const { isPending: isPendingSaveCampaign, mutateAsync: saveCampaign } =
+		useEditCampaign();
+
 	const { mutateAsync: saveTestEmail } = useEditCampaign({
 		suppressToasts: true,
 	});
@@ -250,8 +246,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					await saveTestEmail({
 						id: campaign.id,
 						data: {
+							isAiSubject: values.isAiSubject,
+							draftingMode: values.draftingMode,
+							draftingTone: values.draftingTone,
+							paragraphs: values.paragraphs,
 							subject: values.subject,
-							message: values.fullAiPrompt,
+							fullAiPrompt: values.fullAiPrompt,
 							testMessage: convertAiResponseToRichTextEmail(
 								parsedRes.message,
 								values.font,
@@ -487,23 +487,19 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			batchGenerateEmails();
 		}
 	};
-	console.log('All form values:', form.getValues());
-	const handleSavePrompt = async () => {
-		// Log all form values for debugging
 
-		savePrompt({
+	const onSubmit = async (formValues: z.infer<typeof draftingFormSchema>) => {
+		console.log('🚀 ~ useDraftingSection ~ formValues:', formValues);
+	};
+
+	const handleSavePrompt = () => {
+		if (Object.keys(formState.errors).length > 0) {
+			return;
+		}
+
+		saveCampaign({
 			id: campaign.id,
-			data: {
-				mode: getValues('mode'),
-				subject: getValues('subject'),
-				fullAiPrompt: getValues('fullAiPrompt'),
-				hybridPrompt: getValues('promptHybrid'),
-				handwrittenPrompt: getValues('promptHandwritten'),
-				font: getValues('font'),
-				signatureId: getValues('signature'),
-				draftingTone: getValues('tone'),
-				paragraphs: getValues('paragraphs'),
-			},
+			data: form.getValues(),
 		});
 	};
 
@@ -521,15 +517,17 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		contacts,
 		isConfirmDialogOpen,
 		isPendingGeneration,
-		isPendingSavePrompt,
+		isPendingSaveCampaign,
 		isAiSubject,
-		handleSavePrompt,
 		aiDraftCredits,
 		isTest,
+		handleSavePrompt,
 		signatures,
 		isPendingSignatures,
 		isOpenSignaturesDialog,
 		setIsOpenSignaturesDialog,
 		selectedSignature,
+		onSubmit,
+		draftingMode,
 	};
 };

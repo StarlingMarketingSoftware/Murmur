@@ -43,7 +43,7 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 							</Typography>
 							<FormField
 								control={form.control}
-								name="tone"
+								name="draftingTone"
 								render={({ field }) => (
 									<FormItem>
 										<FormControl>
