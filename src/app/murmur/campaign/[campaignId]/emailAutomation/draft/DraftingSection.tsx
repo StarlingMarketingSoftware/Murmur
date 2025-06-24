@@ -46,7 +46,6 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		isPending,
 		campaign,
 		modeOptions,
-		handleFormAction,
 		form,
 		setIsConfirmDialogOpen,
 		cancelGeneration,
@@ -57,7 +56,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		isPendingGeneration,
 		isAiSubject,
 		isPendingSaveCampaign,
-		onSubmit,
+		batchGenerateEmails,
 		handleSavePrompt,
 		aiDraftCredits,
 		isTest,
@@ -82,7 +81,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	return (
 		<>
 			<Form {...form}>
-				<form onSubmit={form.handleSubmit(onSubmit)}>
+				<form>
 					<div className="flex gap-4">
 						<div className="w-1/2">
 							<div className="mt-6">
@@ -293,9 +292,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									</div>
 									<ConfirmDialog
 										title="Confirm Batch Generation of Emails"
-										confirmAction={() => {
-											handleFormAction('submit');
-										}}
+										confirmAction={batchGenerateEmails}
 										open={isConfirmDialogOpen}
 										onOpenChange={setIsConfirmDialogOpen}
 									>

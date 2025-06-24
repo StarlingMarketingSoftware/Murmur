@@ -13,7 +13,6 @@ import { StepSlider } from '@/components/atoms/StepSlider/StepSlider';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
-import { RecipientAddressLockableInput } from '@/components/atoms/RecipientAddressLockableInput/RecipientAddressLockableInput';
 import { FormField, FormItem, FormControl } from '@/components/ui/form';
 import { useFormContext } from 'react-hook-form';
 

@@ -79,7 +79,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const isAiSubject = form.watch('isAiSubject');
 	const draftingMode = form.watch('draftingMode');
-	const { trigger, getValues, formState } = form;
+	const { getValues, formState } = form;
 
 	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
 
@@ -475,15 +475,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	};
 
-	const handleFormAction = async (action: 'test' | 'submit') => {
-		const isValid = await trigger();
-		if (!isValid) return;
-
-		batchGenerateEmails();
-	};
-
-	const onSubmit = async (formValues: z.infer<typeof draftingFormSchema>) => {};
-
 	const handleSavePrompt = () => {
 		if (Object.keys(formState.errors).length > 0) {
 			return;
@@ -500,7 +491,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		isPending,
 		campaign,
 		modeOptions,
-		handleFormAction,
 		form,
 		setIsConfirmDialogOpen,
 		cancelGeneration,
@@ -519,8 +509,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		isOpenSignaturesDialog,
 		setIsOpenSignaturesDialog,
 		selectedSignature,
-		onSubmit,
 		draftingMode,
 		handleTestPrompt,
+		batchGenerateEmails,
 	};
 };
