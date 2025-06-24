@@ -1,4 +1,4 @@
-import { AiModel, Contact } from '@prisma/client';
+import { Contact } from '@prisma/client';
 import { useMutation } from '@tanstack/react-query';
 
 const ROLE_PROMPT = `Write a personalized email to {first_name} who works at {company}. If there is no recipient name provided, start the email with "Hello!"
@@ -118,7 +118,7 @@ export const usePerplexityDraftEmail = () => {
 						'Content-Type': 'application/json',
 					},
 					body: JSON.stringify({
-						model: AiModel.sonar,
+						model: 'sonar',
 						messages: [
 							{
 								role: 'system',

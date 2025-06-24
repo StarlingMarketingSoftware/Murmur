@@ -2,17 +2,19 @@ import { CampaignWithRelations, OptionWithLabel, TestDraftEmail } from '@/types'
 import { DraftingTone } from '@prisma/client';
 import { useState } from 'react';
 
-export interface DraftingRightPanelProps {
-	campaign: CampaignWithRelations;
-}
 type ActiveTab = 'settings' | 'test';
 
 export interface ToneOption extends OptionWithLabel<DraftingTone> {
 	description: string;
 }
+export interface DraftingRightPanelProps {
+	campaign: CampaignWithRelations;
+	handleTestPrompt: () => Promise<void>;
+	isTest: boolean;
+}
 
 export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
-	const { campaign } = props;
+	const { campaign, handleTestPrompt, isTest } = props;
 
 	const [activeTab, setActiveTab] = useState<ActiveTab>('settings');
 
@@ -50,8 +52,8 @@ export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
 	];
 
 	const draftEmail: TestDraftEmail = {
-		subject: '',
-		message: '',
+		subject: campaign.testSubject || '',
+		message: campaign.testMessage || '',
 		contactEmail: '',
 	};
 
@@ -62,5 +64,7 @@ export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
 		modeOptions,
 		toneOptions,
 		draftEmail,
+		handleTestPrompt,
+		isTest,
 	};
 };

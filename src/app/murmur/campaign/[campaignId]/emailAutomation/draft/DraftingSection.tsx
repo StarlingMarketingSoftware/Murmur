@@ -67,6 +67,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		setIsOpenSignaturesDialog,
 		selectedSignature,
 		draftingMode,
+		handleTestPrompt,
 	} = useDraftingSection(props);
 
 	const {
@@ -99,7 +100,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									activeValue={draftingMode}
 									onValueChange={(val) => form.setValue('draftingMode', val)}
 								/>
-								<div className="m-0 grid grid-cols-12 gap-4 items-center mt-5">
+								<div className="mt-5">
 									<FormField
 										control={form.control}
 										name="subject"
@@ -107,7 +108,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 											required: isAiSubject,
 										}}
 										render={({ field }) => (
-											<FormItem className="col-span-10 sm:col-span-11">
+											<FormItem>
 												<div className="flex items-center gap-2">
 													<FormLabel>Subject</FormLabel>
 													<Separator orientation="vertical" className="!h-5" />
@@ -316,7 +317,11 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 							</div>
 						</div>
 						<div className="w-1/2">
-							<DraftingRightPanel campaign={campaign} />
+							<DraftingRightPanel
+								campaign={campaign}
+								handleTestPrompt={handleTestPrompt}
+								isTest={isTest}
+							/>
 						</div>
 					</div>
 				</form>

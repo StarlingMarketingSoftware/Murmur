@@ -18,10 +18,10 @@ import { z } from 'zod';
 
 const patchCampaignSchema = z.object({
 	name: z.string().optional(),
-	draftingMode: z.nativeEnum(DraftingMode),
-	draftingTone: z.nativeEnum(DraftingTone),
-	paragraphs: z.number().min(0).max(5),
-	isAiSubject: z.boolean(),
+	draftingMode: z.nativeEnum(DraftingMode).optional(),
+	draftingTone: z.nativeEnum(DraftingTone).optional(),
+	paragraphs: z.number().min(0).max(5).optional(),
+	isAiSubject: z.boolean().optional(),
 	subject: z.string().nullable().optional(),
 	fullAiPrompt: z.string().nullable().optional(),
 	hybridPrompt: z.string().nullable().optional(),
@@ -83,7 +83,6 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 
 		const { signatureId, identityId, contactOperation, ...updateData } =
 			validatedData.data;
-		console.log('🚀 ~ PATCH ~ signatureId:', signatureId);
 
 		const updatedCampaign = await prisma.campaign.update({
 			where: {

@@ -136,10 +136,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		isPendingDraftEmail,
 		draftEmailAsync,
 	} = usePerplexityDraftEmail();
+
 	const { mutateAsync: cleanDraftEmail, isPending: isPendingCleanDraftEmail } =
 		useMistral({
 			suppressToasts: true,
 		});
+
 	const { mutate: editUser } = useEditUser({ suppressToasts: true });
 	const { isPending: isPendingSaveCampaign, mutateAsync: saveCampaign } =
 		useEditCampaign();
@@ -216,7 +218,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	};
 
-	const generateTestDraft = async () => {
+	const handleTestPrompt = async () => {
 		const values = getValues();
 
 		setIsTest(true);
@@ -236,7 +238,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					toast.error('No contacts available to send test email.');
 					break;
 				}
-
 				const parsedRes: DraftEmailResponse = await draftEmailChain(
 					contacts[0],
 					values.fullAiPrompt
@@ -246,19 +247,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					await saveTestEmail({
 						id: campaign.id,
 						data: {
-							isAiSubject: values.isAiSubject,
-							draftingMode: values.draftingMode,
-							draftingTone: values.draftingTone,
-							paragraphs: values.paragraphs,
-							subject: values.subject,
-							fullAiPrompt: values.fullAiPrompt,
+							...form.getValues(), // save entire campaign as a checkpoint
 							testMessage: convertAiResponseToRichTextEmail(
 								parsedRes.message,
 								values.font,
 								campaign.signature
 							),
-							testSubject: isAiSubject ? parsedRes.subject : values.subject,
-							font: values.font,
 						},
 					});
 					queryClient.invalidateQueries({
@@ -272,7 +266,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				} else {
 					attempts++;
 				}
-			} catch {
+			} catch (e) {
+				if (e instanceof Error) {
+					console.error('Error generating test email:', e.message);
+				}
+
 				attempts++;
 				continue;
 			}
@@ -481,16 +479,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const isValid = await trigger();
 		if (!isValid) return;
 
-		if (action === 'test') {
-			generateTestDraft();
-		} else {
-			batchGenerateEmails();
-		}
+		batchGenerateEmails();
 	};
 
-	const onSubmit = async (formValues: z.infer<typeof draftingFormSchema>) => {
-		console.log('🚀 ~ useDraftingSection ~ formValues:', formValues);
-	};
+	const onSubmit = async (formValues: z.infer<typeof draftingFormSchema>) => {};
 
 	const handleSavePrompt = () => {
 		if (Object.keys(formState.errors).length > 0) {
@@ -529,5 +521,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		selectedSignature,
 		onSubmit,
 		draftingMode,
+		handleTestPrompt,
 	};
 };

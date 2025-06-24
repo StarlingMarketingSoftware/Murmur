@@ -18,8 +18,15 @@ import { FormField, FormItem, FormControl } from '@/components/ui/form';
 import { useFormContext } from 'react-hook-form';
 
 export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
-	const { activeTab, setActiveTab, modeOptions, toneOptions, draftEmail } =
-		useDraftingRightPanel(props);
+	const {
+		activeTab,
+		setActiveTab,
+		modeOptions,
+		toneOptions,
+		draftEmail,
+		handleTestPrompt,
+		isTest,
+	} = useDraftingRightPanel(props);
 
 	const form = useFormContext();
 
@@ -108,36 +115,36 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 				{activeTab === 'test' && (
 					<div className="grid gap-4 py-4">
 						<div className="grid gap-2">
-							<Label htmlFor="email">Recipient</Label>
-							<div className="relative">
-								<RecipientAddressLockableInput
-									email={draftEmail.contactEmail}
-									overrideTierShowEmail
-								/>
-							</div>
-						</div>
-						<div className="grid gap-2">
 							<Label htmlFor="subject">Subject</Label>
 							<Input
 								id="subject"
 								defaultValue={draftEmail.subject}
 								readOnly
+								disabled={isTest}
 								className="col-span-3 !cursor-text !pointer-events-auto"
 							/>
 						</div>
 						<div className="grid gap-2">
 							<Label htmlFor="message">Message</Label>
 							<RichTextEditor
-								className="!h-full grow max-h-[200px] overflow-y-auto"
+								className="!h-full grow overflow-y-auto"
 								isEdit={false}
 								hideMenuBar
 								value={draftEmail.message}
+								disabled={isTest}
 							/>
 						</div>
 					</div>
 				)}
 				<div className="flex justify-center mt-8">
-					<Button variant="primary-light">
+					<Button
+						isLoading={isTest}
+						variant="primary-light"
+						onClick={() => {
+							handleTestPrompt();
+							setActiveTab('test');
+						}}
+					>
 						<FlaskConicalIcon /> Test Your Prompt
 					</Button>
 				</div>
