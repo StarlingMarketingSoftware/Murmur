@@ -36,14 +36,13 @@ import { ManageSignaturesDialog } from '@/components/organisms/_dialogs/ManageSi
 import { ConfirmDialog } from '@/components/organisms/_dialogs/ConfirmDialog/ConfirmDialog';
 import ProgressIndicator from '@/components/molecules/ProgressIndicator/ProgressIndicator';
 import { Signature } from '@prisma/client';
+import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
 		draftEmails,
 		isPending,
 		campaign,
-		draftingMode,
-		setDraftingMode,
 		modeOptions,
 		handleFormAction,
 		form,
@@ -63,6 +62,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		isPendingSignatures,
 		isOpenSignaturesDialog,
 		setIsOpenSignaturesDialog,
+		selectedSignature,
 	} = useDraftingSection(props);
 
 	const {
@@ -91,8 +91,8 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 							)}
 							<BlockTabs
 								options={modeOptions}
-								activeValue={draftingMode}
-								onValueChange={setDraftingMode}
+								activeValue={form.watch('mode')}
+								onValueChange={(val) => form.setValue('mode', val)}
 							/>
 							<div className="m-0 grid grid-cols-12 gap-4 items-center mt-5">
 								<FormField
@@ -148,21 +148,21 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										<FormMessage />
 									</FormItem>
 								)}
-							/>{' '}
-							<div className="space-y-8">
-								<div className="flex flex-col sm:flex-row gap-4">
+							/>
+							<div>
+								<div className="flex flex-col sm:flex-row gap-2 w-full">
 									<FormField
 										control={form.control}
 										name="font"
 										render={({ field }) => (
-											<FormItem>
+											<FormItem className="w-full mb-2">
 												<FormLabel>Font</FormLabel>
 												<FormControl>
 													<Select
 														onValueChange={field.onChange}
 														defaultValue={field.value}
 													>
-														<SelectTrigger className="w-[180px]">
+														<SelectTrigger className="w-full">
 															<SelectValue />
 														</SelectTrigger>
 														<SelectContent>
@@ -180,12 +180,12 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 												<FormMessage />
 											</FormItem>
 										)}
-									/>{' '}
+									/>
 									<FormField
 										control={form.control}
 										name="signature"
 										render={({ field }) => (
-											<FormItem>
+											<FormItem className="w-full mb-2 relative">
 												<FormLabel>Signature</FormLabel>
 												<FormControl>
 													<Select
@@ -198,7 +198,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 														}}
 														value={field.value?.toString()}
 													>
-														<SelectTrigger className="w-[200px]">
+														<SelectTrigger className="!w-full">
 															<SelectValue placeholder="Select signature" />
 														</SelectTrigger>
 														<SelectContent>
@@ -233,13 +233,19 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 													</Select>
 												</FormControl>
 												<FormMessage />
+												<div className="w-full bg-gray-200 h-5 absolute -bottom-3" />
 											</FormItem>
 										)}
 									/>
 								</div>
+								<RichTextEditor
+									hideMenuBar
+									className="bg-gray-100 border-none h-25 min-h-0 overflow-y-auto"
+									isEdit={false}
+									value={selectedSignature?.content || ''}
+								/>
 
-								<div className="flex flex-col gap-4">
-									<Separator />
+								<div className="flex flex-col gap-4 mt-4">
 									<div className="flex flex-col sm:flex-row gap-4">
 										<Button
 											type="button"

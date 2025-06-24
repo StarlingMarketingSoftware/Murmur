@@ -10,7 +10,13 @@ import { DraftEmailResponse, usePerplexityDraftEmail } from '@/hooks/usePerplexi
 import { CampaignWithRelations, Font, TestDraftEmail } from '@/types';
 import { convertAiResponseToRichTextEmail } from '@/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Contact, DraftingMode, DraftingTone, EmailStatus } from '@prisma/client';
+import {
+	Contact,
+	DraftingMode,
+	DraftingTone,
+	EmailStatus,
+	Signature,
+} from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -103,8 +109,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const draftEmails = data?.filter((email) => email.status === EmailStatus.draft) || [];
 
-	const [draftingMode, setDraftingMode] = useState<DraftingMode>('ai');
-
 	const modeOptions: ModeOption[] = [
 		{ value: 'ai', label: 'Full AI' },
 		{ value: 'hybrid', label: 'Hybrid' },
@@ -126,7 +130,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const isGenerationCancelledRef = useRef(false);
 
 	const aiDraftCredits = user?.aiDraftCredits;
-	const selectedSignature = campaign.signature;
+	const selectedSignature: Signature = signatures?.find(
+		(sig: Signature) => sig.id === form.watch('signature')
+	);
 
 	const {
 		dataDraftEmail: rawDataDraftEmail,
@@ -481,8 +487,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			batchGenerateEmails();
 		}
 	};
-
+	console.log('All form values:', form.getValues());
 	const handleSavePrompt = async () => {
+		// Log all form values for debugging
+
 		savePrompt({
 			id: campaign.id,
 			data: {
@@ -503,8 +511,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		draftEmails,
 		isPending,
 		campaign,
-		draftingMode,
-		setDraftingMode,
 		modeOptions,
 		handleFormAction,
 		form,
@@ -524,5 +530,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		isPendingSignatures,
 		isOpenSignaturesDialog,
 		setIsOpenSignaturesDialog,
+		selectedSignature,
 	};
 };
