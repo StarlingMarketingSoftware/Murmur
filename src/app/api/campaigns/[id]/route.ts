@@ -10,7 +10,7 @@ import {
 	handleApiError,
 	connectOrDisconnectId,
 } from '@/app/api/_utils';
-import { AiModel, Status } from '@prisma/client';
+import { DraftingMode, DraftingTone, Status } from '@prisma/client';
 import { ApiRouteParams } from '@/types';
 import { NextRequest } from 'next/server';
 
@@ -18,13 +18,16 @@ import { z } from 'zod';
 
 const patchCampaignSchema = z.object({
 	name: z.string().optional(),
+	draftingMode: z.nativeEnum(DraftingMode).optional(),
+	draftingTone: z.nativeEnum(DraftingTone).optional(),
+	paragraphs: z.number().min(0).max(5).optional(),
+	isAiSubject: z.boolean().optional(),
 	subject: z.string().nullable().optional(),
-	message: z.string().nullable().optional(),
+	fullAiPrompt: z.string().nullable().optional(),
+	hybridPrompt: z.string().nullable().optional(),
+	handwrittenPrompt: z.string().nullable().optional(),
 	testSubject: z.string().nullable().optional(),
 	testMessage: z.string().nullable().optional(),
-	senderEmail: z.string().nullable().optional(),
-	senderName: z.string().nullable().optional(),
-	aiModel: z.nativeEnum(AiModel).nullable().optional(),
 	font: z.string().optional(),
 	signatureId: z.number().optional().nullable(),
 	identityId: z.number().optional().nullable(),
@@ -51,9 +54,9 @@ export async function GET(req: NextRequest, { params }: { params: ApiRouteParams
 				userId,
 			},
 			include: {
-				contacts: true,
-				emails: true,
 				signature: true,
+				contactLists: true,
+				identity: true,
 			},
 		});
 

@@ -3,9 +3,9 @@ import { Prisma } from '@prisma/client';
 // Enums
 export type CampaignWithRelations = Prisma.CampaignGetPayload<{
 	include: {
-		contacts: true;
-		emails: true;
 		signature: true;
+		contactLists: true;
+		identity: true;
 	};
 }>;
 

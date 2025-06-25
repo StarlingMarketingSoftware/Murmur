@@ -30,7 +30,7 @@ export const useSelectRecipientsDialog = (props: SelectRecipientsDialogProps) =>
 	const { subscriptionTier } = useMe();
 	const { data, isPending } = useGetContacts({
 		filters: {
-			contactListId: selectedContactList?.id,
+			contactListIds: [Number(selectedContactList?.id)],
 			verificationStatus: EmailVerificationStatus.valid,
 		},
 	});

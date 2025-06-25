@@ -46,6 +46,20 @@ enum Status {
   archived
 }
 
+enum DraftingMode {
+  ai
+  hybrid
+  handwritten
+}
+
+enum DraftingTone {
+  normal
+  explanatory
+  formal
+  concise
+  casual
+}
+
 model User {
   id             Int      @id @default(autoincrement())
   clerkId        String   @unique
@@ -139,26 +153,31 @@ model Email {
 }
 
 model Campaign {
-  id           Int           @id @default(autoincrement())
-  name         String
-  status       Status        @default(active)
-  userId       String
-  user         User          @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
-  contacts     Contact[]
-  subject      String?
-  message      String?       @db.Text
-  aiModel      AiModel?
-  font         String        @default("Times New Roman")
-  testMessage  String?       @db.Text
-  testSubject  String?
-  emails       Email[]
-  senderEmail  String?
-  senderName   String?
-  signatureId  Int?
-  signature    Signature?    @relation(fields: [signatureId], references: [id], onDelete: Cascade)
-  identityId   Int?
-  identity     Identity?     @relation(fields: [identityId], references: [id], onDelete: Cascade)
-  contactLists ContactList[]
+  id                Int           @id @default(autoincrement())
+  name              String
+  status            Status        @default(active)
+  userId            String
+  user              User          @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  contacts          Contact[]
+  draftingMode      DraftingMode  @default(ai)
+  draftingTone      DraftingTone  @default(normal)
+  paragraphs        Int?          @default(3)
+  subject           String?
+  isAiSubject       Boolean       @default(true)
+  fullAiPrompt      String?       @map("message") @db.Text
+  hybridPrompt      String?       @db.Text
+  handwrittenPrompt String?       @db.Text
+  font              String        @default("Times New Roman")
+  testMessage       String?       @db.Text
+  testSubject       String?
+  emails            Email[]
+  senderEmail       String?
+  senderName        String?
+  signatureId       Int?
+  signature         Signature?    @relation(fields: [signatureId], references: [id], onDelete: Cascade)
+  identityId        Int?
+  identity          Identity?     @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  contactLists      ContactList[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

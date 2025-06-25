@@ -4,7 +4,6 @@ import { ConfirmDialogProps, useConfirmDialog } from './useConfirmDialog';
 import {
 	Dialog,
 	DialogContent,
-	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
@@ -54,9 +53,8 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 				<DialogHeader>
 					<DialogTitle>{title}</DialogTitle>
 				</DialogHeader>
-				<DialogDescription className="text-sm text-muted-foreground">
-					{text ? text : children}
-				</DialogDescription>
+				{text ? text : children}
+
 				{confirmWithInput ? (
 					<FormProvider {...form}>
 						<form onSubmit={form.handleSubmit(onSubmit)}>

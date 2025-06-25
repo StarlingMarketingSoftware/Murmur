@@ -16,7 +16,6 @@ import { CreateIdentityPanel } from './CreateIdentityPanel/CreateIdentityPanel';
 import { twMerge } from 'tailwind-merge';
 import { Button } from '@/components/ui/button';
 import { ArrowDown, ChevronLeft } from 'lucide-react';
-import Spinner from '@/components/ui/spinner';
 
 export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 	const {
@@ -26,7 +25,6 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 		triggerButton,
 		showCreatePanel,
 		setShowCreatePanel,
-		isPendingIdentities,
 		identities,
 		form,
 		isEdit,
@@ -37,9 +35,6 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 		isPendingAssignIdentity,
 	} = useIdentityDialog(props);
 
-	if (isPendingIdentities) {
-		return <Spinner />;
-	}
 	return (
 		<Dialog
 			open={open}

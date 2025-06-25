@@ -64,6 +64,7 @@ const elementMap = {
 	inlineCode: 'code',
 	lead: 'p',
 	muted: 'p',
+	'action-link': 'span',
 } as const;
 
 interface TypographyProps
