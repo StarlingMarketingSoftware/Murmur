@@ -20,19 +20,17 @@ export const fetchMistral = async (
 	content: string
 ): Promise<string> => {
 	const agentId = MISTRAL_AGENT_IDS[agentType];
-	console.log('🚀 ~ agentId:', agentId);
-	console.log('🚀 ~ prompt:', prompt);
-
 	const apiKey = process.env.MISTRAL_API_KEY;
+
 	if (!agentId || !apiKey) {
 		throw new Error('Mistral environment variables are not set');
 	}
+
 	const mistral = new Mistral({
 		apiKey,
 	});
 
 	const userMessage = `${prompt}\n\n${content}`;
-	console.log('🚀 ~ sending to msitral agent');
 	console.log({
 		messages: [
 			{
@@ -52,7 +50,6 @@ export const fetchMistral = async (
 		],
 		agentId,
 	});
-	console.log('🚀 ~ response:', response);
 	const message = response.choices[0].message.content?.toString();
 	if (!message) {
 		throw new Error('No message content received from Mistral Agent');

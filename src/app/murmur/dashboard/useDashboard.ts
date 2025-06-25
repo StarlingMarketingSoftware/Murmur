@@ -51,7 +51,6 @@ export const useDashboard = () => {
 		});
 
 	const onSubmit = async (data: FormData) => {
-		console.log(data);
 		await refetch();
 		createContactList({
 			name: data.searchText,

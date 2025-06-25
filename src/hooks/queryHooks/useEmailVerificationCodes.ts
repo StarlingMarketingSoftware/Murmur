@@ -61,7 +61,6 @@ export const useEditEmailVerificationCode = (options: CustomMutationOptions = {}
 		mutationFn: async (data: PatchEmailVerificationCodeData) => {
 			const response = await _fetch(urls.api.emailVerificationCodes.index, 'PATCH', data);
 			if (!response.ok) {
-				console.log('response not ok');
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to update verification code');
 			}
