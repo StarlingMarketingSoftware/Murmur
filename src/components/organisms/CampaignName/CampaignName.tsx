@@ -1,11 +1,12 @@
 'use client';
 
-import PageHeading from '@/components/atoms/_text/PageHeading';
 import { FC } from 'react';
 import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { CampaignNameProps, useCampaignName } from './useCampaignName';
+import { Typography } from '@/components/ui/typography';
+import { cn } from '@/utils';
 
 export const CampaignName: FC<CampaignNameProps> = (props) => {
 	const { campaign, isPendingEditCampaign, isEdit, form, onSubmit } =
@@ -18,7 +19,6 @@ export const CampaignName: FC<CampaignNameProps> = (props) => {
 					<div className="m-0 relative mx-auto w-fit">
 						{isEdit ? (
 							<div className="mx-auto w-fit relative">
-								{' '}
 								<FormField
 									control={form.control}
 									name="name"
@@ -38,12 +38,17 @@ export const CampaignName: FC<CampaignNameProps> = (props) => {
 							</div>
 						) : (
 							<>
-								<PageHeading>{campaign.name}</PageHeading>
+								<Typography className="!text-[63px] text-center h-fit w-fit mt-[20px] mb-8">
+									{campaign.name}
+								</Typography>
 							</>
 						)}
 						<Button
 							type="submit"
-							className="absolute translate-x-full -right-3 bottom-2"
+							className={cn(
+								'absolute translate-x-full -right-3 ',
+								isEdit ? 'bottom-0' : 'bottom-5'
+							)}
 							isLoading={isPendingEditCampaign}
 							variant="action-link"
 						>
