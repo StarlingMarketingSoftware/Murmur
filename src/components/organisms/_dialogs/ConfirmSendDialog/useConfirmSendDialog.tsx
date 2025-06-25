@@ -3,7 +3,7 @@ import {
 	EmailWithRelations,
 	StripeSubscriptionStatus,
 } from '@/types';
-import { useEditCampaign, useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
+import { useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { useMe } from '@/hooks/useMe';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -59,8 +59,6 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		suppressToasts: true,
 	});
 
-	const { mutate: editCampaign } = useEditCampaign({ suppressToasts: true });
-
 	const { mutateAsync: updateEmail } = useEditEmail({
 		suppressToasts: true,
 	});
@@ -78,7 +76,6 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		if (!campaign) {
 			return null;
 		}
-		editCampaign({ id: campaign.id.toString(), data: form.getValues() });
 
 		for (const email of draftEmails) {
 			const res = await sendMailgunMessage({

@@ -4,7 +4,6 @@ import * as SliderPrimitive from '@radix-ui/react-slider';
 import { cn } from '@/utils/index';
 import { Typography } from '@/components/ui/typography';
 import { useMemo } from 'react';
-import { twMerge } from 'tailwind-merge';
 
 interface StepSliderProps extends React.ComponentProps<typeof SliderPrimitive.Root> {
 	showStepIndicators?: boolean;
