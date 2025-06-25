@@ -27,6 +27,7 @@ export const useMistral = (options: CustomMutationOptions = {}) => {
 				},
 				body: JSON.stringify(data),
 			});
+
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(

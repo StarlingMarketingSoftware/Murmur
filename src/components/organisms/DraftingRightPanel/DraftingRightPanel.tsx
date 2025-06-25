@@ -117,7 +117,7 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 							<Label htmlFor="subject">Subject</Label>
 							<Input
 								id="subject"
-								defaultValue={draftEmail.subject}
+								value={draftEmail.subject}
 								readOnly
 								disabled={isTest}
 								className="col-span-3 !cursor-text !pointer-events-auto"

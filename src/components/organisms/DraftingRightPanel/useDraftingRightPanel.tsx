@@ -1,6 +1,6 @@
 import { CampaignWithRelations, OptionWithLabel, TestDraftEmail } from '@/types';
 import { DraftingTone } from '@prisma/client';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 type ActiveTab = 'settings' | 'test';
 
@@ -51,11 +51,14 @@ export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
 		},
 	];
 
-	const draftEmail: TestDraftEmail = {
-		subject: campaign.testSubject || '',
-		message: campaign.testMessage || '',
-		contactEmail: '',
-	};
+	const draftEmail: TestDraftEmail = useMemo(
+		() => ({
+			subject: campaign.testSubject || '',
+			message: campaign.testMessage || '',
+			contactEmail: '',
+		}),
+		[campaign.testSubject, campaign.testMessage]
+	);
 
 	return {
 		campaign,

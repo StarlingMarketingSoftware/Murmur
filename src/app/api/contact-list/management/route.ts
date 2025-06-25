@@ -8,8 +8,6 @@ export const GET = async function GET() {
 		if (!userId) {
 			return apiUnauthorized();
 		}
-		console.log('🚀 ~ GET ~ userId:', userId);
-
 		const user = await prisma.user.findUnique({
 			where: { clerkId: userId },
 		});
