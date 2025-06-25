@@ -4,6 +4,7 @@ import * as SliderPrimitive from '@radix-ui/react-slider';
 import { cn } from '@/utils/index';
 import { Typography } from '@/components/ui/typography';
 import { useMemo } from 'react';
+import { twMerge } from 'tailwind-merge';
 
 interface StepSliderProps extends React.ComponentProps<typeof SliderPrimitive.Root> {
 	showStepIndicators?: boolean;
@@ -16,6 +17,7 @@ export const StepSlider = ({
 	min = 0,
 	max = 5,
 	showStepIndicators = true,
+	disabled = false,
 	...props
 }: StepSliderProps) => {
 	const _values = useMemo(
@@ -43,7 +45,7 @@ export const StepSlider = ({
 	}, [min, max, showStepIndicators]);
 
 	return (
-		<div className="relative w-full">
+		<div className={cn('relative w-full', disabled && 'opacity-50 pointer-events-none')}>
 			<SliderPrimitive.Root
 				data-slot="slider"
 				defaultValue={defaultValue}
@@ -57,11 +59,10 @@ export const StepSlider = ({
 				)}
 				{...props}
 			>
-				{' '}
 				<SliderPrimitive.Track
 					data-slot="slider-track"
 					className={cn(
-						'bg-gray-400 cursor-pointer relative grow overflow-visible data-[orientation=horizontal]:h-[2px] data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-[1px]'
+						'bg-gray-400 cursor-pointer relative grow overflow-visible data-[orientation=horizontal]:h-[2px] data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-[1px] data-[disabled]:opacity-50'
 					)}
 					style={{
 						marginLeft: '8px',
@@ -94,7 +95,7 @@ export const StepSlider = ({
 			{/* Step indicators */}
 			{showStepIndicators && (
 				<div
-					className="absolute top-0 w-full h-[2px] pointer-events-none"
+					className={cn('absolute top-0 w-full h-[2px] pointer-events-none transition')}
 					style={{ left: '8px', right: '8px', width: 'calc(100% - 16px)' }}
 				>
 					{stepPositions.map((position, index) => (
@@ -111,7 +112,7 @@ export const StepSlider = ({
 			)}{' '}
 			{/* Step labels */}
 			{showStepIndicators && (
-				<div className="flex justify-between w-full mt-2 px-0.5">
+				<div className={cn('flex justify-between w-full mt-2 px-0.5 transition')}>
 					{Array.from({ length: max - min + 1 }, (_, index) => {
 						const value = min + index;
 						return (

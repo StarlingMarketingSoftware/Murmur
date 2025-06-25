@@ -1,6 +1,9 @@
+import { draftingFormSchema } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 import { CampaignWithRelations, OptionWithLabel, TestDraftEmail } from '@/types';
-import { DraftingTone } from '@prisma/client';
+import { DraftingMode, DraftingTone } from '@prisma/client';
 import { useMemo, useState } from 'react';
+import { useFormContext } from 'react-hook-form';
+import { z } from 'zod';
 
 type ActiveTab = 'settings' | 'test';
 
@@ -11,10 +14,13 @@ export interface DraftingRightPanelProps {
 	campaign: CampaignWithRelations;
 	handleTestPrompt: () => Promise<void>;
 	isTest: boolean;
+	draftingMode: DraftingMode;
 }
 
 export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
-	const { campaign, handleTestPrompt, isTest } = props;
+	const { campaign, handleTestPrompt, isTest, draftingMode } = props;
+	const form = useFormContext<z.infer<typeof draftingFormSchema>>();
+	const areSettingsDisabled = draftingMode !== 'ai';
 
 	const [activeTab, setActiveTab] = useState<ActiveTab>('settings');
 
@@ -69,5 +75,7 @@ export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
 		draftEmail,
 		handleTestPrompt,
 		isTest,
+		form,
+		areSettingsDisabled,
 	};
 };

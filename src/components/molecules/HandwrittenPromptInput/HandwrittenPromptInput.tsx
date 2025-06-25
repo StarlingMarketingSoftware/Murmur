@@ -8,7 +8,7 @@ import {
 import { useFormContext } from 'react-hook-form';
 import RichTextEditor from '../RichTextEditor/RichTextEditor';
 
-const PLACEHOLDER_OPTIONS = [
+export const HANDWRITTEN_PLACEHOLDER_OPTIONS = [
 	{ value: 'name', label: 'Name' },
 	{ value: 'company', label: 'Company' },
 	{ value: 'firstName', label: 'First Name' },
@@ -34,7 +34,7 @@ export const HandwrittenPromptInput = () => {
 							value={field.value}
 							onChange={field.onChange}
 							showPlaceholders={true}
-							placeholderOptions={PLACEHOLDER_OPTIONS}
+							placeholderOptions={HANDWRITTEN_PLACEHOLDER_OPTIONS}
 						/>
 					</FormControl>
 					<FormMessage />

@@ -39,6 +39,7 @@ import { Signature } from '@prisma/client';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 import { HandwrittenPromptInput } from '@/components/molecules/HandwrittenPromptInput/HandwrittenPromptInput';
+import { Typography } from '@/components/ui/typography';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
@@ -56,7 +57,6 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		isPendingGeneration,
 		isAiSubject,
 		isPendingSaveCampaign,
-		batchGenerateEmails,
 		handleSavePrompt,
 		aiDraftCredits,
 		isTest,
@@ -66,11 +66,11 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		setIsOpenSignaturesDialog,
 		selectedSignature,
 		draftingMode,
-		handleTestPrompt,
+		handleGenerateTestDrafts,
+		handleGenerateDrafts,
 	} = useDraftingSection(props);
 
 	const {
-		trigger,
 		formState: { isDirty },
 	} = form;
 
@@ -112,6 +112,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 													<FormLabel>Subject</FormLabel>
 													<Separator orientation="vertical" className="!h-5" />
 													<Switch
+														disabled={draftingMode === 'handwritten'}
 														checked={isAiSubject}
 														onCheckedChange={(val: boolean) =>
 															form.setValue('isAiSubject', val)
@@ -168,6 +169,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 													<FormLabel>Font</FormLabel>
 													<FormControl>
 														<Select
+															disabled={draftingMode === 'handwritten'}
 															onValueChange={field.onChange}
 															defaultValue={field.value}
 														>
@@ -266,15 +268,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 											<Button
 												type="button"
 												variant="primary-light"
-												onClick={async (e) => {
-													e.stopPropagation();
-													const isValid = await trigger();
-													if (!isValid) {
-														e.preventDefault(); // Prevent modal from opening
-														return;
-													}
-													setIsConfirmDialogOpen(true);
-												}}
+												onClick={() => setIsConfirmDialogOpen(true)}
 												isLoading={isPendingGeneration && !isTest}
 												disabled={
 													generationProgress > -1 ||
@@ -292,15 +286,26 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									</div>
 									<ConfirmDialog
 										title="Confirm Batch Generation of Emails"
-										confirmAction={batchGenerateEmails}
+										confirmAction={handleGenerateDrafts}
 										open={isConfirmDialogOpen}
 										onOpenChange={setIsConfirmDialogOpen}
 									>
-										Are you sure you want to generate emails for all selected recipients?
-										<br /> <br />
-										This action will have AI create a custom email for each recipient
-										based on the prompt you provided and will count towards your monthly
-										usage limits.
+										{draftingMode === 'handwritten' ? (
+											<Typography>
+												Are you sure you want to generate handwritten emails for all
+												selected recipients? This action will generate a custom email for
+												each recipient based on the template you provided.{' '}
+											</Typography>
+										) : (
+											<Typography>
+												Are you sure you want to generate emails for all selected
+												recipients?
+												<br /> <br />
+												This action will have AI create a custom email for each recipient
+												based on the prompt you provided and will count towards your
+												monthly usage limits.
+											</Typography>
+										)}
 									</ConfirmDialog>
 									<ProgressIndicator
 										progress={generationProgress}
@@ -316,8 +321,9 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 						<div className="w-1/2">
 							<DraftingRightPanel
 								campaign={campaign}
-								handleTestPrompt={handleTestPrompt}
+								handleTestPrompt={handleGenerateTestDrafts}
 								isTest={isTest}
+								draftingMode={draftingMode}
 							/>
 						</div>
 					</div>

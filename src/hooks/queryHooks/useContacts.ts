@@ -1,4 +1,3 @@
-import { Contact } from '@prisma/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CustomMutationOptions } from '@/types';
 import { toast } from 'sonner';
@@ -8,6 +7,7 @@ import { PostBatchContactData } from '@/app/api/contacts/batch/route';
 import { PatchContactData } from '@/app/api/contacts/[id]/route';
 import { _fetch } from '@/utils';
 import { urls } from '@/constants/urls';
+import { ContactWithName } from '@/types/contact';
 
 const QUERY_KEYS = {
 	all: ['contacts'] as const,
@@ -25,7 +25,7 @@ interface EditContactData {
 }
 
 export const useGetContacts = (options: ContactQueryOptions) => {
-	return useQuery<Contact[]>({
+	return useQuery<ContactWithName[]>({
 		queryKey: [...QUERY_KEYS.list(), options.filters],
 		queryFn: async () => {
 			const url = appendQueryParamsToUrl(urls.api.contacts.index, options.filters);
@@ -36,7 +36,7 @@ export const useGetContacts = (options: ContactQueryOptions) => {
 				throw new Error(errorData.error || 'Failed to _fetch contacts');
 			}
 
-			return response.json() as Promise<Contact[]>;
+			return response.json() as Promise<ContactWithName[]>;
 		},
 	});
 };

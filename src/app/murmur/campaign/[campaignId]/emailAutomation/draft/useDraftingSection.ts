@@ -1,3 +1,4 @@
+import { HANDWRITTEN_PLACEHOLDER_OPTIONS } from '@/components/molecules/HandwrittenPromptInput/HandwrittenPromptInput';
 import {
 	FONT_OPTIONS,
 	getMistralParagraphPrompt,
@@ -18,12 +19,14 @@ import {
 	MistralToneAgentType,
 	TestDraftEmail,
 } from '@/types';
+import { ContactWithName } from '@/types/contact';
 import { convertAiResponseToRichTextEmail } from '@/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
 	Contact,
 	DraftingMode,
 	DraftingTone,
+	Email,
 	EmailStatus,
 	Signature,
 } from '@prisma/client';
@@ -36,6 +39,11 @@ import { z } from 'zod';
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
 }
+
+type GeneratedEmail = Pick<
+	Email,
+	'subject' | 'message' | 'campaignId' | 'status' | 'contactId'
+>;
 
 type BatchGenerationResult = {
 	contactId: number;
@@ -129,6 +137,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			contactListIds: campaign.contactLists.map((list) => list.id),
 		},
 	});
+	console.log('🚀 ~ useDraftingSection ~ contacts:', contacts);
 	const { user } = useMe();
 	const [generationProgress, setGenerationProgress] = useState(-1);
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
@@ -192,7 +201,58 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		/* eslint-disable-next-line react-hooks/exhaustive-deps */
 	}, []);
 
+	useEffect(() => {
+		if (draftingMode === DraftingMode.handwritten) {
+			form.setValue('isAiSubject', false);
+		} else {
+			form.setValue('isAiSubject', true);
+		}
+	}, [draftingMode, form]);
+
 	const queryClient = useQueryClient();
+
+	const batchGenerateHandWrittenDrafts = () => {
+		const generatedEmails: GeneratedEmail[] = [];
+
+		if (!contacts || contacts.length === 0) {
+			toast.error('No contacts available to generate emails.');
+			return generatedEmails;
+		}
+
+		contacts.forEach((contact: ContactWithName) => {
+			generatedEmails.push(generateHandwrittenDraft(contact));
+		});
+
+		createEmail(generatedEmails);
+	};
+
+	const generateHandwrittenDraft = (contact: ContactWithName): GeneratedEmail => {
+		const values = getValues();
+		let processedMessage = values.handwrittenPrompt;
+
+		HANDWRITTEN_PLACEHOLDER_OPTIONS.forEach(({ value }) => {
+			const placeholder = `{{${value}}}`;
+			let contactValue = '';
+			contactValue = contact[value as keyof Contact]?.toString() || '';
+
+			processedMessage = processedMessage.replace(
+				new RegExp(placeholder, 'g'),
+				contactValue
+			);
+		});
+
+		if (selectedSignature?.content) {
+			processedMessage += `<p></p>${selectedSignature.content}`;
+		}
+
+		return {
+			subject: values.subject,
+			message: processedMessage,
+			campaignId: campaign.id,
+			status: 'draft' as EmailStatus,
+			contactId: contact.id,
+		};
+	};
 
 	const draftEmailChain = async (
 		recipient: Contact,
@@ -252,7 +312,25 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	};
 
-	const handleTestPrompt = async () => {
+	const generateHandWrittenDraftTest = async () => {
+		setIsTest(true);
+		if (!contacts || contacts.length === 0) {
+			toast.error('No contacts available to send test email.');
+			return;
+		}
+		const draft = generateHandwrittenDraft(contacts[0]);
+		await saveTestEmail({
+			id: campaign.id,
+			data: {
+				...form.getValues(),
+				testSubject: draft.subject,
+				testMessage: draft.message,
+			},
+		});
+		setIsTest(false);
+	};
+
+	const generateFullAiDraftTest = async () => {
 		const values = getValues();
 
 		setIsTest(true);
@@ -426,17 +504,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		});
 	};
 
-	const batchGenerateEmails = async () => {
+	const batchGenerateFullAiDrafts = async () => {
 		let remainingCredits = aiDraftCredits || 0;
 		setGenerationProgress(0);
 		isGenerationCancelledRef.current = false;
 
 		const controller = new AbortController();
 		setAbortController(controller);
-
-		// you only need all the contacts when you batch generate emails...
-		// so can you fetch them here?
-		// or completely backend? But then it's an endpoint that runs too long
 
 		const BATCH_SIZE = 5;
 		const BATCH_DELAY = 1000;
@@ -527,6 +601,26 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		});
 	};
 
+	const handleGenerateTestDrafts = async () => {
+		if (draftingMode === DraftingMode.ai) {
+			generateFullAiDraftTest();
+		} else if (draftingMode === DraftingMode.handwritten) {
+			generateHandWrittenDraftTest();
+		} else if (draftingMode === DraftingMode.hybrid) {
+			console.log('Hybrid mode is not implemented yet');
+		}
+	};
+
+	const handleGenerateDrafts = async () => {
+		if (draftingMode === DraftingMode.ai) {
+			batchGenerateFullAiDrafts();
+		} else if (draftingMode === DraftingMode.handwritten) {
+			batchGenerateHandWrittenDrafts();
+		} else if (draftingMode === DraftingMode.hybrid) {
+			console.log('Hybrid mode is not implemented yet');
+		}
+	};
+
 	return {
 		draftEmails,
 		isPending,
@@ -540,18 +634,18 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		contacts,
 		isConfirmDialogOpen,
 		isPendingGeneration,
-		isPendingSaveCampaign,
 		isAiSubject,
+		isPendingSaveCampaign,
+		handleSavePrompt,
 		aiDraftCredits,
 		isTest,
-		handleSavePrompt,
 		signatures,
 		isPendingSignatures,
 		isOpenSignaturesDialog,
 		setIsOpenSignaturesDialog,
 		selectedSignature,
 		draftingMode,
-		handleTestPrompt,
-		batchGenerateEmails,
+		handleGenerateTestDrafts,
+		handleGenerateDrafts,
 	};
 };

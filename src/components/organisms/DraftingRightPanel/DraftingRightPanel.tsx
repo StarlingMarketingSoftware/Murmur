@@ -1,12 +1,7 @@
 import { FC } from 'react';
-import {
-	DraftingRightPanelProps,
-	ToneOption,
-	useDraftingRightPanel,
-} from './useDraftingRightPanel';
+import { DraftingRightPanelProps, useDraftingRightPanel } from './useDraftingRightPanel';
 import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
 import { Typography } from '@/components/ui/typography';
-import { twMerge } from 'tailwind-merge';
 import { Button } from '@/components/ui/button';
 import { FlaskConicalIcon } from 'lucide-react';
 import { StepSlider } from '@/components/atoms/StepSlider/StepSlider';
@@ -14,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { FormField, FormItem, FormControl } from '@/components/ui/form';
-import { useFormContext } from 'react-hook-form';
+import { BlockSelect } from '@/components/atoms/BlockSelect/BlockSelect';
 
 export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 	const {
@@ -25,9 +20,9 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 		draftEmail,
 		handleTestPrompt,
 		isTest,
+		areSettingsDisabled,
+		form,
 	} = useDraftingRightPanel(props);
-
-	const form = useFormContext();
 
 	return (
 		<div className="flex flex-col gap-4 mt-6 p-5">
@@ -53,31 +48,12 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 								render={({ field }) => (
 									<FormItem>
 										<FormControl>
-											<div className="grid grid-cols-2 gap-3 mt-2 w-fit">
-												{toneOptions.map((tone: ToneOption) => (
-													<div
-														key={tone.value}
-														className={twMerge(
-															'w-[194px] h-[78px] border-2 p-1 col-span-1 transition',
-															tone.value === field.value
-																? ' bg-gradient-to-br from-background to-primary/30 pointer-events-none border-primary'
-																: 'cursor-pointer hover:bg-primary/10 border-border'
-														)}
-														onClick={() => field.onChange(tone.value)}
-													>
-														<Typography
-															variant="h4"
-															className="text-[20px]"
-															font="secondary"
-														>
-															{tone.label}
-														</Typography>
-														<Typography className="text-[12px]">
-															{tone.description}
-														</Typography>
-													</div>
-												))}
-											</div>
+											<BlockSelect
+												options={toneOptions}
+												value={field.value}
+												onChange={field.onChange}
+												disabled={areSettingsDisabled}
+											/>
 										</FormControl>
 									</FormItem>
 								)}
@@ -97,6 +73,7 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 									<FormItem>
 										<FormControl>
 											<StepSlider
+												disabled={areSettingsDisabled}
 												className="mt-6"
 												value={[field.value]}
 												onValueChange={(value) => field.onChange(value[0])}
@@ -138,6 +115,7 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 				<div className="flex justify-center mt-8">
 					<Button
 						isLoading={isTest}
+						type="button"
 						variant="primary-light"
 						onClick={() => {
 							handleTestPrompt();

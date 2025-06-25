@@ -131,12 +131,7 @@ export const RichTextMenuBar: FC<RichTextMenuBarProps> = ({
 			</Select>
 			{showPlaceholders && placeholderOptions && (
 				<Select value="" onValueChange={handlePlaceholderInsert} disabled={!isEdit}>
-					<SelectTrigger
-						className="w-[150px]"
-						onMouseDown={(e) => {
-							// e.preventDefault();
-						}}
-					>
+					<SelectTrigger className="w-[150px]">
 						<SelectValue placeholder="Placeholders" />
 					</SelectTrigger>
 					<SelectContent
