@@ -137,7 +137,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			contactListIds: campaign.contactLists.map((list) => list.id),
 		},
 	});
-	console.log('🚀 ~ useDraftingSection ~ contacts:', contacts);
 	const { user } = useMe();
 	const [generationProgress, setGenerationProgress] = useState(-1);
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
@@ -274,8 +273,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			agentType: toneAgentType,
 			signal: signal,
 		});
-		console.log('🚀 ~ useDraftingSection ~ mistralResponse1:', mistralResponse1);
-
 		const mistralResponse1Parsed: DraftEmailResponse = JSON.parse(mistralResponse1);
 
 		if (!mistralResponse1Parsed.message || !mistralResponse1Parsed.subject) {
@@ -356,9 +353,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					values.draftingTone,
 					values.paragraphs
 				);
-				console.log('🚀 ~ handleTestPrompt ~ parsedRes from draftEmailChain:', parsedRes);
-				console.log('🚀 ~ handleTestPrompt ~ parsedRes.subject:', parsedRes.subject);
-
 				if (parsedRes.message && parsedRes.subject) {
 					await saveTestEmail({
 						id: campaign.id,
@@ -607,7 +601,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		} else if (draftingMode === DraftingMode.handwritten) {
 			generateHandWrittenDraftTest();
 		} else if (draftingMode === DraftingMode.hybrid) {
-			console.log('Hybrid mode is not implemented yet');
 		}
 	};
 
@@ -617,7 +610,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		} else if (draftingMode === DraftingMode.handwritten) {
 			batchGenerateHandWrittenDrafts();
 		} else if (draftingMode === DraftingMode.hybrid) {
-			console.log('Hybrid mode is not implemented yet');
 		}
 	};
 
