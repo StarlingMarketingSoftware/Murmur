@@ -76,7 +76,18 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { campaign } = props;
 	const campaignId = campaign.id;
 
+	// HOOKS
+
+	const { user } = useMe();
+	const queryClient = useQueryClient();
+
 	const [isOpenSignaturesDialog, setIsOpenSignaturesDialog] = useState(false);
+	const [generationProgress, setGenerationProgress] = useState(-1);
+	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+	const [isTest, setIsTest] = useState<boolean>(false);
+	const [abortController, setAbortController] = useState<AbortController | null>(null);
+
+	const isGenerationCancelledRef = useRef(false);
 
 	const form = useForm<z.infer<typeof draftingFormSchema>>({
 		resolver: zodResolver(draftingFormSchema),
@@ -99,24 +110,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const draftingMode = form.watch('draftingMode');
 	const { getValues, formState } = form;
 
-	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
+	// API
 
-	useEffect(() => {
-		if (campaign) {
-			form.reset({
-				draftingMode: campaign.draftingMode ?? DraftingMode.ai,
-				isAiSubject: campaign.isAiSubject ?? true,
-				subject: campaign.subject ?? '',
-				fullAiPrompt: campaign.fullAiPrompt ?? '',
-				hybridPrompt: campaign.hybridPrompt ?? '',
-				handwrittenPrompt: campaign.handwrittenPrompt ?? '',
-				font: (campaign.font as Font) ?? 'Arial',
-				signatureId: campaign.signatureId ?? (signatures?.[0]?.id || 1),
-				draftingTone: campaign.draftingTone ?? DraftingTone.normal,
-				paragraphs: campaign.paragraphs ?? 3,
-			});
-		}
-	}, [campaign, form, signatures]);
+	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
 
 	const { data, isPending } = useGetEmails({
 		filters: {
@@ -124,30 +120,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		},
 	});
 
-	const draftEmails = data?.filter((email) => email.status === EmailStatus.draft) || [];
-
-	const modeOptions: ModeOption[] = [
-		{ value: 'ai', label: 'Full AI' },
-		{ value: 'hybrid', label: 'Hybrid' },
-		{ value: 'handwritten', label: 'Handwritten' },
-	];
-
 	const { data: contacts } = useGetContacts({
 		filters: {
 			contactListIds: campaign.contactLists.map((list) => list.id),
 		},
 	});
-	const { user } = useMe();
-	const [generationProgress, setGenerationProgress] = useState(-1);
-	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
-	const [isTest, setIsTest] = useState<boolean>(false);
-	const [abortController, setAbortController] = useState<AbortController | null>(null);
-	const isGenerationCancelledRef = useRef(false);
-
-	const aiDraftCredits = user?.aiDraftCredits;
-	const selectedSignature: Signature = signatures?.find(
-		(sig: Signature) => sig.id === form.watch('signatureId')
-	);
 
 	const {
 		dataDraftEmail: rawDataDraftEmail,
@@ -161,6 +138,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		});
 
 	const { mutate: editUser } = useEditUser({ suppressToasts: true });
+
 	const { isPending: isPendingSaveCampaign, mutateAsync: saveCampaign } =
 		useEditCampaign();
 
@@ -170,6 +148,21 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { isPending: isPendingCreateEmail, mutateAsync: createEmail } = useCreateEmail({
 		suppressToasts: true,
 	});
+
+	// VARIABLES
+
+	const draftEmails = data?.filter((email) => email.status === EmailStatus.draft) || [];
+
+	const modeOptions: ModeOption[] = [
+		{ value: 'ai', label: 'Full AI' },
+		{ value: 'hybrid', label: 'Hybrid' },
+		{ value: 'handwritten', label: 'Handwritten' },
+	];
+
+	const aiDraftCredits = user?.aiDraftCredits;
+	const selectedSignature: Signature = signatures?.find(
+		(sig: Signature) => sig.id === form.watch('signatureId')
+	);
 
 	const isPendingGeneration =
 		isPendingDraftEmail || isPendingCallMistralAgent || isPendingCreateEmail;
@@ -191,25 +184,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		dataDraftEmail.message = campaign.testMessage || '';
 	}
 
-	useEffect(() => {
-		return () => {
-			if (abortController) {
-				abortController.abort();
-			}
-		};
-		/* eslint-disable-next-line react-hooks/exhaustive-deps */
-	}, []);
-
-	useEffect(() => {
-		if (draftingMode === DraftingMode.handwritten) {
-			form.setValue('isAiSubject', false);
-		} else {
-			form.setValue('isAiSubject', true);
-		}
-	}, [draftingMode, form]);
-
-	const queryClient = useQueryClient();
-
+	// FUNCTIONS
 	const batchGenerateHandWrittenDrafts = () => {
 		const generatedEmails: GeneratedEmail[] = [];
 
@@ -584,6 +559,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	};
 
+	// HANDLERS
+
 	const handleSavePrompt = () => {
 		if (Object.keys(formState.errors).length > 0) {
 			return;
@@ -612,6 +589,42 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		} else if (draftingMode === DraftingMode.hybrid) {
 		}
 	};
+
+	// EFFECTS
+
+	useEffect(() => {
+		if (campaign) {
+			form.reset({
+				draftingMode: campaign.draftingMode ?? DraftingMode.ai,
+				isAiSubject: campaign.isAiSubject ?? true,
+				subject: campaign.subject ?? '',
+				fullAiPrompt: campaign.fullAiPrompt ?? '',
+				hybridPrompt: campaign.hybridPrompt ?? '',
+				handwrittenPrompt: campaign.handwrittenPrompt ?? '',
+				font: (campaign.font as Font) ?? 'Arial',
+				signatureId: campaign.signatureId ?? (signatures?.[0]?.id || 1),
+				draftingTone: campaign.draftingTone ?? DraftingTone.normal,
+				paragraphs: campaign.paragraphs ?? 3,
+			});
+		}
+	}, [campaign, form, signatures]);
+
+	useEffect(() => {
+		return () => {
+			if (abortController) {
+				abortController.abort();
+			}
+		};
+		/* eslint-disable-next-line react-hooks/exhaustive-deps */
+	}, []);
+
+	useEffect(() => {
+		if (draftingMode === DraftingMode.handwritten) {
+			form.setValue('isAiSubject', false);
+		} else {
+			form.setValue('isAiSubject', true);
+		}
+	}, [draftingMode, form]);
 
 	return {
 		draftEmails,
