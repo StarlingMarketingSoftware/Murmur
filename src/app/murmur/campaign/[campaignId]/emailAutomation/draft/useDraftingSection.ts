@@ -28,6 +28,7 @@ import {
 	DraftingTone,
 	Email,
 	EmailStatus,
+	HybridBlock,
 	Signature,
 } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -61,27 +62,30 @@ const FONT_VALUES: [Font, ...Font[]] = FONT_OPTIONS as [Font, ...Font[]];
 
 export type HybridBlockPrompt = {
 	id: string;
-	type: 'introduction' | 'research' | 'action' | 'text';
+	type: HybridBlock;
 	value: string;
+};
+
+export type HybridBlockPrompts = {
+	availableBlocks: HybridBlock[];
+	blocks: HybridBlockPrompt[];
 };
 
 export const draftingFormSchema = z.object({
 	draftingMode: z.nativeEnum(DraftingMode).default(DraftingMode.ai),
 	isAiSubject: z.boolean().default(true),
-	subject: z.string(),
-	fullAiPrompt: z.string(),
-	hybridPrompt: z.string(),
-	hybridBlockPrompts: z.object({
-		availableBlocks: z.array(z.string()),
-		blocks: z.array(
-			z.object({
-				id: z.string(),
-				type: z.enum(['introduction', 'research', 'action', 'text']),
-				value: z.string(),
-			})
-		),
-	}),
-	handwrittenPrompt: z.string(),
+	subject: z.string().default(''),
+	fullAiPrompt: z.string().default(''),
+	hybridPrompt: z.string().default(''),
+	hybridAvailableBlocks: z.array(z.nativeEnum(HybridBlock)),
+	hybridBlockPrompts: z.array(
+		z.object({
+			id: z.string(),
+			type: z.nativeEnum(HybridBlock),
+			value: z.string(),
+		})
+	),
+	handwrittenPrompt: z.string().default(''),
 	font: z.enum(FONT_VALUES),
 	signatureId: z.number().min(1),
 	draftingTone: z.nativeEnum(DraftingTone).default(DraftingTone.normal),
@@ -115,10 +119,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			subject: '',
 			fullAiPrompt: '',
 			hybridPrompt: '',
-			hybridBlockPrompts: {
-				availableBlocks: ['introduction', 'research', 'action', 'text'],
-				blocks: [],
-			},
+			hybridAvailableBlocks: [
+				HybridBlock.introduction,
+				HybridBlock.research,
+				HybridBlock.action,
+				HybridBlock.text,
+			],
+			hybridBlockPrompts: [],
 			handwrittenPrompt: '',
 			font: 'Arial',
 			signatureId: 1,
@@ -130,7 +137,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const { fields, append, remove, move } = useFieldArray({
 		control: form.control,
-		name: 'hybridBlockPrompts.blocks',
+		name: 'hybridBlockPrompts',
 	});
 
 	const isAiSubject = form.watch('isAiSubject');
@@ -229,7 +236,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const generateHandwrittenDraft = (contact: ContactWithName): GeneratedEmail => {
 		const values = getValues();
-		let processedMessage = values.handwrittenPrompt;
+		let processedMessage = values.handwrittenPrompt || '';
 
 		HANDWRITTEN_PLACEHOLDER_OPTIONS.forEach(({ value }) => {
 			const placeholder = `{{${value}}}`;
@@ -247,7 +254,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 
 		return {
-			subject: values.subject,
+			subject: values.subject || '',
 			message: processedMessage,
 			campaignId: campaign.id,
 			status: 'draft' as EmailStatus,
@@ -627,10 +634,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				subject: campaign.subject ?? '',
 				fullAiPrompt: campaign.fullAiPrompt ?? '',
 				hybridPrompt: campaign.hybridPrompt ?? '',
-				hybridBlockPrompts: {
-					availableBlocks: ['introduction', 'research', 'action', 'text'],
-					blocks: [],
-				},
+				hybridAvailableBlocks: campaign.hybridAvailableBlocks,
+				hybridBlockPrompts: campaign.hybridBlockPrompts ?? [],
 				handwrittenPrompt: campaign.handwrittenPrompt ?? '',
 				font: (campaign.font as Font) ?? 'Arial',
 				signatureId: campaign.signatureId ?? (signatures?.[0]?.id || 1),

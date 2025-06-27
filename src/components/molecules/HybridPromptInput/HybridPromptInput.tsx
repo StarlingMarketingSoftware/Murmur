@@ -25,53 +25,43 @@ import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { HelpTooltip } from '@/components/atoms/HelpTooltip/HelpTooltip';
 import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
+import { HybridBlock } from '@prisma/client';
 
-type BlockType = 'introduction' | 'research' | 'action' | 'text';
-
-type Block = {
-	label: string;
-	value: BlockType;
-	help: string;
-	placeholder: string;
-};
-
-type HybridBlockField = {
-	id: string;
-	type: BlockType;
-	value: string;
-};
-
-const ORDERED_BLOCKS = ['introduction', 'research', 'action'] as const;
-
-const BLOCKS: Block[] = [
+const BLOCKS = [
 	{
 		label: 'Introduction',
-		value: 'introduction',
+		value: HybridBlock.introduction,
 		help: 'Optional. Write a brief prompt for the AI about how to introduce you.',
 		placeholder: 'Prompt the AI about how to introduce you...',
 	},
 	{
 		label: 'Research Contact',
-		value: 'research',
+		value: HybridBlock.research,
 		help: 'Optional. Write a brief prompt for the AI about how to write about the recipient.',
 		placeholder: 'Prompt the AI about how to write about the recipient...',
 	},
 	{
 		label: 'Call to Action',
-		value: 'action',
+		value: HybridBlock.action,
 		help: 'This is a custom text block. You can write a brief prompt for this block.',
 		placeholder: 'Prompt the AI about how to talk about the recipient...',
 	},
 	{
 		label: 'Custom Text',
-		value: 'text',
+		value: HybridBlock.text,
 		help: 'This is a custom text block. You can write a brief prompt for this block.',
 		placeholder: 'Prompt the AI about how you want the recipient to respond...',
 	},
 ];
 
+const ORDERED_BLOCKS = [
+	HybridBlock.introduction,
+	HybridBlock.research,
+	HybridBlock.action,
+] as const;
+
 interface SortableAIBlockProps {
-	block: Block;
+	block: (typeof BLOCKS)[number];
 	id: string;
 	fieldIndex: number;
 	onRemove: (id: string) => void;
@@ -115,7 +105,7 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 			<Input
 				placeholder={block.placeholder}
 				onClick={(e) => e.stopPropagation()}
-				{...form.register(`hybridBlockPrompts.blocks.${fieldIndex}.value`)}
+				{...form.register(`hybridBlockPrompts.${fieldIndex}.value`)}
 			/>
 		</div>
 	);
@@ -124,18 +114,15 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 export const HybridPromptInput = () => {
 	const form = useFormContext<DraftingFormValues>();
 	const [textBlockCount, setTextBlockCount] = useState(0);
-	const [draggableContents, setDraggableContents] = useState<string[]>(
-		BLOCKS.map((block) => block.value)
-	);
 
 	const { fields, append, remove, move } = useFieldArray({
 		control: form.control,
-		name: 'hybridBlockPrompts.blocks',
+		name: 'hybridBlockPrompts',
 	});
 
-	const findCorrectPosition = (newBlock: string, contents: HybridBlockField[]) => {
+	const findCorrectPosition = (newBlock: string, contents: { type: HybridBlock }[]) => {
 		// If it's a custom text block, the position doesn't matter
-		if (newBlock.startsWith('text-')) return contents.length;
+		if (newBlock === HybridBlock.text) return contents.length;
 
 		const orderedBlockIndex = ORDERED_BLOCKS.indexOf(
 			newBlock as (typeof ORDERED_BLOCKS)[number]
@@ -149,7 +136,7 @@ export const HybridPromptInput = () => {
 			);
 
 			// Skip custom text blocks
-			if (currentBlock === 'text') continue;
+			if (currentBlock === HybridBlock.text) continue;
 
 			// If we find a block that should come after our new block, insert before it
 			if (currentBlockIndex > orderedBlockIndex) {
@@ -167,29 +154,30 @@ export const HybridPromptInput = () => {
 
 		const isDroppableTarget =
 			over.id === 'droppable' || fields.some((field) => field.id === over.id);
-		const isDraggableSource = draggableContents.includes(active.id as string);
+		const isDraggableSource = form
+			.getValues('hybridAvailableBlocks')
+			.includes(active.id as HybridBlock);
 
 		if (isDroppableTarget && isDraggableSource) {
 			let activeId: string = active.id as string;
-			const blockType: BlockType =
-				active.id === 'text' ? 'text' : (active.id as BlockType);
+			const blockType = active.id as HybridBlock;
 
-			if (active.id === 'text') {
+			if (blockType === HybridBlock.text) {
 				activeId = `text-${textBlockCount}`;
 				setTextBlockCount(textBlockCount + 1);
 			}
 
-			if (over.id.toString().startsWith('text-') || activeId.startsWith('text-')) {
+			if (blockType === HybridBlock.text || activeId.startsWith('text-')) {
 				if (over.id === 'droppable') {
 					append({ id: activeId, type: blockType, value: '' });
 				} else {
 					const overIndex = fields.findIndex((field) => field.id === over.id);
 					const newFields = [...fields];
 					newFields.splice(overIndex, 0, { id: activeId, type: blockType, value: '' });
-					form.setValue('hybridBlockPrompts.blocks', newFields);
+					form.setValue('hybridBlockPrompts', newFields);
 				}
 			} else {
-				const correctPosition = findCorrectPosition(activeId, fields);
+				const correctPosition = findCorrectPosition(blockType, fields);
 				const attemptedPosition =
 					over.id === 'droppable'
 						? fields.length
@@ -207,8 +195,16 @@ export const HybridPromptInput = () => {
 					type: blockType,
 					value: '',
 				});
-				form.setValue('hybridBlockPrompts.blocks', newFields);
-				setDraggableContents((prev) => prev.filter((id) => id !== active.id));
+				form.setValue('hybridBlockPrompts', newFields);
+			}
+
+			// Only remove non-text blocks from available blocks
+			if (blockType !== HybridBlock.text) {
+				const currentAvailableBlocks = form.getValues('hybridAvailableBlocks');
+				const newAvailableBlocks = currentAvailableBlocks.filter(
+					(block) => block !== blockType
+				);
+				form.setValue('hybridAvailableBlocks', newAvailableBlocks);
 			}
 			return;
 		}
@@ -220,7 +216,10 @@ export const HybridPromptInput = () => {
 			const oldIndex = fields.findIndex((field) => field.id === active.id);
 			const newIndex = fields.findIndex((field) => field.id === over.id);
 
-			if (fields[oldIndex].type === 'text' || fields[newIndex].type === 'text') {
+			if (
+				fields[oldIndex].type === HybridBlock.text ||
+				fields[newIndex].type === HybridBlock.text
+			) {
 				move(oldIndex, newIndex);
 				return;
 			}
@@ -239,35 +238,30 @@ export const HybridPromptInput = () => {
 	}
 
 	const handleRemoveBlock = (id: string) => {
-		const blockIndex = fields.findIndex((field: HybridBlockField) => field.id === id);
+		const blockIndex = fields.findIndex((field) => field.id === id);
 		if (blockIndex === -1) return;
 
 		const blockType = fields[blockIndex].type;
-		// If it's not a custom text block, return it to the draggable area
-		if (!id.startsWith('text-')) {
-			setDraggableContents((prev) => [...prev, blockType]);
+		// Only add non-text blocks back to available blocks
+		if (blockType !== HybridBlock.text) {
+			const currentAvailableBlocks = form.getValues('hybridAvailableBlocks');
+			const newAvailableBlocks = [...currentAvailableBlocks, blockType];
+			form.setValue('hybridAvailableBlocks', newAvailableBlocks);
 		}
 		remove(blockIndex);
 	};
 
-	const getBlock = (value: string): Block => {
-		const baseBlock = BLOCKS.find((b) => b.value === value.split('-')[0]);
-		if (baseBlock) return baseBlock;
-
-		// For custom text blocks, create a new block with text type
-		return {
-			label: value,
-			value: 'text',
-			help: '',
-			placeholder: 'Write your custom text here...',
-		};
+	const getBlock = (value: HybridBlock): (typeof BLOCKS)[number] => {
+		const block = BLOCKS.find((b) => b.value === value);
+		if (!block) throw new Error(`Invalid block type: ${value}`);
+		return block;
 	};
 
 	return (
 		<div>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
 				<div className="flex gap-2">
-					{draggableContents.map((draggableContent) => (
+					{form.getValues('hybridAvailableBlocks').map((draggableContent) => (
 						<Draggable key={draggableContent} id={draggableContent}>
 							<Badge size="large" variant="outline">
 								{getBlock(draggableContent).label}
@@ -287,7 +281,7 @@ export const HybridPromptInput = () => {
 							items={fields.map((f) => f.id)}
 							strategy={verticalListSortingStrategy}
 						>
-							{fields.map((field: HybridBlockField, index: number) => (
+							{fields.map((field, index) => (
 								<SortableAIBlock
 									key={field.id}
 									id={field.id}
