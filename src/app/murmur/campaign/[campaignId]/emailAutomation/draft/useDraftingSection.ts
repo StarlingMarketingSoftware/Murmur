@@ -32,7 +32,7 @@ import {
 } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -59,18 +59,36 @@ type ModeOption = {
 
 const FONT_VALUES: [Font, ...Font[]] = FONT_OPTIONS as [Font, ...Font[]];
 
+export type HybridBlockPrompt = {
+	id: string;
+	type: 'introduction' | 'research' | 'action' | 'text';
+	value: string;
+};
+
 export const draftingFormSchema = z.object({
 	draftingMode: z.nativeEnum(DraftingMode).default(DraftingMode.ai),
 	isAiSubject: z.boolean().default(true),
 	subject: z.string(),
 	fullAiPrompt: z.string(),
 	hybridPrompt: z.string(),
+	hybridBlockPrompts: z.object({
+		availableBlocks: z.array(z.string()),
+		blocks: z.array(
+			z.object({
+				id: z.string(),
+				type: z.enum(['introduction', 'research', 'action', 'text']),
+				value: z.string(),
+			})
+		),
+	}),
 	handwrittenPrompt: z.string(),
 	font: z.enum(FONT_VALUES),
 	signatureId: z.number().min(1),
 	draftingTone: z.nativeEnum(DraftingTone).default(DraftingTone.normal),
 	paragraphs: z.number().min(0).max(5).default(3),
 });
+
+export type DraftingFormValues = z.infer<typeof draftingFormSchema>;
 
 export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { campaign } = props;
@@ -89,7 +107,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const isGenerationCancelledRef = useRef(false);
 
-	const form = useForm<z.infer<typeof draftingFormSchema>>({
+	const form = useForm<DraftingFormValues>({
 		resolver: zodResolver(draftingFormSchema),
 		defaultValues: {
 			draftingMode: DraftingMode.ai,
@@ -97,6 +115,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			subject: '',
 			fullAiPrompt: '',
 			hybridPrompt: '',
+			hybridBlockPrompts: {
+				availableBlocks: ['introduction', 'research', 'action', 'text'],
+				blocks: [],
+			},
 			handwrittenPrompt: '',
 			font: 'Arial',
 			signatureId: 1,
@@ -104,6 +126,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			paragraphs: 3,
 		},
 		mode: 'onChange',
+	});
+
+	const { fields, append, remove, move } = useFieldArray({
+		control: form.control,
+		name: 'hybridBlockPrompts.blocks',
 	});
 
 	const isAiSubject = form.watch('isAiSubject');
@@ -600,6 +627,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				subject: campaign.subject ?? '',
 				fullAiPrompt: campaign.fullAiPrompt ?? '',
 				hybridPrompt: campaign.hybridPrompt ?? '',
+				hybridBlockPrompts: {
+					availableBlocks: ['introduction', 'research', 'action', 'text'],
+					blocks: [],
+				},
 				handwrittenPrompt: campaign.handwrittenPrompt ?? '',
 				font: (campaign.font as Font) ?? 'Arial',
 				signatureId: campaign.signatureId ?? (signatures?.[0]?.id || 1),
@@ -652,5 +683,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		draftingMode,
 		handleGenerateTestDrafts,
 		handleGenerateDrafts,
+		hybridFields: fields,
+		hybridAppend: append,
+		hybridRemove: remove,
+		hybridMove: move,
 	};
 };

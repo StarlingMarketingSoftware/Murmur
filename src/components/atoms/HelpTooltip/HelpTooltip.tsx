@@ -17,6 +17,7 @@ export const HelpTooltip: FC<HelpTooltipProps> = ({
 		<Tooltip>
 			<TooltipTrigger className={className}>
 				<HelpCircle
+					onClick={(e) => e.stopPropagation()}
 					className={`h-4 w-4 text-muted-foreground hover:text-foreground transition-colors ${iconClassName}`}
 				/>
 			</TooltipTrigger>

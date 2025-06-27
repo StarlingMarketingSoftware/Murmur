@@ -6,7 +6,7 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
-import { useFormContext } from 'react-hook-form';
+import { useFormContext, useFieldArray } from 'react-hook-form';
 import { DndContext, DragEndEvent, closestCenter } from '@dnd-kit/core';
 import { useState } from 'react';
 import { Draggable } from '../DragAndDrop/Draggable';
@@ -16,7 +16,6 @@ import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
 import {
 	SortableContext,
-	arrayMove,
 	useSortable,
 	verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
@@ -25,14 +24,21 @@ import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { HelpTooltip } from '@/components/atoms/HelpTooltip/HelpTooltip';
+import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 
-type AiBlockValues = 'introduction' | 'research' | 'action' | 'text';
+type BlockType = 'introduction' | 'research' | 'action' | 'text';
 
 type Block = {
 	label: string;
-	value: AiBlockValues;
+	value: BlockType;
 	help: string;
 	placeholder: string;
+};
+
+type HybridBlockField = {
+	id: string;
+	type: BlockType;
+	value: string;
 };
 
 const ORDERED_BLOCKS = ['introduction', 'research', 'action'] as const;
@@ -67,12 +73,14 @@ const BLOCKS: Block[] = [
 interface SortableAIBlockProps {
 	block: Block;
 	id: string;
+	fieldIndex: number;
 	onRemove: (id: string) => void;
 }
 
-const SortableAIBlock = ({ block, id, onRemove }: SortableAIBlockProps) => {
+const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockProps) => {
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
 		useSortable({ id });
+	const form = useFormContext<DraftingFormValues>();
 
 	const style = {
 		transform: CSS.Transform.toString(transform),
@@ -104,28 +112,28 @@ const SortableAIBlock = ({ block, id, onRemove }: SortableAIBlockProps) => {
 				<Typography variant="h4">{block.label}</Typography>
 				<HelpTooltip content={block.help} />
 			</div>
-			{block.label === 'Custom Text' ? (
-				<>
-					<Input placeholder={block.placeholder} onClick={(e) => e.stopPropagation()} />
-				</>
-			) : (
-				<>
-					<Input placeholder={block.placeholder} onClick={(e) => e.stopPropagation()} />
-				</>
-			)}
+			<Input
+				placeholder={block.placeholder}
+				onClick={(e) => e.stopPropagation()}
+				{...form.register(`hybridBlockPrompts.blocks.${fieldIndex}.value`)}
+			/>
 		</div>
 	);
 };
 
 export const HybridPromptInput = () => {
+	const form = useFormContext<DraftingFormValues>();
+	const [textBlockCount, setTextBlockCount] = useState(0);
 	const [draggableContents, setDraggableContents] = useState<string[]>(
 		BLOCKS.map((block) => block.value)
 	);
-	const [droppableContents, setDroppableContents] = useState<string[]>([]);
-	const [textBlockCount, setTextBlockCount] = useState(0);
-	const form = useFormContext();
 
-	const findCorrectPosition = (newBlock: string, contents: string[]): number => {
+	const { fields, append, remove, move } = useFieldArray({
+		control: form.control,
+		name: 'hybridBlockPrompts.blocks',
+	});
+
+	const findCorrectPosition = (newBlock: string, contents: HybridBlockField[]) => {
 		// If it's a custom text block, the position doesn't matter
 		if (newBlock.startsWith('text-')) return contents.length;
 
@@ -135,7 +143,7 @@ export const HybridPromptInput = () => {
 
 		// Find the first block that should come after our new block
 		for (let i = 0; i < contents.length; i++) {
-			const currentBlock = contents[i].split('-')[0];
+			const currentBlock = contents[i].type;
 			const currentBlockIndex = ORDERED_BLOCKS.indexOf(
 				currentBlock as (typeof ORDERED_BLOCKS)[number]
 			);
@@ -155,49 +163,37 @@ export const HybridPromptInput = () => {
 
 	function handleDragEnd(event: DragEndEvent) {
 		const { over, active } = event;
-		console.log('🚀 ', over, active);
 		if (!over) return;
 
-		// If we're dropping onto a sortable item and the source is from draggable area,
-		// we should treat it as dropping into the droppable container
 		const isDroppableTarget =
-			over.id === 'droppable' || droppableContents.includes(over.id as string);
+			over.id === 'droppable' || fields.some((field) => field.id === over.id);
 		const isDraggableSource = draggableContents.includes(active.id as string);
 
-		// Handle dropping from draggable area to droppable area
 		if (isDroppableTarget && isDraggableSource) {
 			let activeId: string = active.id as string;
+			const blockType: BlockType =
+				active.id === 'text' ? 'text' : (active.id as BlockType);
 
 			if (active.id === 'text') {
 				activeId = `text-${textBlockCount}`;
 				setTextBlockCount(textBlockCount + 1);
 			}
 
-			console.log(
-				'🚀 ',
-				over.id.toString().startsWith('text-'),
-				activeId.startsWith('text-')
-			);
-
-			// If it's a custom text block, place it where the user dropped it
 			if (over.id.toString().startsWith('text-') || activeId.startsWith('text-')) {
 				if (over.id === 'droppable') {
-					setDroppableContents((prev) => [...prev, activeId]);
+					append({ id: activeId, type: blockType, value: '' });
 				} else {
-					const overIndex = droppableContents.indexOf(over.id as string);
-					setDroppableContents((prev) => [
-						...prev.slice(0, overIndex),
-						activeId,
-						...prev.slice(overIndex),
-					]);
+					const overIndex = fields.findIndex((field) => field.id === over.id);
+					const newFields = [...fields];
+					newFields.splice(overIndex, 0, { id: activeId, type: blockType, value: '' });
+					form.setValue('hybridBlockPrompts.blocks', newFields);
 				}
 			} else {
-				// For ordered blocks, find the correct position and show toast if user attempted wrong order
-				const correctPosition = findCorrectPosition(activeId, droppableContents);
+				const correctPosition = findCorrectPosition(activeId, fields);
 				const attemptedPosition =
 					over.id === 'droppable'
-						? droppableContents.length
-						: droppableContents.indexOf(over.id as string);
+						? fields.length
+						: fields.findIndex((field) => field.id === over.id);
 
 				if (attemptedPosition !== correctPosition) {
 					toast.error(
@@ -205,71 +201,66 @@ export const HybridPromptInput = () => {
 					);
 				}
 
-				setDroppableContents((prev) => [
-					...prev.slice(0, correctPosition),
-					activeId,
-					...prev.slice(correctPosition),
-				]);
+				const newFields = [...fields];
+				newFields.splice(correctPosition, 0, {
+					id: activeId,
+					type: blockType,
+					value: '',
+				});
+				form.setValue('hybridBlockPrompts.blocks', newFields);
 				setDraggableContents((prev) => prev.filter((id) => id !== active.id));
 			}
 			return;
 		}
 
-		// Handle sorting within droppable area
 		if (
-			droppableContents.includes(active.id as string) &&
-			droppableContents.includes(over.id as string)
+			fields.some((field) => field.id === active.id) &&
+			fields.some((field) => field.id === over.id)
 		) {
-			const oldIndex = droppableContents.indexOf(active.id as string);
-			const newIndex = droppableContents.indexOf(over.id as string);
+			const oldIndex = fields.findIndex((field) => field.id === active.id);
+			const newIndex = fields.findIndex((field) => field.id === over.id);
 
-			// If it's a custom text block, allow the move as is
-			if (
-				over.id.toString().startsWith('text-') ||
-				active.id.toString().startsWith('text-')
-			) {
-				setDroppableContents(arrayMove(droppableContents, oldIndex, newIndex));
+			if (fields[oldIndex].type === 'text' || fields[newIndex].type === 'text') {
+				move(oldIndex, newIndex);
 				return;
 			}
 
-			// For ordered blocks, find the correct position
-			const tempContents = droppableContents.filter((id) => id !== active.id);
-			const correctPosition = findCorrectPosition(active.id as string, tempContents);
+			const tempFields = fields.filter((_, index) => index !== oldIndex);
+			const correctPosition = findCorrectPosition(fields[oldIndex].type, tempFields);
 
-			// If the user tried to place it somewhere else, show the toast
 			if (newIndex !== correctPosition) {
 				toast.error(
 					'Blocks must be in order: Introduction → Research Contact → Call to Action. Custom Text blocks can be placed anywhere.'
 				);
 			}
 
-			// Move to the correct position
-			const newItems = [...droppableContents];
-			newItems.splice(oldIndex, 1); // Remove from old position
-			newItems.splice(correctPosition, 0, active.id as string); // Insert at correct position
-			setDroppableContents(newItems);
+			move(oldIndex, correctPosition);
 		}
 	}
 
 	const handleRemoveBlock = (id: string) => {
+		const blockIndex = fields.findIndex((field: HybridBlockField) => field.id === id);
+		if (blockIndex === -1) return;
+
+		const blockType = fields[blockIndex].type;
 		// If it's not a custom text block, return it to the draggable area
 		if (!id.startsWith('text-')) {
-			setDraggableContents((prev) => [...prev, id]);
+			setDraggableContents((prev) => [...prev, blockType]);
 		}
-		// Remove from droppable area
-		setDroppableContents((prev) => prev.filter((blockId) => blockId !== id));
+		remove(blockIndex);
 	};
 
 	const getBlock = (value: string): Block => {
 		const baseBlock = BLOCKS.find((b) => b.value === value.split('-')[0]);
-		return (
-			baseBlock || {
-				label: value,
-				value: value as AiBlockValues,
-				help: '',
-				placeholder: 'Write your custom text here...',
-			}
-		);
+		if (baseBlock) return baseBlock;
+
+		// For custom text blocks, create a new block with text type
+		return {
+			label: value,
+			value: 'text',
+			help: '',
+			placeholder: 'Write your custom text here...',
+		};
 	};
 
 	return (
@@ -287,20 +278,21 @@ export const HybridPromptInput = () => {
 
 				<Droppable id="droppable">
 					<div className="min-h-[500px] mt-3 border-2 border-dashed border-gray-300 rounded-xl p-3 bg-gray-50 flex flex-col gap-3 items-start transition w-full">
-						{droppableContents.length === 0 && (
+						{fields.length === 0 && (
 							<Typography font="secondary" className="text-lg text-gray-400 italic">
 								Drag blocks here to build your prompt…
 							</Typography>
 						)}
 						<SortableContext
-							items={droppableContents}
+							items={fields.map((f) => f.id)}
 							strategy={verticalListSortingStrategy}
 						>
-							{droppableContents.map((droppableContent: string) => (
+							{fields.map((field: HybridBlockField, index: number) => (
 								<SortableAIBlock
-									key={droppableContent}
-									id={droppableContent}
-									block={getBlock(droppableContent)}
+									key={field.id}
+									id={field.id}
+									fieldIndex={index}
+									block={getBlock(field.type)}
 									onRemove={handleRemoveBlock}
 								/>
 							))}
