@@ -37,13 +37,3 @@ export const Draggable: FC<DraggableProps> = ({ children, id }) => {
 		</div>
 	);
 };
-
-/*
-
-The useDraggable hook isn't opinionated about how your app should be structured. It does however require you to be able to attach listeners and a ref to the DOM element that you would like to become draggable. You'll also need to provide a unique id attribute to all your draggable components. 
-
-After a draggable item is picked up, the transform property will be populated with the translate coordinates you'll need to move the item on the screen.  
-
-The transform object adheres to the following shape: {x: number, y: number, scaleX: number, scaleY: number}
-
-*/

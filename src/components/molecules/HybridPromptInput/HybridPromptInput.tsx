@@ -31,7 +31,7 @@ const BLOCKS = [
 	{
 		label: 'Introduction',
 		value: HybridBlock.introduction,
-		help: 'Optional. Write a brief prompt for the AI about how to introduce you.',
+		help: 'Optional. Write a brief prompt for the AI about how to introduce you. This will include the greeting line and the first paragraph of the email.',
 		placeholder: 'Prompt the AI about how to introduce you...',
 	},
 	{
@@ -43,14 +43,14 @@ const BLOCKS = [
 	{
 		label: 'Call to Action',
 		value: HybridBlock.action,
-		help: 'This is a custom text block. You can write a brief prompt for this block.',
-		placeholder: 'Prompt the AI about how to talk about the recipient...',
+		help: 'Optional. Write a brief prompt for the AI about how you want the recipient to respond (email, phone call, etc.)',
+		placeholder: 'Prompt the AI about how you want the recipient to respond...',
 	},
 	{
 		label: 'Custom Text',
 		value: HybridBlock.text,
-		help: 'This is a custom text block. You can write a brief prompt for this block.',
-		placeholder: 'Prompt the AI about how you want the recipient to respond...',
+		help: 'This is a custom text block. Here you should write exact text that you want included in your email.',
+		placeholder: 'Write the exact text you want included in your email...',
 	},
 ];
 
@@ -148,7 +148,7 @@ export const HybridPromptInput = () => {
 		return contents.length;
 	};
 
-	function handleDragEnd(event: DragEndEvent) {
+	const handleDragEnd = (event: DragEndEvent) => {
 		const { over, active } = event;
 		if (!over) return;
 
@@ -235,7 +235,7 @@ export const HybridPromptInput = () => {
 
 			move(oldIndex, correctPosition);
 		}
-	}
+	};
 
 	const handleRemoveBlock = (id: string) => {
 		const blockIndex = fields.findIndex((field) => field.id === id);
