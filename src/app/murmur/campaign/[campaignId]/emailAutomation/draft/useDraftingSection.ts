@@ -11,7 +11,12 @@ import { useGetSignatures } from '@/hooks/queryHooks/useSignatures';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { useMe } from '@/hooks/useMe';
 import { useMistral } from '@/hooks/useMistral';
-import { DraftEmailResponse, usePerplexityDraftEmail } from '@/hooks/usePerplexity';
+import { DraftEmailResponse, usePerplexity } from '@/hooks/usePerplexity';
+import {
+	getMistralHybridPrompt,
+	PERPLEXITY_FULL_AI_PROMPT,
+	PERPLEXITY_HYBRID_PROMPT,
+} from '@/constants/ai';
 import {
 	CampaignWithRelations,
 	Font,
@@ -20,7 +25,12 @@ import {
 	TestDraftEmail,
 } from '@/types';
 import { ContactWithName } from '@/types/contact';
-import { convertAiResponseToRichTextEmail } from '@/utils';
+import {
+	convertAiResponseToRichTextEmail,
+	generateEmailTemplateFromBlocks,
+	generatePromptsFromBlocks,
+	stringifyJsonSubset,
+} from '@/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
 	Contact,
@@ -29,6 +39,7 @@ import {
 	Email,
 	EmailStatus,
 	HybridBlock,
+	Identity,
 	Signature,
 } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -161,10 +172,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	});
 
 	const {
-		dataDraftEmail: rawDataDraftEmail,
-		isPendingDraftEmail,
-		draftEmailAsync,
-	} = usePerplexityDraftEmail();
+		data: dataPerplexity,
+		isPending: isPendingCallPerplexity,
+		mutateAsync: callPerplexity,
+	} = usePerplexity();
 
 	const { mutateAsync: callMistralAgent, isPending: isPendingCallMistralAgent } =
 		useMistral({
@@ -199,7 +210,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	);
 
 	const isPendingGeneration =
-		isPendingDraftEmail || isPendingCallMistralAgent || isPendingCreateEmail;
+		isPendingCallPerplexity || isPendingCallMistralAgent || isPendingCreateEmail;
 
 	let dataDraftEmail: TestDraftEmail = {
 		subject: '',
@@ -207,7 +218,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		contactEmail: contacts ? contacts[0].email : '',
 	};
 
-	if (!rawDataDraftEmail && campaign.testMessage && campaign.testMessage.length > 0) {
+	if (!dataPerplexity && campaign.testMessage && campaign.testMessage.length > 0) {
 		dataDraftEmail = {
 			subject: campaign.testSubject || '',
 			message: campaign.testMessage,
@@ -262,17 +273,35 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		};
 	};
 
-	const draftEmailChain = async (
+	const draftFullAiEmail = async (
 		recipient: Contact,
-		message: string,
+		prompt: string,
 		toneAgentType: MistralToneAgentType,
 		paragraphs: number,
 		signal?: AbortSignal
 	): Promise<DraftEmailResponse> => {
-		const perplexityResponse: string = await draftEmailAsync({
-			generateSubject: isAiSubject,
-			recipient,
-			prompt: message,
+		if (!campaign.identity) {
+			toast.error('Campaign identity is required');
+			throw new Error('Campaign identity is required');
+		}
+
+		const perplexityResponse: string = await callPerplexity({
+			model: 'sonar',
+			rolePrompt: PERPLEXITY_FULL_AI_PROMPT,
+			userPrompt: `Recipient: ${stringifyJsonSubset<Contact>(recipient, [
+				'firstName',
+				'lastName',
+				'company',
+				'address',
+				'city',
+				'state',
+				'country',
+				'website',
+				'phone',
+			])}\n\n Sender: ${stringifyJsonSubset<Identity>(campaign.identity, [
+				'name',
+				'website',
+			])}\n\n Prompt: ${prompt}`,
 			signal: signal,
 		});
 
@@ -309,6 +338,69 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		return finalSubjectAndMessage;
 	};
 
+	const draftHybridEmail = async (
+		recipient: Contact,
+		hybridPrompt: string,
+		hybridBlocks: HybridBlockPrompt[],
+		signal?: AbortSignal
+	): Promise<DraftEmailResponse> => {
+		const stringifiedRecipient = stringifyJsonSubset<Contact>(recipient, [
+			'firstName',
+			'lastName',
+			'company',
+			'address',
+			'city',
+			'state',
+			'country',
+			'website',
+			'phone',
+		]);
+
+		if (!campaign.identity) {
+			toast.error('Campaign identity is required');
+			throw new Error('Campaign identity is required');
+		}
+		const stringifiedSender = stringifyJsonSubset<Identity>(campaign.identity, [
+			'name',
+			'website',
+		]);
+		const stringifiedHybridBlocks = generateEmailTemplateFromBlocks(hybridBlocks);
+
+		const perplexityPrompt = `**RECIPIENT**\n${stringifiedRecipient}\n\n**SENDER**\n${stringifiedSender}\n\n**PROMPT**\n${hybridPrompt}\n\n**EMAIL TEMPLATE**\n${stringifiedHybridBlocks}\n\n**PROMPTS**\n${generatePromptsFromBlocks(
+			hybridBlocks
+		)}`;
+
+		const perplexityResponse: string = await callPerplexity({
+			model: 'sonar',
+			rolePrompt: PERPLEXITY_HYBRID_PROMPT,
+			userPrompt: perplexityPrompt,
+			signal: signal,
+		});
+
+		const mistralResponse = await callMistralAgent({
+			prompt: getMistralHybridPrompt(
+				stringifiedHybridBlocks,
+				generatePromptsFromBlocks(hybridBlocks)
+			),
+			content: perplexityResponse,
+			agentType: 'hybrid',
+			signal: signal,
+		});
+
+		const mistralResponseParsed: DraftEmailResponse = JSON.parse(mistralResponse);
+
+		if (!mistralResponseParsed.message || !mistralResponseParsed.subject) {
+			throw new Error('No message or subject generated by Mistral Agent');
+		}
+
+		const finalSubjectAndMessage: DraftEmailResponse = {
+			subject: mistralResponseParsed.subject,
+			message: mistralResponseParsed.message,
+		};
+
+		return finalSubjectAndMessage;
+	};
+
 	const cancelGeneration = () => {
 		isGenerationCancelledRef.current = true;
 		setGenerationProgress(-1);
@@ -336,7 +428,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		setIsTest(false);
 	};
 
-	const generateFullAiDraftTest = async () => {
+	const generateAiDraftTest = async () => {
 		const values = getValues();
 
 		setIsTest(true);
@@ -356,12 +448,26 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					toast.error('No contacts available to send test email.');
 					break;
 				}
-				const parsedRes: DraftEmailResponse = await draftEmailChain(
-					contacts[0],
-					values.fullAiPrompt,
-					values.draftingTone,
-					values.paragraphs
-				);
+
+				let parsedRes: DraftEmailResponse;
+
+				if (values.draftingMode === DraftingMode.ai) {
+					parsedRes = await draftFullAiEmail(
+						contacts[0],
+						values.fullAiPrompt,
+						values.draftingTone,
+						values.paragraphs
+					);
+				} else if (values.draftingMode === DraftingMode.hybrid) {
+					parsedRes = await draftHybridEmail(
+						contacts[0],
+						values.hybridPrompt,
+						values.hybridBlockPrompts
+					);
+				} else {
+					throw new Error('Invalid drafting mode');
+				}
+
 				if (parsedRes.message && parsedRes.subject) {
 					await saveTestEmail({
 						id: campaign.id,
@@ -428,13 +534,23 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 						await new Promise((resolve) => setTimeout(resolve, delay));
 					}
 
-					const parsedDraft = await draftEmailChain(
-						recipient,
-						values.fullAiPrompt,
-						values.draftingTone,
-						values.paragraphs,
-						controller.signal
-					);
+					let parsedDraft;
+
+					if (values.draftingMode === DraftingMode.ai) {
+						parsedDraft = await draftFullAiEmail(
+							recipient,
+							values.fullAiPrompt,
+							values.draftingTone,
+							values.paragraphs,
+							controller.signal
+						);
+					} else if (values.draftingMode === DraftingMode.hybrid) {
+						parsedDraft = await draftHybridEmail(
+							recipient,
+							values.hybridPrompt,
+							values.hybridBlockPrompts
+						);
+					}
 
 					if (parsedDraft) {
 						if (!isAiSubject) {
@@ -607,20 +723,18 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	};
 
 	const handleGenerateTestDrafts = async () => {
-		if (draftingMode === DraftingMode.ai) {
-			generateFullAiDraftTest();
+		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
+			generateAiDraftTest();
 		} else if (draftingMode === DraftingMode.handwritten) {
 			generateHandWrittenDraftTest();
-		} else if (draftingMode === DraftingMode.hybrid) {
 		}
 	};
 
 	const handleGenerateDrafts = async () => {
-		if (draftingMode === DraftingMode.ai) {
+		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
 			batchGenerateFullAiDrafts();
 		} else if (draftingMode === DraftingMode.handwritten) {
 			batchGenerateHandWrittenDrafts();
-		} else if (draftingMode === DraftingMode.hybrid) {
 		}
 	};
 
@@ -635,7 +749,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				fullAiPrompt: campaign.fullAiPrompt ?? '',
 				hybridPrompt: campaign.hybridPrompt ?? '',
 				hybridAvailableBlocks: campaign.hybridAvailableBlocks,
-				hybridBlockPrompts: campaign.hybridBlockPrompts ?? [],
+				hybridBlockPrompts: campaign.hybridBlockPrompts as HybridBlockPrompt[],
 				handwrittenPrompt: campaign.handwrittenPrompt ?? '',
 				font: (campaign.font as Font) ?? 'Arial',
 				signatureId: campaign.signatureId ?? (signatures?.[0]?.id || 1),

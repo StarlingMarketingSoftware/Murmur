@@ -12,6 +12,7 @@ const MISTRAL_AGENT_IDS = {
 	paragraph3: process.env.MISTRAL_PARAGRAPH_3_AGENT_ID,
 	paragraph4: process.env.MISTRAL_PARAGRAPH_4_AGENT_ID,
 	paragraph5: process.env.MISTRAL_PARAGRAPH_5_AGENT_ID,
+	hybrid: process.env.MISTRAL_HYBRID_AGENT_ID,
 } as const;
 
 export const fetchMistral = async (
