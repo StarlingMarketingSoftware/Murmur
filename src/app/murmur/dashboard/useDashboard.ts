@@ -43,7 +43,6 @@ export const useDashboard = () => {
 		},
 		enabled: false,
 	});
-	console.log('🚀 ~ useDashboard ~ contacts:', contacts);
 
 	const {
 		data: apolloContacts,
