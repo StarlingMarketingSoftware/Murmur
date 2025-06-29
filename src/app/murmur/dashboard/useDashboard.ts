@@ -5,11 +5,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useGetApollo } from '@/hooks/queryHooks/useApollo';
 import { useCreateContactList } from '@/hooks/queryHooks/useContactLists';
-import { ContactList } from '@prisma/client';
+import { ContactList, EmailVerificationStatus } from '@prisma/client';
 import { useState } from 'react';
 import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
+import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -35,6 +36,21 @@ export const useDashboard = () => {
 		isLoading: isLoadingContacts,
 		error,
 		refetch,
+	} = useGetContacts({
+		filters: {
+			query: searchText,
+			verificationStatus: EmailVerificationStatus.valid,
+		},
+		enabled: false,
+	});
+	console.log('🚀 ~ useDashboard ~ contacts:', contacts);
+
+	const {
+		data: apolloContacts,
+		isPending: isPendingApolloContacts,
+		isLoading: isLoadingApolloContacts,
+		error: apolloError,
+		refetch: apolloRefetch,
 	} = useGetApollo({
 		filters: {
 			query: searchText,
