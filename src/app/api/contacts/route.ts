@@ -10,7 +10,7 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { getValidatedParamsFromUrl } from '@/utils';
-import { EmailVerificationStatus } from '@prisma/client';
+import { Contact, EmailVerificationStatus } from '@prisma/client';
 
 const createContactSchema = z.object({
 	name: z.string().optional(),
@@ -24,6 +24,8 @@ const createContactSchema = z.object({
 });
 
 const contactFilterSchema = z.object({
+	query: z.string(),
+	limit: z.coerce.number().optional(),
 	verificationStatus: z.nativeEnum(EmailVerificationStatus).optional(),
 	contactListIds: z.array(z.number()).optional(),
 });
@@ -41,19 +43,69 @@ export async function GET(req: NextRequest) {
 		if (!validatedFilters.success) {
 			return apiBadRequest(validatedFilters.error);
 		}
-		const { contactListIds, verificationStatus } = validatedFilters.data;
-		const numberContactListIds =
+		const { contactListIds, verificationStatus, query, limit } = validatedFilters.data;
+
+		const numberContactListIds: number[] =
 			contactListIds?.map((id) => Number(id)).filter((id) => !isNaN(id)) || [];
 
-		const contacts = await prisma.contact.findMany({
-			where: {
-				contactListId: {
-					in: numberContactListIds,
+		let contacts: Contact[] = [];
+
+		// if it's a search by ContactListId, only filter by this ContactList.id and validation status
+		if (numberContactListIds.length > 0) {
+			contacts = await prisma.contact.findMany({
+				where: {
+					contactListId: {
+						in: numberContactListIds,
+					},
+					emailValidationStatus: {
+						equals: verificationStatus,
+					},
 				},
-				emailValidationStatus: {
-					equals: verificationStatus,
+				orderBy: {
+					company: 'asc',
 				},
-			},
+			});
+			return apiResponse(contacts);
+		}
+
+		// if it's a search by query, filter by query and validation status
+
+		const searchTerms: string[] = query
+			.toLowerCase()
+			.split(/\s+/)
+			.filter((term) => term.length > 0);
+		const caseInsensitiveMode = 'insensitive' as const;
+		const whereConditions =
+			searchTerms.length > 0
+				? {
+						AND: [
+							// Each search term must match at least one field
+							...searchTerms.map((term) => ({
+								OR: [
+									{ firstName: { contains: term, mode: caseInsensitiveMode } },
+									{ lastName: { contains: term, mode: caseInsensitiveMode } },
+									{ title: { contains: term, mode: caseInsensitiveMode } },
+									{ email: { contains: term, mode: caseInsensitiveMode } },
+									{ company: { contains: term, mode: caseInsensitiveMode } },
+									{ city: { contains: term, mode: caseInsensitiveMode } },
+									{ state: { contains: term, mode: caseInsensitiveMode } },
+									{ country: { contains: term, mode: caseInsensitiveMode } },
+									{ address: { contains: term, mode: caseInsensitiveMode } },
+									{ headline: { contains: term, mode: caseInsensitiveMode } },
+									{ linkedInUrl: { contains: term, mode: caseInsensitiveMode } },
+									{ website: { contains: term, mode: caseInsensitiveMode } },
+									{ phone: { contains: term, mode: caseInsensitiveMode } },
+								],
+							})),
+							// AND email validation status must be valid
+							{ emailValidationStatus: { equals: EmailVerificationStatus.valid } },
+						],
+				  }
+				: {};
+
+		contacts = await prisma.contact.findMany({
+			where: whereConditions,
+			take: limit,
 			orderBy: {
 				company: 'asc',
 			},
