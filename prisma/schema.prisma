@@ -1,10 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("POSTGRES_PRISMA_URL")
+  provider   = "postgresql"
+  url        = env("POSTGRES_PRISMA_URL")
+  extensions = [vector]
 }
 
 enum EmailStatus {
@@ -137,8 +139,11 @@ model Contact {
   campaigns     Campaign[]
   Email         Email[]
 
+  contentVector Unsupported("vector(1536)")?
+
   @@unique([email, contactListId])
   @@index([contactListId])
+  @@index([contentVector], map: "Contact_contentVector_idx")
 }
 
 model Email {

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CustomMutationOptions } from '@/types';
+import { CustomMutationOptions, CustomQueryOptions } from '@/types';
 import { toast } from 'sonner';
 import { ContactFilterData, PostContactData } from '@/app/api/contacts/route';
 import { appendQueryParamsToUrl } from '@/utils';
@@ -15,7 +15,7 @@ const QUERY_KEYS = {
 	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
 } as const;
 
-export interface ContactQueryOptions {
+export interface ContactQueryOptions extends CustomQueryOptions {
 	filters?: ContactFilterData;
 }
 
@@ -38,6 +38,7 @@ export const useGetContacts = (options: ContactQueryOptions) => {
 
 			return response.json() as Promise<ContactWithName[]>;
 		},
+		enabled: options.enabled === undefined ? true : options.enabled,
 	});
 };
 
