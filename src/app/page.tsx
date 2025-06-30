@@ -17,6 +17,7 @@ import { FaqSection } from '@/components/molecules/FaqSection/FaqSection';
 import { GradientBanner } from '@/components/molecules/GradientBanner/GradientBanner';
 import { StatBlock } from '@/components/molecules/StatBlock/StatBlock';
 import dynamic from 'next/dynamic';
+import MuxPlayer from '@mux/mux-player-react';
 
 const ReactPlayer = dynamic(() => import('react-player'), {
 	ssr: false,
@@ -181,12 +182,13 @@ export default function HomePage() {
 			<div className="py-16 mt-[121px]">
 				<div className="mx-auto max-w-4xl px-8">
 					<div className="relative w-full pb-[56%]">
-						<ReactPlayer
-							url="https://www.youtube.com/embed/p79hZlIlFD0?si=i1chgb0viWy7KKsv"
-							width="100%"
-							height="100%"
-							style={{ position: 'absolute', top: 0, left: 0 }}
-							controls={true}
+						<MuxPlayer
+							accentColor="var(--color-primary)"
+							playbackId="z015rWLTn4mlDbMX0021ale02ieVwttxqtZvzc2Z02nVotA"
+							metadata={{
+								video_title: 'Murmur Testimonials',
+								viewer_user_id: 'Placeholder (optional)',
+							}}
 						/>
 					</div>
 					<div className="flex justify-center mt-12">
