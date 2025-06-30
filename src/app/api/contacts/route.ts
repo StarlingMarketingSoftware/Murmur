@@ -11,6 +11,7 @@ import {
 } from '@/app/api/_utils';
 import { getValidatedParamsFromUrl } from '@/utils';
 import { Contact, EmailVerificationStatus } from '@prisma/client';
+import { searchSimilarContacts, upsertContactToPinecone } from '../_utils/pinecone';
 
 const createContactSchema = z.object({
 	name: z.string().optional(),
@@ -28,6 +29,7 @@ const contactFilterSchema = z.object({
 	limit: z.coerce.number().optional(),
 	verificationStatus: z.nativeEnum(EmailVerificationStatus).optional(),
 	contactListIds: z.array(z.number()).optional(),
+	useVectorSearch: z.boolean().optional(),
 });
 
 export type PostContactData = z.infer<typeof createContactSchema>;
@@ -43,7 +45,8 @@ export async function GET(req: NextRequest) {
 		if (!validatedFilters.success) {
 			return apiBadRequest(validatedFilters.error);
 		}
-		const { contactListIds, verificationStatus, query, limit } = validatedFilters.data;
+		const { contactListIds, verificationStatus, query, limit, useVectorSearch } =
+			validatedFilters.data;
 
 		const numberContactListIds: number[] =
 			contactListIds?.map((id) => Number(id)).filter((id) => !isNaN(id)) || [];
@@ -68,8 +71,43 @@ export async function GET(req: NextRequest) {
 			return apiResponse(contacts);
 		}
 
-		// if it's a search by query, filter by query and validation status
+		console.log('🚀 ~ GET ~ useVectorSearch:', useVectorSearch);
+		console.log('🚀 ~ GET ~ query:', query);
+		// If vector search is enabled and we have a query, use Pinecone
+		if (useVectorSearch && query) {
+			console.log('🚀 ~ vector search!!');
+			const similarContacts = await searchSimilarContacts(query, limit || 10);
+			const contactIds = similarContacts.map((match) =>
+				Number((match.metadata as { contactId: number }).contactId)
+			);
 
+			contacts = await prisma.contact.findMany({
+				where: {
+					id: {
+						in: contactIds,
+					},
+					emailValidationStatus: verificationStatus
+						? {
+								equals: verificationStatus,
+						  }
+						: undefined,
+				},
+				orderBy: {
+					company: 'asc',
+				},
+			});
+
+			// Sort contacts to match the order from vector search
+			contacts.sort((a, b) => {
+				const aIndex = contactIds.indexOf(a.id);
+				const bIndex = contactIds.indexOf(b.id);
+				return aIndex - bIndex;
+			});
+
+			return apiResponse(contacts);
+		}
+
+		// Fallback to regular search if vector search is not enabled
 		const searchTerms: string[] = query
 			.toLowerCase()
 			.split(/\s+/)
@@ -137,6 +175,15 @@ export async function POST(req: NextRequest) {
 				...contactData,
 				contactList: contactListId ? { connect: { id: contactListId } } : undefined,
 			},
+		});
+
+		// Generate and store Pinecone vector
+		const pineconeId = await upsertContactToPinecone(contact);
+
+		// Update contact with Pinecone ID
+		await prisma.contact.update({
+			where: { id: contact.id },
+			data: { pineconeId },
 		});
 
 		return apiCreated(contact);

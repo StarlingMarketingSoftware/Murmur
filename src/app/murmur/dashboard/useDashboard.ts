@@ -40,23 +40,24 @@ export const useDashboard = () => {
 		filters: {
 			query: searchText,
 			verificationStatus: EmailVerificationStatus.valid,
+			useVectorSearch: true,
 		},
 		enabled: false,
 	});
 	console.log('🚀 ~ useDashboard ~ contacts:', contacts);
 
-	const {
-		data: apolloContacts,
-		isPending: isPendingApolloContacts,
-		isLoading: isLoadingApolloContacts,
-		error: apolloError,
-		refetch: apolloRefetch,
-	} = useGetApollo({
-		filters: {
-			query: searchText,
-			limit: 5,
-		},
-	});
+	// const {
+	// 	data: apolloContacts,
+	// 	isPending: isPendingApolloContacts,
+	// 	isLoading: isLoadingApolloContacts,
+	// 	error: apolloError,
+	// 	refetch: apolloRefetch,
+	// } = useGetApollo({
+	// 	filters: {
+	// 		query: searchText,
+	// 		limit: 5,
+	// 	},
+	// });
 
 	const { mutate: createContactList } = useCreateContactList({
 		suppressToasts: true,
