@@ -1,17 +1,34 @@
 import { Contact } from '@prisma/client';
-import { QdrantClient } from '@qdrant/js-client-rest';
 import { OpenAI } from 'openai';
+import { Client } from '@elastic/elasticsearch';
 
 const VECTOR_DIMENSION = 1536; // OpenAI's text-embedding-3-small dimension
-const COLLECTION_NAME = 'contacts';
+const INDEX_NAME = 'contacts';
 
 const openai = new OpenAI({
 	apiKey: process.env.OPEN_AI_API_KEY!,
 });
 
-const qdrant = new QdrantClient({
-	url: process.env.QDRANT_URL || 'http://localhost:6333',
+const elasticsearch = new Client({
+	node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
 });
+
+interface ContactDocument {
+	vector_field: number[];
+	contactId: string;
+	email: string;
+	firstName: string;
+	lastName: string;
+	company: string;
+	title: string;
+	headline: string;
+	city: string;
+	state: string;
+	country: string;
+	address: string;
+	website: string;
+	linkedInUrl: string;
+}
 
 // Helper function to generate embedding for contact data
 async function generateContactEmbedding(contact: Contact) {
@@ -20,12 +37,14 @@ async function generateContactEmbedding(contact: Contact) {
 		contact.lastName,
 		contact.email,
 		contact.company,
-		contact.title,
-		contact.headline,
 		contact.city,
 		contact.state,
 		contact.country,
 		contact.address,
+		contact.title,
+		contact.headline,
+		contact.website,
+		contact.linkedInUrl,
 	]
 		.filter(Boolean)
 		.join(' ');
@@ -38,53 +57,84 @@ async function generateContactEmbedding(contact: Contact) {
 	return response.data[0].embedding;
 }
 
-// Initialize Qdrant collection if it doesn't exist
+// Initialize Elasticsearch index if it doesn't exist
 export async function initializeVectorDb() {
 	try {
-		await qdrant.getCollection(COLLECTION_NAME);
-		console.log('Collection already exists');
-	} catch (e) {
-		console.log('Creating new collection:', e);
-		await qdrant.createCollection(COLLECTION_NAME, {
-			vectors: {
-				size: VECTOR_DIMENSION,
-				distance: 'Cosine',
-			},
-		});
+		const indexExists = await elasticsearch.indices.exists({ index: INDEX_NAME });
+
+		if (!indexExists) {
+			await elasticsearch.indices.create({
+				index: INDEX_NAME,
+				mappings: {
+					properties: {
+						vector_field: {
+							type: 'dense_vector',
+							dims: VECTOR_DIMENSION,
+							index: true,
+							similarity: 'cosine',
+						},
+						contactId: { type: 'keyword' },
+						email: { type: 'keyword' },
+						firstName: { type: 'text' },
+						lastName: { type: 'text' },
+						company: { type: 'text' },
+						title: { type: 'text' },
+						headline: { type: 'text' },
+						city: { type: 'text' },
+						state: { type: 'text' },
+						country: { type: 'text' },
+						address: { type: 'text' },
+						website: { type: 'text' },
+						linkedInUrl: { type: 'text' },
+					},
+				},
+			});
+			console.log('Index created successfully');
+		} else {
+			console.log('Index already exists');
+		}
+	} catch (error) {
+		console.error('Error initializing Elasticsearch:', error);
+		throw error;
 	}
 }
 
-// Upsert a contact's vector to Qdrant
+// Upsert a contact's vector to Elasticsearch
 export async function upsertContactToVectorDb(contact: Contact): Promise<string> {
 	const embedding = await generateContactEmbedding(contact);
-	const id = contact.pineconeId || `contact-${contact.id}`;
+	console.log('🚀 ~ upsertContactToVectorDb ~ embedding:', typeof embedding);
+	console.log('🚀 ~ upsertContactToVectorDb ~ embedding:', embedding);
+	const id = contact.vectorId || `contact-${contact.id}`;
 
-	await qdrant.upsert(COLLECTION_NAME, {
-		wait: true,
-		points: [
-			{
-				id,
-				vector: embedding,
-				payload: {
-					contactId: contact.id,
-					email: contact.email,
-					firstName: contact.firstName || '',
-					lastName: contact.lastName || '',
-					company: contact.company || '',
-					title: contact.title || '',
-				},
-			},
-		],
+	await elasticsearch.index<ContactDocument>({
+		index: INDEX_NAME,
+		id: id,
+		document: {
+			vector_field: embedding,
+			contactId: contact.id.toString(),
+			email: contact.email,
+			firstName: contact.firstName || '',
+			lastName: contact.lastName || '',
+			company: contact.company || '',
+			title: contact.title || '',
+			headline: contact.headline || '',
+			city: contact.city || '',
+			state: contact.state || '',
+			country: contact.country || '',
+			address: contact.address || '',
+			website: contact.website || '',
+			linkedInUrl: contact.linkedInUrl || '',
+		},
 	});
 
 	return id;
 }
 
-// Delete a contact's vector from Qdrant
+// Delete a contact's vector from Elasticsearch
 export async function deleteContactFromVectorDb(id: string) {
-	await qdrant.delete(COLLECTION_NAME, {
-		wait: true,
-		points: [id],
+	await elasticsearch.delete({
+		index: INDEX_NAME,
+		id: id,
 	});
 }
 
@@ -97,19 +147,32 @@ export async function searchSimilarContacts(queryText: string, limit: number = 1
 	});
 	const queryEmbedding = response.data[0].embedding;
 
-	// Search Qdrant
-	const results = await qdrant.search(COLLECTION_NAME, {
-		vector: queryEmbedding,
-		limit,
-		with_payload: true,
+	// Search Elasticsearch using kNN search
+	const results = await elasticsearch.search<ContactDocument>({
+		index: INDEX_NAME,
+		knn: {
+			field: 'vector_field',
+			query_vector: queryEmbedding,
+			k: limit,
+			num_candidates: limit * 2,
+		},
+		fields: ['contactId', 'email', 'firstName', 'lastName', 'company', 'title'],
+		_source: false,
 	});
 
-	// Convert Qdrant results to match the expected format
+	// Convert Elasticsearch results to match the expected format
 	return {
-		matches: results.map((result) => ({
-			id: result.id as string,
-			score: result.score,
-			metadata: result.payload,
+		matches: results.hits.hits.map((hit) => ({
+			id: hit._id,
+			score: hit._score || 0,
+			metadata: {
+				contactId: hit.fields?.contactId[0],
+				email: hit.fields?.email[0],
+				firstName: hit.fields?.firstName[0],
+				lastName: hit.fields?.lastName[0],
+				company: hit.fields?.company[0],
+				title: hit.fields?.title[0],
+			},
 		})),
 	};
 }

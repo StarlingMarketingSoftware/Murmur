@@ -137,7 +137,7 @@ model Contact {
   campaigns     Campaign[]
   Email         Email[]
 
-  pineconeId String? @unique
+  vectorId String? @unique
 
   @@unique([email, contactListId])
   @@index([contactListId])

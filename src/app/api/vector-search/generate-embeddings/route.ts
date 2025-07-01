@@ -10,15 +10,15 @@ export async function POST() {
 			return apiUnauthorized();
 		}
 
-		// Initialize Pinecone index if it doesn't exist
+		// Initialize Elasticsearch index if it doesn't exist
 		await initializeVectorDb();
 
-		// Get all contacts that don't have a pineconeId
+		// Get all contacts that don't have a vectorId
 		const contacts = await prisma.contact.findMany({
 			where: {
-				pineconeId: null,
+				vectorId: null,
 			},
-			take: 100,
+			take: 50,
 		});
 
 		console.log(`Found ${contacts.length} contacts without embeddings`);
@@ -34,18 +34,18 @@ export async function POST() {
 			const batchResults = await Promise.all(
 				batch.map(async (contact) => {
 					try {
-						const pineconeId = await upsertContactToVectorDb(contact);
+						const vectorId = await upsertContactToVectorDb(contact);
 
 						// Update contact with new pineconeId
 						await prisma.contact.update({
 							where: { id: contact.id },
-							data: { pineconeId },
+							data: { vectorId },
 						});
 
 						return {
 							contactId: contact.id,
 							status: 'success',
-							pineconeId,
+							vectorId,
 						};
 					} catch (error) {
 						console.error(`Error processing contact ${contact.id}:`, error);

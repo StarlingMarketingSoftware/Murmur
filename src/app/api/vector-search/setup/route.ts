@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { initializeVectorDb } from '../_utils/vectorDb';
+import { initializeVectorDb } from '../../_utils/vectorDb';
 
 export async function POST() {
 	try {

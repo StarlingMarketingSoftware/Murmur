@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { searchSimilarContacts } from '../_utils/vectorDb';
+import { searchSimilarContacts } from '../../_utils/vectorDb';
 
 export async function POST(req: NextRequest) {
 	try {
