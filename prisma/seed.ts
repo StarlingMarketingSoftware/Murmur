@@ -1,8 +1,20 @@
-import { User } from '@prisma/client';
+import { User, Contact } from '@prisma/client';
 import prisma from '../src/lib/prisma';
 import { parse } from 'csv-parse/sync';
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import { Client } from '@elastic/elasticsearch';
+import {
+	contactEmbeddings,
+	getEmbeddingForContact,
+} from './seed-data/contact-embeddings';
+import { initializeVectorDb, upsertContactToVectorDb } from '@/app/api/_utils/vectorDb';
+
+const elasticsearch = new Client({
+	node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
+});
+
+const INDEX_NAME = 'contacts';
 
 export type ContactCSVFormat = {
 	name: string;
@@ -13,6 +25,7 @@ export type ContactCSVFormat = {
 	state: string;
 	website: string;
 	phone: string;
+	title: string;
 };
 
 export async function getPublicFiles(directory: string = 'demoCsvs'): Promise<string[]> {
@@ -205,6 +218,7 @@ const importCSVWithSubcategories = async (
 				phone: record.phone,
 				contactListId: recordContactListId,
 				emailValidationStatus: 'valid',
+				title: record.title,
 			},
 			update: {
 				lastName: record.name,
@@ -267,14 +281,37 @@ const userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
 		stripeSubscriptionStatus: null,
 	},
 ];
+
+async function seedElasticsearchEmbeddings(contacts: Contact[]) {
+	// First, ensure the index exists
+	await initializeVectorDb();
+
+	// Insert embeddings for each contact
+	for (const contact of contacts) {
+		console.log('🚀 ~ Processing contact:', contact.id);
+		const embeddingData = getEmbeddingForContact(contact);
+
+		if (!embeddingData) {
+			console.warn(`No embedding found for contact ${contact.id}`);
+			continue;
+		}
+
+		await upsertContactToVectorDb(contact);
+	}
+}
+
 async function main() {
-	await prisma.user.createMany({
-		data: userData,
-	});
-	importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
+	// await prisma.user.createMany({
+	// 	data: userData,
+	// });
+	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
+	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoReduced.csv', 'Music Venues');
+	// importCSVWithSubcategories('demoCsvs/musicVenuesDemo100.csv', 'Music Venues');
 	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
 
-	return;
+	/* Seed embeddings */
+	const allContacts = await prisma.contact.findMany();
+	await seedElasticsearchEmbeddings(allContacts);
 }
 
 main()

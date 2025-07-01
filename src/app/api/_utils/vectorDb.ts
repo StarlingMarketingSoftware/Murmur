@@ -101,10 +101,9 @@ export async function initializeVectorDb() {
 
 // Upsert a contact's vector to Elasticsearch
 export async function upsertContactToVectorDb(contact: Contact): Promise<string> {
+	console.log('upserting contact to vector db', contact.id);
 	const embedding = await generateContactEmbedding(contact);
-	console.log('🚀 ~ upsertContactToVectorDb ~ embedding:', typeof embedding);
-	console.log('🚀 ~ upsertContactToVectorDb ~ embedding:', embedding);
-	const id = contact.vectorId || `contact-${contact.id}`;
+	const id = contact.id.toString();
 
 	await elasticsearch.index<ContactDocument>({
 		index: INDEX_NAME,

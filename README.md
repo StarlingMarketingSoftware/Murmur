@@ -152,3 +152,8 @@ export function extractEmailsFromContacts(contacts: Partial<Contact>[]): string[
 ```
 
 - By using @map without running any migrations.
+
+### Local Scripts
+
+- Create a .tsx file in the scripts folder following the format of export-embeddings.tsx.
+- Run with `npx tsx scripts/export-embeddings.tsx`

@@ -13,15 +13,10 @@ export async function POST() {
 		// Initialize Elasticsearch index if it doesn't exist
 		await initializeVectorDb();
 
-		// Get all contacts that don't have a vectorId
-		const contacts = await prisma.contact.findMany({
-			where: {
-				vectorId: null,
-			},
-			take: 50,
-		});
+		// Get all contacts that haven't been processed yet
+		const contacts = await prisma.contact.findMany({});
 
-		console.log(`Found ${contacts.length} contacts without embeddings`);
+		console.log(`Found ${contacts.length} contacts to process`);
 
 		// Process contacts in batches to avoid rate limits
 		const batchSize = 10;
@@ -34,18 +29,12 @@ export async function POST() {
 			const batchResults = await Promise.all(
 				batch.map(async (contact) => {
 					try {
-						const vectorId = await upsertContactToVectorDb(contact);
-
-						// Update contact with new pineconeId
-						await prisma.contact.update({
-							where: { id: contact.id },
-							data: { vectorId },
-						});
+						const id = await upsertContactToVectorDb(contact);
 
 						return {
 							contactId: contact.id,
 							status: 'success',
-							vectorId,
+							id,
 						};
 					} catch (error) {
 						console.error(`Error processing contact ${contact.id}:`, error);
