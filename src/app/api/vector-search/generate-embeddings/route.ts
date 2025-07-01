@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { apiResponse, apiUnauthorized, handleApiError } from '@/app/api/_utils';
-import { initializePineconeIndex, upsertContactToPinecone } from '../../_utils/pinecone';
+import { initializeVectorDb, upsertContactToVectorDb } from '../../_utils/vectorDb';
 
 export async function POST() {
 	try {
@@ -11,7 +11,7 @@ export async function POST() {
 		}
 
 		// Initialize Pinecone index if it doesn't exist
-		await initializePineconeIndex();
+		await initializeVectorDb();
 
 		// Get all contacts that don't have a pineconeId
 		const contacts = await prisma.contact.findMany({
@@ -34,7 +34,7 @@ export async function POST() {
 			const batchResults = await Promise.all(
 				batch.map(async (contact) => {
 					try {
-						const pineconeId = await upsertContactToPinecone(contact);
+						const pineconeId = await upsertContactToVectorDb(contact);
 
 						// Update contact with new pineconeId
 						await prisma.contact.update({

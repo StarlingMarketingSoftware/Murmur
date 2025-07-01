@@ -1,20 +1,20 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
 import {
 	apiBadRequest,
-	apiCreated,
 	apiResponse,
 	apiUnauthorized,
 	handleApiError,
 } from '@/app/api/_utils';
 import { getValidatedParamsFromUrl } from '@/utils';
 import { Contact, EmailVerificationStatus } from '@prisma/client';
-import { searchSimilarContacts, upsertContactToPinecone } from '../_utils/pinecone';
+import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vectorDb';
 
 const createContactSchema = z.object({
-	name: z.string().optional(),
+	firstName: z.string().optional(),
+	lastName: z.string().optional(),
 	email: z.string().email(),
 	company: z.string().optional(),
 	website: z.string().url().optional().nullable(),
@@ -71,13 +71,10 @@ export async function GET(req: NextRequest) {
 			return apiResponse(contacts);
 		}
 
-		console.log('🚀 ~ GET ~ useVectorSearch:', useVectorSearch);
-		console.log('🚀 ~ GET ~ query:', query);
-		// If vector search is enabled and we have a query, use Pinecone
+		// If vector search is enabled and we have a query, use Qdrant
 		if (useVectorSearch && query) {
-			console.log('🚀 ~ vector search!!');
-			const similarContacts = await searchSimilarContacts(query, limit || 10);
-			const contactIds = similarContacts.map((match) =>
+			const results = await searchSimilarContacts(query, limit || 10);
+			const contactIds = results.matches.map((match) =>
 				Number((match.metadata as { contactId: number }).contactId)
 			);
 
@@ -169,7 +166,6 @@ export async function POST(req: NextRequest) {
 		}
 
 		const { contactListId, ...contactData } = validatedData.data;
-
 		const contact = await prisma.contact.create({
 			data: {
 				...contactData,
@@ -177,16 +173,16 @@ export async function POST(req: NextRequest) {
 			},
 		});
 
-		// Generate and store Pinecone vector
-		const pineconeId = await upsertContactToPinecone(contact);
+		// Store contact vector in Qdrant
+		const vectorId = await upsertContactToVectorDb(contact);
 
-		// Update contact with Pinecone ID
+		// Update contact with vector ID
 		await prisma.contact.update({
 			where: { id: contact.id },
-			data: { pineconeId },
+			data: { pineconeId: vectorId },
 		});
 
-		return apiCreated(contact);
+		return apiResponse(contact);
 	} catch (error) {
 		return handleApiError(error);
 	}
