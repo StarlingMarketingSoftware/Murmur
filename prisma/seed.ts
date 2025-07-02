@@ -3,18 +3,8 @@ import prisma from '../src/lib/prisma';
 import { parse } from 'csv-parse/sync';
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { Client } from '@elastic/elasticsearch';
-import {
-	contactEmbeddings,
-	getEmbeddingForContact,
-} from './seed-data/contact-embeddings';
+import { getEmbeddingForContact } from './seed-data/contact-embeddings';
 import { initializeVectorDb, upsertContactToVectorDb } from '@/app/api/_utils/vectorDb';
-
-const elasticsearch = new Client({
-	node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
-});
-
-const INDEX_NAME = 'contacts';
 
 export type ContactCSVFormat = {
 	name: string;
@@ -288,7 +278,6 @@ async function seedElasticsearchEmbeddings(contacts: Contact[]) {
 
 	// Insert embeddings for each contact
 	for (const contact of contacts) {
-		console.log('🚀 ~ Processing contact:', contact.id);
 		const embeddingData = getEmbeddingForContact(contact);
 
 		if (!embeddingData) {
@@ -296,18 +285,22 @@ async function seedElasticsearchEmbeddings(contacts: Contact[]) {
 			continue;
 		}
 
-		await upsertContactToVectorDb(contact);
+		await upsertContactToVectorDb(contact, embeddingData.embedding);
 	}
 }
 
 async function main() {
-	// await prisma.user.createMany({
-	// 	data: userData,
-	// });
+	/* Seed users */
+	await prisma.user.createMany({
+		data: userData,
+	});
+
+	/* Seed contacts */
 	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
 	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoReduced.csv', 'Music Venues');
 	// importCSVWithSubcategories('demoCsvs/musicVenuesDemo100.csv', 'Music Venues');
 	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
+	importCSVWithSubcategories('demoCsvs/musicVenuesDemo4106.csv', 'Music Venues');
 
 	/* Seed embeddings */
 	const allContacts = await prisma.contact.findMany();

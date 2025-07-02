@@ -18,7 +18,7 @@ async function exportEmbeddings() {
 		const response = await elasticsearch.search<EmbeddingSource>({
 			index: INDEX_NAME,
 			query: { match_all: {} },
-			size: 2000, // Adjust this number based on your data size
+			size: 10000, // Adjust this number based on your data size
 		});
 
 		const hits = response.hits.hits;

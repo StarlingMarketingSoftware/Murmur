@@ -157,3 +157,14 @@ export function extractEmailsFromContacts(contacts: Partial<Contact>[]): string[
 
 - Create a .tsx file in the scripts folder following the format of export-embeddings.tsx.
 - Run with `npx tsx scripts/export-embeddings.tsx`
+
+### Generating Seed Data for Local Vector Embeddings
+
+- Prepare a .csv of contacts.
+- Seed only the contacts (comment out the line that seeds embeddings)
+- Call POST /api/vector-search/generate-embeddings
+- Run /scripts/export-embeddings.tsx `npx tsx scripts/export-embeddings.tsx`
+- Paste the generated .txt file's contents to /prisma/seed-data/contact-embeddings.ts
+- 'docker compose down -v' to reset postgres and elastic search databases.
+- 'docker compose up -d' to get fresh databases running.
+- Migrate and run all seed functions 'npx prisma migrate dev'
