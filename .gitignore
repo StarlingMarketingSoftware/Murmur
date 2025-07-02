@@ -45,4 +45,3 @@ next-env.d.ts
 
 # seeding data
 public/demoCsvs/*
-prisma/seed-data/contact-embeddings.ts
