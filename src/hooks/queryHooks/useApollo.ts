@@ -30,6 +30,6 @@ export const useGetApollo = (options: ApolloQueryOptions) => {
 
 			return response.json() as Promise<Contact[]>;
 		},
-		enabled: options.enabled,
+		enabled: options.enabled === undefined ? true : options.enabled,
 	});
 };
