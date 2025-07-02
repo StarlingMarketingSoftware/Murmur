@@ -160,13 +160,27 @@ export const searchSimilarContacts = async (queryText: string, limit: number = 1
 			field: 'vector_field',
 			query_vector: queryEmbedding,
 			k: limit,
-			num_candidates: limit * 2,
+			num_candidates: Math.min(10000, limit * 4),
 		},
-		fields: ['contactId', 'email', 'firstName', 'lastName', 'company', 'title'],
+		size: limit,
+		fields: [
+			'contactId',
+			'email',
+			'firstName',
+			'lastName',
+			'company',
+			'title',
+			'headline',
+			'city',
+			'state',
+			'country',
+			'address',
+			'website',
+			'linkedInUrl',
+		],
 		_source: false,
 	});
 
-	// Convert Elasticsearch results to match the expected format
 	return {
 		matches: results.hits.hits.map((hit) => ({
 			id: hit._id,
@@ -178,6 +192,13 @@ export const searchSimilarContacts = async (queryText: string, limit: number = 1
 				lastName: hit.fields?.lastName[0],
 				company: hit.fields?.company[0],
 				title: hit.fields?.title[0],
+				headline: hit.fields?.headline[0],
+				city: hit.fields?.city[0],
+				state: hit.fields?.state[0],
+				country: hit.fields?.country[0],
+				address: hit.fields?.address[0],
+				website: hit.fields?.website[0],
+				linkedInUrl: hit.fields?.linkedInUrl[0],
 			},
 		})),
 	};

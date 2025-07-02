@@ -41,6 +41,7 @@ export const useDashboard = () => {
 			query: searchText,
 			verificationStatus: EmailVerificationStatus.valid,
 			useVectorSearch: true,
+			limit: 100,
 		},
 		enabled: false,
 	});
@@ -60,6 +61,7 @@ export const useDashboard = () => {
 	const { mutate: createContactList } = useCreateContactList({
 		suppressToasts: true,
 	});
+
 	const { mutateAsync: createCampaign, isPending: isPendingCreateCampaign } =
 		useCreateCampaign({
 			suppressToasts: true,

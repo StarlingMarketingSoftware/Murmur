@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
 
 		// If vector search is enabled and we have a query, use vector search
 		if (useVectorSearch && query) {
-			const results = await searchSimilarContacts(query, limit || 10);
+			const results = await searchSimilarContacts(query, limit || 1000);
 			const contactIds = results.matches.map((match) =>
 				Number((match.metadata as { contactId: number }).contactId)
 			);
