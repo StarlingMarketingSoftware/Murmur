@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
 			return apiResponse(contacts);
 		}
 
-		// If vector search is enabled and we have a query, use Qdrant
+		// If vector search is enabled and we have a query, use vector search
 		if (useVectorSearch && query) {
 			const results = await searchSimilarContacts(query, limit || 10);
 			const contactIds = results.matches.map((match) =>
@@ -134,7 +134,7 @@ export async function GET(req: NextRequest) {
 								],
 							})),
 							// AND email validation status must be valid
-							{ emailValidationStatus: { equals: EmailVerificationStatus.valid } },
+							{ emailValidationStatus: { equals: verificationStatus } },
 						],
 				  }
 				: {};

@@ -7,7 +7,7 @@ const elasticsearch = new Client({
 const INDEX_NAME = 'contacts';
 
 // Function to check if a specific contact exists
-async function checkContact(contactId: string) {
+const checkContact = async (contactId: string) => {
 	try {
 		const exists = await elasticsearch.exists({
 			index: INDEX_NAME,
@@ -27,10 +27,10 @@ async function checkContact(contactId: string) {
 	} catch (error) {
 		console.error('Error checking contact:', error);
 	}
-}
+};
 
 // Function to search contacts by any field
-async function searchContacts(field: string, value: string) {
+const searchContacts = async (field: string, value: string) => {
 	try {
 		const response = await elasticsearch.search({
 			index: INDEX_NAME,
@@ -46,10 +46,10 @@ async function searchContacts(field: string, value: string) {
 	} catch (error) {
 		console.error('Error searching contacts:', error);
 	}
-}
+};
 
 // Function to list all contacts
-async function listAllContacts() {
+const listAllContacts = async () => {
 	try {
 		const response = await elasticsearch.search({
 			index: INDEX_NAME,
@@ -66,7 +66,7 @@ async function listAllContacts() {
 	} catch (error) {
 		console.error('Error listing contacts:', error);
 	}
-}
+};
 
 // Example usage:
 const command = process.argv[2];

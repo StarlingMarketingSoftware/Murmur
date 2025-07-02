@@ -272,7 +272,7 @@ const userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
 	},
 ];
 
-async function seedElasticsearchEmbeddings(contacts: Contact[]) {
+const seedElasticsearchEmbeddings = async (contacts: Contact[]) => {
 	// First, ensure the index exists
 	await initializeVectorDb();
 
@@ -287,7 +287,7 @@ async function seedElasticsearchEmbeddings(contacts: Contact[]) {
 
 		await upsertContactToVectorDb(contact, embeddingData.embedding);
 	}
-}
+};
 
 async function main() {
 	/* Seed users */
@@ -296,10 +296,6 @@ async function main() {
 	});
 
 	/* Seed contacts */
-	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
-	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoReduced.csv', 'Music Venues');
-	// importCSVWithSubcategories('demoCsvs/musicVenuesDemo100.csv', 'Music Venues');
-	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
 	importCSVWithSubcategories('demoCsvs/musicVenuesDemo4106.csv', 'Music Venues');
 
 	/* Seed embeddings */

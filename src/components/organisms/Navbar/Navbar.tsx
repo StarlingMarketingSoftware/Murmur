@@ -41,6 +41,7 @@ export const Navbar = () => {
 		return () => {
 			window.removeEventListener('scroll', controlNavbar);
 		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	type UrlList = {

@@ -31,7 +31,7 @@ interface ContactDocument {
 }
 
 // Helper function to generate embedding for contact data
-async function generateContactEmbedding(contact: Contact) {
+export const generateContactEmbedding = async (contact: Contact) => {
 	const contactText = [
 		contact.firstName,
 		contact.lastName,
@@ -55,10 +55,10 @@ async function generateContactEmbedding(contact: Contact) {
 	});
 
 	return response.data[0].embedding;
-}
+};
 
 // Initialize Elasticsearch index if it doesn't exist
-export async function initializeVectorDb() {
+export const initializeVectorDb = async () => {
 	try {
 		const indexExists = await elasticsearch.indices.exists({ index: INDEX_NAME });
 
@@ -97,13 +97,13 @@ export async function initializeVectorDb() {
 		console.error('Error initializing Elasticsearch:', error);
 		throw error;
 	}
-}
+};
 
 // Upsert a contact's vector to Elasticsearch
-export async function upsertContactToVectorDb(
+export const upsertContactToVectorDb = async (
 	contact: Contact,
 	embedding?: number[]
-): Promise<string> {
+): Promise<string> => {
 	let _embedding = embedding;
 
 	if (!_embedding) {
@@ -134,18 +134,18 @@ export async function upsertContactToVectorDb(
 	});
 
 	return id;
-}
+};
 
 // Delete a contact's vector from Elasticsearch
-export async function deleteContactFromVectorDb(id: string) {
+export const deleteContactFromVectorDb = async (id: string) => {
 	await elasticsearch.delete({
 		index: INDEX_NAME,
 		id: id,
 	});
-}
+};
 
 // Search for similar contacts
-export async function searchSimilarContacts(queryText: string, limit: number = 10) {
+export const searchSimilarContacts = async (queryText: string, limit: number = 10) => {
 	// Generate embedding for the search query
 	const response = await openai.embeddings.create({
 		input: queryText,
@@ -181,4 +181,4 @@ export async function searchSimilarContacts(queryText: string, limit: number = 1
 			},
 		})),
 	};
-}
+};
