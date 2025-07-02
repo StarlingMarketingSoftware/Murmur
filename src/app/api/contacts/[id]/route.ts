@@ -11,6 +11,7 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { ApiRouteParams } from '@/types';
+import { upsertContactToVectorDb } from '../../_utils/vectorDb';
 
 const updateContactSchema = z.object({
 	name: z.string().optional(),
@@ -43,6 +44,8 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 			},
 			data: validatedData.data,
 		});
+
+		await upsertContactToVectorDb(updatedContact);
 
 		return apiResponse(updatedContact);
 	} catch (error) {
