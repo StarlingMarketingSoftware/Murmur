@@ -145,7 +145,11 @@ export const deleteContactFromVectorDb = async (id: string) => {
 };
 
 // Search for similar contacts
-export const searchSimilarContacts = async (queryText: string, limit: number = 10) => {
+export const searchSimilarContacts = async (
+	queryText: string,
+	limit: number = 10,
+	minScore: number = 0.3 // Add minimum similarity threshold
+) => {
 	// Generate embedding for the search query
 	const response = await openai.embeddings.create({
 		input: queryText,
@@ -181,8 +185,11 @@ export const searchSimilarContacts = async (queryText: string, limit: number = 1
 		_source: false,
 	});
 
+	// Filter out results below the similarity threshold
+	const filteredHits = results.hits.hits.filter((hit) => (hit._score || 0) >= minScore);
+
 	return {
-		matches: results.hits.hits.map((hit) => ({
+		matches: filteredHits.map((hit) => ({
 			id: hit._id,
 			score: hit._score || 0,
 			metadata: {
@@ -201,5 +208,7 @@ export const searchSimilarContacts = async (queryText: string, limit: number = 1
 				linkedInUrl: hit.fields?.linkedInUrl[0],
 			},
 		})),
+		totalFound: filteredHits.length,
+		minScoreApplied: minScore,
 	};
 };

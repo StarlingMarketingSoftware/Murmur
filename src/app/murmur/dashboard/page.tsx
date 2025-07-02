@@ -92,8 +92,9 @@ const Dashboard = () => {
 					{contacts?.map((contact) => (
 						<div key={contact.id} className="flex-row  w-full items-center gap-2">
 							<Typography className="text-sm" font="secondary">
-								{contact.name} {contact.city} {contact.state} {contact.company}{' '}
-								{contact.email}
+								{contact.name} | {contact.city} {contact.state} | {contact.company} |{' '}
+								{contact.email} | {contact.headline} | {contact.title} | {contact.address}{' '}
+								| {contact.website} | {contact.country} | {contact.linkedInUrl}
 							</Typography>
 						</div>
 					))}
