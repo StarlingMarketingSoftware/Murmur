@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useGetApollo } from '@/hooks/queryHooks/useApollo';
+// import { useGetApollo } from '@/hooks/queryHooks/useApollo';
 import { useCreateContactList } from '@/hooks/queryHooks/useContactLists';
 import { ContactList, EmailVerificationStatus } from '@prisma/client';
 import { useState } from 'react';
@@ -44,8 +44,6 @@ export const useDashboard = () => {
 		},
 		enabled: false,
 	});
-	console.log('🚀 ~ useDashboard ~ contacts:', contacts);
-
 	// const {
 	// 	data: apolloContacts,
 	// 	isPending: isPendingApolloContacts,

@@ -11,7 +11,7 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { ApiRouteParams } from '@/types';
-import { upsertContactToPinecone } from '../../_utils/pinecone';
+import { upsertContactToVectorDb } from '../../_utils/vectorDb';
 
 const updateContactSchema = z.object({
 	name: z.string().optional(),
@@ -45,14 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 			data: validatedData.data,
 		});
 
-		// Generate and store Pinecone vector
-		const pineconeId = await upsertContactToPinecone(updatedContact);
-
-		// Update contact with Pinecone ID
-		await prisma.contact.update({
-			where: { id: updatedContact.id },
-			data: { pineconeId },
-		});
+		await upsertContactToVectorDb(updatedContact);
 
 		return apiResponse(updatedContact);
 	} catch (error) {

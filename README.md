@@ -161,6 +161,7 @@ export function extractEmailsFromContacts(contacts: Partial<Contact>[]): string[
 ### Generating Seed Data for Local Vector Embeddings
 
 - Prepare a .csv of contacts.
+- Get contact-embeddings.ts (large file that cannot be committed to Github) from a team member and save it in prisma/seed-data
 - Seed only the contacts (comment out the line that seeds embeddings)
 - Call POST /api/vector-search/generate-embeddings
 - Run /scripts/export-embeddings.tsx `npx tsx scripts/export-embeddings.tsx`

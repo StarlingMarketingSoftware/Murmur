@@ -28,7 +28,6 @@ export const useGetContacts = (options: ContactQueryOptions) => {
 	return useQuery<ContactWithName[]>({
 		queryKey: [...QUERY_KEYS.list(), options.filters],
 		queryFn: async () => {
-			console.log('🚀 ~ queryFn: ~ options.filters:', options.filters);
 			const url = appendQueryParamsToUrl(urls.api.contacts.index, options.filters);
 			const response = await _fetch(url);
 

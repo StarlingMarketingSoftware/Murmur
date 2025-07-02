@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
@@ -25,7 +25,7 @@ const createContactSchema = z.object({
 });
 
 const contactFilterSchema = z.object({
-	query: z.string(),
+	query: z.string().optional(),
 	limit: z.coerce.number().optional(),
 	verificationStatus: z.nativeEnum(EmailVerificationStatus).optional(),
 	contactListIds: z.array(z.number()).optional(),
@@ -105,10 +105,11 @@ export async function GET(req: NextRequest) {
 		}
 
 		// Fallback to regular search if vector search is not enabled
-		const searchTerms: string[] = query
-			.toLowerCase()
-			.split(/\s+/)
-			.filter((term) => term.length > 0);
+		const searchTerms: string[] =
+			query
+				?.toLowerCase()
+				.split(/\s+/)
+				.filter((term) => term.length > 0) || [];
 		const caseInsensitiveMode = 'insensitive' as const;
 		const whereConditions =
 			searchTerms.length > 0
@@ -173,14 +174,8 @@ export async function POST(req: NextRequest) {
 			},
 		});
 
-		// Store contact vector in Qdrant
-		const vectorId = await upsertContactToVectorDb(contact);
-
-		// Update contact with vector ID
-		await prisma.contact.update({
-			where: { id: contact.id },
-			data: { pineconeId: vectorId },
-		});
+		// Store contact vector in
+		await upsertContactToVectorDb(contact);
 
 		return apiResponse(contact);
 	} catch (error) {
