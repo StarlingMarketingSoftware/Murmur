@@ -42,7 +42,6 @@ interface DataTableProps<TData, TValue> {
 	handleRowClick?: (rowData: TData) => void;
 	isSelectable?: boolean;
 	noDataMessage?: string;
-	initialRowSelectionState?: string[];
 	searchable?: boolean;
 }
 
@@ -93,7 +92,6 @@ export function CustomTable<TData, TValue>({
 	handleRowClick,
 	isSelectable = false,
 	noDataMessage = 'No data was found.',
-	initialRowSelectionState,
 	variant = 'primary',
 	searchable = true,
 }: CustomTableProps<TData, TValue>) {
@@ -102,23 +100,16 @@ export function CustomTable<TData, TValue>({
 		pageSize: 20,
 	});
 
+	// Initialize all rows as selected
 	const getInitialRowSelection = () => {
-		if (!initialRowSelectionState || !data || !isSelectable) return {};
-
-		return data.reduce((acc, row, index) => {
-			const isSelected = initialRowSelectionState.some(
-				(selectedRow) => JSON.stringify(selectedRow) === JSON.stringify(row)
-			);
-			if (isSelected) {
-				acc[index] = true;
-			}
+		if (!data || !isSelectable) return {};
+		return data.reduce((acc, _, index) => {
+			acc[index] = true;
 			return acc;
 		}, {} as Record<string, boolean>);
 	};
 
 	const [rowSelection, setRowSelection] = useState(getInitialRowSelection());
-	const [isInitialMount, setIsInitialMount] = useState(true);
-
 	const [sorting, setSorting] = useState<SortingState>([]);
 	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 	const [globalFilter, setGlobalFilter] = useState('');
@@ -148,6 +139,25 @@ export function CustomTable<TData, TValue>({
 		},
 	});
 
+	// Update row selection when data changes
+	useEffect(() => {
+		if (data && isSelectable) {
+			setRowSelection(getInitialRowSelection());
+		}
+	}, [data, isSelectable]);
+
+	// Update selected rows in parent component
+	useEffect(() => {
+		if (!setSelectedRows || !data || !isSelectable) return;
+		const selectedRows = table.getSelectedRowModel().rows;
+		if (!singleSelection) {
+			setSelectedRows(selectedRows.map((row) => row.original));
+		} else {
+			const firstSelectedRow = selectedRows[0];
+			setSelectedRows(firstSelectedRow ? [firstSelectedRow.original] : []);
+		}
+	}, [setSelectedRows, rowSelection, data, singleSelection, isSelectable, table]);
+
 	useEffect(() => {
 		if (!data) return;
 
@@ -163,35 +173,6 @@ export function CustomTable<TData, TValue>({
 		}
 	}, [pagination.pageIndex, pagination.pageSize, data]);
 
-	useEffect(() => {
-		if (!setSelectedRows || !data || !isSelectable) return;
-
-		const updateSelectedRows = () => {
-			const selectedRows = table.getSelectedRowModel().rows;
-			if (!singleSelection) {
-				setSelectedRows(selectedRows.map((row) => row.original));
-			} else {
-				const firstSelectedRow = selectedRows[0];
-				setSelectedRows(firstSelectedRow ? [firstSelectedRow.original] : []);
-			}
-		};
-
-		if (isInitialMount || initialRowSelectionState?.length) {
-			setIsInitialMount(false);
-			updateSelectedRows();
-		} else if (!isInitialMount) {
-			updateSelectedRows();
-		}
-		/* eslint-disable-next-line react-hooks/exhaustive-deps */
-	}, [
-		setSelectedRows,
-		rowSelection,
-		data,
-		singleSelection,
-		isInitialMount,
-		initialRowSelectionState,
-	]);
-
 	return (
 		<div>
 			<div className="flex items-center justify-between py-4">
@@ -206,7 +187,7 @@ export function CustomTable<TData, TValue>({
 					)}
 					<div className="flex items-center gap-2">
 						<span className="text-sm text-muted-foreground">Rows per page:</span>
-						{/* <Select
+						<Select
 							value={pagination.pageSize.toString()}
 							onValueChange={(value) =>
 								setPagination((prev) => ({ ...prev, pageSize: parseInt(value, 10) }))
@@ -222,7 +203,7 @@ export function CustomTable<TData, TValue>({
 									</SelectItem>
 								))}
 							</SelectContent>
-						</Select> */}
+						</Select>
 					</div>
 				</div>
 				{isSelectable && (

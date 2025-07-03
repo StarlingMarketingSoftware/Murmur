@@ -6,13 +6,15 @@ import { z } from 'zod';
 // import { useGetApollo } from '@/hooks/queryHooks/useApollo';
 import { useCreateContactList } from '@/hooks/queryHooks/useContactLists';
 import { Contact, ContactList, EmailVerificationStatus } from '@prisma/client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { TableSortingButton } from '@/components/molecules/CustomTable/CustomTable';
 import { ColumnDef } from '@tanstack/react-table';
+import { ContactWithName } from '@/types/contact';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -31,7 +33,6 @@ export const useDashboard = () => {
 
 	const [selectedRows, setSelectedRows] = useState<ContactList[]>([]);
 	const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
-	console.log('🚀 ~ useDashboard ~ selectedContacts:', selectedContacts);
 	const searchText = form.watch('searchText');
 
 	const {
@@ -62,7 +63,34 @@ export const useDashboard = () => {
 	// 	},
 	// });
 
-	const columns: ColumnDef<Contact>[] = [
+	// Initialize selected contacts when contacts load
+	useEffect(() => {
+		if (contacts) {
+			setSelectedContacts(contacts);
+		}
+	}, [contacts]);
+
+	const columns: ColumnDef<ContactWithName>[] = [
+		{
+			id: 'select',
+			header: ({ table }) => (
+				<Checkbox
+					checked={
+						table.getIsAllPageRowsSelected() ||
+						(table.getIsSomePageRowsSelected() && 'indeterminate')
+					}
+					onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+					aria-label="Select all"
+				/>
+			),
+			cell: ({ row }) => (
+				<Checkbox
+					checked={row.getIsSelected()}
+					onCheckedChange={(value) => row.toggleSelected(!!value)}
+					aria-label="Select row"
+				/>
+			),
+		},
 		{
 			accessorKey: 'name',
 			header: ({ column }) => {
@@ -169,11 +197,6 @@ export const useDashboard = () => {
 			router.push(urls.murmur.campaign.detail(campaign.id));
 		}
 	};
-
-	// useEffect(() => {
-
-	// 	setSelectedContacts(contacts || []);
-	// }, [contacts]);
 
 	return {
 		form,

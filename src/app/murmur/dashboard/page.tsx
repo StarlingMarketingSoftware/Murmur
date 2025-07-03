@@ -17,7 +17,6 @@ import {
 } from '@/components/ui/form';
 import ContactListTable from '@/components/organisms/_tables/ContactListTable/ContactListTable';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
-import { useMemo } from 'react';
 
 const Dashboard = () => {
 	const {
@@ -30,13 +29,7 @@ const Dashboard = () => {
 		contacts,
 		columns,
 		setSelectedContacts,
-		selectedContacts,
 	} = useDashboard();
-
-	const contactIds = useMemo(
-		() => contacts ? contacts.map((contact) => String(contact.id)) : [],
-		[contacts]
-	);
 
 	return (
 		<AppLayout>
@@ -50,7 +43,7 @@ const Dashboard = () => {
 					className="mt-18 text-[19px] text-center"
 					color="light"
 				>
-					Let's <strong>start</strong> by creating a campaign.
+					Let&apos;s <strong>start</strong> by creating a campaign.
 				</Typography>
 				<Typography
 					font="secondary"
@@ -71,7 +64,7 @@ const Dashboard = () => {
 								<FormItem>
 									<FormControl>
 										<Input
-											placeholder="Who do you want to send to?  i.e  "Wedding Planners in North Carolina""
+											placeholder="Who do you want to send to?  i.e  “Wedding Planners in North Carolina”"
 											{...field}
 										/>
 									</FormControl>
@@ -103,7 +96,6 @@ const Dashboard = () => {
 			<CustomTable
 				isSelectable
 				setSelectedRows={setSelectedContacts}
-				initialRowSelectionState={contactIds}
 				data={contacts}
 				columns={columns}
 				searchable={false}

@@ -120,7 +120,7 @@ function TableFooter({
 }
 
 const tableRowVariants = cva(
-	'hover:bg-primary/15 transition-colors data-[state=selected]:bg-primary/50 border border-primary/20 border-t border-t-primary data-[state=selected]:border-primary data-[state=selected]:!border-t-primary',
+	'hover:bg-primary/15 transition-colors data-[state=selected]:pointer-events-all border border-primary/20 border-t border-t-primary',
 	{
 		variants: {
 			variant: {
