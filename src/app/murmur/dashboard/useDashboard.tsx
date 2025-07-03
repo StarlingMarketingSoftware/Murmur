@@ -15,6 +15,7 @@ import { TableSortingButton } from '@/components/molecules/CustomTable/CustomTab
 import { ColumnDef } from '@tanstack/react-table';
 import { ContactWithName } from '@/types/contact';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useGetApollo } from '@/hooks/queryHooks/useApollo';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -23,53 +24,6 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>;
 
 export const useDashboard = () => {
-	const router = useRouter();
-	const form = useForm<FormData>({
-		resolver: zodResolver(formSchema),
-		defaultValues: {
-			searchText: '',
-		},
-	});
-
-	const [selectedRows, setSelectedRows] = useState<ContactList[]>([]);
-	const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
-	const searchText = form.watch('searchText');
-
-	const {
-		data: contacts,
-		isPending: isPendingContacts,
-		isLoading: isLoadingContacts,
-		error,
-		refetch,
-	} = useGetContacts({
-		filters: {
-			query: searchText,
-			verificationStatus: EmailVerificationStatus.valid,
-			useVectorSearch: true,
-			limit: 100,
-		},
-		enabled: false,
-	});
-	// const {
-	// 	data: apolloContacts,
-	// 	isPending: isPendingApolloContacts,
-	// 	isLoading: isLoadingApolloContacts,
-	// 	error: apolloError,
-	// 	refetch: apolloRefetch,
-	// } = useGetApollo({
-	// 	filters: {
-	// 		query: searchText,
-	// 		limit: 5,
-	// 	},
-	// });
-
-	// Initialize selected contacts when contacts load
-	useEffect(() => {
-		if (contacts) {
-			setSelectedContacts(contacts);
-		}
-	}, [contacts]);
-
 	const columns: ColumnDef<ContactWithName>[] = [
 		{
 			id: 'select',
@@ -171,6 +125,72 @@ export const useDashboard = () => {
 		},
 	];
 
+	const tabOptions = [
+		{
+			label: 'Search',
+			value: 'search',
+		},
+		{
+			label: 'Select from List',
+			value: 'list',
+		},
+	];
+
+	const [currentTab, setCurrentTab] = useState<(typeof tabOptions)[number]['value']>(
+		tabOptions[0].value
+	);
+
+	const router = useRouter();
+	const form = useForm<FormData>({
+		resolver: zodResolver(formSchema),
+		defaultValues: {
+			searchText: '',
+		},
+	});
+
+	const [selectedContactListRows, setSelectedContactListRows] = useState<ContactList[]>(
+		[]
+	);
+	const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
+	const [activeSearchQuery, setActiveSearchQuery] = useState('');
+
+	const {
+		data: contacts,
+		isPending: isPendingContacts,
+		isLoading: isLoadingContacts,
+		error,
+		refetch: refetchContacts,
+		isRefetching: isRefetchingContacts,
+	} = useGetContacts({
+		filters: {
+			query: activeSearchQuery,
+			verificationStatus: EmailVerificationStatus.valid,
+			useVectorSearch: true,
+			limit: 100,
+		},
+		enabled: false,
+	});
+
+	// const {
+	// 	data: apolloContacts,
+	// 	isPending: isPendingApolloContacts,
+	// 	isLoading: isLoadingApolloContacts,
+	// 	error: apolloError,
+	// 	refetch: apolloRefetch,
+	// } = useGetApollo({
+	// 	filters: {
+	// 		query: activeSearchQuery,
+	// 		limit: 5,
+	// 	},
+	// });
+
+	// Initialize selected contacts when contacts load
+	useEffect(() => {
+		if (contacts) {
+			setSelectedContacts(contacts);
+		}
+	}, [contacts]);
+
 	const { mutate: createContactList } = useCreateContactList({
 		suppressToasts: true,
 	});
@@ -181,17 +201,17 @@ export const useDashboard = () => {
 		});
 
 	const onSubmit = async (data: FormData) => {
-		await refetch();
-		// createContactList({
-		// 	name: data.searchText,
-		// 	contactIds: contacts?.map((contact) => contact.id) || [],
-		// });
+		console.log('submit');
+		setActiveSearchQuery(data.searchText);
+		setTimeout(() => {
+			refetchContacts();
+		}, 0);
 	};
 
 	const handleCreateCampaign = async () => {
 		const campaign = await createCampaign({
 			name: 'New Campaign',
-			contactLists: selectedRows.map((row) => row.id),
+			contactLists: selectedContactListRows.map((row) => row.id),
 		});
 		if (campaign) {
 			router.push(urls.murmur.campaign.detail(campaign.id));
@@ -205,11 +225,16 @@ export const useDashboard = () => {
 		isPendingContacts,
 		isLoadingContacts,
 		error,
-		setSelectedRows,
+		setSelectedContactListRows,
 		handleCreateCampaign,
 		isPendingCreateCampaign,
 		columns,
 		setSelectedContacts,
 		selectedContacts,
+		isRefetchingContacts,
+		activeSearchQuery,
+		tabOptions,
+		currentTab,
+		setCurrentTab,
 	};
 };

@@ -17,18 +17,24 @@ import {
 } from '@/components/ui/form';
 import ContactListTable from '@/components/organisms/_tables/ContactListTable/ContactListTable';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
+import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
 
 const Dashboard = () => {
 	const {
 		form,
 		onSubmit,
 		isLoadingContacts,
-		setSelectedRows,
 		handleCreateCampaign,
 		isPendingCreateCampaign,
 		contacts,
 		columns,
 		setSelectedContacts,
+		isRefetchingContacts,
+		activeSearchQuery,
+		tabOptions,
+		currentTab,
+		setCurrentTab,
+		setSelectedContactListRows,
 	} = useDashboard();
 
 	return (
@@ -54,65 +60,87 @@ const Dashboard = () => {
 				</Typography>
 			</div>
 
-			<div className="mt-12 max-w-[1174px] mx-auto">
-				<Form {...form}>
-					<form onSubmit={form.handleSubmit(onSubmit)}>
-						<FormField
-							control={form.control}
-							name="searchText"
-							render={({ field }) => (
-								<FormItem>
-									<FormControl>
-										<Input
-											placeholder="Who do you want to send to?  i.e  “Wedding Planners in North Carolina”"
-											{...field}
-										/>
-									</FormControl>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
-						<div className="flex items-center justify-end gap-2">
-							<Button variant="light" className="">
-								Import
-							</Button>
-							<Button
-								variant="primary-light"
-								type="submit"
-								className=""
-								isLoading={isLoadingContacts}
-							>
-								Search
-							</Button>
-						</div>
-					</form>
-				</Form>
-			</div>
-			<div className="flex items-center justify-center mt-5">
-				<Button variant="primary-light" className="">
-					Get More Contacts
-				</Button>
-			</div>
-			<CustomTable
-				isSelectable
-				setSelectedRows={setSelectedContacts}
-				data={contacts}
-				columns={columns}
-				searchable={false}
+			<BlockTabs
+				className="mt-12 text-center"
+				options={tabOptions}
+				activeValue={currentTab}
+				onValueChange={(val) => setCurrentTab(val)}
 			/>
 
-			<ContactListTable setSelectedRows={setSelectedRows} />
-			<div className="flex items-center">
-				<Button
-					onClick={handleCreateCampaign}
-					isLoading={isPendingCreateCampaign}
-					variant="primary-light"
-					className="w-8/10 mx-auto mt-5"
-				>
-					Create Campaign
-				</Button>
-			</div>
-			<CampaignsTable />
+			{currentTab === 'search' && (
+				<>
+					<div className="mt-12 max-w-[1174px] mx-auto">
+						<Form {...form}>
+							<form onSubmit={form.handleSubmit(onSubmit)}>
+								<FormField
+									control={form.control}
+									name="searchText"
+									render={({ field }) => (
+										<FormItem>
+											<FormControl>
+												<Input
+													placeholder="Who do you want to send to?  i.e  “Wedding Planners in North Carolina”"
+													{...field}
+												/>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+								<div className="flex items-center justify-end gap-2">
+									<Button variant="light" className="">
+										Import
+									</Button>
+									<Button
+										variant="primary-light"
+										type="submit"
+										className=""
+										isLoading={isLoadingContacts || isRefetchingContacts}
+									>
+										Search
+									</Button>
+								</div>
+							</form>
+						</Form>
+					</div>
+
+					{activeSearchQuery && (
+						<>
+							<div className="flex items-center justify-center mt-5">
+								<Button variant="primary-light" className="">
+									Get More Contacts
+								</Button>
+							</div>
+							<CustomTable
+								isSelectable
+								setSelectedRows={setSelectedContacts}
+								data={contacts}
+								columns={columns}
+								searchable={false}
+							/>
+
+							<div className="flex items-center">
+								<Button
+									onClick={handleCreateCampaign}
+									isLoading={isPendingCreateCampaign}
+									variant="primary-light"
+									className="w-8/10 mx-auto mt-5"
+								>
+									Create Campaign
+								</Button>
+							</div>
+						</>
+					)}
+				</>
+			)}
+
+			{currentTab === 'list' && (
+				<>
+					<ContactListTable setSelectedRows={setSelectedContactListRows} />
+				</>
+			)}
+
+			{/* <CampaignsTable /> */}
 		</AppLayout>
 	);
 };

@@ -8,8 +8,8 @@ import { cva, VariantProps } from 'class-variance-authority';
 const tableVariants = cva('w-full caption-bottom border-collapse', {
 	variants: {
 		variant: {
-			primary: 'text-[15px] font-primary',
-			secondary: 'text-[15px] font-primary bg-primary',
+			primary: 'text-[15px] font-secondary',
+			secondary: 'text-[15px] font-secondary bg-primary',
 		},
 	},
 	defaultVariants: {
@@ -124,8 +124,8 @@ const tableRowVariants = cva(
 	{
 		variants: {
 			variant: {
-				primary: 'font-bold text-[15px] odd:bg-gray-50 even:bg-white',
-				secondary: 'text-[15px] font-primary bg-primary',
+				primary: 'text-[15px] odd:bg-gray-50 even:bg-white',
+				secondary: 'text-[15px] bg-primary',
 			},
 		},
 		defaultVariants: {
@@ -182,8 +182,8 @@ const tableCellVariants = cva(
 	{
 		variants: {
 			variant: {
-				primary: 'text-[15px] font-primary',
-				secondary: 'text-[15px] font-primary bg-primary',
+				primary: 'text-sm font-secondary',
+				secondary: 'text-[15px] font-secondary bg-primary',
 			},
 		},
 		defaultVariants: {
@@ -209,8 +209,8 @@ function TableCell({
 const tableCaptionVariants = cva('text-muted-foreground mt-4 text-sm', {
 	variants: {
 		variant: {
-			primary: 'text-[15px] font-primary',
-			secondary: 'text-[15px] font-primary bg-primary',
+			primary: 'text-[15px] font-secondary',
+			secondary: 'text-[15px] font-secondary bg-primary',
 		},
 	},
 	defaultVariants: {
