@@ -5,14 +5,22 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { fetchMistral } from '@/app/api/_utils';
-import { MISTRAL_PARAGRAPH_AGENT_KEYS, MISTRAL_TONE_AGENT_KEYS } from '@/constants';
+import {
+	MISTRAL_HYBRID_AGENT_KEYS,
+	MISTRAL_PARAGRAPH_AGENT_KEYS,
+	MISTRAL_TONE_AGENT_KEYS,
+} from '@/constants';
 import { MistralAgentType } from '@/types';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
 const postMistralSchema = z.object({
-	agentType: z.enum([...MISTRAL_TONE_AGENT_KEYS, ...MISTRAL_PARAGRAPH_AGENT_KEYS]),
+	agentType: z.enum([
+		...MISTRAL_TONE_AGENT_KEYS,
+		...MISTRAL_PARAGRAPH_AGENT_KEYS,
+		...MISTRAL_HYBRID_AGENT_KEYS,
+	]),
 	prompt: z.string().min(1),
 	content: z.string().min(1),
 });

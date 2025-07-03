@@ -25,6 +25,7 @@ const Dashboard = () => {
 		setSelectedRows,
 		handleCreateCampaign,
 		isPendingCreateCampaign,
+		contacts,
 	} = useDashboard();
 
 	return (
@@ -84,6 +85,20 @@ const Dashboard = () => {
 					</form>
 				</Form>
 			</div>
+			{contacts && (
+				<div className="mt-12 max-w-[1174px] mx-auto">
+					<Typography variant="h2">Contacts</Typography>
+					<Typography variant="h3">{contacts.length} contacts found</Typography>
+					{contacts?.map((contact) => (
+						<div key={contact.id} className="flex-row  w-full items-center gap-2">
+							<Typography className="text-sm" font="secondary">
+								{contact.name} {contact.city} {contact.state} {contact.company}{' '}
+								{contact.email}
+							</Typography>
+						</div>
+					))}
+				</div>
+			)}
 			<ContactListTable setSelectedRows={setSelectedRows} />
 			<div className="flex items-center">
 				<Button

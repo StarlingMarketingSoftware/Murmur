@@ -1,8 +1,10 @@
-import { User } from '@prisma/client';
+import { User, Contact } from '@prisma/client';
 import prisma from '../src/lib/prisma';
 import { parse } from 'csv-parse/sync';
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import { getEmbeddingForContact } from './seed-data/contact-embeddings';
+import { initializeVectorDb, upsertContactToVectorDb } from '@/app/api/_utils/vectorDb';
 
 export type ContactCSVFormat = {
 	name: string;
@@ -13,6 +15,7 @@ export type ContactCSVFormat = {
 	state: string;
 	website: string;
 	phone: string;
+	title: string;
 };
 
 export async function getPublicFiles(directory: string = 'demoCsvs'): Promise<string[]> {
@@ -205,6 +208,7 @@ const importCSVWithSubcategories = async (
 				phone: record.phone,
 				contactListId: recordContactListId,
 				emailValidationStatus: 'valid',
+				title: record.title,
 			},
 			update: {
 				lastName: record.name,
@@ -267,14 +271,36 @@ const userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
 		stripeSubscriptionStatus: null,
 	},
 ];
+
+const seedElasticsearchEmbeddings = async (contacts: Contact[]) => {
+	// First, ensure the index exists
+	await initializeVectorDb();
+
+	// Insert embeddings for each contact
+	for (const contact of contacts) {
+		const embeddingData = getEmbeddingForContact(contact);
+
+		if (!embeddingData) {
+			console.warn(`No embedding found for contact ${contact.id}`);
+			continue;
+		}
+
+		await upsertContactToVectorDb(contact, embeddingData.embedding);
+	}
+};
+
 async function main() {
+	/* Seed users */
 	await prisma.user.createMany({
 		data: userData,
 	});
-	importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
-	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
 
-	return;
+	/* Seed contacts */
+	importCSVWithSubcategories('demoCsvs/musicVenuesDemo4106.csv', 'Music Venues');
+
+	/* Seed embeddings */
+	const allContacts = await prisma.contact.findMany();
+	await seedElasticsearchEmbeddings(allContacts);
 }
 
 main()

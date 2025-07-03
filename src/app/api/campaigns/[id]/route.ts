@@ -10,7 +10,7 @@ import {
 	handleApiError,
 	connectOrDisconnectId,
 } from '@/app/api/_utils';
-import { DraftingMode, DraftingTone, Status } from '@prisma/client';
+import { DraftingMode, DraftingTone, HybridBlock, Status } from '@prisma/client';
 import { ApiRouteParams } from '@/types';
 import { NextRequest } from 'next/server';
 
@@ -24,7 +24,17 @@ const patchCampaignSchema = z.object({
 	isAiSubject: z.boolean().optional(),
 	subject: z.string().nullable().optional(),
 	fullAiPrompt: z.string().nullable().optional(),
+	hybridAvailableBlocks: z.array(z.nativeEnum(HybridBlock)).optional(),
 	hybridPrompt: z.string().nullable().optional(),
+	hybridBlockPrompts: z
+		.array(
+			z.object({
+				id: z.string(),
+				type: z.nativeEnum(HybridBlock),
+				value: z.string(),
+			})
+		)
+		.optional(),
 	handwrittenPrompt: z.string().nullable().optional(),
 	testSubject: z.string().nullable().optional(),
 	testMessage: z.string().nullable().optional(),
