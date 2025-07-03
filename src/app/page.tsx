@@ -8,7 +8,6 @@ import { urls } from '@/constants/urls';
 import { SignUpButton, useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { PromotionLogos } from '@/components/molecules/PromotionLogos/PromotionLogos';
-import { twMerge } from 'tailwind-merge';
 import { ReviewCard } from '@/components/molecules/ReviewCard/ReviewCard';
 import { FAQ, Review } from '@/types';
 import Image from 'next/image';
@@ -16,12 +15,8 @@ import { ProductList } from '@/components/organisms/ProductList/ProductList';
 import { FaqSection } from '@/components/molecules/FaqSection/FaqSection';
 import { GradientBanner } from '@/components/molecules/GradientBanner/GradientBanner';
 import { StatBlock } from '@/components/molecules/StatBlock/StatBlock';
-import dynamic from 'next/dynamic';
 import MuxPlayer from '@mux/mux-player-react';
 
-const ReactPlayer = dynamic(() => import('react-player'), {
-	ssr: false,
-});
 const EMAIL_STATS = [
 	{
 		value: '115%',
