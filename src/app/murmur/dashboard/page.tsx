@@ -16,6 +16,8 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import ContactListTable from '@/components/organisms/_tables/ContactListTable/ContactListTable';
+import CustomTable from '@/components/molecules/CustomTable/CustomTable';
+import { useMemo } from 'react';
 
 const Dashboard = () => {
 	const {
@@ -26,7 +28,15 @@ const Dashboard = () => {
 		handleCreateCampaign,
 		isPendingCreateCampaign,
 		contacts,
+		columns,
+		setSelectedContacts,
+		selectedContacts,
 	} = useDashboard();
+
+	const contactIds = useMemo(
+		() => contacts ? contacts.map((contact) => String(contact.id)) : [],
+		[contacts]
+	);
 
 	return (
 		<AppLayout>
@@ -40,7 +50,7 @@ const Dashboard = () => {
 					className="mt-18 text-[19px] text-center"
 					color="light"
 				>
-					Let’s <strong>start</strong> by creating a campaign.
+					Let's <strong>start</strong> by creating a campaign.
 				</Typography>
 				<Typography
 					font="secondary"
@@ -61,7 +71,7 @@ const Dashboard = () => {
 								<FormItem>
 									<FormControl>
 										<Input
-											placeholder="Who do you want to send to?  i.e  “Wedding Planners in North Carolina”"
+											placeholder="Who do you want to send to?  i.e  "Wedding Planners in North Carolina""
 											{...field}
 										/>
 									</FormControl>
@@ -85,21 +95,20 @@ const Dashboard = () => {
 					</form>
 				</Form>
 			</div>
-			{contacts && (
-				<div className="mt-12 max-w-[1174px] mx-auto">
-					<Typography variant="h2">Contacts</Typography>
-					<Typography variant="h3">{contacts.length} contacts found</Typography>
-					{contacts?.map((contact) => (
-						<div key={contact.id} className="flex-row  w-full items-center gap-2">
-							<Typography className="text-sm" font="secondary">
-								{contact.name} | {contact.city} {contact.state} | {contact.company} |{' '}
-								{contact.email} | {contact.headline} | {contact.title} | {contact.address}{' '}
-								| {contact.website} | {contact.country} | {contact.linkedInUrl}
-							</Typography>
-						</div>
-					))}
-				</div>
-			)}
+			<div className="flex items-center justify-center mt-5">
+				<Button variant="primary-light" className="">
+					Get More Contacts
+				</Button>
+			</div>
+			<CustomTable
+				isSelectable
+				setSelectedRows={setSelectedContacts}
+				initialRowSelectionState={contactIds}
+				data={contacts}
+				columns={columns}
+				searchable={false}
+			/>
+
 			<ContactListTable setSelectedRows={setSelectedRows} />
 			<div className="flex items-center">
 				<Button
