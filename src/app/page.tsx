@@ -8,7 +8,6 @@ import { urls } from '@/constants/urls';
 import { SignUpButton, useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { PromotionLogos } from '@/components/molecules/PromotionLogos/PromotionLogos';
-import { twMerge } from 'tailwind-merge';
 import { ReviewCard } from '@/components/molecules/ReviewCard/ReviewCard';
 import { FAQ, Review } from '@/types';
 import Image from 'next/image';
@@ -16,11 +15,8 @@ import { ProductList } from '@/components/organisms/ProductList/ProductList';
 import { FaqSection } from '@/components/molecules/FaqSection/FaqSection';
 import { GradientBanner } from '@/components/molecules/GradientBanner/GradientBanner';
 import { StatBlock } from '@/components/molecules/StatBlock/StatBlock';
-import dynamic from 'next/dynamic';
+import MuxPlayer from '@mux/mux-player-react';
 
-const ReactPlayer = dynamic(() => import('react-player'), {
-	ssr: false,
-});
 const EMAIL_STATS = [
 	{
 		value: '115%',
@@ -179,14 +175,15 @@ export default function HomePage() {
 
 			{/* Video Section */}
 			<div className="py-16 mt-[121px]">
-				<div className="mx-auto max-w-4xl px-8">
-					<div className="relative w-full pb-[56%]">
-						<ReactPlayer
-							url="https://www.youtube.com/embed/p79hZlIlFD0?si=i1chgb0viWy7KKsv"
-							width="100%"
-							height="100%"
-							style={{ position: 'absolute', top: 0, left: 0 }}
-							controls={true}
+				<div className="mx-auto w-fit">
+					<div className="relative w-[1179px] aspect-video pb-[56%]">
+						<MuxPlayer
+							accentColor="var(--color-primary)"
+							playbackId="z015rWLTn4mlDbMX0021ale02ieVwttxqtZvzc2Z02nVotA"
+							metadata={{
+								video_title: 'Murmur Testimonials',
+								viewer_user_id: 'Placeholder (optional)',
+							}}
 						/>
 					</div>
 					<div className="flex justify-center mt-12">
@@ -235,18 +232,15 @@ export default function HomePage() {
 				<Typography variant="h2" className="text-left text-[60px] max-w-[575px] mx-auto ">
 					Build a campaign that is truly simple.
 				</Typography>
-				<div
-					className={twMerge(
-						'relative w-[1179px] aspect-video mx-auto mt-32',
-						'[&_.ytp-chrome-top-buttons]:!bg-red-500',
-						'[&_.ytp-gradient-top]:!hidden [&_.ytp-large-play-button]:!hidden'
-					)}
-				>
-					<ReactPlayer
-						url="https://www.youtube.com/embed/p79hZlIlFD0?si=i1chgb0viWy7KKsv"
-						width="100%"
-						height="100%"
-						controls={false}
+				<div className="relative w-[1179px] aspect-video mx-auto mt-32">
+					<MuxPlayer
+						accentColor="var(--color-primary)"
+						playbackId="z015rWLTn4mlDbMX0021ale02ieVwttxqtZvzc2Z02nVotA"
+						thumbnailTime={1.5}
+						metadata={{
+							video_title: 'Murmur Testimonials',
+							viewer_user_id: 'Placeholder (optional)',
+						}}
 					/>
 				</div>
 				<Typography

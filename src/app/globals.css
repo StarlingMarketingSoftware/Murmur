@@ -178,3 +178,11 @@
 		@apply text-lg font-bold;
 	}
 }
+
+mux-player {
+	--seek-backward-button: none;
+	--seek-forward-button: none;
+	--cast-button: none;
+	--pip-button: none;
+	--playback-rate-button: none;
+}
