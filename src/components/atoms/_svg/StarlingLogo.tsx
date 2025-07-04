@@ -88,8 +88,8 @@ export const StarlingLogo: FC<CommonIconProps> = (props) => {
 						</g>
 					</g>
 					<polygon
+						className="fill-transparent stroke-black stroke-3"
 						points="245.68 157.08 270.81 273.57 271.43 152.53 291.19 143.66 291.41 143.66 291.54 143.66 291.48 143.66 291.54 143.66 291.2 143.66 271.43 134.78 270.82 13.74 245.68 130.24 224.26 120.67 237.07 143.93 224.26 166.65 245.68 157.08"
-						// style="fill: none; stroke: #000; stroke-miterlimit: 10; stroke-width: 3px;"
 					/>
 					<g>
 						<g>

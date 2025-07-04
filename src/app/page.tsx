@@ -14,23 +14,11 @@ import Image from 'next/image';
 import { ProductList } from '@/components/organisms/ProductList/ProductList';
 import { FaqSection } from '@/components/molecules/FaqSection/FaqSection';
 import { GradientBanner } from '@/components/molecules/GradientBanner/GradientBanner';
-import { StatBlock } from '@/components/molecules/StatBlock/StatBlock';
 import MuxPlayer from '@mux/mux-player-react';
-
-const EMAIL_STATS = [
-	{
-		value: '115%',
-		label: 'More Responses',
-	},
-	{
-		value: '99.7%',
-		label: 'Delivery Rate',
-	},
-	{
-		value: '10x',
-		label: 'More Connections',
-	},
-];
+import { ChatGPTLogo } from '@/components/atoms/_svg/ChatGPTLogo';
+import { MailchimpLogo } from '@/components/atoms/_svg/MailChimpLogo';
+import { MurmurHorizontalLogo } from '@/components/atoms/_svg/MurmurHorizontalLogo';
+import { ComparisonTable } from '@/components/molecules/ComparisonTable/ComparisonTable';
 
 const REVIEWS: Review[] = [
 	{
@@ -135,8 +123,8 @@ export default function HomePage() {
 						<StarlingLogo width="150px" />
 					</div>
 					<div className="row-span1" />
-					<Typography variant="h2" className="row-span-3 text-center text-[46px]">
-						Email Campaigns Reimagined.<br></br> AI Personalization. No Contacts Required.
+					<Typography variant="h2" className="row-span-3 text-center text-[46px] ">
+						Cut Through The Noise.<br></br> Get Contacts. Get Work. Email Anyone.
 					</Typography>
 					<div className="row-span-2">
 						{!isSignedIn ? (
@@ -163,20 +151,21 @@ export default function HomePage() {
 			{/* Explanation */}
 			<div className="mx-auto max-w-[1059px] text-center">
 				<Typography variant="h2" className="row-span-3 text-center text-[52px]">
-					A dedicated AI-Integrated email tool.
+					Murmur helps you draft.<br></br> No ChatGPT. We built our own.
 				</Typography>
 				<Typography className="text-[26px] !mt-[42px]" variant="p">
-					Murmur is an email marketing tool that utilizes the most cutting-edge Machine
-					Learning and AI technology to help you put your personal touch on every email in
-					your campaign, no matter the size. Paired with state of the art list-generation,
-					we have made outreach truly seamless.
+					{`Our software gathers data on each contact every time you draft an email with
+					advanced search algorithms. This allows Murmur to craft customized emails,
+					getting you more responses and more work. Our algorithms are trained on many
+					thousands of successful emails. We've made technology that lets you build a
+					campaign that cuts through the noise. We know what it takes to succeed.`}
 				</Typography>
 			</div>
 
 			{/* Video Section */}
 			<div className="py-16 mt-[121px]">
 				<div className="mx-auto w-fit">
-					<div className="relative w-[1179px] aspect-video pb-[56%]">
+					<div className="relative w-[1179px] aspect-video">
 						<MuxPlayer
 							accentColor="var(--color-primary)"
 							playbackId="z015rWLTn4mlDbMX0021ale02ieVwttxqtZvzc2Z02nVotA"
@@ -194,22 +183,16 @@ export default function HomePage() {
 				</div>
 			</div>
 
-			<GradientBanner className="  mx-auto mt-24 flex justify-center items-center">
-				<Typography
-					variant="h2"
-					className="max-w-[569px] text-center text-[60px] leading-18"
-				>
-					Get the competitive edge you’ve been looking for
+			<GradientBanner className=" mx-auto mt-24 flex justify-center items-center">
+				<Typography variant="h2" className=" text-center text-[63px] leading-18">
+					Generate accurate contact lists in seconds.<br></br> Save countless hours.
 				</Typography>
 			</GradientBanner>
 
-			<div className="h-[200px] w-full mx-auto mt-36">
-				<div className="flex items-center justify-center gap-40">
-					{EMAIL_STATS.map((stat, index) => (
-						<StatBlock key={index} stat={stat.value} description={stat.label}></StatBlock>
-					))}
-				</div>
+			<div className="mt-24 mb-24 bg-light">
+				<ComparisonTable />
 			</div>
+
 			<div className="max-w-[966px] mx-auto mt-24">
 				<Typography variant="h3" className="text-center text-[34px]">
 					Trusted by countless businesses
@@ -230,7 +213,7 @@ export default function HomePage() {
 
 			<div className="mx-auto mt-50 w-full bg-gradient-to-b from-gray-200 to-white py-28">
 				<Typography variant="h2" className="text-left text-[60px] max-w-[575px] mx-auto ">
-					Build a campaign that is truly simple.
+					Send without Limits.<br></br> Dream without Boundaries.
 				</Typography>
 				<div className="relative w-[1179px] aspect-video mx-auto mt-32">
 					<MuxPlayer
@@ -247,11 +230,12 @@ export default function HomePage() {
 					variant="p"
 					className="w-[1130px] mx-auto !mt-32 text-center text-[26px]"
 				>
-					{`Streamlined at every step, you can leave behind the days of cluttered
-					interfaces, and complicated workflows of traditional mass-email tools. We worked
-					hard to make Murmur simple and easy to use. No longer is it frustrating to
-					manage a campaign, with Murmur it's just a few clicks and we do the rest. Giving
-					you more time to do what you love, and less busywork.`}
+					Major email providers have tight sending restrictions, our server has none.
+					Focus your time and energy where it matters most, and leave the volume to us.
+					With Murmur you no longer have to compromise between mass email and custom AI
+					personalization, it does it all. Nothing else like it, Murmur helps you make
+					meaningful connections, not forgettable spam, at a scale previously
+					unimaginable. Dream big, we’ve got you.
 				</Typography>
 			</div>
 
@@ -306,6 +290,7 @@ export default function HomePage() {
 				title="FAQs"
 				description="Everything you need to know about Murmur!"
 			/>
+			<div className="h-24" />
 		</main>
 	);
 }

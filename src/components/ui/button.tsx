@@ -43,7 +43,7 @@ const buttonVariants = cva(
 				icon: 'size-9',
 			},
 			font: {
-				primary: 'font-primary font-extrabold',
+				primary: 'font-primary',
 				secondary: 'font-secondary',
 			},
 			outline: {

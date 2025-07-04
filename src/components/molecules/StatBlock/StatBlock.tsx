@@ -9,7 +9,27 @@ interface StatBlockProps {
 	className?: string;
 }
 
-export const StatBlock: FC<StatBlockProps> = ({ stat, description, size, className }) => {
+const EMAIL_STATS = [
+	{
+		value: '115%',
+		label: 'More Responses',
+	},
+	{
+		value: '99.7%',
+		label: 'Delivery Rate',
+	},
+	{
+		value: '10x',
+		label: 'More Connections',
+	},
+];
+
+export const StatBlock: FC<StatBlockProps> = ({
+	stat = EMAIL_STATS[0].value,
+	description,
+	size,
+	className,
+}) => {
 	const cnStat = [];
 	const cnDescription = [];
 

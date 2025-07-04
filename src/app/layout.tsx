@@ -28,7 +28,7 @@ const timesNewRoman = localFont({
 		},
 		{
 			path: '../../public/fonts/timesBoldItalic.ttf',
-			weight: '400',
+			weight: '700',
 			style: 'italic',
 		},
 		{
