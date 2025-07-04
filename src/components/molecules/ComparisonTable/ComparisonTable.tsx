@@ -62,7 +62,7 @@ const CustomX = () => {
 
 const CustomTd = ({ children }: { children: ReactNode }) => {
 	return (
-		<td className="py-4 border-r-2 text-center border-r-foreground max-w-[250px]">
+		<td className="py-4 border-r-3 text-center border-r-foreground max-w-[250px]">
 			{children}
 		</td>
 	);
@@ -74,7 +74,7 @@ const CustomTh = ({ children }: { children?: ReactNode }) => {
 
 export const ComparisonTable = () => {
 	return (
-		<div className="mx-auto flex justify-center">
+		<div className="mx-auto flex justify-center py-24">
 			<table className="border-collapse w-fit">
 				<thead>
 					<tr className="">
@@ -105,7 +105,7 @@ export const ComparisonTable = () => {
 				<tbody>
 					{features.map((feature, index) => (
 						<tr key={index}>
-							<td className="pt-4 pr-8 text-[34px] font-primary border-r-2 border-r-foreground border-t-transparent text-nowrap text-center w-[250px]">
+							<td className="pt-4 pr-8 text-[34px] font-primary border-r-3 border-r-foreground border-t-transparent text-nowrap text-center w-[250px]">
 								{feature.label}
 							</td>
 							<CustomTd>{feature.murmur ? <CustomCheck /> : <CustomX />}</CustomTd>

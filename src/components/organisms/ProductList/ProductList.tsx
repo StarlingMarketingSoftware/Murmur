@@ -10,11 +10,11 @@ export const ProductList: FC = () => {
 		return <Spinner />;
 	}
 	return (
-		<div className="flex gap-23 w-full mx-auto items-center justify-center flex-wrap group">
+		<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-0 w-full mx-auto place-items-center [&>*:hover~*]:opacity-50 [&>*:hover~*]:scale-[0.99]">
 			{sortedProducts!.map((product) => (
 				<div
 					key={product.id}
-					className="transition duration-300 group-hover:opacity-50 group-hover:scale-99 hover:!opacity-100 hover:!scale-100"
+					className="transition duration-300 hover:opacity-100 hover:scale-100 [&:has(~:hover)]:opacity-50 [&:has(~:hover)]:scale-[0.99]"
 				>
 					<ProductCard product={product} user={user} />
 				</div>

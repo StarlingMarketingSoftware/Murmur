@@ -14,10 +14,7 @@ import Image from 'next/image';
 import { ProductList } from '@/components/organisms/ProductList/ProductList';
 import { FaqSection } from '@/components/molecules/FaqSection/FaqSection';
 import { GradientBanner } from '@/components/molecules/GradientBanner/GradientBanner';
-import MuxPlayer from '@mux/mux-player-react';
-import { ChatGPTLogo } from '@/components/atoms/_svg/ChatGPTLogo';
-import { MailchimpLogo } from '@/components/atoms/_svg/MailChimpLogo';
-import { MurmurHorizontalLogo } from '@/components/atoms/_svg/MurmurHorizontalLogo';
+import { VideoPlayer } from '@/components/molecules/VideoPlayer/VideoPlayer';
 import { ComparisonTable } from '@/components/molecules/ComparisonTable/ComparisonTable';
 
 const REVIEWS: Review[] = [
@@ -166,12 +163,11 @@ export default function HomePage() {
 			<div className="py-16 mt-[121px]">
 				<div className="mx-auto w-fit">
 					<div className="relative w-[1179px] aspect-video">
-						<MuxPlayer
-							accentColor="var(--color-primary)"
+						<VideoPlayer
 							playbackId="z015rWLTn4mlDbMX0021ale02ieVwttxqtZvzc2Z02nVotA"
+							thumbnailTime={1.5}
 							metadata={{
 								video_title: 'Murmur Testimonials',
-								viewer_user_id: 'Placeholder (optional)',
 							}}
 						/>
 					</div>
@@ -193,38 +189,23 @@ export default function HomePage() {
 				<ComparisonTable />
 			</div>
 
-			<div className="max-w-[966px] mx-auto mt-24">
-				<Typography variant="h3" className="text-center text-[34px]">
-					Trusted by countless businesses
-				</Typography>
-				<div className="bg-gradient-to-b from-gray-100 to-white py-16 rounded-md w-full mt-14">
-					<div
-						style={{
-							maskImage:
-								'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)',
-							WebkitMaskImage:
-								'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
-						}}
+			<div className="mt-50 w-full bg-gradient-to-b from-gray-200 to-white py-28">
+				<div className="relative w-[1179px] mx-auto">
+					<Typography
+						variant="h2"
+						className="text-left text-[60px] max-w-[575px] w-full text-nowrap"
 					>
-						<PromotionLogos />
+						Send without Limits.<br></br> Dream without Boundaries.
+					</Typography>
+					<div className="rounded-lg w-fit h-fit aspect-video max-h-fit overflow-hidden mt-32">
+						<VideoPlayer
+							playbackId="z015rWLTn4mlDbMX0021ale02ieVwttxqtZvzc2Z02nVotA"
+							thumbnailTime={1.5}
+							metadata={{
+								video_title: 'Murmur Testimonials',
+							}}
+						/>
 					</div>
-				</div>
-			</div>
-
-			<div className="mx-auto mt-50 w-full bg-gradient-to-b from-gray-200 to-white py-28">
-				<Typography variant="h2" className="text-left text-[60px] max-w-[575px] mx-auto ">
-					Send without Limits.<br></br> Dream without Boundaries.
-				</Typography>
-				<div className="relative w-[1179px] aspect-video mx-auto mt-32">
-					<MuxPlayer
-						accentColor="var(--color-primary)"
-						playbackId="z015rWLTn4mlDbMX0021ale02ieVwttxqtZvzc2Z02nVotA"
-						thumbnailTime={1.5}
-						metadata={{
-							video_title: 'Murmur Testimonials',
-							viewer_user_id: 'Placeholder (optional)',
-						}}
-					/>
 				</div>
 				<Typography
 					variant="p"
@@ -247,27 +228,46 @@ export default function HomePage() {
 				))}
 			</div>
 
+			<div className="max-w-[1608px] mx-auto mt-24">
+				<Typography variant="h3" className="text-center text-[34px]">
+					Trusted by countless businesses
+				</Typography>
+				<div className="bg-gradient-to-b from-gray-100 to-white pt-16 pb-48 rounded-md w-full mt-14 h-fit ">
+					<div
+						style={{
+							maskImage:
+								'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.2) 100%)',
+							WebkitMaskImage:
+								'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
+						}}
+					>
+						<PromotionLogos />
+					</div>
+				</div>
+			</div>
+
 			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-25">
 				<Typography variant="p" className="text-center text-[60px] mx-auto">
-					Every email is personalized.
+					Not Another Email Tool. 
+				</Typography>
+				<Typography
+					variant="p"
+					className="w-8/10 max-w-[1233px] mx-auto !mt-10 text-center text-[26px]"
+				>
+					{`Murmur serves an entirely different purpose. While other email marketing tools like Mailchimp are great for keeping up an email newsletter, Murmur is designed specifically for entrepreneurs, business owners, and those with a vision to bring in leads and sell to new customers. Each email in a campaign is deeply personalized, and written in your own voice rather than using a stock template that falls through the cracks.
+`}
 				</Typography>
 				<Image
 					src="/photos/frontPhoto1.jpg"
 					alt="Personalized Email"
-					width={942}
-					height={628}
-					className="mx-auto mt-24 rounded-sm"
+					width={1173}
+					height={782}
+					className="mx-auto mt-12 rounded-sm"
 				/>
-				<Typography
-					variant="p"
-					className="w-8/10 max-w-[1233px] mx-auto !mt-32 text-center text-[26px]"
-				>
-					{`Our technological approach to email marketing allows us to build your campaigns so that every email in the campaign is differentiated from the last. Let Murmur AI gather information about the companies and recipients you're writing to and help you craft the perfect email.`}
-				</Typography>
 			</div>
 
-			<GradientBanner gloss>
-				<Typography variant="h2" className="text-center text-[60px] mx-auto py-8">
+			<GradientBanner gloss className="mt-24 !py-3">
+				<Typography variant="h2" className="text-center text-[75px] mx-auto py-8">
 					{`Find the plan that's right for`} <span className="italic">you</span>
 				</Typography>
 			</GradientBanner>
