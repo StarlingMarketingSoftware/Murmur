@@ -18,9 +18,11 @@ import {
 import ContactListTable from '@/components/organisms/_tables/ContactListTable/ContactListTable';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
+import Spinner from '@/components/ui/spinner';
 
 const Dashboard = () => {
 	const {
+		apolloContacts,
 		form,
 		onSubmit,
 		isLoadingContacts,
@@ -35,6 +37,9 @@ const Dashboard = () => {
 		currentTab,
 		setCurrentTab,
 		setSelectedContactListRows,
+		handleImportApolloContacts,
+		tableRef,
+		isPendingImportApolloContacts,
 	} = useDashboard();
 
 	return (
@@ -107,17 +112,27 @@ const Dashboard = () => {
 					{activeSearchQuery && (
 						<>
 							<div className="flex items-center justify-center mt-5">
-								<Button variant="primary-light" className="">
+								<Button
+									onClick={handleImportApolloContacts}
+									variant="light"
+									className=""
+									isLoading={isPendingImportApolloContacts}
+								>
 									Get More Contacts
 								</Button>
 							</div>
-							<CustomTable
-								isSelectable
-								setSelectedRows={setSelectedContacts}
-								data={contacts}
-								columns={columns}
-								searchable={false}
-							/>
+							{contacts ? (
+								<CustomTable
+									isSelectable
+									setSelectedRows={setSelectedContacts}
+									data={[...contacts, ...apolloContacts]}
+									columns={columns}
+									searchable={false}
+									tableRef={tableRef}
+								/>
+							) : (
+								<Spinner />
+							)}
 
 							<div className="flex items-center">
 								<Button

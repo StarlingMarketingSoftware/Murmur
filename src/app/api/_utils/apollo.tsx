@@ -5,7 +5,8 @@ import { stripUntilBrace } from '@/utils';
 import { fetchOpenAi } from './openai';
 
 const PROMPT = `You are an expert in Apollo.io's People Search API and are tasked with converting a search query in string format into a valid Apollo People Search object. Use the following guidelines:
-	1. The returned object should match this Typescript type definition:
+	1. Correct any spelling errors in the search query.
+	2. The returned object should match this Typescript type definition:
 		type ApolloPeopleSearch = {
 			person_titles?: string[]; // the more you add, the more results you get
 			person_locations?: string[]; // cities, countries, and US states are supported
@@ -14,10 +15,10 @@ const PROMPT = `You are an expert in Apollo.io's People Search API and are taske
 			contact_email_status?: string[]; // verified, unverified, likely to engage, unavailable, Set this to ['verified', 'likely to engage']
 			organization_num_employees_ranges?: string[]; // The number of employees at a person's current employer. Each range consists of two numbers separated by a comma. Examples: 1,10; 250,500; 10000,20000
 		}
-	2. Here is an example of a valid Apollo People Search object in JSON string format. This is in response to the search query "senior level machine learning software engineer in San Francisco, CA or New York City in a small company based in the United States":
+	3. Here is an example of a valid Apollo People Search object in JSON string format. This is in response to the search query "senior level machine learning software engineer in San Francisco, CA or New York City in a small company based in the United States":
 	{"person_titles": ["Software Engineer", "Data Scientist"],"person_locations": ["San Francisco", "New York City"],"person_seniorities": ["senior"],"organization_locations": ["United States"],"contact_email_status": ["verified", "likely to engage"],"organization_num_employees_ranges": ["1,10", "250,500"],"q_keywords": ""}
-	3. For "contact_email_status", always use this value: ["verified", "likely to engage"]
-	4. Ensure that your response is a valid JSON string that can be parsed by JSON.parse() in JavaScript.
+	4. For "contact_email_status", always use this value: ["verified", "likely to engage"]
+	5. Ensure that your response is a valid JSON string that can be parsed by JSON.parse() in JavaScript.
 	`;
 
 export const fetchApolloContacts = async (
@@ -30,6 +31,8 @@ export const fetchApolloContacts = async (
 		return [];
 	}
 
+	// before calling openAi check the database if the query has already been searched
+
 	const openAiResponse = await fetchOpenAi(
 		OPEN_AI_MODEL_OPTIONS.o4mini,
 		PROMPT,
@@ -37,11 +40,12 @@ export const fetchApolloContacts = async (
 	);
 	const openAiResponseJson = JSON.parse(stripUntilBrace(openAiResponse));
 
+	// if it has been searched, get the page and apolloQuery from the database
 	try {
 		const requestBody = {
 			...openAiResponseJson,
 			page: 1,
-			per_page: pageSize, // max 100
+			per_page: pageSize, // default 100
 			include_similar_titles: true,
 		};
 
@@ -61,11 +65,14 @@ export const fetchApolloContacts = async (
 			return [];
 		}
 
+		// update ApolloQuery table with new page, maxPage
+
 		const data = await response.json();
+		console.log('🚀 ~ data:', data);
 		console.log(
 			`Apollo returned ${data.people?.length || 0} people out of ${
 				data.pagination?.total_entries || 0
-			} total`
+			} total stored in ${data.pagination?.total_pages} pages.`
 		);
 
 		return data.people || [];

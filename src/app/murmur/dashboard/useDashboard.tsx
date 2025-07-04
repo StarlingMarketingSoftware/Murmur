@@ -3,19 +3,17 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-// import { useGetApollo } from '@/hooks/queryHooks/useApollo';
-import { useCreateContactList } from '@/hooks/queryHooks/useContactLists';
-import { Contact, ContactList, EmailVerificationStatus } from '@prisma/client';
-import { useEffect, useState, useMemo } from 'react';
+import { ContactList, EmailVerificationStatus } from '@prisma/client';
+import { useEffect, useState } from 'react';
 import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { TableSortingButton } from '@/components/molecules/CustomTable/CustomTable';
-import { ColumnDef } from '@tanstack/react-table';
+import { ColumnDef, Table } from '@tanstack/react-table';
 import { ContactWithName } from '@/types/contact';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useGetApollo } from '@/hooks/queryHooks/useApollo';
+import { useCreateApolloContacts } from '@/hooks/queryHooks/useApollo';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -24,6 +22,7 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>;
 
 export const useDashboard = () => {
+	/* UI */
 	const columns: ColumnDef<ContactWithName>[] = [
 		{
 			id: 'select',
@@ -136,10 +135,6 @@ export const useDashboard = () => {
 		},
 	];
 
-	const [currentTab, setCurrentTab] = useState<(typeof tabOptions)[number]['value']>(
-		tabOptions[0].value
-	);
-
 	const router = useRouter();
 	const form = useForm<FormData>({
 		resolver: zodResolver(formSchema),
@@ -148,11 +143,17 @@ export const useDashboard = () => {
 		},
 	});
 
+	/* HOOKS */
 	const [selectedContactListRows, setSelectedContactListRows] = useState<ContactList[]>(
 		[]
 	);
-	const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
+	const [selectedContacts, setSelectedContacts] = useState<ContactWithName[]>([]);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
+	const [currentTab, setCurrentTab] = useState<(typeof tabOptions)[number]['value']>(
+		tabOptions[0].value
+	);
+	const [apolloContacts, setApolloContacts] = useState<ContactWithName[]>([]);
+	const [tableInstance, setTableInstance] = useState<Table<ContactWithName>>();
 
 	const {
 		data: contacts,
@@ -171,37 +172,29 @@ export const useDashboard = () => {
 		enabled: false,
 	});
 
-	// const {
-	// 	data: apolloContacts,
-	// 	isPending: isPendingApolloContacts,
-	// 	isLoading: isLoadingApolloContacts,
-	// 	error: apolloError,
-	// 	refetch: apolloRefetch,
-	// } = useGetApollo({
-	// 	filters: {
-	// 		query: activeSearchQuery,
-	// 		limit: 5,
-	// 	},
-	// });
+	const { mutateAsync: importApolloContacts, isPending: isPendingImportApolloContacts } =
+		useCreateApolloContacts({
+			suppressToasts: true,
+		});
 
 	// Initialize selected contacts when contacts load
 	useEffect(() => {
-		if (contacts) {
-			setSelectedContacts(contacts);
+		if (contacts && apolloContacts) {
+			setSelectedContacts([...contacts, ...apolloContacts]);
 		}
-	}, [contacts]);
+	}, [contacts, apolloContacts]);
 
-	const { mutate: createContactList } = useCreateContactList({
-		suppressToasts: true,
-	});
+	// const { mutate: createContactList } = useCreateContactList({
+	// 	suppressToasts: true,
+	// });
 
 	const { mutateAsync: createCampaign, isPending: isPendingCreateCampaign } =
 		useCreateCampaign({
 			suppressToasts: true,
 		});
 
+	/* HANDLERS */
 	const onSubmit = async (data: FormData) => {
-		console.log('submit');
 		setActiveSearchQuery(data.searchText);
 		setTimeout(() => {
 			refetchContacts();
@@ -218,13 +211,32 @@ export const useDashboard = () => {
 		}
 	};
 
+	const handleImportApolloContacts = async () => {
+		const newApolloContacts = await importApolloContacts({
+			query: activeSearchQuery,
+			limit: 1,
+		});
+		console.log(
+			'🚀 ~ handleImportApolloContacts ~ newApolloContacts:',
+			newApolloContacts
+		);
+		setApolloContacts([...apolloContacts, ...newApolloContacts]);
+		// create a database table that tracks queries and apollo pagination
+	};
+
+	const handleTableRef = (table: Table<ContactWithName>) => {
+		setTableInstance(table);
+	};
+
 	return {
+		apolloContacts,
 		form,
 		onSubmit,
 		contacts,
 		isPendingContacts,
 		isLoadingContacts,
 		error,
+		handleImportApolloContacts,
 		setSelectedContactListRows,
 		handleCreateCampaign,
 		isPendingCreateCampaign,
@@ -236,5 +248,8 @@ export const useDashboard = () => {
 		tabOptions,
 		currentTab,
 		setCurrentTab,
+		tableRef: handleTableRef,
+		tableInstance,
+		isPendingImportApolloContacts,
 	};
 };

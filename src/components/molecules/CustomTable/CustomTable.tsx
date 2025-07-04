@@ -10,6 +10,7 @@ import {
 	getSortedRowModel,
 	SortingState,
 	useReactTable,
+	Table as TableType,
 } from '@tanstack/react-table';
 
 import {
@@ -82,6 +83,7 @@ export function TableSortingButton<TData>({
 
 interface CustomTableProps<TData, TValue> extends DataTableProps<TData, TValue> {
 	variant?: 'primary' | 'secondary';
+	tableRef?: (table: TableType<TData>) => void;
 }
 
 export function CustomTable<TData, TValue>({
@@ -94,6 +96,7 @@ export function CustomTable<TData, TValue>({
 	noDataMessage = 'No data was found.',
 	variant = 'primary',
 	searchable = true,
+	tableRef,
 }: CustomTableProps<TData, TValue>) {
 	const [pagination, setPagination] = useState({
 		pageIndex: 0,
@@ -139,24 +142,12 @@ export function CustomTable<TData, TValue>({
 		},
 	});
 
-	// Update row selection when data changes
+	// Add this effect to pass the table instance to parent
 	useEffect(() => {
-		if (data && isSelectable) {
-			setRowSelection(getInitialRowSelection());
+		if (tableRef) {
+			tableRef(table);
 		}
-	}, [data, isSelectable]);
-
-	// Update selected rows in parent component
-	useEffect(() => {
-		if (!setSelectedRows || !data || !isSelectable) return;
-		const selectedRows = table.getSelectedRowModel().rows;
-		if (!singleSelection) {
-			setSelectedRows(selectedRows.map((row) => row.original));
-		} else {
-			const firstSelectedRow = selectedRows[0];
-			setSelectedRows(firstSelectedRow ? [firstSelectedRow.original] : []);
-		}
-	}, [setSelectedRows, rowSelection, data, singleSelection, isSelectable, table]);
+	}, [table, tableRef]);
 
 	useEffect(() => {
 		if (!data) return;

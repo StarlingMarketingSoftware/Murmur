@@ -174,7 +174,6 @@ export async function POST(req: NextRequest) {
 			},
 		});
 
-		// Store contact vector in
 		await upsertContactToVectorDb(contact);
 
 		return apiResponse(contact);
