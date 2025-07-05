@@ -173,9 +173,7 @@ export const useDashboard = () => {
 	});
 
 	const { mutateAsync: importApolloContacts, isPending: isPendingImportApolloContacts } =
-		useCreateApolloContacts({
-			suppressToasts: true,
-		});
+		useCreateApolloContacts({});
 
 	// Initialize selected contacts when contacts load
 	useEffect(() => {

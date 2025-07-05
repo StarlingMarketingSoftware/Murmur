@@ -140,6 +140,7 @@ model Contact {
   headline       String?
   linkedInUrl    String?
   photoUrl       String?
+  metadata       String?
 
   emailValidationStatus    EmailVerificationStatus @default(unknown)
   emailValidationSubStatus String?
@@ -269,9 +270,10 @@ model ContactVerificationRequest {
 }
 
 model ApolloQuery {
-  id              Int    @id @default(autoincrement())
-  query           String
-  apolloQuery     Json
-  maxPage         Int
-  pageLastFetched Int
+  id                  Int        @id @default(autoincrement())
+  query               String
+  apolloQuery         Json       @db.JsonB
+  maxPage             Int
+  pageLastFetched     Int
+  pageFetchTimeStamps DateTime[]
 }

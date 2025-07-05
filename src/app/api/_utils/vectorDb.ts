@@ -28,6 +28,7 @@ interface ContactDocument {
 	address: string;
 	website: string;
 	linkedInUrl: string;
+	metadata: string;
 }
 
 // Helper function to generate embedding for contact data
@@ -45,6 +46,7 @@ export const generateContactEmbedding = async (contact: Contact) => {
 		contact.headline,
 		contact.website,
 		contact.linkedInUrl,
+		contact.metadata,
 	]
 		.filter(Boolean)
 		.join(' ');
@@ -86,6 +88,7 @@ export const initializeVectorDb = async () => {
 						address: { type: 'text' },
 						website: { type: 'text' },
 						linkedInUrl: { type: 'text' },
+						metadata: { type: 'text' },
 					},
 				},
 			});
@@ -130,6 +133,7 @@ export const upsertContactToVectorDb = async (
 			address: contact.address || '',
 			website: contact.website || '',
 			linkedInUrl: contact.linkedInUrl || '',
+			metadata: contact.metadata || '',
 		},
 	});
 
@@ -181,6 +185,7 @@ export const searchSimilarContacts = async (
 			'address',
 			'website',
 			'linkedInUrl',
+			'metadata',
 		],
 		_source: false,
 	});
@@ -206,6 +211,7 @@ export const searchSimilarContacts = async (
 				address: hit.fields?.address[0],
 				website: hit.fields?.website[0],
 				linkedInUrl: hit.fields?.linkedInUrl[0],
+				metadata: hit.fields?.metadata[0],
 			},
 		})),
 		totalFound: filteredHits.length,

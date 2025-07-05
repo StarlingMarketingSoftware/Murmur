@@ -7,9 +7,18 @@ export const ellipsesText = (text: string, maxLength: number): string => {
 	return text;
 };
 
-export const stripUntilBrace = (text: string): string => {
+const stripUntilBrace = (text: string): string => {
 	const braceIndex = text.indexOf('{');
 	return braceIndex >= 0 ? text.substring(braceIndex) : text;
+};
+
+const stripAfterBrace = (text: string): string => {
+	const braceIndex = text.indexOf('}');
+	return braceIndex >= 0 ? text.substring(0, braceIndex + 1) : text;
+};
+
+export const stripBothSidesOfBraces = (text: string): string => {
+	return stripAfterBrace(stripUntilBrace(text));
 };
 
 /**
