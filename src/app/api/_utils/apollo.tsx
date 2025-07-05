@@ -57,6 +57,8 @@ export const fetchApolloContacts = async (query: string): Promise<ApolloPerson[]
 		},
 	});
 
+	// if it's been searched before, and the 
+
 	let currentPageToFetch = 1;
 
 	if (existingQuery) {
