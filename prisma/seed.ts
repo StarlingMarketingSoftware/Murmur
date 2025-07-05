@@ -3,7 +3,7 @@ import prisma from '../src/lib/prisma';
 import { parse } from 'csv-parse/sync';
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { getEmbeddingForContact } from './seed-data/contactEmbeddings2';
+import { getEmbeddingForContact } from './seed-data/contactEmbeddingsHelper';
 import { initializeVectorDb, upsertContactToVectorDb } from '@/app/api/_utils/vectorDb';
 
 export type ContactCSVFormat = {

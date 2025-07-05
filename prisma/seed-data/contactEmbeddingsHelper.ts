@@ -7,7 +7,7 @@ export interface ContactEmbedding {
 	embedding: number[];
 }
 
-// Helper function to get embedding for a contact
+// Combines data from separate contact embeddings files to avoid Github file size limit
 export function getEmbeddingForContact(contact: Contact): ContactEmbedding | undefined {
 	const contactEmbeddings = [...contactEmbeddings1, ...contactEmbeddings2];
 	return contactEmbeddings.find((e) => e.id === String(contact.id));
