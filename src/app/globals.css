@@ -150,15 +150,15 @@
 
 @keyframes scroll {
 	0% {
-		transform: translateX(0);
+		transform: translate(0);
 	}
 	100% {
-		transform: translateX(-50%);
+		transform: translate(calc(-50% - 2.75rem));
 	}
 }
 
 .animate-scroll {
-	animation: scroll 30s linear infinite;
+	animation: scroll 50s linear infinite;
 }
 
 @layer base {
