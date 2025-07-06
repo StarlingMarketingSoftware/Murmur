@@ -48,7 +48,7 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 					<Typography variant="h4" className="text-[59px] font-bold">
 						{formattedPrice}
 					</Typography>
-					<Typography variant="p" className="text-[27px] translate-y-2">
+					<Typography variant="p" className="text-[27px] translate-y-8">
 						{period}
 					</Typography>
 				</div>

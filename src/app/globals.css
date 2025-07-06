@@ -1,6 +1,5 @@
 @import 'tailwindcss';
-
-@plugin "tailwindcss-animate";
+@import 'tailwind-animate';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -154,6 +153,31 @@
 	}
 	100% {
 		transform: translate(calc(-50% - 2.75rem));
+	}
+}
+
+.animate-accordion-down {
+	animation: accordion-down 0.8s ease-out;
+}
+
+.animate-accordion-up {
+	animation: accordion-up 0.8s ease-out;
+}
+
+@keyframes accordion-down {
+	from {
+		height: 0px;
+	}
+	to {
+		height: 500px;
+	}
+}
+@keyframes accordion-up {
+	from {
+		height: 500px;
+	}
+	to {
+		height: 0px;
 	}
 }
 

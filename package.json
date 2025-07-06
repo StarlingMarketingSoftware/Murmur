@@ -90,6 +90,7 @@
 		"string-similarity": "^4.0.4",
 		"stripe": "^16.12.0",
 		"svix": "^1.61.4",
+		"tailwind-animate": "^0.2.10",
 		"tailwind-merge": "^3.0.2",
 		"tailwindcss-animate": "^1.0.7",
 		"zod": "^3.24.2"
