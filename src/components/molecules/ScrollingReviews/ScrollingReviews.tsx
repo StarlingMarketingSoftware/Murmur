@@ -81,7 +81,7 @@ export const ScrollingReviews = () => {
 						</div>
 					))}
 					{REVIEWS.map((review, index) => (
-						<div className="" key={index}>
+						<div className="" key={`${index}-dup`}>
 							<ReviewCard review={review} />
 						</div>
 					))}
