@@ -8,8 +8,7 @@ import { urls } from '@/constants/urls';
 import { SignUpButton, useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { PromotionLogos } from '@/components/molecules/PromotionLogos/PromotionLogos';
-import { ReviewCard } from '@/components/molecules/ReviewCard/ReviewCard';
-import { FAQ, Review } from '@/types';
+import { FAQ } from '@/types';
 import Image from 'next/image';
 import { ProductList } from '@/components/organisms/ProductList/ProductList';
 import { FaqSection } from '@/components/molecules/FaqSection/FaqSection';
@@ -77,18 +76,24 @@ export default function HomePage() {
 				{/* Content layer - centered */}
 				<div className="relative z-20 grid grid-rows-12 justify-items-center h-full gap-0">
 					<div className="row-span-2" />
-					<LogoIcon className="row-span-1" width="106px" height="84px" />
-					<Typography variant="h1" className="row-span-1 !text-[100px] leading-[0.8]">
+					<LogoIcon className="row-span-1 w-[55px] sm:w-[75px] md:w-[90px] lg:w-[106px] h-[44px] sm:h-[60px] md:h-[72px] lg:h-[84px]" />
+					<Typography
+						variant="h1"
+						className="row-span-1 !text-[65px] sm:!text-[100px]  leading-[0.8]"
+					>
 						Murmur
 					</Typography>
-					<div className="row-span-1 flex items-center gap-14">
-						<Typography variant="p" className="text-sm">
+					<div className="row-span-1 flex items-center gap-8 sm:gap-14">
+						<Typography variant="p" className="!text-[16px]">
 							by
 						</Typography>
 						<StarlingLogo width="150px" />
 					</div>
 					<div className="row-span1" />
-					<Typography variant="h2" className="row-span-3 text-center text-[46px] ">
+					<Typography
+						variant="h2"
+						className="row-span-3 text-center text-[30px] sm:text-[46px] px-2"
+					>
 						Cut Through The Noise.<br></br> Get Contacts. Get Work. Email Anyone.
 					</Typography>
 					<div className="row-span-2">
@@ -114,11 +119,14 @@ export default function HomePage() {
 				</div>
 			</div>
 			{/* Explanation */}
-			<div className="mx-auto max-w-[1059px] text-center">
-				<Typography variant="h2" className="row-span-3 text-center text-[52px]">
+			<div className="mx-auto max-w-[1059px] text-center px-3">
+				<Typography
+					variant="h2"
+					className="row-span-3 text-center text-[38px] sm:text-[52px]"
+				>
 					Murmur helps you draft.<br></br> No ChatGPT. We built our own.
 				</Typography>
-				<Typography className="text-[26px] !mt-[42px]" variant="p">
+				<Typography className="!mt-[42px]" variant="p">
 					{`Our software gathers data on each contact every time you draft an email with
 					advanced search algorithms. This allows Murmur to craft customized emails,
 					getting you more responses and more work. Our algorithms are trained on many
@@ -130,7 +138,7 @@ export default function HomePage() {
 			{/* Video Section */}
 			<div className="py-16 mt-[121px]">
 				<div className="mx-auto w-fit">
-					<div className="relative w-[1179px] aspect-video">
+					<div className="relative max-w-[1179px] w-full aspect-video">
 						<VideoPlayer
 							playbackId="z015rWLTn4mlDbMX0021ale02ieVwttxqtZvzc2Z02nVotA"
 							thumbnailTime={1.5}
@@ -147,8 +155,8 @@ export default function HomePage() {
 				</div>
 			</div>
 
-			<GradientBanner className=" mx-auto mt-24 flex justify-center items-center">
-				<Typography variant="h2" className=" text-center text-[63px] leading-18">
+			<GradientBanner className="mx-auto mt-24 flex justify-center items-center">
+				<Typography variant="banner" className=" text-center">
 					Generate accurate contact lists in seconds.<br></br> Save countless hours.
 				</Typography>
 			</GradientBanner>
@@ -157,12 +165,9 @@ export default function HomePage() {
 				<ComparisonTable />
 			</div>
 
-			<div className="mt-50 w-full bg-gradient-to-b from-gray-200 to-white py-28">
-				<div className="relative w-[1179px] mx-auto">
-					<Typography
-						variant="h2"
-						className="text-left text-[60px] max-w-[575px] w-full text-nowrap"
-					>
+			<div className="mt-50 w-full bg-gradient-to-b from-gray-200 to-white py-28 px-4">
+				<div className="relative max-w-[1179px] w-full mx-auto">
+					<Typography variant="banner" className="text-left w-full">
 						Send without Limits.<br></br> Dream without Boundaries.
 					</Typography>
 					<div className="rounded-lg w-fit h-fit aspect-video max-h-fit overflow-hidden mt-32">
@@ -177,14 +182,14 @@ export default function HomePage() {
 				</div>
 				<Typography
 					variant="p"
-					className="w-[1130px] mx-auto !mt-32 text-center text-[26px]"
+					className="w-full max-w-[1130px] mx-auto !mt-32 text-center"
 				>
 					Major email providers have tight sending restrictions, our server has none.
 					Focus your time and energy where it matters most, and leave the volume to us.
 					With Murmur you no longer have to compromise between mass email and custom AI
 					personalization, it does it all. Nothing else like it, Murmur helps you make
 					meaningful connections, not forgettable spam, at a scale previously
-					unimaginable. Dream big, we’ve got you.
+					unimaginable. Dream big, we&apos;ve got you.
 				</Typography>
 			</div>
 
@@ -209,12 +214,12 @@ export default function HomePage() {
 			</div>
 
 			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-25">
-				<Typography variant="p" className="text-center text-[60px] mx-auto">
+				<Typography variant="h2" className="text-center text-[60px] mx-auto">
 					Not Another Email Tool. 
 				</Typography>
 				<Typography
 					variant="p"
-					className="w-8/10 max-w-[1233px] mx-auto !mt-10 text-center text-[26px]"
+					className="w-8/10 max-w-[1233px] mx-auto !mt-10 text-center"
 				>
 					{`Murmur serves an entirely different purpose. While other email marketing tools like Mailchimp are great for keeping up an email newsletter, Murmur is designed specifically for entrepreneurs, business owners, and those with a vision to bring in leads and sell to new customers. Each email in a campaign is deeply personalized, and written in your own voice rather than using a stock template that falls through the cracks.
 `}

@@ -9,6 +9,9 @@ module.exports = {
 	darkMode: 'selector',
 	theme: {
 		extend: {
+			screens: {
+				xs: '480px',
+			},
 			fontSize: {
 				'8xl': '6rem', // 96px
 				'9xl': '8rem', // 128px
