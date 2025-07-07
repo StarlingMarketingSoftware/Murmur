@@ -28,7 +28,6 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 				isLink && 'cursor-pointer',
 				isHighlighted && 'border-navy from-secondary/7 to-gray-100',
 				className
-				// on product page size is different, also margin  w-[302px] h-[715px]
 			)}
 		>
 			<div className="">

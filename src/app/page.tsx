@@ -148,9 +148,11 @@ export default function HomePage() {
 						/>
 					</div>
 					<div className="flex justify-center mt-12">
-						<Button variant="muted" size="lg">
-							Book a demo
-						</Button>
+						<Link href={urls.contact.index}>
+							<Button variant="muted" size="lg">
+								Book a demo
+							</Button>
+						</Link>
 					</div>
 				</div>
 			</div>
@@ -205,7 +207,7 @@ export default function HomePage() {
 							maskImage:
 								'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.2) 100%)',
 							WebkitMaskImage:
-								'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
+								'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 100%)',
 						}}
 					>
 						<PromotionLogos />
@@ -213,13 +215,13 @@ export default function HomePage() {
 				</div>
 			</div>
 
-			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-25">
-				<Typography variant="h2" className="text-center text-[60px] mx-auto">
+			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-25 px-4">
+				<Typography variant="banner" className="text-center mx-auto">
 					Not Another Email Tool. 
 				</Typography>
 				<Typography
 					variant="p"
-					className="w-8/10 max-w-[1233px] mx-auto !mt-10 text-center"
+					className="w-full max-w-[1233px] mx-auto !mt-10 text-center"
 				>
 					{`Murmur serves an entirely different purpose. While other email marketing tools like Mailchimp are great for keeping up an email newsletter, Murmur is designed specifically for entrepreneurs, business owners, and those with a vision to bring in leads and sell to new customers. Each email in a campaign is deeply personalized, and written in your own voice rather than using a stock template that falls through the cracks.
 `}
@@ -234,21 +236,28 @@ export default function HomePage() {
 			</div>
 
 			<GradientBanner gloss className="mt-24 !py-3">
-				<Typography variant="h2" className="text-center text-[75px] mx-auto py-8">
+				<Typography variant="banner" className="text-center mx-auto py-8">
 					{`Find the plan that's right for`} <span className="italic">you</span>
 				</Typography>
 			</GradientBanner>
 
-			<div className="mt-28">
-				<ProductList />
-			</div>
-
-			<div className="mt-41 flex justify-center">
+			<div className="flex justify-center mt-18 lg:hidden">
 				<Link href={urls.pricing.index}>
 					<Button variant="muted" size="lg">
-						Learn More
+						Explore Plans
 					</Button>
 				</Link>
+			</div>
+
+			<div className="mt-28 hidden lg:block">
+				<ProductList />
+				<div className="mt-41 flex justify-center">
+					<Link href={urls.pricing.index}>
+						<Button variant="muted" size="lg">
+							Learn More
+						</Button>
+					</Link>
+				</div>
 			</div>
 
 			<FaqSection
@@ -256,6 +265,7 @@ export default function HomePage() {
 				header="Support"
 				title="FAQs"
 				description="Everything you need to know about Murmur!"
+				showMoreLink={urls.contact.index}
 			/>
 			<div className="h-24" />
 		</main>

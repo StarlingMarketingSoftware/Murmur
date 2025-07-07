@@ -159,17 +159,9 @@
 .animate-scroll {
 	animation: scroll 50s linear infinite;
 }
-@keyframes scrollSmall {
-	0% {
-		transform: translate(0);
-	}
-	100% {
-		transform: translate(calc(-50% - 0.25rem));
-	}
-}
 
-.animate-scroll-small {
-	animation: scrollSmall 30s linear infinite;
+.animate-scroll:hover {
+	animation-play-state: paused;
 }
 
 .animate-accordion-down {

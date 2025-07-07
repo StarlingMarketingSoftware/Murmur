@@ -83,7 +83,7 @@ export const ScrollingReviews = () => {
 			>
 				<div
 					ref={scrollerInnerRef}
-					className="animate-scroll-small sm:animate-scroll hover:animate-none w-fit flex gap-2 sm:gap-22 py-2"
+					className="animate-scroll hover:animate-none w-fit flex gap-22 py-2"
 				>
 					{REVIEWS.map((review, index) => (
 						<div key={index}>

@@ -10,7 +10,7 @@ export const ProductList: FC = () => {
 		return <Spinner />;
 	}
 	return (
-		<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-28 w-fit mx-auto place-items-center [&>*:hover~*]:opacity-50 [&>*:hover~*]:scale-[0.99]">
+		<div className="grid grid-cols-1 lg:grid-cols-3 md:gap-5 lg:gap-5 xl:gap-28 w-fit mx-auto place-items-center [&>*:hover~*]:opacity-50 [&>*:hover~*]:scale-[0.99]">
 			{sortedProducts!.map((product) => (
 				<div
 					key={product.id}
