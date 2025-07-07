@@ -136,7 +136,7 @@ export default function HomePage() {
 			</div>
 
 			{/* Video Section */}
-			<div className="py-16 mt-[121px]">
+			<div className="py-16 mt-[121px] px-4">
 				<div className="mx-auto w-fit">
 					<div className="relative max-w-[1179px] w-full aspect-video">
 						<VideoPlayer

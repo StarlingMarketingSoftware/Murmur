@@ -1,6 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { ReviewCard } from '../ReviewCard/ReviewCard';
 import { Review } from '@/types';
+import {
+	Carousel,
+	CarouselContent,
+	CarouselItem,
+	CarouselNext,
+	CarouselPrevious,
+} from '@/components/ui/carousel';
 
 const REVIEWS: Review[] = [
 	{
@@ -50,31 +57,46 @@ export const ScrollingReviews = () => {
 	}, []);
 
 	return (
-		<div
-			ref={scrollerRef}
-			className="w-full pt-17 pb-11 overflow-hidden"
-			style={{
-				maskImage:
-					'linear-gradient(to right, transparent, white 20%, white 80%, transparent 100%)',
-				WebkitMaskImage:
-					'linear-gradient(to right, transparent, white 20%, white 80%, transparent 100%)',
-			}}
-		>
+		<>
+			<Carousel className="sm:hidden block w-7/10 mx-auto">
+				<CarouselContent>
+					{REVIEWS.map((review, index) => (
+						<CarouselItem key={index} className="w-full mx-auto">
+							<div key={index} className="flex justify-center">
+								<ReviewCard review={review} />
+							</div>
+						</CarouselItem>
+					))}
+				</CarouselContent>
+				<CarouselPrevious />
+				<CarouselNext />
+			</Carousel>
 			<div
-				ref={scrollerInnerRef}
-				className="animate-scroll hover:animate-none w-fit flex gap-22 py-2"
+				ref={scrollerRef}
+				className="w-full pt-17 pb-11 overflow-hidden sm:block hidden"
+				style={{
+					maskImage:
+						'linear-gradient(to right, transparent, white 20%, white 80%, transparent 100%)',
+					WebkitMaskImage:
+						'linear-gradient(to right, transparent, white 20%, white 80%, transparent 100%)',
+				}}
 			>
-				{REVIEWS.map((review, index) => (
-					<div key={index}>
-						<ReviewCard review={review} />
-					</div>
-				))}
-				{REVIEWS.map((review, index) => (
-					<div className="" key={index}>
-						<ReviewCard review={review} />
-					</div>
-				))}
+				<div
+					ref={scrollerInnerRef}
+					className="animate-scroll-small sm:animate-scroll hover:animate-none w-fit flex gap-2 sm:gap-22 py-2"
+				>
+					{REVIEWS.map((review, index) => (
+						<div key={index}>
+							<ReviewCard review={review} />
+						</div>
+					))}
+					{REVIEWS.map((review, index) => (
+						<div className="" key={index}>
+							<ReviewCard review={review} />
+						</div>
+					))}
+				</div>
 			</div>
-		</div>
+		</>
 	);
 };
