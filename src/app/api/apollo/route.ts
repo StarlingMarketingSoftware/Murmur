@@ -42,12 +42,9 @@ export async function POST(req: NextRequest) {
 			return apiBadRequest(validatedData.error);
 		}
 
-		const { query, limit } = validatedData.data;
+		const { query } = validatedData.data;
 
-		const apolloContacts: ApolloPerson[] = await fetchApolloContacts(
-			query,
-			Number(limit)
-		);
+		const apolloContacts: ApolloPerson[] = await fetchApolloContacts(query);
 
 		const existingContacts: Contact[] = await prisma.contact.findMany({
 			where: {

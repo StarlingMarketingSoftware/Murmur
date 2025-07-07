@@ -1,4 +1,4 @@
-firstname	lastname	company	email	address	country	state	website	phone
-John	Smith	Google	example1@example.com	"1234 W Side Street, Oakland, CA 10000"	United States	California	www.example.com	000-000-0000
-Jane	Reddy	Meta	example2@example.com	"3271 Redstone Drive, Spout Brook, NY 10052"	United States	New York	www.example2.com	000-000-0000
-Randy	Santos	Amazon	example3@example.com	"33 N Front St, Cleveland, OH 10002"	United States	California	www.example2.com	000-000-0000
+firstname	lastname	company	email	address	city	state	country	website	phone	title	headline	linkedInUrl	photoUrl	metadata
+John	Smith	Google	example10@example.com	"1234 W Side Street, Oakland, CA 10000"	Los Angeles	California	United States	www.example.com	000-000-0000	Head of Sales	Tech Sales	www.linkedin.com/smith	www.photos.com/1	Sales at big tech company
+Jane	Reddy	Meta	example11@example.com	"3271 Redstone Drive, Spout Brook, NY 10052"	New York	New York	United States	www.example2.com	000-000-0000	Software Engineer	Connecting people with social software.	www.linkedin.com/reddy	www.photos.com/2	Software soft social networks
+Randy	Santos	Amazon	example12@example.com	"33 N Front St, Cleveland, OH 10002"	San Francisco	California	United States	www.example2.com	000-000-0000	Event Planner	sales event expert	www.linkedin.com/santos	www.photos.com/3	large event planning

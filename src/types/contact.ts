@@ -7,3 +7,7 @@ export type ContactWithName = Contact & {
 
 // For use in components that need the computed name field
 export type ContactForDisplay = ContactWithName;
+
+export type ContactWithRequiredEmail = Partial<Contact> & {
+	email: string;
+};

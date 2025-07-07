@@ -169,3 +169,7 @@ export function extractEmailsFromContacts(contacts: Partial<Contact>[]): string[
 - 'docker compose down -v' to reset postgres and elastic search databases.
 - 'docker compose up -d' to get fresh databases running.
 - Migrate and run all seed functions 'npx prisma migrate dev'
+
+## Testing API Endpoints with Postman
+
+- Use this guide to generate a token for Clerk authentication: https://clerk.com/docs/testing/postman-or-insomnia

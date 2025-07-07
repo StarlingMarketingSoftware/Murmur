@@ -1,9 +1,10 @@
 import { ApolloPerson } from '@/types/apollo';
-import { Contact, EmailVerificationStatus } from '@prisma/client';
+import { EmailVerificationStatus } from '@prisma/client';
 import { OPEN_AI_MODEL_OPTIONS } from '@/constants';
 import { fetchOpenAi } from './openai';
 import prisma from '@/lib/prisma';
 import { stripBothSidesOfBraces } from '@/utils/string';
+import { ContactWithRequiredEmail } from '@/types/contact';
 
 const PROMPT = `You are an expert in Apollo.io's People Search API and are tasked with converting a search query in string format into a valid Apollo People Search object. Use the following guidelines:
 	1. Correct any spelling errors in the search query.
@@ -57,7 +58,7 @@ export const fetchApolloContacts = async (query: string): Promise<ApolloPerson[]
 		},
 	});
 
-	// if it's been searched before, and the 
+	// if it's been searched before, and the
 
 	let currentPageToFetch = 1;
 
@@ -211,10 +212,6 @@ export async function enrichApolloContacts(
 	}
 }
 
-type ContactWithRequiredEmail = Partial<Contact> & {
-	email: string;
-};
-
 export function transformApolloContact(person: ApolloPerson): ContactWithRequiredEmail {
 	return {
 		apolloPersonId: person.id,
@@ -222,7 +219,7 @@ export function transformApolloContact(person: ApolloPerson): ContactWithRequire
 		lastName: person.last_name || null,
 		email: person.email,
 		emailValidationStatus: EmailVerificationStatus.unknown,
-		company: person.contact?.organization_name || null,
+		company: person.organization_name || null,
 		city: person.city || null,
 		state: person.state || null,
 		country: person.country || null,
