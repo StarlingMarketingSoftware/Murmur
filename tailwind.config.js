@@ -44,14 +44,8 @@ module.exports = {
 			animation: {
 				'flicker-opacity': 'flicker-opacity 1.5s infinite',
 				scroll: 'scroll 30s linear infinite',
-				animation: {},
-				'scroll-infinite': 'scroll-infinite 20s linear infinite',
 			},
 			keyframes: {
-				'scroll-infinite': {
-					'0%': { transform: 'translateX(0)' },
-					'100%': { transform: 'translateX(-100%)' },
-				},
 				'flicker-opacity': {
 					'0%': { opacity: '70%' },
 					'1%': { opacity: '35%' },

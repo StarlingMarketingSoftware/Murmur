@@ -110,14 +110,6 @@ export const useContactPage = () => {
 	useEffect(() => {
 		const hashValue = window.location.hash.replace('#', '');
 		setHash(hashValue);
-
-		// Optional: Listen for hash changes
-		const handleHashChange = () => {
-			setHash(window.location.hash.replace('#', ''));
-		};
-
-		window.addEventListener('hashchange', handleHashChange);
-		return () => window.removeEventListener('hashchange', handleHashChange);
 	}, []);
 
 	useEffect(() => {

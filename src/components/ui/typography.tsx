@@ -9,7 +9,7 @@ const typographyVariants = cva('', {
 			h2: 'scroll-m-20 text-3xl font-normal',
 			h3: 'scroll-m-20 text-2xl font-normal',
 			h4: 'scroll-m-20 text-xl font-normal',
-			p: 'leading-7 text-[20px]  sm:text-[26px] font-normal',
+			p: 'leading-7 text-[20px] sm:text-[26px] font-normal',
 			label: 'text-[14px]',
 			blockquote: 'border-l-2 pl-6 italic',
 			table: 'my-6 w-full overflow-y-auto',

@@ -46,16 +46,6 @@ export const ScrollingReviews = () => {
 	const scrollerRef = useRef<HTMLDivElement>(null);
 	const scrollerInnerRef = useRef<HTMLDivElement>(null);
 
-	useEffect(() => {
-		const addAnimation = () => {
-			scrollerRef.current?.setAttribute('data-animated', 'true');
-		};
-
-		if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-			addAnimation();
-		}
-	}, []);
-
 	return (
 		<>
 			<Carousel className="sm:hidden block w-7/10 mx-auto">

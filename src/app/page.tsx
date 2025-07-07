@@ -73,7 +73,7 @@ export default function HomePage() {
 					}}
 				/>
 
-				{/* Content layer - centered */}
+				{/* Content layer */}
 				<div className="relative z-20 grid grid-rows-12 justify-items-center h-full gap-0">
 					<div className="row-span-2" />
 					<LogoIcon className="row-span-1 w-[55px] sm:w-[75px] md:w-[90px] lg:w-[106px] h-[44px] sm:h-[60px] md:h-[72px] lg:h-[84px]" />
