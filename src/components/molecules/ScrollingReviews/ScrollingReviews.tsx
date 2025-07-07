@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { ReviewCard } from '../ReviewCard/ReviewCard';
 import { Review } from '@/types';
 import {
