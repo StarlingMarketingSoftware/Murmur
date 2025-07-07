@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 
-import { cn } from '@/utils';
+import { cn } from '@/utils/index';
 import Spinner from './spinner';
 import { twMerge } from 'tailwind-merge';
 
@@ -43,7 +43,7 @@ const buttonVariants = cva(
 				icon: 'size-9',
 			},
 			font: {
-				primary: 'font-primary font-extrabold',
+				primary: 'font-primary',
 				secondary: 'font-secondary',
 			},
 			outline: {

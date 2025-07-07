@@ -24,11 +24,10 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 		<Card
 			onClick={isLink ? handleClick : undefined}
 			className={twMerge(
-				'w-[315px] h-[737px] bg-gradient-to-b from-white to-gray-100 hover:-translate-y-1 transition-all duration-300',
+				'w-[315px] h-[737px] bg-gradient-to-b from-white to-gray-100 hover:-translate-y-1 transition-all duration-300 border-black !border-3 pt-3 px-6',
 				isLink && 'cursor-pointer',
 				isHighlighted && 'border-navy from-secondary/7 to-gray-100',
 				className
-				// on product page size is different, also margin  w-[302px] h-[715px]
 			)}
 		>
 			<div className="">
@@ -48,7 +47,7 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 					<Typography variant="h4" className="text-[59px] font-bold">
 						{formattedPrice}
 					</Typography>
-					<Typography variant="p" className="text-[27px] translate-y-2">
+					<Typography variant="p" className="text-[27px] translate-y-8">
 						{period}
 					</Typography>
 				</div>

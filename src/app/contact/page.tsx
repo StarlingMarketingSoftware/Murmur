@@ -146,7 +146,10 @@ const Contact = () => {
 					<Typography font="secondary">24/7</Typography>
 				</div>
 			</div>
-			<div className="w-full h-fit min-h-100 bg-gradient-to-b from-background from-0% to-light to-15% pt-4">
+			<div
+				id="faq-section"
+				className="w-full h-fit min-h-100 bg-gradient-to-b from-background from-0% to-light to-15% pt-4"
+			>
 				<FaqSection
 					header="Support"
 					title="Help"

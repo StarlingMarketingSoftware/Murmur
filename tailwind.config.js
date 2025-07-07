@@ -9,6 +9,9 @@ module.exports = {
 	darkMode: 'selector',
 	theme: {
 		extend: {
+			screens: {
+				xs: '480px',
+			},
 			fontSize: {
 				'8xl': '6rem', // 96px
 				'9xl': '8rem', // 128px
@@ -41,10 +44,6 @@ module.exports = {
 			animation: {
 				'flicker-opacity': 'flicker-opacity 1.5s infinite',
 				scroll: 'scroll 30s linear infinite',
-				animation: {
-					'accordion-down': 'accordion-down 0.2s ease-out',
-					'accordion-up': 'accordion-up 0.2s ease-out',
-				},
 			},
 			keyframes: {
 				'flicker-opacity': {
@@ -54,14 +53,7 @@ module.exports = {
 					'51%': { opacity: '70%' },
 					'100%': { opacity: '70%' },
 				},
-				'accordion-down': {
-					from: { height: 0 },
-					to: { height: 'var(--radix-accordion-content-height)' },
-				},
-				'accordion-up': {
-					from: { height: 'var(--radix-accordion-content-height)' },
-					to: { height: 0 },
-				},
+
 				scroll: {
 					'0%': { transform: 'translateX(0)' },
 					'100%': { transform: 'translateX(calc(-50%))' },

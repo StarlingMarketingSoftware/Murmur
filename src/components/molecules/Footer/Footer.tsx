@@ -5,7 +5,7 @@ export function Footer() {
 	const currentYear = new Date().getFullYear();
 
 	return (
-		<footer className="border-t py-8 bg-light">
+		<footer className="border-t py-8 bg-background">
 			<div className="container mx-auto px-4">
 				<div className="grid grid-cols-1 md:grid-cols-4 gap-8">
 					<div>
@@ -40,7 +40,7 @@ export function Footer() {
 									href={urls.contact.index}
 									className="text-muted hover:text-foreground transition-colors"
 								>
-									Contact
+									Help
 								</Link>
 							</li>
 						</ul>

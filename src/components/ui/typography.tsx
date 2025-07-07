@@ -9,7 +9,7 @@ const typographyVariants = cva('', {
 			h2: 'scroll-m-20 text-3xl font-normal',
 			h3: 'scroll-m-20 text-2xl font-normal',
 			h4: 'scroll-m-20 text-xl font-normal',
-			p: 'leading-7 text-[26px] font-normal',
+			p: 'leading-7 text-[20px] sm:text-[26px] font-normal',
 			label: 'text-[14px]',
 			blockquote: 'border-l-2 pl-6 italic',
 			table: 'my-6 w-full overflow-y-auto',
@@ -18,6 +18,8 @@ const typographyVariants = cva('', {
 				'relative rounded bg-muted px-[0.3rem] py-[0.2rem]text-sm font-semibold',
 			lead: 'text-xl text-muted-foreground',
 			muted: 'text-lg text-muted-foreground font-normal',
+			banner:
+				'text-[38px] sm:text-[52px] lg:text-[63px] leading-12 sm:leading-14 md:leading-16 lg:leading-18 font-normal',
 		},
 		color: {
 			foreground: 'text-foreground',
@@ -64,6 +66,7 @@ const elementMap = {
 	inlineCode: 'code',
 	lead: 'p',
 	muted: 'p',
+	banner: 'h2',
 	'action-link': 'span',
 } as const;
 
