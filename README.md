@@ -178,3 +178,9 @@ export function extractEmailsFromContacts(contacts: Partial<Contact>[]): string[
 - Subscription cancellation for each tier
 - Subscription initial signup for each tier
 - Subscription switch for each tier
+
+### Not logged in users
+
+- Can they send from the contact from
+- What happens when they try to sign up for a subscription.
+- What happens when they try to search for a contact?

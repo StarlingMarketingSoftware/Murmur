@@ -308,11 +308,11 @@ async function main() {
 	});
 
 	/* Seed contacts */
-	// importCSVWithSubcategories('demoCsvs/musicVenuesDemo4106.csv', 'Music Venues');
+	importCSVWithSubcategories('demoCsvs/musicVenuesDemo4106.csv', 'Music Venues');
 
 	/* Seed embeddings */
-	// const allContacts = await prisma.contact.findMany();
-	// await seedElasticsearchEmbeddings(allContacts);
+	const allContacts = await prisma.contact.findMany();
+	await seedElasticsearchEmbeddings(allContacts);
 }
 
 main()

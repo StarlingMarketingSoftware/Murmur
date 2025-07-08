@@ -28,7 +28,6 @@ export async function fulfillCheckout(
 					stripeCustomerId: customerId,
 				},
 				data: {
-					stripeCustomerId: customerId,
 					stripeSubscriptionId: subscription.id,
 					stripePriceId: priceId,
 					stripeSubscriptionStatus: subscription.status,
