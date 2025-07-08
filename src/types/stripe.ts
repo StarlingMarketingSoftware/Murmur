@@ -17,7 +17,9 @@ export interface StripeProduct extends Stripe.Product {
 
 export type SubscriptionTierData = {
 	name: SubscriptionName;
-	credits: number;
+	draftCredits: number;
+	sendingCredits: number;
+	verificationCredits: number;
 	viewEmailAddresses: boolean;
 };
 
