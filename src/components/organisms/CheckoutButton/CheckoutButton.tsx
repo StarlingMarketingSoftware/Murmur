@@ -31,6 +31,9 @@ export function CheckoutButton({
 		if (onButtonClick) {
 			onButtonClick();
 		} else {
+			console.log(
+				'🚀 ~ CheckoutButton, useCreatecheckoutSession,urls.api.stripe.checkout.index '
+			);
 			const res = await checkout({ priceId });
 			if (res.url) {
 				window.location.href = res.url;

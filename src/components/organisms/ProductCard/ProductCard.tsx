@@ -18,6 +18,7 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 		isLink,
 		className,
 		isHighlighted,
+		billingCycle,
 	} = useProductCard(props);
 
 	return (
@@ -52,9 +53,11 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 					</Typography>
 				</div>
 				<CardContent>
-					<Typography variant="h4" className="text-[16px]">
-						per month, billed annually
-					</Typography>
+					{billingCycle === 'year' ? (
+						<Typography variant="h4" className="text-[16px]">
+							per month, billed annually
+						</Typography>
+					) : null}
 					<div className="mt-7">{!isLink && <>{getButton()}</>}</div>
 					<div className="my-7 h-14 flex items-center">
 						<Typography variant="h4" className="text-[20px] font-semibold">

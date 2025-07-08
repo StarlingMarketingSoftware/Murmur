@@ -11,6 +11,7 @@ import {
 } from '@/app/api/_utils';
 import { z } from 'zod';
 import { getUser } from '../../_utils';
+import { urls } from '@/constants/urls';
 
 const stripeCheckoutRequestSchema = z.object({
 	priceId: z.string().min(1),
@@ -43,7 +44,6 @@ export async function POST(req: Request) {
 			return apiServerError('User does not have a Stripe customer ID');
 		}
 
-		const baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
 		const session: Stripe.Response<Stripe.Checkout.Session> =
 			await stripe.checkout.sessions.create({
 				payment_method_types: ['card'],
@@ -55,8 +55,8 @@ export async function POST(req: Request) {
 					},
 				],
 				mode: 'subscription',
-				success_url: `${baseUrl}/pricing?success=true`,
-				cancel_url: `${baseUrl}/pricing?canceled=true`,
+				success_url: `${urls.murmur.dashboard.index}?success=true`,
+				cancel_url: `${urls.murmur.dashboard.index}?canceled=true`,
 			});
 
 		return apiResponse({ url: session.url });

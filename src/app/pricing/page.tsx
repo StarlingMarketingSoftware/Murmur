@@ -24,27 +24,27 @@ export default function Products() {
 					<Button
 						className={twMerge(
 							'h-[48px] w-[168px] text-[17px]',
-							billingCycle === 'monthly' ? 'pointer-events-none' : 'text-dark'
+							billingCycle === 'month' ? 'pointer-events-none' : 'text-dark'
 						)}
-						variant={billingCycle === 'monthly' ? 'muted' : 'light'}
+						variant={billingCycle === 'month' ? 'muted' : 'light'}
 						outline
-						onClick={() => setBillingCycle('monthly')}
+						onClick={() => setBillingCycle('month')}
 					>
 						Billed Monthly
 					</Button>
 					<Button
 						className={twMerge(
 							'h-[48px] w-[168px] text-[17px]',
-							billingCycle === 'annually' && 'pointer-events-none'
+							billingCycle === 'year' && 'pointer-events-none'
 						)}
-						variant={billingCycle === 'annually' ? 'muted' : 'light'}
-						onClick={() => setBillingCycle('annually')}
+						variant={billingCycle === 'year' ? 'muted' : 'light'}
+						onClick={() => setBillingCycle('year')}
 						outline
 					>
 						Billed Annually
 					</Button>
 				</div>
-				<ProductList />
+				<ProductList billingCycle={billingCycle} />
 				<div className="flex justify-center my-40">
 					<Button
 						variant="ghost"

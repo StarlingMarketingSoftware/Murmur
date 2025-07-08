@@ -14,6 +14,7 @@ const customProductPortalRequestSchema = z.object({
 export async function POST(req: NextRequest) {
 	const data = await req.json();
 	const validatedData = customProductPortalRequestSchema.safeParse(data);
+	console.log('🚀 ~ POST ~ CUSTOM PRODUCT ROUTE:', validatedData);
 
 	if (!validatedData.success) {
 		return apiBadRequest(validatedData.error);

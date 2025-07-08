@@ -1,7 +1,13 @@
 import { useStripeProducts } from '@/hooks/queryHooks/useStripeProducts';
 import { useMe } from '@/hooks/useMe';
+import { BillingCycle } from '@/types';
 
-export const useProductList = () => {
+export interface ProductListProps {
+	billingCycle: BillingCycle;
+}
+
+export const useProductList = (props: ProductListProps) => {
+	const { billingCycle } = props;
 	const { data: products, isPending: isPendingProducts } = useStripeProducts();
 	const filteredProducts = products?.filter((product) => product.metadata.main === '1');
 
@@ -14,5 +20,6 @@ export const useProductList = () => {
 		isPendingProducts,
 		sortedProducts,
 		user,
+		billingCycle,
 	};
 };

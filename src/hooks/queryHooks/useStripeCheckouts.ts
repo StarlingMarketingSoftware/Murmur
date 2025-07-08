@@ -3,6 +3,7 @@ import { CustomMutationOptions } from '@/types';
 import { urls } from '@/constants/urls';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { PostPortalRequestData } from '@/app/api/stripe/portal/route';
 
 const QUERY_KEYS = {
 	all: ['stripeCheckouts'] as const,
@@ -25,10 +26,10 @@ export const useCreateCheckoutSession = (options: CustomMutationOptions = {}) =>
 
 	return useMutation({
 		mutationFn: async (data: PostCheckoutSessionData) => {
-			const response = await _fetch('/api/stripe/checkout', 'POST', data);
+			const response = await _fetch(urls.api.stripe.checkout.index, 'POST', data);
 			if (!response.ok) {
 				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to create campaign');
+				throw new Error(errorData.error || 'Failed to create checkout session');
 			}
 			return response.json();
 		},
@@ -47,12 +48,6 @@ export const useCreateCheckoutSession = (options: CustomMutationOptions = {}) =>
 	});
 };
 
-interface PostCustomerPortalData {
-	customerId: string;
-	priceId: string;
-	productId: string;
-}
-
 export const useCreateCustomerPortal = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
@@ -63,12 +58,8 @@ export const useCreateCustomerPortal = (options: CustomMutationOptions = {}) => 
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async (data: PostCustomerPortalData) => {
-			const response = await _fetch(
-				urls.api.stripe.portal.customProduct.index,
-				'POST',
-				data
-			);
+		mutationFn: async (data: PostPortalRequestData) => {
+			const response = await _fetch(urls.api.stripe.portal.index, 'POST', data);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Failed to create customer portal');
