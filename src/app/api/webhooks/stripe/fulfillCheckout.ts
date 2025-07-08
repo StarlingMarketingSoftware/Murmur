@@ -1,10 +1,8 @@
 import { stripe } from '../../../../stripe/client';
-import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
-import { getSubscriptionTierWithPriceId, getTestEmailCount } from '@/utils';
-import { calcAiCredits } from './calcAiCredits';
+import { getSubscriptionTierWithPriceId } from '@/utils';
+import prisma from '@/lib/prisma';
 
-const prisma = new PrismaClient();
 type StripeSubscription = Stripe.Subscription;
 export async function fulfillCheckout(
 	subscription: StripeSubscription,
@@ -22,8 +20,6 @@ export async function fulfillCheckout(
 		const priceId = subscription.items.data[0].price.id;
 		const subscriptionTier = getSubscriptionTierWithPriceId(priceId);
 
-		const aiDraftCredits = await calcAiCredits(subscriptionTier, priceId);
-
 		if (checkoutSession.payment_status !== 'unpaid') {
 			const customerId = checkoutSession.customer as string;
 
@@ -36,12 +32,10 @@ export async function fulfillCheckout(
 					stripeSubscriptionId: subscription.id,
 					stripePriceId: priceId,
 					stripeSubscriptionStatus: subscription.status,
-					aiDraftCredits: {
-						increment: aiDraftCredits,
-					},
-					aiTestCredits: {
-						increment: getTestEmailCount(aiDraftCredits),
-					},
+					lastCreditUpdate: new Date(),
+					draftCredits: subscriptionTier?.draftCredits || 0,
+					sendingCredits: subscriptionTier?.sendingCredits || 0,
+					verificationCredits: subscriptionTier?.verificationCredits || 0,
 				},
 			});
 			return customer;

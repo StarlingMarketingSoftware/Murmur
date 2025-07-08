@@ -238,6 +238,10 @@ const userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
 		stripeSubscriptionId: 'sub_1RbINU02Nskp21xSVq5hb7x6',
 		stripePriceId: 'price_1RB9Uw02Nskp21xSrRxsLDT3',
 		stripeSubscriptionStatus: 'active',
+		draftCredits: 1000,
+		sendingCredits: 1000,
+		verificationCredits: 1000,
+		lastCreditUpdate: new Date(),
 	},
 	{
 		clerkId: 'user_2yfwfFMcWIho4NSUT25o8V1LYHu',
@@ -254,6 +258,10 @@ const userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
 		stripeSubscriptionId: 'sub_1RUPe302Nskp21xSWvvOiPGs',
 		stripePriceId: 'price_1RB9Uw02Nskp21xSrRxsLDT3',
 		stripeSubscriptionStatus: 'active',
+		draftCredits: 1000,
+		sendingCredits: 1000,
+		verificationCredits: 1000,
+		lastCreditUpdate: new Date(),
 	},
 	{
 		clerkId: 'user_2yfwk3fV2eGnsat4Ph7GdSfpaQ5',
@@ -269,6 +277,10 @@ const userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
 		stripeSubscriptionId: null,
 		stripePriceId: null,
 		stripeSubscriptionStatus: null,
+		draftCredits: 1000,
+		sendingCredits: 1000,
+		verificationCredits: 1000,
+		lastCreditUpdate: new Date(),
 	},
 ];
 
@@ -296,7 +308,7 @@ async function main() {
 	});
 
 	/* Seed contacts */
-	importCSVWithSubcategories('demoCsvs/musicVenuesDemo4106.csv', 'Music Venues');
+	// importCSVWithSubcategories('demoCsvs/musicVenuesDemo4106.csv', 'Music Venues');
 
 	/* Seed embeddings */
 	// const allContacts = await prisma.contact.findMany();
