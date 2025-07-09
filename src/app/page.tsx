@@ -250,7 +250,7 @@ export default function HomePage() {
 			</div>
 
 			<div className="mt-28 hidden lg:block">
-				<ProductList />
+				<ProductList billingCycle="year" />
 				<div className="mt-41 flex justify-center">
 					<Link href={urls.pricing.index}>
 						<Button variant="muted" size="lg">

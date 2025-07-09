@@ -1,6 +1,5 @@
 'use client';
 import { FC } from 'react';
-import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '../../ui/button';
 import { useMe } from '@/hooks/useMe';
