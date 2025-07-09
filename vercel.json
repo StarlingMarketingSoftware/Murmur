@@ -1,0 +1,8 @@
+{
+	"crons": [
+		{
+			"path": "/api/webhooks/stripe/cron",
+			"schedule": "0 0 * * *"
+		}
+	]
+}

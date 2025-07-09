@@ -18,13 +18,14 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 		isLink,
 		className,
 		isHighlighted,
+		billingCycle,
 	} = useProductCard(props);
 
 	return (
 		<Card
 			onClick={isLink ? handleClick : undefined}
 			className={twMerge(
-				'w-[315px] h-[737px] bg-gradient-to-b from-white to-gray-100 hover:-translate-y-1 transition-all duration-300 border-black !border-3 pt-3 px-6',
+				'w-[300px] sm:w-[315px] h-[737px] bg-gradient-to-b from-white to-gray-100 hover:-translate-y-1 transition-all duration-300 border-black !border-3 pt-3 px-6',
 				isLink && 'cursor-pointer',
 				isHighlighted && 'border-navy from-secondary/7 to-gray-100',
 				className
@@ -52,9 +53,11 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 					</Typography>
 				</div>
 				<CardContent>
-					<Typography variant="h4" className="text-[16px]">
-						per month, billed annually
-					</Typography>
+					{billingCycle === 'year' ? (
+						<Typography variant="h4" className="text-[16px]">
+							per month, billed annually
+						</Typography>
+					) : null}
 					<div className="mt-7">{!isLink && <>{getButton()}</>}</div>
 					<div className="my-7 h-14 flex items-center">
 						<Typography variant="h4" className="text-[20px] font-semibold">

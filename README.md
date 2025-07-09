@@ -71,6 +71,8 @@ For Stripe subscription functionality, set up a webhook:
    stripe trigger
    ```
 
+   - If the Stripe CLI API key has expired, run `stripe login` and authenticate via browser.
+
 ## Clerk Webhook Setup
 
 1. https://clerk.com/docs/webhooks/sync-data
@@ -169,3 +171,18 @@ export function extractEmailsFromContacts(contacts: Partial<Contact>[]): string[
 - 'docker compose down -v' to reset postgres and elastic search databases.
 - 'docker compose up -d' to get fresh databases running.
 - Migrate and run all seed functions 'npx prisma migrate dev'
+
+## Comprehensive Testing Guide
+
+### Subscriptions
+
+- Subscription renewal for each tier
+- Subscription cancellation for each tier
+- Subscription initial signup for each tier
+- Subscription switch: The next subscription should begin immediately, and credits should be replaced with the new tier's credits (not cumulative)
+
+### Not logged in users
+
+- Can they send from the contact from
+- What happens when they try to sign up for a subscription.
+- What happens when they try to search for a contact?

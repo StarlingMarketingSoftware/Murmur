@@ -17,7 +17,7 @@ const AdminProducts: FC = () => {
 
 	return (
 		<div className="flex items-center justify-center h-[90vh] w-full">
-			<ProductCard user={user} product={product} />
+			<ProductCard user={user} product={product} billingCycle="year" />
 		</div>
 	);
 };

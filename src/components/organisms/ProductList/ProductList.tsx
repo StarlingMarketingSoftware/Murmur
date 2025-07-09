@@ -1,10 +1,10 @@
 import { FC } from 'react';
-import { useProductList } from './useProductList';
+import { ProductListProps, useProductList } from './useProductList';
 import { ProductCard } from '../ProductCard/ProductCard';
 import Spinner from '@/components/ui/spinner';
 
-export const ProductList: FC = () => {
-	const { sortedProducts, user, isPendingProducts } = useProductList();
+export const ProductList: FC<ProductListProps> = (props) => {
+	const { sortedProducts, user, isPendingProducts, billingCycle } = useProductList(props);
 
 	if (isPendingProducts) {
 		return <Spinner />;
@@ -16,7 +16,7 @@ export const ProductList: FC = () => {
 					key={product.id}
 					className="transition duration-300 hover:opacity-100 hover:scale-100 [&:has(~:hover)]:opacity-50 [&:has(~:hover)]:scale-[0.99]"
 				>
-					<ProductCard product={product} user={user} />
+					<ProductCard product={product} user={user} billingCycle={billingCycle} />
 				</div>
 			))}
 		</div>

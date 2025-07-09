@@ -1,23 +1,24 @@
 import {
-	apiBadRequest,
-	apiNotFound,
 	apiResponse,
-	apiUnauthorized,
 	handleApiError,
+	apiBadRequest,
+	apiUnauthorized,
+	apiNotFound,
 } from '@/app/api/_utils';
-import { BASE_URL } from '@/constants';
-import { urls } from '@/constants/urls';
-import prisma from '@/lib/prisma';
-import { stripe } from '@/stripe/client';
-import { auth } from '@clerk/nextjs/server';
+import { stripe } from '../../../../../stripe/client';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
+import { auth } from '@clerk/nextjs/server';
+import prisma from '@/lib/prisma';
 
-const customProductPortalRequestSchema = z.object({
+const postPortalRequestSchema = z.object({
 	customerId: z.string().min(1),
 	productId: z.string().min(1),
 	priceId: z.string().min(1),
+	returnUrl: z.string().min(1),
 });
+
+export type PostPortalRequestData = z.infer<typeof postPortalRequestSchema>;
 
 export async function POST(req: NextRequest) {
 	try {
@@ -37,12 +38,12 @@ export async function POST(req: NextRequest) {
 		}
 
 		const data = await req.json();
-		const validatedData = customProductPortalRequestSchema.safeParse(data);
+		const validatedData = postPortalRequestSchema.safeParse(data);
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
 
-		const { customerId, productId, priceId } = validatedData.data;
+		const { customerId, productId, priceId, returnUrl } = validatedData.data;
 
 		if (user.stripeCustomerId !== customerId) {
 			return apiBadRequest('Customer ID does not match authenticated user');
@@ -54,6 +55,7 @@ export async function POST(req: NextRequest) {
 			},
 			features: {
 				subscription_update: {
+					proration_behavior: 'always_invoice',
 					enabled: true,
 					default_allowed_updates: ['price'],
 					products: [
@@ -75,7 +77,7 @@ export async function POST(req: NextRequest) {
 		const portalSession = await stripe.billingPortal.sessions.create({
 			customer: customerId,
 			configuration: portalConfig.id,
-			return_url: `${BASE_URL}${urls.pricing.detail(productId)}`,
+			return_url: returnUrl,
 		});
 
 		return apiResponse({ url: portalSession.url });

@@ -68,28 +68,33 @@ enum DraftingTone {
 }
 
 model User {
-  id             Int      @id @default(autoincrement())
-  clerkId        String   @unique
-  email          String   @unique
-  murmurEmail    String?  @unique
-  firstName      String?
-  lastName       String?
-  role           UserRole @default(user)
-  aiDraftCredits Int      @default(5)
-  aiTestCredits  Int      @default(2)
-  customDomain   String?
+  id                  Int      @id @default(autoincrement())
+  clerkId             String   @unique
+  email               String   @unique
+  murmurEmail         String?  @unique
+  firstName           String?
+  lastName            String?
+  role                UserRole @default(user)
+  aiDraftCredits      Int      @default(5)
+  aiTestCredits       Int      @default(2)
+  draftCredits        Int      @default(0)
+  sendingCredits      Int      @default(0)
+  verificationCredits Int      @default(0)
+  customDomain        String?
 
-  stripeCustomerId         String?       @unique
+  stripeCustomerId         String?   @unique
   stripeSubscriptionId     String?
   stripeSubscriptionStatus String?
   stripePriceId            String?
-  createdAt                DateTime      @default(now())
-  updatedAt                DateTime      @updatedAt
-  emails                   Email[]
-  campaigns                Campaign[]
-  signatures               Signature[]
-  identities               Identity[]
-  contactLists             ContactList[]
+  lastCreditUpdate         DateTime?
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  emails       Email[]
+  campaigns    Campaign[]
+  signatures   Signature[]
+  identities   Identity[]
+  contactLists ContactList[]
 }
 
 model ContactList {

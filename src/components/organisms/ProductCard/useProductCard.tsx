@@ -5,21 +5,29 @@ import { User } from '@prisma/client';
 import ManageSubscriptionButton from '@/components/organisms/ManageSubscriptionButton/ManageSubscriptionButton';
 import { ReactNode } from 'react';
 import UpdateSubscriptionButton from '@/components/organisms/UpdateSubscriptionButton/UpdateSubscriptionButton';
-import { StripeProduct, StripeSubscriptionStatus } from '@/types';
-import { SUBSCRIPTION_TIER_DATA_LIST } from '@/constants';
+import { BillingCycle, StripeProduct, StripeSubscriptionStatus } from '@/types';
 import { twMerge } from 'tailwind-merge';
+import { getSubscriptionTierWithPriceId } from '@/utils';
 
 export interface ProductCardProps {
 	product: StripeProduct;
 	className?: string;
 	user: User | null | undefined;
 	isLink?: boolean;
+	billingCycle: BillingCycle;
 }
 
 export const useProductCard = (props: ProductCardProps) => {
-	const { product, className, user, isLink } = props;
+	const { product, className, user, isLink, billingCycle } = props;
 
 	const formatPrice = (price: number, currency: string) => {
+		if (billingCycle === 'year') {
+			return new Intl.NumberFormat('en-US', {
+				style: 'currency',
+				currency: currency.toUpperCase(),
+				minimumFractionDigits: 0,
+			}).format(price / 100 / 12);
+		}
 		return new Intl.NumberFormat('en-US', {
 			style: 'currency',
 			currency: currency.toUpperCase(),
@@ -27,7 +35,9 @@ export const useProductCard = (props: ProductCardProps) => {
 		}).format(price / 100);
 	};
 
-	const price = product.default_price;
+	const price = product.prices.find(
+		(price) => price.recurring?.interval === billingCycle
+	);
 
 	if (!price || typeof price === 'string') {
 		return {
@@ -43,12 +53,12 @@ export const useProductCard = (props: ProductCardProps) => {
 	}
 
 	const isHighlighted =
-		SUBSCRIPTION_TIER_DATA_LIST[product.default_price.id]?.name === 'Standard';
+		getSubscriptionTierWithPriceId(product.prices[0].id)?.name === 'Standard';
 
 	const formattedPrice = formatPrice(price.unit_amount || 0, price.currency || 'usd');
-	const period = price?.recurring?.interval ? `/ ${price.recurring.interval}` : '';
+	const period = '/ month';
 
-	const HIGHLIGHTED_CLASS = 'bg-secondary-light hover:bg-secondary-light/80 hover:bg';
+	const HIGHLIGHTED_CLASS = 'bg-secondary-light hover:bg-secondary-light/80';
 
 	const getButton = (): ReactNode => {
 		const checkoutButton = (
@@ -99,5 +109,6 @@ export const useProductCard = (props: ProductCardProps) => {
 		className,
 		isLink,
 		isHighlighted,
+		billingCycle,
 	};
 };
