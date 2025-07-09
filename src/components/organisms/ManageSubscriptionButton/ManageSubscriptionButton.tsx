@@ -6,6 +6,8 @@ import { Button } from '../../ui/button';
 import { useMe } from '@/hooks/useMe';
 import { toast } from 'sonner';
 import { urls } from '@/constants/urls';
+import { useManageSubscriptionPortal } from '@/hooks/queryHooks/useStripeCheckouts';
+import { BASE_URL } from '@/constants/ui';
 
 interface ManageSubscriptionButtonProps {
 	isUpdateSubscription?: boolean;
@@ -18,26 +20,30 @@ const ManageSubscriptionButton: FC<ManageSubscriptionButtonProps> = ({
 }) => {
 	const { user } = useMe();
 
-	const { mutate: accessPortal, isPending } = useMutation({
-		mutationFn: async () => {
-			const response = await fetch(urls.api.stripe.portal.index, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ customerId: user?.stripeCustomerId }),
-			});
-			const { url } = await response.json();
-			const updateSubscriptionUrl = `${url}/subscriptions/${user?.stripeSubscriptionId}/update`;
-			window.location.href = isUpdateSubscription ? updateSubscriptionUrl : url;
-		},
-		onError: () => {
-			toast.error('Error accessing customer portal. Please try again.');
-		},
-	});
+	const { mutateAsync: accessPortal, isPending } = useManageSubscriptionPortal();
+
+	const handleClick = async () => {
+		if (!user?.stripeCustomerId) {
+			toast.error('No stripe customer id found');
+			return;
+		}
+
+		const res = await accessPortal({
+			customerId: user?.stripeCustomerId,
+			returnUrl: `${BASE_URL}${urls.pricing.index}`,
+		});
+
+		if (res.url) {
+			window.location.href = res.url;
+		} else {
+			throw new Error('No checkout URL returned');
+		}
+	};
 
 	return (
 		<Button
 			className={className}
-			onClick={() => accessPortal()}
+			onClick={handleClick}
 			disabled={isPending}
 			isLoading={isPending}
 			variant="product"

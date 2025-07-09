@@ -71,6 +71,8 @@ For Stripe subscription functionality, set up a webhook:
    stripe trigger
    ```
 
+   - If the Stripe CLI API key has expired, run `stripe login` and authenticate via browser.
+
 ## Clerk Webhook Setup
 
 1. https://clerk.com/docs/webhooks/sync-data
@@ -177,7 +179,7 @@ export function extractEmailsFromContacts(contacts: Partial<Contact>[]): string[
 - Subscription renewal for each tier
 - Subscription cancellation for each tier
 - Subscription initial signup for each tier
-- Subscription switch for each tier
+- Subscription switch: The next subscription should begin immediately, and credits should be replaced with the new tier's credits (not cumulative)
 
 ### Not logged in users
 

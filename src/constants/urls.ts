@@ -105,7 +105,12 @@ export const urls = {
 				index: '/api/stripe/checkout',
 			},
 			portal: {
-				index: '/api/stripe/portal',
+				manageSubscription: {
+					index: '/api/stripe/portal/manage-subscription',
+				},
+				updateSubscription: {
+					index: '/api/stripe/portal/update-subscription',
+				},
 				customProduct: {
 					index: '/api/stripe/portal/custom-product',
 				},

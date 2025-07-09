@@ -12,6 +12,7 @@ import {
 import { z } from 'zod';
 import { getUser } from '../../_utils';
 import { urls } from '@/constants/urls';
+import { BASE_URL } from '@/constants';
 
 const stripeCheckoutRequestSchema = z.object({
 	priceId: z.string().min(1),
@@ -55,8 +56,8 @@ export async function POST(req: Request) {
 					},
 				],
 				mode: 'subscription',
-				success_url: `${urls.murmur.dashboard.index}?success=true`,
-				cancel_url: `${urls.murmur.dashboard.index}?canceled=true`,
+				success_url: `${BASE_URL}${urls.murmur.dashboard.index}?success=true`,
+				cancel_url: `${BASE_URL}${urls.murmur.dashboard.index}?canceled=true`,
 			});
 
 		return apiResponse({ url: session.url });

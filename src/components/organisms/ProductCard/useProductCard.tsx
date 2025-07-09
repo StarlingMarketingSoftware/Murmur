@@ -58,7 +58,7 @@ export const useProductCard = (props: ProductCardProps) => {
 	const formattedPrice = formatPrice(price.unit_amount || 0, price.currency || 'usd');
 	const period = '/ month';
 
-	const HIGHLIGHTED_CLASS = 'bg-secondary-light hover:bg-secondary-light/80 hover:bg';
+	const HIGHLIGHTED_CLASS = 'bg-secondary-light hover:bg-secondary-light/80';
 
 	const getButton = (): ReactNode => {
 		const checkoutButton = (
