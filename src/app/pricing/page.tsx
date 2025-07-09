@@ -42,8 +42,11 @@ export default function Products() {
 						outline
 						onClick={handleScrollToTable}
 					>
-						Compare all plan features
-						<ArrowDown className="absolute right-3 size-5 group-hover:translate-y-1 transition duration-200" />
+						<ArrowDown className="left-3 size-5 group-hover:translate-y-1 transition duration-200" />
+						<Typography variant="h4" className="text-center">
+							Compare all plan features
+						</Typography>
+						<ArrowDown className=" size-5 group-hover:translate-y-1 transition duration-200" />
 					</Button>
 				</div>
 				<GradientBanner className="mt-10">
@@ -69,21 +72,23 @@ export default function Products() {
 					size="lg"
 					className="mt-12"
 				/>
-				<div className="flex justify-center items-center mt-10 gap-40">
+				<div className="flex justify-center items-center mt-10 gap-20 md:gap-40">
 					<StatBlock stat="99%" description="Email List Accuracy" />
 					<StatBlock stat="5x" description="Verification Protocols" />
 				</div>
 			</div>
 			<div className="h-22 w-full" ref={tableRef} />
-			<FeaturesTable />
-			<div className="max-w-[1059px] mx-auto w-9/10">
+			<div className="mx-4">
+				<FeaturesTable />
+			</div>
+			<div className="max-w-[1059px] mx-auto w-9/10 mt-30">
 				<Typography className="text-center">
 					No other campaign tool does personalization like we do. Say goodbye to
 					“spray-and-pray” spam marketing and say hello to building meaningful
 					relationships.
 				</Typography>
 			</div>
-			<div className="max-w-[1059px] mx-auto mt-0 w-9/10">
+			<div className="max-w-[1059px] mx-auto mt-0 w-9/10 mb-20">
 				<Typography className="text-center max-w-[1059px] mx-auto mt-24 w-9/10">
 					Say <i>hello</i> to having a <strong>Fortune 500</strong> marketing department
 					in your pocket.

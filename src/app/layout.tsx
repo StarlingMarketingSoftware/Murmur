@@ -33,7 +33,7 @@ const timesNewRoman = localFont({
 		},
 		{
 			path: '../../public/fonts/timesItalic.ttf',
-			weight: '700',
+			weight: '400',
 			style: 'italic',
 		},
 	],
