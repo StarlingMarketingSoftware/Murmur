@@ -2,13 +2,14 @@
 
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProductList } from '@/components/organisms/ProductList/ProductList';
-import { twMerge } from 'tailwind-merge';
 import { ArrowDown } from 'lucide-react';
 import { GradientBanner } from '@/components/molecules/GradientBanner/GradientBanner';
 import { StatBlock } from '@/components/molecules/StatBlock/StatBlock';
 import { usePricingPage } from './usePricingPage';
 import { FeaturesTable } from '@/components/molecules/FeaturesTable/FeaturesTable';
+import { BillingCycle } from '@/types';
 
 export default function Products() {
 	const { billingCycle, setBillingCycle, tableRef, handleScrollToTable } =
@@ -19,30 +20,18 @@ export default function Products() {
 			<Typography variant="h1" className="text-center mt-[156px]">
 				Pricing
 			</Typography>
-			<div className="w-fit mx-auto">
-				<div className="flex justify-end mb-30">
-					<Button
-						className={twMerge(
-							'h-[48px] w-[168px] text-[17px]',
-							billingCycle === 'month' ? 'pointer-events-none' : 'text-dark'
-						)}
-						variant={billingCycle === 'month' ? 'muted' : 'light'}
-						outline
-						onClick={() => setBillingCycle('month')}
+			<div className="w-full max-w-[90vw] mx-auto mt-12">
+				<div className="flex justify-center overflow-x-auto">
+					<Tabs
+						value={billingCycle}
+						onValueChange={(value) => setBillingCycle(value as BillingCycle)}
+						className="mb-12"
 					>
-						Billed Monthly
-					</Button>
-					<Button
-						className={twMerge(
-							'h-[48px] w-[168px] text-[17px]',
-							billingCycle === 'year' && 'pointer-events-none'
-						)}
-						variant={billingCycle === 'year' ? 'muted' : 'light'}
-						onClick={() => setBillingCycle('year')}
-						outline
-					>
-						Billed Annually
-					</Button>
+						<TabsList>
+							<TabsTrigger value="month">Billed Monthly</TabsTrigger>
+							<TabsTrigger value="year">Billed Annually</TabsTrigger>
+						</TabsList>
+					</Tabs>
 				</div>
 				<ProductList billingCycle={billingCycle} />
 				<div className="flex justify-center my-40">
