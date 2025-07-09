@@ -1,7 +1,15 @@
-import { apiBadRequest, apiResponse, handleApiError } from '@/app/api/_utils';
+import {
+	apiBadRequest,
+	apiNotFound,
+	apiResponse,
+	apiUnauthorized,
+	handleApiError,
+} from '@/app/api/_utils';
 import { BASE_URL } from '@/constants';
 import { urls } from '@/constants/urls';
+import prisma from '@/lib/prisma';
 import { stripe } from '@/stripe/client';
+import { auth } from '@clerk/nextjs/server';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
@@ -12,16 +20,34 @@ const customProductPortalRequestSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-	const data = await req.json();
-	const validatedData = customProductPortalRequestSchema.safeParse(data);
-
-	if (!validatedData.success) {
-		return apiBadRequest(validatedData.error);
-	}
-
-	const { customerId, productId, priceId } = validatedData.data;
-
 	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const user = await prisma.user.findUnique({
+			where: {
+				clerkId: userId,
+			},
+		});
+
+		if (!user) {
+			return apiNotFound();
+		}
+
+		const data = await req.json();
+		const validatedData = customProductPortalRequestSchema.safeParse(data);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
+
+		const { customerId, productId, priceId } = validatedData.data;
+
+		if (user.stripeCustomerId !== customerId) {
+			return apiBadRequest('Customer ID does not match authenticated user');
+		}
+
 		const portalConfig = await stripe.billingPortal.configurations.create({
 			business_profile: {
 				headline: 'Manage Your Subscription',

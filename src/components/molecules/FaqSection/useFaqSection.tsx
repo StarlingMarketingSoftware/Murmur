@@ -5,15 +5,17 @@ export interface FaqSectionProps {
 	header: string;
 	title: string;
 	description: string;
+	showMoreLink?: string;
 }
 
 export const useFaqSection = (props: FaqSectionProps) => {
-	const { faqs, header, title, description } = props;
+	const { faqs, header, title, description, showMoreLink } = props;
 
 	return {
 		faqs,
 		header,
 		title,
 		description,
+		showMoreLink,
 	};
 };

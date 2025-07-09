@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { useCreateCheckoutSession } from '@/hooks/queryHooks/useStripeCheckouts';
 import { useClerk } from '@clerk/nextjs';
 import { User } from '@prisma/client';
-import { twMerge } from 'tailwind-merge';
 
 interface CheckoutButtonProps {
 	priceId: string;
@@ -43,7 +42,7 @@ export function CheckoutButton({
 	return (
 		<Button
 			variant="product"
-			className={twMerge('bg-info hover:bg-info/80', className)}
+			className={className}
 			onClick={handleClick}
 			isLoading={isPending}
 		>
