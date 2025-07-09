@@ -124,7 +124,13 @@ export const useDashboard = () => {
 		},
 	];
 
-	const tabOptions = [
+	type TabValue = 'search' | 'list';
+	type TabOption = {
+		label: string;
+		value: TabValue;
+	};
+
+	const tabOptions: TabOption[] = [
 		{
 			label: 'Search',
 			value: 'search',
@@ -149,9 +155,8 @@ export const useDashboard = () => {
 	);
 	const [selectedContacts, setSelectedContacts] = useState<ContactWithName[]>([]);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
-	const [currentTab, setCurrentTab] = useState<(typeof tabOptions)[number]['value']>(
-		tabOptions[0].value
-	);
+	const [currentTab, setCurrentTab] = useState<TabValue>('search');
+
 	const [apolloContacts, setApolloContacts] = useState<ContactWithName[]>([]);
 	const [tableInstance, setTableInstance] = useState<Table<ContactWithName>>();
 
@@ -200,12 +205,22 @@ export const useDashboard = () => {
 	};
 
 	const handleCreateCampaign = async () => {
-		const campaign = await createCampaign({
-			name: 'New Campaign',
-			contactLists: selectedContactListRows.map((row) => row.id),
-		});
-		if (campaign) {
-			router.push(urls.murmur.campaign.detail(campaign.id));
+		if (currentTab === 'list') {
+			const campaign = await createCampaign({
+				name: 'New Campaign',
+				contactLists: selectedContactListRows.map((row) => row.id),
+			});
+			if (campaign) {
+				router.push(urls.murmur.campaign.detail(campaign.id));
+			}
+		} else if (currentTab === 'search') {
+			const campaign = await createCampaign({
+				name: 'New Campaign',
+				contacts: selectedContacts.map((contact) => contact.id),
+			});
+			if (campaign) {
+				router.push(urls.murmur.campaign.detail(campaign.id));
+			}
 		}
 	};
 
@@ -214,12 +229,7 @@ export const useDashboard = () => {
 			query: activeSearchQuery,
 			limit: 1,
 		});
-		console.log(
-			'🚀 ~ handleImportApolloContacts ~ newApolloContacts:',
-			newApolloContacts
-		);
 		setApolloContacts([...apolloContacts, ...newApolloContacts]);
-		// create a database table that tracks queries and apollo pagination
 	};
 
 	const handleTableRef = (table: Table<ContactWithName>) => {

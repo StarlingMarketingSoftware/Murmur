@@ -19,6 +19,7 @@ import ContactListTable from '@/components/organisms/_tables/ContactListTable/Co
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
 import Spinner from '@/components/ui/spinner';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const Dashboard = () => {
 	const {
@@ -37,9 +38,7 @@ const Dashboard = () => {
 		currentTab,
 		setCurrentTab,
 		setSelectedContactListRows,
-		handleImportApolloContacts,
 		tableRef,
-		isPendingImportApolloContacts,
 	} = useDashboard();
 
 	return (
@@ -111,7 +110,7 @@ const Dashboard = () => {
 
 					{activeSearchQuery && (
 						<>
-							<div className="flex items-center justify-center mt-5">
+							{/* <div className="flex items-center justify-center mt-5">
 								<Button
 									onClick={handleImportApolloContacts}
 									variant="light"
@@ -120,16 +119,23 @@ const Dashboard = () => {
 								>
 									Get More Contacts
 								</Button>
-							</div>
+							</div> */}
 							{contacts ? (
-								<CustomTable
-									isSelectable
-									setSelectedRows={setSelectedContacts}
-									data={[...contacts, ...apolloContacts]}
-									columns={columns}
-									searchable={false}
-									tableRef={tableRef}
-								/>
+								<Card>
+									<CardHeader>
+										<CardTitle>Contacts</CardTitle>
+									</CardHeader>
+									<CardContent>
+										<CustomTable
+											isSelectable
+											setSelectedRows={setSelectedContacts}
+											data={[...contacts, ...apolloContacts]}
+											columns={columns}
+											searchable={false}
+											tableRef={tableRef}
+										/>
+									</CardContent>
+								</Card>
 							) : (
 								<Spinner />
 							)}

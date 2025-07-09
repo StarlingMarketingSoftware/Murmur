@@ -23,7 +23,10 @@ function Table({
 	...props
 }: React.ComponentProps<'table'> & VariantProps<typeof tableVariants>) {
 	return (
-		<div data-slot="table-container" className="relative w-full overflow-x-auto">
+		<div
+			data-slot="table-container"
+			className="relative w-full overflow-x-auto rounded-md"
+		>
 			<table
 				data-slot="table"
 				className={cn(tableVariants({ variant }), className)}
@@ -120,7 +123,7 @@ function TableFooter({
 }
 
 const tableRowVariants = cva(
-	'hover:bg-primary/15 transition-colors data-[state=selected]:pointer-events-all border border-primary/20 border-t border-t-primary',
+	'hover:bg-primary/15 transition-colors data-[state=selected]:pointer-events-all border border-primary/20 border-t',
 	{
 		variants: {
 			variant: {
