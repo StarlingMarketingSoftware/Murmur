@@ -14,6 +14,7 @@ import { ColumnDef, Table } from '@tanstack/react-table';
 import { ContactWithName } from '@/types/contact';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateApolloContacts } from '@/hooks/queryHooks/useApollo';
+import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -187,9 +188,10 @@ export const useDashboard = () => {
 		}
 	}, [contacts, apolloContacts]);
 
-	// const { mutate: createContactList } = useCreateContactList({
-	// 	suppressToasts: true,
-	// });
+	const { mutateAsync: createContactList, isPending: isPendingCreateContactList } =
+		useCreateUserContactList({
+			suppressToasts: true,
+		});
 
 	const { mutateAsync: createCampaign, isPending: isPendingCreateCampaign } =
 		useCreateCampaign({
@@ -205,18 +207,25 @@ export const useDashboard = () => {
 	};
 
 	const handleCreateCampaign = async () => {
-		if (currentTab === 'list') {
-			const campaign = await createCampaign({
-				name: 'New Campaign',
-				contactLists: selectedContactListRows.map((row) => row.id),
+		const defaultName = `${activeSearchQuery} - ${new Date().toLocaleDateString()}`;
+		if (currentTab === 'search') {
+			const newUserContactList = await createContactList({
+				name: defaultName,
+				contactIds: selectedContacts.map((contact) => contact.id),
 			});
+
+			const campaign = await createCampaign({
+				name: defaultName,
+				userContactLists: [newUserContactList.id],
+			});
+
 			if (campaign) {
 				router.push(urls.murmur.campaign.detail(campaign.id));
 			}
-		} else if (currentTab === 'search') {
+		} else if (currentTab === 'list') {
 			const campaign = await createCampaign({
 				name: 'New Campaign',
-				contacts: selectedContacts.map((contact) => contact.id),
+				contactLists: selectedContactListRows.map((row) => row.id),
 			});
 			if (campaign) {
 				router.push(urls.murmur.campaign.detail(campaign.id));
@@ -259,5 +268,6 @@ export const useDashboard = () => {
 		tableRef: handleTableRef,
 		tableInstance,
 		isPendingImportApolloContacts,
+		isPendingCreateContactList,
 	};
 };

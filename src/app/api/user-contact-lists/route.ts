@@ -17,7 +17,7 @@ export const GET = async function GET() {
 			return apiUnauthorized();
 		}
 
-		const result = await prisma.contactList.findMany({
+		const result = await prisma.userContactList.findMany({
 			where: {
 				userId: userId,
 			},
@@ -37,13 +37,12 @@ export const GET = async function GET() {
 	}
 };
 
-const createContactListSchema = z.object({
+const createUserContactListSchema = z.object({
 	name: z.string().min(1),
-	count: z.number().int().default(0).optional(),
 	contactIds: z.array(z.number()).optional(),
 });
 
-export type PostContactListData = z.infer<typeof createContactListSchema>;
+export type PostUserContactListData = z.infer<typeof createUserContactListSchema>;
 
 export async function POST(req: NextRequest) {
 	try {
@@ -52,25 +51,24 @@ export async function POST(req: NextRequest) {
 			return apiUnauthorized();
 		}
 		const body = await req.json();
-		const validatedData = createContactListSchema.safeParse(body);
+		const validatedData = createUserContactListSchema.safeParse(body);
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
 
 		const { contactIds, name } = validatedData.data;
 
-		const contactList = await prisma.contactList.create({
+		const userContactList = await prisma.userContactList.create({
 			data: {
-				name: 'deprecated',
-				title: name,
-				userId: userId,
+				name,
+				userId,
 				contacts: {
 					connect: contactIds?.map((id) => ({ id })),
 				},
 			},
 		});
 
-		return apiCreated(contactList);
+		return apiCreated(userContactList);
 	} catch (error) {
 		return handleApiError(error);
 	}

@@ -13,11 +13,10 @@ import {
 import { ApiRouteParams } from '@/types';
 import { EmailVerificationStatus } from '@prisma/client';
 
-const updateContactListSchema = z.object({
+const updateUserContactListSchema = z.object({
 	name: z.string().min(1).optional(),
-	count: z.number().optional(),
 });
-export type PatchContactListData = z.infer<typeof updateContactListSchema>;
+export type PatchUserContactListData = z.infer<typeof updateUserContactListSchema>;
 
 export async function PATCH(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
@@ -28,14 +27,15 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 
 		const { id } = await params;
 		const body = await req.json();
-		const validatedData = updateContactListSchema.safeParse(body);
+		const validatedData = updateUserContactListSchema.safeParse(body);
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
 
-		const existingList = await prisma.contactList.findFirst({
+		const existingList = await prisma.userContactList.findFirst({
 			where: {
 				id: Number(id),
+				userId, // Ensure user owns this list
 			},
 		});
 
@@ -43,7 +43,7 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 			return apiNotFound();
 		}
 
-		const updatedContactList = await prisma.contactList.update({
+		const updatedUserContactList = await prisma.userContactList.update({
 			where: {
 				id: Number(id),
 			},
@@ -53,7 +53,7 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 			},
 		});
 
-		return apiResponse(updatedContactList);
+		return apiResponse(updatedUserContactList);
 	} catch (error) {
 		return handleApiError(error);
 	}
@@ -67,9 +67,10 @@ export async function GET(req: NextRequest, { params }: { params: ApiRouteParams
 		}
 
 		const { id } = await params;
-		const contactList = await prisma.contactList.findFirst({
+		const userContactList = await prisma.userContactList.findFirst({
 			where: {
 				id: Number(id),
+				userId, // Ensure user owns this list
 			},
 			include: {
 				contacts: {
@@ -80,11 +81,11 @@ export async function GET(req: NextRequest, { params }: { params: ApiRouteParams
 			},
 		});
 
-		if (!contactList) {
+		if (!userContactList) {
 			return apiNotFound();
 		}
 
-		return apiResponse(contactList);
+		return apiResponse(userContactList);
 	} catch (error) {
 		return handleApiError(error);
 	}
@@ -98,9 +99,10 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 		}
 
 		const { id } = await params;
-		const existingList = await prisma.contactList.findFirst({
+		const existingList = await prisma.userContactList.findFirst({
 			where: {
 				id: Number(id),
+				userId, // Ensure user owns this list
 			},
 		});
 
@@ -108,7 +110,7 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 			return apiNotFound();
 		}
 
-		await prisma.contactList.delete({
+		await prisma.userContactList.delete({
 			where: {
 				id: Number(id),
 			},

@@ -127,6 +127,10 @@ export const urls = {
 				index: '/api/stripe/update-subscription',
 			},
 		},
+		userContactList: {
+			index: '/api/user-contact-lists',
+			detail: ((id) => `/api/user-contact-lists/${id}`) as DetailRoute,
+		},
 		users: {
 			index: '/api/users',
 			detail: ((id) => `/api/users/${id}`) as DetailRoute,

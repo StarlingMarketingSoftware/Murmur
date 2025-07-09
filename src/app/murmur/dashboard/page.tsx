@@ -39,6 +39,7 @@ const Dashboard = () => {
 		setCurrentTab,
 		setSelectedContactListRows,
 		tableRef,
+		isPendingCreateContactList,
 	} = useDashboard();
 
 	return (
@@ -143,7 +144,7 @@ const Dashboard = () => {
 							<div className="flex items-center">
 								<Button
 									onClick={handleCreateCampaign}
-									isLoading={isPendingCreateCampaign}
+									isLoading={isPendingCreateCampaign || isPendingCreateContactList}
 									variant="primary-light"
 									className="w-8/10 mx-auto mt-5"
 								>
