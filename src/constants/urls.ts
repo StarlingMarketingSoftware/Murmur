@@ -70,6 +70,9 @@ export const urls = {
 			index: '/api/contacts',
 			batch: {
 				index: '/api/contacts/batch',
+				private: {
+					index: '/api/contacts/batch/private',
+				},
 			},
 			detail: ((id) => `/api/contacts/${id}`) as DetailRoute,
 		},

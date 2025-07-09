@@ -20,6 +20,8 @@ import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
 import Spinner from '@/components/ui/spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import PrivateContactImportDialog from '@/components/organisms/_dialogs/PrivateContactImportDialog/PrivateContactImportDialog';
+import { SimpleDialog } from '@/components/organisms/_dialogs/BasicDialog';
 
 const Dashboard = () => {
 	const {
@@ -44,6 +46,7 @@ const Dashboard = () => {
 
 	return (
 		<AppLayout>
+			<SimpleDialog />
 			<div className="mt-32">
 				<LogoIcon width="106px" height="84px" />
 				<Typography variant="h1" className="text-center mt-3 !text-[80px] leading-[0.8]">
@@ -93,9 +96,7 @@ const Dashboard = () => {
 									)}
 								/>
 								<div className="flex items-center justify-end gap-2">
-									<Button variant="light" className="">
-										Import
-									</Button>
+									<PrivateContactImportDialog />
 									<Button
 										variant="primary-light"
 										type="submit"
