@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 
 import { usePrivateContactImportDialog } from './usePrivateContactImportDialog';
-import { DownloadIcon, PlusIcon, UploadIcon, XIcon } from 'lucide-react';
+import { DownloadIcon, UploadIcon, XIcon } from 'lucide-react';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import { Alert } from '@/components/ui/alert';
 
@@ -29,9 +29,9 @@ export const PrivateContactImportDialog = () => {
 		handleClear,
 	} = usePrivateContactImportDialog();
 	return (
-		<Dialog open={open}>
-			<DialogTrigger onClick={() => setOpen(true)} asChild>
-				<PlusIcon />
+		<Dialog open={open} onOpenChange={setOpen}>
+			<DialogTrigger asChild>
+				<Button variant="light">Import</Button>
 			</DialogTrigger>
 			<DialogContent aria-description="hi" className="min-w-[1000px] !max-w-none !w-9/10">
 				<DialogClose asChild={true}>
@@ -71,14 +71,11 @@ export const PrivateContactImportDialog = () => {
 							You have unsaved changes!
 						</Alert>
 					)}
-					<Button onClick={handleClear} type="button" variant="primary-light">
+					<Button onClick={handleClear} type="button" variant="light">
 						Clear
 					</Button>
 					<Button onClick={handleSave} isLoading={isPending} type="submit">
 						Save
-					</Button>
-					<Button onClick={() => setOpen(false)} type="button" variant="primary-light">
-						cancel
 					</Button>
 				</DialogFooter>
 			</DialogContent>
