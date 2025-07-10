@@ -65,8 +65,12 @@ export async function GET(req: NextRequest) {
 		if (numberContactListIds.length > 0) {
 			contacts = await prisma.contact.findMany({
 				where: {
-					contactListId: {
-						in: numberContactListIds,
+					userContactLists: {
+						some: {
+							id: {
+								in: numberContactListIds,
+							},
+						},
 					},
 					emailValidationStatus: {
 						equals: verificationStatus,

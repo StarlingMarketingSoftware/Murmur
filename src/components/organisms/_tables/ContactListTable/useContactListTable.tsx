@@ -25,20 +25,19 @@ export const useContactListTable = (props: ContactListTableProps) => {
 	const { setSelectedRows } = props;
 
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
-	const [contactListToDelete, setContactListToDelete] = useState<UserContactList | null>(
+	const [currentContactList, setCurrentContactList] = useState<UserContactList | null>(
 		null
 	);
-
 	const handleDeleteClick = (contactList: UserContactList) => {
-		setContactListToDelete(contactList);
+		setCurrentContactList(contactList);
 		setIsConfirmDialogOpen(true);
 	};
 
 	const handleConfirmDelete = () => {
-		if (contactListToDelete) {
-			deleteContactList(contactListToDelete.id);
+		if (currentContactList) {
+			deleteContactList(currentContactList.id);
 			setIsConfirmDialogOpen(false);
-			setContactListToDelete(null);
+			setCurrentContactList(null);
 		}
 	};
 
@@ -109,7 +108,9 @@ export const useContactListTable = (props: ContactListTableProps) => {
 							<Button
 								variant="light"
 								className="h-8 w-8 p-0"
-								onClick={(e) => e.stopPropagation()}
+								onClick={(e) => {
+									e.stopPropagation();
+								}}
 								disabled={isPendingDeleteContactList}
 							>
 								<span className="sr-only">Open menu</span>
@@ -120,6 +121,7 @@ export const useContactListTable = (props: ContactListTableProps) => {
 							<DropdownMenuItem
 								onClick={(e) => {
 									e.stopPropagation();
+									setCurrentContactList(contactList);
 									handleRowClick(contactList);
 								}}
 							>
@@ -170,7 +172,7 @@ export const useContactListTable = (props: ContactListTableProps) => {
 		isPendingDeleteContactList,
 		isConfirmDialogOpen,
 		handleConfirmDelete,
-		contactListToDelete,
+		currentContactList,
 		handleDeleteClick,
 		setIsConfirmDialogOpen,
 	};

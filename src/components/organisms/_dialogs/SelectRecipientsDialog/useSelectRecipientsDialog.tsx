@@ -1,8 +1,7 @@
-import { useMemo, useState } from 'react';
-import { Contact, ContactList, EmailVerificationStatus } from '@prisma/client';
+import { useState } from 'react';
+import { Contact, UserContactList } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useParams } from 'next/navigation';
 import { useMe } from '@/hooks/useMe';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
 import { RESTRICTED_FEATURE_MESSAGES } from '@/constants';
@@ -10,61 +9,23 @@ import {
 	NoDataCell,
 	TableSortingButton,
 } from '@/components/molecules/CustomTable/CustomTable';
-import { useGetContacts } from '@/hooks/queryHooks/useContacts';
-import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
+import { useGetUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 
 export interface SelectRecipientsDialogProps {
 	isOpen: boolean;
 	setIsOpen: (isOpen: boolean) => void;
-	selectedContactList: ContactList | null;
-	selectedRecipients: Contact[];
+	selectedContactList: UserContactList | null;
 }
 
 export const useSelectRecipientsDialog = (props: SelectRecipientsDialogProps) => {
-	const params = useParams();
-	const campaignId = params.campaignId as string;
-	const { selectedContactList, isOpen, setIsOpen, selectedRecipients } = props;
+	const { selectedContactList, isOpen, setIsOpen } = props;
 
 	const [selectedRows, setSelectedRows] = useState<Contact[]>([]);
 
 	const { subscriptionTier } = useMe();
-	const { data, isPending } = useGetContacts({
-		filters: {
-			contactListIds: [Number(selectedContactList?.id)],
-			verificationStatus: EmailVerificationStatus.valid,
-		},
-	});
-	const { mutate: updateCampaign } = useEditCampaign({
-		onSuccess: () => {
-			setIsOpen(false);
-		},
-		successMessage: 'Recipients saved successfully!',
-		errorMessage: 'Failed to save recipients. Please try again.',
-	});
-
-	const filteredData = useMemo(() => {
-		if (!data) return [];
-
-		return data.filter((contact: Contact) => {
-			return !selectedRecipients.some(
-				(selectedContact) => selectedContact.id === contact.id
-			);
-		});
-	}, [data, selectedRecipients]);
-
-	const saveSelectedRecipients = async () => {
-		if (selectedContactList && !!campaignId) {
-			updateCampaign({
-				id: campaignId,
-				data: {
-					contactOperation: {
-						action: 'connect',
-						contactIds: selectedRows.map((row) => row.id),
-					},
-				},
-			});
-		}
-	};
+	const { data, isPending } = useGetUserContactList(
+		selectedContactList?.id.toString() || ''
+	);
 
 	const columns: ColumnDef<Contact>[] = [
 		{
@@ -129,9 +90,7 @@ export const useSelectRecipientsDialog = (props: SelectRecipientsDialogProps) =>
 		isOpen,
 		setIsOpen,
 		columns,
-		setSelectedRows,
 		selectedContactList,
-		saveSelectedRecipients,
-		filteredData,
+		setSelectedRows,
 	};
 };

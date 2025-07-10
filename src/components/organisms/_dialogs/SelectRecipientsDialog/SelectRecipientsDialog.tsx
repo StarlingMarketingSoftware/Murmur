@@ -23,20 +23,19 @@ const SelectRecipientsDialog: FC<SelectRecipientsDialogProps> = (props) => {
 		setIsOpen,
 		columns,
 		setSelectedRows,
+		data,
 		selectedContactList,
-		saveSelectedRecipients,
-		filteredData,
 	} = useSelectRecipientsDialog(props);
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen}>
 			<DialogContent className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px]">
 				<DialogTitle className="capitalize"></DialogTitle>
-				{isPending || !filteredData ? (
+				{isPending ? (
 					<Spinner />
 				) : (
 					<>
 						<DialogTitle className="capitalize">
-							{`${selectedContactList?.title}`}
+							{`${selectedContactList?.name}`}
 						</DialogTitle>
 						<DialogHeader>
 							<DialogDescription>
@@ -45,13 +44,13 @@ const SelectRecipientsDialog: FC<SelectRecipientsDialogProps> = (props) => {
 						</DialogHeader>
 						<CustomTable
 							columns={columns}
-							data={filteredData}
+							data={data?.contacts}
 							setSelectedRows={setSelectedRows}
 							isSelectable
 							noDataMessage="All contacts in this list have been added to your campaign already!"
 						/>
 						<DialogFooter>
-							<Button onClick={saveSelectedRecipients}>
+							<Button>
 								<SaveIcon />
 								Save Selected Recipients
 							</Button>

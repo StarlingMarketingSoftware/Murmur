@@ -3,7 +3,7 @@ import { PostUserContactListData } from '@/app/api/user-contact-lists/route';
 import { _fetch } from '@/utils';
 import { CustomMutationOptions } from '@/types';
 import { urls } from '@/constants/urls';
-import { UserContactList } from '@prisma/client';
+import { UserContactListWithContacts } from '@/types/contact';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -32,7 +32,7 @@ export const useGetUserContactLists = () => {
 };
 
 export const useGetUserContactList = (id: string) => {
-	return useQuery<UserContactList>({
+	return useQuery<UserContactListWithContacts>({
 		queryKey: QUERY_KEYS.detail(id),
 		queryFn: async () => {
 			const response = await _fetch(urls.api.userContactList.detail(id));
@@ -41,6 +41,7 @@ export const useGetUserContactList = (id: string) => {
 			}
 			return response.json();
 		},
+		enabled: !!id,
 	});
 };
 

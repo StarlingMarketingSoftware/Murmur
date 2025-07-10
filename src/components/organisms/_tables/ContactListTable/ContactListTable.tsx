@@ -12,7 +12,6 @@ import Spinner from '@/components/ui/spinner';
 import SelectRecipientsDialog from '../../_dialogs/SelectRecipientsDialog/SelectRecipientsDialog';
 import { ConfirmDialog } from '../../_dialogs/ConfirmDialog/ConfirmDialog';
 import { Typography } from '@/components/ui/typography';
-import { Separator } from '@/components/ui/separator';
 
 const ContactListTable: FC<ContactListTableProps> = (props) => {
 	const {
@@ -22,13 +21,10 @@ const ContactListTable: FC<ContactListTableProps> = (props) => {
 		handleRowClick,
 		isContactListDialogOpen,
 		setIsContactListDialogOpen,
-		selectedContactList,
 		setSelectedRows,
-		isPendingDeleteContactList,
 		isConfirmDialogOpen,
 		setIsConfirmDialogOpen,
-		handleDeleteClick,
-		contactListToDelete,
+		currentContactList,
 		handleConfirmDelete,
 	} = useContactListTable(props);
 
@@ -51,12 +47,11 @@ const ContactListTable: FC<ContactListTableProps> = (props) => {
 					setSelectedRows={setSelectedRows}
 				/>
 			</CardContent>
-			{/* <SelectRecipientsDialog
+			<SelectRecipientsDialog
 				isOpen={isContactListDialogOpen}
 				setIsOpen={setIsContactListDialogOpen}
-				selectedContactList={selectedContactList}
-				selectedRecipients={campaign.contacts}
-			/> */}
+				selectedContactList={currentContactList}
+			/>
 			<ConfirmDialog
 				title="Confirm Contact List Deletion"
 				confirmAction={handleConfirmDelete}
@@ -68,7 +63,7 @@ const ContactListTable: FC<ContactListTableProps> = (props) => {
 					will not be deleted.
 				</Typography>
 				<Typography className="text-center" bold>
-					{contactListToDelete?.name}
+					{currentContactList?.name}
 				</Typography>
 			</ConfirmDialog>
 		</Card>
