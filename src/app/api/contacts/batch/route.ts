@@ -68,8 +68,6 @@ export async function POST(req: NextRequest) {
 				index
 			);
 		});
-		console.log('🚀 ~ uniqueContacts ~ uniqueContacts:', uniqueContacts);
-
 		const duplicatesRemoved = contacts.length - uniqueContacts.length;
 
 		if (isPrivate) {
@@ -109,14 +107,10 @@ export async function POST(req: NextRequest) {
 				contactsWithValidationStatus.filter(
 					(contact) => contact.emailValidationStatus !== EmailVerificationStatus.unknown
 				);
-			console.log('🚀 ~ POST ~ alreadyValidatedContacts:', alreadyValidatedContacts);
-
 			const contactsToVerify: ContactPartialWithRequiredEmail[] =
 				contactsWithValidationStatus.filter(
 					(contact) => contact.emailValidationStatus === EmailVerificationStatus.unknown
 				);
-
-			console.log('🚀 ~ POST ~ contactsToVerify:', contactsToVerify);
 			// TODO the number of contacts they can verify should be limited to their usage limit
 
 			let validatedContacts: ContactPartialWithRequiredEmail[] = [];

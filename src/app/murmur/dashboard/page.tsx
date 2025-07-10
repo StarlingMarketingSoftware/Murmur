@@ -21,6 +21,7 @@ import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
 import Spinner from '@/components/ui/spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
+import { ConfirmDialog } from '@/components/organisms/_dialogs/ConfirmDialog/ConfirmDialog';
 
 const Dashboard = () => {
 	const {

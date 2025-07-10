@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ContactList, EmailVerificationStatus } from '@prisma/client';
+import { ContactList, EmailVerificationStatus, UserContactList } from '@prisma/client';
 import { useEffect, useState } from 'react';
 import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useRouter } from 'next/navigation';
@@ -120,6 +120,10 @@ export const useDashboard = () => {
 				return <TableSortingButton column={column} label="Website" />;
 			},
 			cell: ({ row }) => {
+				console.log(
+					'🚀 ~ useDashboard ~ selectedContactListRows:',
+					selectedContactListRows
+				);
 				return <div className="text-left">{row.getValue('website')}</div>;
 			},
 		},
@@ -151,9 +155,9 @@ export const useDashboard = () => {
 	});
 
 	/* HOOKS */
-	const [selectedContactListRows, setSelectedContactListRows] = useState<ContactList[]>(
-		[]
-	);
+	const [selectedContactListRows, setSelectedContactListRows] = useState<
+		UserContactList[]
+	>([]);
 	const [selectedContacts, setSelectedContacts] = useState<ContactWithName[]>([]);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
 	const [currentTab, setCurrentTab] = useState<TabValue>('search');

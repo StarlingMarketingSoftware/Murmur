@@ -47,8 +47,7 @@ export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) =
 				</DialogHeader>
 				<DialogDescription>
 					Download the template below and open it in your preferred spreadsheet software.
-					Enter your data following the format of the file, then upload your file when you
-					are ready.
+					Enter your data following the format of the file, then upload your file.
 				</DialogDescription>
 				<div className="flex flex-row gap-4">
 					<input
