@@ -8,12 +8,16 @@ import {
 	DialogFooter,
 } from '@/components/ui/dialog';
 
-import { useContactTSVUploadDialog } from './useContactTSVUploadDialog';
-import { DownloadIcon, PlusIcon, UploadIcon } from 'lucide-react';
+import {
+	ContactTSVUploadDialogProps,
+	useContactTSVUploadDialog,
+} from './useContactTSVUploadDialog';
+import { DownloadIcon, UploadIcon } from 'lucide-react';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
-import { Alert } from '@/components/ui/alert';
+import { FC } from 'react';
+import { DialogDescription } from '@radix-ui/react-dialog';
 
-export const ContactTSVUploadDialog = () => {
+export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) => {
 	const {
 		isPending,
 		open,
@@ -26,25 +30,32 @@ export const ContactTSVUploadDialog = () => {
 		fileInputRef,
 		handleSave,
 		handleClear,
-	} = useContactTSVUploadDialog();
+		triggerText,
+		buttonVariant,
+	} = useContactTSVUploadDialog(props);
+
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
-				<Button variant="primary-light" className="w-fit">
-					<PlusIcon />
-					Batch Create with TSV
+				<Button variant={buttonVariant || 'primary-light'} className="w-fit">
+					{triggerText}
 				</Button>
 			</DialogTrigger>
 			<DialogContent className="min-w-[1000px] !max-w-none !w-9/10">
 				<DialogHeader>
 					<DialogTitle>Add Contacts by TSV Upload</DialogTitle>
 				</DialogHeader>
+				<DialogDescription>
+					Download the template below and open it in your preferred spreadsheet software.
+					Enter your data following the format of the file, then upload your file when you
+					are ready.
+				</DialogDescription>
 				<div className="flex flex-row gap-4">
 					<input
 						type="file"
 						ref={fileInputRef}
 						className="hidden"
-						accept=".txt"
+						accept=".tsv"
 						onChange={handleFileUpload}
 					/>
 					<Button onClick={handleUploadClick}>
@@ -62,12 +73,7 @@ export const ContactTSVUploadDialog = () => {
 					noDataMessage="Upload a TSV file to load data."
 				/>
 				<DialogFooter className="justify-between items-center">
-					{tsvData.length > 0 && (
-						<Alert className="grid-cols-none w-fit h-fit" variant="warning">
-							You have unsaved changes!
-						</Alert>
-					)}
-					<Button onClick={handleClear} type="button" variant="primary-light">
+					<Button onClick={handleClear} type="button" variant="light">
 						Clear
 					</Button>
 					<Button onClick={handleSave} isLoading={isPending} type="submit">

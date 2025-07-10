@@ -20,7 +20,7 @@ import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
 import Spinner from '@/components/ui/spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import PrivateContactImportDialog from '@/components/organisms/_dialogs/PrivateContactImportDialog/PrivateContactImportDialog';
+import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
 
 const Dashboard = () => {
 	const {
@@ -94,7 +94,11 @@ const Dashboard = () => {
 									)}
 								/>
 								<div className="flex items-center justify-end gap-2">
-									<PrivateContactImportDialog />
+									<ContactTSVUploadDialog
+										isPrivate
+										triggerText="Import"
+										buttonVariant="light"
+									/>
 									<Button
 										variant="primary-light"
 										type="submit"

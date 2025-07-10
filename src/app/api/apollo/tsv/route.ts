@@ -10,7 +10,7 @@ import { enrichApolloContacts, transformApolloContact } from '@/app/api/_utils';
 
 import { ApolloPerson } from '@/types/apollo';
 import { UserRole } from '@prisma/client';
-import { ContactWithRequiredEmail } from '@/types/contact';
+import { ContactPartialWithRequiredEmail } from '@/types/contact';
 
 const postApolloContactsTSVSchema = z.object({
 	person_titles: z.array(z.string()).optional(),
@@ -132,11 +132,11 @@ export async function POST(req: NextRequest) {
 }
 
 const exportContactsToTSV = async (
-	contacts: ContactWithRequiredEmail[],
+	contacts: ContactPartialWithRequiredEmail[],
 	fileName: string,
 	currentPage: number
 ) => {
-	const tsvData = contacts.map((contact: ContactWithRequiredEmail) => ({
+	const tsvData = contacts.map((contact: ContactPartialWithRequiredEmail) => ({
 		firstname: contact.firstName || '',
 		lastname: contact.lastName || '',
 		company: contact.company || '',
