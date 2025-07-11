@@ -20,7 +20,7 @@ export const FAQS: FAQ[] = [
 	{
 		question: 'What’s the contact discovery rate per search query?',
 		answer:
-			' Each search operation returns approximately 110 validated contacts. The system has no hard limits on search frequency, allowing continuous discovery operations.',
+			'Each search operation returns approximately 100 validated contacts. The system has no hard limits on search frequency, allowing continuous discovery operations.',
 	},
 	{
 		question: 'What deliverability mechanisms prevent spam classification?',
