@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
 	)}_in_${validatedData.data.person_locations?.join('_')}`;
 
 	const completeContacts: TransformedContact[] = [];
-	let maxPage = 100000;
+	// const maxPage = 100000;
 	let i = 1;
 
 	while (i <= 1) {
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
 				data.pagination?.total_entries || 0
 			} total stored in ${data.pagination?.total_pages} pages. Current page: ${i}`
 		);
-		maxPage = data.pagination?.total_pages;
+		// maxPage = data.pagination?.total_pages;
 		i++;
 	}
 

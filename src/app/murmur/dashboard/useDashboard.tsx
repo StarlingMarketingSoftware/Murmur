@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ContactList, EmailVerificationStatus, UserContactList } from '@prisma/client';
+import { EmailVerificationStatus, UserContactList } from '@prisma/client';
 import { useEffect, useState } from 'react';
 import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useRouter } from 'next/navigation';
@@ -15,6 +15,7 @@ import { ContactWithName } from '@/types/contact';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateApolloContacts } from '@/hooks/queryHooks/useApollo';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
+import { toast } from 'sonner';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -120,10 +121,6 @@ export const useDashboard = () => {
 				return <TableSortingButton column={column} label="Website" />;
 			},
 			cell: ({ row }) => {
-				console.log(
-					'🚀 ~ useDashboard ~ selectedContactListRows:',
-					selectedContactListRows
-				);
 				return <div className="text-left">{row.getValue('website')}</div>;
 			},
 		},
@@ -227,8 +224,12 @@ export const useDashboard = () => {
 				router.push(urls.murmur.campaign.detail(campaign.id));
 			}
 		} else if (currentTab === 'list') {
+			if (selectedContactListRows.length === 0) {
+				toast.error('Please select at least one contact list');
+				return;
+			}
 			const campaign = await createCampaign({
-				name: 'New Campaign',
+				name: `New Campaign - ${selectedContactListRows[0].name}`,
 				contactLists: selectedContactListRows.map((row) => row.id),
 			});
 			if (campaign) {
@@ -273,5 +274,6 @@ export const useDashboard = () => {
 		tableInstance,
 		isPendingImportApolloContacts,
 		isPendingCreateContactList,
+		selectedContactListRows,
 	};
 };

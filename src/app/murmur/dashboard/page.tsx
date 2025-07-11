@@ -21,7 +21,6 @@ import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
 import Spinner from '@/components/ui/spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
-import { ConfirmDialog } from '@/components/organisms/_dialogs/ConfirmDialog/ConfirmDialog';
 
 const Dashboard = () => {
 	const {
@@ -39,11 +38,14 @@ const Dashboard = () => {
 		tabOptions,
 		currentTab,
 		setCurrentTab,
+		selectedContactListRows,
 		setSelectedContactListRows,
 		tableRef,
 		isPendingCreateContactList,
 	} = useDashboard();
+	console.log('🚀 ~ Dashboard ~ currentTab:', currentTab);
 
+	console.log('🚀 ~ Dashboard ~ selectedContactListRows:', selectedContactListRows);
 	return (
 		<AppLayout>
 			<div className="mt-32">
@@ -144,17 +146,6 @@ const Dashboard = () => {
 							) : (
 								<Spinner />
 							)}
-
-							<div className="flex items-center">
-								<Button
-									onClick={handleCreateCampaign}
-									isLoading={isPendingCreateCampaign || isPendingCreateContactList}
-									variant="primary-light"
-									className="w-8/10 mx-auto mt-5"
-								>
-									Create Campaign
-								</Button>
-							</div>
 						</>
 					)}
 				</>
@@ -166,7 +157,20 @@ const Dashboard = () => {
 				</>
 			)}
 
-			{/* <CampaignsTable /> */}
+			<div className="flex items-center">
+				<Button
+					onClick={handleCreateCampaign}
+					isLoading={isPendingCreateCampaign || isPendingCreateContactList}
+					variant="primary-light"
+					className="w-8/10 mx-auto mt-5"
+				>
+					Create Campaign
+				</Button>
+			</div>
+
+			<div className="mt-46">
+				<CampaignsTable />
+			</div>
 		</AppLayout>
 	);
 };

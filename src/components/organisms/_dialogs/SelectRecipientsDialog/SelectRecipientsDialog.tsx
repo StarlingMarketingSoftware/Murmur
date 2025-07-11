@@ -1,9 +1,7 @@
-import { Button } from '@/components/ui/button';
 import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
-	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from '@/components/ui/dialog';
@@ -14,7 +12,6 @@ import {
 	useSelectRecipientsDialog,
 } from './useSelectRecipientsDialog';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
-import { SaveIcon } from 'lucide-react';
 
 const SelectRecipientsDialog: FC<SelectRecipientsDialogProps> = (props) => {
 	const { isPending, isOpen, setIsOpen, columns, data, selectedContactList } =
@@ -30,11 +27,6 @@ const SelectRecipientsDialog: FC<SelectRecipientsDialogProps> = (props) => {
 						<DialogTitle className="capitalize">
 							{`${selectedContactList?.name}`}
 						</DialogTitle>
-						<DialogHeader>
-							<DialogDescription>
-								Select recipients from the table, then save them to your campaign.
-							</DialogDescription>
-						</DialogHeader>
 						<CustomTable
 							columns={columns}
 							data={data?.contacts}

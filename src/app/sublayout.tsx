@@ -22,9 +22,9 @@ interface SubLayoutProps {
 const SubLayout: FC<SubLayoutProps> = ({ children }) => {
 	const { setTheme } = useTheme();
 
-	// useEffect(() => {
-	// 	setTheme('light');
-	// }, [setTheme]);
+	useEffect(() => {
+		setTheme('light');
+	}, [setTheme]);
 
 	return (
 		<ClerkProvider>
