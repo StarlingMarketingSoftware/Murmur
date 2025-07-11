@@ -141,7 +141,7 @@ export const useDashboard = () => {
 			value: 'search',
 		},
 		{
-			label: 'Select from List',
+			label: 'Contact Lists',
 			value: 'list',
 		},
 	];
@@ -177,7 +177,7 @@ export const useDashboard = () => {
 			query: activeSearchQuery,
 			verificationStatus: EmailVerificationStatus.valid,
 			useVectorSearch: true,
-			limit: 100,
+			limit: 101,
 		},
 		enabled: false,
 	});

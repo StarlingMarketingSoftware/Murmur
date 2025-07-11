@@ -11,11 +11,18 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { ApiRouteParams } from '@/types';
-import { EmailVerificationStatus } from '@prisma/client';
+import { EmailVerificationStatus, Prisma } from '@prisma/client';
 
 const updateUserContactListSchema = z.object({
 	name: z.string().min(1).optional(),
+	contactOperation: z
+		.object({
+			action: z.enum(['connect', 'disconnect']),
+			contactIds: z.array(z.number()),
+		})
+		.optional(),
 });
+
 export type PatchUserContactListData = z.infer<typeof updateUserContactListSchema>;
 
 export async function PATCH(req: NextRequest, { params }: { params: ApiRouteParams }) {
@@ -32,6 +39,8 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 			return apiBadRequest(validatedData.error);
 		}
 
+		const { name, contactOperation } = validatedData.data;
+
 		const existingList = await prisma.userContactList.findFirst({
 			where: {
 				id: Number(id),
@@ -43,11 +52,24 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 			return apiNotFound();
 		}
 
+		// Prepare update data with proper typing
+		const updateData: Prisma.UserContactListUpdateInput = {};
+		if (name) {
+			updateData.name = name;
+		}
+		if (contactOperation) {
+			updateData.contacts = {
+				[contactOperation.action]: contactOperation.contactIds.map((id: number) => ({
+					id,
+				})),
+			};
+		}
+
 		const updatedUserContactList = await prisma.userContactList.update({
 			where: {
 				id: Number(id),
 			},
-			data: validatedData.data,
+			data: updateData,
 			include: {
 				contacts: true,
 			},

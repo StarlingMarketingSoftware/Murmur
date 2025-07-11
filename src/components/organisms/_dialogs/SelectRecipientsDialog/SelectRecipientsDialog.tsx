@@ -17,15 +17,8 @@ import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import { SaveIcon } from 'lucide-react';
 
 const SelectRecipientsDialog: FC<SelectRecipientsDialogProps> = (props) => {
-	const {
-		isPending,
-		isOpen,
-		setIsOpen,
-		columns,
-		setSelectedRows,
-		data,
-		selectedContactList,
-	} = useSelectRecipientsDialog(props);
+	const { isPending, isOpen, setIsOpen, columns, data, selectedContactList } =
+		useSelectRecipientsDialog(props);
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen}>
 			<DialogContent className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px]">
@@ -45,16 +38,8 @@ const SelectRecipientsDialog: FC<SelectRecipientsDialogProps> = (props) => {
 						<CustomTable
 							columns={columns}
 							data={data?.contacts}
-							setSelectedRows={setSelectedRows}
-							isSelectable
 							noDataMessage="All contacts in this list have been added to your campaign already!"
 						/>
-						<DialogFooter>
-							<Button>
-								<SaveIcon />
-								Save Selected Recipients
-							</Button>
-						</DialogFooter>
 					</>
 				)}
 			</DialogContent>
