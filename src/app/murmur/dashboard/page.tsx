@@ -38,14 +38,10 @@ const Dashboard = () => {
 		tabOptions,
 		currentTab,
 		setCurrentTab,
-		selectedContactListRows,
 		setSelectedContactListRows,
 		tableRef,
 		isPendingCreateContactList,
 	} = useDashboard();
-	console.log('🚀 ~ Dashboard ~ currentTab:', currentTab);
-
-	console.log('🚀 ~ Dashboard ~ selectedContactListRows:', selectedContactListRows);
 	return (
 		<AppLayout>
 			<div className="mt-32">

@@ -38,7 +38,6 @@ export const fetchApolloContacts = async (query: string): Promise<ApolloPerson[]
 		`Given the following search terms, create a valid Apollo People Search object. Search Query: ${query}`
 	);
 	const openAiResponseJson = JSON.parse(stripBothSidesOfBraces(openAiResponse));
-	console.log('🚀 ~ openAiResponseJson:', openAiResponseJson);
 
 	// check if query has been searched before
 	const existingQuery = await prisma.apolloQuery.findFirst({
@@ -137,8 +136,6 @@ export const fetchApolloContacts = async (query: string): Promise<ApolloPerson[]
 				},
 			});
 		}
-
-		console.log('🚀 ~ data:', data);
 
 		console.log(
 			`Apollo returned ${data.people?.length || 0} people out of ${

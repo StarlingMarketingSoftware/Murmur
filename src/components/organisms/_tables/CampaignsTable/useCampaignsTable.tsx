@@ -80,7 +80,6 @@ export const useCampaignsTable = () => {
 	];
 
 	const { data, isPending } = useGetCampaigns();
-	console.log('🚀 ~ useCampaignsTable ~ data:', data);
 	const router = useRouter();
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 	const [currentRow, setCurrentRow] = useState<Campaign | null>(null);

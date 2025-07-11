@@ -169,8 +169,6 @@ export async function POST(req: NextRequest) {
 	try {
 		const { userId } = await auth();
 
-		console.log('🚀 ~  ~ userId:', userId);
-
 		if (!userId) {
 			return apiUnauthorized();
 		}

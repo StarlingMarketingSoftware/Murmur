@@ -28,11 +28,11 @@ export type PostApolloContactsTSVData = z.infer<typeof postApolloContactsTSVSche
 // Define the type for transformed contacts
 type TransformedContact = ReturnType<typeof transformApolloContact>;
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<Response> {
 	const apolloApiKey = process.env.APOLLO_API_KEY;
 	if (!apolloApiKey) {
 		console.error('Apollo API key not found');
-		return [];
+		return apiBadRequest('Apollo API key not found');
 	}
 
 	const { userId } = await auth();
@@ -84,11 +84,10 @@ export async function POST(req: NextRequest) {
 
 		if (!response.ok) {
 			console.error('Apollo API error:', await response.text());
-			return [];
+			return apiBadRequest('Apollo API error');
 		}
 
 		const data = await response.json();
-		console.log('🚀 ~ POST ~ data:', data);
 
 		// filter out apollo ids that already exist
 		const existingContacts = await prisma.contact.findMany({
@@ -135,7 +134,7 @@ const exportContactsToTSV = async (
 	contacts: ContactPartialWithRequiredEmail[],
 	fileName: string,
 	currentPage: number
-) => {
+): Promise<void> => {
 	const tsvData = contacts.map((contact: ContactPartialWithRequiredEmail) => ({
 		firstname: contact.firstName || '',
 		lastname: contact.lastName || '',
@@ -167,8 +166,5 @@ const exportContactsToTSV = async (
 
 	await fs.mkdir(path.join(process.cwd(), 'public', 'exports'), { recursive: true });
 	await fs.writeFile(filepath, tsvContent, 'utf-8');
-	return apiResponse({
-		contacts,
-		tsvUrl: `/exports/${filename}`,
-	});
+	return;
 };

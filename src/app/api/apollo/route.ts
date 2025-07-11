@@ -67,7 +67,6 @@ export async function POST(req: NextRequest) {
 		let validatedContacts = transformedContacts;
 
 		const isTestingEnvironment = process.env.NODE_ENV !== 'production';
-		console.log('🚀 ~ POST ~ isTestingEnvironment:', isTestingEnvironment);
 
 		if (isTestingEnvironment) {
 			// In testing environment, mark all contacts as valid
@@ -96,7 +95,6 @@ export async function POST(req: NextRequest) {
 			}
 		}
 
-		console.log('🚀 ~ POST ~ validatedContacts:', validatedContacts);
 		const createdContacts: Contact[] = await prisma.contact.createManyAndReturn({
 			data: validatedContacts,
 		});
