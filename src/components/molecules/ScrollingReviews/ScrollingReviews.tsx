@@ -14,13 +14,13 @@ const REVIEWS: Review[] = [
 		text: 'When I was at Columbia founding Lotreck Music, a tool like Murmur would have been an absolute game changer!',
 		fullName: 'Robert Lotreck',
 		company: 'Lotreck Music LLC',
-		photoUrl: '/photos/jeremyAvatar.jpg',
+		photoUrl: '/photos/profilePhotoFiller.jpg',
 	},
 	{
 		text: 'Talking to new folks is one of the biggest challenges to overcome as a small business owner. When my husband and I started using Murmur to help us book more events for our catering business, it brought us our busiest month to date!',
 		fullName: 'Julia Bennett',
 		company: 'Wilmington Catering',
-		photoUrl: '/photos/jeremyAvatar.jpg',
+		photoUrl: '/photos/profilePhotoFiller.jpg',
 	},
 	{
 		text: `It's nuts! So we use a bunch of AI related tools. We've even used tools that automate parts of email sending process. Starling's Murmur does this with a lot of precision and a lot of detail.`,
@@ -32,13 +32,13 @@ const REVIEWS: Review[] = [
 		text: `I was able to get done in a day what it took weeks to do in the past! It used to be a chore to get our emails out. We've alleviated a significant time constraint.`,
 		fullName: 'Jack Carter',
 		company: 'Radiance Pharmaceuticals',
-		photoUrl: '/photos/jeremyAvatar.jpg',
+		photoUrl: '/photos/profilePhotoFiller.jpg',
 	},
 	{
 		text: `After exhausting every marketing tool on the market, we found Murmur delivers exactly what we needed. The team is intelligent and responsive.`,
 		fullName: 'Suki Lee',
 		company: 'Nexora Solutions',
-		photoUrl: '/photos/jeremyAvatar.jpg',
+		photoUrl: '/photos/profilePhotoFiller.jpg',
 	},
 ];
 

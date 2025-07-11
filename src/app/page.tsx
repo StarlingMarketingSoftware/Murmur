@@ -97,7 +97,12 @@ export default function HomePage() {
 					<div className="row-span-2">
 						{!isSignedIn ? (
 							<SignUpButton mode="modal">
-								<Button className="bg-black text-white px-6 py-3 rounded-md text-lg font-medium font-secondary hover:bg-gray-800">
+								<Button
+									variant="primary"
+									font="secondary"
+									size="lg"
+									className="w-[194px]"
+								>
 									START
 								</Button>
 							</SignUpButton>

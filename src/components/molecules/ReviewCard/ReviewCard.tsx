@@ -13,7 +13,7 @@ export const ReviewCard: FC<ReviewCardProps> = (props) => {
 				className="text-[15px] sm:text-[17px] h-75/100"
 			>{`"${review.text}"`}</Typography>
 			<div className="flex gap-2 sm:gap-3">
-				<div className="bg-gray-200 p-1 rounded-xl h-[36px] sm:h-[44px] aspect-square">
+				<div className="bg-gray-200 p-1 rounded-xl h-fit aspect-square">
 					<Image
 						src={photoUrl}
 						alt="Reviewer Photo"
