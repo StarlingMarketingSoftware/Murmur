@@ -5,26 +5,46 @@ import { z } from 'zod';
 import {
 	apiBadRequest,
 	apiCreated,
+	apiServerError,
 	apiUnauthorized,
 	handleApiError,
+	processZeroBounceResults,
+	verifyEmailsWithZeroBounce,
+	waitForZeroBounceCompletion,
 } from '@/app/api/_utils';
+import { Contact, EmailVerificationStatus } from '@prisma/client';
+import { ContactPartialWithRequiredEmail } from '@/types/contact';
 
 const batchCreateContactSchema = z.object({
+	isPrivate: z.boolean().optional().default(false),
 	contacts: z.array(
 		z.object({
-			firstname: z.string().optional().nullable(),
-			lastname: z.string().optional().nullable(),
+			firstName: z.string().optional(),
+			lastName: z.string().optional(),
+			company: z.string().optional(),
 			email: z.string(),
-			company: z.string().optional().nullable(),
-			website: z.string().optional().nullable(),
-			state: z.string().optional().nullable(),
-			country: z.string().optional().nullable(),
-			phone: z.string().optional().nullable(),
+			address: z.string().optional(),
+			city: z.string().optional(),
+			state: z.string().optional(),
+			country: z.string().optional(),
+			website: z.string().optional(),
+			phone: z.string().optional(),
+			title: z.string().optional(),
+			headline: z.string().optional(),
+			linkedInUrl: z.string().optional(),
+			photoUrl: z.string().optional(),
+			metadata: z.string().optional(),
 		})
 	),
-	contactListId: z.number().optional(),
 });
 export type PostBatchContactData = z.infer<typeof batchCreateContactSchema>;
+export type PostBatchContactDataResponse = {
+	contacts: Contact[];
+	created: number;
+	skipped: number;
+	duplicatesRemoved: number;
+	skippedEmails: string[];
+};
 
 export async function POST(req: NextRequest) {
 	try {
@@ -38,7 +58,8 @@ export async function POST(req: NextRequest) {
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
-		const { contacts, contactListId } = validatedData.data;
+
+		const { contacts, isPrivate } = validatedData.data;
 
 		// Remove duplicate email addresses, keeping only the first occurrence of each email
 		const uniqueContacts = contacts.filter((contact, index, arr) => {
@@ -47,46 +68,129 @@ export async function POST(req: NextRequest) {
 				index
 			);
 		});
-
 		const duplicatesRemoved = contacts.length - uniqueContacts.length;
 
-		const result = await prisma.$transaction(async (prisma) => {
+		if (isPrivate) {
 			const existingContacts = await prisma.contact.findMany({
 				where: {
-					AND: [
-						{
-							email: {
-								in: uniqueContacts.map((c) => c.email),
-							},
-						},
-						{
-							contactListId,
-						},
-					],
+					email: {
+						in: uniqueContacts.map((c) => c.email),
+					},
 				},
 			});
 
 			const existingEmails = new Set(existingContacts.map((c) => c.email));
-			const newContacts = uniqueContacts.filter(
-				(contact) => !existingEmails.has(contact.email)
-			);
+
+			const contactsWithValidationStatus: ContactPartialWithRequiredEmail[] =
+				uniqueContacts.map((importedContact) => {
+					const existingContact = existingContacts.find(
+						(existingContact) => existingContact.email === importedContact.email
+					);
+					if (existingContact) {
+						return {
+							...importedContact,
+							emailValidationStatus: existingContact.emailValidationStatus,
+							emailValidatedAt: existingContact.emailValidatedAt,
+							isPrivate: true,
+							userId,
+						};
+					}
+					return {
+						...importedContact,
+						emailValidationStatus: EmailVerificationStatus.unknown,
+						isPrivate: true,
+						userId,
+					};
+				});
+
+			const alreadyValidatedContacts: ContactPartialWithRequiredEmail[] =
+				contactsWithValidationStatus.filter(
+					(contact) => contact.emailValidationStatus !== EmailVerificationStatus.unknown
+				);
+			const contactsToVerify: ContactPartialWithRequiredEmail[] =
+				contactsWithValidationStatus.filter(
+					(contact) => contact.emailValidationStatus === EmailVerificationStatus.unknown
+				);
+			// TODO the number of contacts they can verify should be limited to their usage limit
+
+			let validatedContacts: ContactPartialWithRequiredEmail[] = [];
+
+			if (contactsToVerify.length > 0) {
+				const zeroBounceFileId = await verifyEmailsWithZeroBounce(contactsToVerify);
+
+				if (!zeroBounceFileId) {
+					return apiServerError('ZeroBounce validation initial request failed.');
+				}
+
+				const validationCompleted = await waitForZeroBounceCompletion(
+					zeroBounceFileId,
+					10
+				); // 1 minute may be too short for larger datasets
+
+				if (validationCompleted) {
+					validatedContacts = await processZeroBounceResults(
+						zeroBounceFileId,
+						contactsToVerify
+					);
+				}
+			}
+			// if any emails are not valid, still create them and show them to the user. We want to track which emails are not valid. We also want the user to know what happened. These invalid emails will remain in the ContactList, but will not be drafted or sent to.
+
 			const results = await prisma.contact.createMany({
-				data: newContacts.map((contact) => ({
-					...contact,
-					contactListId,
-				})),
+				data: [...validatedContacts, ...alreadyValidatedContacts],
 			});
-			return {
+
+			const createdContacts = await prisma.contact.findMany({
+				where: {
+					email: {
+						in: [...validatedContacts, ...alreadyValidatedContacts].map((c) => c.email),
+					},
+					userId,
+				},
+			});
+
+			return apiCreated({
+				contacts: createdContacts,
 				created: results.count,
 				skipped: uniqueContacts.length - results.count,
 				duplicatesRemoved,
 				skippedEmails: uniqueContacts
 					.filter((contact) => existingEmails.has(contact.email))
 					.map((contact) => contact.email),
-			};
-		});
+			});
+		} else {
+			const result = await prisma.$transaction(async (prisma) => {
+				const existingContacts = await prisma.contact.findMany({
+					where: {
+						email: {
+							in: uniqueContacts.map((c) => c.email),
+						},
+					},
+				});
 
-		return apiCreated(result);
+				// TODO contacts must be indexed in vector database
+
+				const existingEmails = new Set(existingContacts.map((c) => c.email));
+				const newContacts = uniqueContacts.filter(
+					(contact) => !existingEmails.has(contact.email)
+				);
+				const results = await prisma.contact.createMany({
+					data: newContacts.map((contact) => ({
+						...contact,
+					})),
+				});
+				return {
+					created: results.count,
+					skipped: uniqueContacts.length - results.count,
+					duplicatesRemoved,
+					skippedEmails: uniqueContacts
+						.filter((contact) => existingEmails.has(contact.email))
+						.map((contact) => contact.email),
+				};
+			});
+
+			return apiCreated(result);
+		}
 	} catch (error) {
 		return handleApiError(error);
 	}

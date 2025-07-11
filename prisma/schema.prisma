@@ -82,19 +82,20 @@ model User {
   verificationCredits Int      @default(0)
   customDomain        String?
 
-  stripeCustomerId         String?   @unique
+  stripeCustomerId         String?           @unique
   stripeSubscriptionId     String?
   stripeSubscriptionStatus String?
   stripePriceId            String?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  emails                   Email[]
+  campaigns                Campaign[]
+  signatures               Signature[]
+  identities               Identity[]
+  contactLists             ContactList[]
+  userContactLists         UserContactList[]
+  contacts                 Contact[]
   lastCreditUpdate         DateTime?
-
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  emails       Email[]
-  campaigns    Campaign[]
-  signatures   Signature[]
-  identities   Identity[]
-  contactLists ContactList[]
 }
 
 model ContactList {
@@ -108,6 +109,21 @@ model ContactList {
   userId    String?
   user      User?      @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
   campaigns Campaign[]
+
+  @@index([userId])
+}
+
+model UserContactList {
+  id   Int    @id @default(autoincrement())
+  name String
+
+  userId    String
+  user      User       @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  contacts  Contact[]
+  campaigns Campaign[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
 }
@@ -129,6 +145,8 @@ model Contact {
   headline       String?
   linkedInUrl    String?
   photoUrl       String?
+  metadata       String?
+  isPrivate      Boolean @default(false)
 
   emailValidationStatus    EmailVerificationStatus @default(unknown)
   emailValidationSubStatus String?
@@ -137,13 +155,17 @@ model Contact {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  contactListId Int?
-  contactList   ContactList? @relation(fields: [contactListId], references: [id], onDelete: Cascade)
-  campaigns     Campaign[]
-  Email         Email[]
+  userId           String?
+  user             User?             @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  contactListId    Int?
+  contactList      ContactList?      @relation(fields: [contactListId], references: [id], onDelete: Cascade)
+  userContactLists UserContactList[]
+  campaigns        Campaign[]
+  Email            Email[]
 
   @@unique([email, contactListId])
   @@index([contactListId])
+  @@index([userId])
 }
 
 model Email {
@@ -165,33 +187,34 @@ model Email {
 }
 
 model Campaign {
-  id                    Int           @id @default(autoincrement())
+  id                    Int               @id @default(autoincrement())
   name                  String
-  status                Status        @default(active)
+  status                Status            @default(active)
   userId                String
-  user                  User          @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  user                  User              @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
   contacts              Contact[]
-  draftingMode          DraftingMode  @default(ai)
-  draftingTone          DraftingTone  @default(normal)
-  paragraphs            Int?          @default(3)
+  draftingMode          DraftingMode      @default(ai)
+  draftingTone          DraftingTone      @default(normal)
+  paragraphs            Int?              @default(3)
   subject               String?
-  isAiSubject           Boolean       @default(true)
-  fullAiPrompt          String?       @map("message") @db.Text
-  hybridPrompt          String?       @db.Text
-  hybridAvailableBlocks HybridBlock[] @default([introduction, research, action, text])
+  isAiSubject           Boolean           @default(true)
+  fullAiPrompt          String?           @map("message") @db.Text
+  hybridPrompt          String?           @db.Text
+  hybridAvailableBlocks HybridBlock[]     @default([introduction, research, action, text])
   hybridBlockPrompts    Json?
-  handwrittenPrompt     String?       @db.Text
-  font                  String        @default("Times New Roman")
-  testMessage           String?       @db.Text
+  handwrittenPrompt     String?           @db.Text
+  font                  String            @default("Times New Roman")
+  testMessage           String?           @db.Text
   testSubject           String?
   emails                Email[]
   senderEmail           String?
   senderName            String?
   signatureId           Int?
-  signature             Signature?    @relation(fields: [signatureId], references: [id], onDelete: Cascade)
+  signature             Signature?        @relation(fields: [signatureId], references: [id], onDelete: Cascade)
   identityId            Int?
-  identity              Identity?     @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  identity              Identity?         @relation(fields: [identityId], references: [id], onDelete: Cascade)
   contactLists          ContactList[]
+  userContactLists      UserContactList[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -253,4 +276,13 @@ model ContactVerificationRequest {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model ApolloQuery {
+  id                  Int        @id @default(autoincrement())
+  query               String
+  apolloQuery         Json       @db.JsonB
+  maxPage             Int
+  pageLastFetched     Int
+  pageFetchTimeStamps DateTime[]
 }

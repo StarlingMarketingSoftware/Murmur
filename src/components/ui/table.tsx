@@ -8,8 +8,8 @@ import { cva, VariantProps } from 'class-variance-authority';
 const tableVariants = cva('w-full caption-bottom border-collapse', {
 	variants: {
 		variant: {
-			primary: 'text-[15px] font-primary',
-			secondary: 'text-[15px] font-primary bg-primary',
+			primary: 'text-[15px] font-secondary',
+			secondary: 'text-[15px] font-secondary bg-primary',
 		},
 	},
 	defaultVariants: {
@@ -23,7 +23,10 @@ function Table({
 	...props
 }: React.ComponentProps<'table'> & VariantProps<typeof tableVariants>) {
 	return (
-		<div data-slot="table-container" className="relative w-full overflow-x-auto">
+		<div
+			data-slot="table-container"
+			className="relative w-full overflow-x-auto rounded-md"
+		>
 			<table
 				data-slot="table"
 				className={cn(tableVariants({ variant }), className)}
@@ -40,7 +43,7 @@ const tableHeaderVariants = cva(
 		variants: {
 			variant: {
 				primary: 'text-[15px] font-primary',
-				secondary: 'text-[15px] font-primary bg-primary',
+				secondary: 'text-[15px] font-secondary bg-primary',
 			},
 		},
 		defaultVariants: {
@@ -67,7 +70,7 @@ const tableBodyVariants = cva('', {
 	variants: {
 		variant: {
 			primary: 'text-[15px] font-primary',
-			secondary: 'text-[15px] font-primary bg-primary',
+			secondary: 'text-[15px] font-secondary bg-background',
 		},
 	},
 	defaultVariants: {
@@ -96,7 +99,7 @@ const tableFooterVariants = cva(
 		variants: {
 			variant: {
 				primary: 'text-[15px] font-primary',
-				secondary: 'text-[15px] font-primary bg-primary',
+				secondary: 'text-[15px] font-secondary',
 			},
 		},
 		defaultVariants: {
@@ -120,12 +123,12 @@ function TableFooter({
 }
 
 const tableRowVariants = cva(
-	'hover:bg-primary/15 transition-colors data-[state=selected]:bg-primary/50 border border-primary/20 border-t border-t-primary data-[state=selected]:border-primary data-[state=selected]:!border-t-primary',
+	'hover:bg-primary/15 transition-colors data-[state=selected]:pointer-events-all border  border-t',
 	{
 		variants: {
 			variant: {
-				primary: 'font-bold text-[15px] odd:bg-gray-50 even:bg-white',
-				secondary: 'text-[15px] font-primary bg-primary',
+				primary: 'text-[15px] odd:bg-gray-50 even:bg-white border-primary/20',
+				secondary: 'text-[15px] font-secondary bg-background border-gray-200',
 			},
 		},
 		defaultVariants: {
@@ -154,7 +157,7 @@ const tableHeadVariants = cva(
 		variants: {
 			variant: {
 				primary: '',
-				secondary: '',
+				secondary: 'font-secondary',
 			},
 		},
 		defaultVariants: {
@@ -182,8 +185,8 @@ const tableCellVariants = cva(
 	{
 		variants: {
 			variant: {
-				primary: 'text-[15px] font-primary',
-				secondary: 'text-[15px] font-primary bg-primary',
+				primary: 'text-sm font-secondary',
+				secondary: 'text-[15px] font-secondary bg-background',
 			},
 		},
 		defaultVariants: {
@@ -209,8 +212,8 @@ function TableCell({
 const tableCaptionVariants = cva('text-muted-foreground mt-4 text-sm', {
 	variants: {
 		variant: {
-			primary: 'text-[15px] font-primary',
-			secondary: 'text-[15px] font-primary bg-primary',
+			primary: 'text-[15px] font-secondary',
+			secondary: 'text-[15px] font-secondary bg-background',
 		},
 	},
 	defaultVariants: {

@@ -28,6 +28,7 @@ interface ContactDocument {
 	address: string;
 	website: string;
 	linkedInUrl: string;
+	metadata: string;
 }
 
 // Helper function to generate embedding for contact data
@@ -45,6 +46,7 @@ export const generateContactEmbedding = async (contact: Contact) => {
 		contact.headline,
 		contact.website,
 		contact.linkedInUrl,
+		contact.metadata,
 	]
 		.filter(Boolean)
 		.join(' ');
@@ -86,6 +88,7 @@ export const initializeVectorDb = async () => {
 						address: { type: 'text' },
 						website: { type: 'text' },
 						linkedInUrl: { type: 'text' },
+						metadata: { type: 'text' },
 					},
 				},
 			});
@@ -130,13 +133,13 @@ export const upsertContactToVectorDb = async (
 			address: contact.address || '',
 			website: contact.website || '',
 			linkedInUrl: contact.linkedInUrl || '',
+			metadata: contact.metadata || '',
 		},
 	});
 
 	return id;
 };
 
-// Delete a contact's vector from Elasticsearch
 export const deleteContactFromVectorDb = async (id: string) => {
 	await elasticsearch.delete({
 		index: INDEX_NAME,
@@ -144,9 +147,11 @@ export const deleteContactFromVectorDb = async (id: string) => {
 	});
 };
 
-// Search for similar contacts
-export const searchSimilarContacts = async (queryText: string, limit: number = 10) => {
-	// Generate embedding for the search query
+export const searchSimilarContacts = async (
+	queryText: string,
+	limit: number = 10,
+	minScore: number = 0.3
+) => {
 	const response = await openai.embeddings.create({
 		input: queryText,
 		model: 'text-embedding-3-small',
@@ -160,15 +165,33 @@ export const searchSimilarContacts = async (queryText: string, limit: number = 1
 			field: 'vector_field',
 			query_vector: queryEmbedding,
 			k: limit,
-			num_candidates: limit * 2,
+			num_candidates: Math.min(10000, limit * 4),
 		},
-		fields: ['contactId', 'email', 'firstName', 'lastName', 'company', 'title'],
+		size: limit,
+		fields: [
+			'contactId',
+			'email',
+			'firstName',
+			'lastName',
+			'company',
+			'title',
+			'headline',
+			'city',
+			'state',
+			'country',
+			'address',
+			'website',
+			'linkedInUrl',
+			'metadata',
+		],
 		_source: false,
 	});
 
-	// Convert Elasticsearch results to match the expected format
+	// Filter out results below the similarity threshold
+	const filteredHits = results.hits.hits.filter((hit) => (hit._score || 0) >= minScore);
+
 	return {
-		matches: results.hits.hits.map((hit) => ({
+		matches: filteredHits.map((hit) => ({
 			id: hit._id,
 			score: hit._score || 0,
 			metadata: {
@@ -178,7 +201,17 @@ export const searchSimilarContacts = async (queryText: string, limit: number = 1
 				lastName: hit.fields?.lastName[0],
 				company: hit.fields?.company[0],
 				title: hit.fields?.title[0],
+				headline: hit.fields?.headline[0],
+				city: hit.fields?.city[0],
+				state: hit.fields?.state[0],
+				country: hit.fields?.country[0],
+				address: hit.fields?.address[0],
+				website: hit.fields?.website[0],
+				linkedInUrl: hit.fields?.linkedInUrl[0],
+				metadata: hit.fields?.metadata[0],
 			},
 		})),
+		totalFound: filteredHits.length,
+		minScoreApplied: minScore,
 	};
 };

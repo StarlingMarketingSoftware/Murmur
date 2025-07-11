@@ -26,11 +26,13 @@ export const CampaignsTable: FC = () => {
 
 	return (
 		<>
-			<Card className="relative">
+			<Card className="relative  border-none bg-gradient-to-l from-gray-100 via-background to-gray-100 max-w-]1250px] ">
 				{isPending && <Spinner size="medium" className="absolute top-2 right-2" />}
 				<CardHeader>
-					<CardTitle>Your Campaigns</CardTitle>
-					<CardDescription>Campaigns you have created.</CardDescription>
+					<CardTitle className="text-center text-3xl">Your Campaigns</CardTitle>
+					<CardDescription className="text-center !text-[15px] mt-2">
+						Campaigns you have created.
+					</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-2">
 					<CustomTable
@@ -38,7 +40,7 @@ export const CampaignsTable: FC = () => {
 						handleRowClick={handleRowClick}
 						columns={columns}
 						data={data}
-						noDataMessage="You have no campaigns. Please create one to get started."
+						noDataMessage="No campaigns found."
 					/>
 				</CardContent>
 			</Card>

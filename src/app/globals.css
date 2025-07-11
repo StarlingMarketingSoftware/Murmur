@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-@import 'tailwind-animate';
+@plugin "tailwindcss-animate";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -183,6 +183,38 @@
 	}
 }
 
+/* Custom scrollbar for table containers */
+[data-slot="table-container"] {
+	scrollbar-width: thin; /* For Firefox */
+}
+
+[data-slot="table-container"]::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+[data-slot="table-container"]::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+[data-slot="table-container"]::-webkit-scrollbar-thumb {
+	background-color: rgb(203 213 225); /* Tailwind slate-300 */
+	border-radius: 20px;
+}
+
+[data-slot="table-container"]::-webkit-scrollbar-thumb:hover {
+	background-color: rgb(148 163 184); /* Tailwind slate-400 */
+}
+
+/* Hide scrollbar buttons and borders */
+[data-slot="table-container"]::-webkit-scrollbar-button {
+	display: none;
+}
+
+[data-slot="table-container"]::-webkit-scrollbar-corner {
+	background: transparent;
+}
+
 mux-player {
 	--seek-backward-button: none;
 	--seek-forward-button: none;
@@ -190,3 +222,5 @@ mux-player {
 	--pip-button: none;
 	--playback-rate-button: none;
 }
+
+

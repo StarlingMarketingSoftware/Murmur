@@ -24,7 +24,7 @@ const ManageContactListDetail: FC = () => {
 								<PlusIcon />
 								Add Contact
 							</Button> */}
-							<ContactTSVUploadDialog />
+							<ContactTSVUploadDialog isPrivate={false} triggerText="Upload Contacts" />
 						</div>
 						<CustomTable
 							columns={columns}

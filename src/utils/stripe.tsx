@@ -15,7 +15,7 @@ export const getSubscriptionTierWithPriceId = (
 				draftCredits: 200,
 				sendingCredits: 200,
 				verificationCredits: 100,
-				viewEmailAddresses: false,
+				viewEmailAddresses: true,
 			};
 		case process.env.NEXT_PUBLIC_STANDARD_LEGACY_PRICE_ID:
 		case process.env.NEXT_PUBLIC_STANDARD_MONTHLY_PRICE_ID:
@@ -25,7 +25,7 @@ export const getSubscriptionTierWithPriceId = (
 				draftCredits: 1000,
 				sendingCredits: 1000,
 				verificationCredits: 500,
-				viewEmailAddresses: false,
+				viewEmailAddresses: true,
 			};
 		case process.env.NEXT_PUBLIC_PRO_LEGACY_PRICE_ID:
 		case process.env.NEXT_PUBLIC_PRO_MONTHLY_PRICE_ID:
@@ -35,7 +35,7 @@ export const getSubscriptionTierWithPriceId = (
 				draftCredits: 3000,
 				sendingCredits: 3000,
 				verificationCredits: 1000,
-				viewEmailAddresses: false,
+				viewEmailAddresses: true,
 			};
 		case process.env.NEXT_PUBLIC_ELITE_PRICE_ID:
 			return {

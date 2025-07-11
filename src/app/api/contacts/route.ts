@@ -15,13 +15,21 @@ import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vector
 const createContactSchema = z.object({
 	firstName: z.string().optional(),
 	lastName: z.string().optional(),
-	email: z.string().email(),
 	company: z.string().optional(),
-	website: z.string().url().optional().nullable(),
+	email: z.string().email(),
+	address: z.string().optional(),
+	city: z.string().optional(),
 	state: z.string().optional(),
 	country: z.string().optional(),
+	website: z.string().optional(),
 	phone: z.string().optional(),
-	contactListId: z.coerce.number().optional(),
+	title: z.string().optional(),
+	headline: z.string().optional(),
+	linkedInUrl: z.string().optional(),
+	photoUrl: z.string().optional(),
+	metadata: z.string().optional(),
+	isPrivate: z.boolean().optional().default(false),
+	userId: z.string().optional(),
 });
 
 const contactFilterSchema = z.object({
@@ -57,8 +65,12 @@ export async function GET(req: NextRequest) {
 		if (numberContactListIds.length > 0) {
 			contacts = await prisma.contact.findMany({
 				where: {
-					contactListId: {
-						in: numberContactListIds,
+					userContactLists: {
+						some: {
+							id: {
+								in: numberContactListIds,
+							},
+						},
 					},
 					emailValidationStatus: {
 						equals: verificationStatus,
@@ -73,7 +85,7 @@ export async function GET(req: NextRequest) {
 
 		// If vector search is enabled and we have a query, use vector search
 		if (useVectorSearch && query) {
-			const results = await searchSimilarContacts(query, limit || 10);
+			const results = await searchSimilarContacts(query, limit, 0.7);
 			const contactIds = results.matches.map((match) =>
 				Number((match.metadata as { contactId: number }).contactId)
 			);
@@ -156,6 +168,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
 	try {
 		const { userId } = await auth();
+
 		if (!userId) {
 			return apiUnauthorized();
 		}
@@ -166,16 +179,30 @@ export async function POST(req: NextRequest) {
 			return apiBadRequest(validatedData.error);
 		}
 
-		const { contactListId, ...contactData } = validatedData.data;
+		const { isPrivate, userId: passedUserId, ...contactData } = validatedData.data;
+
+		if (isPrivate && !passedUserId) {
+			return apiBadRequest('Private contacts must be associated with a user');
+		}
+
+		if (!isPrivate && passedUserId) {
+			return apiBadRequest('Non-private contacts cannot be associated with a user');
+		}
+
+		if (passedUserId !== userId) {
+			return apiUnauthorized('User passed userId that is not the current user');
+		}
+
 		const contact = await prisma.contact.create({
 			data: {
 				...contactData,
-				contactList: contactListId ? { connect: { id: contactListId } } : undefined,
+				user: passedUserId ? { connect: { clerkId: passedUserId } } : undefined,
 			},
 		});
 
-		// Store contact vector in
-		await upsertContactToVectorDb(contact);
+		if (!isPrivate) {
+			await upsertContactToVectorDb(contact);
+		}
 
 		return apiResponse(contact);
 	} catch (error) {

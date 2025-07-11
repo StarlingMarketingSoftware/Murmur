@@ -16,18 +16,32 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import ContactListTable from '@/components/organisms/_tables/ContactListTable/ContactListTable';
+import CustomTable from '@/components/molecules/CustomTable/CustomTable';
+import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
+import Spinner from '@/components/ui/spinner';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
 
 const Dashboard = () => {
 	const {
+		apolloContacts,
 		form,
 		onSubmit,
 		isLoadingContacts,
-		setSelectedRows,
 		handleCreateCampaign,
 		isPendingCreateCampaign,
 		contacts,
+		columns,
+		setSelectedContacts,
+		isRefetchingContacts,
+		activeSearchQuery,
+		tabOptions,
+		currentTab,
+		setCurrentTab,
+		setSelectedContactListRows,
+		tableRef,
+		isPendingCreateContactList,
 	} = useDashboard();
-
 	return (
 		<AppLayout>
 			<div className="mt-32">
@@ -40,7 +54,7 @@ const Dashboard = () => {
 					className="mt-18 text-[19px] text-center"
 					color="light"
 				>
-					Let’s <strong>start</strong> by creating a campaign.
+					Let&apos;s <strong>start</strong> by creating a campaign.
 				</Typography>
 				<Typography
 					font="secondary"
@@ -51,66 +65,108 @@ const Dashboard = () => {
 				</Typography>
 			</div>
 
-			<div className="mt-12 max-w-[1174px] mx-auto">
-				<Form {...form}>
-					<form onSubmit={form.handleSubmit(onSubmit)}>
-						<FormField
-							control={form.control}
-							name="searchText"
-							render={({ field }) => (
-								<FormItem>
-									<FormControl>
-										<Input
-											placeholder="Who do you want to send to?  i.e  “Wedding Planners in North Carolina”"
-											{...field}
+			<BlockTabs
+				className="mt-12 text-center"
+				options={tabOptions}
+				activeValue={currentTab}
+				onValueChange={(val) => setCurrentTab(val)}
+			/>
+
+			{currentTab === 'search' && (
+				<>
+					<div className="mt-12 max-w-[1174px] mx-auto">
+						<Form {...form}>
+							<form onSubmit={form.handleSubmit(onSubmit)}>
+								<FormField
+									control={form.control}
+									name="searchText"
+									render={({ field }) => (
+										<FormItem>
+											<FormControl>
+												<Input
+													placeholder="Who do you want to send to?  i.e  “Wedding Planners in North Carolina”"
+													{...field}
+												/>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+								<div className="flex items-center justify-end gap-2">
+									<ContactTSVUploadDialog
+										isPrivate
+										triggerText="Import"
+										buttonVariant="light"
+									/>
+									<Button
+										variant="primary-light"
+										type="submit"
+										className=""
+										isLoading={isLoadingContacts || isRefetchingContacts}
+									>
+										Search
+									</Button>
+								</div>
+							</form>
+						</Form>
+					</div>
+
+					{activeSearchQuery && (
+						<>
+							{/* <div className="flex items-center justify-center mt-5">
+								<Button
+									onClick={handleImportApolloContacts}
+									variant="light"
+									className=""
+									isLoading={isPendingImportApolloContacts}
+								>
+									Get More Contacts
+								</Button>
+							</div> */}
+							{contacts ? (
+								<Card>
+									<CardHeader>
+										<CardTitle>Contacts</CardTitle>
+									</CardHeader>
+									<CardContent>
+										<CustomTable
+											isSelectable
+											setSelectedRows={setSelectedContacts}
+											data={[...contacts, ...apolloContacts]}
+											columns={columns}
+											searchable={false}
+											tableRef={tableRef}
 										/>
-									</FormControl>
-									<FormMessage />
-								</FormItem>
+									</CardContent>
+								</Card>
+							) : (
+								<Spinner />
 							)}
-						/>
-						<div className="flex items-center justify-end gap-2">
-							<Button variant="light" className="">
-								Import
-							</Button>
-							<Button
-								variant="primary-light"
-								type="submit"
-								className=""
-								isLoading={isLoadingContacts}
-							>
-								Search
-							</Button>
-						</div>
-					</form>
-				</Form>
-			</div>
-			{contacts && (
-				<div className="mt-12 max-w-[1174px] mx-auto">
-					<Typography variant="h2">Contacts</Typography>
-					<Typography variant="h3">{contacts.length} contacts found</Typography>
-					{contacts?.map((contact) => (
-						<div key={contact.id} className="flex-row  w-full items-center gap-2">
-							<Typography className="text-sm" font="secondary">
-								{contact.name} {contact.city} {contact.state} {contact.company}{' '}
-								{contact.email}
-							</Typography>
-						</div>
-					))}
-				</div>
+						</>
+					)}
+				</>
 			)}
-			<ContactListTable setSelectedRows={setSelectedRows} />
+
+			{currentTab === 'list' && (
+				<>
+					<ContactListTable setSelectedRows={setSelectedContactListRows} />
+				</>
+			)}
+
 			<div className="flex items-center">
 				<Button
 					onClick={handleCreateCampaign}
-					isLoading={isPendingCreateCampaign}
+					isLoading={isPendingCreateCampaign || isPendingCreateContactList}
 					variant="primary-light"
 					className="w-8/10 mx-auto mt-5"
 				>
 					Create Campaign
 				</Button>
 			</div>
-			<CampaignsTable />
+
+			<div className="mt-46">
+				<CampaignsTable />
+			</div>
 		</AppLayout>
 	);
 };

@@ -11,16 +11,6 @@ import { urls } from '@/constants/urls';
 import { useState } from 'react';
 
 export const useCampaignsTable = () => {
-	const { data, isPending } = useGetCampaigns();
-	const router = useRouter();
-	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
-	const [currentRow, setCurrentRow] = useState<Campaign | null>(null);
-
-	const { mutateAsync: deleteCampaign, isPending: isPendingDelete } = useDeleteCampaign();
-
-	const handleRowClick = (rowData: Campaign) => {
-		router.push(urls.murmur.campaign.detail(rowData.id));
-	};
 	const columns: ColumnDef<Campaign>[] = [
 		{
 			accessorKey: 'name',
@@ -88,6 +78,18 @@ export const useCampaignsTable = () => {
 			),
 		},
 	];
+
+	const { data, isPending } = useGetCampaigns();
+	const router = useRouter();
+	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+	const [currentRow, setCurrentRow] = useState<Campaign | null>(null);
+
+	const { mutateAsync: deleteCampaign, isPending: isPendingDelete } = useDeleteCampaign();
+
+	const handleRowClick = (rowData: Campaign) => {
+		router.push(urls.murmur.campaign.detail(rowData.id));
+	};
+
 	return {
 		columns,
 		data,

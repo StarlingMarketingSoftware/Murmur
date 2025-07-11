@@ -98,7 +98,8 @@ const CustomPagination = <TData,>({
 				return (
 					<PaginationItem
 						className={twMerge(
-							page === currentPage + 1 && 'bg-muted text-foreground pointer-events-none',
+							page === currentPage + 1 &&
+								'bg-background border-primary border-1 text-foreground pointer-events-none',
 							'rounded-md'
 						)}
 						key={index}

@@ -14,13 +14,23 @@ import { ApiRouteParams } from '@/types';
 import { upsertContactToVectorDb } from '../../_utils/vectorDb';
 
 const updateContactSchema = z.object({
-	name: z.string().optional(),
+	firstName: z.string().optional().nullable(),
+	lastName: z.string().optional().nullable(),
+	company: z.string().optional().nullable(),
 	email: z.string().email().optional(),
-	company: z.string().optional(),
-	website: z.string().optional(),
-	state: z.string().optional(),
-	country: z.string().optional(),
-	phone: z.string().optional(),
+	address: z.string().optional().nullable(),
+	city: z.string().optional().nullable(),
+	state: z.string().optional().nullable(),
+	country: z.string().optional().nullable(),
+	website: z.string().optional().nullable(),
+	phone: z.string().optional().nullable(),
+	title: z.string().optional().nullable(),
+	headline: z.string().optional().nullable(),
+	linkedInUrl: z.string().optional().nullable(),
+	photoUrl: z.string().optional().nullable(),
+	metadata: z.string().optional().nullable(),
+	isPrivate: z.boolean().optional(),
+	userId: z.string().optional().nullable(),
 });
 export type PatchContactData = z.infer<typeof updateContactSchema>;
 

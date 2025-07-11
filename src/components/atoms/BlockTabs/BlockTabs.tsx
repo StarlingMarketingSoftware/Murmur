@@ -48,7 +48,7 @@ export function BlockTabs<T = string>({
 					}}
 					onClick={() => onValueChange(option.value)}
 				>
-					<Typography font="secondary" className="ml-2 text-[20px]">
+					<Typography font="secondary" className="ml-2 !text-[20px]">
 						{option.label}
 					</Typography>
 				</div>

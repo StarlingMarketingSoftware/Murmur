@@ -1,8 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Contact, ContactList, EmailVerificationStatus } from '@prisma/client';
+import { Contact, UserContactList } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
-import { Checkbox } from '@/components/ui/checkbox';
-import { useParams } from 'next/navigation';
 import { useMe } from '@/hooks/useMe';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
 import { RESTRICTED_FEATURE_MESSAGES } from '@/constants';
@@ -10,83 +7,20 @@ import {
 	NoDataCell,
 	TableSortingButton,
 } from '@/components/molecules/CustomTable/CustomTable';
-import { useGetContacts } from '@/hooks/queryHooks/useContacts';
-import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
+import {
+	useEditUserContactList,
+	useGetUserContactList,
+} from '@/hooks/queryHooks/useUserContactLists';
+import { TableDeleteRowButton } from '@/components/molecules/TableDeleteRowButton/TableDeleteRowButton';
 
 export interface SelectRecipientsDialogProps {
 	isOpen: boolean;
 	setIsOpen: (isOpen: boolean) => void;
-	selectedContactList: ContactList | null;
-	selectedRecipients: Contact[];
+	selectedContactList: UserContactList | null;
 }
 
 export const useSelectRecipientsDialog = (props: SelectRecipientsDialogProps) => {
-	const params = useParams();
-	const campaignId = params.campaignId as string;
-	const { selectedContactList, isOpen, setIsOpen, selectedRecipients } = props;
-
-	const [selectedRows, setSelectedRows] = useState<Contact[]>([]);
-
-	const { subscriptionTier } = useMe();
-	const { data, isPending } = useGetContacts({
-		filters: {
-			contactListIds: [Number(selectedContactList?.id)],
-			verificationStatus: EmailVerificationStatus.valid,
-		},
-	});
-	const { mutate: updateCampaign } = useEditCampaign({
-		onSuccess: () => {
-			setIsOpen(false);
-		},
-		successMessage: 'Recipients saved successfully!',
-		errorMessage: 'Failed to save recipients. Please try again.',
-	});
-
-	const filteredData = useMemo(() => {
-		if (!data) return [];
-
-		return data.filter((contact: Contact) => {
-			return !selectedRecipients.some(
-				(selectedContact) => selectedContact.id === contact.id
-			);
-		});
-	}, [data, selectedRecipients]);
-
-	const saveSelectedRecipients = async () => {
-		if (selectedContactList && !!campaignId) {
-			updateCampaign({
-				id: campaignId,
-				data: {
-					contactOperation: {
-						action: 'connect',
-						contactIds: selectedRows.map((row) => row.id),
-					},
-				},
-			});
-		}
-	};
-
 	const columns: ColumnDef<Contact>[] = [
-		{
-			id: 'select',
-			header: ({ table }) => (
-				<Checkbox
-					checked={
-						table.getIsAllPageRowsSelected() ||
-						(table.getIsSomePageRowsSelected() && 'indeterminate')
-					}
-					onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-					aria-label="Select all"
-				/>
-			),
-			cell: ({ row }) => (
-				<Checkbox
-					checked={row.getIsSelected()}
-					onCheckedChange={(value) => row.toggleSelected(!!value)}
-					aria-label="Select row"
-				/>
-			),
-		},
 		{
 			accessorKey: 'name',
 			header: ({ column }) => {
@@ -121,7 +55,67 @@ export const useSelectRecipientsDialog = (props: SelectRecipientsDialogProps) =>
 				return <div className="text-left">{row.getValue('company')}</div>;
 			},
 		},
+		{
+			accessorKey: 'city',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="City" />;
+			},
+			cell: ({ row }) => {
+				return <div className="text-left">{row.getValue('city')}</div>;
+			},
+		},
+		{
+			accessorKey: 'state',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="State" />;
+			},
+			cell: ({ row }) => {
+				return <div className="text-left">{row.getValue('state')}</div>;
+			},
+		},
+		{
+			accessorKey: 'country',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Country" />;
+			},
+			cell: ({ row }) => {
+				return <div className="text-left">{row.getValue('country')}</div>;
+			},
+		},
+		{
+			id: 'action',
+			cell: ({ row }) => (
+				<TableDeleteRowButton
+					disabled={isPendingRemoveContactFromContactList}
+					onClick={async () => {
+						removeContactFromContactList({
+							id: selectedContactList?.id || 0,
+							data: {
+								contactOperation: {
+									action: 'disconnect',
+									contactIds: [row.original.id],
+								},
+							},
+						});
+					}}
+				/>
+			),
+		},
 	];
+	const { selectedContactList, isOpen, setIsOpen } = props;
+
+	const { subscriptionTier } = useMe();
+	const { data, isPending } = useGetUserContactList(
+		selectedContactList?.id.toString() || ''
+	);
+
+	const {
+		mutate: removeContactFromContactList,
+		isPending: isPendingRemoveContactFromContactList,
+	} = useEditUserContactList({
+		successMessage: 'Contact removed from contact list',
+		errorMessage: 'Failed to remove contact from contact list',
+	});
 
 	return {
 		data,
@@ -129,9 +123,6 @@ export const useSelectRecipientsDialog = (props: SelectRecipientsDialogProps) =>
 		isOpen,
 		setIsOpen,
 		columns,
-		setSelectedRows,
 		selectedContactList,
-		saveSelectedRecipients,
-		filteredData,
 	};
 };
