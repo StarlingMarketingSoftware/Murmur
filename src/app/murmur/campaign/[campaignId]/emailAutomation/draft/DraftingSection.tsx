@@ -4,8 +4,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
 import Spinner from '@/components/ui/spinner';
 import { DraftingRightPanel } from '@/components/organisms/DraftingRightPanel/DraftingRightPanel';
-import { AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
 import { Button } from '@/components/ui/button';
 import {

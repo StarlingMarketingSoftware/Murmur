@@ -155,11 +155,7 @@ export const useDashboard = () => {
 	const [selectedContactListRows, setSelectedContactListRows] = useState<
 		UserContactList[]
 	>([]);
-
-	console.log('🚀 ~ useDashboard ~ selectedContactListRows:', selectedContactListRows);
-
 	const [selectedContacts, setSelectedContacts] = useState<ContactWithName[]>([]);
-	console.log('🚀 ~ useDashboard ~ selectedContacts:', selectedContacts);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
 	const [currentTab, setCurrentTab] = useState<TabValue>('search');
 

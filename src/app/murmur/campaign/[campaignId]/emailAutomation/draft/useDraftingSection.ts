@@ -172,7 +172,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const { data: contacts } = useGetContacts({
 		filters: {
-			contactListIds: campaign.contactLists.map((list) => list.id),
+			contactListIds: campaign.userContactLists.map((list) => list.id),
 		},
 	});
 
@@ -478,7 +478,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 							testMessage: convertAiResponseToRichTextEmail(
 								parsedRes.message,
 								values.font,
-								campaign.signature
+								signatures?.find((sig: Signature) => sig.id === values.signatureId)
 							),
 						},
 					});
