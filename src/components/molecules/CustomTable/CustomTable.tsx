@@ -166,13 +166,12 @@ export function CustomTable<TData, TValue>({
 	return (
 		<div>
 			<div className="flex items-center justify-between py-4 gap-4">
-				<div className="flex items-center gap-4">
+				<div className="flex flex-col sm:flex-row items-center gap-4">
 					{searchable && (
 						<Input
 							placeholder="Search all columns..."
 							value={globalFilter ?? ''}
 							onChange={(event) => setGlobalFilter(event.target.value)}
-							className="max-w-sm"
 						/>
 					)}
 					<div className="flex items-center gap-2">

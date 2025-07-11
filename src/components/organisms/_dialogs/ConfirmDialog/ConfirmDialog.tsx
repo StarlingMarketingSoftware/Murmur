@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { FormProvider } from 'react-hook-form';
+import { Typography } from '@/components/ui/typography';
 
 export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 	const {
@@ -53,7 +54,7 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 				<DialogHeader>
 					<DialogTitle>{title}</DialogTitle>
 				</DialogHeader>
-				{text ? text : children}
+				{text ? <Typography variant="p">{text}</Typography> : children}
 
 				{confirmWithInput ? (
 					<FormProvider {...form}>

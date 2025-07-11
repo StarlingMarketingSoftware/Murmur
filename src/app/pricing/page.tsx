@@ -82,14 +82,17 @@ export default function Products() {
 				<FeaturesTable />
 			</div>
 			<div className="max-w-[1059px] mx-auto w-9/10 mt-30">
-				<Typography className="text-center">
+				<Typography className="text-center" variant="promoP">
 					No other campaign tool does personalization like we do. Say goodbye to
 					“spray-and-pray” spam marketing and say hello to building meaningful
 					relationships.
 				</Typography>
 			</div>
 			<div className="max-w-[1059px] mx-auto mt-0 w-9/10 mb-20">
-				<Typography className="text-center max-w-[1059px] mx-auto mt-24 w-9/10">
+				<Typography
+					className="text-center max-w-[1059px] mx-auto mt-24 w-9/10"
+					variant="promoP"
+				>
 					Say <i>hello</i> to having a <strong>Fortune 500</strong> marketing department
 					in your pocket.
 				</Typography>
