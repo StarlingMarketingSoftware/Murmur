@@ -84,9 +84,7 @@ export default function HomePage() {
 						Murmur
 					</Typography>
 					<div className="row-span-1 flex items-center gap-8 sm:gap-14">
-						<Typography variant="p" className="!text-[16px]">
-							by
-						</Typography>
+						<Typography className="!text-[16px]">by</Typography>
 						<StarlingLogo width="150px" />
 					</div>
 					<div className="row-span1" />
@@ -126,7 +124,7 @@ export default function HomePage() {
 				>
 					Murmur helps you draft.<br></br> No ChatGPT. We built our own.
 				</Typography>
-				<Typography className="!mt-[42px]" variant="p">
+				<Typography className="!mt-[42px]" variant="promoP">
 					{`Our software gathers data on each contact every time you draft an email with
 					advanced search algorithms. This allows Murmur to craft customized emails,
 					getting you more responses and more work. Our algorithms are trained on many
@@ -158,7 +156,7 @@ export default function HomePage() {
 			</div>
 
 			<GradientBanner className="mx-auto mt-24 flex justify-center items-center">
-				<Typography variant="banner" className=" text-center">
+				<Typography variant="banner" className="text-center">
 					Generate accurate contact lists in seconds.<br></br> Save countless hours.
 				</Typography>
 			</GradientBanner>
@@ -183,7 +181,7 @@ export default function HomePage() {
 					</div>
 				</div>
 				<Typography
-					variant="p"
+					variant="promoP"
 					className="w-full max-w-[1130px] mx-auto !mt-32 text-center"
 				>
 					Major email providers have tight sending restrictions, our server has none.
@@ -220,7 +218,7 @@ export default function HomePage() {
 					Not Another Email Tool. 
 				</Typography>
 				<Typography
-					variant="p"
+					variant="promoP"
 					className="w-full max-w-[1233px] mx-auto !mt-10 text-center"
 				>
 					{`Murmur serves an entirely different purpose. While other email marketing tools like Mailchimp are great for keeping up an email newsletter, Murmur is designed specifically for entrepreneurs, business owners, and those with a vision to bring in leads and sell to new customers. Each email in a campaign is deeply personalized, and written in your own voice rather than using a stock template that falls through the cracks.

@@ -62,7 +62,7 @@ const ContactListTable: FC<ContactListTableProps> = (props) => {
 					Are you sure you want to delete the following contact list? Associated contacts
 					will not be deleted.
 				</Typography>
-				<Typography className="text-center" bold>
+				<Typography className="text-center mt-5" variant="h3" bold>
 					{currentContactList?.name}
 				</Typography>
 			</ConfirmDialog>
