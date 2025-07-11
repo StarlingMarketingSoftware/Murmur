@@ -46,7 +46,6 @@ interface DataTableProps<TData, TValue> {
 	searchable?: boolean;
 }
 
-// https://ui.shadcn.com/docs/components/data-table
 interface TableSortingButtonProps<TData> {
 	column: Column<TData, unknown>;
 	label: string;

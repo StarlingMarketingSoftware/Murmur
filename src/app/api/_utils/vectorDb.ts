@@ -140,7 +140,6 @@ export const upsertContactToVectorDb = async (
 	return id;
 };
 
-// Delete a contact's vector from Elasticsearch
 export const deleteContactFromVectorDb = async (id: string) => {
 	await elasticsearch.delete({
 		index: INDEX_NAME,
@@ -148,13 +147,11 @@ export const deleteContactFromVectorDb = async (id: string) => {
 	});
 };
 
-// Search for similar contacts
 export const searchSimilarContacts = async (
 	queryText: string,
 	limit: number = 10,
-	minScore: number = 0.3 // Add minimum similarity threshold
+	minScore: number = 0.3
 ) => {
-	// Generate embedding for the search query
 	const response = await openai.embeddings.create({
 		input: queryText,
 		model: 'text-embedding-3-small',
