@@ -27,7 +27,6 @@ export const useIdentityDialog = (props: IdentityDialogProps) => {
 	const [internalOpen, setInternalOpen] = useState(false);
 	const [showCreatePanel, setShowCreatePanel] = useState(false);
 	const [isEdit, setIsEdit] = useState(false);
-
 	const isClosable = !!campaign.identityId;
 	const isControlled = props.open !== undefined;
 	const open = isControlled ? props.open : internalOpen;

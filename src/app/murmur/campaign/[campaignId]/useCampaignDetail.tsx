@@ -9,6 +9,7 @@ export const useCampaignDetail = () => {
 	const campaignId = params.campaignId as string;
 
 	const { data: campaign, isPending: isPendingCampaign } = useGetCampaign(campaignId);
+	console.log('🚀 ~ useCampaignDetail ~ campaign:', campaign);
 
 	useEffect(() => {
 		if (!campaign) {

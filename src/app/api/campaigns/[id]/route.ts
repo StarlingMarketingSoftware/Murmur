@@ -67,6 +67,7 @@ export async function GET(req: NextRequest, { params }: { params: ApiRouteParams
 				signature: true,
 				contactLists: true,
 				identity: true,
+				userContactLists: true,
 			},
 		});
 

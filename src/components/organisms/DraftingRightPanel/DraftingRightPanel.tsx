@@ -63,7 +63,7 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 							<Typography variant="h3" bold className="text-[26px] mt-8">
 								Paragraphs
 							</Typography>
-							<Typography className="text-[12px] mt-2" color="light">
+							<Typography className="!text-[12px] mt-2" color="light">
 								Select the number of paragraphs you want the AI to generate in your email
 							</Typography>
 							<FormField

@@ -155,7 +155,11 @@ export const useDashboard = () => {
 	const [selectedContactListRows, setSelectedContactListRows] = useState<
 		UserContactList[]
 	>([]);
+
+	console.log('🚀 ~ useDashboard ~ selectedContactListRows:', selectedContactListRows);
+
 	const [selectedContacts, setSelectedContacts] = useState<ContactWithName[]>([]);
+	console.log('🚀 ~ useDashboard ~ selectedContacts:', selectedContacts);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
 	const [currentTab, setCurrentTab] = useState<TabValue>('search');
 
@@ -230,7 +234,7 @@ export const useDashboard = () => {
 			}
 			const campaign = await createCampaign({
 				name: `New Campaign - ${selectedContactListRows[0].name}`,
-				contactLists: selectedContactListRows.map((row) => row.id),
+				userContactLists: selectedContactListRows.map((row) => row.id),
 			});
 			if (campaign) {
 				router.push(urls.murmur.campaign.detail(campaign.id));

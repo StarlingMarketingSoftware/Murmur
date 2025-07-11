@@ -11,6 +11,8 @@ import { twMerge } from 'tailwind-merge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { DraftingSection } from './emailAutomation/draft/DraftingSection';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 const Murmur = () => {
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
@@ -38,15 +40,15 @@ const Murmur = () => {
 									onOpenChange={setIsIdentityDialogOpen}
 								/>
 							</div>
-							<Typography className="font-bold text-[15px]">
+							<Typography className="font-bold !text-[15px]">
 								{campaign?.identity?.name}
 							</Typography>
-							<Typography className="font-bold font-secondary text-[13px]">
+							<Typography className="font-bold font-secondary !text-[13px]">
 								{campaign?.identity?.email}
 							</Typography>
 							<Typography
 								className={twMerge(
-									'font-secondary text-[13px]',
+									'font-secondary !text-[13px]',
 									!campaign?.identity?.website && '!text-muted italic'
 								)}
 							>
@@ -59,11 +61,20 @@ const Murmur = () => {
 								<Typography variant="h2">Lists Selected</Typography>
 								<Button variant="action-link">Change</Button>
 							</div>
-							{campaign?.contactLists?.map((contactList) => (
-								<Typography key={contactList.id} className="font-bold text-[15px]">
-									{contactList?.title}
+							{campaign?.userContactLists?.map((contactList) => (
+								<Typography key={contactList.id} className="font-bold !text-[15px]">
+									{contactList?.name}
 								</Typography>
 							))}
+							{campaign?.userContactLists.length === 0 && (
+								<Alert variant="warning" className="max-w-72">
+									<AlertCircle className="h-4 w-4" />
+									<AlertTitle>No Recipients</AlertTitle>
+									<AlertDescription>
+										You have not selected any recipients for this campaign.
+									</AlertDescription>
+								</Alert>
+							)}
 						</div>
 					</div>
 				</CardContent>

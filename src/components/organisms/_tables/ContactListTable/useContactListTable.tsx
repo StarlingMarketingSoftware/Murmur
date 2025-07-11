@@ -28,6 +28,7 @@ export const useContactListTable = (props: ContactListTableProps) => {
 	const [currentContactList, setCurrentContactList] = useState<UserContactList | null>(
 		null
 	);
+
 	const handleDeleteClick = (contactList: UserContactList) => {
 		setCurrentContactList(contactList);
 		setIsConfirmDialogOpen(true);

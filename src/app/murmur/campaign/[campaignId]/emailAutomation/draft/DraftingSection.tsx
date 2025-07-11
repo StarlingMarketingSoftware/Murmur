@@ -85,15 +85,6 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 					<div className="flex gap-4">
 						<div className="w-1/2">
 							<div className="mt-6">
-								{campaign?.contactLists.length === 0 && (
-									<Alert variant="warning">
-										<AlertCircle className="h-4 w-4" />
-										<AlertTitle>No Recipients</AlertTitle>
-										<AlertDescription>
-											You have not selected any recipients for this campaign.
-										</AlertDescription>
-									</Alert>
-								)}
 								<BlockTabs
 									options={modeOptions}
 									activeValue={draftingMode}

@@ -46,7 +46,7 @@ export const BlockSelect: FC<BlockSelectProps> = ({
 					<Typography variant="h4" className="text-[20px]" font="secondary">
 						{tone.label}
 					</Typography>
-					<Typography className="text-[12px]">{tone.description}</Typography>
+					<Typography className="!text-[12px]">{tone.description}</Typography>
 				</div>
 			))}
 		</div>
