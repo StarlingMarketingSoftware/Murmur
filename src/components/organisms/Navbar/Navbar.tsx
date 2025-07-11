@@ -153,7 +153,7 @@ export const Navbar = () => {
 							<Link
 								key={index}
 								href={url.path}
-								className="px-4 py-6 rounded-md w-[125%] text-center hover:bg-gray-100 transition-all duration-500 text-2xl md:text-4xl font-primary"
+								className="px-4 py-6 rounded-md text-center hover:bg-gray-100 transition-all duration-500 text-2xl md:text-4xl font-primary"
 								onClick={() => setMobileMenuOpen(false)}
 							>
 								{url.label}
