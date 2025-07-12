@@ -4,7 +4,7 @@ import { apiResponse, apiUnauthorized, handleApiError } from '@/app/api/_utils';
 import { initializeVectorDb, upsertContactToVectorDb } from '../../_utils/vectorDb';
 import { UserRole } from '@prisma/client';
 
-export async function POST() {
+export async function GET() {
 	try {
 		const { userId } = await auth();
 		if (!userId) {
@@ -25,7 +25,9 @@ export async function POST() {
 		await initializeVectorDb();
 
 		// Get all contacts
-		const contacts = await prisma.contact.findMany({});
+		const contacts = await prisma.contact.findMany({
+			where: { hasVectorEmbedding: false },
+		});
 
 		console.log(`Found ${contacts.length} contacts to process`);
 
