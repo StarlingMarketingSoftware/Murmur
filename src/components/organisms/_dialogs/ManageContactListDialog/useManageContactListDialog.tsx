@@ -29,7 +29,7 @@ export const useManageContactListDialog = (props: ManageContactListDialogProps) 
 
 	const { data, isPending } = useGetContacts({
 		filters: {
-			contactListId: selectedContactList?.id,
+			contactListIds: [Number(selectedContactList?.id)],
 		},
 	});
 

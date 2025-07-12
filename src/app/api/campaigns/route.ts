@@ -22,6 +22,8 @@ const postCampaignSchema = z.object({
 	senderEmail: z.string().email().optional(),
 	senderName: z.string().optional(),
 	contacts: z.array(z.number()).optional(),
+	contactLists: z.array(z.number()).optional(),
+	userContactLists: z.array(z.number()).optional(),
 });
 export type PostCampaignData = z.infer<typeof postCampaignSchema>;
 
@@ -37,7 +39,7 @@ export async function POST(req: NextRequest) {
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
-		const { contacts } = validatedData.data;
+		const { contacts, contactLists, userContactLists } = validatedData.data;
 
 		const campaign = await prisma.campaign.create({
 			data: {
@@ -45,6 +47,12 @@ export async function POST(req: NextRequest) {
 				userId,
 				contacts: {
 					connect: contacts?.map((id) => ({ id })),
+				},
+				contactLists: {
+					connect: contactLists?.map((id) => ({ id })),
+				},
+				userContactLists: {
+					connect: userContactLists?.map((id) => ({ id })),
 				},
 			},
 			include: {

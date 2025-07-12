@@ -22,11 +22,11 @@ function sanitizeNameForEmail(name: string | null): string {
  * Format: ${sanitizedFirstName}${sanitizedLastName}@${userId}.murmurmailbox.com
  * Ensures the result is always a valid email address by sanitizing input
  */
-export function generateMurmurEmail(
+export const generateMurmurEmail = (
 	firstName: string | null,
 	lastName: string | null,
 	userId: number | string
-): string {
+): string => {
 	const firstNamePart = sanitizeNameForEmail(firstName);
 	const lastNamePart = sanitizeNameForEmail(lastName);
 
@@ -39,4 +39,4 @@ export function generateMurmurEmail(
 	}
 
 	return `${localPart}@${userId}.murmurmailbox.com`;
-}
+};

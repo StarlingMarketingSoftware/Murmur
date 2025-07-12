@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import { Footer } from '@/components/molecules/Footer/Footer';
 import { Toaster } from '@/components/ui/toast';
 import './globals.css';
@@ -9,18 +9,35 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 import StoreProvider from './StoreProvider';
 import { Navbar } from '@/components/organisms/Navbar/Navbar';
 
-const geistSans = Geist({
-	variable: '--font-geist-sans',
-	subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-	variable: '--font-geist-mono',
+const inter = Inter({
+	variable: '--font-inter',
 	subsets: ['latin'],
 });
 
 const timesNewRoman = localFont({
-	src: '../../public/timesNewRoman.ttf',
+	src: [
+		{
+			path: '../../public/fonts/times.ttf',
+			weight: '400',
+			style: 'normal',
+		},
+		{
+			path: '../../public/fonts/timesBold.ttf',
+			weight: '700',
+			style: 'normal',
+		},
+		{
+			path: '../../public/fonts/timesBoldItalic.ttf',
+			weight: '700',
+			style: 'italic',
+		},
+		{
+			path: '../../public/fonts/timesItalic.ttf',
+			weight: '400',
+			style: 'italic',
+		},
+	],
+	variable: '--font-times',
 });
 
 export const metadata: Metadata = {
@@ -35,11 +52,12 @@ export default function RootLayout({
 }>) {
 	return (
 		<StoreProvider>
-			<html lang="en" className={timesNewRoman.className} suppressHydrationWarning>
-				{/* <html lang="en" suppressHydrationWarning> */}
-				<body
-					className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
-				>
+			<html
+				lang="en"
+				className={`${inter.variable} ${timesNewRoman.variable}`}
+				suppressHydrationWarning
+			>
+				<body className={`antialiased min-h-screen flex flex-col`}>
 					<ThemeProvider attribute="class" defaultTheme="light">
 						<SubLayout>
 							<Navbar />

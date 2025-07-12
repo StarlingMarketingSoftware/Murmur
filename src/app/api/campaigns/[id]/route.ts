@@ -10,7 +10,7 @@ import {
 	handleApiError,
 	connectOrDisconnectId,
 } from '@/app/api/_utils';
-import { AiModel, Status } from '@prisma/client';
+import { DraftingMode, DraftingTone, HybridBlock, Status } from '@prisma/client';
 import { ApiRouteParams } from '@/types';
 import { NextRequest } from 'next/server';
 
@@ -18,13 +18,26 @@ import { z } from 'zod';
 
 const patchCampaignSchema = z.object({
 	name: z.string().optional(),
+	draftingMode: z.nativeEnum(DraftingMode).optional(),
+	draftingTone: z.nativeEnum(DraftingTone).optional(),
+	paragraphs: z.number().min(0).max(5).optional(),
+	isAiSubject: z.boolean().optional(),
 	subject: z.string().nullable().optional(),
-	message: z.string().nullable().optional(),
+	fullAiPrompt: z.string().nullable().optional(),
+	hybridAvailableBlocks: z.array(z.nativeEnum(HybridBlock)).optional(),
+	hybridPrompt: z.string().nullable().optional(),
+	hybridBlockPrompts: z
+		.array(
+			z.object({
+				id: z.string(),
+				type: z.nativeEnum(HybridBlock),
+				value: z.string(),
+			})
+		)
+		.optional(),
+	handwrittenPrompt: z.string().nullable().optional(),
 	testSubject: z.string().nullable().optional(),
 	testMessage: z.string().nullable().optional(),
-	senderEmail: z.string().nullable().optional(),
-	senderName: z.string().nullable().optional(),
-	aiModel: z.nativeEnum(AiModel).nullable().optional(),
 	font: z.string().optional(),
 	signatureId: z.number().optional().nullable(),
 	identityId: z.number().optional().nullable(),
@@ -32,6 +45,12 @@ const patchCampaignSchema = z.object({
 		.object({
 			action: z.enum(['connect', 'disconnect']),
 			contactIds: z.array(z.number()),
+		})
+		.optional(),
+	userContactListOperation: z
+		.object({
+			action: z.enum(['connect', 'disconnect']),
+			userContactListIds: z.array(z.number()),
 		})
 		.optional(),
 });
@@ -51,9 +70,10 @@ export async function GET(req: NextRequest, { params }: { params: ApiRouteParams
 				userId,
 			},
 			include: {
-				contacts: true,
-				emails: true,
 				signature: true,
+				contactLists: true,
+				identity: true,
+				userContactLists: true,
 			},
 		});
 
@@ -78,8 +98,13 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 			return apiBadRequest(validatedData.error);
 		}
 
-		const { signatureId, identityId, contactOperation, ...updateData } =
-			validatedData.data;
+		const {
+			signatureId,
+			identityId,
+			contactOperation,
+			userContactListOperation,
+			...updateData
+		} = validatedData.data;
 
 		const updatedCampaign = await prisma.campaign.update({
 			where: {
@@ -97,9 +122,18 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 						}),
 					},
 				}),
+				...(userContactListOperation && {
+					userContactLists: {
+						[userContactListOperation.action]:
+							userContactListOperation.userContactListIds.map((id: number) => {
+								return { id };
+							}),
+					},
+				}),
 			},
 			include: {
 				contacts: true,
+				userContactLists: true,
 			},
 		});
 

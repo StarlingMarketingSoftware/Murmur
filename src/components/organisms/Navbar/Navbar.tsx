@@ -2,104 +2,146 @@
 import { SignUpButton, useAuth, UserButton } from '@clerk/nextjs';
 import { SignInButton } from '@clerk/nextjs';
 import { urls } from '@/constants/urls';
-import AiCredits from '../AiCredits/AiCredits';
-import { DarkModeToggle } from '@/components/atoms/DarkModeToggle/DarkModeToggle';
 import { Button } from '@/components/ui/button';
-import Logo from '@/components/atoms/_svg/Logo';
 import LogoIcon from '@/components/atoms/_svg/LogoIcon';
 import { MenuIcon } from 'lucide-react';
 import { useMe } from '@/hooks/useMe';
 import Link from 'next/link';
 import { cn } from '@/utils';
-import {
-	NavigationMenu,
-	NavigationMenuItem,
-	NavigationMenuLink,
-	NavigationMenuList,
-	navigationMenuTriggerStyle,
-} from '@/components/ui/navigation-menu';
-import { forwardRef, useState } from 'react';
-
+import { NavigationMenuLink } from '@/components/ui/navigation-menu';
+import { forwardRef, useState, useEffect } from 'react';
+import { Typography } from '@/components/ui/typography';
+import { usePathname } from 'next/navigation';
+import { twMerge } from 'tailwind-merge';
 export const Navbar = () => {
 	const { user } = useMe();
 	const { isSignedIn } = useAuth();
-
+	const pathname = usePathname();
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
+	const [isNavbarVisible, setIsNavbarVisible] = useState(true);
+	const [lastScrollY, setLastScrollY] = useState(0);
+
+	const controlNavbar = () => {
+		if (window.scrollY > lastScrollY) {
+			// if scroll down hide the navbar
+			setIsNavbarVisible(false);
+		} else {
+			// if scroll up show the navbar
+			setIsNavbarVisible(true);
+		}
+
+		// remember current page location to use in the next move
+		setLastScrollY(window.scrollY);
+	};
+
+	useEffect(() => {
+		window.addEventListener('scroll', controlNavbar);
+
+		// cleanup function
+		return () => {
+			window.removeEventListener('scroll', controlNavbar);
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
 	type UrlList = {
 		path: string;
 		label: string;
 	};
 	const urlList: UrlList[] = [
 		{ path: urls.home.index, label: 'Home' },
-		{ path: urls.about.index, label: 'About Us' },
-		{ path: urls.murmur.dashboard.index, label: 'Murmur' },
-		{ path: urls.contact.index, label: 'Contact' },
+		{ path: urls.pricing.index, label: 'Pricing' },
+		{ path: urls.contact.index, label: 'Help' },
 		{ path: urls.admin.index, label: 'Admin' },
 	].filter((url) => !(user?.role !== 'admin' && url.path === '/admin'));
-
 	return (
 		<>
-			<div className="sticky top-0 z-10 bg-background shadow-sm dark:shadow-accent">
-				<div className="flex h-16 items-center justify-center">
-					<Link
-						href={urls.home.index}
-						className="ml-4 hidden lg:flex absolute h-6/10 left-0 justify-center items-center space-x-2"
+			<div
+				className={twMerge(
+					'sticky top-0 bg-muted z-50 transition-all duration-300',
+					!isNavbarVisible ? 'h-[55px]' : 'h-[110px]'
+				)}
+			>
+				{/* Desktop Menu */}
+				<div className="flex flex-col h-full justify-center items-center z-50">
+					{/* Logo Section - Hidden when scrolling down */}
+					<div
+						className={twMerge(
+							'w-fit mx-auto flex items-center pt-2 justify-center transition-all duration-300 overflow-hidden',
+							!isNavbarVisible ? 'h-0 opacity-0' : 'h-55/100 opacity-100'
+						)}
 					>
-						<Logo pathClassName="fill-foreground stroke-foreground" />
-					</Link>
-					<Link
-						href={urls.home.index}
-						className="ml-2 absolute h-6/10 w-[200px] left-0 flex lg:hidden  items-center"
-					>
-						<LogoIcon size="150px" pathClassName="fill-foreground stroke-foreground" />
-					</Link>
-					<div className="hidden lg:block">
-						<NavigationMenu>
-							<NavigationMenuList>
-								{urlList.map((url, index) => {
-									return (
-										<NavigationMenuItem key={index}>
-											<Link href={url.path} legacyBehavior passHref>
-												<NavigationMenuLink className={navigationMenuTriggerStyle()}>
-													{url.label}
-												</NavigationMenuLink>
-											</Link>
-										</NavigationMenuItem>
-									);
-								})}
-							</NavigationMenuList>
-						</NavigationMenu>
+						<Link href={urls.home.index} className="w-[200px] items-center">
+							<LogoIcon
+								height="48px"
+								width="59px"
+								pathClassName="fill-background stroke-background"
+							/>
+						</Link>
 					</div>
 
-					<div className="absolute right-5 ml-auto flex items-center space-x-4">
-						<AiCredits />
-						<DarkModeToggle />
-						{isSignedIn ? (
-							<UserButton />
-						) : (
-							<>
-								<SignInButton mode="modal">
-									<Button>Sign In</Button>
-								</SignInButton>
-								<SignUpButton mode="modal">
-									<Button>Sign Up</Button>
-								</SignUpButton>
-							</>
+					{/* Navigation Section - Always visible */}
+					<div
+						className={twMerge(
+							'flex items-center justify-center transition-all duration-300',
+							!isNavbarVisible ? 'h-full' : 'h-45/100'
 						)}
-						<Button
-							variant="outline"
-							size="icon"
-							className="lg:hidden"
-							onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}
-						>
-							<MenuIcon />
-						</Button>
+					>
+						<div className="hidden lg:flex flex-row gap-13 ">
+							{urlList.map((url) => {
+								return (
+									<Link className="hover:cursor-pointer" key={url.path} href={url.path}>
+										<Typography
+											className={twMerge(
+												'!text-[16px] transition duration-300',
+												pathname === url.path
+													? '-translate-y-[2px] opacity-100'
+													: 'translate-y-0 opacity-80'
+											)}
+											color="background"
+										>
+											{url.label}
+										</Typography>
+									</Link>
+								);
+							})}
+						</div>
+
+						<div className="absolute right-5 ml-auto flex items-center space-x-4 ">
+							{isSignedIn ? (
+								<UserButton />
+							) : (
+								<>
+									<SignInButton mode="modal">
+										<Button variant="light" size="sm">
+											Sign In
+										</Button>
+									</SignInButton>
+									<SignUpButton mode="modal">
+										<Button variant="light" size="sm">
+											Sign Up
+										</Button>
+									</SignUpButton>
+								</>
+							)}
+							<Button
+								outline
+								variant="light"
+								size="icon"
+								className="lg:hidden"
+								onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}
+							>
+								<MenuIcon />
+							</Button>
+						</div>
 					</div>
 				</div>
 			</div>
+
+			{/* Mobile Menu */}
 			<div
 				className={cn(
-					'fixed z-40 top-16 right-0 w-full h-[calc(100vh-4rem)] bg-background shadow-lg transform transition-opacity duration-500 ease-in-out lg:hidden',
+					'fixed z-40 top-13 right-0 w-full h-screen transform transition-opacity duration-500 ease-in-out lg:hidden bg-background',
 					isMobileMenuOpen
 						? 'pointer-events-auto opacity-100'
 						: 'pointer-events-none opacity-0'
@@ -111,7 +153,7 @@ export const Navbar = () => {
 							<Link
 								key={index}
 								href={url.path}
-								className="px-4 py-2 rounded-md w-[125%] text-center hover:bg-card transition-all duration-500 text-3xl "
+								className="px-4 py-6 rounded-md text-center hover:bg-gray-100 transition-all duration-500 text-2xl md:text-4xl font-primary"
 								onClick={() => setMobileMenuOpen(false)}
 							>
 								{url.label}

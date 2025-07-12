@@ -8,7 +8,7 @@ import Spinner from '@/components/ui/spinner';
 export const SentEmailsTable: FC<SentEmailsTableProps> = (props) => {
 	const {
 		columns,
-		isPending,
+		isPendingEmails,
 		handleRowClick,
 		isDraftDialogOpen,
 		selectedDraft,
@@ -22,7 +22,7 @@ export const SentEmailsTable: FC<SentEmailsTableProps> = (props) => {
 				<CardTitle>Sent Emails</CardTitle>
 			</CardHeader>
 			<CardContent>
-				{isPending ? (
+				{isPendingEmails ? (
 					<Spinner />
 				) : (
 					<CustomTable

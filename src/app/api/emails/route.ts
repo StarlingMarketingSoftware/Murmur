@@ -14,7 +14,7 @@ import {
 import { EmailStatus } from '@prisma/client';
 import { getValidatedParamsFromUrl } from '@/utils';
 
-const postEmailSchema = z.object({
+const postSingleEmailSchema = z.object({
 	subject: z.string().min(1),
 	message: z.string().min(1),
 	campaignId: z.number().int().positive(),
@@ -22,10 +22,14 @@ const postEmailSchema = z.object({
 	sentAt: z.string().datetime().nullable().optional(),
 	contactId: z.number().int().positive(),
 });
+
+const postEmailSchema = z.union([postSingleEmailSchema, z.array(postSingleEmailSchema)]);
+
 const emailFilterSchema = z.object({
 	campaignId: z.union([z.string(), z.number()]).optional(),
 });
 export type PostEmailData = z.infer<typeof postEmailSchema>;
+
 export type EmailFilterData = z.infer<typeof emailFilterSchema>;
 
 export async function GET(req: NextRequest) {
@@ -68,15 +72,20 @@ export async function POST(req: NextRequest) {
 		}
 
 		const body = await req.json();
+
 		const validatedData = postEmailSchema.safeParse(body);
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
 
+		// Normalize to array format for consistent processing
+		const emailsArray = Array.isArray(validatedData.data)
+			? validatedData.data
+			: [validatedData.data];
+
+		const campaignId = emailsArray[0].campaignId;
 		const campaign = await prisma.campaign.findUnique({
-			where: {
-				id: validatedData.data.campaignId,
-			},
+			where: { id: campaignId },
 		});
 
 		if (!campaign) {
@@ -87,11 +96,25 @@ export async function POST(req: NextRequest) {
 			return apiUnauthorizedResource();
 		}
 
-		const email = await prisma.email.create({
-			data: { ...validatedData.data, userId },
-		});
+		if (emailsArray.length === 1) {
+			const email = await prisma.email.create({
+				data: { ...emailsArray[0], userId },
+			});
+			return apiCreated(email);
+		} else {
+			const createdEmails = await prisma.email.createMany({
+				data: emailsArray.map((email) => ({
+					...email,
+					userId,
+				})),
+				skipDuplicates: true,
+			});
 
-		return apiCreated(email);
+			return apiCreated({
+				count: createdEmails.count,
+				message: `Successfully created ${createdEmails.count} emails`,
+			});
+		}
 	} catch (error) {
 		return handleApiError(error);
 	}

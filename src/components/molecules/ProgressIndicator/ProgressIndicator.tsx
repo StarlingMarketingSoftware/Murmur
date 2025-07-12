@@ -1,7 +1,7 @@
 import { FC } from 'react';
 import { ProgressIndicatorProps, useProgressIndicator } from './useProgressIndicator';
 import { Progress } from '@/components/ui/progress';
-import { TypographySmall } from '@/components/ui/typography';
+import { Typography } from '@/components/ui/typography';
 import { BanIcon, CheckCircle2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Spinner from '@/components/ui/spinner';
@@ -30,19 +30,25 @@ const ProgressIndicator: FC<ProgressIndicatorProps> = (props) => {
 				className="absolute top-2 right-2"
 				size="icon"
 			>
-				<X size="20px" className="text-primary" />
+				<X size="20px" className="text-muted" />
 			</Button>
 			<div className="flex flex-row items-center gap-2">
-				<TypographySmall>
+				<Typography variant="label" font="secondary" className="!text-sm">
 					{isComplete ? finalCompleteMessage : finalPendingMessage}
-				</TypographySmall>
+				</Typography>
 				{isComplete ? (
 					<CheckCircle2 size="20px" className="text-success animate-pulse" />
 				) : (
 					<>
 						<Spinner size="small" className="!m-0 min-h-[20px]" />
 						{cancelAction && (
-							<Button onClick={cancelAction} variant="ghost">
+							<Button
+								size="sm"
+								font="secondary"
+								className="text-xs text-muted"
+								onClick={cancelAction}
+								variant="ghost"
+							>
 								<BanIcon className="text-destructive" /> Cancel
 							</Button>
 						)}

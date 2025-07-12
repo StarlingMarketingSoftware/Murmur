@@ -9,12 +9,14 @@ interface CheckoutButtonProps {
 	buttonText: string;
 	onButtonClick?: () => void;
 	user: User | null | undefined;
+	className?: string;
 }
 
 export function CheckoutButton({
 	priceId,
 	buttonText,
 	onButtonClick,
+	className,
 }: CheckoutButtonProps) {
 	const { isSignedIn, redirectToSignIn } = useClerk();
 	const { mutateAsync: checkout, isPending } = useCreateCheckoutSession();
@@ -38,7 +40,12 @@ export function CheckoutButton({
 	};
 
 	return (
-		<Button className="mx-auto" onClick={handleClick} isLoading={isPending}>
+		<Button
+			variant="product"
+			className={className}
+			onClick={handleClick}
+			isLoading={isPending}
+		>
 			{buttonText}
 		</Button>
 	);

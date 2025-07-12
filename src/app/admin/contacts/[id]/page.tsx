@@ -16,7 +16,7 @@ const ManageContactListDetail: FC = () => {
 			) : (
 				<Card size="lg">
 					<CardHeader>
-						<CardTitle>{contactListData?.name}</CardTitle>
+						<CardTitle>{contactListData?.title}</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<div className="flex flex-row gap-4">
@@ -24,7 +24,7 @@ const ManageContactListDetail: FC = () => {
 								<PlusIcon />
 								Add Contact
 							</Button> */}
-							<ContactTSVUploadDialog />
+							<ContactTSVUploadDialog isPrivate={false} triggerText="Upload Contacts" />
 						</div>
 						<CustomTable
 							columns={columns}

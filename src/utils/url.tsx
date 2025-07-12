@@ -24,7 +24,12 @@ export const getValidatedParamsFromUrl = <T extends z.ZodRawShape>(
 	url: string,
 	schema: z.ZodObject<T>
 ): z.SafeParseReturnType<z.infer<z.ZodObject<T>>, z.infer<z.ZodObject<T>>> => {
-	const searchParams = Object.fromEntries(new URL(url).searchParams);
+	const urlObj = new URL(url);
+	const searchParams = queryString.parse(urlObj.search, {
+		arrayFormat: 'bracket',
+		parseNumbers: true,
+		parseBooleans: true,
+	});
 	return schema.safeParse(searchParams);
 };
 
@@ -34,11 +39,15 @@ export const getValidatedParamsFromUrl = <T extends z.ZodRawShape>(
 
 export const appendQueryParamsToUrl = (
 	url: string,
-	obj?: Record<string, string | number | boolean | undefined>
+	obj?: Record<string, string[] | number[] | string | number | boolean | undefined>
 ): string => {
 	if (!obj) {
 		return url;
 	}
-	const query = queryString.stringify(obj);
+	const query = queryString.stringify(obj, {
+		arrayFormat: 'bracket', // Converts arrays to format: key[]=value1&key[]=value2
+		skipNull: true,
+		skipEmptyString: true,
+	});
 	return `${url}?${query}`;
 };

@@ -45,12 +45,18 @@ export const addSignatureToHtml = (html: string, signature: Signature | null): s
 	return `${html}<p></p><div>${signatureContent}</div>`;
 };
 
+export const replaceLineBreaksWithRichTextTags = (text: string, font: string): string => {
+	const fontStyle = `style="font-family: ${font}"`;
+	const res = `<p><span ${fontStyle}>${text}</span></p>`;
+	return res.replace(/\n/g, `</span></p><p><span ${fontStyle}>`);
+};
+
 export const convertAiResponseToRichTextEmail = (
 	html: string,
 	font: string,
 	signature: Signature | null
 ): string => {
-	const htmlWithFont = addFontToHtml(html, font);
+	const htmlWithFont = replaceLineBreaksWithRichTextTags(html, font);
 	return addSignatureToHtml(htmlWithFont, signature);
 };
 

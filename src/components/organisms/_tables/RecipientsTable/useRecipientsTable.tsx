@@ -4,7 +4,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { TrashIcon } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMe } from '@/hooks/useMe';
-import { TypographyMuted } from '@/components/ui/typography';
+import { Typography } from '@/components/ui/typography';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
 import { RESTRICTED_FEATURE_MESSAGES } from '@/constants';
 import { TableSortingButton } from '@/components/molecules/CustomTable/CustomTable';
@@ -37,7 +37,9 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 				return name ? (
 					<div>{name}</div>
 				) : (
-					<TypographyMuted className="text-sm">No Data</TypographyMuted>
+					<Typography variant="muted" className="text-sm">
+						No Data
+					</Typography>
 				);
 			},
 		},

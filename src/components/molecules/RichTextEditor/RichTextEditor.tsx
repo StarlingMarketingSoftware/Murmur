@@ -18,6 +18,9 @@ interface RichTextEditorProps {
 	isEdit?: boolean;
 	className?: string;
 	hideMenuBar?: boolean;
+	disabled?: boolean;
+	showPlaceholders?: boolean;
+	placeholderOptions?: { value: string; label: string }[];
 }
 
 const Div = Node.create({
@@ -38,6 +41,9 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 	isEdit = true,
 	className,
 	hideMenuBar = false,
+	disabled = false,
+	showPlaceholders = false,
+	placeholderOptions,
 }) => {
 	const editor = useEditor({
 		extensions: [
@@ -78,12 +84,15 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 		editorProps: {
 			attributes: {
 				class: twMerge(
-					'min-h-[200px] w-full rounded-md border border-input bg-input/30',
-					'px-3 py-2 text-sm ring-offset-background ',
+					'min-h-[200px] w-full rounded-md border border-input bg-background',
+					'px-3 py-2 text-sm ',
 					'placeholder:text-muted-foreground',
-					' focus-visible:outline-none focus-visible:ring-2 ',
-					'focus-visible:ring-ring focus-visible:ring-offset-2 ',
 					'disabled:cursor-not-allowed disabled:opacity-50',
+					disabled && [
+						'cursor-not-allowed bg-light !text-light-foreground',
+						'text-muted-foreground pointer-events-none',
+						'border-muted-foreground',
+					],
 					className
 				),
 			},
@@ -106,7 +115,14 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 
 	return (
 		<div className="flex flex-col gap-2">
-			{!hideMenuBar && <RichTextMenuBar editor={editor} isEdit={isEdit} />}
+			{!hideMenuBar && (
+				<RichTextMenuBar
+					editor={editor}
+					isEdit={isEdit}
+					showPlaceholders={showPlaceholders}
+					placeholderOptions={placeholderOptions}
+				/>
+			)}
 			<EditorContent editor={editor} />
 		</div>
 	);

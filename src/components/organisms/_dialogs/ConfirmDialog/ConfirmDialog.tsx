@@ -4,7 +4,6 @@ import { ConfirmDialogProps, useConfirmDialog } from './useConfirmDialog';
 import {
 	Dialog,
 	DialogContent,
-	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
@@ -20,6 +19,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { FormProvider } from 'react-hook-form';
+import { Typography } from '@/components/ui/typography';
 
 export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 	const {
@@ -54,9 +54,8 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 				<DialogHeader>
 					<DialogTitle>{title}</DialogTitle>
 				</DialogHeader>
-				<DialogDescription className="text-sm text-muted-foreground">
-					{text ? text : children}
-				</DialogDescription>
+				{text ? <Typography variant="p">{text}</Typography> : children}
+
 				{confirmWithInput ? (
 					<FormProvider {...form}>
 						<form onSubmit={form.handleSubmit(onSubmit)}>
@@ -84,11 +83,7 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 								/>
 							</div>
 							<DialogFooter>
-								<Button
-									type="button"
-									onClick={() => onOpenChange(false)}
-									variant="outline"
-								>
+								<Button type="button" onClick={() => onOpenChange(false)} variant="light">
 									Cancel
 								</Button>
 								<Button
@@ -103,7 +98,7 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 					</FormProvider>
 				) : (
 					<DialogFooter>
-						<Button type="button" onClick={() => onOpenChange(false)} variant="outline">
+						<Button type="button" onClick={() => onOpenChange(false)} variant="light">
 							Cancel
 						</Button>
 						<Button

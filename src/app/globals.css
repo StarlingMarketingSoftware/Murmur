@@ -1,5 +1,4 @@
 @import 'tailwindcss';
-
 @plugin "tailwindcss-animate";
 
 @custom-variant dark (&:is(.dark *));
@@ -9,8 +8,10 @@
 	--color-background: var(--background);
 	--color-dark-background: var(--dark-background);
 
-	--color-muted-foreground: var(--muted-foreground);
 	--color-muted: var(--muted);
+	--color-medium: var(--medium);
+	--color-light: var(--light);
+	--color-light-foreground: var(--light-foreground);
 
 	--color-primary-foreground: var(--primary-foreground);
 	--color-primary: var(--primary);
@@ -18,8 +19,16 @@
 	--color-secondary-foreground: var(--secondary-foreground);
 	--color-secondary: var(--secondary);
 
+	--color-secondary-light: var(--secondary-light);
+	--color-secondary-light-foreground: var(--secondary-light-foreground);
+
+	--color-info: var(--info);
+	--color-info-foreground: var(--info-foreground);
+
 	--color-accent-foreground: var(--accent-foreground);
 	--color-accent: var(--accent);
+
+	--color-navy: var(--navy);
 
 	--color-chart-5: var(--chart-5);
 	--color-chart-4: var(--chart-4);
@@ -32,6 +41,8 @@
 	--color-destructive: var(--destructive);
 	--color-warning: var(--warning);
 	--color-success: var(--success);
+	--color-dark: var(--dark);
+	--color-dark-foreground: var(--dark-foreground);
 
 	--color-popover-foreground: var(--popover-foreground);
 	--color-popover: var(--popover);
@@ -53,32 +64,39 @@
 	--color-sidebar-foreground: var(--sidebar-foreground);
 	--color-sidebar: var(--sidebar);
 
-	--font-sans: var(--font-geist-sans);
-	--font-mono: var(--font-geist-mono);
+	--font-primary: var(--font-times);
+	--font-secondary: var(--font-inter);
 }
 
 :root {
 	--radius: 0.625rem;
+	--foreground: oklch(0.25 0.03 270)
+	--background: oklch(0.98 0.005 270);
 	--card: oklch(1 0 0);
 	--card-foreground: oklch(0.145 0 0);
 	--popover: oklch(1 0 0);
 	--popover-foreground: oklch(0.145 0 0);
-	--primary: oklch(0.147 0.004 49.25);
-	--primary-foreground: oklch(0.985 0 0);
-	--secondary: oklch(0.709 0.01 56.259);
-	--secondary-foreground: oklch(0.205 0 0);
-	--muted: oklch(0.97 0 0);
-	--muted-foreground: oklch(0.556 0 0);
+	--primary: oklch(0.6795 0.1263 147.14);
+	--primary-foreground: oklch(1 0 147.14);
+	--secondary: oklch(0.6231 0.188 259.81);
+	--secondary-foreground: oklch(1 0 0);
+	--secondary-light: oklch(0.7906 0.1089 252.45);
+	--secondary-light-foreground: oklch(0 0 0);
+	--light:oklch(0.9642 0 0);
+	--light-foreground: oklch(55.553% 0.00006 271.152);
+	--medium: oklch(0.8853 0 0);
+	--muted: oklch(0.3211 0 0);
 	--accent: oklch(0.923 0.003 48.717);
 	--accent-foreground: oklch(0.205 0 0);
-	--destructive: oklch(0.577 0.245 27.325);
+	--destructive: oklch(59.157% 0.24065 26.32);
 	--warning: oklch(0.77 0.16 70);
-	--success: oklch(0.72 0.19 150);
+	--success: oklch(0.4953 0.1037 140.3);
+	--navy: oklch(0.4865 0.17 266.18);
 
-	--border: oklch(0.922 0 0);
+	--border: oklch(83.591% 0.0001 271.152);
 	--input: oklch(0.922 0 0);
 	--ring: oklch(0.708 0 0);
-	--chart-1: oklch(0.646 0.222 41.116);
+	--chart-1: oklch(12.953% 0.00351 69.753);
 	--chart-2: oklch(0.6 0.118 184.704);
 	--chart-3: oklch(0.398 0.07 227.392);
 	--chart-4: oklch(0.828 0.189 84.429);
@@ -131,16 +149,21 @@
 
 @keyframes scroll {
 	0% {
-		transform: translateX(0);
+		transform: translate(0);
 	}
 	100% {
-		transform: translateX(-50%);
+		transform: translate(calc(-50% - 2.75rem));
 	}
 }
 
 .animate-scroll {
-	animation: scroll 30s linear infinite;
+	animation: scroll 50s linear infinite;
 }
+
+.animate-scroll:hover {
+	animation-play-state: paused;
+}
+
 
 @layer base {
 	* {
@@ -159,3 +182,45 @@
 		@apply text-lg font-bold;
 	}
 }
+
+/* Custom scrollbar for table containers */
+[data-slot="table-container"] {
+	scrollbar-width: thin; /* For Firefox */
+}
+
+[data-slot="table-container"]::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+[data-slot="table-container"]::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+[data-slot="table-container"]::-webkit-scrollbar-thumb {
+	background-color: rgb(203 213 225); /* Tailwind slate-300 */
+	border-radius: 20px;
+}
+
+[data-slot="table-container"]::-webkit-scrollbar-thumb:hover {
+	background-color: rgb(148 163 184); /* Tailwind slate-400 */
+}
+
+/* Hide scrollbar buttons and borders */
+[data-slot="table-container"]::-webkit-scrollbar-button {
+	display: none;
+}
+
+[data-slot="table-container"]::-webkit-scrollbar-corner {
+	background: transparent;
+}
+
+mux-player {
+	--seek-backward-button: none;
+	--seek-forward-button: none;
+	--cast-button: none;
+	--pip-button: none;
+	--playback-rate-button: none;
+}
+
+

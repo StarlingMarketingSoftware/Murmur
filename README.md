@@ -71,6 +71,8 @@ For Stripe subscription functionality, set up a webhook:
    stripe trigger
    ```
 
+   - If the Stripe CLI API key has expired, run `stripe login` and authenticate via browser.
+
 ## Clerk Webhook Setup
 
 1. https://clerk.com/docs/webhooks/sync-data
@@ -92,6 +94,14 @@ Murmur uses Semantic Versioning (SemVer) – (MAJOR.MINOR.PATCH). In this system
 
 This project is licensed under the MIT License.
 
+## PR Checklist
+
+- Create a branch based on an issue.
+-
+- run `npm run build`
+- Have your PR reviewed by Github Copilot.
+- Request a review from a team member before merging.
+
 ## Code Style
 
 - When possible, write descriptions of functions in the following style:
@@ -105,3 +115,78 @@ export function extractEmailsFromContacts(contacts: Partial<Contact>[]): string[
 		.filter((email): email is string => email !== null && email !== undefined);
 }```
 ````
+
+## Git Branching Workflow
+
+### main/production branch (current production code)
+
+- Only contains released, production-ready code
+- Hotfixes are merged here
+
+### develop branch (integration branch)
+
+- Where feature branches merge for testing
+- Your main development baseline
+
+###feature/your-feature branch (your long-running feature)
+
+- Create this off develop
+- Work here for several weeks
+- Regularly merge develop into this to stay current
+
+### hotfix/xxx branches (for production fixes)
+
+- Created from main
+- After fixing, merge to both main and develop
+
+### Database Migrations
+
+- Renaming: Avoid migrations when possible when renaming a field is required. For example:
+
+```message String?  @db.Text
+
+```
+
+- Can be renamed to:
+
+```fullAiPrompt String?  @map("message") @db.Text
+
+```
+
+- By using @map without running any migrations.
+
+### Local Scripts
+
+- Create a .tsx file in the scripts folder following the format of export-embeddings.tsx.
+- Run with `npx tsx scripts/export-embeddings.tsx`
+
+### Generating Seed Data for Local Vector Embeddings
+
+- If you don't need to generate new vector embeddings, just run 'npx prisma db seed'. If you have a new list of contacts to embed, follow the next steps:
+- Prepare a .csv of contacts.
+- Seed only the contacts (comment out the line that seeds embeddings)
+- Call POST /api/vector-search/generate-embeddings
+- Run /scripts/export-embeddings.tsx `npx tsx scripts/export-embeddings.tsx`
+- Paste the generated .txt file's contents to /prisma/seed-data/contactEmbeddings1.ts and contactEmbeddings2.ts. The reason the files are split is to avoid the 100MB limit per file for Github.
+- 'docker compose down -v' to reset postgres and elastic search databases.
+- 'docker compose up -d' to get fresh databases running.
+- Migrate and run all seed functions 'npx prisma migrate dev'
+
+## Testing API Endpoints with Postman
+
+- Use this guide to generate a token for Clerk authentication: https://clerk.com/docs/testing/postman-or-insomnia
+
+## Comprehensive Testing Guide
+
+### Subscriptions
+
+- Subscription renewal for each tier
+- Subscription cancellation for each tier
+- Subscription initial signup for each tier
+- Subscription switch: The next subscription should begin immediately, and credits should be replaced with the new tier's credits (not cumulative)
+
+### Not logged in users
+
+- Can they send from the contact from
+- What happens when they try to sign up for a subscription.
+- What happens when they try to search for a contact?

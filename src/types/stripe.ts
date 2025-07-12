@@ -12,12 +12,25 @@ export enum StripeSubscriptionStatus {
 }
 
 export interface StripeProduct extends Stripe.Product {
-	default_price: Stripe.Price;
+	prices: Stripe.Price[];
 }
 
 export type SubscriptionTierData = {
-	name: string;
-	aiEmailCount: number;
-	testEmailCount: number;
+	name: SubscriptionName;
+	draftCredits: number;
+	sendingCredits: number;
+	verificationCredits: number;
 	viewEmailAddresses: boolean;
 };
+
+export type SubscriptionName =
+	| 'Basic'
+	| 'Standard'
+	| 'Pro'
+	| 'Custom'
+	| 'Elite'
+	| 'Prophet'
+	| 'Admin Lite'
+	| 'Admin Full';
+
+export type BillingCycle = 'day' | 'week' | 'month' | 'year';

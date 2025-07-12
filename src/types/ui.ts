@@ -3,3 +3,20 @@ export type Logo = {
 	width: number;
 	darkFileName?: string;
 };
+
+export type Review = {
+	text: string;
+	fullName: string;
+	company: string;
+	photoUrl?: string;
+};
+
+export type FAQ = {
+	question: string;
+	answer: string;
+};
+
+export type OptionWithLabel<T = string> = {
+	value: T;
+	label: string;
+};
