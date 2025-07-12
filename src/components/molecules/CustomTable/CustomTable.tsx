@@ -151,15 +151,6 @@ export function CustomTable<TData, TValue>({
 	}, [table, tableRef]);
 
 	useEffect(() => {
-		if (setSelectedRows && data) {
-			const selectedData = table
-				.getFilteredSelectedRowModel()
-				.rows.map((row) => row.original);
-			setSelectedRows(selectedData);
-		}
-	}, [setSelectedRows, table, data, rowSelection]);
-
-	useEffect(() => {
 		if (!data) return;
 
 		const totalPages = Math.ceil(data.length / pagination.pageSize);
