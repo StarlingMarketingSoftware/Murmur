@@ -1,6 +1,7 @@
 import { Contact } from '@prisma/client';
 import { OpenAI } from 'openai';
 import { Client } from '@elastic/elasticsearch';
+import prisma from '@/lib/prisma';
 
 const VECTOR_DIMENSION = 1536; // OpenAI's text-embedding-3-small dimension
 const INDEX_NAME = 'contacts';
@@ -135,6 +136,11 @@ export const upsertContactToVectorDb = async (
 			linkedInUrl: contact.linkedInUrl || '',
 			metadata: contact.metadata || '',
 		},
+	});
+
+	await prisma.contact.update({
+		where: { id: contact.id },
+		data: { hasVectorEmbedding: true },
 	});
 
 	return id;
