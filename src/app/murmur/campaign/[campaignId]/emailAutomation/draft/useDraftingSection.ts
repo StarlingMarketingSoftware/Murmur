@@ -639,14 +639,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 		const BATCH_SIZE = 5;
 		let successfulEmails = 0;
-		let stoppedDueToCredits = false; // Add flag to track credit exhaustion
+		let stoppedDueToCredits = false;
 
 		if (!contacts || contacts.length === 0) {
 			toast.error('No contacts available to generate emails.');
 			return;
 		}
 
-		console.log('🚀 ~ batchGenerateFullAiDrafts ~ contacts:', contacts.length);
 		const paragraphs = form.getValues('paragraphs');
 		const creditCost = paragraphs <= 3 ? 1 : 1.5;
 
@@ -660,7 +659,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				const adjustedBatchSize = Math.min(BATCH_SIZE, maxEmails);
 
 				if (remainingCredits < creditCost) {
-					stoppedDueToCredits = true; // Set flag when stopping due to credits
+					stoppedDueToCredits = true;
 					cancelGeneration();
 					break;
 				}
@@ -705,13 +704,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					data: { draftCredits: newCreditBalance },
 				});
 			}
-			console.log(
-				'🚀 ~ batchGenerateFullAiDrafts ~ stoppedDueToCredits:',
-				stoppedDueToCredits
-			);
-			console.log('🚀 ~ batchGenerateFullAiDrafts ~ successfulEmails:', successfulEmails);
 
-			// Updated success message logic
 			if (!isGenerationCancelledRef.current && !stoppedDueToCredits) {
 				if (successfulEmails === contacts.length) {
 					toast.success('All emails generated successfully!');
@@ -821,7 +814,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		isAiSubject,
 		isPendingSaveCampaign,
 		handleSavePrompt,
-		aiDraftCredits: draftCredits,
 		isTest,
 		signatures,
 		isPendingSignatures,
