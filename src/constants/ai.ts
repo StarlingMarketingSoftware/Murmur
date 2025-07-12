@@ -1,8 +1,6 @@
 import { MistralToneAgentType } from '@/types';
 
-const PERPLEXITY_FORMATTING_INSTRUCTIONS = `FORMATTING INSTRUCTIONS: Within the message, use an extra <p></p> to create line breaks between paragraphs as follows:
-{subject: generatedSubject,message: <p>Hi Josh,</p><p></p><p>Paragraph 1 content</p><p></p><p>Paragraph 2 content</p><p></p><p>Paragraph 3 content</p>} 
-`;
+const PERPLEXITY_FORMATTING_INSTRUCTIONS = ``;
 
 export const PERPLEXITY_FULL_AI_PROMPT = `
 ${PERPLEXITY_FORMATTING_INSTRUCTIONS}
@@ -130,11 +128,10 @@ Hi {FIRST_NAME},
 	`;
 
 const MISTRAL_FORMATTING_INSTRUCTIONS = `
-1. !IMPORTANT! Ensure that there is an empty paragraph tag, <p></p>, between each paragraph. Even after the first line, which is just a short greeting, there should be a <p></p> tag. This is for formatting purposes in rich text as well as for email clients.
-2. Do not include a <p></p> tag before the first line of text. 
+1. !IMPORTANT! Ensure that there is a line break character "\n" between each paragraph. Even after the first line, which is just a short greeting, there should be a line break character "\n".
+2. Do not include a line break before the first line of text. 
 2. At the end of the first line (the short greeting), use a comma. For example: "Hi,"
-3. Do not add any space or tab before the first letter of each paragraph.
-4. Remove any new line characters. All new lines are accomplished with the <p></p> tag.`;
+3. Do not add any space or tab before the first letter of each paragraph.`;
 
 export const getMistralTonePrompt = (tone: MistralToneAgentType): string => {
 	return `I will send an email message in RichText format. 
@@ -178,7 +175,7 @@ ${blockPrompts}
 };
 
 export const getMistralParagraphPrompt = (numberOfParagraphs: number): string => {
-	return `I will send a message in RichText format. 
+	return `I will send a message in plain text format, including the line break character "\n". 
 
 Perform the following task the text message:
 1. ${MISTRAL_PARAGRAPH_PROMPTS[numberOfParagraphs]}
@@ -186,7 +183,7 @@ Perform the following task the text message:
 Here are directions about formatting:
 ${MISTRAL_FORMATTING_INSTRUCTIONS}
 
-Return the updated message in RichText format without any additional text or explanation.
+Return the updated message in plain text format, using the line break character "\n", without any additional text or explanation.
 `;
 };
 

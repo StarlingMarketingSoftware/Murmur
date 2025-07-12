@@ -164,12 +164,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
 
-	const { data, isPending } = useGetEmails({
-		filters: {
-			campaignId,
-		},
-	});
-
 	const { data: contacts } = useGetContacts({
 		filters: {
 			contactListIds: campaign.userContactLists.map((list) => list.id),
@@ -200,8 +194,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	});
 
 	// VARIABLES
-
-	const draftEmails = data?.filter((email) => email.status === EmailStatus.draft) || [];
 
 	const modeOptions: ModeOption[] = [
 		{ value: 'ai', label: 'Full AI' },
@@ -778,8 +770,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	}, [draftingMode, form]);
 
 	return {
-		draftEmails,
-		isPending,
 		campaign,
 		modeOptions,
 		form,

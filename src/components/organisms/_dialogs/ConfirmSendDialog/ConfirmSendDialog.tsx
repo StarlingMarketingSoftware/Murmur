@@ -1,11 +1,3 @@
-import {
-	Form,
-	FormControl,
-	FormField,
-	FormItem,
-	FormLabel,
-	FormMessage,
-} from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import {
 	Dialog,
@@ -18,65 +10,58 @@ import {
 } from '@/components/ui/dialog';
 import { FC } from 'react';
 import { ConfirmSendDialogProps, useConfirmSendDialog } from './useConfirmSendDialog';
-import { Input } from '@/components/ui/input';
 import { CheckIcon, SendIcon } from 'lucide-react';
+import { Typography } from '@/components/ui/typography';
 
 export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
-	const { handleSend, form, draftEmailCount, isOpen, setIsOpen } =
+	const { handleSend, draftEmailCount, isOpen, setIsOpen, user, campaign } =
 		useConfirmSendDialog(props);
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen} modal>
 			<DialogTrigger asChild>
 				<Button className="w-full sm:w-fit" disabled={draftEmailCount <= 0}>
 					<CheckIcon />
-					Proceed to Confirmation
+					Proceed to Sending Confirmation
 				</Button>
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-[425px]">
 				<DialogHeader>
 					<DialogTitle>Send Campaign Confirmation</DialogTitle>
 				</DialogHeader>
-				<DialogDescription className="py-4">{`Murmur uses a marketing email service to send emails in place of sending directly from your account. As part of this process, we require your name and email address so that the recipient sees the correct sender information and replies go to your inbox. This does not grant Murmur access to your email in any way. Please enter this information below and confirm.`}</DialogDescription>
-				<Form {...form}>
-					<form onSubmit={form.handleSubmit(handleSend)}>
-						<div className="space-y-4">
-							<FormField
-								control={form.control}
-								name="senderName"
-								render={({ field }) => (
-									<FormItem className="col-span-11">
-										<FormLabel>Sender Name</FormLabel>
-										<FormControl>
-											<Input className="flex-grow" {...field} />
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-							<FormField
-								control={form.control}
-								name="senderEmail"
-								render={({ field }) => (
-									<FormItem className="col-span-11">
-										<FormLabel>Sender Email</FormLabel>
-										<FormControl>
-											<Input className="flex-grow" {...field} />
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-						</div>
-						<DialogFooter>
-							<div className="flex gap-2 w-full items-center justify-center">
-								<Button type="submit">
-									<SendIcon />
-									{`Send ${draftEmailCount} Emails`}
-								</Button>
-							</div>
-						</DialogFooter>
-					</form>
-				</Form>
+				<Typography variant="p" className="py-4">
+					Let&apos;s confirm the following details before sending your campaign.
+				</Typography>
+				<Typography variant="p" className="py-4">
+					{`Murmur has generated a personalized email address for you to send from: `}
+					<strong>{user?.murmurEmail}</strong>
+				</Typography>
+
+				<Typography variant="p" className="py-4">
+					Murmur will <strong>not</strong> display this email address to the recipients.
+					The recipients will see the Identity information that you&apos;ve connected to
+					this campaign:
+					<br className="mt-2" />
+					<strong>{campaign?.identity?.name}</strong>
+					<br />
+					<strong>{campaign?.identity?.email}</strong>
+				</Typography>
+				<Typography>
+					If the above information is not correct, please return to the top of the
+					campaign to edit your Identity or create a new one.
+				</Typography>
+				<Typography variant="p" className="py-4">
+					By clicking &quot;Send&quot;, you confirm that the email address{' '}
+					<strong>{campaign?.identity?.email}</strong> is correct and that you wish to
+					receive replies to this address.
+				</Typography>
+				<DialogFooter>
+					<div className="flex gap-2 w-full items-center justify-center">
+						<Button onClick={handleSend}>
+							<SendIcon />
+							{`Send ${draftEmailCount} Emails`}
+						</Button>
+					</div>
+				</DialogFooter>
 			</DialogContent>
 		</Dialog>
 	);

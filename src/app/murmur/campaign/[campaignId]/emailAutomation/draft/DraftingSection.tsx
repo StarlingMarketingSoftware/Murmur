@@ -1,8 +1,5 @@
 import { FC } from 'react';
-import EmailsTable from '../../../../../../components/organisms/_tables/EmailsTable/EmailsTable';
-import { Card, CardContent } from '@/components/ui/card';
 import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
-import Spinner from '@/components/ui/spinner';
 import { DraftingRightPanel } from '@/components/organisms/DraftingRightPanel/DraftingRightPanel';
 import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
 import { Button } from '@/components/ui/button';
@@ -41,8 +38,6 @@ import { Typography } from '@/components/ui/typography';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
-		draftEmails,
-		isPending,
 		campaign,
 		modeOptions,
 		form,
@@ -71,10 +66,6 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
 		formState: { isDirty },
 	} = form;
-
-	if (isPending) {
-		return <Spinner />;
-	}
 
 	return (
 		<>
@@ -318,16 +309,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 					</div>
 				</form>
 			</Form>
-			<Card className="relative">
-				<CardContent>
-					<EmailsTable
-						isEditable
-						emails={draftEmails}
-						isPending={isPending}
-						noDataMessage="Drafts will appear here as they are created."
-					/>
-				</CardContent>
-			</Card>
+
 			<ManageSignaturesDialog
 				campaign={campaign}
 				open={isOpenSignaturesDialog}

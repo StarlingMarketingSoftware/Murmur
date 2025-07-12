@@ -13,6 +13,8 @@ import { Separator } from '@/components/ui/separator';
 import { DraftingSection } from './emailAutomation/draft/DraftingSection';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { PrepareSendingTable } from '@/components/organisms/_tables/PrepareSendingTable/PrepareSendingTable';
+import { SentEmailsTable } from '@/components/organisms/_tables/SentEmailsTable/SentEmailsTable';
 
 const Murmur = () => {
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
@@ -94,6 +96,7 @@ const Murmur = () => {
 			</Typography>
 			<Separator className="!w-1/2" />
 			<DraftingSection campaign={campaign} />
+			<PrepareSendingTable campaign={campaign} />
 		</AppLayout>
 	);
 };

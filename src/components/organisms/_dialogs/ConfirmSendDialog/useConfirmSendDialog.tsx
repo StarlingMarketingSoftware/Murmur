@@ -77,13 +77,18 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 			return null;
 		}
 
+		if (!campaign?.identity?.email || !campaign?.identity?.name) {
+			toast.error('Please create an Identity before sending emails.');
+			return;
+		}
+
 		for (const email of draftEmails) {
 			const res = await sendMailgunMessage({
 				subject: email.subject,
 				message: email.message,
 				recipientEmail: email.contact.email,
-				senderEmail: form.getValues().senderEmail,
-				senderName: form.getValues().senderName,
+				senderEmail: campaign?.identity?.email,
+				senderName: campaign?.identity?.name,
 				originEmail: user?.customDomain ?? user?.murmurEmail,
 			});
 			if (res.success) {
@@ -103,9 +108,10 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 
 	return {
 		handleSend,
-		form,
 		draftEmailCount,
 		isOpen,
 		setIsOpen,
+		user,
+		campaign,
 	};
 };
