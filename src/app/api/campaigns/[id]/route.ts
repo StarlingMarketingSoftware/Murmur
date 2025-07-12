@@ -24,7 +24,7 @@ const patchCampaignSchema = z.object({
 	isAiSubject: z.boolean().optional(),
 	subject: z.string().nullable().optional(),
 	fullAiPrompt: z.string().nullable().optional(),
-	hybridAvailableBlocks: z.array(z.nativeEnum(HybridBlock)).optional(),
+	hybridAvailableBlocks: z.array(z.nativeEnum(HybridBlock)).nullable().optional(),
 	hybridPrompt: z.string().nullable().optional(),
 	hybridBlockPrompts: z
 		.array(
@@ -34,6 +34,7 @@ const patchCampaignSchema = z.object({
 				value: z.string(),
 			})
 		)
+		.nullable()
 		.optional(),
 	handwrittenPrompt: z.string().nullable().optional(),
 	testSubject: z.string().nullable().optional(),
@@ -103,6 +104,8 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 			identityId,
 			contactOperation,
 			userContactListOperation,
+			hybridAvailableBlocks,
+			hybridBlockPrompts,
 			...updateData
 		} = validatedData.data;
 
@@ -113,6 +116,9 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 			},
 			data: {
 				...updateData,
+				// Handle null values for array fields - convert null to undefined to omit the field
+				...(hybridAvailableBlocks !== null && { hybridAvailableBlocks }),
+				...(hybridBlockPrompts !== null && { hybridBlockPrompts }),
 				signature: connectOrDisconnectId(signatureId),
 				identity: connectOrDisconnectId(identityId),
 				...(contactOperation && {
