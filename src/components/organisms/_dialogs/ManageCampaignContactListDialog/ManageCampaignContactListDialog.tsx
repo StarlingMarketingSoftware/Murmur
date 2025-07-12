@@ -30,7 +30,6 @@ import {
 	SelectValue,
 } from '@/components/ui/select';
 
-// Reusable Contact List Item Component
 interface ContactListItemProps {
 	contactList: UserContactList;
 	children: ReactNode;

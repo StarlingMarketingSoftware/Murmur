@@ -20,14 +20,11 @@ export const useManageCampaignContactListDialog = (
 	const [selectedEditContactList, setSelectedEditContactList] =
 		useState<UserContactList | null>(null);
 
-	// Get all user contact lists
 	const { data: allUserContactLists, isPending: isPendingUserContactLists } =
 		useGetUserContactLists();
 
-	// Get campaign's current contact lists
 	const campaignContactListIds = campaign.userContactLists?.map((list) => list.id) || [];
 
-	// Filter available contact lists (not already in campaign)
 	const availableContactLists =
 		allUserContactLists?.filter(
 			(list: UserContactList) =>
@@ -35,10 +32,8 @@ export const useManageCampaignContactListDialog = (
 				list.name.toLowerCase().includes(searchQuery.toLowerCase())
 		) || [];
 
-	// Current campaign contact lists
 	const campaignContactLists = campaign.userContactLists || [];
 
-	// Edit campaign mutation
 	const { mutate: editCampaign, isPending: isPendingEditCampaign } = useEditCampaign({
 		suppressToasts: true,
 		onSuccess: () => {
@@ -46,7 +41,6 @@ export const useManageCampaignContactListDialog = (
 		},
 	});
 
-	// Add contact list to campaign
 	const handleAddContactList = (contactList: UserContactList) => {
 		editCampaign({
 			id: campaign.id,
@@ -59,7 +53,6 @@ export const useManageCampaignContactListDialog = (
 		});
 	};
 
-	// Remove contact list from campaign
 	const handleRemoveContactList = (contactList: UserContactList) => {
 		editCampaign({
 			id: campaign.id,
@@ -72,7 +65,6 @@ export const useManageCampaignContactListDialog = (
 		});
 	};
 
-	// Open edit dialog for a contact list
 	const handleEditContactList = (contactList: UserContactList) => {
 		setSelectedEditContactList(contactList);
 		setIsEditDialogOpen(true);
