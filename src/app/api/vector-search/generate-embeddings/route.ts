@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { apiResponse, apiUnauthorized, handleApiError } from '@/app/api/_utils';
 import { initializeVectorDb, upsertContactToVectorDb } from '../../_utils/vectorDb';
-import { UserRole } from '@prisma/client';
+import { EmailVerificationStatus, UserRole } from '@prisma/client';
 
 export async function GET() {
 	try {
@@ -26,7 +26,10 @@ export async function GET() {
 
 		// Get all contacts
 		const contacts = await prisma.contact.findMany({
-			where: { hasVectorEmbedding: false },
+			where: {
+				hasVectorEmbedding: false,
+				emailValidationStatus: EmailVerificationStatus.valid,
+			},
 		});
 
 		console.log(`Found ${contacts.length} contacts to process`);
