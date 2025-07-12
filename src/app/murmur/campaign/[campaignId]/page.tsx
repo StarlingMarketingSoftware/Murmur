@@ -97,6 +97,7 @@ const Murmur = () => {
 			<Separator className="!w-1/2" />
 			<DraftingSection campaign={campaign} />
 			<PrepareSendingTable campaign={campaign} />
+			<SentEmailsTable campaign={campaign} />
 		</AppLayout>
 	);
 };

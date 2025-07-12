@@ -1,20 +1,25 @@
 import { AccessorFnColumnDef, ColumnDef } from '@tanstack/react-table';
 import { TableSortingButton } from '../../../molecules/CustomTable/CustomTable';
-import { EmailWithRelations } from '@/types';
+import { CampaignWithRelations, EmailWithRelations } from '@/types';
 import { useState } from 'react';
 import { ellipsesText, MMddyyyyHHmm } from '@/utils';
-import { useDeleteEmail } from '@/hooks/queryHooks/useEmails';
+import { useDeleteEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { stripHtmlTags } from '@/utils';
 
 export interface SentEmailsTableProps {
-	emails: EmailWithRelations[];
-	isPending: boolean;
+	campaign: CampaignWithRelations;
 }
 
 export const useSentEmailsTable = (props: SentEmailsTableProps) => {
-	const { emails, isPending } = props;
+	const { campaign } = props;
 
-	const sentEmails = emails.filter((email) => email.status === 'sent');
+	const { data: emails, isPending: isPendingEmails } = useGetEmails({
+		filters: {
+			campaignId: campaign.id,
+		},
+	});
+
+	const sentEmails = emails?.filter((email) => email.status === 'sent') || [];
 
 	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
 
@@ -80,7 +85,7 @@ export const useSentEmailsTable = (props: SentEmailsTableProps) => {
 
 	return {
 		columns,
-		isPending,
+		isPendingEmails,
 		handleRowClick,
 		isDraftDialogOpen,
 		selectedDraft,
