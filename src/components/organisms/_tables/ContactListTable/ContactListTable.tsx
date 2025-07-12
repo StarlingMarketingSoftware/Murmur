@@ -9,9 +9,9 @@ import {
 import CustomTable from '../../../molecules/CustomTable/CustomTable';
 import { ContactListTableProps, useContactListTable } from './useContactListTable';
 import Spinner from '@/components/ui/spinner';
-import SelectRecipientsDialog from '../../_dialogs/SelectRecipientsDialog/SelectRecipientsDialog';
 import { ConfirmDialog } from '../../_dialogs/ConfirmDialog/ConfirmDialog';
 import { Typography } from '@/components/ui/typography';
+import EditContactListDialog from '../../_dialogs/EditContactListDialog/EditContactListDialog';
 
 const ContactListTable: FC<ContactListTableProps> = (props) => {
 	const {
@@ -47,7 +47,7 @@ const ContactListTable: FC<ContactListTableProps> = (props) => {
 					setSelectedRows={setSelectedRows}
 				/>
 			</CardContent>
-			<SelectRecipientsDialog
+			<EditContactListDialog
 				isOpen={isContactListDialogOpen}
 				setIsOpen={setIsContactListDialogOpen}
 				selectedContactList={currentContactList}

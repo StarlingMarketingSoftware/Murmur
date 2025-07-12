@@ -15,10 +15,16 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { PrepareSendingTable } from '@/components/organisms/_tables/PrepareSendingTable/PrepareSendingTable';
 import { SentEmailsTable } from '@/components/organisms/_tables/SentEmailsTable/SentEmailsTable';
+import { urls } from '@/constants/urls';
+import Link from 'next/link';
+import { ManageCampaignContactListDialog } from '@/components/organisms/_dialogs/ManageCampaignContactListDialog/ManageCampaignContactListDialog';
+import { useState } from 'react';
 
 const Murmur = () => {
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
 		useCampaignDetail();
+
+	const [isContactListDialogOpen, setIsContactListDialogOpen] = useState(false);
 
 	if (isPendingCampaign || !campaign) {
 		return <Spinner />;
@@ -61,7 +67,11 @@ const Murmur = () => {
 						<div className="flex flex-col">
 							<div className="flex gap-8 mb-6 items-center">
 								<Typography variant="h2">Lists Selected</Typography>
-								<Button variant="action-link">Change</Button>
+								<ManageCampaignContactListDialog
+									campaign={campaign}
+									open={isContactListDialogOpen}
+									onOpenChange={setIsContactListDialogOpen}
+								/>
 							</div>
 							{campaign?.userContactLists?.map((contactList) => (
 								<Typography key={contactList.id} className="font-bold !text-[15px]">
@@ -98,6 +108,11 @@ const Murmur = () => {
 			<DraftingSection campaign={campaign} />
 			<PrepareSendingTable campaign={campaign} />
 			<SentEmailsTable campaign={campaign} />
+			<Link href={urls.murmur.dashboard.index}>
+				<Button className="w-full font-bold" size="lg" variant="light">
+					Back to Dashboard
+				</Button>
+			</Link>
 		</AppLayout>
 	);
 };

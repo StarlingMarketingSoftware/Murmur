@@ -13,13 +13,13 @@ import {
 } from '@/hooks/queryHooks/useUserContactLists';
 import { TableDeleteRowButton } from '@/components/molecules/TableDeleteRowButton/TableDeleteRowButton';
 
-export interface SelectRecipientsDialogProps {
+export interface EditContactListDialogProps {
 	isOpen: boolean;
 	setIsOpen: (isOpen: boolean) => void;
 	selectedContactList: UserContactList | null;
 }
 
-export const useSelectRecipientsDialog = (props: SelectRecipientsDialogProps) => {
+export const useEditContactListDialog = (props: EditContactListDialogProps) => {
 	const columns: ColumnDef<Contact>[] = [
 		{
 			accessorKey: 'name',

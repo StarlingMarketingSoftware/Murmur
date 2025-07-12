@@ -6,7 +6,7 @@ import {
 } from '@/constants';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
-import { useCreateEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { useCreateEmail } from '@/hooks/queryHooks/useEmails';
 import { useGetSignatures } from '@/hooks/queryHooks/useSignatures';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { useMe } from '@/hooks/useMe';
@@ -107,7 +107,6 @@ export type DraftingFormValues = z.infer<typeof draftingFormSchema>;
 
 export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { campaign } = props;
-	const campaignId = campaign.id;
 
 	// HOOKS
 
@@ -734,7 +733,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	// EFFECTS
 
 	useEffect(() => {
-		if (campaign) {
+		if (campaign && form && signatures?.length > 0) {
 			form.reset({
 				draftingMode: campaign.draftingMode ?? DraftingMode.ai,
 				isAiSubject: campaign.isAiSubject ?? true,
@@ -745,7 +744,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				hybridBlockPrompts: campaign.hybridBlockPrompts as HybridBlockPrompt[],
 				handwrittenPrompt: campaign.handwrittenPrompt ?? '',
 				font: (campaign.font as Font) ?? 'Arial',
-				signatureId: campaign.signatureId ?? (signatures?.[0]?.id || 1),
+				signatureId: campaign.signatureId ?? signatures?.[0]?.id,
 				draftingTone: campaign.draftingTone ?? DraftingTone.normal,
 				paragraphs: campaign.paragraphs ?? 3,
 			});
