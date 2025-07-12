@@ -51,7 +51,6 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		isAiSubject,
 		isPendingSaveCampaign,
 		handleSavePrompt,
-		aiDraftCredits,
 		isTest,
 		signatures,
 		isPendingSignatures,
@@ -239,7 +238,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										<div className="flex flex-col sm:flex-row gap-4">
 											<Button
 												type="button"
-												variant="secondary-light"
+												variant="light"
 												onClick={handleSavePrompt}
 												isLoading={isPendingSaveCampaign}
 											>
@@ -253,8 +252,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 												disabled={
 													generationProgress > -1 ||
 													contacts?.length === 0 ||
-													isPendingGeneration ||
-													aiDraftCredits === 0
+													isPendingGeneration
 												}
 											>
 												Generate Drafts

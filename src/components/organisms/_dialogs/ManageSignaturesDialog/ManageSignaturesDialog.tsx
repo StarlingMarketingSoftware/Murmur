@@ -26,7 +26,7 @@ import { Signature } from '@prisma/client';
 import Spinner from '@/components/ui/spinner';
 import { twMerge } from 'tailwind-merge';
 import { Input } from '@/components/ui/input';
-import { SaveIcon, SquareCheckIcon, TrashIcon } from 'lucide-react';
+import { SaveIcon, TrashIcon } from 'lucide-react';
 import {
 	Select,
 	SelectContent,
@@ -50,7 +50,6 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 		isPendingSaveSignature,
 		isPendingDeleteSignature,
 		isPendingCreateSignature,
-		campaign,
 		open,
 		onOpenChange,
 	} = useManageSignaturesDialog(props);
@@ -95,8 +94,6 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 														isSelected && 'pointer-events-none'
 													)}
 												>
-													{campaign.signatureId === signature.id && <SquareCheckIcon />}
-
 													<div className="text-sm">{signature.name}</div>
 												</SelectItem>
 											</div>
@@ -127,13 +124,12 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 											<div key={signature.id}>
 												<Button
 													onClick={() => setCurrentSignature(signature)}
-													variant={isSelected ? 'secondary-light' : 'ghost'}
+													variant={isSelected ? 'light' : 'ghost'}
 													className={twMerge(
 														'w-full max-w-[100%]',
 														isSelected && 'pointer-events-none'
 													)}
 												>
-													{campaign.signatureId === signature.id && <SquareCheckIcon />}
 													<div className="text-sm">{signature.name}</div>
 												</Button>
 												<Separator className="my-2" />

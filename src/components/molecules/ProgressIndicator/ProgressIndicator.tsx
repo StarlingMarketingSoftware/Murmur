@@ -42,7 +42,13 @@ const ProgressIndicator: FC<ProgressIndicatorProps> = (props) => {
 					<>
 						<Spinner size="small" className="!m-0 min-h-[20px]" />
 						{cancelAction && (
-							<Button onClick={cancelAction} variant="ghost">
+							<Button
+								size="sm"
+								font="secondary"
+								className="text-xs text-muted"
+								onClick={cancelAction}
+								variant="ghost"
+							>
 								<BanIcon className="text-destructive" /> Cancel
 							</Button>
 						)}

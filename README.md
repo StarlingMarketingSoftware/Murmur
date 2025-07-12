@@ -178,6 +178,12 @@ export function extractEmailsFromContacts(contacts: Partial<Contact>[]): string[
 
 ## Comprehensive Testing Guide
 
+### Drafting
+
+- 0 draftCredits remaining, user attempts to draft emails.
+- 1 draftCredits remaining, user attempts to draft 4 or 5 paragraph email.
+- 6 draftCredits remaining, user drafts 7 emails.
+
 ### Subscriptions
 
 - Subscription renewal for each tier
