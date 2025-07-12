@@ -1,4 +1,4 @@
-import { Contact, EmailVerificationStatus } from '@prisma/client';
+import { Contact } from '@prisma/client';
 import { OpenAI } from 'openai';
 import { Client } from '@elastic/elasticsearch';
 import prisma from '@/lib/prisma';
@@ -37,9 +37,6 @@ interface ContactDocument {
 
 // Helper function to generate embedding for contact data
 export const generateContactEmbedding = async (contact: Contact) => {
-	if (contact.emailValidationStatus !== EmailVerificationStatus.valid) {
-		return null;
-	}
 	const contactText = [
 		contact.firstName,
 		contact.lastName,
