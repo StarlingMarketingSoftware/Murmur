@@ -289,7 +289,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		if (created > 0) {
 			await createContactList({
 				name: `TSV Upload - ${new Date().toLocaleDateString()}`,
-				contactIds: contacts.map((contact: Contact) => contact.id),
+				contactIds: contacts?.map((contact: Contact) => contact.id) || [],
 			});
 		}
 		setTsvData([]);

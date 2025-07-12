@@ -6,11 +6,13 @@ import Spinner from '@/components/ui/spinner';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import CreateContactListDialog from '@/components/organisms/_dialogs/CreateContactListDialog/CreateContactListDialog';
 import ContactVerificationTable from '@/components/organisms/_tables/ContactVerificationTable/ContactVerificationTable';
+import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
 const ManageContactsPage = () => {
 	const { contactLists, isPendingContactLists, columns, handleRowClick } =
 		useManageContacts();
 	return (
 		<>
+			<ContactTSVUploadDialog isPrivate={false} triggerText="Upload Contacts via TSV" />
 			<Card size="lg">
 				<CardHeader>
 					<CardTitle>Manage Contact Lists</CardTitle>
