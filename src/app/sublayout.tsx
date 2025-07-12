@@ -4,7 +4,6 @@ import { useTheme } from 'next-themes';
 import { ClerkProvider } from '@clerk/nextjs';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FC, useEffect } from 'react';
-import MaintenanceScreen from '@/components/organisms/MaintenanceScreen';
 
 const queryClient = new QueryClient({
 	defaultOptions: {
@@ -29,9 +28,7 @@ const SubLayout: FC<SubLayoutProps> = ({ children }) => {
 
 	return (
 		<ClerkProvider>
-			<QueryClientProvider client={queryClient}>
-				<MaintenanceScreen>{children}</MaintenanceScreen>
-			</QueryClientProvider>
+			<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 		</ClerkProvider>
 	);
 };
