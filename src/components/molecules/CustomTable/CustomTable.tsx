@@ -44,6 +44,7 @@ interface DataTableProps<TData, TValue> {
 	isSelectable?: boolean;
 	noDataMessage?: string;
 	searchable?: boolean;
+	initialSelectAll?: boolean;
 }
 
 interface TableSortingButtonProps<TData> {
@@ -96,6 +97,7 @@ export function CustomTable<TData, TValue>({
 	variant = 'primary',
 	searchable = true,
 	tableRef,
+	initialSelectAll = false,
 }: CustomTableProps<TData, TValue>) {
 	const [pagination, setPagination] = useState({
 		pageIndex: 0,
@@ -106,7 +108,7 @@ export function CustomTable<TData, TValue>({
 	const getInitialRowSelection = () => {
 		if (!data || !isSelectable) return {};
 		return data.reduce((acc, _, index) => {
-			acc[index] = true;
+			acc[index] = initialSelectAll;
 			return acc;
 		}, {} as Record<string, boolean>);
 	};
@@ -147,6 +149,15 @@ export function CustomTable<TData, TValue>({
 			tableRef(table);
 		}
 	}, [table, tableRef]);
+
+	useEffect(() => {
+		if (setSelectedRows && data) {
+			const selectedData = table
+				.getFilteredSelectedRowModel()
+				.rows.map((row) => row.original);
+			setSelectedRows(selectedData);
+		}
+	}, [setSelectedRows, table, data, rowSelection]);
 
 	useEffect(() => {
 		if (!data) return;

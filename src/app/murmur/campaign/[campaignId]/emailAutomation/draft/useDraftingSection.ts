@@ -6,7 +6,7 @@ import {
 } from '@/constants';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
-import { useCreateEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { useCreateEmail } from '@/hooks/queryHooks/useEmails';
 import { useGetSignatures } from '@/hooks/queryHooks/useSignatures';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { useMe } from '@/hooks/useMe';
@@ -83,7 +83,7 @@ export type HybridBlockPrompts = {
 };
 
 export const draftingFormSchema = z.object({
-	draftingMode: z.nativeEnum(DraftingMode).default(DraftingMode.ai),
+	draftingMode: z.nativeEnum(DraftingMode).default(DraftingMode.hybrid),
 	isAiSubject: z.boolean().default(true),
 	subject: z.string().default(''),
 	fullAiPrompt: z.string().default(''),
@@ -107,7 +107,6 @@ export type DraftingFormValues = z.infer<typeof draftingFormSchema>;
 
 export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { campaign } = props;
-	const campaignId = campaign.id;
 
 	// HOOKS
 
@@ -125,7 +124,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const form = useForm<DraftingFormValues>({
 		resolver: zodResolver(draftingFormSchema),
 		defaultValues: {
-			draftingMode: DraftingMode.ai,
+			draftingMode: DraftingMode.hybrid,
 			isAiSubject: true,
 			subject: '',
 			fullAiPrompt: '',
@@ -164,15 +163,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
 
-	const { data, isPending } = useGetEmails({
-		filters: {
-			campaignId,
-		},
-	});
-
 	const { data: contacts } = useGetContacts({
 		filters: {
-			contactListIds: campaign.contactLists.map((list) => list.id),
+			contactListIds: campaign.userContactLists.map((list) => list.id),
 		},
 	});
 
@@ -201,11 +194,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	// VARIABLES
 
-	const draftEmails = data?.filter((email) => email.status === EmailStatus.draft) || [];
-
 	const modeOptions: ModeOption[] = [
-		{ value: 'ai', label: 'Full AI' },
 		{ value: 'hybrid', label: 'Hybrid' },
+		{ value: 'ai', label: 'Full AI' },
 		{ value: 'handwritten', label: 'Handwritten' },
 	];
 
@@ -220,14 +211,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	let dataDraftEmail: TestDraftEmail = {
 		subject: '',
 		message: '',
-		contactEmail: contacts ? contacts[0].email : '',
+		contactEmail: contacts ? contacts[0]?.email : '',
 	};
 
 	if (!dataPerplexity && campaign.testMessage && campaign.testMessage.length > 0) {
 		dataDraftEmail = {
 			subject: campaign.testSubject || '',
 			message: campaign.testMessage,
-			contactEmail: contacts ? contacts[0].email : '',
+			contactEmail: contacts ? contacts[0]?.email : '',
 		};
 	} else {
 		dataDraftEmail.subject = campaign.testSubject || '';
@@ -478,7 +469,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 							testMessage: convertAiResponseToRichTextEmail(
 								parsedRes.message,
 								values.font,
-								campaign.signature
+								signatures?.find((sig: Signature) => sig.id === values.signatureId)
 							),
 						},
 					});
@@ -742,7 +733,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	// EFFECTS
 
 	useEffect(() => {
-		if (campaign) {
+		if (campaign && form && signatures?.length > 0) {
 			form.reset({
 				draftingMode: campaign.draftingMode ?? DraftingMode.ai,
 				isAiSubject: campaign.isAiSubject ?? true,
@@ -753,7 +744,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				hybridBlockPrompts: campaign.hybridBlockPrompts as HybridBlockPrompt[],
 				handwrittenPrompt: campaign.handwrittenPrompt ?? '',
 				font: (campaign.font as Font) ?? 'Arial',
-				signatureId: campaign.signatureId ?? (signatures?.[0]?.id || 1),
+				signatureId: campaign.signatureId ?? signatures?.[0]?.id,
 				draftingTone: campaign.draftingTone ?? DraftingTone.normal,
 				paragraphs: campaign.paragraphs ?? 3,
 			});
@@ -778,8 +769,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	}, [draftingMode, form]);
 
 	return {
-		draftEmails,
-		isPending,
 		campaign,
 		modeOptions,
 		form,

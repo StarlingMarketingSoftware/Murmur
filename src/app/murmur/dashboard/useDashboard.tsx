@@ -230,7 +230,7 @@ export const useDashboard = () => {
 			}
 			const campaign = await createCampaign({
 				name: `New Campaign - ${selectedContactListRows[0].name}`,
-				contactLists: selectedContactListRows.map((row) => row.id),
+				userContactLists: selectedContactListRows.map((row) => row.id),
 			});
 			if (campaign) {
 				router.push(urls.murmur.campaign.detail(campaign.id));

@@ -47,6 +47,12 @@ const patchCampaignSchema = z.object({
 			contactIds: z.array(z.number()),
 		})
 		.optional(),
+	userContactListOperation: z
+		.object({
+			action: z.enum(['connect', 'disconnect']),
+			userContactListIds: z.array(z.number()),
+		})
+		.optional(),
 });
 export type PatchCampaignData = z.infer<typeof patchCampaignSchema>;
 
@@ -67,6 +73,7 @@ export async function GET(req: NextRequest, { params }: { params: ApiRouteParams
 				signature: true,
 				contactLists: true,
 				identity: true,
+				userContactLists: true,
 			},
 		});
 
@@ -91,8 +98,13 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 			return apiBadRequest(validatedData.error);
 		}
 
-		const { signatureId, identityId, contactOperation, ...updateData } =
-			validatedData.data;
+		const {
+			signatureId,
+			identityId,
+			contactOperation,
+			userContactListOperation,
+			...updateData
+		} = validatedData.data;
 
 		const updatedCampaign = await prisma.campaign.update({
 			where: {
@@ -110,9 +122,18 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 						}),
 					},
 				}),
+				...(userContactListOperation && {
+					userContactLists: {
+						[userContactListOperation.action]:
+							userContactListOperation.userContactListIds.map((id: number) => {
+								return { id };
+							}),
+					},
+				}),
 			},
 			include: {
 				contacts: true,
+				userContactLists: true,
 			},
 		});
 

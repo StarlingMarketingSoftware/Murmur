@@ -130,6 +130,7 @@ const Dashboard = () => {
 									</CardHeader>
 									<CardContent>
 										<CustomTable
+											initialSelectAll
 											isSelectable
 											setSelectedRows={setSelectedContacts}
 											data={[...contacts, ...apolloContacts]}

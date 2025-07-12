@@ -6,6 +6,7 @@ export type CampaignWithRelations = Prisma.CampaignGetPayload<{
 		signature: true;
 		contactLists: true;
 		identity: true;
+		userContactLists: true;
 	};
 }>;
 

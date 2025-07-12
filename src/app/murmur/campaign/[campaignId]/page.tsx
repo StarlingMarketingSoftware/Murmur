@@ -11,10 +11,20 @@ import { twMerge } from 'tailwind-merge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { DraftingSection } from './emailAutomation/draft/DraftingSection';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
+import { PrepareSendingTable } from '@/components/organisms/_tables/PrepareSendingTable/PrepareSendingTable';
+import { SentEmailsTable } from '@/components/organisms/_tables/SentEmailsTable/SentEmailsTable';
+import { urls } from '@/constants/urls';
+import Link from 'next/link';
+import { ManageCampaignContactListDialog } from '@/components/organisms/_dialogs/ManageCampaignContactListDialog/ManageCampaignContactListDialog';
+import { useState } from 'react';
 
 const Murmur = () => {
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
 		useCampaignDetail();
+
+	const [isContactListDialogOpen, setIsContactListDialogOpen] = useState(false);
 
 	if (isPendingCampaign || !campaign) {
 		return <Spinner />;
@@ -38,15 +48,15 @@ const Murmur = () => {
 									onOpenChange={setIsIdentityDialogOpen}
 								/>
 							</div>
-							<Typography className="font-bold text-[15px]">
+							<Typography className="font-bold !text-[15px]">
 								{campaign?.identity?.name}
 							</Typography>
-							<Typography className="font-bold font-secondary text-[13px]">
+							<Typography className="font-bold font-secondary !text-[13px]">
 								{campaign?.identity?.email}
 							</Typography>
 							<Typography
 								className={twMerge(
-									'font-secondary text-[13px]',
+									'font-secondary !text-[13px]',
 									!campaign?.identity?.website && '!text-muted italic'
 								)}
 							>
@@ -57,13 +67,26 @@ const Murmur = () => {
 						<div className="flex flex-col">
 							<div className="flex gap-8 mb-6 items-center">
 								<Typography variant="h2">Lists Selected</Typography>
-								<Button variant="action-link">Change</Button>
+								<ManageCampaignContactListDialog
+									campaign={campaign}
+									open={isContactListDialogOpen}
+									onOpenChange={setIsContactListDialogOpen}
+								/>
 							</div>
-							{campaign?.contactLists?.map((contactList) => (
-								<Typography key={contactList.id} className="font-bold text-[15px]">
-									{contactList?.title}
+							{campaign?.userContactLists?.map((contactList) => (
+								<Typography key={contactList.id} className="font-bold !text-[15px]">
+									{contactList?.name}
 								</Typography>
 							))}
+							{campaign?.userContactLists.length === 0 && (
+								<Alert variant="warning" className="max-w-72">
+									<AlertCircle className="h-4 w-4" />
+									<AlertTitle>No Recipients</AlertTitle>
+									<AlertDescription>
+										You have not selected any recipients for this campaign.
+									</AlertDescription>
+								</Alert>
+							)}
 						</div>
 					</div>
 				</CardContent>
@@ -83,6 +106,13 @@ const Murmur = () => {
 			</Typography>
 			<Separator className="!w-1/2" />
 			<DraftingSection campaign={campaign} />
+			<PrepareSendingTable campaign={campaign} />
+			<SentEmailsTable campaign={campaign} />
+			<Link href={urls.murmur.dashboard.index}>
+				<Button className="w-full font-bold" size="lg" variant="light">
+					Back to Dashboard
+				</Button>
+			</Link>
 		</AppLayout>
 	);
 };

@@ -2,14 +2,14 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { FC } from 'react';
 import Spinner from '@/components/ui/spinner';
 import {
-	SelectRecipientsDialogProps,
-	useSelectRecipientsDialog,
-} from './useSelectRecipientsDialog';
+	EditContactListDialogProps,
+	useEditContactListDialog,
+} from './useEditContactListDialog';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 
-const SelectRecipientsDialog: FC<SelectRecipientsDialogProps> = (props) => {
+const EditContactListDialog: FC<EditContactListDialogProps> = (props) => {
 	const { isPending, isOpen, setIsOpen, columns, data, selectedContactList } =
-		useSelectRecipientsDialog(props);
+		useEditContactListDialog(props);
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen}>
 			<DialogContent className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px]">
@@ -33,4 +33,4 @@ const SelectRecipientsDialog: FC<SelectRecipientsDialogProps> = (props) => {
 	);
 };
 
-export default SelectRecipientsDialog;
+export default EditContactListDialog;

@@ -32,10 +32,10 @@ import {
 	SelectContent,
 	SelectGroup,
 	SelectItem,
+	SelectLabel,
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
-import { SelectLabel } from '@radix-ui/react-select';
 
 export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) => {
 	const {
@@ -127,7 +127,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 											<div key={signature.id}>
 												<Button
 													onClick={() => setCurrentSignature(signature)}
-													variant={isSelected ? 'secondary' : 'ghost'}
+													variant={isSelected ? 'secondary-light' : 'ghost'}
 													className={twMerge(
 														'w-full max-w-[100%]',
 														isSelected && 'pointer-events-none'

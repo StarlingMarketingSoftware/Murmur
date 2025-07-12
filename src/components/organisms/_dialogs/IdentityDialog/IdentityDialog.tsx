@@ -163,7 +163,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 						isLoading={isPendingAssignIdentity}
 						onClick={handleAssignIdentity}
 						variant="primary-light"
-						disabled={!selectedIdentity}
+						disabled={!selectedIdentity || showCreatePanel}
 					>
 						<ArrowDown /> Confirm and Continue
 						<ArrowDown />
