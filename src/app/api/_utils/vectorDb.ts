@@ -12,6 +12,9 @@ const openai = new OpenAI({
 
 const elasticsearch = new Client({
 	node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
+	auth: {
+		apiKey: process.env.ELASTICSEARCH_API_KEY!,
+	},
 });
 
 interface ContactDocument {
