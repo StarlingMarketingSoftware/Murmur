@@ -1,10 +1,6 @@
 import { MistralToneAgentType } from '@/types';
 
-const PERPLEXITY_FORMATTING_INSTRUCTIONS = ``;
-
 export const PERPLEXITY_FULL_AI_PROMPT = `
-${PERPLEXITY_FORMATTING_INSTRUCTIONS}
-
 INSTRUCTIONS FOR EMAIL CONTENT:
 
 Write a personalized email to {first_name} who works at {company}. If there is no recipient name provided, start the email with "Hello!"
@@ -88,8 +84,6 @@ Return the message and the subject line, without any signature or other text.`;
 export const PERPLEXITY_HYBRID_PROMPT = `
 
 You will be provided with an email template to follow that includes pre-written text that must remain in its original form, as well as placeholders that may include {{introduction}} {{research}} and {{call-to-action}}. Only fill in the placeholders, do not change the pre-written text. Each placeholder may have specific instructions attached to them.
-
-${PERPLEXITY_FORMATTING_INSTRUCTIONS}
 
 Please carefully read and follow these instructions exactly. Your task is to compose an email consisting of exactly three distinct paragraphs, clearly serving these functions in this exact order:
 

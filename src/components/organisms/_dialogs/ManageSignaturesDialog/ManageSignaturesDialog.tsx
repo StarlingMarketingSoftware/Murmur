@@ -32,10 +32,10 @@ import {
 	SelectContent,
 	SelectGroup,
 	SelectItem,
+	SelectLabel,
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
-import { SelectLabel } from '@radix-ui/react-select';
 
 export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) => {
 	const {

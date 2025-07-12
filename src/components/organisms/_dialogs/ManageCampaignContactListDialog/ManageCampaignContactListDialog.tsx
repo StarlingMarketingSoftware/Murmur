@@ -25,10 +25,10 @@ import {
 	SelectContent,
 	SelectGroup,
 	SelectItem,
+	SelectLabel,
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
-import { SelectLabel } from '@radix-ui/react-select';
 
 // Reusable Contact List Item Component
 interface ContactListItemProps {
@@ -138,9 +138,8 @@ export const ManageCampaignContactListDialog: FC<ManageCampaignContactListDialog
 															size="sm"
 															variant="ghost"
 															onClick={() => handleEditContactList(contactList)}
-															className="text-secondary text-blue-500"
 														>
-															<EditIcon className="h-3 w-3 !text-blue-500" />
+															<EditIcon className="h-3 w-3 " />
 														</Button>
 														<Button
 															size="sm"

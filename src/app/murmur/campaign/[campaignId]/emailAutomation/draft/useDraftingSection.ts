@@ -627,8 +627,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const BATCH_DELAY = 1000;
 		let successfulEmails = 0;
 
-		// here is contacts variable
-
 		if (!contacts || contacts.length === 0) {
 			toast.error('No contacts available to generate emails.');
 			return;

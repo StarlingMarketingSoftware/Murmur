@@ -64,6 +64,10 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 	});
 
 	const handleSend = async () => {
+		if (!campaign?.identity?.email || !campaign?.identity?.name) {
+			toast.error('Please create an Identity before sending emails.');
+			return;
+		}
 		setIsOpen(false);
 		if (
 			!subscriptionTier &&
@@ -75,11 +79,6 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		setSendingProgress(0);
 		if (!campaign) {
 			return null;
-		}
-
-		if (!campaign?.identity?.email || !campaign?.identity?.name) {
-			toast.error('Please create an Identity before sending emails.');
-			return;
 		}
 
 		for (const email of draftEmails) {

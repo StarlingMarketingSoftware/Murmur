@@ -28,7 +28,6 @@ export async function POST(request: Request) {
 		}
 
 		const data = await request.json();
-		console.log('🚀 ~ POST ~ data:', data);
 		const validatedData = postMailgunSchema.safeParse(data);
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
