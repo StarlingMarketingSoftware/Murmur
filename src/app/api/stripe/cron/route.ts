@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
 	}
 
 	if (req.headers.get('Authorization') !== `Bearer ${cronSecret}`) {
+		console.error('CRON JOB: Unauthorized');
 		return apiUnauthorized();
 	}
 
@@ -84,9 +85,9 @@ export async function GET(req: NextRequest) {
 			}
 		}
 
-		return apiResponse(
-			`Successfully updated ${updatedUsersCount}/${users.length} annual subscription users with monthly credits.`
-		);
+		const message = `CRON JOB: Successfully updated ${updatedUsersCount}/${users.length} annual subscription users with monthly credits.`;
+		console.log(message);
+		return apiResponse(message);
 	} catch (error) {
 		return handleApiError(error);
 	}
