@@ -30,17 +30,25 @@ const ProgressIndicator: FC<ProgressIndicatorProps> = (props) => {
 				className="absolute top-2 right-2"
 				size="icon"
 			>
-				<X size="20px" className="text-primary" />
+				<X size="20px" className="text-muted" />
 			</Button>
 			<div className="flex flex-row items-center gap-2">
-				<Typography>{isComplete ? finalCompleteMessage : finalPendingMessage}</Typography>
+				<Typography variant="label" font="secondary" className="!text-sm">
+					{isComplete ? finalCompleteMessage : finalPendingMessage}
+				</Typography>
 				{isComplete ? (
 					<CheckCircle2 size="20px" className="text-success animate-pulse" />
 				) : (
 					<>
 						<Spinner size="small" className="!m-0 min-h-[20px]" />
 						{cancelAction && (
-							<Button onClick={cancelAction} variant="ghost">
+							<Button
+								size="sm"
+								font="secondary"
+								className="text-xs text-muted"
+								onClick={cancelAction}
+								variant="ghost"
+							>
 								<BanIcon className="text-destructive" /> Cancel
 							</Button>
 						)}

@@ -5,13 +5,13 @@ import { z } from 'zod';
 import {
 	apiBadRequest,
 	apiResponse,
+	apiServerError,
 	apiUnauthorized,
 	handleApiError,
 	processZeroBounceResults,
 	verifyEmailsWithZeroBounce,
 	waitForZeroBounceCompletion,
 } from '@/app/api/_utils';
-import { getValidatedParamsFromUrl } from '@/utils';
 import {
 	enrichApolloContacts,
 	fetchApolloContacts,
@@ -20,133 +20,92 @@ import {
 
 import { ApolloPerson } from '@/types/apollo';
 import { Contact, EmailVerificationStatus } from '@prisma/client';
+import { upsertContactToVectorDb } from '../_utils/vectorDb';
 
-const getApolloContactsSchema = z.object({
+const postApolloContactsSchema = z.object({
 	query: z.string(),
 	limit: z.coerce.number().default(20),
 });
-export type GetApolloContactsData = z.infer<typeof getApolloContactsSchema>;
+export type PostApolloContactsData = z.infer<typeof postApolloContactsSchema>;
 
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
 	try {
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
 		}
 
-		const validatedFilters = getValidatedParamsFromUrl(req.url, getApolloContactsSchema);
+		const data = await req.json();
+		const validatedData = postApolloContactsSchema.safeParse(data);
 
-		if (!validatedFilters.success) {
-			return apiBadRequest(validatedFilters.error);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
 		}
 
-		const { query, limit } = validatedFilters.data;
-		const searchTerms: string[] = query
-			.toLowerCase()
-			.split(/\s+/)
-			.filter((term) => term.length > 0);
-		const caseInsensitiveMode = 'insensitive' as const;
-		const whereConditions =
-			searchTerms.length > 0
-				? {
-						AND: [
-							// Each search term must match at least one field
-							...searchTerms.map((term) => ({
-								OR: [
-									{ firstName: { contains: term, mode: caseInsensitiveMode } },
-									{ lastName: { contains: term, mode: caseInsensitiveMode } },
-									{ title: { contains: term, mode: caseInsensitiveMode } },
-									{ email: { contains: term, mode: caseInsensitiveMode } },
-									{ company: { contains: term, mode: caseInsensitiveMode } },
-									{ city: { contains: term, mode: caseInsensitiveMode } },
-									{ state: { contains: term, mode: caseInsensitiveMode } },
-									{ country: { contains: term, mode: caseInsensitiveMode } },
-									{ address: { contains: term, mode: caseInsensitiveMode } },
-									{ headline: { contains: term, mode: caseInsensitiveMode } },
-									{ linkedInUrl: { contains: term, mode: caseInsensitiveMode } },
-									{ website: { contains: term, mode: caseInsensitiveMode } },
-									{ phone: { contains: term, mode: caseInsensitiveMode } },
-								],
-							})),
-							// AND email validation status must be valid
-							{ emailValidationStatus: { equals: EmailVerificationStatus.valid } },
-						],
-				  }
-				: {};
+		const { query } = validatedData.data;
 
-		const localContacts: Contact[] = await prisma.contact.findMany({
-			where: whereConditions,
-			take: limit,
-			orderBy: {
-				company: 'asc',
+		const apolloContacts: ApolloPerson[] = await fetchApolloContacts(query);
+
+		const existingContacts: Contact[] = await prisma.contact.findMany({
+			where: {
+				apolloPersonId: {
+					in: apolloContacts.map((person: ApolloPerson) => person.id),
+				},
 			},
 		});
 
-		if (localContacts.length < limit) {
-			const apolloContacts: ApolloPerson[] = await fetchApolloContacts(
-				query,
-				Number(limit)
-			);
+		const filteredApolloContacts = apolloContacts.filter(
+			(contact: ApolloPerson) =>
+				!existingContacts.some(
+					(existingContact) => existingContact.apolloPersonId === contact.id
+				)
+		);
 
-			const existingContacts: Contact[] = await prisma.contact.findMany({
-				where: {
-					apolloPersonId: {
-						in: apolloContacts.map((person: ApolloPerson) => person.id),
-					},
-				},
-			});
+		const enrichedPeople = await enrichApolloContacts(filteredApolloContacts);
+		const transformedContacts = enrichedPeople.map(transformApolloContact);
 
-			const filteredApolloContacts = apolloContacts.filter(
-				(contact: ApolloPerson) =>
-					!existingContacts.some(
-						(existingContact) => existingContact.apolloPersonId === contact.id
-					)
-			);
+		let validatedContacts = transformedContacts;
 
-			for (const existingContact of existingContacts) {
-				const contactExistsInLocalSearch = localContacts.find(
-					(contact) => contact.apolloPersonId === existingContact.apolloPersonId
-				);
-				if (!contactExistsInLocalSearch) {
-					localContacts.push(existingContact);
-				}
-			}
+		const isTestingEnvironment = process.env.NODE_ENV !== 'production';
 
-			const enrichedPeople = await enrichApolloContacts(filteredApolloContacts);
-			const transformedContacts = enrichedPeople.map(transformApolloContact);
+		if (isTestingEnvironment) {
+			// In testing environment, mark all contacts as valid
+			validatedContacts = transformedContacts.map((contact) => ({
+				...contact,
+				emailValidationStatus: EmailVerificationStatus.valid,
+				emailValidatedAt: new Date(),
+			}));
+		} else {
+			// In production, use ZeroBounce validation
 			const zeroBounceFileId = await verifyEmailsWithZeroBounce(transformedContacts);
-			let finalContacts = transformedContacts;
 
 			if (!zeroBounceFileId) {
-				return apiResponse(localContacts);
+				return apiServerError('ZeroBounce validation initial request failed.');
 			}
 
 			const validationCompleted = await waitForZeroBounceCompletion(zeroBounceFileId, 1); // 1 minute may be too short for larger datasets
 
 			if (validationCompleted) {
-				finalContacts = await processZeroBounceResults(
+				validatedContacts = await processZeroBounceResults(
 					zeroBounceFileId,
 					transformedContacts
 				);
 			} else {
-				return apiResponse(localContacts);
+				return apiServerError('ZeroBounce validation failed or timed out.');
 			}
-
-			const createdContacts: Contact[] = await prisma.contact.createManyAndReturn({
-				data: finalContacts,
-			});
-			const validCreatedContacts = createdContacts.filter(
-				(contact) => contact.emailValidationStatus === EmailVerificationStatus.valid
-			);
-			const combinedResults = [...localContacts, ...validCreatedContacts];
-
-			return apiResponse(
-				combinedResults.filter(
-					(contact) => contact.emailValidationStatus === EmailVerificationStatus.valid
-				)
-			);
 		}
-		return apiResponse(localContacts);
+
+		const createdContacts: Contact[] = await prisma.contact.createManyAndReturn({
+			data: validatedContacts,
+		});
+
+		void Promise.all(createdContacts.map((contact) => upsertContactToVectorDb(contact)));
+
+		const validCreatedContacts = createdContacts.filter(
+			(contact) => contact.emailValidationStatus === EmailVerificationStatus.valid
+		);
+
+		return apiResponse(validCreatedContacts);
 	} catch (error) {
 		return handleApiError(error);
 	}

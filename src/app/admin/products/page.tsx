@@ -38,7 +38,13 @@ export default function Products() {
 		<div className="flex flex-col items-center justify-center p-8">
 			<div className="flex flex-wrap gap-6 justify-center p-8">
 				{sortedProducts.map((product) => (
-					<ProductCard isLink key={product.id} product={product} user={user} />
+					<ProductCard
+						isLink
+						key={product.id}
+						product={product}
+						user={user}
+						billingCycle="month"
+					/>
 				))}
 			</div>
 		</div>

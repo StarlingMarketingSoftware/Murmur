@@ -5,6 +5,7 @@ import { FC } from 'react';
 interface TableDeleteRowButtonProps {
 	onClick: () => void;
 	isLoading?: boolean;
+	disabled?: boolean;
 }
 
 const useTableDeleteRowButton = (props: TableDeleteRowButtonProps) => {
@@ -14,10 +15,11 @@ const useTableDeleteRowButton = (props: TableDeleteRowButtonProps) => {
 };
 
 export const TableDeleteRowButton: FC<TableDeleteRowButtonProps> = (props) => {
-	const { onClick, isLoading } = useTableDeleteRowButton(props);
+	const { onClick, isLoading, disabled } = useTableDeleteRowButton(props);
 	return (
 		<Button
 			variant="ghost"
+			disabled={disabled}
 			isLoading={isLoading}
 			size="icon"
 			onClick={async (e) => {

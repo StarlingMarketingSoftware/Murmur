@@ -28,12 +28,12 @@ const timesNewRoman = localFont({
 		},
 		{
 			path: '../../public/fonts/timesBoldItalic.ttf',
-			weight: '400',
+			weight: '700',
 			style: 'italic',
 		},
 		{
 			path: '../../public/fonts/timesItalic.ttf',
-			weight: '700',
+			weight: '400',
 			style: 'italic',
 		},
 	],

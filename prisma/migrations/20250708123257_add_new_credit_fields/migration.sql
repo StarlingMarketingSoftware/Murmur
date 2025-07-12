@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "draftCredits" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "sendingCredits" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "verificationCredits" INTEGER NOT NULL DEFAULT 0;

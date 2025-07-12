@@ -9,16 +9,12 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
 const postPerplexitySchema = z.object({
-	model: z.string().min(1),
-	messages: z
-		.array(
-			z.object({
-				role: z.enum(['user', 'system']),
-				content: z.string().min(1),
-			})
-		)
-		.min(1),
+	model: z.enum(['sonar', 'sonar-pro']),
+	rolePrompt: z.string().min(1),
+	userPrompt: z.string().min(1),
 });
+
+export type PostPerplexityData = z.infer<typeof postPerplexitySchema>;
 
 export async function POST(request: NextRequest) {
 	try {
@@ -33,13 +29,27 @@ export async function POST(request: NextRequest) {
 			return apiBadRequest(validatedData.error);
 		}
 
+		const { model, rolePrompt, userPrompt } = validatedData.data;
+
 		const response = await fetch('https://api.perplexity.ai/chat/completions', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
 				Authorization: `Bearer ${process.env.PERPLEXITY_API_KEY}`,
 			},
-			body: JSON.stringify(validatedData.data),
+			body: JSON.stringify({
+				model,
+				messages: [
+					{
+						role: 'system',
+						content: rolePrompt,
+					},
+					{
+						role: 'user',
+						content: userPrompt,
+					},
+				],
+			}),
 		});
 
 		const perplexityData = await response.json();

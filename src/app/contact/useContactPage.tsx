@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
+import { useEffect, useState } from 'react';
 
 export const FAQS: FAQ[] = [
 	{
@@ -19,7 +20,7 @@ export const FAQS: FAQ[] = [
 	{
 		question: 'What’s the contact discovery rate per search query?',
 		answer:
-			' Each search operation returns approximately 110 validated contacts. The system has no hard limits on search frequency, allowing continuous discovery operations.',
+			'Each search operation returns approximately 100 validated contacts. The system has no hard limits on search frequency, allowing continuous discovery operations.',
 	},
 	{
 		question: 'What deliverability mechanisms prevent spam classification?',
@@ -103,6 +104,22 @@ export const useContactPage = () => {
 			message: emailBody,
 		});
 	};
+
+	const [hash, setHash] = useState('');
+
+	useEffect(() => {
+		const hashValue = window.location.hash.replace('#', '');
+		setHash(hashValue);
+	}, []);
+
+	useEffect(() => {
+		if (hash) {
+			const element = document.getElementById(hash);
+			if (element) {
+				element.scrollIntoView({ behavior: 'smooth' });
+			}
+		}
+	}, [hash]);
 
 	return {
 		isPending,

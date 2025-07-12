@@ -9,6 +9,9 @@ import {
 import CustomTable from '../../../molecules/CustomTable/CustomTable';
 import { ContactListTableProps, useContactListTable } from './useContactListTable';
 import Spinner from '@/components/ui/spinner';
+import { ConfirmDialog } from '../../_dialogs/ConfirmDialog/ConfirmDialog';
+import { Typography } from '@/components/ui/typography';
+import EditContactListDialog from '../../_dialogs/EditContactListDialog/EditContactListDialog';
 
 const ContactListTable: FC<ContactListTableProps> = (props) => {
 	const {
@@ -16,10 +19,13 @@ const ContactListTable: FC<ContactListTableProps> = (props) => {
 		dataContactLists,
 		isPendingContactLists,
 		handleRowClick,
-		// isContactListDialogOpen,
-		// setIsContactListDialogOpen,
-		// selectedContactList,
+		isContactListDialogOpen,
+		setIsContactListDialogOpen,
 		setSelectedRows,
+		isConfirmDialogOpen,
+		setIsConfirmDialogOpen,
+		currentContactList,
+		handleConfirmDelete,
 	} = useContactListTable(props);
 
 	if (isPendingContactLists) {
@@ -30,9 +36,7 @@ const ContactListTable: FC<ContactListTableProps> = (props) => {
 		<Card>
 			<CardHeader>
 				<CardTitle>Contact Lists</CardTitle>
-				<CardDescription>
-					Click on a list to view and select individual recipients.
-				</CardDescription>
+				<CardDescription>Select lists and create your campaign.</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-2">
 				<CustomTable
@@ -43,12 +47,25 @@ const ContactListTable: FC<ContactListTableProps> = (props) => {
 					setSelectedRows={setSelectedRows}
 				/>
 			</CardContent>
-			{/* <SelectRecipientsDialog
+			<EditContactListDialog
 				isOpen={isContactListDialogOpen}
 				setIsOpen={setIsContactListDialogOpen}
-				selectedContactList={selectedContactList}
-				selectedRecipients={campaign.contacts}
-			/> */}
+				selectedContactList={currentContactList}
+			/>
+			<ConfirmDialog
+				title="Confirm Contact List Deletion"
+				confirmAction={handleConfirmDelete}
+				open={isConfirmDialogOpen}
+				onOpenChange={setIsConfirmDialogOpen}
+			>
+				<Typography>
+					Are you sure you want to delete the following contact list? Associated contacts
+					will not be deleted.
+				</Typography>
+				<Typography className="text-center mt-5" variant="h3" bold>
+					{currentContactList?.name}
+				</Typography>
+			</ConfirmDialog>
 		</Card>
 	);
 };

@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { User } from '@prisma/client';
 import { useCreateCustomerPortal } from '@/hooks/queryHooks/useStripeCheckouts';
 import { twMerge } from 'tailwind-merge';
+import { urls } from '@/constants/urls';
+import { BASE_URL } from '@/constants';
 
 interface UpdateSubscriptionButtonProps {
 	className?: string;
@@ -32,6 +34,7 @@ const UpdateSubscriptionButton: FC<UpdateSubscriptionButtonProps> = ({
 			customerId: user.stripeCustomerId,
 			priceId,
 			productId,
+			returnUrl: `${BASE_URL}${urls.pricing.index}`,
 		});
 		const { url } = res;
 		const updateSubscriptionUrl = `${url}/subscriptions/${user?.stripeSubscriptionId}/update`;

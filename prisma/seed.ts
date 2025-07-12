@@ -1,8 +1,10 @@
-import { User } from '@prisma/client';
+import { User, Contact } from '@prisma/client';
 import prisma from '../src/lib/prisma';
 import { parse } from 'csv-parse/sync';
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import { getEmbeddingForContact } from './seed-data/contactEmbeddingsHelper';
+import { initializeVectorDb, upsertContactToVectorDb } from '@/app/api/_utils/vectorDb';
 
 export type ContactCSVFormat = {
 	name: string;
@@ -13,6 +15,7 @@ export type ContactCSVFormat = {
 	state: string;
 	website: string;
 	phone: string;
+	title: string;
 };
 
 export async function getPublicFiles(directory: string = 'demoCsvs'): Promise<string[]> {
@@ -205,6 +208,7 @@ const importCSVWithSubcategories = async (
 				phone: record.phone,
 				contactListId: recordContactListId,
 				emailValidationStatus: 'valid',
+				title: record.title,
 			},
 			update: {
 				lastName: record.name,
@@ -229,11 +233,15 @@ const userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
 		role: 'admin',
 		aiDraftCredits: 1000,
 		aiTestCredits: 100,
-		customDomain: 'michaelshingo.com',
+		customDomain: '',
 		stripeCustomerId: 'cus_SWKynJjTpn1Taw',
 		stripeSubscriptionId: 'sub_1RbINU02Nskp21xSVq5hb7x6',
 		stripePriceId: 'price_1RB9Uw02Nskp21xSrRxsLDT3',
 		stripeSubscriptionStatus: 'active',
+		draftCredits: 1000,
+		sendingCredits: 1000,
+		verificationCredits: 1000,
+		lastCreditUpdate: new Date(),
 	},
 	{
 		clerkId: 'user_2yfwfFMcWIho4NSUT25o8V1LYHu',
@@ -244,12 +252,16 @@ const userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
 		role: 'user',
 		aiDraftCredits: 1000,
 		aiTestCredits: 100,
-		customDomain: 'michaelshingo.com',
+		customDomain: '',
 
 		stripeCustomerId: 'cus_SPE3wRaFWOtqDF',
 		stripeSubscriptionId: 'sub_1RUPe302Nskp21xSWvvOiPGs',
 		stripePriceId: 'price_1RB9Uw02Nskp21xSrRxsLDT3',
 		stripeSubscriptionStatus: 'active',
+		draftCredits: 1000,
+		sendingCredits: 1000,
+		verificationCredits: 1000,
+		lastCreditUpdate: new Date(),
 	},
 	{
 		clerkId: 'user_2yfwk3fV2eGnsat4Ph7GdSfpaQ5',
@@ -258,23 +270,49 @@ const userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
 		firstName: 'Michael',
 		lastName: 'Shingo',
 		role: 'user',
-		customDomain: 'michaelshingo.com',
+		customDomain: '',
 		aiDraftCredits: 1000,
 		aiTestCredits: 100,
 		stripeCustomerId: 'cus_SWL0AB6nMvD5qb',
 		stripeSubscriptionId: null,
 		stripePriceId: null,
 		stripeSubscriptionStatus: null,
+		draftCredits: 1000,
+		sendingCredits: 1000,
+		verificationCredits: 1000,
+		lastCreditUpdate: new Date(),
 	},
 ];
+
+const seedElasticsearchEmbeddings = async (contacts: Contact[]) => {
+	// First, ensure the index exists
+	await initializeVectorDb();
+
+	// Insert embeddings for each contact
+	for (const contact of contacts) {
+		const embeddingData = getEmbeddingForContact(contact);
+
+		if (!embeddingData) {
+			console.warn(`No embedding found for contact ${contact.id}`);
+			continue;
+		}
+
+		await upsertContactToVectorDb(contact, embeddingData.embedding);
+	}
+};
+
 async function main() {
+	/* Seed users */
 	await prisma.user.createMany({
 		data: userData,
 	});
-	importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
-	// importCSVWithSubcategories('demoCsvs/musicVenuesDemoFull.csv', 'Music Venues');
 
-	return;
+	/* Seed contacts */
+	importCSVWithSubcategories('demoCsvs/musicVenuesDemo4106.csv', 'Music Venues');
+
+	/* Seed embeddings */
+	const allContacts = await prisma.contact.findMany();
+	await seedElasticsearchEmbeddings(allContacts);
 }
 
 main()

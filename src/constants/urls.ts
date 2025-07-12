@@ -70,6 +70,9 @@ export const urls = {
 			index: '/api/contacts',
 			batch: {
 				index: '/api/contacts/batch',
+				private: {
+					index: '/api/contacts/batch/private',
+				},
 			},
 			detail: ((id) => `/api/contacts/${id}`) as DetailRoute,
 		},
@@ -105,7 +108,12 @@ export const urls = {
 				index: '/api/stripe/checkout',
 			},
 			portal: {
-				index: '/api/stripe/portal',
+				manageSubscription: {
+					index: '/api/stripe/portal/manage-subscription',
+				},
+				updateSubscription: {
+					index: '/api/stripe/portal/update-subscription',
+				},
 				customProduct: {
 					index: '/api/stripe/portal/custom-product',
 				},
@@ -121,6 +129,10 @@ export const urls = {
 			updateSubscription: {
 				index: '/api/stripe/update-subscription',
 			},
+		},
+		userContactList: {
+			index: '/api/user-contact-lists',
+			detail: ((id) => `/api/user-contact-lists/${id}`) as DetailRoute,
 		},
 		users: {
 			index: '/api/users',

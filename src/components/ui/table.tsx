@@ -5,11 +5,11 @@ import * as React from 'react';
 import { cn } from '@/utils';
 import { cva, VariantProps } from 'class-variance-authority';
 
-const tableVariants = cva('w-full caption-bottom', {
+const tableVariants = cva('w-full caption-bottom border-collapse', {
 	variants: {
 		variant: {
-			primary: 'text-[15px] font-primary',
-			secondary: 'text-[15px] font-primary bg-primary',
+			primary: 'text-[15px] font-secondary',
+			secondary: 'text-[15px] font-secondary bg-primary',
 		},
 	},
 	defaultVariants: {
@@ -23,7 +23,10 @@ function Table({
 	...props
 }: React.ComponentProps<'table'> & VariantProps<typeof tableVariants>) {
 	return (
-		<div data-slot="table-container" className="relative w-full overflow-x-auto">
+		<div
+			data-slot="table-container"
+			className="relative w-full overflow-x-auto rounded-md"
+		>
 			<table
 				data-slot="table"
 				className={cn(tableVariants({ variant }), className)}
@@ -33,17 +36,21 @@ function Table({
 	);
 }
 
-const tableHeaderVariants = cva('[&_tr]:border-b', {
-	variants: {
-		variant: {
-			primary: 'text-[15px] font-primary',
-			secondary: 'text-[15px] font-primary bg-primary',
+const tableHeaderVariants = cva(
+	'',
+	// '[&_tr]:border-b',
+	{
+		variants: {
+			variant: {
+				primary: 'text-[15px] font-primary',
+				secondary: 'text-[15px] font-secondary bg-primary',
+			},
 		},
-	},
-	defaultVariants: {
-		variant: 'primary',
-	},
-});
+		defaultVariants: {
+			variant: 'primary',
+		},
+	}
+);
 
 function TableHeader({
 	className,
@@ -59,11 +66,11 @@ function TableHeader({
 	);
 }
 
-const tableBodyVariants = cva('[&_tr:last-child]:border-0', {
+const tableBodyVariants = cva('', {
 	variants: {
 		variant: {
 			primary: 'text-[15px] font-primary',
-			secondary: 'text-[15px] font-primary bg-primary',
+			secondary: 'text-[15px] font-secondary bg-background',
 		},
 	},
 	defaultVariants: {
@@ -86,12 +93,13 @@ function TableBody({
 }
 
 const tableFooterVariants = cva(
-	'bg-muted/50 border-t font-medium [&>tr]:last:border-b-0',
+	'bg-muted/50 border-t font-medium ',
+	// '[&>tr]:last:border-b-0',
 	{
 		variants: {
 			variant: {
 				primary: 'text-[15px] font-primary',
-				secondary: 'text-[15px] font-primary bg-primary',
+				secondary: 'text-[15px] font-secondary',
 			},
 		},
 		defaultVariants: {
@@ -115,12 +123,12 @@ function TableFooter({
 }
 
 const tableRowVariants = cva(
-	'hover:bg-primary/15 data-[state=selected]:bg-muted border-b transition-colors',
+	'hover:bg-primary/15 transition-colors data-[state=selected]:pointer-events-all border  border-t',
 	{
 		variants: {
 			variant: {
-				primary: 'font-bold text-[15px] odd:bg-gray-50 even:bg-white',
-				secondary: 'text-[15px] font-primary bg-primary',
+				primary: 'text-[15px] odd:bg-gray-50 even:bg-white border-primary/20',
+				secondary: 'text-[15px] font-secondary bg-background border-gray-200',
 			},
 		},
 		defaultVariants: {
@@ -144,12 +152,12 @@ function TableRow({
 }
 
 const tableHeadVariants = cva(
-	'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] bg-background rounded-md',
+	'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] bg-background',
 	{
 		variants: {
 			variant: {
 				primary: '',
-				secondary: '',
+				secondary: 'font-secondary',
 			},
 		},
 		defaultVariants: {
@@ -177,8 +185,8 @@ const tableCellVariants = cva(
 	{
 		variants: {
 			variant: {
-				primary: 'text-[15px] font-primary',
-				secondary: 'text-[15px] font-primary bg-primary',
+				primary: 'text-sm font-secondary',
+				secondary: 'text-[15px] font-secondary bg-background',
 			},
 		},
 		defaultVariants: {
@@ -204,8 +212,8 @@ function TableCell({
 const tableCaptionVariants = cva('text-muted-foreground mt-4 text-sm', {
 	variants: {
 		variant: {
-			primary: 'text-[15px] font-primary',
-			secondary: 'text-[15px] font-primary bg-primary',
+			primary: 'text-[15px] font-secondary',
+			secondary: 'text-[15px] font-secondary bg-background',
 		},
 	},
 	defaultVariants: {

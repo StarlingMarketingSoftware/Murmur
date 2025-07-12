@@ -26,30 +26,29 @@ import {
 interface RichTextMenuBarProps {
 	editor: Editor | null;
 	isEdit?: boolean;
+	showPlaceholders?: boolean;
+	placeholderOptions?: { value: string; label: string }[];
 }
 
 const fontOptions = ['Times New Roman', 'Arial', 'Calibri', 'Georgia', 'Courier New'];
 
-export const RichTextMenuBar: FC<RichTextMenuBarProps> = ({ editor, isEdit }) => {
+export const RichTextMenuBar: FC<RichTextMenuBarProps> = ({
+	editor,
+	isEdit,
+	showPlaceholders = false,
+	placeholderOptions,
+}) => {
+	const handlePlaceholderInsert = (placeholder: string) => {
+		if (editor) {
+			editor.chain().focus().insertContent(`{{${placeholder}}}`).run();
+		}
+	};
+
 	if (!editor) {
 		return null;
 	}
+
 	const Options = [
-		// {
-		// 	icon: <Heading1 className="size-4" />,
-		// 	onClick: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
-		// 	pressed: editor.isActive('heading', { level: 1 }),
-		// },
-		// {
-		// 	icon: <Heading2 className="size-4" />,
-		// 	onClick: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-		// 	pressed: editor.isActive('heading', { level: 2 }),
-		// },
-		// {
-		// 	icon: <Heading3 className="size-4" />,
-		// 	onClick: () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
-		// 	pressed: editor.isActive('heading', { level: 3 }),
-		// },
 		{
 			icon: <Bold className="size-4" />,
 			onClick: () => editor.chain().focus().toggleBold().run(),
@@ -130,6 +129,30 @@ export const RichTextMenuBar: FC<RichTextMenuBarProps> = ({ editor, isEdit }) =>
 					</SelectGroup>
 				</SelectContent>
 			</Select>
+			{showPlaceholders && placeholderOptions && (
+				<Select value="" onValueChange={handlePlaceholderInsert} disabled={!isEdit}>
+					<SelectTrigger className="w-[150px]">
+						<SelectValue placeholder="Placeholders" />
+					</SelectTrigger>
+					<SelectContent
+						onCloseAutoFocus={(e) => {
+							e.preventDefault();
+							if (editor) {
+								editor.commands.focus();
+							}
+						}}
+					>
+						<SelectGroup>
+							<SelectLabel>Insert Placeholders</SelectLabel>
+							{placeholderOptions.map((option) => (
+								<SelectItem key={option.value} value={option.value}>
+									{option.label}
+								</SelectItem>
+							))}
+						</SelectGroup>
+					</SelectContent>
+				</Select>
+			)}
 		</div>
 	);
 };

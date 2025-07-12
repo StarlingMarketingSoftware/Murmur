@@ -56,7 +56,7 @@ const Contact = () => {
 			<div className="mt-39">
 				<Form {...form}>
 					<form onSubmit={form.handleSubmit(onSubmit)} className="">
-						<Card className="max-w-[1480px] mx-auto w-9/10 border-primary border-3 px-11 pb-15 pt-6">
+						<Card className="max-w-[1480px] mx-auto w-9/10 border-primary border-3 px-4 sm:px-11 pb-8 sm:pb-15 pt-6">
 							<CardContent>
 								<div className="flex sm:flex-row flex-col items-center w-full gap-0 sm:gap-18 m-0">
 									<FormField
@@ -119,10 +119,10 @@ const Contact = () => {
 								/>
 							</CardContent>
 						</Card>
-						<div className="flex justify-center mt-22">
+						<div className="flex justify-center mt-10 sm:mt-22">
 							<Button
 								font="secondary"
-								className="rounded-none w-[341px]"
+								className="rounded-none max-w-[341px] mx-10"
 								size="lg"
 								type="submit"
 								isLoading={isPending}
@@ -133,20 +133,27 @@ const Contact = () => {
 					</form>
 				</Form>
 			</div>
-			<div className="mt-46 mx-auto w-fit">
-				<Typography bold className="text-[25px] text-center">
+			<div className="mt-46 mx-auto w-fit px-3">
+				<Typography variant="h2" bold className="text-center">
 					Other Ways to Reach Us
 				</Typography>
-				<div className="mt-12 flex gap-30 text-[23px]">
+				<div className="mt-12 flex flex-col sm:flex-row sm:gap-30 gap-3 sm:text-[23px] ">
 					<Typography bold>Email:</Typography>
-					<Typography font="secondary">starlingmarketingagency@gmail.com</Typography>
+					<Typography font="secondary" className="!text-[15px]">
+						starlingmarketingagency@gmail.com
+					</Typography>
 				</div>
-				<div className="mt-6 flex gap-30 text-[23px]">
+				<div className="mt-6 flex flex-col sm:flex-row sm:gap-30 gap-3 sm:text-[23px]">
 					<Typography bold>Hours:</Typography>
-					<Typography font="secondary">24/7</Typography>
+					<Typography font="secondary" className="!text-[15px]">
+						24/7
+					</Typography>
 				</div>
 			</div>
-			<div className="w-full h-fit min-h-100 bg-gradient-to-b from-background from-0% to-light to-15% pt-4">
+			<div
+				id="faq-section"
+				className="w-full h-fit min-h-100 bg-gradient-to-b from-background from-0% to-light to-15% pt-4"
+			>
 				<FaqSection
 					header="Support"
 					title="Help"

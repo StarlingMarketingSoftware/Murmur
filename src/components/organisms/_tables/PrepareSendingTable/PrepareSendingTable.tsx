@@ -7,20 +7,25 @@ import {
 } from './usePrepareSendingTable';
 import { ConfirmSendDialog } from '../../_dialogs/ConfirmSendDialog/ConfirmSendDialog';
 import ProgressIndicator from '@/components/molecules/ProgressIndicator/ProgressIndicator';
+import Spinner from '@/components/ui/spinner';
 
 export const PrepareSendingTable: FC<PrepareSendingTableProps> = (props) => {
-	const { campaign, draftEmails, isPending, sendingProgress, setSendingProgress } =
+	const { campaign, draftEmails, isPendingEmails, sendingProgress, setSendingProgress } =
 		usePrepareSendingTable(props);
+
+	if (isPendingEmails) {
+		return <Spinner />;
+	}
 
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>Drafts to be Sent</CardTitle>
+				<CardTitle>Drafted Emails</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<EmailsTable
 					emails={draftEmails}
-					isPending={isPending}
+					isPending={isPendingEmails}
 					noDataMessage="No draft emails were found."
 					isEditable
 				/>

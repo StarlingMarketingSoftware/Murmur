@@ -8,7 +8,7 @@ export const GradientBanner: FC<GradientBannerProps> = (props) => {
 	return (
 		<div
 			className={twMerge(
-				'relative w-full bg-gradient-to-r from-transparent via-gray-200 to-transparent overflow-hidden py-7',
+				'relative w-full bg-gradient-to-r from-transparent via-gray-100 to-transparent overflow-hidden py-12 px-4',
 				className
 			)}
 		>

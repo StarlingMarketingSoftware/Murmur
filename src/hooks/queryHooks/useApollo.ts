@@ -1,10 +1,9 @@
-import { Contact } from '@prisma/client';
-import { useQuery } from '@tanstack/react-query';
-import { CustomQueryOptions } from '@/types';
-import { appendQueryParamsToUrl } from '@/utils';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { CustomMutationOptions, CustomQueryOptions } from '@/types';
 import { _fetch } from '@/utils';
 import { urls } from '@/constants/urls';
-import { GetApolloContactsData } from '@/app/api/apollo/route';
+import { PostApolloContactsData } from '@/app/api/apollo/route';
+import { toast } from 'sonner';
 
 const QUERY_KEYS = {
 	all: ['apollo'] as const,
@@ -13,23 +12,41 @@ const QUERY_KEYS = {
 } as const;
 
 export interface ApolloQueryOptions extends CustomQueryOptions {
-	filters?: GetApolloContactsData;
+	filters?: PostApolloContactsData;
 }
 
-export const useGetApollo = (options: ApolloQueryOptions) => {
-	return useQuery<Contact[]>({
-		queryKey: [...QUERY_KEYS.list(), options.filters],
-		queryFn: async () => {
-			const url = appendQueryParamsToUrl(urls.api.apollo.index, options.filters);
-			const response = await _fetch(url);
+export const useCreateApolloContacts = (options: CustomMutationOptions) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Contact created successfully',
+		errorMessage = 'Failed to create contact',
+		onSuccess: onSuccessCallback,
+	} = options;
+
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (data: PostApolloContactsData) => {
+			const response = await _fetch(urls.api.apollo.index, 'POST', data);
 
 			if (!response.ok) {
 				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to _fetch contacts');
+				throw new Error(errorData.error || 'Failed to import Apollo contacts');
 			}
 
-			return response.json() as Promise<Contact[]>;
+			return response.json();
 		},
-		enabled: false,
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
+			if (!suppressToasts) {
+				toast.success(successMessage);
+			}
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
 	});
 };

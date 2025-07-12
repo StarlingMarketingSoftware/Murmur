@@ -59,7 +59,6 @@ export async function POST(request: NextRequest) {
 				expiresAt,
 			},
 		});
-
 		const mailgun = new Mailgun(FormData);
 		const mg = mailgun.client({
 			username: 'api',
@@ -181,7 +180,6 @@ export async function PATCH(request: NextRequest) {
 				verified: false,
 			},
 		});
-
 		if (!verificationRecord) {
 			return apiBadRequest('Invalid verification code');
 		}
@@ -194,14 +192,11 @@ export async function PATCH(request: NextRequest) {
 			return apiNotFound('Verification code has expired');
 		}
 
-		await prisma.emailVerificationCode.deleteMany({
+		const verificationCode = await prisma.emailVerificationCode.deleteMany({
 			where: { email },
 		});
 
-		return apiResponse({
-			verified: true,
-			message: 'Email verified successfully',
-		});
+		return apiResponse(verificationCode.count);
 	} catch (error) {
 		return handleApiError(error);
 	}

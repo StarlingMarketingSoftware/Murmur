@@ -1,5 +1,4 @@
 @import 'tailwindcss';
-
 @plugin "tailwindcss-animate";
 
 @custom-variant dark (&:is(.dark *));
@@ -89,15 +88,15 @@
 	--muted: oklch(0.3211 0 0);
 	--accent: oklch(0.923 0.003 48.717);
 	--accent-foreground: oklch(0.205 0 0);
-	--destructive: oklch(0.577 0.245 27.325);
+	--destructive: oklch(59.157% 0.24065 26.32);
 	--warning: oklch(0.77 0.16 70);
 	--success: oklch(0.4953 0.1037 140.3);
 	--navy: oklch(0.4865 0.17 266.18);
 
-	--border: oklch(0.922 0 0);
+	--border: oklch(83.591% 0.0001 271.152);
 	--input: oklch(0.922 0 0);
 	--ring: oklch(0.708 0 0);
-	--chart-1: oklch(0.646 0.222 41.116);
+	--chart-1: oklch(12.953% 0.00351 69.753);
 	--chart-2: oklch(0.6 0.118 184.704);
 	--chart-3: oklch(0.398 0.07 227.392);
 	--chart-4: oklch(0.828 0.189 84.429);
@@ -150,16 +149,21 @@
 
 @keyframes scroll {
 	0% {
-		transform: translateX(0);
+		transform: translate(0);
 	}
 	100% {
-		transform: translateX(-50%);
+		transform: translate(calc(-50% - 2.75rem));
 	}
 }
 
 .animate-scroll {
-	animation: scroll 30s linear infinite;
+	animation: scroll 50s linear infinite;
 }
+
+.animate-scroll:hover {
+	animation-play-state: paused;
+}
+
 
 @layer base {
 	* {
@@ -178,3 +182,45 @@
 		@apply text-lg font-bold;
 	}
 }
+
+/* Custom scrollbar for table containers */
+[data-slot="table-container"] {
+	scrollbar-width: thin; /* For Firefox */
+}
+
+[data-slot="table-container"]::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+[data-slot="table-container"]::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+[data-slot="table-container"]::-webkit-scrollbar-thumb {
+	background-color: rgb(203 213 225); /* Tailwind slate-300 */
+	border-radius: 20px;
+}
+
+[data-slot="table-container"]::-webkit-scrollbar-thumb:hover {
+	background-color: rgb(148 163 184); /* Tailwind slate-400 */
+}
+
+/* Hide scrollbar buttons and borders */
+[data-slot="table-container"]::-webkit-scrollbar-button {
+	display: none;
+}
+
+[data-slot="table-container"]::-webkit-scrollbar-corner {
+	background: transparent;
+}
+
+mux-player {
+	--seek-backward-button: none;
+	--seek-forward-button: none;
+	--cast-button: none;
+	--pip-button: none;
+	--playback-rate-button: none;
+}
+
+

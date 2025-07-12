@@ -6,7 +6,6 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-	DialogTrigger,
 } from '@/components/ui/dialog';
 import { FC } from 'react';
 import {
@@ -27,23 +26,16 @@ import { Signature } from '@prisma/client';
 import Spinner from '@/components/ui/spinner';
 import { twMerge } from 'tailwind-merge';
 import { Input } from '@/components/ui/input';
-import {
-	ArrowDownNarrowWideIcon,
-	CopyXIcon,
-	SaveIcon,
-	SignatureIcon,
-	SquareCheckIcon,
-	TrashIcon,
-} from 'lucide-react';
+import { SaveIcon, TrashIcon } from 'lucide-react';
 import {
 	Select,
 	SelectContent,
 	SelectGroup,
 	SelectItem,
+	SelectLabel,
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
-import { SelectLabel } from '@radix-ui/react-select';
 
 export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) => {
 	const {
@@ -58,20 +50,12 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 		isPendingSaveSignature,
 		isPendingDeleteSignature,
 		isPendingCreateSignature,
-		isPendingSaveSignatureToCampaign,
-		handleSaveSignatureToCampaign,
-		handleRemoveSignatureFromCampaign,
-		campaign,
+		open,
+		onOpenChange,
 	} = useManageSignaturesDialog(props);
 
 	return (
-		<Dialog>
-			<DialogTrigger asChild>
-				<Button className="w-full sm:w-fit" variant="primary-light">
-					<SignatureIcon />
-					Manage Signatures
-				</Button>
-			</DialogTrigger>
+		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px]">
 				<DialogHeader>
 					<DialogTitle>Manage Signatures</DialogTitle>
@@ -110,8 +94,6 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 														isSelected && 'pointer-events-none'
 													)}
 												>
-													{campaign.signatureId === signature.id && <SquareCheckIcon />}
-
 													<div className="text-sm">{signature.name}</div>
 												</SelectItem>
 											</div>
@@ -142,13 +124,12 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 											<div key={signature.id}>
 												<Button
 													onClick={() => setCurrentSignature(signature)}
-													variant={isSelected ? 'secondary' : 'ghost'}
+													variant={isSelected ? 'light' : 'ghost'}
 													className={twMerge(
 														'w-full max-w-[100%]',
 														isSelected && 'pointer-events-none'
 													)}
 												>
-													{campaign.signatureId === signature.id && <SquareCheckIcon />}
 													<div className="text-sm">{signature.name}</div>
 												</Button>
 												<Separator className="my-2" />
@@ -220,27 +201,6 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 										<TrashIcon />
 										Delete
 									</Button>
-
-									{campaign.signatureId === currentSignature?.id ? (
-										<Button
-											type="button"
-											variant="primary-light"
-											onClick={(e) => handleRemoveSignatureFromCampaign(e)}
-											isLoading={isPendingSaveSignatureToCampaign}
-										>
-											<CopyXIcon /> Remove Signature from Campaign
-										</Button>
-									) : (
-										<Button
-											type="button"
-											variant="primary-light"
-											onClick={(e) => handleSaveSignatureToCampaign(e)}
-											isLoading={isPendingSaveSignatureToCampaign}
-										>
-											<ArrowDownNarrowWideIcon /> Assign Signature to Campaign
-										</Button>
-									)}
-
 									<Button isLoading={isPendingSaveSignature} type="submit">
 										<SaveIcon /> Save
 									</Button>

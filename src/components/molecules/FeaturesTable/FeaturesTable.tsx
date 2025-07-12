@@ -184,7 +184,7 @@ const FeatureCell: FC<FeatureCellProps> = ({ value, bgColor = '' }) => {
 	}
 	return (
 		<TableCell className={`text-center border-y-0 border-x-1 border-gray-200 ${bgColor}`}>
-			<Typography className="text-center text-[16px]">{value}</Typography>
+			<Typography className="text-center !text-[16px]">{value}</Typography>
 		</TableCell>
 	);
 };
@@ -204,10 +204,8 @@ const FeatureRow = <T extends keyof Feature>({
 
 	return (
 		<TableRow className={`border-x-2 border-gray-200 border-y-0 ${rowBgColor}`}>
-			<TableCell
-				className={`font-medium !pl-5 border-y-0 border-x-1 border-gray-200 ${rowBgColor}`}
-			>
-				<Typography className="text-[16px]">{featureLabel}</Typography>
+			<TableCell className={`!pl-5 border-y-0 border-x-1 border-gray-200 ${rowBgColor}`}>
+				<Typography className="!text-[16px]">{featureLabel}</Typography>
 			</TableCell>
 			<FeatureCell
 				value={FEATURE_DATA.basic[sectionKey][featureKey] as boolean | string}
@@ -234,12 +232,90 @@ const SectionHeader: FC<SectionHeaderProps> = ({ title }) => {
 	return (
 		<TableRow className="border-x-2 border-gray-200 border-y-0">
 			<TableHead className="bg-gray-200 font-semibold text-foreground !pl-5 border-y-0 border-x-1 border-gray-200">
-				<Typography className="text-[16px] font-bold italic">{title}</Typography>
+				<Typography className="!text-[16px] !font-bold !italic font-primary">
+					{title}
+				</Typography>
 			</TableHead>
 			<TableHead className={cn} />
-			<TableHead className={cn} />
-			<TableHead className={cn} />
+			<TableHead className={twMerge(cn, 'hidden md:table-cell')} />
+			<TableHead className={twMerge(cn, ' hidden md:table-cell')} />
 		</TableRow>
+	);
+};
+
+interface MobilePlanTableProps {
+	plan: Plan;
+	planTitle: string;
+}
+
+const MobilePlanTable: FC<MobilePlanTableProps> = ({ plan, planTitle }) => {
+	const renderSection = <T extends keyof Feature>(sectionKey: T) => {
+		const features = Object.keys(FEATURE_DATA[plan][sectionKey]) as Array<
+			keyof Feature[T]
+		>;
+
+		// Filter out features that are false or empty strings
+		const visibleFeatures = features.filter((featureKey) => {
+			const value = FEATURE_DATA[plan][sectionKey][featureKey];
+			return value !== false && value !== '';
+		});
+
+		// Only render section if there are visible features
+		if (visibleFeatures.length === 0) return null;
+
+		return (
+			<>
+				<SectionHeader title={SECTION_LABELS[sectionKey]} />
+				{visibleFeatures.map((featureKey, index) => (
+					<TableRow
+						key={`${sectionKey}-${String(featureKey)}`}
+						className={`border-x-2 border-gray-200 border-y-0 ${
+							index % 2 === 0 ? 'bg-background' : 'bg-gray-100'
+						}`}
+					>
+						<TableCell
+							className={`!pl-5 border-y-0 border-x-1 border-gray-200 whitespace-normal`}
+						>
+							<Typography className="!text-[16px] break-words">
+								{FEATURE_LABELS[sectionKey][featureKey as string]}
+							</Typography>
+						</TableCell>
+						<FeatureCell
+							value={FEATURE_DATA[plan][sectionKey][featureKey] as boolean | string}
+						/>
+					</TableRow>
+				))}
+			</>
+		);
+	};
+
+	return (
+		<div className="mb-12 last:mb-0">
+			<Typography className="text-center text-[22px] font-bold italic pb-4">
+				{planTitle}
+			</Typography>
+			<Table className="!text-wrap">
+				<TableHeader>
+					<TableRow className="border-solid border-x-2 border-gray-200 pointer-events-none bg-gray-50">
+						<TableHead className="w-2/3 !pl-5 whitespace-normal">
+							<Typography
+								variant="h4"
+								className="font-bold italic text-[18px] break-words"
+							>
+								Features
+							</Typography>
+						</TableHead>
+						<TableHead className="w-1/3 text-center"></TableHead>
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					{renderSection('contactFeatures')}
+					{renderSection('emailFeatures')}
+					{renderSection('usageFeatures')}
+					{renderSection('supportFeatures')}
+				</TableBody>
+			</Table>
+		</div>
 	);
 };
 
@@ -267,55 +343,64 @@ export const FeaturesTable: FC = () => {
 	const tableHeadingStyles = 'text-center text-[22px] font-bold italic pb-2';
 
 	return (
-		<Table className="max-w-[1395px] mx-auto">
-			<TableHeader className="">
-				<TableRow className="border-none pointer-events-none">
-					<TableHead className="w-1/3"></TableHead>
-					<TableHead className="">
-						<Typography className={tableHeadingStyles} variant="h3">
-							Basic
-						</Typography>
-					</TableHead>
-					<TableHead className="">
-						<Typography
+		<>
+			<div className="hidden md:block">
+				<Table className="max-w-[1395px] mx-auto !text-wrap">
+					<TableHeader className="">
+						<TableRow className="border-none pointer-events-none">
+							<TableHead className="w-1/3"></TableHead>
+							<TableHead className="">
+								<Typography className={tableHeadingStyles} variant="h3">
+									Basic
+								</Typography>
+							</TableHead>
+							<TableHead className="">
+								<Typography
+									className={twMerge(
+										tableHeadingStyles,
+										'border-b-solid border-b-2 border-secondary'
+									)}
+									variant="h3"
+								>
+									Standard
+								</Typography>
+							</TableHead>
+							<TableHead className="">
+								<Typography className={tableHeadingStyles} variant="h3">
+									Pro
+								</Typography>
+							</TableHead>
+						</TableRow>
+					</TableHeader>
+					<TableHeader>
+						<TableRow
 							className={twMerge(
-								tableHeadingStyles,
-								'border-b-solid border-b-2 border-secondary'
+								'border-solid border-x-2 border-gray-200 pointer-events-none bg-gray-50'
 							)}
-							variant="h3"
 						>
-							Standard
-						</Typography>
-					</TableHead>
-					<TableHead className="">
-						<Typography className={tableHeadingStyles} variant="h3">
-							Pro
-						</Typography>
-					</TableHead>
-				</TableRow>
-			</TableHeader>
-			<TableHeader>
-				<TableRow
-					className={twMerge(
-						'border-solid border-x-2 border-gray-200 pointer-events-none bg-gray-50'
-					)}
-				>
-					<TableHead className="w-1/3">
-						<Typography variant="h4" className="font-bold italic text-[18px]">
-							Features
-						</Typography>
-					</TableHead>
-					<TableHead className="text-center"></TableHead>
-					<TableHead className="text-center"></TableHead>
-					<TableHead className="text-center"></TableHead>
-				</TableRow>
-			</TableHeader>
-			<TableBody>
-				{renderSection('contactFeatures')}
-				{renderSection('emailFeatures')}
-				{renderSection('usageFeatures')}
-				{renderSection('supportFeatures')}
-			</TableBody>
-		</Table>
+							<TableHead className="w-1/3 !pl-5">
+								<Typography variant="h4" className="font-bold italic text-[18px]">
+									Features
+								</Typography>
+							</TableHead>
+							<TableHead className="text-center"></TableHead>
+							<TableHead className="text-center"></TableHead>
+							<TableHead className="text-center"></TableHead>
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{renderSection('contactFeatures')}
+						{renderSection('emailFeatures')}
+						{renderSection('usageFeatures')}
+						{renderSection('supportFeatures')}
+					</TableBody>
+				</Table>
+			</div>
+			<div className="block md:hidden px-4">
+				<MobilePlanTable plan="basic" planTitle="Basic" />
+				<MobilePlanTable plan="standard" planTitle="Standard" />
+				<MobilePlanTable plan="pro" planTitle="Pro" />
+			</div>
+		</>
 	);
 };
