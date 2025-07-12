@@ -111,7 +111,6 @@ export async function POST(req: NextRequest) {
 				contactsWithValidationStatus.filter(
 					(contact) => contact.emailValidationStatus === EmailVerificationStatus.unknown
 				);
-			// TODO the number of contacts they can verify should be limited to their usage limit
 
 			let validatedContacts: ContactPartialWithRequiredEmail[] = [];
 

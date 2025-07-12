@@ -12,6 +12,7 @@ import Papa from 'papaparse';
 import { ButtonVariants } from '@/components/ui/button';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { PostBatchContactData } from '@/app/api/contacts/batch/route';
+import { useMe } from '@/hooks/useMe';
 
 export interface ContactTSVUploadDialogProps {
 	isPrivate: boolean;
@@ -202,6 +203,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 	const [open, setOpen] = useState(false);
 	const [tsvData, setTsvData] = useState<ContactInput[]>([]);
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const { user } = useMe();
 
 	/* API */
 	const { mutateAsync: batchCreateContacts, isPending: isPendingBatchCreateContacts } =
@@ -270,6 +272,15 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			toast.error('No data to upload');
 			return;
 		}
+		const verificationCredits = user?.verificationCredits;
+
+		if (tsvData.length > (verificationCredits || 0)) {
+			toast.error(
+				`You do not have enough upload credits to create this many contacts. Please upgrade your plan. Credits: ${verificationCredits} Number of contacts: ${tsvData.length}`
+			);
+			return;
+		}
+
 		const { contacts, created } = await batchCreateContacts({
 			isPrivate,
 			contacts: tsvData,
