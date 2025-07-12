@@ -244,7 +244,7 @@ export const ManageCampaignContactListDialog: FC<ManageCampaignContactListDialog
 														variant="ghost"
 														onClick={() => handleRemoveContactList(contactList)}
 														disabled={isPendingEditCampaign}
-														className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+														className="h-8 w-8 p-0 text-destructive"
 													>
 														<X className="h-4 w-4" />
 													</Button>

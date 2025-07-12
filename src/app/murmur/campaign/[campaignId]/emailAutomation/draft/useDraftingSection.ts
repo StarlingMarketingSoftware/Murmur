@@ -83,7 +83,7 @@ export type HybridBlockPrompts = {
 };
 
 export const draftingFormSchema = z.object({
-	draftingMode: z.nativeEnum(DraftingMode).default(DraftingMode.ai),
+	draftingMode: z.nativeEnum(DraftingMode).default(DraftingMode.hybrid),
 	isAiSubject: z.boolean().default(true),
 	subject: z.string().default(''),
 	fullAiPrompt: z.string().default(''),
@@ -124,7 +124,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const form = useForm<DraftingFormValues>({
 		resolver: zodResolver(draftingFormSchema),
 		defaultValues: {
-			draftingMode: DraftingMode.ai,
+			draftingMode: DraftingMode.hybrid,
 			isAiSubject: true,
 			subject: '',
 			fullAiPrompt: '',
@@ -195,8 +195,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	// VARIABLES
 
 	const modeOptions: ModeOption[] = [
-		{ value: 'ai', label: 'Full AI' },
 		{ value: 'hybrid', label: 'Hybrid' },
+		{ value: 'ai', label: 'Full AI' },
 		{ value: 'handwritten', label: 'Handwritten' },
 	];
 
@@ -211,14 +211,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	let dataDraftEmail: TestDraftEmail = {
 		subject: '',
 		message: '',
-		contactEmail: contacts ? contacts[0].email : '',
+		contactEmail: contacts ? contacts[0]?.email : '',
 	};
 
 	if (!dataPerplexity && campaign.testMessage && campaign.testMessage.length > 0) {
 		dataDraftEmail = {
 			subject: campaign.testSubject || '',
 			message: campaign.testMessage,
-			contactEmail: contacts ? contacts[0].email : '',
+			contactEmail: contacts ? contacts[0]?.email : '',
 		};
 	} else {
 		dataDraftEmail.subject = campaign.testSubject || '';
@@ -626,6 +626,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const BATCH_SIZE = 5;
 		const BATCH_DELAY = 1000;
 		let successfulEmails = 0;
+
+		// here is contacts variable
 
 		if (!contacts || contacts.length === 0) {
 			toast.error('No contacts available to generate emails.');
