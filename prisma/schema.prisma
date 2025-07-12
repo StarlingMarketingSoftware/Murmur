@@ -77,9 +77,9 @@ model User {
   role                UserRole @default(user)
   aiDraftCredits      Int      @default(5)
   aiTestCredits       Int      @default(2)
-  draftCredits        Int      @default(0)
-  sendingCredits      Int      @default(0)
-  verificationCredits Int      @default(0)
+  draftCredits        Float    @default(0)
+  sendingCredits      Float    @default(0)
+  verificationCredits Float    @default(0)
   customDomain        String?
 
   stripeCustomerId         String?           @unique

@@ -128,7 +128,7 @@ const MISTRAL_FORMATTING_INSTRUCTIONS = `
 3. Do not add any space or tab before the first letter of each paragraph.`;
 
 export const getMistralTonePrompt = (tone: MistralToneAgentType): string => {
-	return `I will send an email message in RichText format. 
+	return `I will send an email message in plain text format. 
 
 	Perform the following tasks to the message:
 	1. !IMPORTANT! ${MISTRAL_TONE_PROMPTS[tone]}
@@ -147,7 +147,7 @@ ${MISTRAL_FORMATTING_INSTRUCTIONS}
 Please return your response in JSON with the following format. Do not include any other text or explanation. Your response should be a valid JSON object that can be parsed by JSON.parse() in Javascript:
 {
   "subject": "cleanedSubjectInPlainTextFormat",
-  "message": "cleanedMessageInRichTextFormat"
+  "message": "cleanedMessageInPlainTextFormat"
 }
 `;
 };

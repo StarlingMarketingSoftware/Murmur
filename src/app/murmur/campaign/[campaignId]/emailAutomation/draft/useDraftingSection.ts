@@ -180,7 +180,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			suppressToasts: true,
 		});
 
-	const { mutate: editUser } = useEditUser({ suppressToasts: true });
+	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 
 	const { isPending: isPendingSaveCampaign, mutateAsync: saveCampaign } =
 		useEditCampaign();
@@ -200,7 +200,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		{ value: 'handwritten', label: 'Handwritten' },
 	];
 
-	const aiDraftCredits = user?.aiDraftCredits;
+	const draftCredits = user?.draftCredits;
 	const selectedSignature: Signature = signatures?.find(
 		(sig: Signature) => sig.id === form.watch('signatureId')
 	);
@@ -421,10 +421,18 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	};
 
 	const generateAiDraftTest = async () => {
+		const draftCredits = user?.draftCredits;
+		const paragraphs = form.getValues('paragraphs');
+		const creditCost = paragraphs <= 3 ? 1 : 1.5;
+
+		if (!draftCredits || draftCredits < creditCost) {
+			toast.error('You have run out of drafting credits! Please upgrade your plan.');
+			return;
+		}
+
 		const values = getValues();
 
 		setIsTest(true);
-		// if you run out of credits, stop here
 
 		let isSuccess = false;
 		let attempts = 0;
@@ -471,6 +479,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 								values.font,
 								signatures?.find((sig: Signature) => sig.id === values.signatureId)
 							),
+						},
+					});
+					await editUser({
+						clerkId: user.clerkId,
+						data: {
+							draftCredits: draftCredits - creditCost,
 						},
 					});
 					queryClient.invalidateQueries({
@@ -616,7 +630,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	};
 
 	const batchGenerateFullAiDrafts = async () => {
-		let remainingCredits = aiDraftCredits || 0;
+		let remainingCredits = draftCredits || 0;
 		setGenerationProgress(0);
 		isGenerationCancelledRef.current = false;
 
@@ -624,39 +638,45 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		setAbortController(controller);
 
 		const BATCH_SIZE = 5;
-		const BATCH_DELAY = 1000;
 		let successfulEmails = 0;
+		let stoppedDueToCredits = false;
 
 		if (!contacts || contacts.length === 0) {
 			toast.error('No contacts available to generate emails.');
 			return;
 		}
+
+		const paragraphs = form.getValues('paragraphs');
+		const creditCost = paragraphs <= 3 ? 1 : 1.5;
+
 		try {
 			for (
 				let i = 0;
 				i < contacts.length && !isGenerationCancelledRef.current;
 				i += BATCH_SIZE
 			) {
-				if (remainingCredits <= 0) {
-					toast.error('You have run out of AI draft credits!');
+				const maxEmails = Math.floor(remainingCredits / creditCost);
+				const adjustedBatchSize = Math.min(BATCH_SIZE, maxEmails);
+
+				if (remainingCredits < creditCost) {
+					stoppedDueToCredits = true;
 					cancelGeneration();
 					break;
 				}
 
 				const batch: Contact[] = contacts.slice(
 					i,
-					Math.min(i + BATCH_SIZE, contacts.length)
+					Math.min(i + adjustedBatchSize, contacts.length)
 				);
-				const availableCreditsForBatch = Math.min(batch.length, remainingCredits);
-				const batchToProcess: Contact[] = batch.slice(0, availableCreditsForBatch);
 
 				const currentBatchPromises: Promise<BatchGenerationResult>[] =
-					generateBatchPromises(batchToProcess, controller);
+					generateBatchPromises(batch, controller);
 
 				const batchResults = await Promise.allSettled(currentBatchPromises);
+
 				for (const result of batchResults) {
 					if (result.status === 'fulfilled' && result.value.success) {
-						remainingCredits--;
+						remainingCredits -= creditCost;
 						successfulEmails++;
 					} else if (result.status === 'rejected') {
 						if (result.reason?.message === 'Request cancelled.') {
@@ -665,20 +685,27 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					}
 				}
 
-				if (i + BATCH_SIZE < contacts.length && !isGenerationCancelledRef.current) {
-					await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY));
+				// Check if we've run out of credits after processing this batch
+				if (remainingCredits < creditCost && successfulEmails < contacts.length) {
+					stoppedDueToCredits = true;
+					toast.error('You have run out of drafting credits! Please upgrade your plan.');
+					cancelGeneration();
+					break;
 				}
 			}
 
-			if (user && aiDraftCredits && successfulEmails > 0) {
-				const newCreditBalance = Math.max(0, aiDraftCredits - successfulEmails);
+			if (user && draftCredits && successfulEmails > 0) {
+				const newCreditBalance = Math.max(
+					0,
+					draftCredits - creditCost * successfulEmails
+				);
 				editUser({
 					clerkId: user.clerkId,
-					data: { aiDraftCredits: newCreditBalance },
+					data: { draftCredits: newCreditBalance },
 				});
 			}
 
-			if (!isGenerationCancelledRef.current) {
+			if (!isGenerationCancelledRef.current && !stoppedDueToCredits) {
 				if (successfulEmails === contacts.length) {
 					toast.success('All emails generated successfully!');
 				} else if (successfulEmails > 0) {
@@ -688,6 +715,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				} else {
 					toast.error('Email generation failed. Please try again.');
 				}
+			} else if (stoppedDueToCredits && successfulEmails > 0) {
+				// Show partial success message when stopped due to credits
+				toast.warning(
+					`Generated ${successfulEmails} emails before running out of credits. Please upgrade your plan to continue.`
+				);
 			}
 		} catch (error) {
 			if (error instanceof Error && error.message === 'Request cancelled.') {
@@ -782,7 +814,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		isAiSubject,
 		isPendingSaveCampaign,
 		handleSavePrompt,
-		aiDraftCredits,
 		isTest,
 		signatures,
 		isPendingSignatures,
