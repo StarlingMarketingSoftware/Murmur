@@ -71,8 +71,7 @@ export const useEmailsTable = (props: EmailsTableProps) => {
 			cell: ({ row }) => (
 				<TableDeleteRowButton
 					disabled={isPendingDeleteEmail}
-					onClick={(e) => {
-						e.stopPropagation();
+					onClick={() => {
 						handleDeleteEmail(row.original.id);
 					}}
 				/>
