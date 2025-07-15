@@ -10,7 +10,7 @@ import { FC } from 'react';
 interface InfoTooltipProps {
 	message?: string;
 }
-const InfoTooltip: FC<InfoTooltipProps> = ({ message = '' }) => {
+const InfoTooltip: FC<InfoTooltipProps> = ({ message }) => {
 	return (
 		<TooltipProvider>
 			<Tooltip>

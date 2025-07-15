@@ -35,7 +35,7 @@ export function Spinner({ className, size = 'xl', color = 'primary' }: SpinnerPr
 			cn.push('text-foreground');
 			break;
 		case 'background':
-			cn.push('text-b');
+			cn.push('text-background');
 			break;
 	}
 

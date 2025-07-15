@@ -89,7 +89,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 													<RadioGroup
 														value={field.value}
 														onValueChange={field.onChange}
-														className="space-y-2 grid grid-cols sm:grid-cols-2 md:grid-cols-3 gap-6"
+														className="space-y-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6"
 													>
 														{identities?.map((identity) => (
 															<div key={identity.id} className="flex items-center gap-3">
