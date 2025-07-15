@@ -33,6 +33,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 		isClosable,
 		handleAssignIdentity,
 		isPendingAssignIdentity,
+		setValue,
 	} = useIdentityDialog(props);
 
 	return (
@@ -154,6 +155,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 								isEdit={isEdit}
 								selectedIdentity={selectedIdentity}
 								showCreatePanel={showCreatePanel}
+								setValue={setValue}
 							/>
 						</div>
 					</div>
