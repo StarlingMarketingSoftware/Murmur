@@ -3,7 +3,7 @@ import { TrashIcon } from 'lucide-react';
 import { FC } from 'react';
 
 interface TableDeleteRowButtonProps {
-	onClick: () => void;
+	onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
 	isLoading?: boolean;
 	disabled?: boolean;
 }
@@ -24,7 +24,7 @@ export const TableDeleteRowButton: FC<TableDeleteRowButtonProps> = (props) => {
 			size="icon"
 			onClick={async (e) => {
 				e.stopPropagation();
-				onClick();
+				onClick(e);
 			}}
 		>
 			<TrashIcon className="h-3 w-2 text-destructive" />
