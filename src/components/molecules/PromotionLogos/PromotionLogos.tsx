@@ -17,56 +17,57 @@ export const PromotionLogos = () => {
 		return null;
 	}
 
+	const LOGO_HORIZONTAL_WIDTH = 400;
+	const LOGO_VERTICAL_WIDTH = 200;
+
 	const logos: Logo[] = [
 		{
 			fileName: 'nordstrom.png',
-			width: 400,
-			darkFileName: 'nordstromDark.png',
+			width: LOGO_HORIZONTAL_WIDTH,
 		},
 		{
 			fileName: 'cushman.png',
-			width: 400,
+			width: LOGO_HORIZONTAL_WIDTH,
 		},
 		{
-			fileName: 'uPenn.png',
-			width: 200,
+			fileName: 'uPennTextLogo.png',
+			width: LOGO_HORIZONTAL_WIDTH,
 		},
 		{
 			fileName: 'freeLibraryFoundation.png',
-			width: 200,
+			width: LOGO_VERTICAL_WIDTH,
 		},
 		{
 			fileName: 'massMutual.png',
-			width: 400,
+			width: LOGO_HORIZONTAL_WIDTH,
 		},
 		{
 			fileName: 'charlesSchwab.png',
-			width: 200,
+			width: LOGO_VERTICAL_WIDTH,
 		},
 		{
 			fileName: 'uPittsburgh.png',
-			width: 200,
+			width: LOGO_VERTICAL_WIDTH,
 		},
 		{
 			fileName: 'headForTheCure.png',
-			width: 400,
+			width: LOGO_HORIZONTAL_WIDTH,
 		},
 		{
 			fileName: 'bjs.png',
-			width: 200,
+			width: LOGO_VERTICAL_WIDTH,
 		},
 		{
 			fileName: 'pennsylvaniaMedical.png',
-			width: 400,
+			width: LOGO_HORIZONTAL_WIDTH,
 		},
 		{
 			fileName: 'americanLungAssociation.png',
-			width: 400,
+			width: LOGO_HORIZONTAL_WIDTH,
 		},
 		{
 			fileName: 'lutherCrest.png',
-			width: 400,
-			darkFileName: 'lutherCrestDark.png',
+			width: LOGO_HORIZONTAL_WIDTH,
 		},
 	];
 
@@ -133,7 +134,7 @@ export const PromotionLogos = () => {
 						<Image
 							src={`/logos/${fileName1}`}
 							alt="Logo"
-							height={94}
+							height={50}
 							width={logo1.width}
 							className="w-[200px] lg:w-[250px] h-auto object-contain max-h-45"
 						/>
@@ -143,7 +144,7 @@ export const PromotionLogos = () => {
 							<Image
 								src={`/logos/${fileName2}`}
 								alt="Logo"
-								height={94}
+								height={50}
 								width={logo2.width}
 								className="w-[200px] lg:w-[250px] h-auto object-contain max-h-45"
 							/>

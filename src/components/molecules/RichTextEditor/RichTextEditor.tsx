@@ -76,7 +76,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 			}),
 			FontFamily,
 			TextStyle.configure({ mergeNestedSpanStyles: true }),
-			Div, // Add the Div extension here
+			Div,
 		],
 		editable: isEdit,
 		immediatelyRender: false,
@@ -84,7 +84,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 		editorProps: {
 			attributes: {
 				class: twMerge(
-					'min-h-[200px] w-full rounded-md border border-input bg-background',
+					'min-h-[200px] w-full rounded-md border border-gray-300 bg-background',
 					'px-3 py-2 text-sm ',
 					'placeholder:text-muted-foreground',
 					'disabled:cursor-not-allowed disabled:opacity-50',
