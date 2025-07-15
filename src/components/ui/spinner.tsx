@@ -4,10 +4,10 @@ import { twMerge } from 'tailwind-merge';
 interface SpinnerProps {
 	className?: string;
 	size?: 'small' | 'medium' | 'large' | 'xl' | number;
-	color?: 'foreground' | 'background';
+	color?: 'foreground' | 'background' | 'primary';
 }
 
-export function Spinner({ className, size = 'xl', color = 'foreground' }: SpinnerProps) {
+export function Spinner({ className, size = 'xl', color = 'primary' }: SpinnerProps) {
 	const cn = [className, 'animate-spin mx-auto'];
 	const sizeValue = (): number => {
 		if (typeof size === 'number') {
@@ -28,11 +28,15 @@ export function Spinner({ className, size = 'xl', color = 'foreground' }: Spinne
 	};
 
 	switch (color) {
+		case 'primary':
+			cn.push('text-primary');
+			break;
 		case 'foreground':
 			cn.push('text-foreground');
 			break;
 		case 'background':
 			cn.push('text-b');
+			break;
 	}
 
 	return <Loader2 size={sizeValue()} className={twMerge(cn)} />;

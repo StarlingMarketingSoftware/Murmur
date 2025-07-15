@@ -16,6 +16,7 @@ import { CreateIdentityPanel } from './CreateIdentityPanel/CreateIdentityPanel';
 import { twMerge } from 'tailwind-merge';
 import { Button } from '@/components/ui/button';
 import { ArrowDown, ChevronLeft } from 'lucide-react';
+import Spinner from '@/components/ui/spinner';
 
 export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 	const {
@@ -34,6 +35,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 		handleAssignIdentity,
 		isPendingAssignIdentity,
 		setValue,
+		isPendingIdentities,
 	} = useIdentityDialog(props);
 
 	return (
@@ -63,103 +65,107 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 						variant="light"
 					>
 						<ChevronLeft />
-						Go Back
+						<span className="hidden sm:block">Go Back</span>
 					</Button>
 				</DialogHeader>
-				<div className="relative overflow-hidden h-fit">
-					<div
-						className={twMerge(
-							'flex transition-transform duration-300 ease-in-out w-[200%]',
-							showCreatePanel ? '-translate-x-[50.3%]' : 'translate-x-0'
-						)}
-					>
-						<div className="w-1/2 flex-shrink-0 p-4">
-							<Form {...form}>
-								<FormField
-									control={form.control}
-									name="identityId"
-									render={({ field }) => (
-										<FormItem>
-											<FormControl>
-												<RadioGroup
-													value={field.value}
-													onValueChange={field.onChange}
-													className="space-y-2 grid grid-cols-3 gap-6"
-												>
-													{identities?.map((identity) => (
-														<div key={identity.id} className="flex items-center gap-3">
-															<div className="flex flex-col gap-2">
-																<div className="flex gap-2">
-																	<RadioGroupItem
-																		value={identity.id.toString()}
-																		id={`identity-${identity.id}`}
-																	/>
+				{isPendingIdentities ? (
+					<Spinner />
+				) : (
+					<div className="relative overflow-hidden h-fit">
+						<div
+							className={twMerge(
+								'flex transition-transform duration-300 ease-in-out w-[200%]',
+								showCreatePanel ? '-translate-x-[50.3%]' : 'translate-x-0'
+							)}
+						>
+							<div className="w-1/2 flex-shrink-0 p-4">
+								<Form {...form}>
+									<FormField
+										control={form.control}
+										name="identityId"
+										render={({ field }) => (
+											<FormItem>
+												<FormControl>
+													<RadioGroup
+														value={field.value}
+														onValueChange={field.onChange}
+														className="space-y-2 grid grid-cols sm:grid-cols-2 md:grid-cols-3 gap-6"
+													>
+														{identities?.map((identity) => (
+															<div key={identity.id} className="flex items-center gap-3">
+																<div className="flex flex-col gap-2">
+																	<div className="flex gap-2">
+																		<RadioGroupItem
+																			value={identity.id.toString()}
+																			id={`identity-${identity.id}`}
+																		/>
+																		<Label
+																			className="font-primary font-bold"
+																			htmlFor={`identity-${identity.id}`}
+																		>
+																			{identity.name}
+																		</Label>
+																	</div>
 																	<Label
-																		className="font-primary font-bold"
+																		className="ml-6 font-bold"
 																		htmlFor={`identity-${identity.id}`}
 																	>
-																		{identity.name}
+																		{identity.email}
+																	</Label>
+																	<Label
+																		className={twMerge(
+																			'ml-6',
+																			!identity.website && '!text-muted italic'
+																		)}
+																		htmlFor={`identity-${identity.id}`}
+																		onClick={() => {
+																			setShowCreatePanel(true);
+																			setIsEdit(true);
+																		}}
+																	>
+																		{identity.website || 'No website'}
+																	</Label>
+																	<Label
+																		className="ml-6 text-secondary underline cursor-pointer"
+																		htmlFor={`identity-${identity.id}`}
+																		onClick={() => {
+																			setIsEdit(true);
+																			setShowCreatePanel(true);
+																		}}
+																	>
+																		Edit
 																	</Label>
 																</div>
-																<Label
-																	className="ml-6 font-bold"
-																	htmlFor={`identity-${identity.id}`}
-																>
-																	{identity.email}
-																</Label>
-																<Label
-																	className={twMerge(
-																		'ml-6',
-																		!identity.website && '!text-muted italic'
-																	)}
-																	htmlFor={`identity-${identity.id}`}
-																	onClick={() => {
-																		setShowCreatePanel(true);
-																		setIsEdit(true);
-																	}}
-																>
-																	{identity.website || 'No website'}
-																</Label>
-																<Label
-																	className="ml-6 text-secondary underline cursor-pointer"
-																	htmlFor={`identity-${identity.id}`}
-																	onClick={() => {
-																		setIsEdit(true);
-																		setShowCreatePanel(true);
-																	}}
-																>
-																	Edit
-																</Label>
 															</div>
-														</div>
-													))}
-												</RadioGroup>
-											</FormControl>
-										</FormItem>
-									)}
+														))}
+													</RadioGroup>
+												</FormControl>
+											</FormItem>
+										)}
+									/>
+								</Form>
+								<Button
+									variant="secondary-outline"
+									onClick={() => {
+										setShowCreatePanel(true);
+										setIsEdit(false);
+									}}
+								>
+									Add a New Profile
+								</Button>
+							</div>
+							<div className="w-1/2 flex-shrink-0 p-4">
+								<CreateIdentityPanel
+									setShowCreatePanel={setShowCreatePanel}
+									isEdit={isEdit}
+									selectedIdentity={selectedIdentity}
+									showCreatePanel={showCreatePanel}
+									setValue={setValue}
 								/>
-							</Form>
-							<Button
-								variant="secondary-outline"
-								onClick={() => {
-									setShowCreatePanel(true);
-									setIsEdit(false);
-								}}
-							>
-								Add a New Profile
-							</Button>
-						</div>
-						<div className="w-1/2 flex-shrink-0 p-4">
-							<CreateIdentityPanel
-								setShowCreatePanel={setShowCreatePanel}
-								isEdit={isEdit}
-								selectedIdentity={selectedIdentity}
-								showCreatePanel={showCreatePanel}
-								setValue={setValue}
-							/>
+							</div>
 						</div>
 					</div>
-				</div>
+				)}
 				<DialogFooter>
 					<Button
 						isLoading={isPendingAssignIdentity}
