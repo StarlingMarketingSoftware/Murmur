@@ -41,8 +41,8 @@ export default function HomePage() {
 	const { isSignedIn } = useClerk();
 
 	return (
-		<main className="min-h-screen overflow-hidden">
-			<div className="relative h-screen w-screen overflow-hidden">
+		<main className="overflow-hidden">
+			<div className="relative h-fit min-h-screen w-screen overflow-hidden">
 				{/* Background layer with Birds */}
 				<div className="absolute inset-0 z-0">
 					<div
@@ -74,34 +74,31 @@ export default function HomePage() {
 				/>
 
 				{/* Content layer */}
-				<div className="relative z-20 grid grid-rows-12 justify-items-center h-full gap-0">
-					<div className="row-span-2" />
-					<LogoIcon className="row-span-1 w-[55px] sm:w-[75px] md:w-[90px] lg:w-[106px] h-[44px] sm:h-[60px] md:h-[72px] lg:h-[84px]" />
-					<Typography
-						variant="h1"
-						className="row-span-1 !text-[65px] sm:!text-[100px]  leading-[0.8]"
-					>
+				<div className="relative z-20 justify-items-center h-full gap-0">
+					<div className="w-[55px] sm:w-[75px] md:w-[90px] lg:!w-[96px] h-[44px] sm:h-[60px] md:h-[72px] lg:h-[80px] mt-18 sm:mt-24 md:mt-30 lg:mt-36">
+						<LogoIcon />
+					</div>
+					<Typography variant="h1" className="!text-[52px] sm:!text-[80px] leading-[0.8]">
 						Murmur
 					</Typography>
-					<div className="row-span-1 flex items-center gap-8 sm:gap-14">
-						<Typography className="!text-[16px]">by</Typography>
-						<StarlingLogo width="150px" />
+					<div className="flex items-center gap-8 sm:gap-14 mt-6">
+						<Typography className="!text-[12px]">by</Typography>
+						<StarlingLogo width="110px" />
 					</div>
-					<div className="row-span1" />
 					<Typography
 						variant="h2"
-						className="row-span-3 text-center text-[30px] sm:text-[46px] px-2"
+						className="text-center text-[24px] sm:text-[37px] px-2 mt-8"
 					>
 						Cut Through The Noise.<br></br> Get Contacts. Get Work. Email Anyone.
 					</Typography>
-					<div className="row-span-2">
+					<div className="mt-24">
 						{!isSignedIn ? (
 							<SignUpButton mode="modal">
 								<Button
 									variant="primary"
 									font="secondary"
 									size="lg"
-									className="w-[194px]"
+									className="w-[155px]"
 								>
 									START
 								</Button>
@@ -112,7 +109,7 @@ export default function HomePage() {
 									variant="primary"
 									size="lg"
 									font="secondary"
-									className="w-[194px]"
+									className="w-[155px]"
 								>
 									START
 								</Button>
@@ -122,11 +119,8 @@ export default function HomePage() {
 				</div>
 			</div>
 			{/* Explanation */}
-			<div className="mx-auto max-w-[1059px] text-center px-3">
-				<Typography
-					variant="h2"
-					className="row-span-3 text-center text-[38px] sm:text-[52px]"
-				>
+			<div className="mx-auto max-w-[1059px] text-center px-3 mt-16">
+				<Typography variant="h2" className="text-center text-[30px] sm:text-[42px]">
 					Murmur helps you draft.<br></br> No ChatGPT. We built our own.
 				</Typography>
 				<Typography className="!mt-[42px]" variant="promoP">
@@ -141,7 +135,7 @@ export default function HomePage() {
 			{/* Video Section */}
 			<div className="py-16 mt-[121px] px-4">
 				<div className="mx-auto w-fit">
-					<div className="relative max-w-[1179px] w-full aspect-video">
+					<div className="relative max-w-[943px] w-full aspect-video">
 						<VideoPlayer
 							playbackId="aBYYjecc99ZfIWP016iEXTwZvyg1HQV700haM1c6Ll9wQ"
 							thumbnailTime={1.5}
@@ -171,7 +165,7 @@ export default function HomePage() {
 			</div>
 
 			<div className="mt-50 w-full bg-gradient-to-b from-gray-200 to-white py-28 px-4">
-				<div className="relative max-w-[1179px] w-full mx-auto">
+				<div className="relative max-w-[943px] w-full mx-auto">
 					<Typography variant="banner" className="text-left w-full">
 						Send without Limits.<br></br> Dream without Boundaries.
 					</Typography>
@@ -201,7 +195,7 @@ export default function HomePage() {
 			<ScrollingReviews />
 
 			<div className="max-w-[1608px] mx-auto mt-24">
-				<Typography variant="h3" className="text-center text-[34px]">
+				<Typography variant="h3" className="text-center text-[27px]">
 					Trusted by countless businesses
 				</Typography>
 				<div className="bg-gradient-to-b from-gray-100 to-white pt-16 pb-48 rounded-md w-full mt-14 h-fit ">
@@ -232,8 +226,8 @@ export default function HomePage() {
 				<Image
 					src="/photos/frontPhoto1.jpg"
 					alt="Personalized Email"
-					width={1173}
-					height={782}
+					width={943}
+					height={626}
 					className="mx-auto mt-12 rounded-sm"
 				/>
 			</div>
