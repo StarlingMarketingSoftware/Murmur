@@ -14,7 +14,7 @@ import { ApiRouteParams } from '@/types';
 
 const updateIdentitySchema = z.object({
 	name: z.string().min(1).optional(),
-	website: z.string().min(1).optional(),
+	website: z.string().optional(),
 	email: z.string().email().optional(),
 });
 

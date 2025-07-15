@@ -17,6 +17,7 @@ import { FormProvider } from 'react-hook-form';
 import { CheckCircleIcon } from 'lucide-react';
 import { Typography } from '@/components/ui/typography';
 import { FC } from 'react';
+import InfoTooltip from '@/components/atoms/InfoTooltip/InfoTooltip';
 
 export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 	const {
@@ -42,7 +43,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 						name="name"
 						render={({ field }) => (
 							<FormItem className="col-span-11">
-								<FormLabel>{'Name (First and Last)'}</FormLabel>
+								<FormLabel>{'Name (First and Last)*'}</FormLabel>
 								<FormControl>
 									<Input className="flex-grow" {...field} />
 								</FormControl>
@@ -68,7 +69,10 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 						name="email"
 						render={({ field }) => (
 							<FormItem>
-								<FormLabel>Email Address</FormLabel>
+								<div className="flex items-start gap-2">
+									<FormLabel>Email Address*</FormLabel>
+									<InfoTooltip message="This is the address where you will receive your responses." />
+								</div>
 								<FormControl>
 									<div className="grid grid-cols-5 gap-2 items-center">
 										<div className="col-span-4 relative">

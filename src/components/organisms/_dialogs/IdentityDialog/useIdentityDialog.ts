@@ -17,7 +17,7 @@ export interface IdentityDialogProps {
 	campaign: Campaign;
 }
 
-const identityFormSchema = z.object({
+export const identityFormSchema = z.object({
 	identityId: z.string(),
 });
 
@@ -39,6 +39,7 @@ export const useIdentityDialog = (props: IdentityDialogProps) => {
 		},
 	});
 
+	const { setValue } = form;
 	const { data: identities, isPending: isPendingIdentities } = useGetIdentities({});
 
 	const { mutate: assignIdentity, isPending: isPendingAssignIdentity } = useEditCampaign({
@@ -92,5 +93,6 @@ export const useIdentityDialog = (props: IdentityDialogProps) => {
 		isClosable,
 		handleAssignIdentity,
 		isPendingAssignIdentity,
+		setValue,
 	};
 };
