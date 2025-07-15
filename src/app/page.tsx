@@ -42,7 +42,7 @@ export default function HomePage() {
 
 	return (
 		<main className="overflow-hidden">
-			<div className="relative h-fit min-h-screen w-screen overflow-hidden">
+			<div className="relative h-fit sm:min-h-screen w-screen overflow-hidden">
 				{/* Background layer with Birds */}
 				<div className="absolute inset-0 z-0">
 					<div
@@ -133,7 +133,7 @@ export default function HomePage() {
 			</div>
 
 			{/* Video Section */}
-			<div className="py-16 mt-[121px] px-4">
+			<div className="py-16 mt-2 sm:mt-32 px-4">
 				<div className="mx-auto w-fit">
 					<div className="relative max-w-[943px] w-full aspect-video">
 						<VideoPlayer
@@ -154,22 +154,22 @@ export default function HomePage() {
 				</div>
 			</div>
 
-			<GradientBanner className="mx-auto mt-24 flex justify-center items-center">
+			<GradientBanner className="mx-auto mt-4 sm:mt-24 flex justify-center items-center">
 				<Typography variant="banner" className="text-center">
 					Generate accurate contact lists in seconds.<br></br> Save countless hours.
 				</Typography>
 			</GradientBanner>
 
-			<div className="mt-24 mb-24 bg-light">
+			<div className="mt-24 bg-light">
 				<ComparisonTable />
 			</div>
 
-			<div className="mt-50 w-full bg-gradient-to-b from-gray-200 to-white py-28 px-4">
+			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-28 px-4">
 				<div className="relative max-w-[943px] w-full mx-auto">
 					<Typography variant="banner" className="text-left w-full">
 						Send without Limits.<br></br> Dream without Boundaries.
 					</Typography>
-					<div className="rounded-lg w-fit h-fit aspect-video max-h-fit overflow-hidden mt-32">
+					<div className="rounded-lg w-fit h-fit aspect-video max-h-fit overflow-hidden mt-16 sm:mt-32">
 						<VideoPlayer
 							playbackId="z015rWLTn4mlDbMX0021ale02ieVwttxqtZvzc2Z02nVotA"
 							thumbnailTime={1.5}
@@ -181,7 +181,7 @@ export default function HomePage() {
 				</div>
 				<Typography
 					variant="promoP"
-					className="w-full max-w-[1130px] mx-auto !mt-32 text-center"
+					className="w-full max-w-[1130px] mx-auto !mt-16 sm:!mt-32 text-center"
 				>
 					Major email providers have tight sending restrictions, our server has none.
 					Focus your time and energy where it matters most, and leave the volume to us.
@@ -194,11 +194,11 @@ export default function HomePage() {
 
 			<ScrollingReviews />
 
-			<div className="max-w-[1608px] mx-auto mt-24">
+			<div className="max-w-[1608px] mx-auto mt-18 sm:mt-24">
 				<Typography variant="h3" className="text-center text-[27px]">
 					Trusted by countless businesses
 				</Typography>
-				<div className="bg-gradient-to-b from-gray-100 to-white pt-16 pb-48 rounded-md w-full mt-14 h-fit ">
+				<div className="bg-gradient-to-b from-gray-100 to-white pt-16 pb-16 sm:pb-48 rounded-md w-full mt-8 sm:mt-14 h-fit ">
 					<div
 						style={{
 							maskImage:
@@ -212,9 +212,9 @@ export default function HomePage() {
 				</div>
 			</div>
 
-			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-25 px-4">
+			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-25 px-4">
 				<Typography variant="banner" className="text-center mx-auto">
-					Not Another Email Tool. 
+					Not Another Email Tool.
 				</Typography>
 				<Typography
 					variant="promoP"
@@ -246,9 +246,9 @@ export default function HomePage() {
 				</Link>
 			</div>
 
-			<div className="mt-28 hidden lg:block">
+			<div className="mt-6 hidden lg:block">
 				<ProductList billingCycle="year" />
-				<div className="mt-41 flex justify-center">
+				<div className="mt-16 flex justify-center">
 					<Link href={urls.pricing.index}>
 						<Button variant="muted" size="lg">
 							Learn More

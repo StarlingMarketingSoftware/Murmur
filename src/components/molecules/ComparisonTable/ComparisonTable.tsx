@@ -58,7 +58,7 @@ const LOGO_CN =
 const CustomCheck = () => {
 	return (
 		<SquareCheck
-			className="mx-auto text-primary stroke-primary h-[75px] w-[24px] sm:w-[32px] md:w-[48px] lg:w-[64px]"
+			className="mx-auto text-primary stroke-primary h-[30px] sm:h-[75px] w-[16px] sm:w-[32px] md:w-[48px] lg:w-[64px]"
 			pathClassName="!stroke-[#4C9F3B]"
 		/>
 	);
@@ -67,7 +67,7 @@ const CustomCheck = () => {
 const CustomX = () => {
 	return (
 		<SquareX
-			className="mx-auto text-destructive stroke-destructive h-[75px] w-[20px] sm:w-[28px] md:w-[42px] lg:w-[56px]"
+			className="mx-auto text-destructive stroke-destructive h-[30px] sm:h-[75px] w-[16px] sm:w-[28px] md:w-[42px] lg:w-[56px]"
 			pathClassName="!stroke-[#AC0E0E]"
 		/>
 	);
