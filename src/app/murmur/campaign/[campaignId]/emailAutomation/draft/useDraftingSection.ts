@@ -43,7 +43,7 @@ import {
 	Signature,
 } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -107,7 +107,7 @@ export type DraftingFormValues = z.infer<typeof draftingFormSchema>;
 
 export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { campaign } = props;
-
+	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	// HOOKS
 
 	const { user } = useMe();
@@ -122,30 +122,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const isGenerationCancelledRef = useRef(false);
 
 	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
-
-	const formValues = useMemo(() => {
-		if (!campaign) return undefined;
-
-		return {
-			draftingMode: campaign.draftingMode ?? DraftingMode.hybrid,
-			isAiSubject: campaign.isAiSubject ?? true,
-			subject: campaign.subject ?? '',
-			fullAiPrompt: campaign.fullAiPrompt ?? '',
-			hybridPrompt: campaign.hybridPrompt ?? '',
-			hybridAvailableBlocks: campaign.hybridAvailableBlocks ?? [
-				HybridBlock.introduction,
-				HybridBlock.research,
-				HybridBlock.action,
-				HybridBlock.text,
-			],
-			hybridBlockPrompts: (campaign.hybridBlockPrompts as HybridBlockPrompt[]) ?? [],
-			handwrittenPrompt: campaign.handwrittenPrompt ?? '',
-			font: (campaign.font as Font) ?? 'Arial',
-			signatureId: campaign.signatureId ?? signatures?.[0]?.id,
-			draftingTone: campaign.draftingTone ?? DraftingTone.normal,
-			paragraphs: campaign.paragraphs ?? 0,
-		};
-	}, [campaign, signatures]);
 
 	const form = useForm<DraftingFormValues>({
 		resolver: zodResolver(draftingFormSchema),
@@ -164,11 +140,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			hybridBlockPrompts: [],
 			handwrittenPrompt: '',
 			font: 'Arial',
-			signatureId: undefined,
+			signatureId: campaign.signatureId ?? signatures?.[0]?.id,
 			draftingTone: DraftingTone.normal,
 			paragraphs: 0,
 		},
-		values: formValues,
 		mode: 'onChange',
 	});
 
@@ -789,56 +764,46 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	// EFFECTS
 
-	// useEffect(() => {
-	// 	if (campaign && form && signatures?.length > 0) {
-	// 		console.log('🚀 ~ useEffect ~ signatures:', signatures);
-	// 		console.log('🚀 ~ useEffect ~ campaign:', campaign);
-
-	// 		if (!campaign.signature) {
-	// 			saveCampaign({
-	// 				id: campaign.id,
-	// 				data: {
-	// 					signatureId: signatures?.[0]?.id,
-	// 				},
-	// 			});
-	// 		}
-
-	// 		form.reset({
-	// 			draftingMode: campaign.draftingMode ?? DraftingMode.ai,
-	// 			isAiSubject: campaign.isAiSubject ?? true,
-	// 			subject: campaign.subject ?? '',
-	// 			fullAiPrompt: campaign.fullAiPrompt ?? '',
-	// 			hybridPrompt: campaign.hybridPrompt ?? '',
-	// 			hybridAvailableBlocks: campaign.hybridAvailableBlocks ?? [
-	// 				HybridBlock.introduction,
-	// 				HybridBlock.research,
-	// 				HybridBlock.action,
-	// 				HybridBlock.text,
-	// 			],
-	// 			hybridBlockPrompts: (campaign.hybridBlockPrompts as HybridBlockPrompt[]) ?? [],
-	// 			handwrittenPrompt: campaign.handwrittenPrompt ?? '',
-	// 			font: (campaign.font as Font) ?? 'Arial',
-	// 			signatureId: campaign.signatureId ?? signatures?.[0]?.id,
-	// 			draftingTone: campaign.draftingTone ?? DraftingTone.normal,
-	// 			paragraphs: campaign.paragraphs ?? 0,
-	// 		});
-	// 		console.log(
-	// 			'🚀 ~ useEffect ~ form.getValues(signatureId):',
-	// 			form.getValues('signatureId')
-	// 		);
-	// 	}
-	// }, [campaign, form, signatures]);
-
 	useEffect(() => {
-		if (campaign && signatures?.length > 0 && !campaign.signature) {
-			saveCampaign({
-				id: campaign.id,
-				data: {
-					signatureId: signatures[0].id,
-				},
+		if (campaign && form && signatures?.length > 0 && isFirstLoad) {
+			console.log('🚀 ~ useEffect ~ signatures:', signatures);
+			console.log('🚀 ~ useEffect ~ campaign:', campaign);
+
+			// if (!campaign.signature) {
+			// 	saveCampaign({
+			// 		id: campaign.id,
+			// 		data: {
+			// 			signatureId: signatures?.[0]?.id,
+			// 		},
+			// 	});
+			// }
+
+			form.reset({
+				draftingMode: campaign.draftingMode ?? DraftingMode.ai,
+				isAiSubject: campaign.isAiSubject ?? true,
+				subject: campaign.subject ?? '',
+				fullAiPrompt: campaign.fullAiPrompt ?? '',
+				hybridPrompt: campaign.hybridPrompt ?? '',
+				hybridAvailableBlocks: campaign.hybridAvailableBlocks ?? [
+					HybridBlock.introduction,
+					HybridBlock.research,
+					HybridBlock.action,
+					HybridBlock.text,
+				],
+				hybridBlockPrompts: (campaign.hybridBlockPrompts as HybridBlockPrompt[]) ?? [],
+				handwrittenPrompt: campaign.handwrittenPrompt ?? '',
+				font: (campaign.font as Font) ?? 'Arial',
+				signatureId: campaign.signatureId ?? signatures?.[0]?.id,
+				draftingTone: campaign.draftingTone ?? DraftingTone.normal,
+				paragraphs: campaign.paragraphs ?? 0,
 			});
+			console.log(
+				'🚀 ~ useEffect ~ form.getValues(signatureId):',
+				form.getValues('signatureId')
+			);
+			setIsFirstLoad(false);
 		}
-	}, [campaign, signatures, saveCampaign]);
+	}, [campaign, form, signatures, isFirstLoad, saveCampaign]);
 
 	useEffect(() => {
 		return () => {
