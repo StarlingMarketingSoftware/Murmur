@@ -35,6 +35,7 @@ import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 import { HandwrittenPromptInput } from '@/components/molecules/HandwrittenPromptInput/HandwrittenPromptInput';
 import { Typography } from '@/components/ui/typography';
+import { Spinner } from '@/components/ui/spinner';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
@@ -171,61 +172,65 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 												</FormItem>
 											)}
 										/>
-										<FormField
-											control={form.control}
-											name="signatureId"
-											render={({ field }) => (
-												<FormItem className="w-full mb-2 relative">
-													<FormLabel>Signature</FormLabel>
-													<FormControl>
-														<Select
-															onValueChange={(value) => {
-																if (value === 'manage-signatures') {
-																	setIsOpenSignaturesDialog(true);
-																	return;
-																}
-																field.onChange(Number(value));
-															}}
-															value={field.value?.toString() || ''}
-														>
-															<SelectTrigger className="!w-full">
-																<SelectValue placeholder="Select signature" />
-															</SelectTrigger>
-															<SelectContent>
-																<SelectGroup>
-																	<SelectLabel>Signatures</SelectLabel>
-																	{isPendingSignatures ? (
-																		<SelectItem value="loading" disabled>
-																			Loading signatures...
-																		</SelectItem>
-																	) : signatures && signatures.length > 0 ? (
-																		signatures.map((signature: Signature) => (
-																			<SelectItem
-																				key={signature.id}
-																				value={signature.id.toString()}
-																			>
-																				{signature.name}
+										{isPendingSignatures ? (
+											<Spinner />
+										) : (
+											<FormField
+												control={form.control}
+												name="signatureId"
+												render={({ field }) => (
+													<FormItem className="w-full mb-2 relative">
+														<FormLabel>Signature</FormLabel>
+														<FormControl>
+															<Select
+																onValueChange={(value) => {
+																	if (value === 'manage-signatures') {
+																		setIsOpenSignaturesDialog(true);
+																		return;
+																	}
+																	field.onChange(Number(value));
+																}}
+																value={field.value ? field.value.toString() : ''}
+															>
+																<SelectTrigger className="!w-full">
+																	<SelectValue placeholder="Select signature" />
+																</SelectTrigger>
+																<SelectContent>
+																	<SelectGroup>
+																		<SelectLabel>Signatures</SelectLabel>
+																		{isPendingSignatures ? (
+																			<SelectItem value="loading" disabled>
+																				Loading signatures...
 																			</SelectItem>
-																		))
-																	) : (
-																		<SelectItem value="no-signatures" disabled>
-																			No signatures available
+																		) : signatures && signatures.length > 0 ? (
+																			signatures.map((signature: Signature) => (
+																				<SelectItem
+																					key={signature.id}
+																					value={signature.id.toString()}
+																				>
+																					{signature.name}
+																				</SelectItem>
+																			))
+																		) : (
+																			<SelectItem value="no-signatures" disabled>
+																				No signatures available
+																			</SelectItem>
+																		)}
+																		<Separator className="my-1" />{' '}
+																	</SelectGroup>
+																	<SelectGroup>
+																		<SelectItem value="manage-signatures">
+																			Manage Signatures
 																		</SelectItem>
-																	)}
-																	<Separator className="my-1" />{' '}
-																</SelectGroup>
-																<SelectGroup>
-																	<SelectItem value="manage-signatures">
-																		Manage Signatures
-																	</SelectItem>
-																</SelectGroup>
-															</SelectContent>
-														</Select>
-													</FormControl>
-													<div className="w-full bg-gray-200 h-5 absolute -bottom-3" />
-												</FormItem>
-											)}
-										/>
+																	</SelectGroup>
+																</SelectContent>
+															</Select>
+														</FormControl>
+														<div className="w-full bg-gray-200 h-5 absolute -bottom-3" />
+													</FormItem>
+												)}
+											/>
+										)}
 									</div>
 									<RichTextEditor
 										hideMenuBar

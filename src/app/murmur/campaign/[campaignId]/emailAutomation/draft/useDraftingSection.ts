@@ -43,7 +43,7 @@ import {
 	Signature,
 } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -98,7 +98,7 @@ export const draftingFormSchema = z.object({
 	),
 	handwrittenPrompt: z.string().default(''),
 	font: z.enum(FONT_VALUES),
-	signatureId: z.number().min(1),
+	signatureId: z.number().optional(),
 	draftingTone: z.nativeEnum(DraftingTone).default(DraftingTone.normal),
 	paragraphs: z.number().min(0).max(5).default(3),
 });
@@ -121,6 +121,32 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const isGenerationCancelledRef = useRef(false);
 
+	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
+
+	const formValues = useMemo(() => {
+		if (!campaign) return undefined;
+
+		return {
+			draftingMode: campaign.draftingMode ?? DraftingMode.hybrid,
+			isAiSubject: campaign.isAiSubject ?? true,
+			subject: campaign.subject ?? '',
+			fullAiPrompt: campaign.fullAiPrompt ?? '',
+			hybridPrompt: campaign.hybridPrompt ?? '',
+			hybridAvailableBlocks: campaign.hybridAvailableBlocks ?? [
+				HybridBlock.introduction,
+				HybridBlock.research,
+				HybridBlock.action,
+				HybridBlock.text,
+			],
+			hybridBlockPrompts: (campaign.hybridBlockPrompts as HybridBlockPrompt[]) ?? [],
+			handwrittenPrompt: campaign.handwrittenPrompt ?? '',
+			font: (campaign.font as Font) ?? 'Arial',
+			signatureId: campaign.signatureId ?? signatures?.[0]?.id,
+			draftingTone: campaign.draftingTone ?? DraftingTone.normal,
+			paragraphs: campaign.paragraphs ?? 0,
+		};
+	}, [campaign, signatures]);
+
 	const form = useForm<DraftingFormValues>({
 		resolver: zodResolver(draftingFormSchema),
 		defaultValues: {
@@ -138,10 +164,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			hybridBlockPrompts: [],
 			handwrittenPrompt: '',
 			font: 'Arial',
-			signatureId: 1,
+			signatureId: undefined,
 			draftingTone: DraftingTone.normal,
-			paragraphs: 3,
+			paragraphs: 0,
 		},
+		values: formValues,
 		mode: 'onChange',
 	});
 
@@ -160,8 +187,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { getValues, formState } = form;
 
 	// API
-
-	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
 
 	const { data: contacts } = useGetContacts({
 		filters: {
@@ -764,29 +789,56 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	// EFFECTS
 
+	// useEffect(() => {
+	// 	if (campaign && form && signatures?.length > 0) {
+	// 		console.log('🚀 ~ useEffect ~ signatures:', signatures);
+	// 		console.log('🚀 ~ useEffect ~ campaign:', campaign);
+
+	// 		if (!campaign.signature) {
+	// 			saveCampaign({
+	// 				id: campaign.id,
+	// 				data: {
+	// 					signatureId: signatures?.[0]?.id,
+	// 				},
+	// 			});
+	// 		}
+
+	// 		form.reset({
+	// 			draftingMode: campaign.draftingMode ?? DraftingMode.ai,
+	// 			isAiSubject: campaign.isAiSubject ?? true,
+	// 			subject: campaign.subject ?? '',
+	// 			fullAiPrompt: campaign.fullAiPrompt ?? '',
+	// 			hybridPrompt: campaign.hybridPrompt ?? '',
+	// 			hybridAvailableBlocks: campaign.hybridAvailableBlocks ?? [
+	// 				HybridBlock.introduction,
+	// 				HybridBlock.research,
+	// 				HybridBlock.action,
+	// 				HybridBlock.text,
+	// 			],
+	// 			hybridBlockPrompts: (campaign.hybridBlockPrompts as HybridBlockPrompt[]) ?? [],
+	// 			handwrittenPrompt: campaign.handwrittenPrompt ?? '',
+	// 			font: (campaign.font as Font) ?? 'Arial',
+	// 			signatureId: campaign.signatureId ?? signatures?.[0]?.id,
+	// 			draftingTone: campaign.draftingTone ?? DraftingTone.normal,
+	// 			paragraphs: campaign.paragraphs ?? 0,
+	// 		});
+	// 		console.log(
+	// 			'🚀 ~ useEffect ~ form.getValues(signatureId):',
+	// 			form.getValues('signatureId')
+	// 		);
+	// 	}
+	// }, [campaign, form, signatures]);
+
 	useEffect(() => {
-		if (campaign && form && signatures?.length > 0) {
-			form.reset({
-				draftingMode: campaign.draftingMode ?? DraftingMode.ai,
-				isAiSubject: campaign.isAiSubject ?? true,
-				subject: campaign.subject ?? '',
-				fullAiPrompt: campaign.fullAiPrompt ?? '',
-				hybridPrompt: campaign.hybridPrompt ?? '',
-				hybridAvailableBlocks: campaign.hybridAvailableBlocks ?? [
-					HybridBlock.introduction,
-					HybridBlock.research,
-					HybridBlock.action,
-					HybridBlock.text,
-				],
-				hybridBlockPrompts: (campaign.hybridBlockPrompts as HybridBlockPrompt[]) ?? [],
-				handwrittenPrompt: campaign.handwrittenPrompt ?? '',
-				font: (campaign.font as Font) ?? 'Arial',
-				signatureId: campaign.signatureId ?? signatures?.[0]?.id,
-				draftingTone: campaign.draftingTone ?? DraftingTone.normal,
-				paragraphs: campaign.paragraphs ?? 3,
+		if (campaign && signatures?.length > 0 && !campaign.signature) {
+			saveCampaign({
+				id: campaign.id,
+				data: {
+					signatureId: signatures[0].id,
+				},
 			});
 		}
-	}, [campaign, form, signatures]);
+	}, [campaign, signatures, saveCampaign]);
 
 	useEffect(() => {
 		return () => {

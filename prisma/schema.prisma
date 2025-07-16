@@ -196,7 +196,7 @@ model Campaign {
   contacts              Contact[]
   draftingMode          DraftingMode      @default(ai)
   draftingTone          DraftingTone      @default(normal)
-  paragraphs            Int?              @default(3)
+  paragraphs            Int?              @default(0)
   subject               String?
   isAiSubject           Boolean           @default(true)
   fullAiPrompt          String?           @map("message") @db.Text
