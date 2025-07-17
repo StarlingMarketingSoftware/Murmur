@@ -1,5 +1,6 @@
 import { HANDWRITTEN_PLACEHOLDER_OPTIONS } from '@/components/molecules/HandwrittenPromptInput/HandwrittenPromptInput';
 import {
+	DEFAULT_FONT,
 	FONT_OPTIONS,
 	getMistralParagraphPrompt,
 	getMistralTonePrompt,
@@ -98,7 +99,7 @@ export const draftingFormSchema = z.object({
 	),
 	handwrittenPrompt: z.string().default(''),
 	font: z.enum(FONT_VALUES),
-	signatureId: z.number().min(1),
+	signatureId: z.number().optional(),
 	draftingTone: z.nativeEnum(DraftingTone).default(DraftingTone.normal),
 	paragraphs: z.number().min(0).max(5).default(3),
 });
@@ -107,6 +108,7 @@ export type DraftingFormValues = z.infer<typeof draftingFormSchema>;
 
 export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { campaign } = props;
+	const [isFirstLoad, setIsFirstLoad] = useState(true);
 
 	// HOOKS
 
@@ -120,6 +122,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [abortController, setAbortController] = useState<AbortController | null>(null);
 
 	const isGenerationCancelledRef = useRef(false);
+
+	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
 
 	const form = useForm<DraftingFormValues>({
 		resolver: zodResolver(draftingFormSchema),
@@ -137,14 +141,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			],
 			hybridBlockPrompts: [],
 			handwrittenPrompt: '',
-			font: 'Arial',
-			signatureId: 1,
+			font: (campaign.font as Font) ?? DEFAULT_FONT,
+			signatureId: campaign.signatureId ?? signatures?.[0]?.id,
 			draftingTone: DraftingTone.normal,
-			paragraphs: 3,
+			paragraphs: 0,
 		},
 		mode: 'onChange',
 	});
-
 	const {
 		fields: hybridFields,
 		append: hybridAppend,
@@ -160,8 +163,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { getValues, formState } = form;
 
 	// API
-
-	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
 
 	const { data: contacts } = useGetContacts({
 		filters: {
@@ -765,7 +766,18 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	// EFFECTS
 
 	useEffect(() => {
-		if (campaign && form && signatures?.length > 0) {
+		const currentSignature = signatures?.find(
+			(signature: Signature) => signature.id === form.getValues('signatureId')
+		);
+		if (!currentSignature && signatures?.length === 0) {
+			form.setValue('signatureId', undefined);
+		} else if (!currentSignature && signatures?.length > 0) {
+			form.setValue('signatureId', signatures[0].id);
+		}
+	}, [signatures, form]);
+
+	useEffect(() => {
+		if (campaign && form && signatures?.length > 0 && isFirstLoad) {
 			form.reset({
 				draftingMode: campaign.draftingMode ?? DraftingMode.ai,
 				isAiSubject: campaign.isAiSubject ?? true,
@@ -780,13 +792,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				],
 				hybridBlockPrompts: (campaign.hybridBlockPrompts as HybridBlockPrompt[]) ?? [],
 				handwrittenPrompt: campaign.handwrittenPrompt ?? '',
-				font: (campaign.font as Font) ?? 'Arial',
+				font: (campaign.font as Font) ?? DEFAULT_FONT,
 				signatureId: campaign.signatureId ?? signatures?.[0]?.id,
 				draftingTone: campaign.draftingTone ?? DraftingTone.normal,
-				paragraphs: campaign.paragraphs ?? 3,
+				paragraphs: campaign.paragraphs ?? 0,
 			});
+			setIsFirstLoad(false);
 		}
-	}, [campaign, form, signatures]);
+	}, [campaign, form, signatures, isFirstLoad, saveCampaign]);
 
 	useEffect(() => {
 		return () => {

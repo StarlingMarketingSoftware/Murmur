@@ -1,14 +1,14 @@
 import { Font } from '@/types';
 
 export const FONT_OPTIONS: Font[] = [
-	'Times New Roman',
 	'Arial',
+	'Times New Roman',
 	'Calibri',
 	'Georgia',
 	'Courier New',
 ];
 
-export const DEFAULT_FONT = 'Times New Roman';
+export const DEFAULT_FONT: Font = 'Arial';
 
 export const RESTRICTED_FEATURE_MESSAGES = {
 	viewEmails: 'Upgrade your subscription to view recipient emails before sending.',

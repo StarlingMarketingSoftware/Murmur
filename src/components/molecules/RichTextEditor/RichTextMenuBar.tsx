@@ -22,6 +22,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
+import { DEFAULT_FONT, FONT_OPTIONS } from '@/constants/ui';
 
 interface RichTextMenuBarProps {
 	editor: Editor | null;
@@ -29,8 +30,6 @@ interface RichTextMenuBarProps {
 	showPlaceholders?: boolean;
 	placeholderOptions?: { value: string; label: string }[];
 }
-
-const fontOptions = ['Times New Roman', 'Arial', 'Calibri', 'Georgia', 'Courier New'];
 
 export const RichTextMenuBar: FC<RichTextMenuBarProps> = ({
 	editor,
@@ -110,7 +109,7 @@ export const RichTextMenuBar: FC<RichTextMenuBarProps> = ({
 			))}
 			<Select
 				onValueChange={(font) => editor.chain().focus().setFontFamily(font).run()}
-				defaultValue={fontOptions[0]}
+				defaultValue={DEFAULT_FONT}
 				value={editor.getAttributes('textStyle').fontFamily}
 				disabled={!isEdit}
 			>
@@ -121,7 +120,7 @@ export const RichTextMenuBar: FC<RichTextMenuBarProps> = ({
 				<SelectContent>
 					<SelectGroup>
 						<SelectLabel>Fonts</SelectLabel>
-						{fontOptions.map((font) => (
+						{FONT_OPTIONS.map((font) => (
 							<SelectItem key={font} value={font} style={{ fontFamily: font }}>
 								{font}
 							</SelectItem>

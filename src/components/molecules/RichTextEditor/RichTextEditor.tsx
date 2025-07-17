@@ -45,6 +45,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 	showPlaceholders = false,
 	placeholderOptions,
 }) => {
+	const _isEdit = isEdit && !disabled;
 	const editor = useEditor({
 		extensions: [
 			StarterKit.configure({
@@ -78,7 +79,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 			TextStyle.configure({ mergeNestedSpanStyles: true }),
 			Div, // Add the Div extension here
 		],
-		editable: isEdit,
+		editable: _isEdit,
 		immediatelyRender: false,
 		content: value ? value : '',
 		editorProps: {
@@ -109,16 +110,16 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 
 	useEffect(() => {
 		if (editor) {
-			editor.setEditable(isEdit);
+			editor.setEditable(_isEdit);
 		}
-	}, [editor, isEdit]);
+	}, [editor, _isEdit]);
 
 	return (
 		<div className="flex flex-col gap-2">
 			{!hideMenuBar && (
 				<RichTextMenuBar
 					editor={editor}
-					isEdit={isEdit}
+					isEdit={_isEdit}
 					showPlaceholders={showPlaceholders}
 					placeholderOptions={placeholderOptions}
 				/>

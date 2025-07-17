@@ -98,7 +98,6 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
-
 		const {
 			signatureId,
 			identityId,

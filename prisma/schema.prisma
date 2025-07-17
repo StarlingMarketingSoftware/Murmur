@@ -196,7 +196,7 @@ model Campaign {
   contacts              Contact[]
   draftingMode          DraftingMode      @default(ai)
   draftingTone          DraftingTone      @default(normal)
-  paragraphs            Int?              @default(3)
+  paragraphs            Int?              @default(0)
   subject               String?
   isAiSubject           Boolean           @default(true)
   fullAiPrompt          String?           @map("message") @db.Text
@@ -204,16 +204,16 @@ model Campaign {
   hybridAvailableBlocks HybridBlock[]     @default([introduction, research, action, text])
   hybridBlockPrompts    Json?
   handwrittenPrompt     String?           @db.Text
-  font                  String            @default("Times New Roman")
+  font                  String            @default("Arial")
   testMessage           String?           @db.Text
   testSubject           String?
   emails                Email[]
   senderEmail           String?
   senderName            String?
   signatureId           Int?
-  signature             Signature?        @relation(fields: [signatureId], references: [id], onDelete: Cascade)
+  signature             Signature?        @relation(fields: [signatureId], references: [id])
   identityId            Int?
-  identity              Identity?         @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  identity              Identity?         @relation(fields: [identityId], references: [id])
   contactLists          ContactList[]
   userContactLists      UserContactList[]
 
