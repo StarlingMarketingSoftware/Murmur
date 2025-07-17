@@ -35,6 +35,7 @@ import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 import { HandwrittenPromptInput } from '@/components/molecules/HandwrittenPromptInput/HandwrittenPromptInput';
 import { Typography } from '@/components/ui/typography';
+import { Font } from '@/types';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
@@ -149,7 +150,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 														<Select
 															disabled={draftingMode === 'handwritten'}
 															onValueChange={field.onChange}
-															defaultValue={field.value}
+															value={field.value as Font}
 														>
 															<SelectTrigger className="w-full">
 																<SelectValue />
@@ -186,7 +187,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																}
 																field.onChange(Number(value));
 															}}
-															defaultValue={field.value?.toString()}
+															defaultValue={field.value ? field.value.toString() : ''}
 															value={field.value ? field.value.toString() : ''}
 														>
 															<SelectTrigger className="!w-full">

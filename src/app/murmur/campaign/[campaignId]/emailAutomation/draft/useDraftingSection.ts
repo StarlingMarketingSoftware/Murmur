@@ -1,5 +1,6 @@
 import { HANDWRITTEN_PLACEHOLDER_OPTIONS } from '@/components/molecules/HandwrittenPromptInput/HandwrittenPromptInput';
 import {
+	DEFAULT_FONT,
 	FONT_OPTIONS,
 	getMistralParagraphPrompt,
 	getMistralTonePrompt,
@@ -108,6 +109,7 @@ export type DraftingFormValues = z.infer<typeof draftingFormSchema>;
 export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { campaign } = props;
 	const [isFirstLoad, setIsFirstLoad] = useState(true);
+
 	// HOOKS
 
 	const { user } = useMe();
@@ -139,14 +141,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			],
 			hybridBlockPrompts: [],
 			handwrittenPrompt: '',
-			font: 'Arial',
+			font: (campaign.font as Font) ?? DEFAULT_FONT,
 			signatureId: campaign.signatureId ?? signatures?.[0]?.id,
 			draftingTone: DraftingTone.normal,
 			paragraphs: 0,
 		},
 		mode: 'onChange',
 	});
-
 	const {
 		fields: hybridFields,
 		append: hybridAppend,
@@ -765,19 +766,18 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	// EFFECTS
 
 	useEffect(() => {
+		const currentSignature = signatures?.find(
+			(signature: Signature) => signature.id === form.getValues('signatureId')
+		);
+		if (!currentSignature && signatures?.length === 0) {
+			form.setValue('signatureId', undefined);
+		} else if (!currentSignature && signatures?.length > 0) {
+			form.setValue('signatureId', signatures[0].id);
+		}
+	}, [signatures, form]);
+
+	useEffect(() => {
 		if (campaign && form && signatures?.length > 0 && isFirstLoad) {
-			console.log('🚀 ~ useEffect ~ signatures:', signatures);
-			console.log('🚀 ~ useEffect ~ campaign:', campaign);
-
-			// if (!campaign.signature) {
-			// 	saveCampaign({
-			// 		id: campaign.id,
-			// 		data: {
-			// 			signatureId: signatures?.[0]?.id,
-			// 		},
-			// 	});
-			// }
-
 			form.reset({
 				draftingMode: campaign.draftingMode ?? DraftingMode.ai,
 				isAiSubject: campaign.isAiSubject ?? true,
@@ -792,15 +792,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				],
 				hybridBlockPrompts: (campaign.hybridBlockPrompts as HybridBlockPrompt[]) ?? [],
 				handwrittenPrompt: campaign.handwrittenPrompt ?? '',
-				font: (campaign.font as Font) ?? 'Arial',
+				font: (campaign.font as Font) ?? DEFAULT_FONT,
 				signatureId: campaign.signatureId ?? signatures?.[0]?.id,
 				draftingTone: campaign.draftingTone ?? DraftingTone.normal,
 				paragraphs: campaign.paragraphs ?? 0,
 			});
-			console.log(
-				'🚀 ~ useEffect ~ form.getValues(signatureId):',
-				form.getValues('signatureId')
-			);
 			setIsFirstLoad(false);
 		}
 	}, [campaign, form, signatures, isFirstLoad, saveCampaign]);
