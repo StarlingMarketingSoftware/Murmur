@@ -95,13 +95,9 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 
 		const body = await req.json();
 		const validatedData = patchCampaignSchema.safeParse(body);
-		console.log('🚀 ~ PATCH ~ validatedData:', validatedData);
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
-
-		console.log('🚀 ~ PATCH ~ body:', body);
-
 		const {
 			signatureId,
 			identityId,

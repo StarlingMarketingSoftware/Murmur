@@ -10,7 +10,7 @@ import { useForm, UseFormSetValue } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { identityFormSchema } from '../useIdentityDialog';
-import { useCreateSignature } from '@/hooks/queryHooks/useSignatures';
+import { useCreateSignature, useGetSignatures } from '@/hooks/queryHooks/useSignatures';
 import { DEFAULT_FONT } from '@/constants/ui';
 
 const upsertIdentityFormSchema = z.object({
@@ -66,6 +66,7 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 		},
 	});
 
+	const { data: signatures } = useGetSignatures();
 	const { mutate: createSignature } = useCreateSignature({
 		suppressToasts: true,
 	});
@@ -156,11 +157,12 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 				website: values.website,
 			});
 			setValue('identityId', String(newIdentity.id));
-			createSignature({
-				name: 'Default Signature',
-				content: `<p><span style="font-family: ${DEFAULT_FONT}">Sincerely,</span></p><p></p><p><span style="font-family: ${DEFAULT_FONT}">${values.name}</span></p>`,
-			});
-			// refetch campaign??
+			if (signatures?.length === 0) {
+				createSignature({
+					name: 'Default Signature',
+					content: `<p><span style="font-family: ${DEFAULT_FONT}">Sincerely,</span></p><p></p><p><span style="font-family: ${DEFAULT_FONT}">${values.name}</span></p>`,
+				});
+			}
 		}
 	};
 
