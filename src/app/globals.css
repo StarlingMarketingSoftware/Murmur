@@ -184,34 +184,34 @@
 }
 
 /* Custom scrollbar for table containers */
-[data-slot="table-container"] {
+table {
 	scrollbar-width: thin; /* For Firefox */
 }
 
-[data-slot="table-container"]::-webkit-scrollbar {
+table::-webkit-scrollbar {
 	width: 6px;
 	height: 6px;
 }
 
-[data-slot="table-container"]::-webkit-scrollbar-track {
+table::-webkit-scrollbar-track {
 	background: transparent;
 }
 
-[data-slot="table-container"]::-webkit-scrollbar-thumb {
+table::-webkit-scrollbar-thumb {
 	background-color: rgb(203 213 225); /* Tailwind slate-300 */
 	border-radius: 20px;
 }
 
-[data-slot="table-container"]::-webkit-scrollbar-thumb:hover {
+table::-webkit-scrollbar-thumb:hover {
 	background-color: rgb(148 163 184); /* Tailwind slate-400 */
 }
 
 /* Hide scrollbar buttons and borders */
-[data-slot="table-container"]::-webkit-scrollbar-button {
+table::-webkit-scrollbar-button {
 	display: none;
 }
 
-[data-slot="table-container"]::-webkit-scrollbar-corner {
+table::-webkit-scrollbar-corner {
 	background: transparent;
 }
 

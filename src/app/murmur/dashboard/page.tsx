@@ -84,6 +84,7 @@ const Dashboard = () => {
 										<FormItem>
 											<FormControl>
 												<Input
+													className="!border-foreground"
 													placeholder="Who do you want to send to?  i.e  “Wedding Planners in North Carolina”"
 													{...field}
 												/>
@@ -124,22 +125,36 @@ const Dashboard = () => {
 								</Button>
 							</div> */}
 							{contacts ? (
-								<Card>
-									<CardHeader>
-										<CardTitle>Contacts</CardTitle>
-									</CardHeader>
-									<CardContent>
-										<CustomTable
-											initialSelectAll
-											isSelectable
-											setSelectedRows={setSelectedContacts}
-											data={[...contacts, ...apolloContacts]}
-											columns={columns}
-											searchable={false}
-											tableRef={tableRef}
-										/>
-									</CardContent>
-								</Card>
+								<>
+									<Card>
+										<CardHeader>
+											<CardTitle>Contacts</CardTitle>
+										</CardHeader>
+										<CardContent>
+											<CustomTable
+												initialSelectAll
+												isSelectable
+												setSelectedRows={setSelectedContacts}
+												data={[...contacts, ...apolloContacts]}
+												columns={columns}
+												searchable={false}
+												tableRef={tableRef}
+												rowsPerPage={100}
+												displayRowsPerPage={false}
+											/>
+										</CardContent>
+									</Card>
+									<div className="flex items-center">
+										<Button
+											onClick={handleCreateCampaign}
+											isLoading={isPendingCreateCampaign || isPendingCreateContactList}
+											variant="primary-light"
+											className="w-8/10 mx-auto mt-5"
+										>
+											Create Campaign
+										</Button>
+									</div>
+								</>
 							) : (
 								<Spinner />
 							)}
@@ -151,19 +166,18 @@ const Dashboard = () => {
 			{currentTab === 'list' && (
 				<>
 					<ContactListTable setSelectedRows={setSelectedContactListRows} />
+					<div className="flex items-center">
+						<Button
+							onClick={handleCreateCampaign}
+							isLoading={isPendingCreateCampaign || isPendingCreateContactList}
+							variant="primary-light"
+							className="w-8/10 mx-auto mt-5"
+						>
+							Create Campaign
+						</Button>
+					</div>
 				</>
 			)}
-
-			<div className="flex items-center">
-				<Button
-					onClick={handleCreateCampaign}
-					isLoading={isPendingCreateCampaign || isPendingCreateContactList}
-					variant="primary-light"
-					className="w-8/10 mx-auto mt-5"
-				>
-					Create Campaign
-				</Button>
-			</div>
 
 			<div className="mt-46">
 				<CampaignsTable />

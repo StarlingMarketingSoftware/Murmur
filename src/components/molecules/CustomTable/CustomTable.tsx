@@ -45,6 +45,8 @@ interface DataTableProps<TData, TValue> {
 	noDataMessage?: string;
 	searchable?: boolean;
 	initialSelectAll?: boolean;
+	rowsPerPage?: number;
+	displayRowsPerPage?: boolean;
 }
 
 interface TableSortingButtonProps<TData> {
@@ -98,10 +100,12 @@ export function CustomTable<TData, TValue>({
 	searchable = true,
 	tableRef,
 	initialSelectAll = false,
+	rowsPerPage = 20,
+	displayRowsPerPage = true,
 }: CustomTableProps<TData, TValue>) {
 	const [pagination, setPagination] = useState({
 		pageIndex: 0,
-		pageSize: 20,
+		pageSize: rowsPerPage,
 	});
 
 	// Initialize all rows as selected
@@ -145,6 +149,13 @@ export function CustomTable<TData, TValue>({
 
 	// Add this effect to pass the table instance to parent
 	useEffect(() => {
+		setPagination((prev) => ({
+			...prev,
+			pageSize: rowsPerPage,
+		}));
+	}, [rowsPerPage]);
+
+	useEffect(() => {
 		if (tableRef) {
 			tableRef(table);
 		}
@@ -166,7 +177,7 @@ export function CustomTable<TData, TValue>({
 	}, [pagination.pageIndex, pagination.pageSize, data]);
 
 	return (
-		<div>
+		<div className=" [&_::-webkit-scrollbar]:h-[4px] [&_::-webkit-scrollbar]:md:h-[7px] [&_::-webkit-scrollbar-thumb]:bg-gray-300 [&_::-webkit-scrollbar-thumb]:rounded-full [&_::-webkit-scrollbar]:w-[4px] [&_::-webkit-scrollbar]:md:w-[7px]">
 			<div className="flex items-center justify-between py-4 gap-4">
 				<div className="flex flex-col sm:flex-row items-center gap-4">
 					{searchable && (
@@ -176,28 +187,30 @@ export function CustomTable<TData, TValue>({
 							onChange={(event) => setGlobalFilter(event.target.value)}
 						/>
 					)}
-					<div className="flex items-center gap-2">
-						<span className="text-sm text-muted-foreground text-nowrap">
-							Rows per page:
-						</span>
-						<Select
-							value={pagination.pageSize.toString()}
-							onValueChange={(value) =>
-								setPagination((prev) => ({ ...prev, pageSize: parseInt(value, 10) }))
-							}
-						>
-							<SelectTrigger className="w-[100px]">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{[10, 20, 30, 50, 100, 200, 500, 1000].map((size) => (
-									<SelectItem key={size} value={size.toString()}>
-										{size}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</div>
+					{displayRowsPerPage && (
+						<div className="flex items-center gap-2">
+							<span className="text-sm text-muted-foreground text-nowrap">
+								Rows per page:
+							</span>
+							<Select
+								value={pagination.pageSize.toString()}
+								onValueChange={(value) =>
+									setPagination((prev) => ({ ...prev, pageSize: parseInt(value, 10) }))
+								}
+							>
+								<SelectTrigger className="w-[100px]">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									{[10, 20, 30, 50, 100, 200, 500, 1000].map((size) => (
+										<SelectItem key={size} value={size.toString()}>
+											{size}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+					)}
 				</div>
 				{isSelectable && (
 					<div className="flex-1 gap-4 text-sm text-muted-foreground">
@@ -206,14 +219,18 @@ export function CustomTable<TData, TValue>({
 					</div>
 				)}
 			</div>
-			<div className="rounded-md border">
-				<Table variant={variant}>
-					<TableHeader variant={variant}>
+			<div className="rounded-md border relative overflow-y-auto max-h-[750px] ">
+				<Table className="relative" variant={variant}>
+					<TableHeader variant={variant} sticky>
 						{table.getHeaderGroups().map((headerGroup) => (
-							<TableRow key={headerGroup.id} variant={variant}>
+							<TableRow className="!sticky !top-0" key={headerGroup.id} variant={variant}>
 								{headerGroup.headers.map((header) => {
 									return (
-										<TableHead className={twMerge()} key={header.id} variant={variant}>
+										<TableHead
+											className={twMerge('sticky top-0')}
+											key={header.id}
+											variant={variant}
+										>
 											{header.isPlaceholder
 												? null
 												: flexRender(header.column.columnDef.header, header.getContext())}

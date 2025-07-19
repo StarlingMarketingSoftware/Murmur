@@ -23,16 +23,11 @@ function Table({
 	...props
 }: React.ComponentProps<'table'> & VariantProps<typeof tableVariants>) {
 	return (
-		<div
-			data-slot="table-container"
-			className="relative w-full overflow-x-auto rounded-md"
-		>
-			<table
-				data-slot="table"
-				className={cn(tableVariants({ variant }), className)}
-				{...props}
-			/>
-		</div>
+		<table
+			data-slot="table"
+			className={cn(tableVariants({ variant }), className, 'rounded-md')}
+			{...props}
+		/>
 	);
 }
 
@@ -52,15 +47,20 @@ const tableHeaderVariants = cva(
 	}
 );
 
-function TableHeader({
-	className,
-	variant,
-	...props
-}: React.ComponentProps<'thead'> & VariantProps<typeof tableHeaderVariants>) {
+interface TableHeaderProps extends React.ComponentProps<'thead'> {
+	variant: 'primary' | 'secondary';
+	sticky?: boolean;
+}
+
+function TableHeader({ className, variant, sticky = false, ...props }: TableHeaderProps) {
 	return (
 		<thead
 			data-slot="table-header"
-			className={cn(tableHeaderVariants({ variant }), className)}
+			className={cn(
+				tableHeaderVariants({ variant }),
+				sticky && 'sticky -top-2 z-10 bg-background',
+				className
+			)}
 			{...props}
 		/>
 	);

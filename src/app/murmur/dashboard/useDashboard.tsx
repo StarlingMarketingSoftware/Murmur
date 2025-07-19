@@ -174,7 +174,7 @@ export const useDashboard = () => {
 			query: activeSearchQuery,
 			verificationStatus: EmailVerificationStatus.valid,
 			useVectorSearch: true,
-			limit: 101,
+			limit: 100,
 		},
 		enabled: false,
 	});
