@@ -4,17 +4,17 @@ AI-powered marketing automation platform that helps you create, manage, and opti
 
 ## Initial Setup
 
-- Install Node version 20 or above. Using nvm (Node Version Manager) is recommended in case you eventually having to handle multiple versions locally for different applications.
+- Install Node version 20 or above. Using nvm (Node Version Manager) is recommended in case you eventually have to handle multiple versions locally for different applications.
 - In the folder where you want to clone the repo, run `git clone https://github.com/StarlingMarketingSoftware/Murmur.git`
 - cd into the murmur folder.
 - Get localhost environment variables from a team member and paste it into .env file in the root directory.
 - Run `npm i` to install packages.
-- Install PostgreSQL https://www.postgresql.org/download/ and create a new database.
-- Make sure that the POSTGRES_PRISMA_URL environment variable matches the user, password, host, port information of the database you just created.
-- Run `npx prisma migrate dev`
+- Install Docker Desktop https://www.docker.com/products/docker-desktop/
+- Make sure Docker is running, and in your terminal for the repo, run `docker-compose up -d` to create and start a Docker container with PostgreSQL and Elastic Search vector databases.
+- Run `npx prisma migrate dev` to apply all database migrations.
 - Run `npx prisma db seed` Requires .csv file with contact seed information to be in the /public folder. Ask a team member.
 - Run `npm run dev` and access the server on localhost:3000.
-- Make sure the Clerk webhook is running, and create a user in the application. If you have an existing user on Clerk and are installing on a new computer, copy the user data from the old computer's local database for consistency.
+- If you don't have a Clerk user created for local Development, make sure the Clerk webhook is running, and create a user in the application. If you have an existing user on Clerk and are setting up local development environment on a new computer, copy the user data from the old computer's local database for consistency. Your newly created user can be added to the seed.ts file for quick setup on new computers and in cases where database reset is necessary (create a new branch for this change).
 - The local database can be managed using Prisma Studio `npx prisma studio` or with your preferred database manager, such as DBeaver or pgAdmin.
 - If working from China, your VPN must be configured as follows:
   - Use Astrill's StealthVPN or similar VPN with protocol/port selection
