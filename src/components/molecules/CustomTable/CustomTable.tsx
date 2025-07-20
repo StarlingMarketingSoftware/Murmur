@@ -47,6 +47,7 @@ interface DataTableProps<TData, TValue> {
 	initialSelectAll?: boolean;
 	rowsPerPage?: number;
 	displayRowsPerPage?: boolean;
+	highlightedRowIds?: Set<number>;
 }
 
 interface TableSortingButtonProps<TData> {
@@ -259,11 +260,13 @@ export function CustomTable<TData, TValue>({
 									key={row.id}
 									data-state={row.getIsSelected() && 'selected'}
 								>
-									{row.getVisibleCells().map((cell) => (
-										<TableCell key={cell.id} variant={variant}>
-											{flexRender(cell.column.columnDef.cell, cell.getContext())}
-										</TableCell>
-									))}
+									{row.getVisibleCells().map((cell) => {
+										return (
+											<TableCell key={cell.id} variant={variant}>
+												{flexRender(cell.column.columnDef.cell, cell.getContext())}
+											</TableCell>
+										);
+									})}
 								</TableRow>
 							))
 						) : (

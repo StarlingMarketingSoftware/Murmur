@@ -42,6 +42,23 @@ export const useGetContacts = (options: ContactQueryOptions) => {
 	});
 };
 
+export const useGetUsedContactIds = () => {
+	return useQuery<number[]>({
+		queryKey: [...QUERY_KEYS.list(), 'used-contacts'],
+		queryFn: async () => {
+			const url = appendQueryParamsToUrl(urls.api.contacts.usedContacts.index);
+			const response = await _fetch(url);
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to fetch used contacts');
+			}
+
+			return response.json() as Promise<number[]>;
+		},
+	});
+};
+
 export const useCreateContact = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,

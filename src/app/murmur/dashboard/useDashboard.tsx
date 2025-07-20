@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
-import { useGetContacts } from '@/hooks/queryHooks/useContacts';
+import { useGetContacts, useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import { TableSortingButton } from '@/components/molecules/CustomTable/CustomTable';
 import { ColumnDef, Table } from '@tanstack/react-table';
 import { ContactWithName } from '@/types/contact';
@@ -16,6 +16,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateApolloContacts } from '@/hooks/queryHooks/useApollo';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { toast } from 'sonner';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { twMerge } from 'tailwind-merge';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -64,7 +66,23 @@ export const useDashboard = () => {
 				return <TableSortingButton column={column} label="Email" />;
 			},
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('email')}</div>;
+				const isUsed = usedContactIdsSet.has(row.original.id);
+				return (
+					<div className="flex">
+						{isUsed ? (
+							<Tooltip>
+								<TooltipTrigger>
+									<div className="text-left bg-warning/20 px-2 rounded-md">
+										{row.getValue('email')}
+									</div>
+								</TooltipTrigger>
+								<TooltipContent>This contact has been used in a campaign.</TooltipContent>
+							</Tooltip>
+						) : (
+							<div className={twMerge('text-left')}>{row.getValue('email')}</div>
+						)}
+					</div>
+				);
 			},
 		},
 		{
@@ -163,10 +181,14 @@ export const useDashboard = () => {
 	>([]);
 	const [selectedContacts, setSelectedContacts] = useState<ContactWithName[]>([]);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
+	const [activeLocation, setActiveLocation] = useState('');
+	const [activeExcludeUsedContacts, setActiveExcludeUsedContacts] = useState(true);
+	const [activeExactMatchesOnly, setActiveExactMatchesOnly] = useState(false);
 	const [currentTab, setCurrentTab] = useState<TabValue>('search');
 	const [limit, setLimit] = useState(100);
 	const [apolloContacts, setApolloContacts] = useState<ContactWithName[]>([]);
 	const [tableInstance, setTableInstance] = useState<Table<ContactWithName>>();
+	const [usedContactIdsSet, setUsedContactIdsSet] = useState<Set<number>>(new Set());
 
 	const {
 		data: contacts,
@@ -179,15 +201,13 @@ export const useDashboard = () => {
 		filters: {
 			query: activeSearchQuery,
 			verificationStatus: EmailVerificationStatus.valid,
-			useVectorSearch: !form.getValues('exactMatchesOnly'),
+			useVectorSearch: !activeExactMatchesOnly,
 			limit,
-			excludeUsedContacts: form.getValues('excludeUsedContacts'),
-			location: form.getValues('location'),
+			excludeUsedContacts: activeExcludeUsedContacts,
+			location: activeLocation,
 		},
 		enabled: false,
 	});
-	console.log('🚀 ~ useDashboard ~ contacts:', contacts);
-
 	const { mutateAsync: importApolloContacts, isPending: isPendingImportApolloContacts } =
 		useCreateApolloContacts({});
 
@@ -208,9 +228,15 @@ export const useDashboard = () => {
 			suppressToasts: true,
 		});
 
+	const { data: usedContactIds } = useGetUsedContactIds();
+
 	/* HANDLERS */
 	const onSubmit = async (data: FormData) => {
 		setActiveSearchQuery(data.searchText);
+		setActiveLocation(data.location || '');
+		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? true);
+		setActiveExactMatchesOnly(data.exactMatchesOnly ?? false);
+		setLimit(100);
 		setTimeout(() => {
 			refetchContacts();
 		}, 0);
@@ -259,6 +285,13 @@ export const useDashboard = () => {
 		setTableInstance(table);
 	};
 
+	/* EFFECTS */
+	useEffect(() => {
+		if (usedContactIds) {
+			setUsedContactIdsSet(new Set(usedContactIds));
+		}
+	}, [usedContactIds]);
+
 	return {
 		apolloContacts,
 		form,
@@ -286,5 +319,6 @@ export const useDashboard = () => {
 		isPendingImportApolloContacts,
 		isPendingCreateContactList,
 		selectedContactListRows,
+		usedContactIdsSet,
 	};
 };

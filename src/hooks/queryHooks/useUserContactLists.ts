@@ -1,7 +1,10 @@
 import { PatchUserContactListData } from '@/app/api/user-contact-lists/[id]/route';
-import { PostUserContactListData } from '@/app/api/user-contact-lists/route';
-import { _fetch } from '@/utils';
-import { CustomMutationOptions } from '@/types';
+import {
+	PostUserContactListData,
+	UserContactListFilterData,
+} from '@/app/api/user-contact-lists/route';
+import { _fetch, appendQueryParamsToUrl } from '@/utils';
+import { CustomMutationOptions, CustomQueryOptions } from '@/types';
 import { urls } from '@/constants/urls';
 import { UserContactListWithContacts } from '@/types/contact';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
@@ -18,11 +21,16 @@ interface EditUserContactListData {
 	data: PatchUserContactListData;
 }
 
-export const useGetUserContactLists = () => {
+export interface UserContactListQueryOptions extends CustomQueryOptions {
+	filters?: UserContactListFilterData;
+}
+
+export const useGetUserContactLists = (options: UserContactListQueryOptions) => {
 	return useQuery({
-		queryKey: QUERY_KEYS.list(),
+		queryKey: [...QUERY_KEYS.list(), options.filters],
 		queryFn: async () => {
-			const response = await _fetch(urls.api.userContactList.index);
+			const url = appendQueryParamsToUrl(urls.api.userContactList.index, options.filters);
+			const response = await _fetch(url);
 			if (!response.ok) {
 				throw new Error('Failed to fetch user contact lists');
 			}

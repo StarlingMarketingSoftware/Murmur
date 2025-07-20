@@ -195,6 +195,7 @@ const Dashboard = () => {
 									onClick={handleCreateCampaign}
 									isLoading={isPendingCreateCampaign}
 									variant="primary-light"
+									bold
 									className="w-8/10 mx-auto mt-5"
 								>
 									Create Campaign

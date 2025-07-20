@@ -68,6 +68,9 @@ export const urls = {
 		},
 		contacts: {
 			index: '/api/contacts',
+			usedContacts: {
+				index: '/api/contacts/used-contacts',
+			},
 			batch: {
 				index: '/api/contacts/batch',
 				private: {
