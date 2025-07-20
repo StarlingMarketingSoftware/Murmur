@@ -77,6 +77,9 @@ export const urls = {
 					index: '/api/contacts/batch/private',
 				},
 			},
+			bulkUpdate: {
+				index: '/api/contacts/bulk-update',
+			},
 			detail: ((id) => `/api/contacts/${id}`) as DetailRoute,
 		},
 		emails: {

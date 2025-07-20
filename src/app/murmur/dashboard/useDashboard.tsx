@@ -8,7 +8,11 @@ import { useEffect, useState } from 'react';
 import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
-import { useGetContacts, useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
+import {
+	useBatchUpdateContacts,
+	useGetContacts,
+	useGetUsedContactIds,
+} from '@/hooks/queryHooks/useContacts';
 import { TableSortingButton } from '@/components/molecules/CustomTable/CustomTable';
 import { ColumnDef, Table } from '@tanstack/react-table';
 import { ContactWithName } from '@/types/contact';
@@ -233,6 +237,10 @@ export const useDashboard = () => {
 			suppressToasts: true,
 		});
 
+	const { mutateAsync: batchUpdateContacts } = useBatchUpdateContacts({
+		suppressToasts: true,
+	});
+
 	const { data: usedContactIds } = useGetUsedContactIds();
 
 	/* HANDLERS */
@@ -248,6 +256,20 @@ export const useDashboard = () => {
 	};
 
 	const handleCreateCampaign = async () => {
+		if (!contacts) return;
+		const deselectedContacts = contacts.filter(
+			(contact) => !selectedContacts.includes(contact.id)
+		);
+
+		const updates = deselectedContacts.map((contact) => ({
+			id: contact.id,
+			data: {
+				manualDeselections: contact.manualDeselections + 1,
+			},
+		}));
+
+		await batchUpdateContacts({ updates });
+
 		const defaultName = `${activeSearchQuery} - ${new Date().toLocaleDateString()}`;
 		if (currentTab === 'search') {
 			const newUserContactList = await createContactList({

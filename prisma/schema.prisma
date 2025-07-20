@@ -149,6 +149,7 @@ model Contact {
   isPrivate            Boolean @default(false)
   hasVectorEmbedding   Boolean @default(false)
   userContactListCount Int     @default(0)
+  manualDeselections   Int     @default(0)
 
   emailValidationStatus    EmailVerificationStatus @default(unknown)
   emailValidationSubStatus String?
