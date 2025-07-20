@@ -71,7 +71,7 @@ export const Navbar = () => {
 							!isNavbarVisible ? 'h-0 opacity-0' : 'h-55/100 opacity-100'
 						)}
 					>
-						<Link href={urls.home.index} className="w-[200px] items-center">
+						<Link href={urls.murmur.dashboard.index} className="w-[200px] items-center">
 							<LogoIcon
 								height="48px"
 								width="59px"
@@ -107,7 +107,7 @@ export const Navbar = () => {
 							})}
 						</div>
 
-						<div className="absolute right-5 ml-auto flex items-center space-x-4 ">
+						<div className="absolute right-5 ml-auto flex items-center space-x-4">
 							{isSignedIn ? (
 								<UserButton />
 							) : (
