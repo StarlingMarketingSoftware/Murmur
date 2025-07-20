@@ -179,7 +179,7 @@ export const useDashboard = () => {
 	const [selectedContactListRows, setSelectedContactListRows] = useState<
 		UserContactList[]
 	>([]);
-	const [selectedContacts, setSelectedContacts] = useState<ContactWithName[]>([]);
+	const [selectedContacts, setSelectedContacts] = useState<number[]>([]);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
 	const [activeLocation, setActiveLocation] = useState('');
 	const [activeExcludeUsedContacts, setActiveExcludeUsedContacts] = useState(true);
@@ -214,7 +214,10 @@ export const useDashboard = () => {
 	// Initialize selected contacts when contacts load
 	useEffect(() => {
 		if (contacts && apolloContacts) {
-			setSelectedContacts([...contacts, ...apolloContacts]);
+			setSelectedContacts([
+				...contacts.map((contact) => contact.id),
+				...apolloContacts.map((contact) => contact.id),
+			]);
 		}
 	}, [contacts, apolloContacts]);
 
@@ -247,7 +250,7 @@ export const useDashboard = () => {
 		if (currentTab === 'search') {
 			const newUserContactList = await createContactList({
 				name: defaultName,
-				contactIds: selectedContacts.map((contact) => contact.id),
+				contactIds: selectedContacts,
 			});
 
 			const campaign = await createCampaign({

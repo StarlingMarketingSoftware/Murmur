@@ -38,7 +38,7 @@ import {
 interface DataTableProps<TData, TValue> {
 	columns: ColumnDef<TData, TValue>[];
 	data: TData[] | undefined;
-	setSelectedRows?: ((rows: TData[]) => void) | Dispatch<SetStateAction<TData[]>>;
+	setSelectedRows?: ((rows: number[]) => void) | Dispatch<SetStateAction<number[]>>;
 	singleSelection?: boolean;
 	handleRowClick?: (rowData: TData) => void;
 	isSelectable?: boolean;
@@ -161,6 +161,22 @@ export function CustomTable<TData, TValue>({
 			tableRef(table);
 		}
 	}, [table, tableRef]);
+
+	// Update parent component with selected rows
+	useEffect(() => {
+		if (setSelectedRows && isSelectable) {
+			const selectedRowsData = table
+				.getFilteredSelectedRowModel()
+				.rows.map((row) => {
+					const original = row.original as Record<string, unknown>;
+					return 'id' in original && typeof original.id === 'number'
+						? original.id
+						: undefined;
+				})
+				.filter((id): id is number => id !== undefined);
+			setSelectedRows(selectedRowsData);
+		}
+	}, [rowSelection, setSelectedRows, isSelectable, table]);
 
 	useEffect(() => {
 		if (!data) return;

@@ -25,9 +25,9 @@ export interface UserContactListQueryOptions extends CustomQueryOptions {
 	filters?: UserContactListFilterData;
 }
 
-export const useGetUserContactLists = (options: UserContactListQueryOptions) => {
+export const useGetUserContactLists = (options: UserContactListQueryOptions = {}) => {
 	return useQuery({
-		queryKey: [...QUERY_KEYS.list(), options.filters],
+		queryKey: [...QUERY_KEYS.list(), options?.filters],
 		queryFn: async () => {
 			const url = appendQueryParamsToUrl(urls.api.userContactList.index, options.filters);
 			const response = await _fetch(url);

@@ -115,7 +115,6 @@ export async function GET(req: NextRequest) {
 
 		// If vector search is enabled and we have a query, use vector search
 		if (useVectorSearch && query) {
-			console.log('🚀 ~ GET ~ vector search:');
 			const results = await searchSimilarContacts(query, VECTOR_SEARCH_LIMIT, 0.7);
 
 			// Create a map of contactId to relevance score for efficient lookup
@@ -183,8 +182,6 @@ export async function GET(req: NextRequest) {
 		}
 
 		// Fallback to regular search if vector search is not enabled
-
-		console.log('🚀 ~ GET ~ regular search:');
 		const searchTerms: string[] =
 			query
 				?.toLowerCase()
