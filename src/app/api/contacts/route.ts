@@ -12,6 +12,8 @@ import { getValidatedParamsFromUrl } from '@/utils';
 import { Contact, EmailVerificationStatus } from '@prisma/client';
 import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vectorDb';
 
+const VECTOR_SEARCH_LIMIT = 2000;
+
 const createContactSchema = z.object({
 	firstName: z.string().optional(),
 	lastName: z.string().optional(),
@@ -61,6 +63,23 @@ export async function GET(req: NextRequest) {
 
 		let contacts: Contact[] = [];
 
+		const userContactLists = await prisma.userContactList.findMany({
+			where: {
+				userId: userId,
+			},
+			include: {
+				contacts: true,
+			},
+		});
+
+		const addedContactIds: number[] = [];
+
+		for (const list of userContactLists) {
+			for (const contact of list.contacts) {
+				addedContactIds.push(contact.id);
+			}
+		}
+
 		// if it's a search by ContactListId, only filter by this ContactList.id and validation status
 		if (numberContactListIds.length > 0) {
 			contacts = await prisma.contact.findMany({
@@ -85,7 +104,17 @@ export async function GET(req: NextRequest) {
 
 		// If vector search is enabled and we have a query, use vector search
 		if (useVectorSearch && query) {
-			const results = await searchSimilarContacts(query, limit, 0.7);
+			const results = await searchSimilarContacts(query, VECTOR_SEARCH_LIMIT, 0.7);
+
+			// Create a map of contactId to relevance score for efficient lookup
+			const relevanceMap = new Map<number, number>();
+			results.matches.forEach((match, index) => {
+				const contactId = Number((match.metadata as { contactId: number }).contactId);
+				// Use the actual score from vector search, or fall back to rank-based scoring
+				const relevanceScore = match.score || 1 - index / results.matches.length;
+				relevanceMap.set(contactId, relevanceScore);
+			});
+
 			const contactIds = results.matches.map((match) =>
 				Number((match.metadata as { contactId: number }).contactId)
 			);
@@ -94,6 +123,7 @@ export async function GET(req: NextRequest) {
 				where: {
 					id: {
 						in: contactIds,
+						notIn: addedContactIds,
 					},
 					emailValidationStatus: verificationStatus
 						? {
@@ -106,14 +136,29 @@ export async function GET(req: NextRequest) {
 				},
 			});
 
-			// Sort contacts to match the order from vector search
+			// Implement balanced sorting combining relevance and userContactListCount
+			const maxUserContactListCount = Math.max(
+				...contacts.map((c) => c.userContactListCount),
+				1
+			);
+
 			contacts.sort((a, b) => {
-				const aIndex = contactIds.indexOf(a.id);
-				const bIndex = contactIds.indexOf(b.id);
-				return aIndex - bIndex;
+				const aRelevance = relevanceMap.get(a.id) || 0;
+				const bRelevance = relevanceMap.get(b.id) || 0;
+
+				// Normalize userContactListCount (invert so lower count = higher score)
+				const aCountScore = 1 - a.userContactListCount / maxUserContactListCount;
+				const bCountScore = 1 - b.userContactListCount / maxUserContactListCount;
+
+				// Weighted combination (70% relevance, 30% userContactListCount)
+				const aCompositeScore = 0.7 * aRelevance + 0.3 * aCountScore;
+				const bCompositeScore = 0.7 * bRelevance + 0.3 * bCountScore;
+
+				// Sort by composite score (descending - higher score first)
+				return bCompositeScore - aCompositeScore;
 			});
 
-			return apiResponse(contacts);
+			return apiResponse(contacts.slice(0, limit));
 		}
 
 		// Fallback to regular search if vector search is not enabled
