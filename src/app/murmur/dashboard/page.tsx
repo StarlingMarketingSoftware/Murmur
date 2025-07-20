@@ -13,11 +13,11 @@ import {
 	FormControl,
 	FormField,
 	FormItem,
+	FormLabel,
 	FormMessage,
 } from '@/components/ui/form';
-import ContactListTable from '@/components/organisms/_tables/ContactListTable/ContactListTable';
+import { Checkbox } from '@/components/ui/checkbox';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
-import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
 import Spinner from '@/components/ui/spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
@@ -35,12 +35,7 @@ const Dashboard = () => {
 		setSelectedContacts,
 		isRefetchingContacts,
 		activeSearchQuery,
-		tabOptions,
-		currentTab,
-		setCurrentTab,
-		setSelectedContactListRows,
 		tableRef,
-		isPendingCreateContactList,
 	} = useDashboard();
 	return (
 		<AppLayout>
@@ -65,27 +60,36 @@ const Dashboard = () => {
 				</Typography>
 			</div>
 
-			<BlockTabs
-				className="mt-12 text-center"
-				options={tabOptions}
-				activeValue={currentTab}
-				onValueChange={(val) => setCurrentTab(val)}
-			/>
-
-			{currentTab === 'search' && (
-				<>
-					<div className="mt-12 max-w-[1174px] mx-auto">
-						<Form {...form}>
-							<form onSubmit={form.handleSubmit(onSubmit)}>
+			<div className="mt-12 max-w-[1174px] mx-auto">
+				<Form {...form}>
+					<form onSubmit={form.handleSubmit(onSubmit)}>
+						<FormField
+							control={form.control}
+							name="searchText"
+							render={({ field }) => (
+								<FormItem>
+									<FormControl>
+										<Input
+											className="!border-foreground"
+											placeholder="Who do you want to send to?  i.e  “Wedding Planners in North Carolina”"
+											{...field}
+										/>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+						<div className="flex flex-row gap-4 items-center justify-between">
+							<div className="flex flex-row gap-4 items-center">
 								<FormField
 									control={form.control}
-									name="searchText"
+									name="location"
 									render={({ field }) => (
 										<FormItem>
 											<FormControl>
 												<Input
-													className="!border-foreground"
-													placeholder="Who do you want to send to?  i.e  “Wedding Planners in North Carolina”"
+													className=""
+													placeholder="Location (optional)"
 													{...field}
 												/>
 											</FormControl>
@@ -93,28 +97,70 @@ const Dashboard = () => {
 										</FormItem>
 									)}
 								/>
-								<div className="flex items-center justify-end gap-2">
-									<ContactTSVUploadDialog
-										isPrivate
-										triggerText="Import"
-										buttonVariant="light"
-									/>
-									<Button
-										variant="primary-light"
-										type="submit"
-										className=""
-										isLoading={isLoadingContacts || isRefetchingContacts}
-									>
-										Search
-									</Button>
-								</div>
-							</form>
-						</Form>
-					</div>
 
-					{activeSearchQuery && (
-						<>
-							{/* <div className="flex items-center justify-center mt-5">
+								<FormField
+									control={form.control}
+									name="excludeUsedContacts"
+									render={({ field }) => (
+										<FormItem className="flex flex-row items-start space-x-3 space-y-0">
+											<FormControl>
+												<Checkbox
+													checked={field.value}
+													onCheckedChange={field.onChange}
+												/>
+											</FormControl>
+											<div className="space-y-1 leading-none">
+												<FormLabel className="text-sm font-medium cursor-pointer">
+													Exclude Used Contacts
+												</FormLabel>
+											</div>
+										</FormItem>
+									)}
+								/>
+								<FormField
+									control={form.control}
+									name="exactMatchesOnly"
+									render={({ field }) => (
+										<FormItem className="flex flex-row items-start space-x-3 space-y-0">
+											<FormControl>
+												<Checkbox
+													checked={field.value}
+													onCheckedChange={field.onChange}
+												/>
+											</FormControl>
+											<div className="space-y-1 leading-none">
+												<FormLabel className="text-sm font-medium cursor-pointer">
+													Exact Matches Only
+												</FormLabel>
+											</div>
+										</FormItem>
+									)}
+								/>
+							</div>
+							<div className="flex items-center justify-end gap-2">
+								<ContactTSVUploadDialog
+									isPrivate
+									triggerText="Import"
+									buttonVariant="light"
+								/>
+								<Button
+									variant="primary-light"
+									type="submit"
+									bold
+									className="px-20"
+									isLoading={isLoadingContacts || isRefetchingContacts}
+								>
+									Search
+								</Button>
+							</div>
+						</div>
+					</form>
+				</Form>
+			</div>
+
+			{activeSearchQuery && (
+				<>
+					{/* <div className="flex items-center justify-center mt-5">
 								<Button
 									onClick={handleImportApolloContacts}
 									variant="light"
@@ -124,62 +170,44 @@ const Dashboard = () => {
 									Get More Contacts
 								</Button>
 							</div> */}
-							{contacts ? (
-								<>
-									<Card>
-										<CardHeader>
-											<CardTitle>Contacts</CardTitle>
-										</CardHeader>
-										<CardContent>
-											<CustomTable
-												initialSelectAll
-												isSelectable
-												setSelectedRows={setSelectedContacts}
-												data={[...contacts, ...apolloContacts]}
-												columns={columns}
-												searchable={false}
-												tableRef={tableRef}
-												rowsPerPage={100}
-												displayRowsPerPage={false}
-											/>
-										</CardContent>
-									</Card>
-									<div className="flex items-center">
-										<Button
-											onClick={handleCreateCampaign}
-											isLoading={isPendingCreateCampaign || isPendingCreateContactList}
-											variant="primary-light"
-											className="w-8/10 mx-auto mt-5"
-										>
-											Create Campaign
-										</Button>
-									</div>
-								</>
-							) : (
-								<Spinner />
-							)}
+					{contacts ? (
+						<>
+							<Card>
+								<CardHeader>
+									<CardTitle>Contacts</CardTitle>
+								</CardHeader>
+								<CardContent>
+									<CustomTable
+										initialSelectAll
+										isSelectable
+										setSelectedRows={setSelectedContacts}
+										data={[...contacts, ...apolloContacts]}
+										columns={columns}
+										searchable={false}
+										tableRef={tableRef}
+										rowsPerPage={100}
+										displayRowsPerPage={false}
+									/>
+								</CardContent>
+							</Card>
+							<div className="flex items-center">
+								<Button
+									onClick={handleCreateCampaign}
+									isLoading={isPendingCreateCampaign}
+									variant="primary-light"
+									className="w-8/10 mx-auto mt-5"
+								>
+									Create Campaign
+								</Button>
+							</div>
 						</>
+					) : (
+						<Spinner />
 					)}
 				</>
 			)}
 
-			{currentTab === 'list' && (
-				<>
-					<ContactListTable setSelectedRows={setSelectedContactListRows} />
-					<div className="flex items-center">
-						<Button
-							onClick={handleCreateCampaign}
-							isLoading={isPendingCreateCampaign || isPendingCreateContactList}
-							variant="primary-light"
-							className="w-8/10 mx-auto mt-5"
-						>
-							Create Campaign
-						</Button>
-					</div>
-				</>
-			)}
-
-			<div className="mt-46">
+			<div className="mt-76">
 				<CampaignsTable />
 			</div>
 		</AppLayout>

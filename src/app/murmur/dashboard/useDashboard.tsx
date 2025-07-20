@@ -19,6 +19,9 @@ import { toast } from 'sonner';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
+	location: z.string().optional(),
+	excludeUsedContacts: z.boolean().optional().default(true),
+	exactMatchesOnly: z.boolean().optional().default(true),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -148,6 +151,9 @@ export const useDashboard = () => {
 		resolver: zodResolver(formSchema),
 		defaultValues: {
 			searchText: '',
+			location: '',
+			excludeUsedContacts: true,
+			exactMatchesOnly: false,
 		},
 	});
 
@@ -158,7 +164,7 @@ export const useDashboard = () => {
 	const [selectedContacts, setSelectedContacts] = useState<ContactWithName[]>([]);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
 	const [currentTab, setCurrentTab] = useState<TabValue>('search');
-
+	const [limit, setLimit] = useState(100);
 	const [apolloContacts, setApolloContacts] = useState<ContactWithName[]>([]);
 	const [tableInstance, setTableInstance] = useState<Table<ContactWithName>>();
 
@@ -173,11 +179,14 @@ export const useDashboard = () => {
 		filters: {
 			query: activeSearchQuery,
 			verificationStatus: EmailVerificationStatus.valid,
-			useVectorSearch: true,
-			limit: 100,
+			useVectorSearch: !form.getValues('exactMatchesOnly'),
+			limit,
+			excludeUsedContacts: form.getValues('excludeUsedContacts'),
+			location: form.getValues('location'),
 		},
 		enabled: false,
 	});
+	console.log('🚀 ~ useDashboard ~ contacts:', contacts);
 
 	const { mutateAsync: importApolloContacts, isPending: isPendingImportApolloContacts } =
 		useCreateApolloContacts({});
@@ -270,6 +279,8 @@ export const useDashboard = () => {
 		tabOptions,
 		currentTab,
 		setCurrentTab,
+		setLimit,
+		limit,
 		tableRef: handleTableRef,
 		tableInstance,
 		isPendingImportApolloContacts,

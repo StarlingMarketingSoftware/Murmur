@@ -53,12 +53,17 @@ const buttonVariants = cva(
 				true: '', // Base outline class, will be combined with variant
 				false: '',
 			},
+			bold: {
+				true: 'font-bold',
+				false: '',
+			},
 		},
 		defaultVariants: {
 			variant: 'primary',
 			size: 'default',
 			outline: false,
 			font: 'primary',
+			bold: false,
 		},
 	}
 );
@@ -68,6 +73,7 @@ function Button({
 	variant = 'primary',
 	size,
 	font,
+	bold,
 	outline,
 	asChild = false,
 	children,
@@ -79,6 +85,7 @@ function Button({
 		asChild?: boolean;
 		isLoading?: boolean;
 		noPadding?: boolean;
+		bold?: boolean;
 	}) {
 	const Comp = asChild ? SlotPrimitive.Slot : 'button';
 
@@ -121,6 +128,7 @@ function Button({
 					size,
 					font,
 					outline,
+					bold,
 					className,
 				}),
 				outlineClasses,
