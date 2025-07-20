@@ -76,7 +76,9 @@ export const useDashboard = () => {
 										{row.getValue('email')}
 									</div>
 								</TooltipTrigger>
-								<TooltipContent>This contact has been used in a campaign.</TooltipContent>
+								<TooltipContent side="right">
+									This contact has been used in a campaign.
+								</TooltipContent>
 							</Tooltip>
 						) : (
 							<div className={twMerge('text-left')}>{row.getValue('email')}</div>

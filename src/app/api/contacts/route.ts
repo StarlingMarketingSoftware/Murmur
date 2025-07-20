@@ -91,6 +91,73 @@ export async function GET(req: NextRequest) {
 			}
 		}
 
+		const substringSearch = async (): Promise<Contact[]> => {
+			const searchTerms: string[] =
+				query
+					?.toLowerCase()
+					.split(/\s+/)
+					.filter((term) => term.length > 0) || [];
+			const caseInsensitiveMode = 'insensitive' as const;
+			const whereConditions: Prisma.ContactWhereInput = {
+				AND: [
+					// Search terms condition (only if there are search terms)
+					...(searchTerms.length > 0
+						? [
+								{
+									AND: searchTerms.map((term) => ({
+										OR: [
+											{ firstName: { contains: term, mode: caseInsensitiveMode } },
+											{ lastName: { contains: term, mode: caseInsensitiveMode } },
+											{ title: { contains: term, mode: caseInsensitiveMode } },
+											{ email: { contains: term, mode: caseInsensitiveMode } },
+											{ company: { contains: term, mode: caseInsensitiveMode } },
+											{ city: { contains: term, mode: caseInsensitiveMode } },
+											{ state: { contains: term, mode: caseInsensitiveMode } },
+											{ country: { contains: term, mode: caseInsensitiveMode } },
+											{ address: { contains: term, mode: caseInsensitiveMode } },
+											{ headline: { contains: term, mode: caseInsensitiveMode } },
+											{ linkedInUrl: { contains: term, mode: caseInsensitiveMode } },
+											{ website: { contains: term, mode: caseInsensitiveMode } },
+											{ phone: { contains: term, mode: caseInsensitiveMode } },
+										],
+									})),
+								},
+						  ]
+						: []),
+					// Email validation status condition
+					...(verificationStatus
+						? [{ emailValidationStatus: { equals: verificationStatus } }]
+						: []),
+					// Location condition (must match at least one location field)
+					...(location
+						? [
+								{
+									OR: [
+										{ city: { contains: location, mode: caseInsensitiveMode } },
+										{ state: { contains: location, mode: caseInsensitiveMode } },
+										{ country: { contains: location, mode: caseInsensitiveMode } },
+										{ address: { contains: location, mode: caseInsensitiveMode } },
+									],
+								},
+						  ]
+						: []),
+					// Exclude used contacts condition
+					...(excludeUsedContacts && addedContactIds.length > 0
+						? [{ id: { notIn: addedContactIds } }]
+						: []),
+				],
+			};
+
+			return await prisma.contact.findMany({
+				where: whereConditions,
+
+				take: limit,
+				orderBy: {
+					userContactListCount: 'asc',
+				},
+			});
+		};
+
 		// if it's a search by ContactListId, only filter by this ContactList.id and validation status
 		if (numberContactListIds.length > 0) {
 			contacts = await prisma.contact.findMany({
@@ -115,7 +182,7 @@ export async function GET(req: NextRequest) {
 
 		// If vector search is enabled and we have a query, use vector search
 		if (useVectorSearch && query) {
-			const results = await searchSimilarContacts(query, VECTOR_SEARCH_LIMIT, 0.7);
+			const results = await searchSimilarContacts(query, VECTOR_SEARCH_LIMIT, 0.65);
 
 			// Create a map of contactId to relevance score for efficient lookup
 			const relevanceMap = new Map<number, number>();
@@ -156,6 +223,21 @@ export async function GET(req: NextRequest) {
 				},
 			});
 
+			if (contacts.length < 100) {
+				const fallbackContacts = await substringSearch();
+
+				// Create a set of existing contact IDs for efficient lookup
+				const existingContactIds = new Set(contacts.map((contact) => contact.id));
+
+				// Filter out duplicates from fallback contacts
+				const uniqueFallbackContacts = fallbackContacts.filter(
+					(contact) => !existingContactIds.has(contact.id)
+				);
+
+				// Merge contacts with unique fallback contacts
+				contacts = [...contacts, ...uniqueFallbackContacts];
+			}
+
 			// Implement balanced sorting combining relevance and userContactListCount
 			const maxUserContactListCount = Math.max(
 				...contacts.map((c) => c.userContactListCount),
@@ -179,75 +261,12 @@ export async function GET(req: NextRequest) {
 			});
 
 			return apiResponse(contacts.slice(0, limit));
+		} else {
+			// Use regular search if vector search is not enabled
+			contacts = await substringSearch();
+
+			return apiResponse(contacts);
 		}
-
-		// Fallback to regular search if vector search is not enabled
-		const searchTerms: string[] =
-			query
-				?.toLowerCase()
-				.split(/\s+/)
-				.filter((term) => term.length > 0) || [];
-		const caseInsensitiveMode = 'insensitive' as const;
-		const whereConditions: Prisma.ContactWhereInput = {
-			AND: [
-				// Search terms condition (only if there are search terms)
-				...(searchTerms.length > 0
-					? [
-							{
-								AND: searchTerms.map((term) => ({
-									OR: [
-										{ firstName: { contains: term, mode: caseInsensitiveMode } },
-										{ lastName: { contains: term, mode: caseInsensitiveMode } },
-										{ title: { contains: term, mode: caseInsensitiveMode } },
-										{ email: { contains: term, mode: caseInsensitiveMode } },
-										{ company: { contains: term, mode: caseInsensitiveMode } },
-										{ city: { contains: term, mode: caseInsensitiveMode } },
-										{ state: { contains: term, mode: caseInsensitiveMode } },
-										{ country: { contains: term, mode: caseInsensitiveMode } },
-										{ address: { contains: term, mode: caseInsensitiveMode } },
-										{ headline: { contains: term, mode: caseInsensitiveMode } },
-										{ linkedInUrl: { contains: term, mode: caseInsensitiveMode } },
-										{ website: { contains: term, mode: caseInsensitiveMode } },
-										{ phone: { contains: term, mode: caseInsensitiveMode } },
-									],
-								})),
-							},
-					  ]
-					: []),
-				// Email validation status condition
-				...(verificationStatus
-					? [{ emailValidationStatus: { equals: verificationStatus } }]
-					: []),
-				// Location condition (must match at least one location field)
-				...(location
-					? [
-							{
-								OR: [
-									{ city: { contains: location, mode: caseInsensitiveMode } },
-									{ state: { contains: location, mode: caseInsensitiveMode } },
-									{ country: { contains: location, mode: caseInsensitiveMode } },
-									{ address: { contains: location, mode: caseInsensitiveMode } },
-								],
-							},
-					  ]
-					: []),
-				// Exclude used contacts condition
-				...(excludeUsedContacts && addedContactIds.length > 0
-					? [{ id: { notIn: addedContactIds } }]
-					: []),
-			],
-		};
-
-		contacts = await prisma.contact.findMany({
-			where: whereConditions,
-
-			take: limit,
-			orderBy: {
-				userContactListCount: 'asc',
-			},
-		});
-
-		return apiResponse(contacts);
 	} catch (error) {
 		return handleApiError(error);
 	}
