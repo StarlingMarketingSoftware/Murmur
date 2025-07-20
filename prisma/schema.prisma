@@ -129,25 +129,26 @@ model UserContactList {
 }
 
 model Contact {
-  id                 Int     @id @default(autoincrement())
-  apolloPersonId     String? @unique
-  firstName          String?
-  lastName           String?
-  email              String
-  company            String?
-  city               String?
-  state              String?
-  country            String?
-  address            String?
-  phone              String?
-  website            String?
-  title              String?
-  headline           String?
-  linkedInUrl        String?
-  photoUrl           String?
-  metadata           String?
-  isPrivate          Boolean @default(false)
-  hasVectorEmbedding Boolean @default(false)
+  id                   Int     @id @default(autoincrement())
+  apolloPersonId       String? @unique
+  firstName            String?
+  lastName             String?
+  email                String
+  company              String?
+  city                 String?
+  state                String?
+  country              String?
+  address              String?
+  phone                String?
+  website              String?
+  title                String?
+  headline             String?
+  linkedInUrl          String?
+  photoUrl             String?
+  metadata             String?
+  isPrivate            Boolean @default(false)
+  hasVectorEmbedding   Boolean @default(false)
+  userContactListCount Int     @default(0)
 
   emailValidationStatus    EmailVerificationStatus @default(unknown)
   emailValidationSubStatus String?
