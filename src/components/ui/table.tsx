@@ -48,11 +48,16 @@ const tableHeaderVariants = cva(
 );
 
 interface TableHeaderProps extends React.ComponentProps<'thead'> {
-	variant: 'primary' | 'secondary';
+	variant?: 'primary' | 'secondary';
 	sticky?: boolean;
 }
 
-function TableHeader({ className, variant, sticky = false, ...props }: TableHeaderProps) {
+function TableHeader({
+	className,
+	variant = 'primary',
+	sticky = false,
+	...props
+}: TableHeaderProps) {
 	return (
 		<thead
 			data-slot="table-header"

@@ -21,7 +21,6 @@ const ContactListTable: FC<ContactListTableProps> = (props) => {
 		handleRowClick,
 		isContactListDialogOpen,
 		setIsContactListDialogOpen,
-		setSelectedRows,
 		isConfirmDialogOpen,
 		setIsConfirmDialogOpen,
 		currentContactList,
@@ -44,7 +43,7 @@ const ContactListTable: FC<ContactListTableProps> = (props) => {
 					data={dataContactLists}
 					handleRowClick={handleRowClick}
 					isSelectable
-					setSelectedRows={setSelectedRows}
+					// setSelectedRows={setSelectedRows}
 				/>
 			</CardContent>
 			<EditContactListDialog

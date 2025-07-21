@@ -9,6 +9,7 @@ import {
 	apiBadRequest,
 } from '@/app/api/_utils';
 import { upsertContactToVectorDb } from '../../_utils/vectorDb';
+import { EmailVerificationStatus } from '@prisma/client';
 
 const updateContactSchema = z.object({
 	firstName: z.string().optional().nullable(),
@@ -28,7 +29,7 @@ const updateContactSchema = z.object({
 	metadata: z.string().optional().nullable(),
 	isPrivate: z.boolean().optional(),
 	userId: z.string().optional().nullable(),
-	emailValidationStatus: z.enum(['valid', 'invalid', 'unknown']).optional(),
+	emailValidationStatus: z.nativeEnum(EmailVerificationStatus).optional(),
 	emailValidatedAt: z.date().optional(),
 	manualDeselections: z.number().optional(),
 });

@@ -39,13 +39,14 @@ const contactFilterSchema = z.object({
 	limit: z.coerce.number().optional(),
 	verificationStatus: z.nativeEnum(EmailVerificationStatus).optional(),
 	contactListIds: z.array(z.number()).optional(),
-	useVectorSearch: z.boolean().optional().default(false),
+	useVectorSearch: z.boolean().optional(),
 	location: z.string().optional(),
-	excludeUsedContacts: z.boolean().optional().default(true),
+	excludeUsedContacts: z.boolean().optional(),
 });
 
-export type PostContactData = z.infer<typeof createContactSchema>;
 export type ContactFilterData = z.infer<typeof contactFilterSchema>;
+
+export type PostContactData = z.infer<typeof createContactSchema>;
 
 export async function GET(req: NextRequest) {
 	try {
