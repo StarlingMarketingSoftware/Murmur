@@ -5,7 +5,7 @@ UPDATE "Contact" c
 SET "userContactListCount" = (
     SELECT COUNT(*)
     FROM "_ContactToUserContactList"
-    WHERE "B" = c.id
+    WHERE "A" = c.id  -- Changed from "B" to "A"
 );
 
 -- Create the trigger function
@@ -15,11 +15,11 @@ BEGIN
     IF TG_OP = 'INSERT' THEN
         UPDATE "Contact"
         SET "userContactListCount" = "userContactListCount" + 1
-        WHERE id = NEW."B";
+        WHERE id = NEW."A";  -- Changed from NEW."B" to NEW."A"
     ELSIF TG_OP = 'DELETE' THEN
         UPDATE "Contact"
         SET "userContactListCount" = "userContactListCount" - 1
-        WHERE id = OLD."B";
+        WHERE id = OLD."A";  -- Changed from OLD."B" to OLD."A"
     END IF;
     RETURN NULL;
 END;

@@ -146,6 +146,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 							}
 							className="w-full"
 							isLoading={isPendingCreateSignature}
+							variant="primary-light"
 						>
 							New Signature
 						</Button>
