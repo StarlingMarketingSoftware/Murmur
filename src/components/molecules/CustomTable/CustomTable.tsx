@@ -21,7 +21,7 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table';
-import { Dispatch, SetStateAction, useEffect, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect, useState, useMemo } from 'react';
 import { twMerge } from 'tailwind-merge';
 import CustomPagination from '@/components/molecules/CustomPagination/CustomPagination';
 import { Input } from '@/components/ui/input';
@@ -118,10 +118,24 @@ export function CustomTable<TData, TValue>({
 		}, {} as Record<string, boolean>);
 	};
 
-	const [rowSelection, setRowSelection] = useState(getInitialRowSelection());
+	const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 	const [sorting, setSorting] = useState<SortingState>([]);
 	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 	const [globalFilter, setGlobalFilter] = useState('');
+
+	// Create a stable key for the data to detect changes
+	const dataKey = useMemo(() => {
+		if (!data) return 'no-data';
+		return data.length + '-' + (data[0] ? JSON.stringify(Object.keys(data[0])) : '');
+	}, [data]);
+
+	// Reset table state when data changes (using dataKey to prevent infinite loops)
+	useEffect(() => {
+		if (data) {
+			setRowSelection(getInitialRowSelection());
+			setPagination({ pageIndex: 0, pageSize: rowsPerPage });
+		}
+	}, [dataKey, rowsPerPage]); // Using dataKey instead of data directly
 
 	const table = useReactTable({
 		data: data || [],

@@ -209,7 +209,6 @@ export async function GET(req: NextRequest) {
 								equals: verificationStatus,
 						  }
 						: undefined,
-					// Location filtering across multiple fields
 					...(location && {
 						OR: [
 							{ city: { contains: location, mode: 'insensitive' } },
@@ -226,20 +225,15 @@ export async function GET(req: NextRequest) {
 
 			if (contacts.length < 100) {
 				const fallbackContacts = await substringSearch();
-
-				// Create a set of existing contact IDs for efficient lookup
 				const existingContactIds = new Set(contacts.map((contact) => contact.id));
-
-				// Filter out duplicates from fallback contacts
 				const uniqueFallbackContacts = fallbackContacts.filter(
 					(contact) => !existingContactIds.has(contact.id)
 				);
 
-				// Merge contacts with unique fallback contacts
 				contacts = [...contacts, ...uniqueFallbackContacts];
 			}
 
-			// Implement balanced sorting combining relevance and userContactListCount
+			// balanced sorting combining relevance and userContactListCount
 			const maxUserContactListCount = Math.max(
 				...contacts.map((c) => c.userContactListCount),
 				1
@@ -254,8 +248,8 @@ export async function GET(req: NextRequest) {
 				const bCountScore = 1 - b.userContactListCount / maxUserContactListCount;
 
 				// Weighted combination (70% relevance, 30% userContactListCount)
-				const aCompositeScore = 0.7 * aRelevance + 0.3 * aCountScore;
-				const bCompositeScore = 0.7 * bRelevance + 0.3 * bCountScore;
+				const aCompositeScore = 0.4 * aRelevance + 0.6 * aCountScore;
+				const bCompositeScore = 0.4 * bRelevance + 0.6 * bCountScore;
 
 				// Sort by composite score (descending - higher score first)
 				return bCompositeScore - aCompositeScore;

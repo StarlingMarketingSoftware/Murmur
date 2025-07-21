@@ -36,6 +36,8 @@ const Dashboard = () => {
 		isRefetchingContacts,
 		activeSearchQuery,
 		tableRef,
+		selectedContacts,
+		isPendingBatchUpdateContacts,
 	} = useDashboard();
 	return (
 		<AppLayout>
@@ -193,10 +195,11 @@ const Dashboard = () => {
 							<div className="flex items-center">
 								<Button
 									onClick={handleCreateCampaign}
-									isLoading={isPendingCreateCampaign}
+									isLoading={isPendingCreateCampaign || isPendingBatchUpdateContacts}
 									variant="primary-light"
 									bold
 									className="w-8/10 mx-auto mt-5"
+									disabled={selectedContacts.length === 0}
 								>
 									Create Campaign
 								</Button>

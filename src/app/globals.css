@@ -183,37 +183,6 @@
 	}
 }
 
-/* Custom scrollbar for table containers */
-table {
-	scrollbar-width: thin; /* For Firefox */
-}
-
-table::-webkit-scrollbar {
-	width: 6px;
-	height: 6px;
-}
-
-table::-webkit-scrollbar-track {
-	background: transparent;
-}
-
-table::-webkit-scrollbar-thumb {
-	background-color: rgb(203 213 225); /* Tailwind slate-300 */
-	border-radius: 20px;
-}
-
-table::-webkit-scrollbar-thumb:hover {
-	background-color: rgb(148 163 184); /* Tailwind slate-400 */
-}
-
-/* Hide scrollbar buttons and borders */
-table::-webkit-scrollbar-button {
-	display: none;
-}
-
-table::-webkit-scrollbar-corner {
-	background: transparent;
-}
 
 mux-player {
 	--seek-backward-button: none;

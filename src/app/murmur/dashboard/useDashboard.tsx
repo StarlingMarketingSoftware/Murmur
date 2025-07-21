@@ -76,7 +76,7 @@ export const useDashboard = () => {
 						{isUsed ? (
 							<Tooltip>
 								<TooltipTrigger>
-									<div className="text-left bg-warning/20 px-2 rounded-md">
+									<div className="text-left bg-secondary/20 px-2 rounded-md">
 										{row.getValue('email')}
 									</div>
 								</TooltipTrigger>
@@ -220,10 +220,7 @@ export const useDashboard = () => {
 	// Initialize selected contacts when contacts load
 	useEffect(() => {
 		if (contacts && apolloContacts) {
-			setSelectedContacts([
-				...contacts.map((contact) => contact.id),
-				...apolloContacts.map((contact) => contact.id),
-			]);
+			setSelectedContacts([...contacts.map((contact) => contact.id)]);
 		}
 	}, [contacts, apolloContacts]);
 
@@ -237,9 +234,10 @@ export const useDashboard = () => {
 			suppressToasts: true,
 		});
 
-	const { mutateAsync: batchUpdateContacts } = useBatchUpdateContacts({
-		suppressToasts: true,
-	});
+	const { mutateAsync: batchUpdateContacts, isPending: isPendingBatchUpdateContacts } =
+		useBatchUpdateContacts({
+			suppressToasts: true,
+		});
 
 	const { data: usedContactIds } = useGetUsedContactIds();
 
@@ -347,5 +345,6 @@ export const useDashboard = () => {
 		isPendingCreateContactList,
 		selectedContactListRows,
 		usedContactIdsSet,
+		isPendingBatchUpdateContacts,
 	};
 };
