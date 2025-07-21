@@ -24,7 +24,6 @@ import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUp
 
 const Dashboard = () => {
 	const {
-		apolloContacts,
 		form,
 		onSubmit,
 		isLoadingContacts,
@@ -162,16 +161,6 @@ const Dashboard = () => {
 
 			{activeSearchQuery && (
 				<>
-					{/* <div className="flex items-center justify-center mt-5">
-								<Button
-									onClick={handleImportApolloContacts}
-									variant="light"
-									className=""
-									isLoading={isPendingImportApolloContacts}
-								>
-									Get More Contacts
-								</Button>
-							</div> */}
 					{contacts ? (
 						<>
 							<Card>
@@ -183,7 +172,7 @@ const Dashboard = () => {
 										initialSelectAll
 										isSelectable
 										setSelectedRows={setSelectedContacts}
-										data={[...contacts, ...apolloContacts]}
+										data={contacts}
 										columns={columns}
 										searchable={false}
 										tableRef={tableRef}

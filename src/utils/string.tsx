@@ -7,6 +7,16 @@ export const ellipsesText = (text: string, maxLength: number): string => {
 	return text;
 };
 
+/**
+ * Capitalizes the first letter of a string and makes the rest lowercase
+ * @param text - The string to capitalize
+ * @returns The capitalized string
+ */
+export const capitalize = (text: string): string => {
+	if (!text) return '';
+	return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+};
+
 const stripUntilBrace = (text: string): string => {
 	const braceIndex = text.indexOf('{');
 	return braceIndex >= 0 ? text.substring(braceIndex) : text;

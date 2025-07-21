@@ -22,6 +22,7 @@ import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { twMerge } from 'tailwind-merge';
+import { capitalize } from '@/utils/string';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -219,10 +220,10 @@ export const useDashboard = () => {
 
 	// Initialize selected contacts when contacts load
 	useEffect(() => {
-		if (contacts && apolloContacts) {
-			setSelectedContacts([...contacts.map((contact) => contact.id)]);
+		if (contacts) {
+			setSelectedContacts(contacts.map((contact) => contact.id));
 		}
-	}, [contacts, apolloContacts]);
+	}, [contacts]);
 
 	const { mutateAsync: createContactList, isPending: isPendingCreateContactList } =
 		useCreateUserContactList({
@@ -268,7 +269,9 @@ export const useDashboard = () => {
 
 		await batchUpdateContacts({ updates });
 
-		const defaultName = `${activeSearchQuery} - ${new Date().toLocaleDateString()}`;
+		const defaultName = `${capitalize(activeSearchQuery)} ${capitalize(
+			activeLocation
+		)} - ${new Date().toLocaleDateString()}`;
 		if (currentTab === 'search') {
 			const newUserContactList = await createContactList({
 				name: defaultName,
@@ -318,7 +321,6 @@ export const useDashboard = () => {
 	}, [usedContactIds]);
 
 	return {
-		apolloContacts,
 		form,
 		onSubmit,
 		contacts,
