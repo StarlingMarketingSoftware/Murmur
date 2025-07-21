@@ -178,6 +178,7 @@ const Dashboard = () => {
 										tableRef={tableRef}
 										rowsPerPage={100}
 										displayRowsPerPage={false}
+										constrainHeight
 									/>
 								</CardContent>
 							</Card>

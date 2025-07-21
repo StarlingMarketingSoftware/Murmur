@@ -47,7 +47,7 @@ interface DataTableProps<TData, TValue> {
 	initialSelectAll?: boolean;
 	rowsPerPage?: number;
 	displayRowsPerPage?: boolean;
-	highlightedRowIds?: Set<number>;
+	constrainHeight?: boolean;
 }
 
 interface TableSortingButtonProps<TData> {
@@ -103,6 +103,7 @@ export function CustomTable<TData, TValue>({
 	initialSelectAll = false,
 	rowsPerPage = 20,
 	displayRowsPerPage = true,
+	constrainHeight = false,
 }: CustomTableProps<TData, TValue>) {
 	const [pagination, setPagination] = useState({
 		pageIndex: 0,
@@ -250,18 +251,19 @@ export function CustomTable<TData, TValue>({
 					</div>
 				)}
 			</div>
-			<div className="rounded-md border relative overflow-y-auto max-h-[750px] ">
+			<div
+				className={twMerge(
+					'rounded-md border relative overflow-y-auto',
+					constrainHeight && 'max-h-[750px]'
+				)}
+			>
 				<Table className="relative" variant={variant}>
 					<TableHeader variant={variant} sticky>
 						{table.getHeaderGroups().map((headerGroup) => (
-							<TableRow className="!sticky !top-0" key={headerGroup.id} variant={variant}>
+							<TableRow className="sticky top-0" key={headerGroup.id} variant={variant}>
 								{headerGroup.headers.map((header) => {
 									return (
-										<TableHead
-											className={twMerge('sticky top-0')}
-											key={header.id}
-											variant={variant}
-										>
+										<TableHead key={header.id} variant={variant}>
 											{header.isPlaceholder
 												? null
 												: flexRender(header.column.columnDef.header, header.getContext())}

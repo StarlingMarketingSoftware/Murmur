@@ -41,7 +41,7 @@ export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) =
 					{triggerText}
 				</Button>
 			</DialogTrigger>
-			<DialogContent className="">
+			<DialogContent>
 				<DialogHeader>
 					<DialogTitle>Add Contacts by TSV Upload</DialogTitle>
 				</DialogHeader>
