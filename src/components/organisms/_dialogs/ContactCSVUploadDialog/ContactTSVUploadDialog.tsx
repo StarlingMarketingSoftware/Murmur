@@ -37,11 +37,11 @@ export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) =
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
-				<Button variant={buttonVariant || 'primary-light'} className="w-fit">
+				<Button variant={buttonVariant || 'primary-light'} className="w-fit" bold>
 					{triggerText}
 				</Button>
 			</DialogTrigger>
-			<DialogContent className="min-w-[1000px] !max-w-none !w-9/10">
+			<DialogContent>
 				<DialogHeader>
 					<DialogTitle>Add Contacts by TSV Upload</DialogTitle>
 				</DialogHeader>

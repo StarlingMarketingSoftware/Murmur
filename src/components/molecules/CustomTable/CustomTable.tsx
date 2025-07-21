@@ -21,7 +21,7 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table';
-import { Dispatch, SetStateAction, useEffect, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect, useState, useMemo } from 'react';
 import { twMerge } from 'tailwind-merge';
 import CustomPagination from '@/components/molecules/CustomPagination/CustomPagination';
 import { Input } from '@/components/ui/input';
@@ -38,13 +38,16 @@ import {
 interface DataTableProps<TData, TValue> {
 	columns: ColumnDef<TData, TValue>[];
 	data: TData[] | undefined;
-	setSelectedRows?: ((rows: TData[]) => void) | Dispatch<SetStateAction<TData[]>>;
+	setSelectedRows?: ((rows: number[]) => void) | Dispatch<SetStateAction<number[]>>;
 	singleSelection?: boolean;
 	handleRowClick?: (rowData: TData) => void;
 	isSelectable?: boolean;
 	noDataMessage?: string;
 	searchable?: boolean;
 	initialSelectAll?: boolean;
+	rowsPerPage?: number;
+	displayRowsPerPage?: boolean;
+	constrainHeight?: boolean;
 }
 
 interface TableSortingButtonProps<TData> {
@@ -98,10 +101,13 @@ export function CustomTable<TData, TValue>({
 	searchable = true,
 	tableRef,
 	initialSelectAll = false,
+	rowsPerPage = 20,
+	displayRowsPerPage = true,
+	constrainHeight = false,
 }: CustomTableProps<TData, TValue>) {
 	const [pagination, setPagination] = useState({
 		pageIndex: 0,
-		pageSize: 20,
+		pageSize: rowsPerPage,
 	});
 
 	// Initialize all rows as selected
@@ -113,10 +119,24 @@ export function CustomTable<TData, TValue>({
 		}, {} as Record<string, boolean>);
 	};
 
-	const [rowSelection, setRowSelection] = useState(getInitialRowSelection());
+	const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 	const [sorting, setSorting] = useState<SortingState>([]);
 	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 	const [globalFilter, setGlobalFilter] = useState('');
+
+	// Create a stable key for the data to detect changes
+	const dataKey = useMemo(() => {
+		if (!data) return 'no-data';
+		return data.length + '-' + (data[0] ? JSON.stringify(Object.keys(data[0])) : '');
+	}, [data]);
+
+	// Reset table state when data changes (using dataKey to prevent infinite loops)
+	useEffect(() => {
+		if (data) {
+			setRowSelection(getInitialRowSelection());
+			setPagination({ pageIndex: 0, pageSize: rowsPerPage });
+		}
+	}, [dataKey, rowsPerPage]); // Using dataKey instead of data directly
 
 	const table = useReactTable({
 		data: data || [],
@@ -145,10 +165,33 @@ export function CustomTable<TData, TValue>({
 
 	// Add this effect to pass the table instance to parent
 	useEffect(() => {
+		setPagination((prev) => ({
+			...prev,
+			pageSize: rowsPerPage,
+		}));
+	}, [rowsPerPage]);
+
+	useEffect(() => {
 		if (tableRef) {
 			tableRef(table);
 		}
 	}, [table, tableRef]);
+
+	// Update parent component with selected rows
+	useEffect(() => {
+		if (setSelectedRows && isSelectable) {
+			const selectedRowsData = table
+				.getFilteredSelectedRowModel()
+				.rows.map((row) => {
+					const original = row.original as Record<string, unknown>;
+					return 'id' in original && typeof original.id === 'number'
+						? original.id
+						: undefined;
+				})
+				.filter((id): id is number => id !== undefined);
+			setSelectedRows(selectedRowsData);
+		}
+	}, [rowSelection, setSelectedRows, isSelectable, table]);
 
 	useEffect(() => {
 		if (!data) return;
@@ -166,7 +209,7 @@ export function CustomTable<TData, TValue>({
 	}, [pagination.pageIndex, pagination.pageSize, data]);
 
 	return (
-		<div>
+		<div className=" [&_::-webkit-scrollbar]:h-[4px] [&_::-webkit-scrollbar]:md:h-[7px] [&_::-webkit-scrollbar-thumb]:bg-gray-300 [&_::-webkit-scrollbar-thumb]:rounded-full [&_::-webkit-scrollbar]:w-[4px] [&_::-webkit-scrollbar]:md:w-[7px]">
 			<div className="flex items-center justify-between py-4 gap-4">
 				<div className="flex flex-col sm:flex-row items-center gap-4">
 					{searchable && (
@@ -176,28 +219,30 @@ export function CustomTable<TData, TValue>({
 							onChange={(event) => setGlobalFilter(event.target.value)}
 						/>
 					)}
-					<div className="flex items-center gap-2">
-						<span className="text-sm text-muted-foreground text-nowrap">
-							Rows per page:
-						</span>
-						<Select
-							value={pagination.pageSize.toString()}
-							onValueChange={(value) =>
-								setPagination((prev) => ({ ...prev, pageSize: parseInt(value, 10) }))
-							}
-						>
-							<SelectTrigger className="w-[100px]">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{[10, 20, 30, 50, 100, 200, 500, 1000].map((size) => (
-									<SelectItem key={size} value={size.toString()}>
-										{size}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</div>
+					{displayRowsPerPage && (
+						<div className="flex items-center gap-2">
+							<span className="text-sm text-muted-foreground text-nowrap">
+								Rows per page:
+							</span>
+							<Select
+								value={pagination.pageSize.toString()}
+								onValueChange={(value) =>
+									setPagination((prev) => ({ ...prev, pageSize: parseInt(value, 10) }))
+								}
+							>
+								<SelectTrigger className="w-[100px]">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									{[10, 20, 30, 50, 100, 200, 500, 1000].map((size) => (
+										<SelectItem key={size} value={size.toString()}>
+											{size}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+					)}
 				</div>
 				{isSelectable && (
 					<div className="flex-1 gap-4 text-sm text-muted-foreground">
@@ -206,14 +251,19 @@ export function CustomTable<TData, TValue>({
 					</div>
 				)}
 			</div>
-			<div className="rounded-md border">
-				<Table variant={variant}>
-					<TableHeader variant={variant}>
+			<div
+				className={twMerge(
+					'rounded-md border relative overflow-y-auto',
+					constrainHeight && 'max-h-[750px]'
+				)}
+			>
+				<Table className="relative" variant={variant}>
+					<TableHeader variant={variant} sticky>
 						{table.getHeaderGroups().map((headerGroup) => (
-							<TableRow key={headerGroup.id} variant={variant}>
+							<TableRow className="sticky top-0" key={headerGroup.id} variant={variant}>
 								{headerGroup.headers.map((header) => {
 									return (
-										<TableHead className={twMerge()} key={header.id} variant={variant}>
+										<TableHead key={header.id} variant={variant}>
 											{header.isPlaceholder
 												? null
 												: flexRender(header.column.columnDef.header, header.getContext())}
@@ -242,11 +292,13 @@ export function CustomTable<TData, TValue>({
 									key={row.id}
 									data-state={row.getIsSelected() && 'selected'}
 								>
-									{row.getVisibleCells().map((cell) => (
-										<TableCell key={cell.id} variant={variant}>
-											{flexRender(cell.column.columnDef.cell, cell.getContext())}
-										</TableCell>
-									))}
+									{row.getVisibleCells().map((cell) => {
+										return (
+											<TableCell key={cell.id} variant={variant}>
+												{flexRender(cell.column.columnDef.cell, cell.getContext())}
+											</TableCell>
+										);
+									})}
 								</TableRow>
 							))
 						) : (
