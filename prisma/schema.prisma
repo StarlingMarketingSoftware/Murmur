@@ -147,7 +147,7 @@ model Contact {
   photoUrl           String?
   metadata           String?
   companyLinkedInUrl String?
-  companyFoundedYear Int?
+  companyFoundedYear String?
   companyType        String?
   companyTechStack   String[]
   companyPostalCode  String?

@@ -34,6 +34,12 @@ const batchCreateContactSchema = z.object({
 			linkedInUrl: z.string().optional(),
 			photoUrl: z.string().optional(),
 			metadata: z.string().optional(),
+			companyLinkedInUrl: z.string().optional(),
+			companyFoundedYear: z.string().optional(),
+			companyType: z.string().optional(),
+			companyTechStack: z.array(z.string()).optional(),
+			companyPostalCode: z.string().optional(),
+			companyKeywords: z.array(z.string()).optional(),
 		})
 	),
 });

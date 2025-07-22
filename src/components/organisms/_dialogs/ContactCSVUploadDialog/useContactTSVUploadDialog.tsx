@@ -397,7 +397,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 						firstName: row.firstname || undefined,
 						lastName: row.lastname || undefined,
 						company: row.company || undefined,
-						email: row.email,
+						email: row.email || 'EMAIL IS REQUIRED',
 						address: row.address || undefined,
 						city: row.city || undefined,
 						country: row.country || undefined,
@@ -412,9 +412,9 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 						companyLinkedInUrl: row.companylinkedinurl || undefined,
 						companyFoundedYear: row.companyfoundedyear || undefined,
 						companyType: row.companytype || undefined,
-						companyTechStack: row.companytechstack?.split(',') || [],
+						companyTechStack: row.companytechstack || undefined,
 						companyPostalCode: row.companypostalcode || undefined,
-						companyKeywords: row.companykeywords?.split(',') || [],
+						companyKeywords: row.companykeywords || undefined,
 						companyIndustry: row.companyindustry || undefined,
 					}));
 
@@ -441,6 +441,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		}
 		const verificationCredits = user?.verificationCredits;
 
+		// only check verification if isPrivate
 		if (tsvData.length > (verificationCredits || 0)) {
 			toast.error(
 				`You do not have enough upload credits to create this many contacts. Please upgrade your plan. Credits: ${verificationCredits} Number of contacts: ${tsvData.length}`

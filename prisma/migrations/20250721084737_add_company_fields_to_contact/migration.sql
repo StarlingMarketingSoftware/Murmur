@@ -1,5 +1,5 @@
 -- AlterTable
-ALTER TABLE "Contact" ADD COLUMN     "companyFoundedYear" INTEGER,
+ALTER TABLE "Contact" ADD COLUMN     "companyFoundedYear" TEXT,
 ADD COLUMN     "companyIndustry" TEXT,
 ADD COLUMN     "companyKeywords" TEXT[],
 ADD COLUMN     "companyLinkedInUrl" TEXT,
