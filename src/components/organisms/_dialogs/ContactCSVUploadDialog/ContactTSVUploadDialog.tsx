@@ -16,6 +16,7 @@ import { DownloadIcon, UploadIcon } from 'lucide-react';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import { FC } from 'react';
 import { DialogDescription } from '@radix-ui/react-dialog';
+import { twMerge } from 'tailwind-merge';
 
 export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) => {
 	const {
@@ -32,16 +33,17 @@ export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) =
 		handleClear,
 		triggerText,
 		buttonVariant,
+		isAdmin,
 	} = useContactTSVUploadDialog(props);
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
-				<Button variant={buttonVariant || 'primary-light'} className="w-fit">
+				<Button variant={buttonVariant || 'primary-light'} className="w-fit" bold>
 					{triggerText}
 				</Button>
 			</DialogTrigger>
-			<DialogContent className="min-w-[1000px] !max-w-none !w-9/10">
+			<DialogContent className={twMerge(isAdmin && '!max-w-98/100 !max-h-98/100')}>
 				<DialogHeader>
 					<DialogTitle>Add Contacts by TSV Upload</DialogTitle>
 				</DialogHeader>
@@ -70,8 +72,9 @@ export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) =
 					columns={columns}
 					data={tsvData}
 					noDataMessage="Upload a TSV file to load data."
+					constrainHeight
 				/>
-				<DialogFooter className="justify-between items-center">
+				<DialogFooter className="justify-center items-center">
 					<Button onClick={handleClear} type="button" variant="light">
 						Clear
 					</Button>

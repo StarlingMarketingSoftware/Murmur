@@ -2,7 +2,7 @@ import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useGetIdentities } from '@/hooks/queryHooks/useIdentities';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Campaign } from '@prisma/client';
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -17,7 +17,7 @@ export interface IdentityDialogProps {
 	campaign: Campaign;
 }
 
-const identityFormSchema = z.object({
+export const identityFormSchema = z.object({
 	identityId: z.string(),
 });
 
@@ -39,7 +39,16 @@ export const useIdentityDialog = (props: IdentityDialogProps) => {
 		},
 	});
 
+	const { setValue } = form;
 	const { data: identities, isPending: isPendingIdentities } = useGetIdentities({});
+
+	useEffect(() => {
+		if (campaign.identityId) {
+			setValue('identityId', String(campaign.identityId));
+		} else {
+			setValue('identityId', String(identities?.[0]?.id));
+		}
+	}, [campaign, identities, setValue]);
 
 	const { mutate: assignIdentity, isPending: isPendingAssignIdentity } = useEditCampaign({
 		onSuccess: () => {
@@ -92,5 +101,6 @@ export const useIdentityDialog = (props: IdentityDialogProps) => {
 		isClosable,
 		handleAssignIdentity,
 		isPendingAssignIdentity,
+		setValue,
 	};
 };

@@ -129,8 +129,8 @@ model UserContactList {
 }
 
 model Contact {
-  id                 Int     @id @default(autoincrement())
-  apolloPersonId     String? @unique
+  id                 Int      @id @default(autoincrement())
+  apolloPersonId     String?  @unique
   firstName          String?
   lastName           String?
   email              String
@@ -146,8 +146,18 @@ model Contact {
   linkedInUrl        String?
   photoUrl           String?
   metadata           String?
-  isPrivate          Boolean @default(false)
-  hasVectorEmbedding Boolean @default(false)
+  companyLinkedInUrl String?
+  companyFoundedYear String?
+  companyType        String?
+  companyTechStack   String[]
+  companyPostalCode  String?
+  companyKeywords    String[]
+  companyIndustry    String?
+
+  isPrivate            Boolean @default(false)
+  hasVectorEmbedding   Boolean @default(false)
+  userContactListCount Int     @default(0)
+  manualDeselections   Int     @default(0)
 
   emailValidationStatus    EmailVerificationStatus @default(unknown)
   emailValidationSubStatus String?
@@ -196,7 +206,7 @@ model Campaign {
   contacts              Contact[]
   draftingMode          DraftingMode      @default(ai)
   draftingTone          DraftingTone      @default(normal)
-  paragraphs            Int?              @default(3)
+  paragraphs            Int?              @default(0)
   subject               String?
   isAiSubject           Boolean           @default(true)
   fullAiPrompt          String?           @map("message") @db.Text
@@ -204,16 +214,16 @@ model Campaign {
   hybridAvailableBlocks HybridBlock[]     @default([introduction, research, action, text])
   hybridBlockPrompts    Json?
   handwrittenPrompt     String?           @db.Text
-  font                  String            @default("Times New Roman")
+  font                  String            @default("Arial")
   testMessage           String?           @db.Text
   testSubject           String?
   emails                Email[]
   senderEmail           String?
   senderName            String?
   signatureId           Int?
-  signature             Signature?        @relation(fields: [signatureId], references: [id], onDelete: Cascade)
+  signature             Signature?        @relation(fields: [signatureId], references: [id])
   identityId            Int?
-  identity              Identity?         @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  identity              Identity?         @relation(fields: [identityId], references: [id])
   contactLists          ContactList[]
   userContactLists      UserContactList[]
 

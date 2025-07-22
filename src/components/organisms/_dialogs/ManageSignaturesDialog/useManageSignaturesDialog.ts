@@ -37,7 +37,16 @@ export const useManageSignaturesDialog = (props: ManageSignaturesDialogProps) =>
 		useEditSignature({ suppressToasts: true });
 
 	const { mutate: deleteSignature, isPending: isPendingDeleteSignature } =
-		useDeleteSignature({});
+		useDeleteSignature({
+			onSuccess: () => {
+				form.reset({
+					name: '',
+					content: '<p></p>',
+				});
+				setCurrentSignature(null);
+				setIsEdit(false);
+			},
+		});
 
 	const { mutate: createSignature, isPending: isPendingCreateSignature } =
 		useCreateSignature({ suppressToasts: true });

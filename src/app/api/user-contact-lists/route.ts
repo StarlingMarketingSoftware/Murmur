@@ -9,19 +9,37 @@ import {
 	apiUnauthorized,
 	handleApiError,
 } from '@/app/api/_utils';
+import { getValidatedParamsFromUrl } from '@/utils';
 
-export const GET = async function GET() {
+const userContactListFilterSchema = z.object({
+	includeContacts: z.boolean().optional().default(false),
+});
+
+export type UserContactListFilterData = z.infer<typeof userContactListFilterSchema>;
+
+export const GET = async function GET(req: NextRequest) {
 	try {
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
 		}
 
+		const validatedFilters = getValidatedParamsFromUrl(
+			req.url,
+			userContactListFilterSchema
+		);
+		if (!validatedFilters.success) {
+			return apiBadRequest(validatedFilters.error);
+		}
+
+		const { includeContacts } = validatedFilters.data;
+
 		const result = await prisma.userContactList.findMany({
 			where: {
 				userId: userId,
 			},
 			include: {
+				contacts: includeContacts,
 				user: true,
 				_count: {
 					select: {

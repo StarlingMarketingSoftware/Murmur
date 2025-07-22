@@ -5,6 +5,7 @@ import { ContactFilterData, PostContactData } from '@/app/api/contacts/route';
 import { appendQueryParamsToUrl } from '@/utils';
 import { PostBatchContactData } from '@/app/api/contacts/batch/route';
 import { PatchContactData } from '@/app/api/contacts/[id]/route';
+import { PostBulkUpdateContactData } from '@/app/api/contacts/bulk-update/route';
 import { _fetch } from '@/utils';
 import { urls } from '@/constants/urls';
 import { ContactWithName } from '@/types/contact';
@@ -39,6 +40,23 @@ export const useGetContacts = (options: ContactQueryOptions) => {
 			return response.json() as Promise<ContactWithName[]>;
 		},
 		enabled: options.enabled === undefined ? true : options.enabled,
+	});
+};
+
+export const useGetUsedContactIds = () => {
+	return useQuery<number[]>({
+		queryKey: [...QUERY_KEYS.list(), 'used-contacts'],
+		queryFn: async () => {
+			const url = appendQueryParamsToUrl(urls.api.contacts.usedContacts.index);
+			const response = await _fetch(url);
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to fetch used contacts');
+			}
+
+			return response.json() as Promise<number[]>;
+		},
 	});
 };
 
@@ -171,6 +189,45 @@ export const useDeleteContact = (options: CustomMutationOptions = {}) => {
 			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.all });
 			if (!suppressToasts) {
 				toast.success(successMessage);
+			}
+			onSuccessCallback?.();
+		},
+		onError: () => {
+			if (!suppressToasts) {
+				toast.error(errorMessage);
+			}
+		},
+	});
+};
+
+export const useBatchUpdateContacts = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = false,
+		successMessage = 'Contacts updated successfully',
+		errorMessage = 'Failed to update contacts',
+		onSuccess: onSuccessCallback,
+	} = options;
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (data: PostBulkUpdateContactData) => {
+			const response = await _fetch(urls.api.contacts.bulkUpdate.index, 'PATCH', data);
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to update contacts');
+			}
+
+			return response.json();
+		},
+		onSuccess: (data) => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
+			if (!suppressToasts) {
+				const { updatedCount, failedCount } = data;
+				const message =
+					failedCount > 0
+						? `${successMessage}! ${updatedCount} contacts updated, ${failedCount} failed.`
+						: `${successMessage}! ${updatedCount} contacts updated.`;
+				toast.success(message);
 			}
 			onSuccessCallback?.();
 		},

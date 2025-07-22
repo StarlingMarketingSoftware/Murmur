@@ -68,11 +68,17 @@ export const urls = {
 		},
 		contacts: {
 			index: '/api/contacts',
+			usedContacts: {
+				index: '/api/contacts/used-contacts',
+			},
 			batch: {
 				index: '/api/contacts/batch',
 				private: {
 					index: '/api/contacts/batch/private',
 				},
+			},
+			bulkUpdate: {
+				index: '/api/contacts/bulk-update',
 			},
 			detail: ((id) => `/api/contacts/${id}`) as DetailRoute,
 		},
