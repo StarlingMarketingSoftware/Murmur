@@ -333,11 +333,12 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 
 				const parsedData = (results.data as Record<string, string>[])
 					.filter((row) => Object.values(row).some((value) => value !== ''))
+					.filter((row) => row.email !== undefined && row.email !== '')
 					.map((row) => ({
 						firstName: row.firstname || undefined,
 						lastName: row.lastname || undefined,
 						company: row.company || undefined,
-						email: row.email || undefined,
+						email: row.email,
 						address: row.address || undefined,
 						city: row.city || undefined,
 						country: row.country || undefined,
