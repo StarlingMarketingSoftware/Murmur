@@ -1,7 +1,9 @@
 import { Contact } from '@prisma/client';
 import { OpenAI } from 'openai';
-import { Client } from '@elastic/elasticsearch';
+import { Client, estypes } from '@elastic/elasticsearch';
 import prisma from '@/lib/prisma';
+
+type MappingProperty = estypes.MappingProperty;
 
 const VECTOR_DIMENSION = 1536; // OpenAI's text-embedding-3-small dimension
 const INDEX_NAME = 'contacts';
@@ -33,6 +35,10 @@ interface ContactDocument {
 	website: string;
 	linkedInUrl: string;
 	metadata: string;
+	companyType: string;
+	companyTechStack: string[];
+	companyKeywords: string[];
+	companyIndustry: string;
 }
 
 // Helper function to generate embedding for contact data
@@ -51,6 +57,10 @@ export const generateContactEmbedding = async (contact: Contact) => {
 		contact.website,
 		contact.linkedInUrl,
 		contact.metadata,
+		contact.companyType,
+		contact.companyTechStack,
+		contact.companyKeywords,
+		contact.companyIndustry,
 	]
 		.filter(Boolean)
 		.join(' ');
@@ -93,6 +103,10 @@ export const initializeVectorDb = async () => {
 						website: { type: 'text' },
 						linkedInUrl: { type: 'text' },
 						metadata: { type: 'text' },
+						companyType: { type: 'text' },
+						companyTechStack: { type: 'text' },
+						companyKeywords: { type: 'text' },
+						companyIndustry: { type: 'text' },
 					},
 				},
 			});
@@ -102,6 +116,53 @@ export const initializeVectorDb = async () => {
 		}
 	} catch (error) {
 		console.error('Error initializing Elasticsearch:', error);
+		throw error;
+	}
+};
+
+export const updateWithNewFields = async () => {
+	try {
+		const currentMapping = await elasticsearch.indices.getMapping({
+			index: INDEX_NAME,
+		});
+
+		const existingProperties = currentMapping[INDEX_NAME]?.mappings?.properties || {};
+
+		const newFields = {
+			companyType: { type: 'text' },
+			companyTechStack: { type: 'text' },
+			companyKeywords: { type: 'text' },
+			companyIndustry: { type: 'text' },
+		};
+
+		const fieldsToUpdate: Record<string, MappingProperty> = {};
+
+		for (const [fieldName, mapping] of Object.entries(newFields)) {
+			const existingField = existingProperties[fieldName];
+
+			if (!existingField) {
+				fieldsToUpdate[fieldName] = mapping as MappingProperty;
+				console.log(`Will add new field: ${fieldName}`);
+			} else if (existingField.type !== mapping.type) {
+				console.warn(
+					`Field ${fieldName} exists with type ${existingField.type}, wanted ${mapping.type}`
+				);
+			}
+		}
+
+		if (Object.keys(fieldsToUpdate).length > 0) {
+			const res = await elasticsearch.indices.putMapping({
+				index: INDEX_NAME,
+				properties: fieldsToUpdate,
+			});
+			console.log(`Added ${Object.keys(fieldsToUpdate).length} new field mappings`);
+			return res;
+		} else {
+			console.log('All field mappings are already up to date');
+		}
+		return null;
+	} catch (error) {
+		console.error('Error ensuring correct mappings:', error);
 		throw error;
 	}
 };
@@ -138,6 +199,10 @@ export const upsertContactToVectorDb = async (
 			website: contact.website || '',
 			linkedInUrl: contact.linkedInUrl || '',
 			metadata: contact.metadata || '',
+			companyType: contact.companyType || '',
+			companyTechStack: contact.companyTechStack || [],
+			companyKeywords: contact.companyKeywords || [],
+			companyIndustry: contact.companyIndustry || '',
 		},
 	});
 
@@ -218,6 +283,10 @@ export const searchSimilarContacts = async (
 				website: hit.fields?.website[0],
 				linkedInUrl: hit.fields?.linkedInUrl[0],
 				metadata: hit.fields?.metadata[0],
+				companyType: hit.fields?.companyType[0],
+				companyTechStack: hit.fields?.companyTechStack[0],
+				companyKeywords: hit.fields?.companyKeywords[0],
+				companyIndustry: hit.fields?.companyIndustry[0],
 			},
 		})),
 		totalFound: filteredHits.length,

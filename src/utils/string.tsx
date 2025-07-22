@@ -1,10 +1,43 @@
 import { HybridBlockPrompt } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 
-export const ellipsesText = (text: string, maxLength: number): string => {
-	if (text.length > maxLength) {
-		return text.substring(0, maxLength) + '...';
+/**
+ * Truncates text to a specified length and adds ellipses
+ * Tries to break at word boundaries when possible for better readability
+ * @param text - The text to truncate
+ * @param maxLength - Maximum length before truncation
+ * @param breakOnWords - Whether to try to break at word boundaries (default: true)
+ * @returns The truncated text with ellipses if needed
+ */
+export const ellipsesText = (
+	text: string,
+	maxLength: number,
+	breakOnWords: boolean = true
+): string => {
+	if (!text || text.length <= maxLength) {
+		return text;
 	}
-	return text;
+
+	if (maxLength <= 3) {
+		return '...';
+	}
+
+	const truncateLength = maxLength - 3; // Reserve space for ellipses
+
+	if (!breakOnWords) {
+		return text.substring(0, truncateLength) + '...';
+	}
+
+	// Try to break at word boundaries
+	const truncated = text.substring(0, truncateLength);
+	const lastSpaceIndex = truncated.lastIndexOf(' ');
+
+	// If we found a space and it's not too close to the beginning, break there
+	if (lastSpaceIndex > truncateLength * 0.5) {
+		return truncated.substring(0, lastSpaceIndex) + '...';
+	}
+
+	// Otherwise, just cut at the character limit
+	return truncated + '...';
 };
 
 /**

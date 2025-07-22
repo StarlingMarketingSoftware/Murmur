@@ -21,13 +21,13 @@ export const TableDeleteRowButton: FC<TableDeleteRowButtonProps> = (props) => {
 			variant="ghost"
 			disabled={disabled}
 			isLoading={isLoading}
-			size="icon"
+			size="iconSm"
 			onClick={async (e) => {
 				e.stopPropagation();
 				onClick(e);
 			}}
 		>
-			<TrashIcon className="h-3 w-2 text-destructive" />
+			<TrashIcon className="text-destructive" />
 		</Button>
 	);
 };

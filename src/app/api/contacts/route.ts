@@ -32,6 +32,13 @@ const createContactSchema = z.object({
 	metadata: z.string().optional(),
 	isPrivate: z.boolean().optional().default(false),
 	userId: z.string().optional(),
+	companyLinkedInUrl: z.string().optional(),
+	companyFoundedYear: z.string().optional(),
+	companyType: z.string().optional(),
+	companyTechStack: z.array(z.string()).optional(),
+	companyPostalCode: z.string().optional(),
+	companyKeywords: z.array(z.string()).optional(),
+	companyIndustry: z.string().optional(),
 });
 
 const contactFilterSchema = z.object({

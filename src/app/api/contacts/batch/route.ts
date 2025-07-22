@@ -34,6 +34,13 @@ const batchCreateContactSchema = z.object({
 			linkedInUrl: z.string().optional(),
 			photoUrl: z.string().optional(),
 			metadata: z.string().optional(),
+			companyLinkedInUrl: z.string().optional(),
+			companyFoundedYear: z.string().optional(),
+			companyType: z.string().optional(),
+			companyTechStack: z.array(z.string()).optional(),
+			companyPostalCode: z.string().optional(),
+			companyKeywords: z.array(z.string()).optional(),
+			companyIndustry: z.string().optional(),
 		})
 	),
 });
@@ -166,8 +173,6 @@ export async function POST(req: NextRequest) {
 						},
 					},
 				});
-
-				// TODO contacts must be indexed in vector database
 
 				const existingEmails = new Set(existingContacts.map((c) => c.email));
 				const newContacts = uniqueContacts.filter(

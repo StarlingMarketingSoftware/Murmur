@@ -168,37 +168,11 @@ const importCSVWithSubcategories = async (
 		categoryToCount[finalCategoryName] += 1;
 	}
 
-	for (const categoryName of Object.keys(categoryToCount)) {
-		await prisma.contactList.create({
-			data: {
-				name: categoryName,
-			},
-
-			// count: categoryToCount[categoryName],
-		});
-	}
-
-	const allContactLists = await prisma.contactList.findMany({});
-
 	for (const record of records) {
-		const recordCategoryName = generateCategoryName(categoryName, record.state);
-		const recordContactListId = allContactLists.find(
-			(contactList) => contactList.name === recordCategoryName
-		)?.id;
+		// const recordCategoryName = generateCategoryName(categoryName, record.state);
 
-		if (!recordContactListId) {
-			console.error(`Contact list not found for category: ${recordCategoryName}`);
-			continue;
-		}
-
-		await prisma.contact.upsert({
-			where: {
-				email_contactListId: {
-					email: record['email'],
-					contactListId: recordContactListId,
-				},
-			},
-			create: {
+		await prisma.contact.create({
+			data: {
 				lastName: record.name,
 				email: record.email,
 				company: record.company,
@@ -206,18 +180,11 @@ const importCSVWithSubcategories = async (
 				state: record.state,
 				country: record.country,
 				phone: record.phone,
-				contactListId: recordContactListId,
 				emailValidationStatus: 'valid',
+				hasVectorEmbedding: true,
 				title: record.title,
-			},
-			update: {
-				lastName: record.name,
-				company: record.company,
-				website: record.website,
-				state: record.state,
-				country: record.country,
-				phone: record.phone,
-				emailValidationStatus: 'valid',
+				companyTechStack: [],
+				companyKeywords: [],
 			},
 		});
 	}

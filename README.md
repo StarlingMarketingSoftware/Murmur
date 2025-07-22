@@ -143,14 +143,14 @@ export function extractEmailsFromContacts(contacts: Partial<Contact>[]): string[
 
 - Renaming: Avoid migrations when possible when renaming a field is required. For example:
 
-```message String?  @db.Text
-
+```
+message String?  @db.Text
 ```
 
 - Can be renamed to:
 
-```fullAiPrompt String?  @map("message") @db.Text
-
+```
+fullAiPrompt String?  @map("message") @db.Text
 ```
 
 - By using @map without running any migrations.
@@ -169,6 +169,7 @@ export function extractEmailsFromContacts(contacts: Partial<Contact>[]): string[
 - Run /scripts/export-embeddings.tsx `npx tsx scripts/export-embeddings.tsx`
 - Paste the generated .txt file's contents to /prisma/seed-data/contactEmbeddings1.ts and contactEmbeddings2.ts. The reason the files are split is to avoid the 100MB limit per file for Github.
 - 'docker compose down -v' to reset postgres and elastic search databases.
+- If you only want to reset the vector db, run `curl.exe -X DELETE "http://localhost:9200/contacts"`
 - 'docker compose up -d' to get fresh databases running.
 - Migrate and run all seed functions 'npx prisma migrate dev'
 
