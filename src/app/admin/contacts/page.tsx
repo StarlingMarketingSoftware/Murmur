@@ -12,7 +12,7 @@ const ManageContactsPage = () => {
 		useManageContacts();
 	return (
 		<>
-			<ContactTSVUploadDialog isPrivate={false} triggerText="Upload Contacts via TSV" />
+			<ContactTSVUploadDialog isAdmin triggerText="Upload Contacts via TSV" />
 			<Card size="lg">
 				<CardHeader>
 					<CardTitle>Manage Contact Lists</CardTitle>

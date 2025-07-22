@@ -41,9 +41,10 @@ const buttonVariants = cva(
 			size: {
 				default: 'h-10 w-fit px-4 py-2 has-[>svg]:px-3',
 				sm: 'h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5',
-				lg: 'h-10 rounded-md py-7 px-16 sm:px-28 text-[20px] sm:text-[23px] has-[>svg]:px-4',
+				lg: 'h-9 rounded-md py-5 sm:py-6 px-14 sm:px-24 text-[17px] sm:text-[20px] has-[>svg]:px-4',
 				xl: 'h-19 p-8 text-[30px]',
-				icon: 'size-9',
+				icon: 'size-8',
+				iconSm: 'size-4',
 			},
 			font: {
 				primary: 'font-primary',
@@ -53,12 +54,17 @@ const buttonVariants = cva(
 				true: '', // Base outline class, will be combined with variant
 				false: '',
 			},
+			bold: {
+				true: 'font-bold',
+				false: '',
+			},
 		},
 		defaultVariants: {
 			variant: 'primary',
 			size: 'default',
 			outline: false,
 			font: 'primary',
+			bold: false,
 		},
 	}
 );
@@ -68,6 +74,7 @@ function Button({
 	variant = 'primary',
 	size,
 	font,
+	bold,
 	outline,
 	asChild = false,
 	children,
@@ -79,6 +86,7 @@ function Button({
 		asChild?: boolean;
 		isLoading?: boolean;
 		noPadding?: boolean;
+		bold?: boolean;
 	}) {
 	const Comp = asChild ? SlotPrimitive.Slot : 'button';
 
@@ -121,6 +129,7 @@ function Button({
 					size,
 					font,
 					outline,
+					bold,
 					className,
 				}),
 				outlineClasses,

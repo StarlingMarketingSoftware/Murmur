@@ -60,7 +60,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 				<DialogHeader>
 					<DialogTitle>Manage Signatures</DialogTitle>
 					<DialogDescription>
-						Your selected signature will be added to the end of every email you draft.
+						Signatures are added to the end of every email you draft.
 					</DialogDescription>
 				</DialogHeader>
 				<div className="grid grid-cols-2 gap-4 md:hidden w-full">
@@ -146,6 +146,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 							}
 							className="w-full"
 							isLoading={isPendingCreateSignature}
+							variant="primary-light"
 						>
 							New Signature
 						</Button>
@@ -163,7 +164,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 								render={({ field }) => (
 									<FormItem className="col-span-11">
 										<FormControl>
-											<Input {...field} />
+											<Input {...field} disabled={!currentSignature} />
 										</FormControl>
 										<FormMessage />
 									</FormItem>
@@ -179,6 +180,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 												value={field.value}
 												onChange={field.onChange}
 												className="!h-full grow max-h-[200px] overflow-y-auto"
+												disabled={!currentSignature}
 											/>
 										</FormControl>
 										<FormMessage />
@@ -189,8 +191,9 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 								<div className="flex flex-col sm:flex-row gap-4">
 									<Button
 										type="button"
-										variant="primary-light"
+										variant="light"
 										isLoading={isPendingDeleteSignature}
+										disabled={!currentSignature}
 										onClick={(e) => {
 											if (!currentSignature) return;
 											setCurrentSignature(signatures[1]);
@@ -201,7 +204,11 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 										<TrashIcon />
 										Delete
 									</Button>
-									<Button isLoading={isPendingSaveSignature} type="submit">
+									<Button
+										disabled={!currentSignature}
+										isLoading={isPendingSaveSignature}
+										type="submit"
+									>
 										<SaveIcon /> Save
 									</Button>
 								</div>

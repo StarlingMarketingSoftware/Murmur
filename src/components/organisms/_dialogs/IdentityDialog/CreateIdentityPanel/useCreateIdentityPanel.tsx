@@ -6,11 +6,14 @@ import { useCreateIdentity, useEditIdentity } from '@/hooks/queryHooks/useIdenti
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Identity } from '@prisma/client';
 import { useEffect, useState, useRef, Dispatch, SetStateAction } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, UseFormSetValue } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { identityFormSchema } from '../useIdentityDialog';
+import { useCreateSignature, useGetSignatures } from '@/hooks/queryHooks/useSignatures';
+import { DEFAULT_FONT } from '@/constants/ui';
 
-const identityFormSchema = z.object({
+const upsertIdentityFormSchema = z.object({
 	name: z.string().min(1, 'Name is required'),
 	email: z.string().email('Invalid email address'),
 	website: z.string().optional(),
@@ -22,10 +25,12 @@ export interface CreateIdentityPanelProps {
 	selectedIdentity?: Identity;
 	setShowCreatePanel: Dispatch<SetStateAction<boolean>>;
 	showCreatePanel: boolean;
+	setValue: UseFormSetValue<z.infer<typeof identityFormSchema>>;
 }
 
 export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
-	const { isEdit, selectedIdentity, setShowCreatePanel, showCreatePanel } = props;
+	const { isEdit, selectedIdentity, setShowCreatePanel, showCreatePanel, setValue } =
+		props;
 
 	const [countdown, setCountdown] = useState<number | null>(null);
 	const [isCodeVerified, setIsCodeVerified] = useState(false);
@@ -33,9 +38,9 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 
 	const isCodeExpired = countdown === 0;
 
-	const form = useForm<z.infer<typeof identityFormSchema>>({
+	const form = useForm<z.infer<typeof upsertIdentityFormSchema>>({
 		mode: 'onTouched',
-		resolver: zodResolver(identityFormSchema),
+		resolver: zodResolver(upsertIdentityFormSchema),
 		defaultValues: {
 			name: '',
 			email: '',
@@ -61,7 +66,12 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 		},
 	});
 
-	const { mutate: createIdentity, isPending: isPendingCreateIdentity } =
+	const { data: signatures } = useGetSignatures();
+	const { mutate: createSignature } = useCreateSignature({
+		suppressToasts: true,
+	});
+
+	const { mutateAsync: createIdentity, isPending: isPendingCreateIdentity } =
 		useCreateIdentity({
 			onSuccess: () => {
 				resetEditEmailVerificationCode();
@@ -126,7 +136,7 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 		}
 	};
 
-	const onSubmit = async (values: z.infer<typeof identityFormSchema>) => {
+	const onSubmit = async (values: z.infer<typeof upsertIdentityFormSchema>) => {
 		if (isEdit) {
 			if (!selectedIdentity) {
 				toast.error('No identity selected for editing.');
@@ -141,11 +151,18 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 				},
 			});
 		} else {
-			createIdentity({
+			const newIdentity: Identity = await createIdentity({
 				name: values.name,
 				email: values.email,
 				website: values.website,
 			});
+			setValue('identityId', String(newIdentity.id));
+			if (signatures?.length === 0) {
+				createSignature({
+					name: 'Default Signature',
+					content: `<p><span style="font-family: ${DEFAULT_FONT}">Sincerely,</span></p><p></p><p><span style="font-family: ${DEFAULT_FONT}">${values.name}</span></p>`,
+				});
+			}
 		}
 	};
 

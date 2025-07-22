@@ -45,6 +45,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 	showPlaceholders = false,
 	placeholderOptions,
 }) => {
+	const _isEdit = isEdit && !disabled;
 	const editor = useEditor({
 		extensions: [
 			StarterKit.configure({
@@ -76,15 +77,15 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 			}),
 			FontFamily,
 			TextStyle.configure({ mergeNestedSpanStyles: true }),
-			Div, // Add the Div extension here
+			Div,
 		],
-		editable: isEdit,
+		editable: _isEdit,
 		immediatelyRender: false,
 		content: value ? value : '',
 		editorProps: {
 			attributes: {
 				class: twMerge(
-					'min-h-[200px] w-full rounded-md border border-input bg-background',
+					'min-h-[200px] w-full rounded-md border border-gray-300 bg-background',
 					'px-3 py-2 text-sm ',
 					'placeholder:text-muted-foreground',
 					'disabled:cursor-not-allowed disabled:opacity-50',
@@ -109,16 +110,16 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 
 	useEffect(() => {
 		if (editor) {
-			editor.setEditable(isEdit);
+			editor.setEditable(_isEdit);
 		}
-	}, [editor, isEdit]);
+	}, [editor, _isEdit]);
 
 	return (
 		<div className="flex flex-col gap-2">
 			{!hideMenuBar && (
 				<RichTextMenuBar
 					editor={editor}
-					isEdit={isEdit}
+					isEdit={_isEdit}
 					showPlaceholders={showPlaceholders}
 					placeholderOptions={placeholderOptions}
 				/>

@@ -35,6 +35,7 @@ import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 import { HandwrittenPromptInput } from '@/components/molecules/HandwrittenPromptInput/HandwrittenPromptInput';
 import { Typography } from '@/components/ui/typography';
+import { Font } from '@/types';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
@@ -53,7 +54,6 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		handleSavePrompt,
 		isTest,
 		signatures,
-		isPendingSignatures,
 		isOpenSignaturesDialog,
 		setIsOpenSignaturesDialog,
 		selectedSignature,
@@ -150,7 +150,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 														<Select
 															disabled={draftingMode === 'handwritten'}
 															onValueChange={field.onChange}
-															defaultValue={field.value}
+															value={field.value as Font}
 														>
 															<SelectTrigger className="w-full">
 																<SelectValue />
@@ -171,6 +171,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 												</FormItem>
 											)}
 										/>
+
 										<FormField
 											control={form.control}
 											name="signatureId"
@@ -186,7 +187,8 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																}
 																field.onChange(Number(value));
 															}}
-															value={field.value?.toString() || ''}
+															defaultValue={field.value ? field.value.toString() : ''}
+															value={field.value ? field.value.toString() : ''}
 														>
 															<SelectTrigger className="!w-full">
 																<SelectValue placeholder="Select signature" />
@@ -194,11 +196,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 															<SelectContent>
 																<SelectGroup>
 																	<SelectLabel>Signatures</SelectLabel>
-																	{isPendingSignatures ? (
-																		<SelectItem value="loading" disabled>
-																			Loading signatures...
-																		</SelectItem>
-																	) : signatures && signatures.length > 0 ? (
+																	{signatures && signatures.length > 0 ? (
 																		signatures.map((signature: Signature) => (
 																			<SelectItem
 																				key={signature.id}

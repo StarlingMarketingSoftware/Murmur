@@ -67,6 +67,7 @@ export async function GET() {
 
 			// Add a small delay between batches to avoid rate limits
 			if (i + batchSize < contacts.length) {
+				console.log(`Batch completed ${i + batchSize} of ${contacts.length}`);
 				await new Promise((resolve) => setTimeout(resolve, 1000));
 			}
 		}

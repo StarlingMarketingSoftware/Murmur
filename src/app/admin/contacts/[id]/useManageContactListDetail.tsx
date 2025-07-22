@@ -21,7 +21,9 @@ export const useManageContactListDetail = () => {
 
 	const queryClient = useQueryClient();
 	const { data, isPending } = useGetContacts({
-		filters: { contactListIds: [Number(contactListId)] },
+		filters: {
+			contactListIds: [Number(contactListId)],
+		},
 	});
 	const { data: contactListData, isPending: isPendingContactList } =
 		useGetContactList(contactListId);

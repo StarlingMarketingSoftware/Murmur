@@ -2,14 +2,13 @@ import { AccessorFnColumnDef, ColumnDef } from '@tanstack/react-table';
 import { TableSortingButton } from '../../../molecules/CustomTable/CustomTable';
 import { EmailWithRelations } from '@/types';
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { TrashIcon } from 'lucide-react';
 import { ellipsesText } from '@/utils';
 import { useMe } from '@/hooks/useMe';
 import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureLockedButton';
 import { RESTRICTED_FEATURE_MESSAGES } from '@/constants';
 import { useDeleteEmail } from '@/hooks/queryHooks/useEmails';
 import { stripHtmlTags } from '@/utils';
+import { TableDeleteRowButton } from '@/components/molecules/TableDeleteRowButton/TableDeleteRowButton';
 
 export interface EmailsTableProps {
 	emails: EmailWithRelations[];
@@ -70,16 +69,12 @@ export const useEmailsTable = (props: EmailsTableProps) => {
 		{
 			id: 'action',
 			cell: ({ row }) => (
-				<Button
-					variant="ghost"
-					size="icon"
-					onClick={(e) => {
-						e.stopPropagation();
+				<TableDeleteRowButton
+					disabled={isPendingDeleteEmail}
+					onClick={() => {
 						handleDeleteEmail(row.original.id);
 					}}
-				>
-					<TrashIcon className="h-3 w-2 text-destructive" />
-				</Button>
+				/>
 			),
 		},
 	];

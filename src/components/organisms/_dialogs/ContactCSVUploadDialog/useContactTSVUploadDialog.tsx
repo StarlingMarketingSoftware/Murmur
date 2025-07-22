@@ -13,17 +13,26 @@ import { ButtonVariants } from '@/components/ui/button';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { PostBatchContactData } from '@/app/api/contacts/batch/route';
 import { useMe } from '@/hooks/useMe';
+import { EllipsesWithTooltip } from '@/components/atoms/EllipsesWithTooltip/EllipsesWithTooltip';
 
 export interface ContactTSVUploadDialogProps {
-	isPrivate: boolean;
+	isAdmin: boolean;
 	triggerText: string;
 	buttonVariant?: ButtonVariants['variant'];
 }
 
 type ContactInput = PostBatchContactData['contacts'][number];
 
+const TSVTableTooltip = ({ text }: { text: string }) => {
+	return (
+		<div className="text-left">
+			<EllipsesWithTooltip tooltipPlacement="right" text={text} maxLength={40} />
+		</div>
+	);
+};
+
 export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) => {
-	const columns: ColumnDef<ContactInput>[] = [
+	const publicColumns: ColumnDef<ContactInput>[] = [
 		{
 			accessorKey: 'firstName',
 			header: ({ column }) => {
@@ -63,7 +72,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const company: string = row.getValue('company');
 				if (!company) return <NoDataCell />;
-				return <div className="text-left">{company}</div>;
+				return <TSVTableTooltip text={company} />;
 			},
 		},
 		{
@@ -74,7 +83,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const title: string = row.getValue('title');
 				if (!title) return <NoDataCell />;
-				return <div className="text-left">{title}</div>;
+				return <TSVTableTooltip text={title} />;
 			},
 		},
 		{
@@ -85,7 +94,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const headline: string = row.getValue('headline');
 				if (!headline) return <NoDataCell />;
-				return <div className="text-left">{headline}</div>;
+				return <TSVTableTooltip text={headline} />;
 			},
 		},
 		{
@@ -96,7 +105,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const address: string = row.getValue('address');
 				if (!address) return <NoDataCell />;
-				return <div className="text-left">{address}</div>;
+				return <TSVTableTooltip text={address} />;
 			},
 		},
 		{
@@ -151,7 +160,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const website: string = row.getValue('website');
 				if (!website) return <NoDataCell />;
-				return <div className="text-left">{website}</div>;
+				return <TSVTableTooltip text={website} />;
 			},
 		},
 		{
@@ -162,7 +171,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const linkedInUrl: string = row.getValue('linkedInUrl');
 				if (!linkedInUrl) return <NoDataCell />;
-				return <div className="text-left">{linkedInUrl}</div>;
+				return <TSVTableTooltip text={linkedInUrl} />;
 			},
 		},
 		{
@@ -173,7 +182,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const photoUrl: string = row.getValue('photoUrl');
 				if (!photoUrl) return <NoDataCell />;
-				return <div className="text-left">{photoUrl}</div>;
+				return <TSVTableTooltip text={photoUrl} />;
 			},
 		},
 		{
@@ -184,7 +193,87 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const metadata: string = row.getValue('metadata');
 				if (!metadata) return <NoDataCell />;
-				return <div className="text-left">{metadata}</div>;
+				return <TSVTableTooltip text={metadata} />;
+			},
+		},
+	];
+
+	const adminColumns: ColumnDef<ContactInput>[] = [
+		{
+			accessorKey: 'companyLinkedInUrl',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Company LinkedIn URL" />;
+			},
+			cell: ({ row }) => {
+				const companyLinkedInUrl: string = row.getValue('companyLinkedInUrl');
+				if (!companyLinkedInUrl) return <NoDataCell />;
+				return <TSVTableTooltip text={companyLinkedInUrl} />;
+			},
+		},
+		{
+			accessorKey: 'companyFoundedYear',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Company Founded Year" />;
+			},
+			cell: ({ row }) => {
+				const companyFoundedYear: string = row.getValue('companyFoundedYear');
+				if (!companyFoundedYear) return <NoDataCell />;
+				return <div className="text-left">{companyFoundedYear}</div>;
+			},
+		},
+		{
+			accessorKey: 'companyType',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Company Type" />;
+			},
+			cell: ({ row }) => {
+				const companyType: string = row.getValue('companyType');
+				if (!companyType) return <NoDataCell />;
+				return <div className="text-left">{companyType}</div>;
+			},
+		},
+		{
+			accessorKey: 'companyTechStack',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Company Tech Stack" />;
+			},
+			cell: ({ row }) => {
+				const companyTechStack: string[] = row.getValue('companyTechStack');
+				if (!companyTechStack || companyTechStack.length === 0) return <NoDataCell />;
+				return <TSVTableTooltip text={companyTechStack.join(', ')} />;
+			},
+		},
+		{
+			accessorKey: 'companyPostalCode',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Company Postal Code" />;
+			},
+			cell: ({ row }) => {
+				const companyPostalCode: string = row.getValue('companyPostalCode');
+				if (!companyPostalCode) return <NoDataCell />;
+				return <div className="text-left">{companyPostalCode}</div>;
+			},
+		},
+		{
+			accessorKey: 'companyKeywords',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Company Keywords" />;
+			},
+			cell: ({ row }) => {
+				const companyKeywords: string[] = row.getValue('companyKeywords');
+				if (!companyKeywords || companyKeywords.length === 0) return <NoDataCell />;
+				return <TSVTableTooltip text={companyKeywords.join(', ')} />;
+			},
+		},
+		{
+			accessorKey: 'companyIndustry',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Company Industry" />;
+			},
+			cell: ({ row }) => {
+				const companyIndustry: string = row.getValue('companyIndustry');
+				if (!companyIndustry) return <NoDataCell />;
+				return <div className="text-left">{companyIndustry}</div>;
 			},
 		},
 		{
@@ -199,7 +288,14 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 	];
 
-	const { isPrivate, triggerText, buttonVariant } = props;
+	const columns: ColumnDef<ContactInput>[] = publicColumns;
+
+	const { isAdmin, triggerText, buttonVariant } = props;
+
+	if (isAdmin) {
+		columns.push(...adminColumns);
+	}
+
 	const [open, setOpen] = useState(false);
 	const [tsvData, setTsvData] = useState<ContactInput[]>([]);
 	const fileInputRef = useRef<HTMLInputElement>(null);
@@ -213,6 +309,10 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		useCreateUserContactList({
 			suppressToasts: true,
 		});
+
+	const trimKeywords = (keywords: string[]): string[] => {
+		return keywords.map((keyword) => keyword.trim());
+	};
 
 	const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];
@@ -233,6 +333,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 
 				const parsedData = (results.data as Record<string, string>[])
 					.filter((row) => Object.values(row).some((value) => value !== ''))
+					.filter((row) => row.email !== undefined && row.email !== '')
 					.map((row) => ({
 						firstName: row.firstname || undefined,
 						lastName: row.lastname || undefined,
@@ -249,6 +350,13 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 						linkedInUrl: row.linkedinurl || undefined,
 						photoUrl: row.photourl || undefined,
 						metadata: row.metadata || undefined,
+						companyLinkedInUrl: row.companylinkedinurl || undefined,
+						companyFoundedYear: row.companyfoundedyear || undefined,
+						companyType: row.companytype || undefined,
+						companyTechStack: trimKeywords(row.companytechstack?.split(',') || []),
+						companyPostalCode: row.companypostalcode || undefined,
+						companyKeywords: trimKeywords(row.companykeywords?.split(',') || []),
+						companyIndustry: row.companyindustry || undefined,
 					}));
 
 				setTsvData(parsedData);
@@ -274,7 +382,8 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		}
 		const verificationCredits = user?.verificationCredits;
 
-		if (tsvData.length > (verificationCredits || 0)) {
+		// only check verification if not isAdmin
+		if (!isAdmin && tsvData.length > (verificationCredits || 0)) {
 			toast.error(
 				`You do not have enough upload credits to create this many contacts. Please upgrade your plan. Credits: ${verificationCredits} Number of contacts: ${tsvData.length}`
 			);
@@ -282,7 +391,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		}
 
 		const { contacts, created } = await batchCreateContacts({
-			isPrivate,
+			isPrivate: !isAdmin,
 			contacts: tsvData,
 		});
 
@@ -325,5 +434,6 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		handleClear,
 		triggerText,
 		buttonVariant,
+		isAdmin,
 	};
 };
