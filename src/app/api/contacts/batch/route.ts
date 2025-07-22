@@ -40,6 +40,7 @@ const batchCreateContactSchema = z.object({
 			companyTechStack: z.array(z.string()).optional(),
 			companyPostalCode: z.string().optional(),
 			companyKeywords: z.array(z.string()).optional(),
+			companyIndustry: z.string().optional(),
 		})
 	),
 });

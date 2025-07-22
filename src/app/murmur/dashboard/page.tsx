@@ -140,7 +140,7 @@ const Dashboard = () => {
 							</div>
 							<div className="flex items-center justify-end gap-2">
 								<ContactTSVUploadDialog
-									isPrivate
+									isAdmin={false}
 									triggerText="Import"
 									buttonVariant="light"
 								/>

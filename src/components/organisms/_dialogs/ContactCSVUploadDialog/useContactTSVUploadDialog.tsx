@@ -16,15 +16,23 @@ import { useMe } from '@/hooks/useMe';
 import { EllipsesWithTooltip } from '@/components/atoms/EllipsesWithTooltip/EllipsesWithTooltip';
 
 export interface ContactTSVUploadDialogProps {
-	isPrivate: boolean;
+	isAdmin: boolean;
 	triggerText: string;
 	buttonVariant?: ButtonVariants['variant'];
 }
 
 type ContactInput = PostBatchContactData['contacts'][number];
 
+const TSVTableTooltip = ({ text }: { text: string }) => {
+	return (
+		<div className="text-left">
+			<EllipsesWithTooltip tooltipPlacement="right" text={text} maxLength={40} />
+		</div>
+	);
+};
+
 export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) => {
-	const userColumns: ColumnDef<ContactInput>[] = [
+	const publicColumns: ColumnDef<ContactInput>[] = [
 		{
 			accessorKey: 'firstName',
 			header: ({ column }) => {
@@ -64,11 +72,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const company: string = row.getValue('company');
 				if (!company) return <NoDataCell />;
-				return (
-					<div className="text-left">
-						<EllipsesWithTooltip tooltipPlacement="right" text={company} maxLength={40} />
-					</div>
-				);
+				return <TSVTableTooltip text={company} />;
 			},
 		},
 		{
@@ -79,11 +83,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const title: string = row.getValue('title');
 				if (!title) return <NoDataCell />;
-				return (
-					<div className="text-left">
-						<EllipsesWithTooltip tooltipPlacement="right" text={title} maxLength={40} />
-					</div>
-				);
+				return <TSVTableTooltip text={title} />;
 			},
 		},
 		{
@@ -94,15 +94,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const headline: string = row.getValue('headline');
 				if (!headline) return <NoDataCell />;
-				return (
-					<div className="text-left">
-						<EllipsesWithTooltip
-							tooltipPlacement="right"
-							text={headline}
-							maxLength={40}
-						/>
-					</div>
-				);
+				return <TSVTableTooltip text={headline} />;
 			},
 		},
 		{
@@ -113,11 +105,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const address: string = row.getValue('address');
 				if (!address) return <NoDataCell />;
-				return (
-					<div className="text-left">
-						<EllipsesWithTooltip tooltipPlacement="right" text={address} maxLength={40} />
-					</div>
-				);
+				return <TSVTableTooltip text={address} />;
 			},
 		},
 		{
@@ -172,11 +160,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const website: string = row.getValue('website');
 				if (!website) return <NoDataCell />;
-				return (
-					<div className="text-left">
-						<EllipsesWithTooltip tooltipPlacement="right" text={website} maxLength={40} />
-					</div>
-				);
+				return <TSVTableTooltip text={website} />;
 			},
 		},
 		{
@@ -187,15 +171,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const linkedInUrl: string = row.getValue('linkedInUrl');
 				if (!linkedInUrl) return <NoDataCell />;
-				return (
-					<div className="text-left">
-						<EllipsesWithTooltip
-							tooltipPlacement="right"
-							text={linkedInUrl}
-							maxLength={40}
-						/>
-					</div>
-				);
+				return <TSVTableTooltip text={linkedInUrl} />;
 			},
 		},
 		{
@@ -206,15 +182,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const photoUrl: string = row.getValue('photoUrl');
 				if (!photoUrl) return <NoDataCell />;
-				return (
-					<div className="text-left">
-						<EllipsesWithTooltip
-							tooltipPlacement="right"
-							text={photoUrl}
-							maxLength={40}
-						/>
-					</div>
-				);
+				return <TSVTableTooltip text={photoUrl} />;
 			},
 		},
 		{
@@ -225,15 +193,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const metadata: string = row.getValue('metadata');
 				if (!metadata) return <NoDataCell />;
-				return (
-					<div className="text-left">
-						<EllipsesWithTooltip
-							tooltipPlacement="right"
-							text={metadata}
-							maxLength={40}
-						/>
-					</div>
-				);
+				return <TSVTableTooltip text={metadata} />;
 			},
 		},
 	];
@@ -247,15 +207,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const companyLinkedInUrl: string = row.getValue('companyLinkedInUrl');
 				if (!companyLinkedInUrl) return <NoDataCell />;
-				return (
-					<div className="text-left">
-						<EllipsesWithTooltip
-							tooltipPlacement="right"
-							text={companyLinkedInUrl}
-							maxLength={40}
-						/>
-					</div>
-				);
+				return <TSVTableTooltip text={companyLinkedInUrl} />;
 			},
 		},
 		{
@@ -288,15 +240,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const companyTechStack: string[] = row.getValue('companyTechStack');
 				if (!companyTechStack || companyTechStack.length === 0) return <NoDataCell />;
-				return (
-					<div className="text-left">
-						<EllipsesWithTooltip
-							tooltipPlacement="right"
-							text={companyTechStack.join(', ')}
-							maxLength={40}
-						/>
-					</div>
-				);
+				return <TSVTableTooltip text={companyTechStack.join(', ')} />;
 			},
 		},
 		{
@@ -318,15 +262,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const companyKeywords: string[] = row.getValue('companyKeywords');
 				if (!companyKeywords || companyKeywords.length === 0) return <NoDataCell />;
-				return (
-					<div className="text-left">
-						<EllipsesWithTooltip
-							tooltipPlacement="right"
-							text={companyKeywords.join(', ')}
-							maxLength={40}
-						/>
-					</div>
-				);
+				return <TSVTableTooltip text={companyKeywords.join(', ')} />;
 			},
 		},
 		{
@@ -352,11 +288,11 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 	];
 
-	const columns: ColumnDef<ContactInput>[] = userColumns;
+	const columns: ColumnDef<ContactInput>[] = publicColumns;
 
-	const { isPrivate, triggerText, buttonVariant } = props;
+	const { isAdmin, triggerText, buttonVariant } = props;
 
-	if (!isPrivate) {
+	if (isAdmin) {
 		columns.push(...adminColumns);
 	}
 
@@ -401,7 +337,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 						firstName: row.firstname || undefined,
 						lastName: row.lastname || undefined,
 						company: row.company || undefined,
-						email: row.email || 'EMAIL IS REQUIRED',
+						email: row.email || undefined,
 						address: row.address || undefined,
 						city: row.city || undefined,
 						country: row.country || undefined,
@@ -445,8 +381,8 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		}
 		const verificationCredits = user?.verificationCredits;
 
-		// only check verification if isPrivate
-		if (tsvData.length > (verificationCredits || 0)) {
+		// only check verification if not isAdmin
+		if (!isAdmin && tsvData.length > (verificationCredits || 0)) {
 			toast.error(
 				`You do not have enough upload credits to create this many contacts. Please upgrade your plan. Credits: ${verificationCredits} Number of contacts: ${tsvData.length}`
 			);
@@ -454,7 +390,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		}
 
 		const { contacts, created } = await batchCreateContacts({
-			isPrivate,
+			isPrivate: !isAdmin,
 			contacts: tsvData,
 		});
 
@@ -497,6 +433,6 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		handleClear,
 		triggerText,
 		buttonVariant,
-		isPrivate,
+		isAdmin,
 	};
 };

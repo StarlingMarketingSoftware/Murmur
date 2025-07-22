@@ -6,6 +6,7 @@ interface EllipsesWithTooltipProps {
 	maxLength?: number;
 	className?: string;
 	tooltipPlacement?: 'top' | 'bottom' | 'left' | 'right';
+	tooltipDelay?: number;
 }
 
 export const EllipsesWithTooltip = ({
@@ -13,6 +14,7 @@ export const EllipsesWithTooltip = ({
 	maxLength = 50,
 	className = '',
 	tooltipPlacement = 'top',
+	tooltipDelay = 350,
 }: EllipsesWithTooltipProps) => {
 	if (!text) return null;
 
@@ -24,7 +26,7 @@ export const EllipsesWithTooltip = ({
 	}
 
 	return (
-		<Tooltip>
+		<Tooltip delayDuration={tooltipDelay}>
 			<TooltipTrigger asChild>
 				<span className={`cursor-help ${className}`}>{truncatedText}</span>
 			</TooltipTrigger>

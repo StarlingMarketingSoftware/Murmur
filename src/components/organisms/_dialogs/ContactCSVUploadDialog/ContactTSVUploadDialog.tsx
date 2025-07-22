@@ -33,7 +33,7 @@ export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) =
 		handleClear,
 		triggerText,
 		buttonVariant,
-		isPrivate,
+		isAdmin,
 	} = useContactTSVUploadDialog(props);
 
 	return (
@@ -43,7 +43,7 @@ export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) =
 					{triggerText}
 				</Button>
 			</DialogTrigger>
-			<DialogContent className={twMerge(!isPrivate && '!max-w-98/100 !max-h-98/100')}>
+			<DialogContent className={twMerge(isAdmin && '!max-w-98/100 !max-h-98/100')}>
 				<DialogHeader>
 					<DialogTitle>Add Contacts by TSV Upload</DialogTitle>
 				</DialogHeader>

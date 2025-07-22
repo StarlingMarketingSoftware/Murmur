@@ -27,7 +27,7 @@ export const TableDeleteRowButton: FC<TableDeleteRowButtonProps> = (props) => {
 				onClick(e);
 			}}
 		>
-			<TrashIcon className="!w-full text-destructive" />
+			<TrashIcon className="text-destructive" />
 		</Button>
 	);
 };

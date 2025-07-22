@@ -270,12 +270,12 @@ const seedElasticsearchEmbeddings = async (contacts: Contact[]) => {
 
 async function main() {
 	/* Seed users */
-	// await prisma.user.createMany({
-	// 	data: userData,
-	// });
+	await prisma.user.createMany({
+		data: userData,
+	});
 
 	/* Seed contacts */
-	// importCSVWithSubcategories('demoCsvs/musicVenuesDemo4106.csv', 'Music Venues');
+	importCSVWithSubcategories('demoCsvs/musicVenuesDemo4106.csv', 'Music Venues');
 
 	/* Seed embeddings */
 	const allContacts = await prisma.contact.findMany();
