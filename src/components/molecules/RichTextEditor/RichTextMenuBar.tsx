@@ -96,7 +96,7 @@ export const RichTextMenuBar: FC<RichTextMenuBarProps> = ({
 	];
 
 	return (
-		<div className="border rounded-md p-1 mb-1 space-x-2 space-y-0.5 z-50 flex flex-wrap">
+		<div className="border rounded-md p-1 mb-1 space-x-2 space-y-0.5 z-40 flex flex-wrap">
 			{Options.map((option, index) => (
 				<Toggle
 					disabled={!isEdit}

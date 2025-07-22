@@ -11,6 +11,7 @@ import { FC, useEffect } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { Node } from '@tiptap/core';
 import TextStyle from '@tiptap/extension-text-style';
+import { DEFAULT_FONT } from '@/constants/ui';
 
 interface RichTextEditorProps {
 	value: string;
@@ -49,11 +50,6 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 	const editor = useEditor({
 		extensions: [
 			StarterKit.configure({
-				// paragraph: {
-				// 	HTMLAttributes: {
-				// 		style: 'margin-top:3px; padding:0;',
-				// 	},
-				// },
 				bulletList: {
 					HTMLAttributes: {
 						class: 'list-disc pl-6',
@@ -79,6 +75,36 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 			TextStyle.configure({ mergeNestedSpanStyles: true }),
 			Div,
 		],
+		onSelectionUpdate: ({ editor }) => {
+			const { state } = editor;
+			const { selection } = state;
+			const { $head } = selection;
+
+			if ($head.parent.content.size === 0) {
+				let storedMarks = state.storedMarks || $head.marks();
+
+				if (!storedMarks || storedMarks.length === 0) {
+					let prevPos = $head.pos - 1;
+					while (prevPos > 0) {
+						const resolvedPos = state.doc.resolve(prevPos);
+						const prevMarks = resolvedPos.marks();
+
+						if (prevMarks.length > 0) {
+							storedMarks = prevMarks;
+							break;
+						}
+						prevPos--;
+					}
+				}
+
+				if (storedMarks) {
+					console.log('Restoring marks:', storedMarks);
+					storedMarks.forEach((mark) => {
+						editor.commands.setMark(mark.type.name, mark.attrs);
+					});
+				}
+			}
+		},
 		editable: _isEdit,
 		immediatelyRender: false,
 		content: value ? value : '',
@@ -113,6 +139,12 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 			editor.setEditable(_isEdit);
 		}
 	}, [editor, _isEdit]);
+
+	useEffect(() => {
+		if (editor) {
+			editor.commands.setFontFamily(DEFAULT_FONT);
+		}
+	}, [editor]);
 
 	return (
 		<div className="flex flex-col gap-2">
