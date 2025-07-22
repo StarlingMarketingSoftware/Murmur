@@ -374,6 +374,10 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			suppressToasts: true,
 		});
 
+	const trimKeywords = (keywords: string[]): string[] => {
+		return keywords.map((keyword) => keyword.trim());
+	};
+
 	const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];
 		if (!file) return;
@@ -412,9 +416,9 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 						companyLinkedInUrl: row.companylinkedinurl || undefined,
 						companyFoundedYear: row.companyfoundedyear || undefined,
 						companyType: row.companytype || undefined,
-						companyTechStack: row.companytechstack || undefined,
+						companyTechStack: trimKeywords(row.companytechstack?.split(',') || []),
 						companyPostalCode: row.companypostalcode || undefined,
-						companyKeywords: row.companykeywords || undefined,
+						companyKeywords: trimKeywords(row.companykeywords?.split(',') || []),
 						companyIndustry: row.companyindustry || undefined,
 					}));
 

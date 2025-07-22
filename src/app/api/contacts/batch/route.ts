@@ -173,8 +173,6 @@ export async function POST(req: NextRequest) {
 					},
 				});
 
-				// TODO contacts must be indexed in vector database
-
 				const existingEmails = new Set(existingContacts.map((c) => c.email));
 				const newContacts = uniqueContacts.filter(
 					(contact) => !existingEmails.has(contact.email)
