@@ -122,41 +122,34 @@ export const initializeVectorDb = async () => {
 
 export const updateWithNewFields = async () => {
 	try {
-		// Get current mapping
 		const currentMapping = await elasticsearch.indices.getMapping({
 			index: INDEX_NAME,
 		});
 
 		const existingProperties = currentMapping[INDEX_NAME]?.mappings?.properties || {};
 
-		// Define desired mappings for new fields
 		const newFields = {
-			companyType: { type: 'keyword' },
-			companyTechStack: { type: 'keyword' },
-			companyKeywords: { type: 'keyword' },
-			companyIndustry: { type: 'keyword' },
+			companyType: { type: 'text' },
+			companyTechStack: { type: 'text' },
+			companyKeywords: { type: 'text' },
+			companyIndustry: { type: 'text' },
 		};
 
-		// Check which fields need to be added/updated
 		const fieldsToUpdate: Record<string, MappingProperty> = {};
 
 		for (const [fieldName, mapping] of Object.entries(newFields)) {
 			const existingField = existingProperties[fieldName];
 
 			if (!existingField) {
-				// Field doesn't exist, add it
 				fieldsToUpdate[fieldName] = mapping as MappingProperty;
 				console.log(`Will add new field: ${fieldName}`);
 			} else if (existingField.type !== mapping.type) {
-				// Field exists but with wrong type
 				console.warn(
 					`Field ${fieldName} exists with type ${existingField.type}, wanted ${mapping.type}`
 				);
-				// Note: You can't change field types in existing indices
 			}
 		}
 
-		// Update mappings if needed
 		if (Object.keys(fieldsToUpdate).length > 0) {
 			const res = await elasticsearch.indices.putMapping({
 				index: INDEX_NAME,
