@@ -261,15 +261,15 @@ export async function GET(req: NextRequest) {
 								equals: verificationStatus,
 						  }
 						: undefined,
-					city: locationJson.city
-						? { contains: locationJson.city, mode: 'insensitive' }
-						: undefined,
-					state: locationJson.state
-						? { contains: locationJson.state, mode: 'insensitive' }
-						: undefined,
-					country: locationJson.country
-						? { contains: locationJson.country, mode: 'insensitive' }
-						: undefined,
+					// city: locationJson.city
+					// 	? { contains: locationJson.city, mode: 'insensitive' }
+					// 	: undefined,
+					// state: locationJson.state
+					// 	? { contains: locationJson.state, mode: 'insensitive' }
+					// 	: undefined,
+					// country: locationJson.country
+					// 	? { contains: locationJson.country, mode: 'insensitive' }
+					// 	: undefined,
 				},
 			});
 

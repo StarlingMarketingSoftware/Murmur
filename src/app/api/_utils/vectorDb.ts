@@ -43,27 +43,35 @@ interface ContactDocument {
 
 // Helper function to generate embedding for contact data
 export const generateContactEmbedding = async (contact: Contact) => {
+	const locationString = [contact.city, contact.state, contact.country]
+		.filter(Boolean)
+		.join(', ');
+
 	const contactText = [
-		contact.firstName,
-		contact.lastName,
-		contact.email,
-		contact.company,
-		contact.city,
-		contact.state,
-		contact.country,
-		contact.address,
-		contact.title,
-		contact.headline,
-		contact.website,
-		contact.linkedInUrl,
-		contact.metadata,
-		contact.companyType,
-		contact.companyTechStack,
-		contact.companyKeywords,
-		contact.companyIndustry,
+		'This is a contact record. Location is especially important for search. the fields are ordered in the order of importance for search.',
+		`Location: ${locationString}`,
+		locationString ? `This contact is located in ${locationString}.` : '',
+		`Address: ${contact.address || ''}`,
+		`City: ${contact.city || ''}`,
+		`State: ${contact.state || ''}`,
+		`Country: ${contact.country || ''}`,
+		`Title: ${contact.title || ''}`,
+		`Metadata: ${contact.metadata || ''}`,
+		`Company Industry: ${contact.companyIndustry || ''}`,
+		`Company Type: ${contact.companyType || ''}`,
+		`Headline: ${contact.headline || ''}`,
+		`Company: ${contact.company || ''}`,
+		`Company Keywords: ${(contact.companyKeywords || []).join(', ')}`,
+		`Email: ${contact.email || ''}`,
+		`Website: ${contact.website || ''}`,
+		`Company Tech Stack: ${(contact.companyTechStack || []).join(', ')}`,
+		`First Name: ${contact.firstName || ''}`,
+		`Last Name: ${contact.lastName || ''}`,
 	]
 		.filter(Boolean)
-		.join(' ');
+		.join('\n');
+
+	console.log('🚀 ~ generateContactEmbedding ~ contactText:', contactText);
 
 	const response = await openai.embeddings.create({
 		input: contactText,
