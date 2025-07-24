@@ -153,11 +153,14 @@ model Contact {
   companyPostalCode  String?
   companyKeywords    String[]
   companyIndustry    String?
+  latitude           Float?
+  longitude          Float?
 
-  isPrivate            Boolean @default(false)
-  hasVectorEmbedding   Boolean @default(false)
-  userContactListCount Int     @default(0)
-  manualDeselections   Int     @default(0)
+  isPrivate            Boolean   @default(false)
+  hasVectorEmbedding   Boolean   @default(false)
+  userContactListCount Int       @default(0)
+  manualDeselections   Int       @default(0)
+  lastResearchedDate   DateTime?
 
   emailValidationStatus    EmailVerificationStatus @default(unknown)
   emailValidationSubStatus String?
