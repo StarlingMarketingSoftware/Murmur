@@ -44,5 +44,6 @@ next-env.d.ts
 /.clerk/
 
 # seeding data
+public/contactLists/*
 public/demoCsvs/*
 public/exports/*
