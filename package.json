@@ -79,6 +79,7 @@
 		"tailwind-animate": "^0.2.10",
 		"tailwind-merge": "^3.0.2",
 		"tailwindcss-animate": "^1.0.7",
+		"xlsx": "^0.18.5",
 		"zod": "^3.24.2"
 	},
 	"devDependencies": {
