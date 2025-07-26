@@ -68,6 +68,7 @@ longitude // longitude of the contact's location (float)
 
 Additional notes:
 - If it's not possible to find certain information, leave the field blank. Don't make up any information.
+- If a field contains the string value "undefined" return a null value.
 - Contacts may have invalid characters, like vertical tabs (VT) and ? symbols. Please remove these or replace them with a character that would make most sense, such as an apostophe. 
 - Use existing information to populate other fields if possible. For example, the city or state field might be blank, but the address field may contain city and state information. Or the firstName may be blank, but the email address contains a first name.
 
