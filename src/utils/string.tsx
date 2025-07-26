@@ -50,6 +50,11 @@ export const capitalize = (text: string): string => {
 	return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
 };
 
+/**
+ * Strips everything before the first { character
+ * @param text - The text to strip
+ * @returns The text with everything before the first { character removed
+ */
 const stripUntilBrace = (text: string): string => {
 	const braceIndex = text.indexOf('{');
 	return braceIndex >= 0 ? text.substring(braceIndex) : text;

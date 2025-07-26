@@ -1,4 +1,4 @@
-import { MistralToneAgentType } from '@/types';
+import { MistralToneAgentType, PerplexityModel } from '@/types';
 
 export const PERPLEXITY_FULL_AI_PROMPT = `
 INSTRUCTIONS FOR EMAIL CONTENT:
@@ -184,6 +184,12 @@ Return the updated message in plain text format, using the line break character 
 export const OPEN_AI_MODEL_OPTIONS = {
 	o4mini: 'o4-mini-2025-04-16',
 	gpt4: 'gpt-4-0613',
+	gpt4nano: 'gpt-4.1-nano-2025-04-14',
+};
+
+export const PERPLEXITY_MODEL_OPTIONS: Record<string, PerplexityModel> = {
+	sonar: 'sonar',
+	sonar_pro: 'sonar-pro',
 };
 
 export const MISTRAL_PARAGRAPH_PROMPTS: Record<number, string> = {
