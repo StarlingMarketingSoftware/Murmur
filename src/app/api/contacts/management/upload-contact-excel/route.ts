@@ -32,7 +32,7 @@ interface ExcelContactRow {
 	emailvalidationstatus?: string;
 }
 
-export const GET = async function GET() {
+export const POST = async function POST() {
 	try {
 		const { userId } = await auth();
 		if (!userId) {
@@ -77,6 +77,7 @@ export const GET = async function GET() {
 		const unknownEmailValidationStatus: string[] = [];
 		const errorEmails: string[] = [];
 		const newContacts = [];
+		const validStatuses = Object.values(EmailVerificationStatus);
 
 		for (const row of rows) {
 			try {
@@ -99,7 +100,6 @@ export const GET = async function GET() {
 						: [];
 
 				// Parse emailValidationStatus, default to 'unknown' if not valid
-				const validStatuses = Object.values(EmailVerificationStatus);
 				const emailValidationStatus = validStatuses.includes(
 					row.emailvalidationstatus as EmailVerificationStatus
 				)
@@ -114,28 +114,30 @@ export const GET = async function GET() {
 				}
 
 				newContacts.push({
-					firstName: String(row.firstname) || null,
-					lastName: String(row.lastname) || null,
-					company: String(row.company) || null,
+					firstName: row.firstname ? String(row.firstname) : null,
+					lastName: row.lastname ? String(row.lastname) : null,
+					company: row.company ? String(row.company) : null,
 					email: String(row.email),
-					address: String(row.address) || null,
-					city: String(row.city) || null,
-					state: String(row.state) || null,
-					country: String(row.country) || null,
-					website: String(row.website) || null,
-					phone: String(row.phone) || null,
-					title: String(row.title) || null,
-					headline: String(row.headline) || null,
-					linkedInUrl: String(row.linkedInUrl) || null,
-					photoUrl: String(row.photoUrl) || null,
-					metadata: String(row.metadata) || null,
-					companyLinkedInUrl: String(row.companylinkedinurl) || null,
-					companyFoundedYear: String(row.companyfounded) || null,
-					companyType: String(row.companytype) || null,
+					address: row.address ? String(row.address) : null,
+					city: row.city ? String(row.city) : null,
+					state: row.state ? String(row.state) : null,
+					country: row.country ? String(row.country) : null,
+					website: row.website ? String(row.website) : null,
+					phone: row.phone ? String(row.phone) : null,
+					title: row.title ? String(row.title) : null,
+					headline: row.headline ? String(row.headline) : null,
+					linkedInUrl: row.linkedInUrl ? String(row.linkedInUrl) : null,
+					photoUrl: row.photoUrl ? String(row.photoUrl) : null,
+					metadata: row.metadata ? String(row.metadata) : null,
+					companyLinkedInUrl: row.companylinkedinurl
+						? String(row.companylinkedinurl)
+						: null,
+					companyFoundedYear: row.companyfounded ? String(row.companyfounded) : null,
+					companyType: row.companytype ? String(row.companytype) : null,
 					companyTechStack,
-					companyPostalCode: String(row.companypostalcode) || null,
+					companyPostalCode: row.companypostalcode ? String(row.companypostalcode) : null,
 					companyKeywords,
-					companyIndustry: String(row.companyindustry) || null,
+					companyIndustry: row.companyindustry ? String(row.companyindustry) : null,
 					emailValidationStatus,
 					emailValidatedAt: new Date(),
 				});
