@@ -44,7 +44,7 @@ const createContactSchema = z.object({
 });
 
 const contactFilterSchema = z.object({
-	query: z.string().optional().default(''),
+	query: z.string().optional(),
 	limit: z.coerce.number().optional(),
 	verificationStatus: z.nativeEnum(EmailVerificationStatus).optional(),
 	contactListIds: z.array(z.number()).optional(),
@@ -88,11 +88,10 @@ export async function GET(req: NextRequest) {
 			- Return a valid JSON string that can be parsed by a JSON.parse() in JavaScript. 
 			- There are some place names that can also be a word (such as buffalo steak house in new york) (Buffalo is a city in New York but it is also a general word for an animal). Use the context of the query to determine if the word is a place name or not.
 			- Return the JSON string and nothing else.`,
-			query
+			query || ''
 		);
 
 		const locationJson = JSON.parse(locationResponse);
-		console.log('🚀 ~ GET ~ locationJson:', locationJson);
 
 		const numberContactListIds: number[] =
 			contactListIds?.map((id) => Number(id)).filter((id) => !isNaN(id)) || [];
