@@ -92,7 +92,6 @@ export async function GET(req: NextRequest) {
 		);
 
 		const locationJson = JSON.parse(locationResponse);
-		console.log('🚀 ~ GET ~ locationJson:', locationJson);
 
 		const numberContactListIds: number[] =
 			contactListIds?.map((id) => Number(id)).filter((id) => !isNaN(id)) || [];

@@ -29,7 +29,7 @@ export const fetchPerplexity = async (
 	const res = await response.json();
 
 	if (!response.ok) {
-		throw new Error(res.error?.message || 'Open AI request failed');
+		throw new Error(res.error?.message || 'Perplexity AI request failed');
 	}
 	return res;
 };

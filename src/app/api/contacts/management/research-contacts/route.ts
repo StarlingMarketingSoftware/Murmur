@@ -100,8 +100,21 @@ Return your response as a JSON string that can be parsed by JSON.parse() in Java
 				);
 
 				console.log(`Researched contact: ${JSON.stringify(openAiResponse)}`);
+				let researchedContact: Partial<Contact>;
 
-				const researchedContact: Partial<Contact> = JSON.parse(openAiResponse);
+				try {
+					researchedContact = JSON.parse(openAiResponse);
+				} catch (parseError) {
+					console.error(
+						`Failed to parse OpenAI response for contact with email ${contact.email}:`,
+
+						parseError,
+
+						`Response: ${openAiResponse}`
+					);
+
+					continue;
+				}
 
 				const updateRes = await prisma.contact.update({
 					where: { id: contact.id },
