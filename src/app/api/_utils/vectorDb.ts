@@ -33,37 +33,43 @@ interface ContactDocument {
 	country: string;
 	address: string;
 	website: string;
-	linkedInUrl: string;
 	metadata: string;
 	companyType: string;
 	companyTechStack: string[];
 	companyKeywords: string[];
 	companyIndustry: string;
+	location: string;
 }
 
 // Helper function to generate embedding for contact data
 export const generateContactEmbedding = async (contact: Contact) => {
+	const locationString = [contact.city, contact.state, contact.country]
+		.filter(Boolean)
+		.join(', ');
+
 	const contactText = [
-		contact.firstName,
-		contact.lastName,
-		contact.email,
-		contact.company,
-		contact.city,
-		contact.state,
-		contact.country,
-		contact.address,
-		contact.title,
-		contact.headline,
-		contact.website,
-		contact.linkedInUrl,
-		contact.metadata,
-		contact.companyType,
-		contact.companyTechStack,
-		contact.companyKeywords,
-		contact.companyIndustry,
+		'This is a contact record. Location is especially important for search. the fields are ordered in the order of importance for search.',
+		`Location: ${locationString}`,
+		locationString ? `This contact is located in ${locationString}.` : '',
+		`Address: ${contact.address || ''}`,
+		`City: ${contact.city || ''}`,
+		`State: ${contact.state || ''}`,
+		`Country: ${contact.country || ''}`,
+		`Title: ${contact.title || ''}`,
+		`Metadata: ${contact.metadata || ''}`,
+		`Company Industry: ${contact.companyIndustry || ''}`,
+		`Company Type: ${contact.companyType || ''}`,
+		`Headline: ${contact.headline || ''}`,
+		`Company: ${contact.company || ''}`,
+		`Company Keywords: ${(contact.companyKeywords || []).join(', ')}`,
+		`Email: ${contact.email || ''}`,
+		`Website: ${contact.website || ''}`,
+		`Company Tech Stack: ${(contact.companyTechStack || []).join(', ')}`,
+		`First Name: ${contact.firstName || ''}`,
+		`Last Name: ${contact.lastName || ''}`,
 	]
 		.filter(Boolean)
-		.join(' ');
+		.join('\n');
 
 	const response = await openai.embeddings.create({
 		input: contactText,
@@ -81,6 +87,16 @@ export const initializeVectorDb = async () => {
 		if (!indexExists) {
 			await elasticsearch.indices.create({
 				index: INDEX_NAME,
+				settings: {
+					analysis: {
+						normalizer: {
+							lowercase: {
+								type: 'custom',
+								filter: ['lowercase'],
+							},
+						},
+					},
+				},
 				mappings: {
 					properties: {
 						vector_field: {
@@ -91,22 +107,72 @@ export const initializeVectorDb = async () => {
 						},
 						contactId: { type: 'keyword' },
 						email: { type: 'keyword' },
-						firstName: { type: 'text' },
-						lastName: { type: 'text' },
-						company: { type: 'text' },
-						title: { type: 'text' },
+						firstName: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
+						lastName: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
+						company: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
+						title: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
 						headline: { type: 'text' },
-						city: { type: 'text' },
-						state: { type: 'text' },
-						country: { type: 'text' },
+						city: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
+						state: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
+						country: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
 						address: { type: 'text' },
+						location: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
 						website: { type: 'text' },
-						linkedInUrl: { type: 'text' },
 						metadata: { type: 'text' },
-						companyType: { type: 'text' },
+						companyType: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
 						companyTechStack: { type: 'text' },
 						companyKeywords: { type: 'text' },
-						companyIndustry: { type: 'text' },
+						companyIndustry: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
 					},
 				},
 			});
@@ -120,6 +186,7 @@ export const initializeVectorDb = async () => {
 	}
 };
 
+// no longer needed because we can clearing the entire index
 export const updateWithNewFields = async () => {
 	try {
 		const currentMapping = await elasticsearch.indices.getMapping({
@@ -197,12 +264,12 @@ export const upsertContactToVectorDb = async (
 			country: contact.country || '',
 			address: contact.address || '',
 			website: contact.website || '',
-			linkedInUrl: contact.linkedInUrl || '',
 			metadata: contact.metadata || '',
 			companyType: contact.companyType || '',
 			companyTechStack: contact.companyTechStack || [],
 			companyKeywords: contact.companyKeywords || [],
 			companyIndustry: contact.companyIndustry || '',
+			location: [contact.city, contact.state, contact.country].filter(Boolean).join(', '),
 		},
 	});
 
@@ -255,7 +322,6 @@ export const searchSimilarContacts = async (
 			'country',
 			'address',
 			'website',
-			'linkedInUrl',
 			'metadata',
 		],
 		_source: false,
@@ -281,7 +347,6 @@ export const searchSimilarContacts = async (
 				country: hit.fields?.country[0],
 				address: hit.fields?.address[0],
 				website: hit.fields?.website[0],
-				linkedInUrl: hit.fields?.linkedInUrl[0],
 				metadata: hit.fields?.metadata[0],
 				companyType: hit.fields?.companyType?.[0],
 				companyTechStack: hit.fields?.companyTechStack?.[0],
