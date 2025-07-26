@@ -1,7 +1,7 @@
 import prisma from '@/lib/prisma';
 import { auth } from '@clerk/nextjs/server';
 import { apiResponse, apiUnauthorized, handleApiError } from '@/app/api/_utils';
-import { EmailVerificationStatus } from '@prisma/client';
+import { EmailVerificationStatus, UserRole } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 import * as XLSX from 'xlsx';
@@ -39,6 +39,14 @@ export const GET = async function GET() {
 			return apiUnauthorized();
 		}
 
+		const user = await prisma.user.findUnique({
+			where: { clerkId: userId },
+		});
+
+		if (user?.role !== UserRole.admin) {
+			return apiUnauthorized();
+		}
+
 		// Path to the Excel file
 		const excelPath = path.join(
 			process.cwd(),
@@ -53,7 +61,7 @@ export const GET = async function GET() {
 		const sheetName = workbook.SheetNames[0];
 		const sheet = workbook.Sheets[sheetName];
 		const rows = XLSX.utils.sheet_to_json(sheet) as ExcelContactRow[];
-		console.log(`parsed excel file with ${rows.length} rows`);
+		console.log(`Parsed Excel file with ${rows.length} rows`);
 
 		const emails = rows.map((row) => row.email);
 
@@ -62,6 +70,8 @@ export const GET = async function GET() {
 			where: { email: { in: emails } },
 			select: { email: true },
 		});
+
+		console.log(`Found ${existingContacts.length} existing contacts`);
 		const existingEmails = new Set(existingContacts.map((c) => c.email));
 
 		const unknownEmailValidationStatus: string[] = [];
@@ -138,6 +148,7 @@ export const GET = async function GET() {
 
 		let createdCount = 0;
 		if (newContacts.length > 0) {
+			console.log(`Creating ${newContacts.length} new contacts`);
 			const result = await prisma.contact.createMany({
 				data: newContacts,
 				skipDuplicates: true, // extra safety
