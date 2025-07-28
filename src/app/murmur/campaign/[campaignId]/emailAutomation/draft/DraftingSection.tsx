@@ -58,6 +58,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		handleGenerateTestDrafts,
 		handleGenerateDrafts,
 		autosaveStatus,
+		isJustSaved,
 	} = useDraftingSection(props);
 
 	const {
@@ -75,11 +76,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 				);
 			case 'saved':
 				return (
-					<Badge
-						size="small"
-						variant="default"
-						className="text-xs bg-green-100 text-green-800 border-green-200"
-					>
+					<Badge size="small" variant="default" className="text-xs">
 						Saved
 					</Badge>
 				);
@@ -92,7 +89,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 			case 'idle':
 				return (
 					<>
-						{isDirty && autosaveStatus === 'idle' && (
+						{!isJustSaved && isDirty && autosaveStatus === 'idle' && (
 							<Badge size="small" variant="warning" className="text-xs">
 								Unsaved
 							</Badge>

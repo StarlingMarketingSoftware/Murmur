@@ -44,7 +44,7 @@ import {
 	Signature,
 } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -111,20 +111,19 @@ export type DraftingFormValues = z.infer<typeof draftingFormSchema>;
 
 export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { campaign } = props;
-	const [isFirstLoad, setIsFirstLoad] = useState(true);
 
 	// HOOKS
 
 	const { user } = useMe();
 	const queryClient = useQueryClient();
 
+	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	const [isOpenSignaturesDialog, setIsOpenSignaturesDialog] = useState(false);
 	const [generationProgress, setGenerationProgress] = useState(-1);
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 	const [isTest, setIsTest] = useState<boolean>(false);
 	const [abortController, setAbortController] = useState<AbortController | null>(null);
-
-	// Add autosave state
+	const [isJustSaved, setIsJustSaved] = useState(false);
 	const [autosaveStatus, setAutosaveStatus] = useState<
 		'idle' | 'saving' | 'saved' | 'error'
 	>('idle');
@@ -744,39 +743,39 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	};
 
-	const suppressNextAutosaveRef = useRef(false); // Add autosave function
-	const performAutosave = async (values: DraftingFormValues) => {
-		try {
-			suppressNextAutosaveRef.current = true;
-			setAutosaveStatus('saving');
-			await saveCampaign({
-				id: campaign.id,
-				data: values,
-			});
-			setAutosaveStatus('saved');
-			setLastSavedAt(new Date());
-			form.reset(form.getValues());
-			// Reset to idle after showing "saved" for a moment
-			setTimeout(() => {
-				setAutosaveStatus('idle');
-			}, 2000);
-		} catch (error) {
-			setAutosaveStatus('error');
-			console.error('Autosave failed:', error);
+	const performAutosave = useCallback(
+		async (values: DraftingFormValues) => {
+			try {
+				setAutosaveStatus('saving');
+				await saveCampaign({
+					id: campaign.id,
+					data: values,
+				});
+				setAutosaveStatus('saved');
+				setLastSavedAt(new Date());
+				setIsJustSaved(true);
 
-			// Reset to idle after showing error for a moment
-			setTimeout(() => {
-				setAutosaveStatus('idle');
-			}, 3000);
-		}
-	};
+				setTimeout(() => {
+					setAutosaveStatus('idle');
+				}, 2000);
+			} catch (error) {
+				setAutosaveStatus('error');
+				console.error('Autosave failed:', error);
 
-	// Create debounced autosave function
-	const debouncedAutosave = useCallback(
-		debounce((values: DraftingFormValues) => {
-			performAutosave(values);
-		}, 1500), // 1.5 second delay
-		[campaign.id, saveCampaign]
+				setTimeout(() => {
+					setAutosaveStatus('idle');
+				}, 3000);
+			}
+		},
+		[campaign.id, saveCampaign, form]
+	);
+
+	const debouncedAutosave = useMemo(
+		() =>
+			debounce((values: DraftingFormValues) => {
+				performAutosave(values);
+			}, 1500),
+		[performAutosave]
 	);
 
 	// HANDLERS
@@ -863,20 +862,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	}, [draftingMode, form]);
 
-	// Add autosave effect - watch for changes in any form field
 	useEffect(() => {
-		if (isFirstLoad) return; // Don't autosave on initial load
+		if (isFirstLoad) return;
 
 		const subscription = form.watch((value, { name }) => {
-			// Autosave on any form field change
-			if (suppressNextAutosaveRef.current) {
-				suppressNextAutosaveRef.current = false;
-				return;
-			}
 			if (name) {
 				const formValues = form.getValues();
 
-				// Validate form before autosaving
+				setIsJustSaved(false);
 				if (Object.keys(form.formState.errors).length === 0) {
 					debouncedAutosave(formValues);
 				}
@@ -920,8 +913,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		hybridAppend,
 		hybridRemove,
 		hybridMove,
-		// Add autosave exports
 		autosaveStatus,
 		lastSavedAt,
+		isJustSaved,
 	};
 };
