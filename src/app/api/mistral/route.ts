@@ -27,7 +27,7 @@ const postMistralSchema = z.object({
 
 export type PostMistralData = z.infer<typeof postMistralSchema>;
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
 	try {
