@@ -22,6 +22,7 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 		isTest,
 		areSettingsDisabled,
 		form,
+		isGenerationDisabled,
 	} = useDraftingRightPanel(props);
 
 	return (
@@ -117,6 +118,7 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 						isLoading={isTest}
 						type="button"
 						variant="primary-light"
+						disabled={isGenerationDisabled}
 						onClick={() => {
 							handleTestPrompt();
 							setActiveTab('test');

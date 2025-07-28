@@ -235,6 +235,32 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		dataDraftEmail.message = campaign.testMessage || '';
 	}
 
+	const [fullAiPrompt, handwrittenPrompt, hybridPrompt] = form.watch([
+		'fullAiPrompt',
+		'handwrittenPrompt',
+		'hybridPrompt',
+	]);
+
+	const isGenerationDisabled = useMemo(() => {
+		return (
+			(fullAiPrompt === '' && draftingMode === 'ai') ||
+			handwrittenPrompt === '' ||
+			(handwrittenPrompt === '<p></p>' && draftingMode === 'handwritten') ||
+			(hybridPrompt === '' && draftingMode === 'hybrid') ||
+			generationProgress > -1 ||
+			contacts?.length === 0 ||
+			isPendingGeneration
+		);
+	}, [
+		fullAiPrompt,
+		draftingMode,
+		handwrittenPrompt,
+		hybridPrompt,
+		generationProgress,
+		contacts?.length,
+		isPendingGeneration,
+	]);
+
 	// FUNCTIONS
 	const batchGenerateHandWrittenDrafts = () => {
 		const generatedEmails: GeneratedEmail[] = [];
@@ -916,5 +942,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		autosaveStatus,
 		lastSavedAt,
 		isJustSaved,
+		isGenerationDisabled,
 	};
 };

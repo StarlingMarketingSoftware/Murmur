@@ -15,10 +15,12 @@ export interface DraftingRightPanelProps {
 	handleTestPrompt: () => Promise<void>;
 	isTest: boolean;
 	draftingMode: DraftingMode;
+	isGenerationDisabled: boolean;
 }
 
 export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
-	const { campaign, handleTestPrompt, isTest, draftingMode } = props;
+	const { campaign, handleTestPrompt, isTest, draftingMode, isGenerationDisabled } =
+		props;
 	const form = useFormContext<z.infer<typeof draftingFormSchema>>();
 	const areSettingsDisabled = draftingMode !== 'ai';
 
@@ -77,5 +79,6 @@ export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
 		isTest,
 		form,
 		areSettingsDisabled,
+		isGenerationDisabled,
 	};
 };

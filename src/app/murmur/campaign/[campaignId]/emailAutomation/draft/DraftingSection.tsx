@@ -59,6 +59,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		handleGenerateDrafts,
 		autosaveStatus,
 		isJustSaved,
+		isGenerationDisabled,
 	} = useDraftingSection(props);
 
 	const {
@@ -274,11 +275,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 												variant="primary-light"
 												onClick={() => setIsConfirmDialogOpen(true)}
 												isLoading={isPendingGeneration && !isTest}
-												disabled={
-													generationProgress > -1 ||
-													contacts?.length === 0 ||
-													isPendingGeneration
-												}
+												disabled={isGenerationDisabled}
 											>
 												Generate Drafts
 											</Button>
@@ -321,6 +318,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 						</div>
 						<div className="w-1/2">
 							<DraftingRightPanel
+								isGenerationDisabled={isGenerationDisabled}
 								campaign={campaign}
 								handleTestPrompt={handleGenerateTestDrafts}
 								isTest={isTest}
