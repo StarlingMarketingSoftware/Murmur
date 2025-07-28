@@ -91,6 +91,7 @@ You may edit the following fields:
 - "companyFoundedYear" is a string like "1850"
 - "companyIndustry" are industries such as "Higher Education", "Law", "Events Services"
 - "companyKeywords" is a comma-separated list of keywords
+- "website" is a string like "https://www.acme.com"
 - "metadata" is a few sentences of extra information about the contact
 - "companyPostalCode" is a string like "10578"
 - "companyTechStack" is a comma-separated list like postgres,nextjs,tailwind css,
@@ -178,6 +179,7 @@ Return your response as a JSON string that can be parsed by JSON.parse() in Java
 						- If there are empty strings in fields like "", set the field to null.
 						- If companyTechStack or companyKeywords are null, set it to an empty array [].
 						- companyFoundedYear should be a string like "1850"
+						- website should be a string like "https://www.acme.com"
 						`,
 						`emailAddress: ${contact.email}
 						${perplexityResponse.choices[0].message.content}

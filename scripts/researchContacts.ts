@@ -1,6 +1,6 @@
 // scripts/researchContacts.tsx
 import fetch from 'node-fetch';
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx';
 import { existsSync } from 'fs';
 import { join } from 'path';
 
