@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, ReactNode } from 'react';
 import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
 import { DraftingRightPanel } from '@/components/organisms/DraftingRightPanel/DraftingRightPanel';
 import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
@@ -14,7 +14,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { SaveIcon } from 'lucide-react';
 import {
 	Select,
 	SelectContent,
@@ -50,8 +49,6 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		isConfirmDialogOpen,
 		isPendingGeneration,
 		isAiSubject,
-		isPendingSaveCampaign,
-		handleSavePrompt,
 		isTest,
 		signatures,
 		isOpenSignaturesDialog,
@@ -60,11 +57,52 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		draftingMode,
 		handleGenerateTestDrafts,
 		handleGenerateDrafts,
+		autosaveStatus,
 	} = useDraftingSection(props);
 
 	const {
 		formState: { isDirty },
 	} = form;
+
+	// Helper function to get autosave status display
+	const getAutosaveStatusDisplay = (): ReactNode => {
+		switch (autosaveStatus) {
+			case 'saving':
+				return (
+					<Badge size="small" variant="secondary" className="text-xs">
+						Saving...
+					</Badge>
+				);
+			case 'saved':
+				return (
+					<Badge
+						size="small"
+						variant="default"
+						className="text-xs bg-green-100 text-green-800 border-green-200"
+					>
+						Saved
+					</Badge>
+				);
+			case 'error':
+				return (
+					<Badge size="small" variant="destructive" className="text-xs">
+						Save failed
+					</Badge>
+				);
+			case 'idle':
+				return (
+					<>
+						{isDirty && autosaveStatus === 'idle' && (
+							<Badge size="small" variant="warning" className="text-xs">
+								Unsaved
+							</Badge>
+						)}
+					</>
+				);
+			default:
+				return null;
+		}
+	};
 
 	return (
 		<>
@@ -233,15 +271,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									/>
 
 									<div className="flex flex-col gap-4 mt-4">
-										<div className="flex flex-col sm:flex-row gap-4">
-											<Button
-												type="button"
-												variant="light"
-												onClick={handleSavePrompt}
-												isLoading={isPendingSaveCampaign}
-											>
-												<SaveIcon /> Save Prompt
-											</Button>
+										<div className="flex flex-col sm:flex-row gap-4 items-center">
 											<Button
 												type="button"
 												variant="primary-light"
@@ -255,9 +285,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 											>
 												Generate Drafts
 											</Button>
-											{isDirty && (
-												<Badge variant="warning">You have unsaved changes</Badge>
-											)}
+											{getAutosaveStatusDisplay()}
 										</div>
 									</div>
 									<ConfirmDialog

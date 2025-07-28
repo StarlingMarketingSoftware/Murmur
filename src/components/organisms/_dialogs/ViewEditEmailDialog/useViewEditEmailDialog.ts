@@ -1,6 +1,6 @@
 import { EmailWithRelations } from '@/types';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Dispatch, SetStateAction, useEffect, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -62,7 +62,6 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 		form,
 		handleSave,
 		isPendingEditEmail,
-		resetFormToCurrentEmail,
 		isEditable,
 		showRecipientEmail,
 	};

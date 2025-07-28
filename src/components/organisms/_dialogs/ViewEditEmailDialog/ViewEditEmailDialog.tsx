@@ -34,7 +34,6 @@ export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 		handleSave,
 		form,
 		isPendingEditEmail,
-		resetFormToCurrentEmail,
 		isEditable,
 		showRecipientEmail,
 	} = useViewEditEmailDialog(props);

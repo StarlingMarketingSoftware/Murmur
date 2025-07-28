@@ -44,10 +44,13 @@ import {
 	Signature,
 } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
+
+// Add debounce import for autosave functionality
+import { debounce } from 'lodash';
 
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
@@ -121,6 +124,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [isTest, setIsTest] = useState<boolean>(false);
 	const [abortController, setAbortController] = useState<AbortController | null>(null);
 
+	// Add autosave state
+	const [autosaveStatus, setAutosaveStatus] = useState<
+		'idle' | 'saving' | 'saved' | 'error'
+	>('idle');
+	const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+
 	const isGenerationCancelledRef = useRef(false);
 
 	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
@@ -183,8 +192,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 
-	const { isPending: isPendingSaveCampaign, mutateAsync: saveCampaign } =
-		useEditCampaign();
+	const { isPending: isPendingSaveCampaign, mutateAsync: saveCampaign } = useEditCampaign(
+		{ suppressToasts: true }
+	);
 
 	const { mutateAsync: saveTestEmail } = useEditCampaign({
 		suppressToasts: true,
@@ -734,6 +744,41 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	};
 
+	const suppressNextAutosaveRef = useRef(false); // Add autosave function
+	const performAutosave = async (values: DraftingFormValues) => {
+		try {
+			suppressNextAutosaveRef.current = true;
+			setAutosaveStatus('saving');
+			await saveCampaign({
+				id: campaign.id,
+				data: values,
+			});
+			setAutosaveStatus('saved');
+			setLastSavedAt(new Date());
+			form.reset(form.getValues());
+			// Reset to idle after showing "saved" for a moment
+			setTimeout(() => {
+				setAutosaveStatus('idle');
+			}, 2000);
+		} catch (error) {
+			setAutosaveStatus('error');
+			console.error('Autosave failed:', error);
+
+			// Reset to idle after showing error for a moment
+			setTimeout(() => {
+				setAutosaveStatus('idle');
+			}, 3000);
+		}
+	};
+
+	// Create debounced autosave function
+	const debouncedAutosave = useCallback(
+		debounce((values: DraftingFormValues) => {
+			performAutosave(values);
+		}, 1500), // 1.5 second delay
+		[campaign.id, saveCampaign]
+	);
+
 	// HANDLERS
 
 	const handleSavePrompt = () => {
@@ -818,6 +863,36 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	}, [draftingMode, form]);
 
+	// Add autosave effect - watch for changes in any form field
+	useEffect(() => {
+		if (isFirstLoad) return; // Don't autosave on initial load
+
+		const subscription = form.watch((value, { name }) => {
+			// Autosave on any form field change
+			if (suppressNextAutosaveRef.current) {
+				suppressNextAutosaveRef.current = false;
+				return;
+			}
+			if (name) {
+				const formValues = form.getValues();
+
+				// Validate form before autosaving
+				if (Object.keys(form.formState.errors).length === 0) {
+					debouncedAutosave(formValues);
+				}
+			}
+		});
+
+		return () => subscription.unsubscribe();
+	}, [form, debouncedAutosave, isFirstLoad]);
+
+	// Cleanup debounced function on unmount
+	useEffect(() => {
+		return () => {
+			debouncedAutosave.cancel();
+		};
+	}, [debouncedAutosave]);
+
 	return {
 		campaign,
 		modeOptions,
@@ -845,5 +920,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		hybridAppend,
 		hybridRemove,
 		hybridMove,
+		// Add autosave exports
+		autosaveStatus,
+		lastSavedAt,
 	};
 };
