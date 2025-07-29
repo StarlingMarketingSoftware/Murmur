@@ -81,7 +81,7 @@ export async function researchContactsWithExcelLogging() {
 		console.log(`\n--- Starting iteration ${iteration}... ---`);
 
 		const response = await fetch(
-			'http://localhost:3000/api/contacts/management/research-contacts',
+			'http://localhost:3001/api/contacts/management/research-contacts',
 			{
 				method: 'PATCH',
 				headers: {

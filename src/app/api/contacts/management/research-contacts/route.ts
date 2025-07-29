@@ -68,7 +68,7 @@ export const PATCH = async function PATCH() {
 				lastResearchedDate: null,
 				emailValidationStatus: EmailVerificationStatus.valid,
 			},
-			take: 10, // Increased to process more contacts in batches
+			take: 50, // Increased to process more contacts in batches
 		});
 
 		const PROMPT = `
@@ -114,7 +114,7 @@ Return your response as a JSON string that can be parsed by JSON.parse() in Java
 
 		let successCount = 0;
 		const startTime = new Date().getTime();
-		const BATCH_SIZE = 10;
+		const BATCH_SIZE = 50;
 
 		let perplexityTokensUsed = 0;
 
@@ -230,10 +230,21 @@ Return your response as a JSON string that can be parsed by JSON.parse() in Java
 
 			if (successfulContacts.length > 0) {
 				const updatePromises = successfulContacts.map((contactData) => {
-					const { id, ...rest } = contactData;
+					const { id, website, ...rest } = contactData;
+					let websiteString = website;
+					if (Array.isArray(website)) {
+						// Handle array case
+						websiteString = website.length > 0 ? website[0] : null;
+					} else if (typeof website === 'string') {
+						// Handle string case
+						websiteString = website.trim() || null;
+					} else {
+						// Handle null, undefined, or other types
+						websiteString = null;
+					}
 					return prisma.contact.update({
 						where: { id },
-						data: rest,
+						data: { ...rest, website: websiteString },
 					});
 				});
 
