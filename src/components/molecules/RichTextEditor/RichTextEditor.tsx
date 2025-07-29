@@ -111,7 +111,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 		editorProps: {
 			attributes: {
 				class: twMerge(
-					'min-h-[200px] w-full rounded-md border border-gray-300 bg-background',
+					'min-h-[200px] w-full rounded-md border border-gray-300 bg-gray-50',
 					'px-3 py-2 text-sm ',
 					'placeholder:text-muted-foreground',
 					'disabled:cursor-not-allowed disabled:opacity-50',

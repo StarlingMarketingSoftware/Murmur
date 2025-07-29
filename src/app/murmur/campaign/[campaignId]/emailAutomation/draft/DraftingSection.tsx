@@ -103,7 +103,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	};
 
 	return (
-		<>
+		<div className="mb-30">
 			<Form {...form}>
 				<form>
 					<div className="flex gap-4">
@@ -269,17 +269,18 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									/>
 
 									<div className="flex flex-col gap-4 mt-4">
-										<div className="flex flex-col sm:flex-row gap-4 items-center">
+										<div className="flex flex-col sm:flex-row gap-4 items-center justify-end">
+											{getAutosaveStatusDisplay()}
 											<Button
 												type="button"
 												variant="primary-light"
 												onClick={() => setIsConfirmDialogOpen(true)}
 												isLoading={isPendingGeneration && !isTest}
 												disabled={isGenerationDisabled()}
+												bold
 											>
 												Generate Drafts
 											</Button>
-											{getAutosaveStatusDisplay()}
 										</div>
 									</div>
 									<ConfirmDialog
@@ -334,6 +335,6 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 				open={isOpenSignaturesDialog}
 				onOpenChange={setIsOpenSignaturesDialog}
 			/>
-		</>
+		</div>
 	);
 };

@@ -7,7 +7,8 @@ const cardVariants = cva('bg-card text-card-foreground flex flex-col p-4 my-4', 
 		variant: {
 			primary:
 				'text-[15px] font-primary rounded-md border-x-3 border-t-7 border-b-3 border-primary/25 border-solid p-10',
-			secondary: 'text-[15px] font-primary bg-primary',
+			secondary:
+				'text-[15px] font-primary border-border border-x-2 border-y-2 rounded-md p-10',
 		},
 	},
 	defaultVariants: {
@@ -72,7 +73,7 @@ const cardTitleVariants = cva('leading-none font-semibold', {
 	variants: {
 		variant: {
 			primary: 'text-[30px] font-bold',
-			secondary: 'text-[15px] font-primary bg-primary',
+			secondary: 'text-[15px] font-primary',
 		},
 	},
 	defaultVariants: {

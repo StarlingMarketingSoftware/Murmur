@@ -16,8 +16,12 @@ export const SentEmailsTable: FC<SentEmailsTableProps> = (props) => {
 		sentEmails,
 	} = useSentEmailsTable(props);
 
+	if (sentEmails.length === 0) {
+		return null;
+	}
+
 	return (
-		<Card>
+		<Card className="mt-12" variant="secondary">
 			<CardHeader>
 				<CardTitle>Sent Emails</CardTitle>
 			</CardHeader>
