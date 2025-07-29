@@ -211,8 +211,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	];
 
 	const draftCredits = user?.draftCredits;
+	const signatureId = form.watch('signatureId');
 	const selectedSignature: Signature = signatures?.find(
-		(sig: Signature) => sig.id === form.watch('signatureId')
+		(sig: Signature) => sig.id === signatureId
 	);
 
 	const isPendingGeneration =
@@ -235,31 +236,19 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		dataDraftEmail.message = campaign.testMessage || '';
 	}
 
-	const [fullAiPrompt, handwrittenPrompt, hybridPrompt] = form.watch([
-		'fullAiPrompt',
-		'handwrittenPrompt',
-		'hybridPrompt',
-	]);
-
-	const isGenerationDisabled = useMemo(() => {
+	// Use getValues() for validation instead of watching all fields
+	const isGenerationDisabled = useCallback(() => {
+		const values = form.getValues();
 		return (
-			(fullAiPrompt === '' && draftingMode === 'ai') ||
-			handwrittenPrompt === '' ||
-			(handwrittenPrompt === '<p></p>' && draftingMode === 'handwritten') ||
-			(hybridPrompt === '' && draftingMode === 'hybrid') ||
+			(values.fullAiPrompt === '' && draftingMode === 'ai') ||
+			(values.handwrittenPrompt === '' && draftingMode === 'handwritten') ||
+			(values.handwrittenPrompt === '<p></p>' && draftingMode === 'handwritten') ||
+			(values.hybridPrompt === '' && draftingMode === 'hybrid') ||
 			generationProgress > -1 ||
 			contacts?.length === 0 ||
 			isPendingGeneration
 		);
-	}, [
-		fullAiPrompt,
-		draftingMode,
-		handwrittenPrompt,
-		hybridPrompt,
-		generationProgress,
-		contacts?.length,
-		isPendingGeneration,
-	]);
+	}, [form, draftingMode, generationProgress, contacts?.length, isPendingGeneration]);
 
 	// FUNCTIONS
 	const batchGenerateHandWrittenDrafts = () => {
@@ -604,7 +593,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 							message: convertAiResponseToRichTextEmail(
 								parsedDraft.message,
 								values.font,
-								campaign.signature
+								selectedSignature
 							),
 							campaignId: campaign.id,
 							status: 'draft' as EmailStatus,

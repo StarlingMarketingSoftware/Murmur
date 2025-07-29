@@ -275,7 +275,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 												variant="primary-light"
 												onClick={() => setIsConfirmDialogOpen(true)}
 												isLoading={isPendingGeneration && !isTest}
-												disabled={isGenerationDisabled}
+												disabled={isGenerationDisabled()}
 											>
 												Generate Drafts
 											</Button>

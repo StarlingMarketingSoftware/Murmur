@@ -15,7 +15,7 @@ export interface DraftingRightPanelProps {
 	handleTestPrompt: () => Promise<void>;
 	isTest: boolean;
 	draftingMode: DraftingMode;
-	isGenerationDisabled: boolean;
+	isGenerationDisabled: () => boolean;
 }
 
 export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
