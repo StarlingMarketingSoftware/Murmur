@@ -29,16 +29,15 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 		},
 	});
 
-	const resetFormToCurrentEmail = () => {
-		if (email) {
-			form.setValue('subject', email.subject);
-			form.setValue('message', email.message);
-		}
-	};
-
 	useEffect(() => {
+		const resetFormToCurrentEmail = () => {
+			console.log('resetting form to current email');
+			if (email) {
+				form.setValue('subject', email.subject);
+				form.setValue('message', email.message);
+			}
+		};
 		resetFormToCurrentEmail();
-		/* eslint-disable-next-line react-hooks/exhaustive-deps */
 	}, [email, form]);
 
 	const { isPending: isPendingEditEmail, mutateAsync: editEmail } = useEditEmail({});

@@ -36,6 +36,43 @@ const Div = Node.create({
 	},
 });
 
+// Custom FontFamily extension that properly handles font names with spaces
+const CustomFontFamily = FontFamily.extend({
+	addGlobalAttributes() {
+		return [
+			{
+				types: this.options.types,
+				attributes: {
+					fontFamily: {
+						default: null,
+						parseHTML: (element) => {
+							const fontFamily = element.style.fontFamily;
+							// Remove quotes and decode HTML entities
+							return fontFamily
+								? fontFamily.replace(/['"]/g, '').replace(/&quot;/g, '"')
+								: null;
+						},
+						renderHTML: (attributes) => {
+							if (!attributes.fontFamily) {
+								return {};
+							}
+
+							// Properly quote font names with spaces
+							const fontName = attributes.fontFamily;
+							const needsQuotes = fontName.includes(' ');
+							const quotedFontName = needsQuotes ? `"${fontName}"` : fontName;
+
+							return {
+								style: `font-family: ${quotedFontName}`,
+							};
+						},
+					},
+				},
+			},
+		];
+	},
+});
+
 const RichTextEditor: FC<RichTextEditorProps> = ({
 	value,
 	onChange,
@@ -47,6 +84,12 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 	placeholderOptions,
 }) => {
 	const _isEdit = isEdit && !disabled;
+
+	// Clean the incoming HTML to fix font-family issues
+	const cleanHtml = (html: string) => {
+		return html.replace(/&quot;/g, '');
+	};
+
 	const editor = useEditor({
 		extensions: [
 			StarterKit.configure({
@@ -71,7 +114,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 				types: ['heading', 'paragraph'],
 				alignments: ['left', 'center', 'right'],
 			}),
-			FontFamily,
+			CustomFontFamily, // Use the custom extension instead
 			TextStyle.configure({ mergeNestedSpanStyles: true }),
 			Div,
 		],
@@ -107,7 +150,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 		},
 		editable: _isEdit,
 		immediatelyRender: false,
-		content: value ? value : '',
+		content: value ? cleanHtml(value) : '', // Clean the incoming HTML
 		editorProps: {
 			attributes: {
 				class: twMerge(
@@ -128,9 +171,10 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 			onChange?.(editor.getHTML());
 		},
 	});
+
 	useEffect(() => {
 		if (editor && value !== editor.getHTML()) {
-			editor.commands.setContent(value);
+			editor.commands.setContent(cleanHtml(value)); // Clean the HTML when setting content
 		}
 	}, [value, editor]);
 

@@ -662,7 +662,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const controller = new AbortController();
 		setAbortController(controller);
 
-		const BATCH_SIZE = 5;
+		const BATCH_SIZE = 10;
 		let successfulEmails = 0;
 		let stoppedDueToCredits = false;
 

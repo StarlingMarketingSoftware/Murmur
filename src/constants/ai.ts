@@ -139,8 +139,9 @@ export const getMistralTonePrompt = (tone: MistralToneAgentType): string => {
 	6. Don't include a signature.
 	7. Make it more human.
 	8. Use more bursts and less uniform.
-	9. Always start with "Hi" and not "Hey".
+	9. Always start with "Hi" and the person's name (if it's provided) and not "Hey".
 	10. Don't say "here's the revised version" -- just provide the subject and message in JSON format.
+	11. If the email greeting includes a person's name, keep it there. DO NOT remove it.
 
 ${MISTRAL_FORMATTING_INSTRUCTIONS}
 
