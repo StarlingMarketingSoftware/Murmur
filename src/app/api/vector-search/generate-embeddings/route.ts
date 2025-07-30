@@ -43,7 +43,7 @@ export async function GET() {
 				},
 				take: 50,
 			}),
-			20000 // 10 second timeout
+			20000 // 20 second timeout
 		);
 
 		console.log(`Found ${contacts.length} contacts to process`);

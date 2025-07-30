@@ -12,10 +12,14 @@ import z from 'zod';
 import { getValidatedParamsFromUrl } from '@/utils/url';
 import { NextRequest } from 'next/server';
 
+if (!process.env.ELASTICSEARCH_API_KEY) {
+	throw new Error('ELASTICSEARCH_API_KEY environment variable is not defined.');
+}
+
 const elasticsearch = new Client({
 	node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
 	auth: {
-		apiKey: process.env.ELASTICSEARCH_API_KEY!,
+		apiKey: process.env.ELASTICSEARCH_API_KEY,
 	},
 });
 
