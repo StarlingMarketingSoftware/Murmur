@@ -27,19 +27,8 @@ import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor
 import { RecipientAddressLockableInput } from '@/components/atoms/RecipientAddressLockableInput/RecipientAddressLockableInput';
 
 export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
-	const {
-		email,
-		isOpen,
-		setIsOpen,
-		isEdit,
-		setIsEdit,
-		handleSave,
-		form,
-		isPendingEditEmail,
-		resetFormToCurrentEmail,
-		isEditable,
-		showRecipientEmail,
-	} = useViewEditEmailDialog(props);
+	const { email, isOpen, handleSave, form, isPendingEditEmail, isEditable, setIsOpen } =
+		useViewEditEmailDialog(props);
 
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -47,7 +36,7 @@ export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 				onOpenAutoFocus={(e) => {
 					e.preventDefault();
 				}}
-				className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px]"
+				className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto"
 			>
 				<DialogHeader>
 					<DialogTitle>Email</DialogTitle>
@@ -60,23 +49,26 @@ export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 						<Form {...form}>
 							<form onSubmit={form.handleSubmit(handleSave)}>
 								<div className="space-y-4">
-									<RecipientAddressLockableInput
-										email={email.contact.email}
-										overrideTierShowEmail={showRecipientEmail}
-									/>
-									<FormField
-										control={form.control}
-										name="subject"
-										render={({ field }) => (
-											<FormItem className="col-span-11">
-												<FormLabel>Subject</FormLabel>
-												<FormControl>
-													<Input className="flex-grow" readOnly={!isEdit} {...field} />
-												</FormControl>
-												<FormMessage />
-											</FormItem>
-										)}
-									/>
+									<div className="flex flex-col sm:flex-row gap-2 w-full mb-0">
+										<RecipientAddressLockableInput
+											className="w-1/2"
+											email={email.contact.email}
+											label="Recipient"
+										/>
+										<FormField
+											control={form.control}
+											name="subject"
+											render={({ field }) => (
+												<FormItem className="w-1/2">
+													<FormLabel>Subject</FormLabel>
+													<FormControl>
+														<Input className="flex-grow w-1/2" {...field} />
+													</FormControl>
+													<FormMessage />
+												</FormItem>
+											)}
+										/>
+									</div>
 									<FormField
 										control={form.control}
 										name="message"
@@ -86,9 +78,8 @@ export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 												<FormControl>
 													<RichTextEditor
 														value={field.value}
-														isEdit={isEdit}
 														onChange={field.onChange}
-														className="!h-full grow max-h-[200px] overflow-y-auto"
+														className="!h-full grow overflow-y-auto max-h-[500px]"
 													/>
 												</FormControl>
 												<FormMessage />
@@ -97,42 +88,17 @@ export const ViewEditEmailDialog: FC<ViewEditEmailDialogProps> = (props) => {
 									/>
 								</div>
 								<DialogFooter>
-									{isEditable &&
-										(!isEdit ? (
+									{isEditable && (
+										<div className="flex gap-4">
 											<Button
-												type="button"
+												isLoading={isPendingEditEmail}
 												className="w-fit"
-												variant="primary-light"
-												onClick={(e) => {
-													e.preventDefault();
-													setIsEdit(true);
-												}}
+												type="submit"
 											>
-												Edit
+												Save
 											</Button>
-										) : (
-											<div className="flex gap-4">
-												<Button
-													type="button"
-													className="w-fit"
-													variant="primary-light"
-													onClick={(e) => {
-														e.preventDefault();
-														setIsEdit(false);
-														resetFormToCurrentEmail();
-													}}
-												>
-													Cancel
-												</Button>
-												<Button
-													isLoading={isPendingEditEmail}
-													className="w-fit"
-													type="submit"
-												>
-													Save
-												</Button>
-											</div>
-										))}
+										</div>
+									)}
 								</DialogFooter>
 							</form>
 						</Form>

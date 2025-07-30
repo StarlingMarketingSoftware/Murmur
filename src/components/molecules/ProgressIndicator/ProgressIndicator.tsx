@@ -23,7 +23,7 @@ const ProgressIndicator: FC<ProgressIndicatorProps> = (props) => {
 	}
 
 	return (
-		<div className="border-border border-[1px] rounded-md p-4 fixed bottom-5 w-[90vw] md:w-[45vw] md:min-w-[500px] max-w-[600px] bg-background z-10 left-1/2 transform -translate-x-1/2">
+		<div className="border-border border-[1px] rounded-md p-4 fixed bottom-5 w-[90vw] md:w-[45vw] md:min-w-[500px] max-w-[600px] bg-background z-20 left-1/2 transform -translate-x-1/2">
 			<Button
 				onClick={() => setIsOpen(false)}
 				variant="ghost"

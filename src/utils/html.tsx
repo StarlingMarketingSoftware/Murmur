@@ -51,12 +51,14 @@ export const replaceLineBreaksWithRichTextTags = (text: string, font: string): s
 	return res.replace(/\n/g, `</span></p><p><span ${fontStyle}>`);
 };
 
+// take all instances of single \n and replace them with \n\n (does not do anything to instances of two consecutive new lines \n\n)
 export const convertAiResponseToRichTextEmail = (
 	html: string,
 	font: string,
 	signature: Signature | null
 ): string => {
-	const htmlWithFont = replaceLineBreaksWithRichTextTags(html, font);
+	const cleanedNewLines = html.replace(/(?<!\n)\n(?!\n)/g, '\n\n');
+	const htmlWithFont = replaceLineBreaksWithRichTextTags(cleanedNewLines, font);
 	return addSignatureToHtml(htmlWithFont, signature);
 };
 

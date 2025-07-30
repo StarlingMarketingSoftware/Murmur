@@ -1,6 +1,6 @@
 import { EmailWithRelations } from '@/types';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Dispatch, SetStateAction, useEffect, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -21,7 +21,6 @@ const editEmailSchema = z.object({
 
 export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 	const { email, setIsOpen, showRecipientEmail, isOpen, isEditable } = props;
-	const [isEdit, setIsEdit] = useState(false);
 	const form = useForm<z.infer<typeof editEmailSchema>>({
 		resolver: zodResolver(editEmailSchema),
 		defaultValues: {
@@ -30,16 +29,14 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 		},
 	});
 
-	const resetFormToCurrentEmail = () => {
-		if (email) {
-			form.setValue('subject', email.subject);
-			form.setValue('message', email.message);
-		}
-	};
-
 	useEffect(() => {
+		const resetFormToCurrentEmail = () => {
+			if (email) {
+				form.setValue('subject', email.subject);
+				form.setValue('message', email.message);
+			}
+		};
 		resetFormToCurrentEmail();
-		/* eslint-disable-next-line react-hooks/exhaustive-deps */
 	}, [email, form]);
 
 	const { isPending: isPendingEditEmail, mutateAsync: editEmail } = useEditEmail({});
@@ -60,12 +57,9 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 		email,
 		isOpen,
 		setIsOpen,
-		isEdit,
-		setIsEdit,
 		form,
 		handleSave,
 		isPendingEditEmail,
-		resetFormToCurrentEmail,
 		isEditable,
 		showRecipientEmail,
 	};

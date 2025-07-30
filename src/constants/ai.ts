@@ -3,11 +3,11 @@ import { MistralToneAgentType, PerplexityModel } from '@/types';
 export const PERPLEXITY_FULL_AI_PROMPT = `
 INSTRUCTIONS FOR EMAIL CONTENT:
 
-Write a personalized email to {first_name} who works at {company}. If there is no recipient name provided, start the email with "Hello!"
+Write a personalized email to {recipient_first_name} who works at {company}. If there is no recipient name provided, start the email with "Hello!"
 
 Here is a template to follow:
 
-1. "Hi {first_name},
+1. "Hi {recipient_first_name},
 
 I'm reaching out regarding how I could help {company}. [insert knowledge about the company in a way that feels anecdotal and not like you're reiterating their own sales pitches]
 
@@ -38,6 +38,7 @@ Do not include a subject line or signature - just the body text.
 Do not keep to too strict a formula, we want this to feel human.
 
 Rules:
+- NEVER confuse the recipient's name with the sender's name. The recipient's information is clearly provided. If this happens, it will ruin the email.
 0. No passive sentences, only active sentences
 1.Don't include "hope you're doing well"
 2. keep it very succinct
@@ -139,8 +140,9 @@ export const getMistralTonePrompt = (tone: MistralToneAgentType): string => {
 	6. Don't include a signature.
 	7. Make it more human.
 	8. Use more bursts and less uniform.
-	9. Always start with "Hi" and not "Hey".
+	9. Always start with "Hi" and the person's name (if it's provided) and not "Hey".
 	10. Don't say "here's the revised version" -- just provide the subject and message in JSON format.
+	11. If the email greeting includes a person's name, keep it there. DO NOT remove it.
 
 ${MISTRAL_FORMATTING_INSTRUCTIONS}
 
