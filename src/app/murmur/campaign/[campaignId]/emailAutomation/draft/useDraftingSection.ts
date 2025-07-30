@@ -306,23 +306,26 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			throw new Error('Campaign identity is required');
 		}
 
+		const perplexityPrompt = `Recipient: ${stringifyJsonSubset<Contact>(recipient, [
+			'firstName',
+			'lastName',
+			'company',
+			'address',
+			'city',
+			'state',
+			'country',
+			'website',
+			'phone',
+		])}\n\n Sender: ${stringifyJsonSubset<Identity>(campaign.identity, [
+			'name',
+			'website',
+		])}\n\n Prompt: ${prompt}`;
+		console.log('🚀 ~ draftFullAiEmail ~ perplexityPrompt:', perplexityPrompt);
+
 		const perplexityResponse: string = await callPerplexity({
 			model: 'sonar',
 			rolePrompt: PERPLEXITY_FULL_AI_PROMPT,
-			userPrompt: `Recipient: ${stringifyJsonSubset<Contact>(recipient, [
-				'firstName',
-				'lastName',
-				'company',
-				'address',
-				'city',
-				'state',
-				'country',
-				'website',
-				'phone',
-			])}\n\n Sender: ${stringifyJsonSubset<Identity>(campaign.identity, [
-				'name',
-				'website',
-			])}\n\n Prompt: ${prompt}`,
+			userPrompt: perplexityPrompt,
 			signal: signal,
 		});
 
@@ -347,6 +350,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				agentType: `paragraph${paragraphs}` as MistralParagraphAgentType,
 				signal: signal,
 			});
+			console.log('🚀 ~ draftFullAiEmail ~ mistralResponse2:', mistralResponse2);
 		} else {
 			return mistralResponse1Parsed;
 		}

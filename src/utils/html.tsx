@@ -56,7 +56,9 @@ export const convertAiResponseToRichTextEmail = (
 	font: string,
 	signature: Signature | null
 ): string => {
-	const htmlWithFont = replaceLineBreaksWithRichTextTags(html, font);
+	// take all instances of single \n and replace them with \n\n (do not do anything to instances of two consecutive new lines \n\n)
+	const cleanedNewLines = html.replace(/(?<!\n)\n(?!\n)/g, '\n\n');
+	const htmlWithFont = replaceLineBreaksWithRichTextTags(cleanedNewLines, font);
 	return addSignatureToHtml(htmlWithFont, signature);
 };
 
