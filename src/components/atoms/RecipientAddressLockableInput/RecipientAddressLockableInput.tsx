@@ -6,13 +6,16 @@ import {
 	RecipientAddressLockableInputProps,
 	useRecipientAddressLockableInput,
 } from './useRecipientAddressLockableInput';
+import { FormLabel } from '@/components/ui/form';
 
 export const RecipientAddressLockableInput: FC<RecipientAddressLockableInputProps> = (
 	props
 ) => {
-	const { email, displayEmail } = useRecipientAddressLockableInput(props);
+	const { email, displayEmail, label, className } =
+		useRecipientAddressLockableInput(props);
 	return (
-		<div className="relative">
+		<div className={`relative ${className}`}>
+			<FormLabel>{label}</FormLabel>
 			<Input
 				id="email"
 				defaultValue={displayEmail ? email : '************'}

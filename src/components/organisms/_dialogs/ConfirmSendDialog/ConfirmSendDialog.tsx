@@ -36,7 +36,6 @@ export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
 				</Typography>
 
 				<Typography variant="p" className="py-4">
-					Murmur will <strong>not</strong> display this email address to the recipients.
 					The recipients will see the Identity information that you&apos;ve connected to
 					this campaign:
 					<br className="mt-2" />

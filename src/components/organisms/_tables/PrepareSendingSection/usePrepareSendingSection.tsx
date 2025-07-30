@@ -3,11 +3,11 @@ import { CampaignWithRelations } from '@/types';
 import { EmailStatus } from '@prisma/client';
 import { useState } from 'react';
 
-export interface PrepareSendingTableProps {
+export interface PrepareSendingSectionProps {
 	campaign: CampaignWithRelations;
 }
 
-export const usePrepareSendingTable = (props: PrepareSendingTableProps) => {
+export const usePrepareSendingSection = (props: PrepareSendingSectionProps) => {
 	const { campaign } = props;
 	const [sendingProgress, setSendingProgress] = useState(-1);
 
@@ -18,11 +18,14 @@ export const usePrepareSendingTable = (props: PrepareSendingTableProps) => {
 	});
 
 	const draftEmails = emails?.filter((email) => email.status === EmailStatus.draft) || [];
+	const sentEmails = emails?.filter((email) => email.status === EmailStatus.sent) || [];
+
 	return {
 		...props,
 		draftEmails,
 		sendingProgress,
 		setSendingProgress,
 		isPendingEmails,
+		sentEmails,
 	};
 };

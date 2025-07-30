@@ -23,47 +23,58 @@ interface ContactDocument {
 	vector_field: number[];
 	contactId: string;
 	email: string;
-	firstName: string;
-	lastName: string;
-	company: string;
-	title: string;
-	headline: string;
-	city: string;
-	state: string;
-	country: string;
-	address: string;
-	website: string;
-	linkedInUrl: string;
-	metadata: string;
-	companyType: string;
-	companyTechStack: string[];
-	companyKeywords: string[];
-	companyIndustry: string;
+	firstName: string | null;
+	lastName: string | null;
+	company: string | null;
+	title: string | null;
+	headline: string | null;
+	city: string | null;
+	state: string | null;
+	country: string | null;
+	address: string | null;
+	website: string | null;
+	metadata: string | null;
+	companyFoundedYear: string | null;
+	companyType: string | null;
+	companyTechStack: string | null;
+	companyKeywords: string | null;
+	companyIndustry: string | null;
+	location: string | null;
+	coordinates?: {
+		lat: number;
+		lon: number;
+	};
 }
 
 // Helper function to generate embedding for contact data
 export const generateContactEmbedding = async (contact: Contact) => {
+	const locationString =
+		[contact.city, contact.state, contact.country].filter(Boolean).join(', ') || null;
+
 	const contactText = [
-		contact.firstName,
-		contact.lastName,
-		contact.email,
-		contact.company,
-		contact.city,
-		contact.state,
-		contact.country,
-		contact.address,
-		contact.title,
-		contact.headline,
-		contact.website,
-		contact.linkedInUrl,
-		contact.metadata,
-		contact.companyType,
-		contact.companyTechStack,
-		contact.companyKeywords,
-		contact.companyIndustry,
+		'This is a contact record. Location is especially important for search. the fields are ordered in the order of importance for search.',
+		`Location: ${locationString}`,
+		locationString ? `This contact is located in ${locationString}.` : '',
+		`Address: ${contact.address || ''}`,
+		`City: ${contact.city || ''}`,
+		`State: ${contact.state || ''}`,
+		`Country: ${contact.country || ''}`,
+		`Title: ${contact.title || ''}`,
+		`Metadata: ${contact.metadata || ''}`,
+		`Company Industry: ${contact.companyIndustry || ''}`,
+		`Company Type: ${contact.companyType || ''}`,
+		`Company Founded Year: ${contact.companyFoundedYear || ''}`,
+		`Headline: ${contact.headline || ''}`,
+		`Company: ${contact.company || ''}`,
+		`Company Keywords: ${(contact.companyKeywords || []).join(', ')}`,
+		`Email: ${contact.email || ''}`,
+		`Website: ${contact.website || ''}`,
+		`Company Tech Stack: ${contact.companyTechStack || ''}`,
+		`First Name: ${contact.firstName || ''}`,
+		`Last Name: ${contact.lastName || ''}`,
 	]
 		.filter(Boolean)
-		.join(' ');
+		.join('\n');
 
 	const response = await openai.embeddings.create({
 		input: contactText,
@@ -81,6 +92,16 @@ export const initializeVectorDb = async () => {
 		if (!indexExists) {
 			await elasticsearch.indices.create({
 				index: INDEX_NAME,
+				settings: {
+					analysis: {
+						normalizer: {
+							lowercase: {
+								type: 'custom',
+								filter: ['lowercase'],
+							},
+						},
+					},
+				},
 				mappings: {
 					properties: {
 						vector_field: {
@@ -91,22 +112,84 @@ export const initializeVectorDb = async () => {
 						},
 						contactId: { type: 'keyword' },
 						email: { type: 'keyword' },
-						firstName: { type: 'text' },
-						lastName: { type: 'text' },
-						company: { type: 'text' },
-						title: { type: 'text' },
+						firstName: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
+						lastName: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
+						company: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
+						title: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
 						headline: { type: 'text' },
-						city: { type: 'text' },
-						state: { type: 'text' },
-						country: { type: 'text' },
+						city: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
+						state: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
+						country: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
 						address: { type: 'text' },
+						location: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
 						website: { type: 'text' },
-						linkedInUrl: { type: 'text' },
 						metadata: { type: 'text' },
-						companyType: { type: 'text' },
-						companyTechStack: { type: 'text' },
-						companyKeywords: { type: 'text' },
-						companyIndustry: { type: 'text' },
+						companyFoundedYear: { type: 'text' },
+						companyType: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
+						companyTechStack: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
+						companyKeywords: {
+							type: 'text',
+							fields: { keyword: { type: 'keyword', normalizer: 'lowercase' } },
+						},
+						companyIndustry: {
+							type: 'text',
+							fields: {
+								keyword: { type: 'keyword', normalizer: 'lowercase' },
+							},
+						},
+						coordinates: {
+							type: 'geo_point',
+						},
 					},
 				},
 			});
@@ -187,22 +270,30 @@ export const upsertContactToVectorDb = async (
 			vector_field: _embedding,
 			contactId: contact.id.toString(),
 			email: contact.email,
-			firstName: contact.firstName || '',
-			lastName: contact.lastName || '',
-			company: contact.company || '',
-			title: contact.title || '',
-			headline: contact.headline || '',
-			city: contact.city || '',
-			state: contact.state || '',
-			country: contact.country || '',
-			address: contact.address || '',
-			website: contact.website || '',
-			linkedInUrl: contact.linkedInUrl || '',
-			metadata: contact.metadata || '',
-			companyType: contact.companyType || '',
-			companyTechStack: contact.companyTechStack || [],
-			companyKeywords: contact.companyKeywords || [],
-			companyIndustry: contact.companyIndustry || '',
+			firstName: contact.firstName || null,
+			lastName: contact.lastName || null,
+			company: contact.company || null,
+			title: contact.title || null,
+			headline: contact.headline || null,
+			city: contact.city || null,
+			state: contact.state || null,
+			country: contact.country || null,
+			address: contact.address || null,
+			website: contact.website || null,
+			metadata: contact.metadata || null,
+			companyFoundedYear: contact.companyFoundedYear?.toString() || null,
+			companyType: contact.companyType || null,
+			companyTechStack: contact.companyTechStack?.join(', ') || null,
+			companyKeywords: contact.companyKeywords?.join(', ') || null,
+			companyIndustry: contact.companyIndustry || null,
+			location: [contact.city, contact.state, contact.country].filter(Boolean).join(', '),
+			coordinates:
+				contact.latitude && contact.longitude
+					? {
+							lat: contact.latitude,
+							lon: contact.longitude,
+					  }
+					: undefined,
 		},
 	});
 
@@ -255,8 +346,13 @@ export const searchSimilarContacts = async (
 			'country',
 			'address',
 			'website',
-			'linkedInUrl',
 			'metadata',
+			'companyFoundedYear',
+			'companyType',
+			'companyTechStack',
+			'companyKeywords',
+			'companyIndustry',
+			'location',
 		],
 		_source: false,
 	});
@@ -266,6 +362,94 @@ export const searchSimilarContacts = async (
 
 	return {
 		matches: filteredHits.map((hit) => ({
+			id: hit._id,
+			score: hit._score || 0,
+			metadata: {
+				contactId: hit.fields?.contactId[0],
+				email: hit.fields?.email[0],
+				firstName: hit.fields?.firstName?.[0],
+				lastName: hit.fields?.lastName?.[0],
+				company: hit.fields?.company?.[0],
+				title: hit.fields?.title?.[0],
+				headline: hit.fields?.headline?.[0],
+				city: hit.fields?.city?.[0],
+				state: hit.fields?.state?.[0],
+				country: hit.fields?.country?.[0],
+				address: hit.fields?.address?.[0],
+				website: hit.fields?.website?.[0],
+				metadata: hit.fields?.metadata?.[0],
+				companyFoundedYear: hit.fields?.companyFoundedYear?.[0],
+				companyType: hit.fields?.companyType?.[0],
+				companyTechStack: hit.fields?.companyTechStack?.[0],
+				companyKeywords: hit.fields?.companyKeywords?.[0],
+				companyIndustry: hit.fields?.companyIndustry?.[0],
+				location: hit.fields?.location?.[0],
+			},
+		})),
+		totalFound: filteredHits.length,
+		minScoreApplied: minScore,
+	};
+};
+
+// Search contacts by geographic proximity
+export const searchContactsByLocation = async (
+	latitude: number,
+	longitude: number,
+	distanceKm: number = 50,
+	limit: number = 10
+) => {
+	const results = await elasticsearch.search<ContactDocument>({
+		index: INDEX_NAME,
+		query: {
+			geo_distance: {
+				distance: `${distanceKm}km`,
+				coordinates: {
+					lat: latitude,
+					lon: longitude,
+				},
+			},
+		},
+		size: limit,
+		sort: [
+			{
+				geo_distance: {
+					order: 'asc',
+					unit: 'km',
+					mode: 'min',
+					distance_type: 'arc',
+					coordinates: {
+						lat: latitude,
+						lon: longitude,
+					},
+				},
+			},
+		],
+		fields: [
+			'contactId',
+			'email',
+			'firstName',
+			'lastName',
+			'company',
+			'title',
+			'headline',
+			'city',
+			'state',
+			'country',
+			'address',
+			'website',
+			'metadata',
+			'companyFoundedYear',
+			'companyType',
+			'companyTechStack',
+			'companyKeywords',
+			'companyIndustry',
+			'location',
+		],
+		_source: false,
+	});
+
+	return {
+		matches: results.hits.hits.map((hit) => ({
 			id: hit._id,
 			score: hit._score || 0,
 			metadata: {
@@ -281,15 +465,16 @@ export const searchSimilarContacts = async (
 				country: hit.fields?.country[0],
 				address: hit.fields?.address[0],
 				website: hit.fields?.website[0],
-				linkedInUrl: hit.fields?.linkedInUrl[0],
 				metadata: hit.fields?.metadata[0],
 				companyType: hit.fields?.companyType?.[0],
 				companyTechStack: hit.fields?.companyTechStack?.[0],
 				companyKeywords: hit.fields?.companyKeywords?.[0],
 				companyIndustry: hit.fields?.companyIndustry?.[0],
+				companyFoundedYear: hit.fields?.companyFoundedYear?.[0],
+				location: hit.fields?.location?.[0],
 			},
 		})),
-		totalFound: filteredHits.length,
-		minScoreApplied: minScore,
+		totalFound: results.hits.hits.length,
+		distanceKm,
 	};
 };

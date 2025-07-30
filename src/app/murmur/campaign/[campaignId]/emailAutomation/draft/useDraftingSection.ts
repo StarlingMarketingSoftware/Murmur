@@ -44,10 +44,11 @@ import {
 	Signature,
 } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { debounce } from 'lodash';
 
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
@@ -108,18 +109,23 @@ export type DraftingFormValues = z.infer<typeof draftingFormSchema>;
 
 export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { campaign } = props;
-	const [isFirstLoad, setIsFirstLoad] = useState(true);
 
 	// HOOKS
 
 	const { user } = useMe();
 	const queryClient = useQueryClient();
 
+	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	const [isOpenSignaturesDialog, setIsOpenSignaturesDialog] = useState(false);
 	const [generationProgress, setGenerationProgress] = useState(-1);
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 	const [isTest, setIsTest] = useState<boolean>(false);
 	const [abortController, setAbortController] = useState<AbortController | null>(null);
+	const [isJustSaved, setIsJustSaved] = useState(false);
+	const [autosaveStatus, setAutosaveStatus] = useState<
+		'idle' | 'saving' | 'saved' | 'error'
+	>('idle');
+	const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
 	const isGenerationCancelledRef = useRef(false);
 
@@ -183,8 +189,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 
-	const { isPending: isPendingSaveCampaign, mutateAsync: saveCampaign } =
-		useEditCampaign();
+	const { isPending: isPendingSaveCampaign, mutateAsync: saveCampaign } = useEditCampaign(
+		{ suppressToasts: true }
+	);
 
 	const { mutateAsync: saveTestEmail } = useEditCampaign({
 		suppressToasts: true,
@@ -202,8 +209,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	];
 
 	const draftCredits = user?.draftCredits;
+	const signatureId = form.watch('signatureId');
 	const selectedSignature: Signature = signatures?.find(
-		(sig: Signature) => sig.id === form.watch('signatureId')
+		(sig: Signature) => sig.id === signatureId
 	);
 
 	const isPendingGeneration =
@@ -225,6 +233,19 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		dataDraftEmail.subject = campaign.testSubject || '';
 		dataDraftEmail.message = campaign.testMessage || '';
 	}
+
+	const isGenerationDisabled = useCallback(() => {
+		const values = form.getValues();
+		return (
+			(values.fullAiPrompt === '' && draftingMode === 'ai') ||
+			(values.handwrittenPrompt === '' && draftingMode === 'handwritten') ||
+			(values.handwrittenPrompt === '<p></p>' && draftingMode === 'handwritten') ||
+			(values.hybridPrompt === '' && draftingMode === 'hybrid') ||
+			generationProgress > -1 ||
+			contacts?.length === 0 ||
+			isPendingGeneration
+		);
+	}, [form, draftingMode, generationProgress, contacts?.length, isPendingGeneration]);
 
 	// FUNCTIONS
 	const batchGenerateHandWrittenDrafts = () => {
@@ -282,23 +303,25 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			throw new Error('Campaign identity is required');
 		}
 
+		const perplexityPrompt = `Recipient: ${stringifyJsonSubset<Contact>(recipient, [
+			'firstName',
+			'lastName',
+			'company',
+			'address',
+			'city',
+			'state',
+			'country',
+			'website',
+			'phone',
+		])}\n\n Sender: ${stringifyJsonSubset<Identity>(campaign.identity, [
+			'name',
+			'website',
+		])}\n\n Prompt: ${prompt}`;
+
 		const perplexityResponse: string = await callPerplexity({
 			model: 'sonar',
 			rolePrompt: PERPLEXITY_FULL_AI_PROMPT,
-			userPrompt: `Recipient: ${stringifyJsonSubset<Contact>(recipient, [
-				'firstName',
-				'lastName',
-				'company',
-				'address',
-				'city',
-				'state',
-				'country',
-				'website',
-				'phone',
-			])}\n\n Sender: ${stringifyJsonSubset<Identity>(campaign.identity, [
-				'name',
-				'website',
-			])}\n\n Prompt: ${prompt}`,
+			userPrompt: perplexityPrompt,
 			signal: signal,
 		});
 
@@ -569,7 +592,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 							message: convertAiResponseToRichTextEmail(
 								parsedDraft.message,
 								values.font,
-								campaign.signature
+								selectedSignature
 							),
 							campaignId: campaign.id,
 							status: 'draft' as EmailStatus,
@@ -638,7 +661,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const controller = new AbortController();
 		setAbortController(controller);
 
-		const BATCH_SIZE = 5;
+		const BATCH_SIZE = 10;
 		let successfulEmails = 0;
 		let stoppedDueToCredits = false;
 
@@ -734,6 +757,41 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	};
 
+	const performAutosave = useCallback(
+		async (values: DraftingFormValues) => {
+			try {
+				setAutosaveStatus('saving');
+				await saveCampaign({
+					id: campaign.id,
+					data: values,
+				});
+				setAutosaveStatus('saved');
+				setLastSavedAt(new Date());
+				setIsJustSaved(true);
+
+				setTimeout(() => {
+					setAutosaveStatus('idle');
+				}, 2000);
+			} catch (error) {
+				setAutosaveStatus('error');
+				console.error('Autosave failed:', error);
+
+				setTimeout(() => {
+					setAutosaveStatus('idle');
+				}, 3000);
+			}
+		},
+		[campaign.id, saveCampaign]
+	);
+
+	const debouncedAutosave = useMemo(
+		() =>
+			debounce((values: DraftingFormValues) => {
+				performAutosave(values);
+			}, 1500),
+		[performAutosave]
+	);
+
 	// HANDLERS
 
 	const handleSavePrompt = () => {
@@ -818,6 +876,30 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	}, [draftingMode, form]);
 
+	useEffect(() => {
+		if (isFirstLoad) return;
+
+		const subscription = form.watch((value, { name }) => {
+			if (name) {
+				const formValues = form.getValues();
+
+				setIsJustSaved(false);
+				if (Object.keys(form.formState.errors).length === 0) {
+					debouncedAutosave(formValues);
+				}
+			}
+		});
+
+		return () => subscription.unsubscribe();
+	}, [form, debouncedAutosave, isFirstLoad]);
+
+	// Cleanup debounced function on unmount
+	useEffect(() => {
+		return () => {
+			debouncedAutosave.cancel();
+		};
+	}, [debouncedAutosave]);
+
 	return {
 		campaign,
 		modeOptions,
@@ -845,5 +927,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		hybridAppend,
 		hybridRemove,
 		hybridMove,
+		autosaveStatus,
+		lastSavedAt,
+		isJustSaved,
+		isGenerationDisabled,
 	};
 };
