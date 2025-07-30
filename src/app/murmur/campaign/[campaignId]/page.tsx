@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { DraftingSection } from './emailAutomation/draft/DraftingSection';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { PrepareSendingTable } from '@/components/organisms/_tables/PrepareSendingTable/PrepareSendingTable';
+import { PrepareSendingSection } from '@/components/organisms/_tables/PrepareSendingSection/PrepareSendingSection';
 import { SentEmailsTable } from '@/components/organisms/_tables/SentEmailsTable/SentEmailsTable';
 import { urls } from '@/constants/urls';
 import Link from 'next/link';
@@ -109,10 +109,10 @@ const Murmur = () => {
 				</Typography>
 				<Separator className="!w-1/2" />
 				<DraftingSection campaign={campaign} />
-				<PrepareSendingTable campaign={campaign} />
+				<PrepareSendingSection campaign={campaign} />
 				<SentEmailsTable campaign={campaign} />
 				<Link href={urls.murmur.dashboard.index}>
-					<Button className="w-full font-bold" size="lg" variant="light">
+					<Button className="w-full font-bold mt-8" size="lg" variant="light">
 						Back to Dashboard
 					</Button>
 				</Link>

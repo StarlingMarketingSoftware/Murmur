@@ -33,6 +33,9 @@ const EmailsTable: FC<EmailsTableProps> = (props) => {
 				singleSelection
 				noDataMessage={noDataMessage || 'No emails were found.'}
 				handleRowClick={handleRowClick}
+				constrainHeight
+				displayRowsPerPage={false}
+				rowsPerPage={200}
 			/>
 			<ViewEditEmailDialog
 				email={selectedDraft}

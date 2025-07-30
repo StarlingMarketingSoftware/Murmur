@@ -114,7 +114,10 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 					recipientEmail: email.contact.email,
 					senderEmail: campaign?.identity?.email,
 					senderName: campaign?.identity?.name,
-					originEmail: user?.customDomain ?? user?.murmurEmail,
+					originEmail:
+						user?.customDomain && user?.customDomain !== ''
+							? user?.customDomain
+							: user?.murmurEmail,
 				});
 
 				if (res.success) {
