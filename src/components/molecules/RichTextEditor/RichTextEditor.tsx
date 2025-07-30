@@ -114,7 +114,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 				types: ['heading', 'paragraph'],
 				alignments: ['left', 'center', 'right'],
 			}),
-			CustomFontFamily, // Use the custom extension instead
+			CustomFontFamily,
 			TextStyle.configure({ mergeNestedSpanStyles: true }),
 			Div,
 		],
@@ -150,7 +150,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 		},
 		editable: _isEdit,
 		immediatelyRender: false,
-		content: value ? cleanHtml(value) : '', // Clean the incoming HTML
+		content: value ? cleanHtml(value) : '',
 		editorProps: {
 			attributes: {
 				class: twMerge(
@@ -174,7 +174,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 
 	useEffect(() => {
 		if (editor && value !== editor.getHTML()) {
-			editor.commands.setContent(cleanHtml(value)); // Clean the HTML when setting content
+			editor.commands.setContent(cleanHtml(value));
 		}
 	}, [value, editor]);
 

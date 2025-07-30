@@ -48,8 +48,6 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-
-// Add debounce import for autosave functionality
 import { debounce } from 'lodash';
 
 export interface DraftingSectionProps {
@@ -236,7 +234,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		dataDraftEmail.message = campaign.testMessage || '';
 	}
 
-	// Use getValues() for validation instead of watching all fields
 	const isGenerationDisabled = useCallback(() => {
 		const values = form.getValues();
 		return (
@@ -320,7 +317,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			'name',
 			'website',
 		])}\n\n Prompt: ${prompt}`;
-		console.log('🚀 ~ draftFullAiEmail ~ perplexityPrompt:', perplexityPrompt);
 
 		const perplexityResponse: string = await callPerplexity({
 			model: 'sonar',
@@ -350,7 +346,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				agentType: `paragraph${paragraphs}` as MistralParagraphAgentType,
 				signal: signal,
 			});
-			console.log('🚀 ~ draftFullAiEmail ~ mistralResponse2:', mistralResponse2);
 		} else {
 			return mistralResponse1Parsed;
 		}
@@ -786,7 +781,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				}, 3000);
 			}
 		},
-		[campaign.id, saveCampaign, form]
+		[campaign.id, saveCampaign]
 	);
 
 	const debouncedAutosave = useMemo(

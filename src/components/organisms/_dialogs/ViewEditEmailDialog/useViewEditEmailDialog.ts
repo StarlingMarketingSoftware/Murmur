@@ -31,7 +31,6 @@ export const useViewEditEmailDialog = (props: ViewEditEmailDialogProps) => {
 
 	useEffect(() => {
 		const resetFormToCurrentEmail = () => {
-			console.log('resetting form to current email');
 			if (email) {
 				form.setValue('subject', email.subject);
 				form.setValue('message', email.message);
