@@ -1,8 +1,18 @@
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
-import { apiResponse, apiUnauthorized, handleApiError } from '@/app/api/_utils';
+import { apiResponse, apiUnauthorized } from '@/app/api/_utils';
 import { initializeVectorDb, upsertContactToVectorDb } from '../../_utils/vectorDb';
 import { EmailVerificationStatus, UserRole } from '@prisma/client';
+
+// Add timeout wrapper
+const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+	return Promise.race([
+		promise,
+		new Promise<never>((_, reject) =>
+			setTimeout(() => reject(new Error('Operation timed out')), timeoutMs)
+		),
+	]);
+};
 
 export async function GET() {
 	try {
@@ -21,46 +31,56 @@ export async function GET() {
 			return apiUnauthorized();
 		}
 
-		// Initialize Elasticsearch index if it doesn't exist
-		await initializeVectorDb();
+		// Add timeout to initialization
+		await withTimeout(initializeVectorDb(), 30000); // 30 second timeout
 
-		// Get all contacts
-		const contacts = await prisma.contact.findMany({
-			where: {
-				hasVectorEmbedding: false,
-				emailValidationStatus: EmailVerificationStatus.valid,
-			},
-		});
+		// Add timeout to database query
+		const contacts = await withTimeout(
+			prisma.contact.findMany({
+				where: {
+					hasVectorEmbedding: false,
+					emailValidationStatus: EmailVerificationStatus.valid,
+				},
+				take: 50,
+			}),
+			20000 // 10 second timeout
+		);
 
 		console.log(`Found ${contacts.length} contacts to process`);
 
 		// Process contacts in batches to avoid rate limits
-		const batchSize = 10;
+		const batchSize = 50;
 		const results = [];
 
 		for (let i = 0; i < contacts.length; i += batchSize) {
 			const batch = contacts.slice(i, i + batchSize);
 
-			// Process each contact in the batch concurrently
-			const batchResults = await Promise.all(
-				batch.map(async (contact) => {
-					try {
-						const id = await upsertContactToVectorDb(contact);
+			// Add timeout to each batch processing
+			const batchResults = await withTimeout(
+				Promise.all(
+					batch.map(async (contact) => {
+						try {
+							const id = await withTimeout(
+								upsertContactToVectorDb(contact),
+								20000 // 10 second timeout per contact
+							);
 
-						return {
-							contactId: contact.id,
-							status: 'success',
-							id,
-						};
-					} catch (error) {
-						console.error(`Error processing contact ${contact.id}:`, error);
-						return {
-							contactId: contact.id,
-							status: 'error',
-							error: error instanceof Error ? error.message : 'Unknown error',
-						};
-					}
-				})
+							return {
+								contactId: contact.id,
+								status: 'success',
+								id,
+							};
+						} catch (error) {
+							console.error(`Error processing contact ${contact.id}:`, error);
+							return {
+								contactId: contact.id,
+								status: 'error',
+								error: error instanceof Error ? error.message : 'Unknown error',
+							};
+						}
+					})
+				),
+				30000 // 30 second timeout for entire batch
 			);
 
 			results.push(...batchResults);
@@ -77,6 +97,22 @@ export async function GET() {
 			processedResults: results,
 		});
 	} catch (error) {
-		return handleApiError(error);
+		return apiResponse(error); // don't return api error, return a response with log
 	}
 }
+
+/** this error must be prevented 
+ * 
+ * 
+ * Error: Operation timed out
+    at Timeout.eval [as _onTimeout] (src\app\api\vector-search\generate-embeddings\route.ts:12:27)
+  10 |          promise,
+  11 |          new Promise<never>((_, reject) =>
+> 12 |                  setTimeout(() => reject(new Error('Operation timed out')), timeoutMs)
+     |                                         ^
+  13 |          ),
+  14 |  ]);
+  15 | };
+Operation timed out
+ * 
+ */
