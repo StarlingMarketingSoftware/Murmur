@@ -203,7 +203,6 @@ export const initializeVectorDb = async () => {
 	}
 };
 
-// no longer needed because we can clearing the entire index
 export const updateWithNewFields = async () => {
 	try {
 		const currentMapping = await elasticsearch.indices.getMapping({

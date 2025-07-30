@@ -8,7 +8,7 @@ import {
 } from '@/app/api/_utils';
 import { fetchPerplexity } from '@/app/api/_utils/perplexity';
 import { OPEN_AI_MODEL_OPTIONS, PERPLEXITY_MODEL_OPTIONS } from '@/constants';
-import { Contact, EmailVerificationStatus } from '@prisma/client';
+import { Contact, EmailVerificationStatus, UserRole } from '@prisma/client';
 import { PerplexityCompletionObject } from '@/types';
 
 // Function to filter contact object to only include allowed fields
@@ -50,17 +50,17 @@ function filterAllowedContactFields(
 
 export const PATCH = async function PATCH() {
 	try {
-		// const { userId } = await auth();
-		// if (!userId) {
-		// 	return apiUnauthorized();
-		// }
-		// const user = await prisma.user.findUnique({
-		// 	where: { clerkId: userId },
-		// });
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+		const user = await prisma.user.findUnique({
+			where: { clerkId: userId },
+		});
 
-		// if (user?.role !== UserRole.admin) {
-		// 	return apiUnauthorized('Only admins can access this route');
-		// }
+		if (user?.role !== UserRole.admin) {
+			return apiUnauthorized('Only admins can access this route');
+		}
 
 		// Read the TSV file
 		const unresearchedValidContacts = await prisma.contact.findMany({
