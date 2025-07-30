@@ -11,6 +11,8 @@ import { OPEN_AI_MODEL_OPTIONS, PERPLEXITY_MODEL_OPTIONS } from '@/constants';
 import { Contact, EmailVerificationStatus, UserRole } from '@prisma/client';
 import { PerplexityCompletionObject } from '@/types';
 
+/** !IMPORTANT! Before running again, ensure that empty cells in Excel do not result in "undefined" (as a string value) or empty string "" in the database */
+
 // Function to filter contact object to only include allowed fields
 function filterAllowedContactFields(
 	contactData: Record<string, unknown>
@@ -68,7 +70,7 @@ export const PATCH = async function PATCH() {
 				lastResearchedDate: null,
 				emailValidationStatus: EmailVerificationStatus.valid,
 			},
-			take: 50, // Increased to process more contacts in batches
+			take: 50,
 		});
 
 		const PROMPT = `
@@ -105,7 +107,7 @@ Additional notes:
 - Contacts may have invalid characters, like vertical tabs (VT) and ? symbols. Please remove these or replace them with a character that would make most sense, such as an apostophe. 
 - Use existing information to populate other fields if possible. For example, the city or state field might be blank, but the address field may contain city and state information.
 - Do not set fields to null if the field has data in the original contact object.
-- Do not include the  "id" field in the response. 
+- Do not include the "id" field in the response. 
 
 Return your response as a JSON string that can be parsed by JSON.parse() in JavaScript. The format should look like this, with no new line characters:
 

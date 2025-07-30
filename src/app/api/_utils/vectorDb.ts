@@ -412,7 +412,7 @@ export const searchContactsByLocation = async (
 		size: limit,
 		sort: [
 			{
-				_coordinates: {
+				geo_distance: {
 					order: 'asc',
 					unit: 'km',
 					mode: 'min',

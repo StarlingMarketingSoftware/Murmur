@@ -3,7 +3,7 @@
 	"version": "1.0.1",
 	"private": true,
 	"scripts": {
-		"dev": "next dev --port 3001",
+		"dev": "next dev --port 3000",
 		"build": "set NODE_OPTIONS=--max-old-space-size=8192 && next build",
 		"start": "next start",
 		"lint": "next lint",
