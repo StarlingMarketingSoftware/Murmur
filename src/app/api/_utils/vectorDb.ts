@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma';
 
 type MappingProperty = estypes.MappingProperty;
 
-const VECTOR_DIMENSION = 1536; // OpenAI's text-embedding-3-small dimension
+const VECTOR_DIMENSION = 1536;
 const INDEX_NAME = 'contacts';
 
 const openai = new OpenAI({
@@ -46,7 +46,6 @@ interface ContactDocument {
 	};
 }
 
-// Helper function to generate embedding for contact data
 export const generateContactEmbedding = async (contact: Contact) => {
 	const locationString =
 		[contact.city, contact.state, contact.country].filter(Boolean).join(', ') || null;
@@ -84,7 +83,6 @@ export const generateContactEmbedding = async (contact: Contact) => {
 	return response.data[0].embedding;
 };
 
-// Initialize Elasticsearch index if it doesn't exist
 export const initializeVectorDb = async () => {
 	try {
 		const indexExists = await elasticsearch.indices.exists({ index: INDEX_NAME });
@@ -250,7 +248,6 @@ export const updateWithNewFields = async () => {
 	}
 };
 
-// Upsert a contact's vector to Elasticsearch
 export const upsertContactToVectorDb = async (
 	contact: Contact,
 	embedding?: number[]
@@ -357,7 +354,6 @@ export const searchSimilarContacts = async (
 		_source: false,
 	});
 
-	// Filter out results below the similarity threshold
 	const filteredHits = results.hits.hits.filter((hit) => (hit._score || 0) >= minScore);
 
 	return {
@@ -391,7 +387,6 @@ export const searchSimilarContacts = async (
 	};
 };
 
-// Search contacts by geographic proximity
 export const searchContactsByLocation = async (
 	latitude: number,
 	longitude: number,
@@ -447,6 +442,8 @@ export const searchContactsByLocation = async (
 		],
 		_source: false,
 	});
+
+	console.log('🚀 ~ searchContactsByLocation ~ results:', results);
 
 	return {
 		matches: results.hits.hits.map((hit) => ({
