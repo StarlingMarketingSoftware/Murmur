@@ -80,25 +80,8 @@ const Dashboard = () => {
 								</FormItem>
 							)}
 						/>
-						<div className="flex flex-row gap-4 items-center justify-between">
+						<div className="flex flex-col md:flex-row gap-0 md:gap-4 items-center justify-between">
 							<div className="flex flex-row gap-4 items-center">
-								<FormField
-									control={form.control}
-									name="location"
-									render={({ field }) => (
-										<FormItem>
-											<FormControl>
-												<Input
-													className=""
-													placeholder="Location (optional)"
-													{...field}
-												/>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
-								/>
-
 								<FormField
 									control={form.control}
 									name="excludeUsedContacts"
@@ -148,7 +131,7 @@ const Dashboard = () => {
 									variant="primary-light"
 									type="submit"
 									bold
-									className="px-20"
+									className="px-10 md:px-20"
 									isLoading={isLoadingContacts || isRefetchingContacts}
 								>
 									Search
