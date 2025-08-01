@@ -309,16 +309,30 @@ export const deleteContactFromVectorDb = async (id: string) => {
 	});
 };
 
+export type QueryJson = {
+	city: string | null;
+	state: string | null;
+	country: string | null;
+	restOfQuery: string;
+};
 export const searchSimilarContacts = async (
-	queryText: string,
+	queryJson: QueryJson,
 	limit: number = 10,
 	minScore: number = 0.3
 ) => {
 	const response = await openai.embeddings.create({
-		input: queryText,
+		input: queryJson.restOfQuery,
 		model: 'text-embedding-3-small',
 	});
 	const queryEmbedding = response.data[0].embedding;
+
+	const count = await elasticsearch.count({
+		index: INDEX_NAME,
+		query: {
+			match_all: {},
+		},
+	});
+	console.log(`Total contacts in vector db: ${JSON.stringify(count)}`);
 
 	// Search Elasticsearch using kNN search
 	const results = await elasticsearch.search<ContactDocument>({
@@ -327,7 +341,58 @@ export const searchSimilarContacts = async (
 			field: 'vector_field',
 			query_vector: queryEmbedding,
 			k: limit,
-			num_candidates: Math.min(10000, limit * 4),
+			num_candidates: 10000, // maximum is 10,000
+		},
+		query: {
+			bool: {
+				should: [
+					// confirm that this emphasizes the correct fields
+					{
+						multi_match: {
+							query: queryJson.restOfQuery,
+							fields: [
+								'title',
+								'headline',
+								'company',
+								'companyIndustry',
+								'companyKeywords',
+							],
+							type: 'best_fields',
+							fuzziness: 'AUTO',
+						},
+					},
+				],
+				must: [
+					// Exact location matching using term queries
+					...(queryJson.state
+						? [
+								{
+									term: {
+										'state.keyword': queryJson.state.toLowerCase(),
+									},
+								},
+						  ]
+						: []),
+					...(queryJson.city
+						? [
+								{
+									term: {
+										'city.keyword': queryJson.city.toLowerCase(),
+									},
+								},
+						  ]
+						: []),
+					...(queryJson.country
+						? [
+								{
+									term: {
+										'country.keyword': queryJson.country.toLowerCase(),
+									},
+								},
+						  ]
+						: []),
+				],
+			},
 		},
 		size: limit,
 		fields: [
@@ -442,8 +507,6 @@ export const searchContactsByLocation = async (
 		],
 		_source: false,
 	});
-
-	console.log('🚀 ~ searchContactsByLocation ~ results:', results);
 
 	return {
 		matches: results.hits.hits.map((hit) => ({
