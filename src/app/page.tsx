@@ -75,13 +75,16 @@ export default function HomePage() {
 
 				{/* Content layer */}
 				<div className="relative z-20 justify-items-center h-full gap-0">
-					<div className="w-[55px] sm:w-[75px] md:w-[90px] lg:!w-[96px] h-[44px] sm:h-[60px] md:h-[72px] lg:h-[80px] mt-18 sm:mt-24 md:mt-30 lg:mt-36">
+					<div className="w-[55px] sm:w-[75px] md:w-[90px] lg:!w-[96px] h-[44px] sm:h-[60px] md:h-[72px] lg:h-[80px] mt-18 sm:mt-24 md:mt-30 lg:mt-36 mx-auto">
 						<LogoIcon />
 					</div>
-					<Typography variant="h1" className="!text-[52px] sm:!text-[80px] leading-[0.8]">
+					<Typography
+						variant="h1"
+						className="!text-[52px] sm:!text-[80px] leading-[0.8] text-center"
+					>
 						Murmur
 					</Typography>
-					<div className="flex items-center gap-8 sm:gap-14 mt-6">
+					<div className="flex items-center gap-8 sm:gap-14 mt-6 mx-auto text-center justify-center">
 						<Typography className="!text-[12px]">by</Typography>
 						<StarlingLogo width="110px" />
 					</div>
@@ -91,7 +94,7 @@ export default function HomePage() {
 					>
 						Cut Through The Noise.<br></br> Get Contacts. Get Work. Email Anyone.
 					</Typography>
-					<div className="mt-24">
+					<div className="mt-24 flex justify-center">
 						{!isSignedIn ? (
 							<SignUpButton mode="modal">
 								<Button
@@ -134,10 +137,11 @@ export default function HomePage() {
 
 			{/* Video Section */}
 			<div className="py-16 mt-2 sm:mt-32 px-4">
-				<div className="mx-auto w-fit">
-					<div className="relative max-w-[943px] w-full aspect-video">
+				<div className="mx-auto w-9/10 flex items-center justify-center flex-col">
+					<div className="relative max-w-[943px] w-full h-full aspect-video">
 						<VideoPlayer
 							playbackId="aBYYjecc99ZfIWP016iEXTwZvyg1HQV700haM1c6Ll9wQ"
+							className="h-full w-full"
 							thumbnailTime={1.5}
 							metadata={{
 								video_title: 'Murmur Testimonials',
@@ -164,14 +168,15 @@ export default function HomePage() {
 				<ComparisonTable />
 			</div>
 
-			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-28 px-4">
-				<div className="relative max-w-[943px] w-full mx-auto">
+			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-28 px-4 bg-blue-300">
+				<div className="mx-auto w-9/10 flex items-center justify-center flex-col">
 					<Typography variant="banner" className="text-left w-full">
 						Send without Limits.<br></br> Dream without Boundaries.
 					</Typography>
-					<div className="rounded-lg w-fit h-fit aspect-video max-h-fit overflow-hidden mt-16 sm:mt-32">
+					<div className="relative max-w-[943px] w-full h-full aspect-video mt-16 sm:mt-32">
 						<VideoPlayer
 							playbackId="z015rWLTn4mlDbMX0021ale02ieVwttxqtZvzc2Z02nVotA"
+							className="h-full w-full"
 							thumbnailTime={1.5}
 							metadata={{
 								video_title: 'Murmur Testimonials',
