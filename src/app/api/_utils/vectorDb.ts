@@ -326,14 +326,6 @@ export const searchSimilarContacts = async (
 	});
 	const queryEmbedding = response.data[0].embedding;
 
-	const count = await elasticsearch.count({
-		index: INDEX_NAME,
-		query: {
-			match_all: {},
-		},
-	});
-	console.log(`Total contacts in vector db: ${JSON.stringify(count)}`);
-
 	// Search Elasticsearch using kNN search
 	const results = await elasticsearch.search<ContactDocument>({
 		index: INDEX_NAME,

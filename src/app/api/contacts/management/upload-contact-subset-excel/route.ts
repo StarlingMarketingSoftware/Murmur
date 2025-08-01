@@ -49,18 +49,18 @@ interface ExcelContactRow {
 
 export const POST = async function POST(request: Request) {
 	try {
-		// const { userId } = await auth();
-		// if (!userId) {
-		// 	return apiUnauthorized();
-		// }
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
 
-		// const user = await prisma.user.findUnique({
-		// 	where: { clerkId: userId },
-		// });
+		const user = await prisma.user.findUnique({
+			where: { clerkId: userId },
+		});
 
-		// if (user?.role !== UserRole.admin) {
-		// 	return apiUnauthorized();
-		// }
+		if (user?.role !== UserRole.admin) {
+			return apiUnauthorized();
+		}
 
 		// Parse request body for configuration
 		const body = await request.json();
