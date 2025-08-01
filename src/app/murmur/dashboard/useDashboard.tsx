@@ -27,7 +27,6 @@ import { TableCellTooltip } from '@/components/molecules/TableCellTooltip/TableC
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
-	location: z.string().optional(),
 	excludeUsedContacts: z.boolean().optional().default(true),
 	exactMatchesOnly: z.boolean().optional().default(true),
 });
@@ -191,7 +190,6 @@ export const useDashboard = () => {
 		resolver: zodResolver(formSchema),
 		defaultValues: {
 			searchText: '',
-			location: '',
 			excludeUsedContacts: true,
 			exactMatchesOnly: false,
 		},
@@ -203,7 +201,6 @@ export const useDashboard = () => {
 	>([]);
 	const [selectedContacts, setSelectedContacts] = useState<number[]>([]);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
-	const [activeLocation, setActiveLocation] = useState('');
 	const [activeExcludeUsedContacts, setActiveExcludeUsedContacts] = useState(true);
 	const [activeExactMatchesOnly, setActiveExactMatchesOnly] = useState(false);
 	const [currentTab, setCurrentTab] = useState<TabValue>('search');
@@ -226,7 +223,6 @@ export const useDashboard = () => {
 			useVectorSearch: !activeExactMatchesOnly,
 			limit,
 			excludeUsedContacts: activeExcludeUsedContacts,
-			location: activeLocation,
 		},
 		enabled: false,
 	});
@@ -260,7 +256,6 @@ export const useDashboard = () => {
 	/* HANDLERS */
 	const onSubmit = async (data: FormData) => {
 		setActiveSearchQuery(data.searchText);
-		setActiveLocation(data.location || '');
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? true);
 		setActiveExactMatchesOnly(data.exactMatchesOnly ?? false);
 		setLimit(100);
@@ -284,8 +279,8 @@ export const useDashboard = () => {
 
 		await batchUpdateContacts({ updates });
 
-		const defaultName = `${capitalize(activeSearchQuery)} ${capitalize(
-			activeLocation
+		const defaultName = `${capitalize(
+			activeSearchQuery
 		)} - ${new Date().toLocaleDateString()}`;
 		if (currentTab === 'search') {
 			const newUserContactList = await createContactList({
