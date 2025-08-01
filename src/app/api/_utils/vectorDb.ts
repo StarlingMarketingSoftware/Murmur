@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma';
 
 type MappingProperty = estypes.MappingProperty;
 
-const VECTOR_DIMENSION = 1536; // OpenAI's text-embedding-3-small dimension
+const VECTOR_DIMENSION = 1536;
 const INDEX_NAME = 'contacts';
 
 const openai = new OpenAI({
@@ -46,7 +46,6 @@ interface ContactDocument {
 	};
 }
 
-// Helper function to generate embedding for contact data
 export const generateContactEmbedding = async (contact: Contact) => {
 	const locationString =
 		[contact.city, contact.state, contact.country].filter(Boolean).join(', ') || null;
@@ -84,7 +83,6 @@ export const generateContactEmbedding = async (contact: Contact) => {
 	return response.data[0].embedding;
 };
 
-// Initialize Elasticsearch index if it doesn't exist
 export const initializeVectorDb = async () => {
 	try {
 		const indexExists = await elasticsearch.indices.exists({ index: INDEX_NAME });
@@ -250,7 +248,6 @@ export const updateWithNewFields = async () => {
 	}
 };
 
-// Upsert a contact's vector to Elasticsearch
 export const upsertContactToVectorDb = async (
 	contact: Contact,
 	embedding?: number[]
@@ -312,13 +309,19 @@ export const deleteContactFromVectorDb = async (id: string) => {
 	});
 };
 
+export type QueryJson = {
+	city: string | null;
+	state: string | null;
+	country: string | null;
+	restOfQuery: string;
+};
 export const searchSimilarContacts = async (
-	queryText: string,
+	queryJson: QueryJson,
 	limit: number = 10,
 	minScore: number = 0.3
 ) => {
 	const response = await openai.embeddings.create({
-		input: queryText,
+		input: queryJson.restOfQuery,
 		model: 'text-embedding-3-small',
 	});
 	const queryEmbedding = response.data[0].embedding;
@@ -330,7 +333,58 @@ export const searchSimilarContacts = async (
 			field: 'vector_field',
 			query_vector: queryEmbedding,
 			k: limit,
-			num_candidates: Math.min(10000, limit * 4),
+			num_candidates: 10000, // maximum is 10,000
+		},
+		query: {
+			bool: {
+				should: [
+					// confirm that this emphasizes the correct fields
+					{
+						multi_match: {
+							query: queryJson.restOfQuery,
+							fields: [
+								'title',
+								'headline',
+								'company',
+								'companyIndustry',
+								'companyKeywords',
+							],
+							type: 'best_fields',
+							fuzziness: 'AUTO',
+						},
+					},
+				],
+				must: [
+					// Exact location matching using term queries
+					...(queryJson.state
+						? [
+								{
+									term: {
+										'state.keyword': queryJson.state.toLowerCase(),
+									},
+								},
+						  ]
+						: []),
+					...(queryJson.city
+						? [
+								{
+									term: {
+										'city.keyword': queryJson.city.toLowerCase(),
+									},
+								},
+						  ]
+						: []),
+					...(queryJson.country
+						? [
+								{
+									term: {
+										'country.keyword': queryJson.country.toLowerCase(),
+									},
+								},
+						  ]
+						: []),
+				],
+			},
 		},
 		size: limit,
 		fields: [
@@ -357,7 +411,6 @@ export const searchSimilarContacts = async (
 		_source: false,
 	});
 
-	// Filter out results below the similarity threshold
 	const filteredHits = results.hits.hits.filter((hit) => (hit._score || 0) >= minScore);
 
 	return {
@@ -391,7 +444,6 @@ export const searchSimilarContacts = async (
 	};
 };
 
-// Search contacts by geographic proximity
 export const searchContactsByLocation = async (
 	latitude: number,
 	longitude: number,

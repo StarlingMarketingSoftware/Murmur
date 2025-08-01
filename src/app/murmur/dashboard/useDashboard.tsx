@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { twMerge } from 'tailwind-merge';
 import { capitalize } from '@/utils/string';
+import { TableCellTooltip } from '@/components/molecules/TableCellTooltip/TableCellTooltip';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -35,6 +36,8 @@ type FormData = z.infer<typeof formSchema>;
 
 export const useDashboard = () => {
 	/* UI */
+
+	const MAX_CELL_LENGTH = 35;
 	const columns: ColumnDef<ContactWithName>[] = [
 		{
 			id: 'select',
@@ -62,7 +65,9 @@ export const useDashboard = () => {
 				return <TableSortingButton column={column} label="Name" />;
 			},
 			cell: ({ row }) => {
-				return <div className="capitalize text-left">{row.getValue('name')}</div>;
+				return (
+					<TableCellTooltip text={row.getValue('name')} maxLength={MAX_CELL_LENGTH} />
+				);
 			},
 		},
 		{
@@ -98,7 +103,9 @@ export const useDashboard = () => {
 				return <TableSortingButton column={column} label="Company" />;
 			},
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('company')}</div>;
+				return (
+					<TableCellTooltip text={row.getValue('company')} maxLength={MAX_CELL_LENGTH} />
+				);
 			},
 		},
 		{
@@ -107,7 +114,9 @@ export const useDashboard = () => {
 				return <TableSortingButton column={column} label="Title" />;
 			},
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('title')}</div>;
+				return (
+					<TableCellTooltip text={row.getValue('title')} maxLength={MAX_CELL_LENGTH} />
+				);
 			},
 		},
 		{
@@ -116,7 +125,9 @@ export const useDashboard = () => {
 				return <TableSortingButton column={column} label="City" />;
 			},
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('city')}</div>;
+				return (
+					<TableCellTooltip text={row.getValue('city')} maxLength={MAX_CELL_LENGTH} />
+				);
 			},
 		},
 		{
@@ -140,7 +151,9 @@ export const useDashboard = () => {
 				return <TableSortingButton column={column} label="Address" />;
 			},
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('address')}</div>;
+				return (
+					<TableCellTooltip text={row.getValue('address')} maxLength={MAX_CELL_LENGTH} />
+				);
 			},
 		},
 		{
@@ -149,7 +162,9 @@ export const useDashboard = () => {
 				return <TableSortingButton column={column} label="Website" />;
 			},
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('website')}</div>;
+				return (
+					<TableCellTooltip text={row.getValue('website')} maxLength={MAX_CELL_LENGTH} />
+				);
 			},
 		},
 	];

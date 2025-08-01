@@ -72,7 +72,7 @@ const Dashboard = () => {
 									<FormControl>
 										<Input
 											className="!border-foreground"
-											placeholder="Who do you want to send to?  i.e  “Wedding Planners in North Carolina”"
+											placeholder="Who do you want to send to?  i.e  “Music venues in North Carolina”"
 											{...field}
 										/>
 									</FormControl>
