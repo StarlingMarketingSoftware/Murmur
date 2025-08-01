@@ -168,7 +168,7 @@ export default function HomePage() {
 				<ComparisonTable />
 			</div>
 
-			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-28 px-4 bg-blue-300">
+			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-28 px-4">
 				<div className="mx-auto w-9/10 flex items-center justify-center flex-col">
 					<Typography variant="banner" className="text-left w-full">
 						Send without Limits.<br></br> Dream without Boundaries.
