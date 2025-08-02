@@ -8,9 +8,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useFormContext } from 'react-hook-form';
 import { DndContext, closestCenter } from '@dnd-kit/core';
-import { Draggable } from '../DragAndDrop/Draggable';
 import { Droppable } from '../DragAndDrop/Droppable';
-import { Badge } from '@/components/ui/badge';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
 import {
@@ -19,7 +17,6 @@ import {
 	DropdownMenuGroup,
 	DropdownMenuItem,
 	DropdownMenuLabel,
-	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -29,15 +26,13 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
-import { PlusIcon, Trash2 } from 'lucide-react';
+import { EditIcon, PlusIcon, Trash2 } from 'lucide-react';
 import { HelpTooltip } from '@/components/atoms/HelpTooltip/HelpTooltip';
-import {
-	DraftingFormValues,
-	HybridBlockPrompt,
-} from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
+import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 import { HybridBlock } from '@prisma/client';
 import { BLOCKS, useHybridPromptInput } from './useHybridPromptInput';
 import { twMerge } from 'tailwind-merge';
+import { useState } from 'react';
 
 interface SortableAIBlockProps {
 	block: (typeof BLOCKS)[number];
@@ -50,6 +45,7 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
 		useSortable({ id });
 	const form = useFormContext<DraftingFormValues>();
+	const [isEdit, setIsEdit] = useState(false);
 
 	const style = {
 		transform: CSS.Transform.toString(transform),
@@ -68,10 +64,22 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 				isDragging ? 'opacity-50 z-10' : ''
 			)}
 		>
-			<div className="group absolute right-3 top-3">
+			{isDragging && <div className="absolute inset-0 rounded-md bg-gray-100 z-10" />}
+			<div className="absolute right-3 top-3">
+				<Button
+					type="button"
+					variant="action-link"
+					onClick={(e) => {
+						e.stopPropagation();
+						setIsEdit(!isEdit);
+					}}
+				>
+					{isEdit ? 'Cancel' : 'Edit'}
+				</Button>
 				<Button
 					type="button"
 					variant="ghost"
+					className="group"
 					size="icon"
 					onClick={(e) => {
 						e.stopPropagation();
@@ -81,9 +89,13 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 					<Trash2 className="h-4 w-4 group-hover:text-red-500" />
 				</Button>
 			</div>
-			<div {...attributes} {...listeners} className="cursor-grab mb-2 flex gap-2">
-				<Typography variant="h4">{block.label}</Typography>
-				<HelpTooltip content={block.help} />
+			<div {...attributes} {...listeners} className="cursor-grab mb-2 flex gap-2 min-h-7">
+				{!isTextBlock && (
+					<>
+						<Typography variant="h4">{block.label}</Typography>
+						<HelpTooltip content={block.help} />
+					</>
+				)}
 			</div>
 			{isTextBlock ? (
 				<Textarea
@@ -92,11 +104,15 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 					{...form.register(`hybridBlockPrompts.${fieldIndex}.value`)}
 				/>
 			) : (
-				<Input
-					placeholder={block.placeholder}
-					onClick={(e) => e.stopPropagation()}
-					{...form.register(`hybridBlockPrompts.${fieldIndex}.value`)}
-				/>
+				<>
+					{isEdit && (
+						<Input
+							placeholder={block.placeholder}
+							onClick={(e) => e.stopPropagation()}
+							{...form.register(`hybridBlockPrompts.${fieldIndex}.value`)}
+						/>
+					)}
+				</>
 			)}
 		</div>
 	);
@@ -104,7 +120,6 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 
 export const HybridPromptInput = () => {
 	const {
-		form,
 		fields,
 		watchedAvailableBlocks,
 		handleDragEnd,
