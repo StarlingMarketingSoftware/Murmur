@@ -7,6 +7,7 @@ import Highlight from '@tiptap/extension-highlight';
 import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
 import FontFamily from '@tiptap/extension-font-family';
+import Placeholder from '@tiptap/extension-placeholder';
 import { FC, useEffect } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { Node } from '@tiptap/core';
@@ -118,6 +119,10 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 			}),
 			CustomFontFamily,
 			TextStyle.configure({ mergeNestedSpanStyles: true }),
+			Placeholder.configure({
+				placeholder: placeholder || 'Start typing...',
+				emptyEditorClass: 'is-editor-empty',
+			}),
 			Div,
 		],
 		onSelectionUpdate: ({ editor }) => {
@@ -202,7 +207,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 					placeholderOptions={placeholderOptions}
 				/>
 			)}
-			<EditorContent editor={editor} placeholder={placeholder} />
+			<EditorContent editor={editor} />
 		</div>
 	);
 };

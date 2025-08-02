@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { FormField, FormItem, FormControl } from '@/components/ui/form';
 import { BlockSelect } from '@/components/atoms/BlockSelect/BlockSelect';
-import { CampaignName } from '../CampaignName/CampaignName';
 import { twMerge } from 'tailwind-merge';
 
 export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
