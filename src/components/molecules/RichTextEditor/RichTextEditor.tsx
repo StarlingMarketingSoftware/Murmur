@@ -22,6 +22,7 @@ interface RichTextEditorProps {
 	disabled?: boolean;
 	showPlaceholders?: boolean;
 	placeholderOptions?: { value: string; label: string }[];
+	placeholder?: string;
 }
 
 const Div = Node.create({
@@ -82,6 +83,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 	disabled = false,
 	showPlaceholders = false,
 	placeholderOptions,
+	placeholder,
 }) => {
 	const _isEdit = isEdit && !disabled;
 
@@ -200,7 +202,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 					placeholderOptions={placeholderOptions}
 				/>
 			)}
-			<EditorContent editor={editor} />
+			<EditorContent editor={editor} placeholder={placeholder} />
 		</div>
 	);
 };
