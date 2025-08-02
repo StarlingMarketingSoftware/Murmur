@@ -1,7 +1,7 @@
 import { draftingFormSchema } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 import { CampaignWithRelations, OptionWithLabel, TestDraftEmail } from '@/types';
 import { DraftingMode, DraftingTone } from '@prisma/client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -68,6 +68,14 @@ export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
 		[campaign.testSubject, campaign.testMessage]
 	);
 
+	useEffect(() => {
+		if (draftingMode !== 'ai') {
+			setActiveTab('test');
+		}
+	}, [draftingMode]);
+
+	const hasTestMessage = campaign.testMessage || campaign.testSubject;
+
 	return {
 		campaign,
 		activeTab,
@@ -80,5 +88,7 @@ export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
 		form,
 		areSettingsDisabled,
 		isGenerationDisabled,
+		draftingMode,
+		hasTestMessage,
 	};
 };

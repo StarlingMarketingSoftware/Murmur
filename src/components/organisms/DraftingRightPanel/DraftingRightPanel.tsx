@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { FormField, FormItem, FormControl } from '@/components/ui/form';
 import { BlockSelect } from '@/components/atoms/BlockSelect/BlockSelect';
+import { twMerge } from 'tailwind-merge';
 
 export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 	const {
@@ -23,15 +24,19 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 		areSettingsDisabled,
 		form,
 		isGenerationDisabled,
+		draftingMode,
+		hasTestMessage,
 	} = useDraftingRightPanel(props);
 
 	return (
 		<div className="flex flex-col gap-4 mt-6 p-5">
-			<BlockTabs
-				activeValue={activeTab}
-				onValueChange={setActiveTab}
-				options={modeOptions}
-			/>
+			{draftingMode === 'ai' && (
+				<BlockTabs
+					activeValue={activeTab}
+					onValueChange={setActiveTab}
+					options={modeOptions}
+				/>
+			)}
 			<div>
 				{activeTab === 'settings' && (
 					<>
@@ -90,13 +95,22 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 					</>
 				)}
 				{activeTab === 'test' && (
-					<div className="grid gap-4 py-4">
+					<div className="grid gap-4 py-4 relative p-4">
+						<div
+							className={twMerge(
+								!hasTestMessage
+									? 'absolute w-full h-full top-0 left-0 backdrop-blur-xs z-10'
+									: 'hidden'
+							)}
+						/>
+
 						<div className="grid gap-2">
 							<Label htmlFor="subject">Subject</Label>
 							<Input
 								id="subject"
 								value={draftEmail.subject}
 								readOnly
+								placeholder="Subject for test email"
 								disabled={isTest}
 								className="col-span-3 !cursor-text !pointer-events-auto"
 							/>
@@ -107,26 +121,52 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 								className="!h-full grow overflow-y-auto"
 								isEdit={false}
 								hideMenuBar
+								placeholder="Hello, this is a message for a test email. This is where your AI generated message will go once you test your prompt. Best regards."
 								value={draftEmail.message}
 								disabled={isTest}
 							/>
 						</div>
+						<div
+							className={twMerge(
+								hasTestMessage && 'flex justify-center mt-8',
+								!hasTestMessage &&
+									'absolute top-1/2 left-1/2 -translate-x-1/2 z-20 -translate-y-1/2'
+							)}
+						>
+							<Button
+								isLoading={isTest}
+								type="button"
+								bold
+								variant="primary-light"
+								disabled={isGenerationDisabled()}
+								onClick={() => {
+									handleTestPrompt();
+									setActiveTab('test');
+								}}
+							>
+								<FlaskConicalIcon /> Test Your Prompt
+							</Button>
+						</div>
 					</div>
 				)}
-				<div className="flex justify-center mt-8">
-					<Button
-						isLoading={isTest}
-						type="button"
-						variant="primary-light"
-						disabled={isGenerationDisabled()}
-						onClick={() => {
-							handleTestPrompt();
-							setActiveTab('test');
-						}}
-					>
-						<FlaskConicalIcon /> Test Your Prompt
-					</Button>
-				</div>
+
+				{activeTab === 'settings' && (
+					<div className="flex justify-center mt-8">
+						<Button
+							isLoading={isTest}
+							type="button"
+							bold
+							variant="primary-light"
+							disabled={isGenerationDisabled()}
+							onClick={() => {
+								handleTestPrompt();
+								setActiveTab('test');
+							}}
+						>
+							<FlaskConicalIcon /> Test Your Prompt
+						</Button>
+					</div>
+				)}
 			</div>
 		</div>
 	);
