@@ -26,7 +26,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
-import { EditIcon, PlusIcon, Trash2 } from 'lucide-react';
+import { GripVerticalIcon, PlusIcon, Trash2 } from 'lucide-react';
 import { HelpTooltip } from '@/components/atoms/HelpTooltip/HelpTooltip';
 import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 import { HybridBlock } from '@prisma/client';
@@ -59,61 +59,71 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 			ref={setNodeRef}
 			style={style}
 			className={twMerge(
-				'w-full relative border-2 border-gray-300 rounded-md bg-gray-100 p-4',
+				'w-full relative border-2 border-gray-300 rounded-md bg-gray-100 p-4 pl-1',
 				isTextBlock ? 'border-primary' : 'border-secondary',
 				isDragging ? 'opacity-50 z-10' : ''
 			)}
 		>
-			{isDragging && <div className="absolute inset-0 rounded-md bg-gray-100 z-10" />}
-			<div className="absolute right-3 top-3">
-				<Button
-					type="button"
-					variant="action-link"
-					onClick={(e) => {
-						e.stopPropagation();
-						setIsEdit(!isEdit);
-					}}
-				>
-					{isEdit ? 'Cancel' : 'Edit'}
-				</Button>
-				<Button
-					type="button"
-					variant="ghost"
-					className="group"
-					size="icon"
-					onClick={(e) => {
-						e.stopPropagation();
-						onRemove(id);
-					}}
-				>
-					<Trash2 className="h-4 w-4 group-hover:text-red-500" />
-				</Button>
-			</div>
-			<div {...attributes} {...listeners} className="cursor-grab mb-2 flex gap-2 min-h-7">
-				{!isTextBlock && (
-					<>
-						<Typography variant="h4">{block.label}</Typography>
-						<HelpTooltip content={block.help} />
-					</>
-				)}
-			</div>
-			{isTextBlock ? (
-				<Textarea
-					placeholder={block.placeholder}
-					onClick={(e) => e.stopPropagation()}
-					{...form.register(`hybridBlockPrompts.${fieldIndex}.value`)}
-				/>
-			) : (
-				<>
-					{isEdit && (
-						<Input
+			<div className="flex items-center gap-2">
+				<div {...attributes} {...listeners} className="cursor-grab h-fit w-fit">
+					<GripVerticalIcon className="text-muted" />
+				</div>
+				<div className="flex-grow">
+					{isDragging && <div className="absolute inset-0 rounded-md bg-gray-100 z-10" />}
+					<div className="absolute right-3 top-3">
+						{!isTextBlock && (
+							<Button
+								type="button"
+								className="mr-1"
+								variant="action-link"
+								onClick={(e) => {
+									e.stopPropagation();
+									setIsEdit(!isEdit);
+								}}
+							>
+								{isEdit ? 'Cancel' : 'Edit'}
+							</Button>
+						)}
+						<Button
+							type="button"
+							variant="ghost"
+							className="group"
+							size="icon"
+							onClick={(e) => {
+								e.stopPropagation();
+								onRemove(id);
+							}}
+						>
+							<Trash2 className="h-4 w-4 group-hover:text-red-500" />
+						</Button>
+					</div>
+					<div className="mb-2 flex gap-2 min-h-7">
+						{!isTextBlock && (
+							<>
+								<Typography variant="h4">{block.label}</Typography>
+								<HelpTooltip content={block.help} />
+							</>
+						)}
+					</div>
+					{isTextBlock ? (
+						<Textarea
 							placeholder={block.placeholder}
 							onClick={(e) => e.stopPropagation()}
 							{...form.register(`hybridBlockPrompts.${fieldIndex}.value`)}
 						/>
+					) : (
+						<>
+							{isEdit && (
+								<Input
+									placeholder={block.placeholder}
+									onClick={(e) => e.stopPropagation()}
+									{...form.register(`hybridBlockPrompts.${fieldIndex}.value`)}
+								/>
+							)}
+						</>
 					)}
-				</>
-			)}
+				</div>
+			</div>
 		</div>
 	);
 };

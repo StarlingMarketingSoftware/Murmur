@@ -37,42 +37,63 @@ export const BLOCKS = [
 		placeholder: 'Write the exact text you want included in your email...',
 	},
 ];
+
 export const useHybridPromptInput = () => {
 	const form = useFormContext<DraftingFormValues>();
 	const [textBlockCount, setTextBlockCount] = useState(0);
 
-	const { fields, append, remove, move } = useFieldArray({
+	const { fields, append, remove, move, insert } = useFieldArray({
 		control: form.control,
 		name: 'hybridBlockPrompts',
 	});
 
 	const watchedAvailableBlocks = form.watch('hybridAvailableBlocks');
 
-	const handleAddBlock = (block: (typeof BLOCKS)[number]) => {
-		append({ id: block.value, type: block.value, value: '' });
-		form.setValue(
-			'hybridAvailableBlocks',
-			watchedAvailableBlocks.filter((b) => b !== block.value)
-		);
-	};
-
 	const findCorrectPosition = (newBlock: string, contents: { type: HybridBlock }[]) => {
-		// If it's a custom text block, the position doesn't matter
 		if (newBlock === HybridBlock.text) return contents.length;
 
 		const orderedBlockIndex = ORDERED_BLOCKS.indexOf(
 			newBlock as (typeof ORDERED_BLOCKS)[number]
 		);
 
-		// Find the first block that should come after our new block
+		const blockOrderMap = {
+			[HybridBlock.introduction]: 0,
+			[HybridBlock.research]: 1,
+			[HybridBlock.action]: 2,
+		};
+
+		const aiBlockNumberSequence: number[] = [];
+
+		const introductionIndex = contents.findIndex(
+			(block) => block.type === HybridBlock.introduction
+		);
+		const researchIndex = contents.findIndex(
+			(block) => block.type === HybridBlock.research
+		);
+		const callToActionIndex = contents.findIndex(
+			(block) => block.type === HybridBlock.action
+		);
+
+		if (callToActionIndex === 0) {
+			toast.error('Call to Action cannot be the first block.');
+			if (researchIndex !== -1) {
+				return researchIndex + 1;
+			} else if (introductionIndex !== -1) {
+				return introductionIndex + 1;
+			}
+			return contents.length;
+		}
+
 		for (let i = 0; i < contents.length; i++) {
 			const currentBlock = contents[i].type;
+
 			const currentBlockIndex = ORDERED_BLOCKS.indexOf(
 				currentBlock as (typeof ORDERED_BLOCKS)[number]
 			);
 
-			// Skip custom text blocks
 			if (currentBlock === HybridBlock.text) continue;
+
+			aiBlockNumberSequence.push(blockOrderMap[currentBlock]);
 
 			// If we find a block that should come after our new block, insert before it
 			if (currentBlockIndex > orderedBlockIndex) {
@@ -80,13 +101,45 @@ export const useHybridPromptInput = () => {
 			}
 		}
 
-		// If we didn't find a position, add to the end
 		return contents.length;
+	};
+
+	const handleAddBlock = (block: (typeof BLOCKS)[number]) => {
+		const newFields = [...fields];
+		if (newFields.length === 0) {
+			if (block.value === HybridBlock.research || block.value === HybridBlock.action) {
+				toast.error('Please use Introduction or Text block as the first block.');
+				return;
+			}
+		}
+		const correctPosition = findCorrectPosition(block.value, newFields);
+
+		const currentPosition = fields.findIndex((field) => field.id === block.value);
+
+		if (currentPosition !== -1) {
+			remove(currentPosition);
+		}
+
+		insert(correctPosition, { id: block.value, type: block.value, value: '' });
+		form.setValue(
+			'hybridAvailableBlocks',
+			watchedAvailableBlocks.filter((b) => b !== block.value)
+		);
 	};
 
 	const handleDragEnd = (event: DragEndEvent) => {
 		const { over, active } = event;
 		if (!over) return;
+
+		const { canBeRemoved, blockWithIssue } = checkBeginningOrder(active.id as string);
+		if (!canBeRemoved && blockWithIssue) {
+			toast.error(
+				`${
+					getBlock(blockWithIssue).label
+				} cannot be removed from the beginning if there is Research or Call to Action after it.`
+			);
+			return;
+		}
 
 		const isDroppableTarget =
 			over.id === 'droppable' || fields.some((field) => field.id === over.id);
@@ -105,44 +158,16 @@ export const useHybridPromptInput = () => {
 
 			if (blockType === HybridBlock.text || activeId.startsWith('text-')) {
 				if (over.id === 'droppable') {
-					console.log({ id: activeId, type: blockType, value: '' });
 					append({ id: activeId, type: blockType, value: '' });
 				} else {
 					const overIndex = fields.findIndex((field) => field.id === over.id);
-					const newFields = [...fields];
-					newFields.splice(overIndex, 0, { id: activeId, type: blockType, value: '' });
-					form.setValue('hybridBlockPrompts', newFields);
+					insert(overIndex, { id: activeId, type: blockType, value: '' });
 				}
 			} else {
 				const correctPosition = findCorrectPosition(blockType, fields);
-				const attemptedPosition =
-					over.id === 'droppable'
-						? fields.length
-						: fields.findIndex((field) => field.id === over.id);
-
-				if (attemptedPosition !== correctPosition) {
-					toast.error(
-						'Blocks must be in order: Introduction → Research Contact → Call to Action. Custom Text blocks can be placed anywhere.'
-					);
-				}
-
-				const newFields = [...fields];
-				newFields.splice(correctPosition, 0, {
-					id: activeId,
-					type: blockType,
-					value: '',
-				});
-				form.setValue('hybridBlockPrompts', newFields);
+				insert(correctPosition, { id: activeId, type: blockType, value: '' });
 			}
 
-			// Only remove non-text blocks from available blocks
-			if (blockType !== HybridBlock.text) {
-				const currentAvailableBlocks = form.getValues('hybridAvailableBlocks');
-				const newAvailableBlocks = currentAvailableBlocks.filter(
-					(block) => block !== blockType
-				);
-				form.setValue('hybridAvailableBlocks', newAvailableBlocks);
-			}
 			return;
 		}
 
@@ -166,7 +191,7 @@ export const useHybridPromptInput = () => {
 
 			if (newIndex !== correctPosition) {
 				toast.error(
-					'Blocks must be in order: Introduction → Research Contact → Call to Action. Custom Text blocks can be placed anywhere.'
+					'AI Blocks must be in order: Introduction → Research Contact → Call to Action. Custom Text blocks can be placed anywhere.'
 				);
 			}
 
@@ -174,9 +199,102 @@ export const useHybridPromptInput = () => {
 		}
 	};
 
+	const checkBeginningOrder = (id: string) => {
+		const blockIndex = fields.findIndex((field) => field.id === id);
+
+		if (blockIndex > 0) {
+			return {
+				canBeRemoved: true,
+				blockWithIssue: null,
+			};
+		}
+
+		if (blockIndex === -1)
+			return {
+				canBeRemoved: false,
+				blockWithIssue: null,
+			};
+
+		const blockToBeRemoved = fields[blockIndex];
+		const nextBlock = blockIndex + 1 < fields.length ? fields[blockIndex + 1] : null;
+		const previousBlock = blockIndex > 0 ? fields[blockIndex - 1] : null;
+
+		if (blockToBeRemoved.type === HybridBlock.introduction) {
+			if (
+				previousBlock?.type !== HybridBlock.text &&
+				(nextBlock?.type === HybridBlock.research ||
+					nextBlock?.type === HybridBlock.action)
+			) {
+				return {
+					canBeRemoved: false,
+					blockWithIssue: HybridBlock.introduction,
+				};
+			}
+		}
+
+		if (blockToBeRemoved.type === HybridBlock.text) {
+			if (
+				(previousBlock?.type !== HybridBlock.text &&
+					previousBlock?.type !== HybridBlock.introduction &&
+					nextBlock?.type === HybridBlock.research) ||
+				nextBlock?.type === HybridBlock.action
+			) {
+				return {
+					canBeRemoved: false,
+					blockWithIssue: HybridBlock.text,
+				};
+			}
+		}
+		return {
+			canBeRemoved: true,
+			blockWithIssue: null,
+		};
+	};
+
 	const handleRemoveBlock = (id: string) => {
 		const blockIndex = fields.findIndex((field) => field.id === id);
+
 		if (blockIndex === -1) return;
+
+		const { canBeRemoved, blockWithIssue } = checkBeginningOrder(id);
+
+		if (!canBeRemoved && blockWithIssue) {
+			toast.error(
+				`${
+					getBlock(blockWithIssue).label
+				} cannot be removed from the beginning if there is Research or Call to Action after it.`
+			);
+			return;
+		}
+
+		const blockToBeRemoved = fields[blockIndex];
+		const nextBlock = blockIndex + 1 < fields.length ? fields[blockIndex + 1] : null;
+		const previousBlock = blockIndex > 0 ? fields[blockIndex - 1] : null;
+
+		if (blockToBeRemoved.type === HybridBlock.introduction) {
+			if (
+				(previousBlock?.type !== HybridBlock.text &&
+					nextBlock?.type === HybridBlock.research) ||
+				nextBlock?.type === HybridBlock.action
+			) {
+				toast.error(
+					'Introduction cannot be removed if there is Research or Call to Action after it.'
+				);
+				return;
+			}
+		}
+
+		if (blockToBeRemoved.type === HybridBlock.text) {
+			if (
+				nextBlock?.type === HybridBlock.research ||
+				nextBlock?.type === HybridBlock.action
+			) {
+				toast.error(
+					'Text block cannot be removed from the beginning if there is Research or Call to Action after it.'
+				);
+				return;
+			}
+		}
 
 		const blockType = fields[blockIndex].type;
 		// Only add non-text blocks back to available blocks
