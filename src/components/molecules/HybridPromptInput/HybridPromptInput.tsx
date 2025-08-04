@@ -96,7 +96,7 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 								onRemove(id);
 							}}
 						>
-							<Trash2 className="h-4 w-4 group-hover:text-red-500" />
+							<Trash2 className="h-4 w-4 group-hover:text-destructive" />
 						</Button>
 					</div>
 					<div className="mb-2 flex gap-2 min-h-7">
@@ -158,16 +158,6 @@ export const HybridPromptInput = () => {
 			/>
 			<FormLabel>Email Template</FormLabel>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
-				{/* <div className="flex gap-2">
-					{form.getValues('hybridAvailableBlocks').map((draggableContent) => (
-						<Draggable key={draggableContent} id={draggableContent}>
-							<Badge size="large" variant="outline">
-								{getBlock(draggableContent).label}
-							</Badge>
-						</Draggable>
-					))}
-				</div> */}
-
 				<Droppable id="droppable">
 					<div className="min-h-[500px] mt-3 border-2 border-foreground rounded-xl p-3 bg-gray-50 flex flex-col gap-3 items-start transition w-full mb-4">
 						{fields.length === 0 && (

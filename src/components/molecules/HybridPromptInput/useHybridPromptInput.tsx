@@ -298,7 +298,7 @@ export const useHybridPromptInput = () => {
 		}
 
 		const blockType = fields[blockIndex].type;
-		// Only add non-text blocks back to available blocks
+
 		if (blockType !== HybridBlock.text) {
 			const currentAvailableBlocks = form.getValues('hybridAvailableBlocks');
 			const newAvailableBlocks = [...currentAvailableBlocks, blockType];
