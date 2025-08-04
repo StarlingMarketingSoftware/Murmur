@@ -207,15 +207,15 @@ model Campaign {
   userId                String
   user                  User              @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
   contacts              Contact[]
-  draftingMode          DraftingMode      @default(ai)
+  draftingMode          DraftingMode      @default(hybrid)
   draftingTone          DraftingTone      @default(normal)
   paragraphs            Int?              @default(0)
   subject               String?
   isAiSubject           Boolean           @default(true)
   fullAiPrompt          String?           @map("message") @db.Text
   hybridPrompt          String?           @db.Text
-  hybridAvailableBlocks HybridBlock[]     @default([introduction, research, action, text])
-  hybridBlockPrompts    Json?
+  hybridAvailableBlocks HybridBlock[]     @default([text])
+  hybridBlockPrompts    Json?             @default("[{\"id\": \"introduction\", \"type\": \"introduction\", \"value\": \"\"}, {\"id\": \"research\", \"type\": \"research\", \"value\": \"\"}, {\"id\": \"action\", \"type\": \"action\", \"value\": \"\"}]")
   handwrittenPrompt     String?           @db.Text
   font                  String            @default("Arial")
   testMessage           String?           @db.Text
