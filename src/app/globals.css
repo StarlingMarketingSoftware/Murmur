@@ -192,4 +192,13 @@ mux-player {
 	--playback-rate-button: none;
 }
 
+/* TipTap Placeholder Styles */
+.is-editor-empty:first-child::before {
+	content: attr(data-placeholder);
+	float: left;
+	color: hsl(var(--muted-foreground));
+	pointer-events: none;
+	height: 0;
+}
+
 

@@ -1,4 +1,5 @@
 import { HybridBlockPrompt } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
+import { HybridBlock } from '@prisma/client';
 
 /**
  * Truncates text to a specified length and adds ellipses
@@ -168,7 +169,9 @@ export const generateEmailTemplateFromBlocks = (blocks: HybridBlockPrompt[]): st
 export const generatePromptsFromBlocks = (blocks: HybridBlockPrompt[]): string => {
 	const prompts: string[] = [];
 	for (const block of blocks) {
-		prompts.push(`Prompt for {{${block.type}}}: ${block.value}`);
+		if (block.type !== HybridBlock.text) {
+			prompts.push(`Prompt for {{${block.type}}}: ${block.value}`);
+		}
 	}
 	return prompts.join('\n\n');
 };

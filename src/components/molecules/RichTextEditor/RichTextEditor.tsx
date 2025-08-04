@@ -7,6 +7,7 @@ import Highlight from '@tiptap/extension-highlight';
 import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
 import FontFamily from '@tiptap/extension-font-family';
+import Placeholder from '@tiptap/extension-placeholder';
 import { FC, useEffect } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { Node } from '@tiptap/core';
@@ -22,6 +23,7 @@ interface RichTextEditorProps {
 	disabled?: boolean;
 	showPlaceholders?: boolean;
 	placeholderOptions?: { value: string; label: string }[];
+	placeholder?: string;
 }
 
 const Div = Node.create({
@@ -82,6 +84,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 	disabled = false,
 	showPlaceholders = false,
 	placeholderOptions,
+	placeholder,
 }) => {
 	const _isEdit = isEdit && !disabled;
 
@@ -116,6 +119,10 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 			}),
 			CustomFontFamily,
 			TextStyle.configure({ mergeNestedSpanStyles: true }),
+			Placeholder.configure({
+				placeholder: placeholder || 'Start typing...',
+				emptyEditorClass: 'is-editor-empty',
+			}),
 			Div,
 		],
 		onSelectionUpdate: ({ editor }) => {
@@ -141,7 +148,6 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 				}
 
 				if (storedMarks) {
-					console.log('Restoring marks:', storedMarks);
 					storedMarks.forEach((mark) => {
 						editor.commands.setMark(mark.type.name, mark.attrs);
 					});

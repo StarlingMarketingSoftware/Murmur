@@ -86,44 +86,47 @@ export const PERPLEXITY_HYBRID_PROMPT = `
 
 You will be provided with an email template to follow that includes pre-written text that must remain in its original form, as well as placeholders that may include {{introduction}} {{research}} and {{call-to-action}}. Only fill in the placeholders, do not change the pre-written text. Each placeholder may have specific instructions attached to them.
 
-Please carefully read and follow these instructions exactly. Your task is to compose an email consisting of exactly three distinct paragraphs, clearly serving these functions in this exact order:
+!IMPORTANT! If an {{introduction}} placeholder is provided, follow these instructions for writing it. If it is not provided, ignore these instructions:
+- Introduction paragraph begin exactly with the following greeting (no changes or variations): Hi {FIRST_NAME},
+- After this greeting line, add exactly one blank line.
+- Then, write a casual, friendly, authentic introduction paragraph of approximately 2–4 sentences. Clearly and genuinely introduce yourself in a general way, casually stating that you're reaching out simply to connect or say hello.
+- Strictly follow these rules in the introduction paragraph:
+	- Avoid all sales-style or networking language (no "synergies," "mutual benefit," "collaboration opportunities," etc.)
+	- Never include placeholder text, square brackets ([ ]), or invented personal details; generically refer only to "my background," "my work," or "my professional field."
+	- Never add specific or unrequested details about digital campaigns, marketing, or specific projects.
+	- No preamble phrases like "here is an introduction..."
+	- No closing statements or signatures included at any point.
 
-(1) Introduction paragraph begin exactly with the following greeting (no changes or variations):
-Hi {FIRST_NAME},
+!IMPORTANT!	If the {{research}} placeholder is included, use the following instructions to write it. If {{research}} is not included, ignore these instructions.
+- Do a quick bit of research on the provided recipient.
+- Then write one short, natural, casual paragraph (approximately 2–4 sentences) informally explaining, in your own words, what that company does. Vary your opening phrase naturally each time. For example, using phrases such as "I’m aware," "I know," "I’m impressed by," “I saw,” “I noticed,” or just start with a simple natural comment. Include one genuine, specific factor or detail if possible.
+- Strictly follow these rules in the research contact paragraph:
+	* Never copy or reword their exact marketing language or website content.
+	* Never invent or fabricate information or details that aren't factually clear or provided.
+	* Keep tone authentic, human, relaxed and entirely non-salesy.
 
-	(after this greeting line, add exactly one blank line.)
-	Then, write a casual, friendly, authentic introduction paragraph of approximately 2–4 sentences. Clearly and genuinely introduce yourself in a general way, casually stating that you're reaching out simply to connect or say hello.
-	Strictly follow these rules in the introduction paragraph:
-	Avoid all sales-style or networking language (no "synergies," "mutual benefit," "collaboration opportunities," etc.)
-	Never include placeholder text, square brackets ([ ]), or invented personal details; generically refer only to "my background," "my work," or "my professional field."
-	Never add specific or unrequested details about digital campaigns, marketing, or specific projects.
-	No preamble phrases like "here is an introduction..."
-	No closing statements or signatures included at any point.
-	(2) Research contact paragraph next, do a quick bit of research on the provided company ({COMPANY}). Then write one short, natural, casual paragraph (approximately 2–4 sentences) informally explaining, in your own words, what that company does. Vary your opening phrase naturally each time– for example, using phrases such as "I’m aware," "I know," "I’m impressed by," “I saw,” “I noticed,” or just start with a simple natural comment. Include one genuine, specific factor or detail if possible.
-	Strictly follow these rules in the research contact paragraph:
-	Never copy or reword their exact marketing language or website content.
-	Never invent or fabricate information or details that aren't factually clear or provided.
-	Keep tone authentic, human, relaxed and entirely non-salesy.
-	(3) Call-to-action paragraph finally, write a friendly, naturally conversational call-to-action paragraph that clearly, politely, and genuinely invites the recipient to schedule a phone call. This paragraph must sound casual, professional, and non-pushy, while clearly prompting them to respond.
-	Specifically include a sentence closely resembling:
-	"If you have time this upcoming week, I'd love to schedule a phone call." Also explicitly ask the casual question:
-	"What times would work best for you?"
-	Strictly follow these rules in the call-to-action paragraph:
-	Never begin with phrases such as "to wrap up," "here's a call to action," or "to finalize."
-	Do not add any greetings or closings ("thank you," "regards," etc.).
-	Never include artificially formal or awkward expressions like "this will help me ensure we connect at a time that suits you perfectly" or "I'll set it up accordingly."
-	Never use phrases like "I would appreciate it if" or "could you let."
-	Final mandatory check before submission:
-	✅ Each of the three paragraphs (introduction, research contact, call to action) must appear exactly in this order and is clearly distinct and fully complete.
-	✅ Begin exactly with "Hi {FIRST_NAME}," followed by one exact blank line.
+!IMPORTANT! If {{call-to-action}} placeholder is included use the following instructions, if {{call-to-action}} placeholder is not included, ignore these instructions.
+- Write a friendly, naturally conversational call-to-action paragraph that clearly, politely, and genuinely invites the recipient to schedule a phone call. This paragraph must sound casual, professional, and non-pushy, while clearly prompting them to respond.
+	- ONLY if the {{call-to-action}} placeholder is provided, specifically include a sentence closely resembling:
+		"If you have time this upcoming week, I'd love to schedule a phone call." Also explicitly ask the casual question:
+		"What times would work best for you?" 
+		DO NOT include this sentence if {{call-to-action}} placeholder is not provided.
+	- Strictly follow these rules in the call-to-action paragraph:
+		- Never begin with phrases such as "to wrap up," "here's a call to action," or "to finalize."
+		- Do not add any greetings or closings ("thank you," "regards," etc.).
+		- Never include artificially formal or awkward expressions like "this will help me ensure we connect at a time that suits you perfectly" or "I'll set it up accordingly."
+		- Never use phrases like "I would appreciate it if" or "could you let."
+
+	!IMPORTANT! Final mandatory check before submission:
+	✅ The provided template that includes EXACT text as well as placeholders {{}} must be followed exactly. Make sure each placeholder corresponds to a paragraph in the generated email. Do not remove, add to, or modify any of the paragraphs with exact text. Only fill in the placeholders. Do not add any additional paragraphs for which there is no placeholder.
 	✅ You have included no brackets "[ ]" or placeholder text. You have invented nothing.
 	✅ Your text contains no preambles, no closing phrases or signatures.
 	✅ Your tone throughout is casual, human, authentic, friendly, natural, and never sales-like or artificial. 
-	If you do not exactly follow these instructions, your task will be immediately and fully rejected as incorrect. This is critical—review your response carefully before finalizing.
+	If you do not exactly follow these instructions, your task will be immediately and fully rejected as incorrect. This is critical: review your response carefully before finalizing.
 	`;
 
 const MISTRAL_FORMATTING_INSTRUCTIONS = `
-1. !IMPORTANT! Ensure that there is a line break character "\n" between each paragraph. Even after the first line, which is just a short greeting, there should be a line break character "\n".
+1. !IMPORTANT! Ensure that there is a line break character "\n" between each paragraph. Even after the first line, which is just a short greeting, there should be a line break character "\n". 
 2. Do not include a line break before the first line of text. 
 2. At the end of the first line (the short greeting), use a comma. For example: "Hi,"
 3. Do not add any space or tab before the first letter of each paragraph.`;
@@ -159,11 +162,32 @@ export const getMistralHybridPrompt = (
 	blockPrompts: string
 ): string => {
 	return `
-${getMistralTonePrompt('normal')}
 
-!IMPORTANT! ADDITIONAL INSTRUCTIONS: 
-The provided email was generated from a template that includes pre-written text that must remain in its original form, as well as placeholders that may include {{introduction}} {{research}} and {{call-to-action}}. When you revise the email, only revise the sections generated from the placeholders. DO NOT change sections that were pre-written text. Each placeholder may have specific instructions attached to them. Please make sure to follow the instructions for each placeholder.
+I will provide an email that was generated from a template that includes pre-written text that must remain in its original form, as well as placeholders that may include {{introduction}} {{research}} and {{call-to-action}}. When you revise the email, only revise the sections generated from the placeholders. DO NOT change sections that were pre-written text. Each placeholder may have specific instructions attached to them. Please make sure to follow the instructions for each placeholder.
 
+	Perform the following tasks to the email:
+	1. If there is a greeting at the beginning of the email like "Hello!" "Hi ~~" or "こんにちは", keep it as it is. DO NOT remove the new line character after the greeting if there is one. Also do not remove any special characters if they are there. Simply put, DO NOT change it.
+	2. Generate a subject line for the email.
+	3. Remove all text in brackets [] and recompose the email to make sense.
+	4. Don't make up any websites and double check that the email is cogent.
+	5. Don't pretend to be anyone or add any additional information that isn't factual.
+	6. Don't include a signature.
+	7. Make it more human.
+	8. Use more bursts and less uniform.
+	10. Don't say "here's the revised version" -- just provide the subject and message in JSON format.
+	11. If the email greeting includes a person's name, keep it there. DO NOT remove it.
+
+	Formatting Instructions:
+1. !IMPORTANT! Ensure that there is a line break character "\n" between each paragraph.
+2. If there is an existing line break between lines of text, DO NOT remove it. Please follow the format of the email template exactly.
+
+Please return your response in JSON with the following format. Do not include any other text or explanation. Your response should be a valid JSON object that can be parsed by JSON.parse() in Javascript:
+{
+  "subject": "cleanedSubjectInPlainTextFormat",
+  "message": "cleanedMessageInPlainTextFormat"
+}
+
+## EMAIL TEMPLATE ##
 ${emailTemplate}
 
 ${blockPrompts}

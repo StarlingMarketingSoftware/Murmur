@@ -412,7 +412,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 
 		return {
-			subject: mistralResponseParsed.subject,
+			subject: isAiSubject ? mistralResponseParsed.subject : form.getValues('subject'),
 			message: mistralResponseParsed.message,
 		};
 	};
@@ -842,13 +842,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				subject: campaign.subject ?? '',
 				fullAiPrompt: campaign.fullAiPrompt ?? '',
 				hybridPrompt: campaign.hybridPrompt ?? '',
-				hybridAvailableBlocks: campaign.hybridAvailableBlocks ?? [
-					HybridBlock.introduction,
-					HybridBlock.research,
-					HybridBlock.action,
-					HybridBlock.text,
+				hybridAvailableBlocks: campaign.hybridAvailableBlocks ?? [HybridBlock.text],
+				hybridBlockPrompts: (campaign.hybridBlockPrompts as HybridBlockPrompt[]) ?? [
+					{ id: 'introduction', type: 'introduction', value: '' },
+					{ id: 'research', type: 'research', value: '' },
+					{ id: 'action', type: 'action', value: '' },
 				],
-				hybridBlockPrompts: (campaign.hybridBlockPrompts as HybridBlockPrompt[]) ?? [],
 				handwrittenPrompt: campaign.handwrittenPrompt ?? '',
 				font: (campaign.font as Font) ?? DEFAULT_FONT,
 				signatureId: campaign.signatureId ?? signatures?.[0]?.id,
