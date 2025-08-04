@@ -412,7 +412,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 
 		return {
-			subject: mistralResponseParsed.subject,
+			subject: isAiSubject ? mistralResponseParsed.subject : form.getValues('subject'),
 			message: mistralResponseParsed.message,
 		};
 	};

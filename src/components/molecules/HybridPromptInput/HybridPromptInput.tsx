@@ -45,7 +45,9 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
 		useSortable({ id });
 	const form = useFormContext<DraftingFormValues>();
-	const [isEdit, setIsEdit] = useState(false);
+	const [isEdit, setIsEdit] = useState(
+		form.getValues(`hybridBlockPrompts.${fieldIndex}.value`) !== ''
+	);
 
 	const style = {
 		transform: CSS.Transform.toString(transform),
@@ -61,7 +63,7 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 			className={twMerge(
 				'w-full relative border-2 border-gray-300 rounded-md bg-gray-100 p-4 pl-1',
 				isTextBlock ? 'border-primary' : 'border-secondary',
-				isDragging ? 'opacity-50 z-10' : ''
+				isDragging ? 'opacity-50 z-50 translate-z-0' : ''
 			)}
 		>
 			<div className="flex items-center gap-2">
@@ -130,6 +132,7 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 
 export const HybridPromptInput = () => {
 	const {
+		form,
 		fields,
 		watchedAvailableBlocks,
 		handleDragEnd,
@@ -140,7 +143,7 @@ export const HybridPromptInput = () => {
 
 	return (
 		<div>
-			{/* <FormField
+			<FormField
 				control={form.control}
 				name="hybridPrompt"
 				render={({ field }) => (
@@ -152,7 +155,7 @@ export const HybridPromptInput = () => {
 						<FormMessage />
 					</FormItem>
 				)}
-			/> */}
+			/>
 			<FormLabel>Email Template</FormLabel>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
 				{/* <div className="flex gap-2">

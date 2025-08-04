@@ -148,7 +148,6 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 				}
 
 				if (storedMarks) {
-					console.log('Restoring marks:', storedMarks);
 					storedMarks.forEach((mark) => {
 						editor.commands.setMark(mark.type.name, mark.attrs);
 					});

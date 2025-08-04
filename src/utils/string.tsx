@@ -168,7 +168,9 @@ export const generateEmailTemplateFromBlocks = (blocks: HybridBlockPrompt[]): st
 export const generatePromptsFromBlocks = (blocks: HybridBlockPrompt[]): string => {
 	const prompts: string[] = [];
 	for (const block of blocks) {
-		prompts.push(`Prompt for {{${block.type}}}: ${block.value}`);
+		if (block.type !== 'text') {
+			prompts.push(`Prompt for {{${block.type}}}: ${block.value}`);
+		}
 	}
 	return prompts.join('\n\n');
 };

@@ -286,7 +286,8 @@ export const useHybridPromptInput = () => {
 
 		if (blockToBeRemoved.type === HybridBlock.text) {
 			if (
-				nextBlock?.type === HybridBlock.research ||
+				(previousBlock?.type !== HybridBlock.text &&
+					nextBlock?.type === HybridBlock.research) ||
 				nextBlock?.type === HybridBlock.action
 			) {
 				toast.error(
