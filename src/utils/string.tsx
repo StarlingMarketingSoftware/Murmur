@@ -1,5 +1,5 @@
 import { HybridBlockPrompt } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
-import { HybridBlock } from '@/constants/ai';
+import { HybridBlock } from '@prisma/client';
 
 /**
  * Truncates text to a specified length and adds ellipses
