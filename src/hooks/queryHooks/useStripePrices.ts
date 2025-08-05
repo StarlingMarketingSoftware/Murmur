@@ -9,11 +9,11 @@ const QUERY_KEYS = {
 	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
 } as const;
 
-export const useGetStripePrice = (productId: string) => {
-	return useQuery({
-		queryKey: QUERY_KEYS.detail(productId),
-		queryFn: async (): Promise<Stripe.Price[]> => {
-			const response = await _fetch(urls.api.stripe.prices.detail(productId));
+export const useGetStripePrice = (priceId: string) => {
+	return useQuery<Stripe.Price>({
+		queryKey: QUERY_KEYS.detail(priceId),
+		queryFn: async () => {
+			const response = await _fetch(urls.api.stripe.prices.detail(priceId));
 			if (!response.ok) {
 				throw new Error('Failed to fetch price');
 			}

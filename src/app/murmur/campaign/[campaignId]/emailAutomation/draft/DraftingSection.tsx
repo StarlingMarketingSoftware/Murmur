@@ -35,6 +35,7 @@ import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/Hybr
 import { HandwrittenPromptInput } from '@/components/molecules/HandwrittenPromptInput/HandwrittenPromptInput';
 import { Typography } from '@/components/ui/typography';
 import { Font } from '@/types';
+import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
@@ -60,6 +61,8 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		autosaveStatus,
 		isJustSaved,
 		isGenerationDisabled,
+		isOpenUpgradeSubscriptionDrawer,
+		setIsOpenUpgradeSubscriptionDrawer,
 	} = useDraftingSection(props);
 
 	const {
@@ -334,6 +337,13 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 				campaign={campaign}
 				open={isOpenSignaturesDialog}
 				onOpenChange={setIsOpenSignaturesDialog}
+			/>
+			<UpgradeSubscriptionDrawer
+				message="You have run out of drafting credits! Please upgrade your plan."
+				triggerButtonText="Upgrade"
+				isOpen={isOpenUpgradeSubscriptionDrawer}
+				setIsOpen={setIsOpenUpgradeSubscriptionDrawer}
+				hideTriggerButton
 			/>
 		</div>
 	);

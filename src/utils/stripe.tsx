@@ -16,6 +16,7 @@ export const getSubscriptionTierWithPriceId = (
 				sendingCredits: 200,
 				verificationCredits: 100,
 				viewEmailAddresses: true,
+				trialDraftCredits: 50,
 			};
 		case process.env.NEXT_PUBLIC_STANDARD_LEGACY_PRICE_ID:
 		case process.env.NEXT_PUBLIC_STANDARD_MONTHLY_PRICE_ID:
@@ -26,6 +27,7 @@ export const getSubscriptionTierWithPriceId = (
 				sendingCredits: 1000,
 				verificationCredits: 500,
 				viewEmailAddresses: true,
+				trialDraftCredits: 125,
 			};
 		case process.env.NEXT_PUBLIC_PRO_LEGACY_PRICE_ID:
 		case process.env.NEXT_PUBLIC_PRO_MONTHLY_PRICE_ID:
@@ -36,6 +38,7 @@ export const getSubscriptionTierWithPriceId = (
 				sendingCredits: 3000,
 				verificationCredits: 1000,
 				viewEmailAddresses: true,
+				trialDraftCredits: 375,
 			};
 		case process.env.NEXT_PUBLIC_ELITE_PRICE_ID:
 			return {
@@ -44,6 +47,7 @@ export const getSubscriptionTierWithPriceId = (
 				sendingCredits: 15000,
 				verificationCredits: 7500,
 				viewEmailAddresses: true,
+				trialDraftCredits: 750,
 			};
 		case process.env.NEXT_PUBLIC_PROPHET_PRICE_ID:
 			return {
@@ -52,6 +56,7 @@ export const getSubscriptionTierWithPriceId = (
 				sendingCredits: 25000,
 				verificationCredits: 12500,
 				viewEmailAddresses: true,
+				trialDraftCredits: 1250,
 			};
 		case process.env.NEXT_PUBLIC_ADMIN_LITE_PRICE_ID:
 			return {
@@ -60,6 +65,7 @@ export const getSubscriptionTierWithPriceId = (
 				sendingCredits: 100000,
 				verificationCredits: 50000,
 				viewEmailAddresses: false,
+				trialDraftCredits: 2500,
 			};
 		case process.env.NEXT_PUBLIC_ADMIN_FULL_PRICE_ID:
 			return {
@@ -68,6 +74,7 @@ export const getSubscriptionTierWithPriceId = (
 				sendingCredits: 500000,
 				verificationCredits: 250000,
 				viewEmailAddresses: true,
+				trialDraftCredits: 6250,
 			};
 		default:
 			return {
@@ -76,6 +83,7 @@ export const getSubscriptionTierWithPriceId = (
 				sendingCredits: 1667,
 				verificationCredits: 833,
 				viewEmailAddresses: false,
+				trialDraftCredits: 200,
 			};
 	}
 };

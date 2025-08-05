@@ -37,6 +37,8 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 		formValue,
 		form,
 		confirmAction,
+		confirmButtonText,
+		hideCancelButton,
 	} = useConfirmDialog(props);
 
 	return (
@@ -83,9 +85,15 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 								/>
 							</div>
 							<DialogFooter>
-								<Button type="button" onClick={() => onOpenChange(false)} variant="light">
-									Cancel
-								</Button>
+								{!hideCancelButton && (
+									<Button
+										type="button"
+										onClick={() => onOpenChange(false)}
+										variant="light"
+									>
+										Cancel
+									</Button>
+								)}
 								<Button
 									isLoading={isLoading}
 									disabled={confirmWithInput && !(formValue === confirmWithInputValue)}
@@ -98,9 +106,11 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 					</FormProvider>
 				) : (
 					<DialogFooter>
-						<Button type="button" onClick={() => onOpenChange(false)} variant="light">
-							Cancel
-						</Button>
+						{!hideCancelButton && (
+							<Button type="button" onClick={() => onOpenChange(false)} variant="light">
+								Cancel
+							</Button>
+						)}
 						<Button
 							isLoading={isLoading}
 							disabled={confirmWithInput && !(formValue === confirmWithInputValue)}
@@ -110,7 +120,7 @@ export const ConfirmDialog: FC<ConfirmDialogProps> = (props) => {
 								onOpenChange(false);
 							}}
 						>
-							Confirm
+							{confirmButtonText ?? 'Confirm'}
 						</Button>
 					</DialogFooter>
 				)}

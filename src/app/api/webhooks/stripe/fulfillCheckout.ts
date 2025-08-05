@@ -2,6 +2,7 @@ import { stripe } from '../../../../stripe/client';
 import Stripe from 'stripe';
 import { getSubscriptionTierWithPriceId } from '@/utils';
 import prisma from '@/lib/prisma';
+import { StripeSubscriptionStatus } from '@/types';
 
 type StripeSubscription = Stripe.Subscription;
 export async function fulfillCheckout(
@@ -19,6 +20,7 @@ export async function fulfillCheckout(
 
 		const priceId = subscription.items.data[0].price.id;
 		const subscriptionTier = getSubscriptionTierWithPriceId(priceId);
+		const isFreeTrial = subscription.status === StripeSubscriptionStatus.TRIALING;
 
 		if (checkoutSession.payment_status !== 'unpaid') {
 			const customerId = checkoutSession.customer as string;
@@ -32,9 +34,13 @@ export async function fulfillCheckout(
 					stripePriceId: priceId,
 					stripeSubscriptionStatus: subscription.status,
 					lastCreditUpdate: new Date(),
-					draftCredits: subscriptionTier?.draftCredits || 0,
-					sendingCredits: subscriptionTier?.sendingCredits || 0,
-					verificationCredits: subscriptionTier?.verificationCredits || 0,
+					draftCredits: isFreeTrial
+						? subscriptionTier?.trialDraftCredits || 0
+						: subscriptionTier?.draftCredits || 0,
+					sendingCredits:
+						subscriptionTier && !isFreeTrial ? subscriptionTier.sendingCredits : 0,
+					verificationCredits:
+						subscriptionTier && !isFreeTrial ? subscriptionTier.verificationCredits : 0,
 				},
 			});
 			return customer;
