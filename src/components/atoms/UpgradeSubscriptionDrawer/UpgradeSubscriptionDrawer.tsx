@@ -43,7 +43,7 @@ export const UpgradeSubscriptionDrawer: FC<UpgradeSubscriptionDrawerProps> = (pr
 			onOpenChange={setIsOpen ? setIsOpen : setIsOpenInternal}
 		>
 			{!hideTriggerButton && (
-				<DrawerTrigger>
+				<DrawerTrigger asChild>
 					<Button variant={buttonVariant ? buttonVariant : 'primary'}>
 						{triggerButtonText}
 					</Button>
@@ -63,7 +63,7 @@ export const UpgradeSubscriptionDrawer: FC<UpgradeSubscriptionDrawerProps> = (pr
 								onClick={() => (setIsOpen ? setIsOpen(false) : setIsOpenInternal(false))}
 								className="w-full"
 							>
-								Get Back to Emailing
+								Close and Continue
 							</Button>
 						</div>
 						<DrawerFooter />

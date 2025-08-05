@@ -49,7 +49,7 @@ export async function POST(req: Request) {
 				const canceled = subscription.canceled_at;
 				if (canceled) {
 					console.info('Subscription canceled');
-					return;
+					return apiResponse('Subscription canceled');
 				}
 				const priceId = subscription.items.data[0].price.id;
 				const subscriptionTier = getSubscriptionTierWithPriceId(priceId);

@@ -657,7 +657,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const batchGenerateFullAiDrafts = async () => {
 		let remainingCredits = draftCredits || 0;
-		isGenerationCancelledRef.current = false;
 
 		const controller = new AbortController();
 		setAbortController(controller);
@@ -679,6 +678,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			return;
 		}
 
+		isGenerationCancelledRef.current = false;
 		setGenerationProgress(0);
 		try {
 			for (

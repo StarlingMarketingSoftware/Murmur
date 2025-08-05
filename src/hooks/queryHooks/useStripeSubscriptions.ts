@@ -29,6 +29,11 @@ export const useEditStripeSubscription = (options: CustomMutationOptions = {}) =
 				throw new Error(errorData.error || 'Failed to update subscription');
 			}
 
+			return response.json();
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
+
 			let attempts = 0;
 			const maxAttempts = 15;
 			const pollInterval = setInterval(() => {
@@ -39,11 +44,6 @@ export const useEditStripeSubscription = (options: CustomMutationOptions = {}) =
 					clearInterval(pollInterval);
 				}
 			}, 1000);
-
-			return response.json();
-		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
 
 			if (!suppressToasts) {
 				toast.success(successMessage);
