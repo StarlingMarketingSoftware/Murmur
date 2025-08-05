@@ -6,11 +6,9 @@ import { NextRequest } from 'next/server';
 export async function GET(req: NextRequest, { params }: { params: ApiRouteParams }) {
 	try {
 		const { id } = await params;
-		const prices = await stripe.prices.list({
-			product: id,
-			active: true,
-		});
-		return apiResponse(prices.data);
+
+		const price = await stripe.prices.retrieve(id);
+		return apiResponse(price);
 	} catch (error) {
 		return handleApiError(error);
 	}

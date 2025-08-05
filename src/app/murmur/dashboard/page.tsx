@@ -21,6 +21,7 @@ import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import Spinner from '@/components/ui/spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
+import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 
 const Dashboard = () => {
 	const {
@@ -37,6 +38,7 @@ const Dashboard = () => {
 		tableRef,
 		selectedContacts,
 		isPendingBatchUpdateContacts,
+		isFreeTrial,
 	} = useDashboard();
 	return (
 		<AppLayout>
@@ -122,11 +124,20 @@ const Dashboard = () => {
 								/>
 							</div>
 							<div className="flex items-center justify-end gap-2">
-								<ContactTSVUploadDialog
-									isAdmin={false}
-									triggerText="Import"
-									buttonVariant="light"
-								/>
+								{isFreeTrial ? (
+									<UpgradeSubscriptionDrawer
+										message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
+										triggerButtonText="Import"
+										buttonVariant="light"
+									/>
+								) : (
+									<ContactTSVUploadDialog
+										isAdmin={false}
+										triggerText="Import"
+										buttonVariant="light"
+									/>
+								)}
+
 								<Button
 									variant="primary-light"
 									type="submit"

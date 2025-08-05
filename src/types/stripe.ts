@@ -21,6 +21,7 @@ export type SubscriptionTierData = {
 	sendingCredits: number;
 	verificationCredits: number;
 	viewEmailAddresses: boolean;
+	trialDraftCredits: number;
 };
 
 export type SubscriptionName =

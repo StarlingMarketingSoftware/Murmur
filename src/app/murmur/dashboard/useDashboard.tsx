@@ -24,6 +24,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { twMerge } from 'tailwind-merge';
 import { capitalize } from '@/utils/string';
 import { TableCellTooltip } from '@/components/molecules/TableCellTooltip/TableCellTooltip';
+import { useMe } from '@/hooks/useMe';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -196,6 +197,7 @@ export const useDashboard = () => {
 	});
 
 	/* HOOKS */
+	const { isFreeTrial } = useMe();
 	const [selectedContactListRows, setSelectedContactListRows] = useState<
 		UserContactList[]
 	>([]);
@@ -358,5 +360,6 @@ export const useDashboard = () => {
 		selectedContactListRows,
 		usedContactIdsSet,
 		isPendingBatchUpdateContacts,
+		isFreeTrial,
 	};
 };
