@@ -117,6 +117,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	const [isOpenSignaturesDialog, setIsOpenSignaturesDialog] = useState(false);
+	const [isOpenUpgradeSubscriptionDrawer, setIsOpenUpgradeSubscriptionDrawer] =
+		useState(false);
 	const [generationProgress, setGenerationProgress] = useState(-1);
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 	const [isTest, setIsTest] = useState<boolean>(false);
@@ -450,7 +452,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const creditCost = paragraphs <= 3 ? 1 : 1.5;
 
 		if (!draftCredits || draftCredits < creditCost) {
-			toast.error('You have run out of drafting credits! Please upgrade your plan.');
+			setIsOpenUpgradeSubscriptionDrawer(true);
 			return;
 		}
 
@@ -655,7 +657,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const batchGenerateFullAiDrafts = async () => {
 		let remainingCredits = draftCredits || 0;
-		setGenerationProgress(0);
 		isGenerationCancelledRef.current = false;
 
 		const controller = new AbortController();
@@ -673,6 +674,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const paragraphs = form.getValues('paragraphs');
 		const creditCost = paragraphs <= 3 ? 1 : 1.5;
 
+		if (!draftCredits || draftCredits < creditCost) {
+			setIsOpenUpgradeSubscriptionDrawer(true);
+			return;
+		}
+
+		setGenerationProgress(0);
 		try {
 			for (
 				let i = 0;
@@ -712,7 +719,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				// Check if we've run out of credits after processing this batch
 				if (remainingCredits < creditCost && successfulEmails < contacts.length) {
 					stoppedDueToCredits = true;
-					toast.error('You have run out of drafting credits! Please upgrade your plan.');
+					setIsOpenUpgradeSubscriptionDrawer(true);
 					cancelGeneration();
 					break;
 				}
@@ -930,5 +937,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		lastSavedAt,
 		isJustSaved,
 		isGenerationDisabled,
+		isOpenUpgradeSubscriptionDrawer,
+		setIsOpenUpgradeSubscriptionDrawer,
 	};
 };

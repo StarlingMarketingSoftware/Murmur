@@ -30,15 +30,27 @@ export const UpgradeSubscriptionDrawer: FC<UpgradeSubscriptionDrawerProps> = (pr
 		setIsOpen,
 		isSubscriptionActive,
 		isUpgrading,
+		isOpenInternal,
+		setIsOpenInternal,
+		isUpdateSubscriptionTriggered,
+		hideTriggerButton,
+		buttonVariant,
 	} = useUpgradeSubscriptionDrawer(props);
 
 	return (
-		<Drawer open={isOpen} onOpenChange={setIsOpen}>
-			<DrawerTrigger asChild>
-				<Button variant="primary">{triggerButtonText}</Button>
-			</DrawerTrigger>
+		<Drawer
+			open={isOpen ? isOpen : isOpenInternal}
+			onOpenChange={setIsOpen ? setIsOpen : setIsOpenInternal}
+		>
+			{!hideTriggerButton && (
+				<DrawerTrigger>
+					<Button variant={buttonVariant ? buttonVariant : 'primary'}>
+						{triggerButtonText}
+					</Button>
+				</DrawerTrigger>
+			)}
 			<DrawerContent>
-				{isSubscriptionActive ? (
+				{isSubscriptionActive && isUpdateSubscriptionTriggered ? (
 					<div className="mx-auto w-full max-w-sm">
 						<DrawerHeader>
 							<DrawerTitle>Upgrade Successful!</DrawerTitle>
@@ -47,7 +59,10 @@ export const UpgradeSubscriptionDrawer: FC<UpgradeSubscriptionDrawerProps> = (pr
 							</DrawerDescription>
 						</DrawerHeader>
 						<div className="p-4 pb-0">
-							<Button onClick={() => setIsOpen(false)} className="w-full">
+							<Button
+								onClick={() => (setIsOpen ? setIsOpen(false) : setIsOpenInternal(false))}
+								className="w-full"
+							>
 								Get Back to Emailing
 							</Button>
 						</div>
