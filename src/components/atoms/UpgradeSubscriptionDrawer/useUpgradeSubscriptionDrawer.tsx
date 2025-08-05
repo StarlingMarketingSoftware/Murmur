@@ -1,8 +1,10 @@
 import { urls } from '@/constants/urls';
+import { useGetStripePrice } from '@/hooks/queryHooks/useStripePrices';
+import { useEditStripeSubscription } from '@/hooks/queryHooks/useStripeSubscriptions';
 import { useMe } from '@/hooks/useMe';
-import { StripeSubscriptionStatus } from '@/types';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { StripeSubscriptionStatus } from '@/types';
 
 export interface UpgradeSubscriptionDrawerProps {
 	triggerButtonText: string;
@@ -13,25 +15,51 @@ export const useUpgradeSubscriptionDrawer = (props: UpgradeSubscriptionDrawerPro
 	const { triggerButtonText, message } = props;
 	const { user, subscriptionTier, isFreeTrial } = useMe();
 	const router = useRouter();
+
+	const isSubscriptionActive =
+		user?.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE;
+	const [isOpen, setIsOpen] = useState(false);
 	const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+	const [isUpdateSubscriptionTriggered, setIsUpdateSubscriptionTriggered] =
+		useState(false);
 
-	const { mutateAsync: updateSubscription } = useUpdateSubscription();
+	const { data: price } = useGetStripePrice(user?.stripePriceId ?? '');
+	const formattedPrice = `$${price?.unit_amount ? price.unit_amount / 100 : 0}`;
 
-	const handleUpgradeSubscription = () => {
+	const { mutate: updateSubscription } = useEditStripeSubscription({
+		onSuccess: () => {},
+	});
+
+	const handleConfirmUpgradeSubscription = () => {
 		if (isFreeTrial) {
-			// upgrade to the full version of current trial plan
 			setIsConfirmModalOpen(true);
-			// is there a way to do this through the portal, or must do it programmatically?
 		} else {
 			router.push(urls.pricing.index);
 		}
 	};
+
+	const handleUpgradeFreeTrialSubscription = () => {
+		setIsUpdateSubscriptionTriggered(true);
+		updateSubscription({
+			trialEnd: 'now',
+		});
+	};
+
+	const isUpgrading = isUpdateSubscriptionTriggered && !isSubscriptionActive;
+
 	return {
-		handleUpgradeSubscription,
+		handleConfirmUpgradeSubscription,
 		triggerButtonText,
 		message,
 		isConfirmModalOpen,
 		setIsConfirmModalOpen,
 		subscriptionTier,
+		price,
+		formattedPrice,
+		handleUpgradeFreeTrialSubscription,
+		isOpen,
+		setIsOpen,
+		isSubscriptionActive,
+		isUpgrading,
 	};
 };

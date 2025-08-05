@@ -14,6 +14,8 @@ export interface ConfirmDialogProps {
 	children?: ReactNode;
 	isLoading?: boolean;
 	triggerButton?: ReactNode;
+	confirmButtonText?: string;
+	hideCancelButton?: boolean;
 }
 
 type ConfirmModalFormValues = {
@@ -23,9 +25,25 @@ type ConfirmModalFormValues = {
 export const useConfirmDialog = (props: ConfirmDialogProps) => {
 	const [internalOpen, setInternalOpen] = useState(false);
 
-	const { confirmAction } = props;
+	const {
+		confirmAction,
+		confirmButtonText,
+		title,
+		children,
+		text,
+		onOpenChange,
+		confirmWithInput,
+		confirmWithInputValue,
+		placeholderText,
+		isLoading,
+		triggerButton,
+		open,
+		onClose,
+		hideCancelButton,
+	} = props;
+
 	const isControlled = props.open !== undefined;
-	const open = isControlled ? props.open : internalOpen;
+	const _open = isControlled ? open : internalOpen;
 
 	const form = useForm<ConfirmModalFormValues>({
 		defaultValues: {
@@ -37,10 +55,10 @@ export const useConfirmDialog = (props: ConfirmDialogProps) => {
 		if (!isControlled) {
 			setInternalOpen(newOpen);
 		}
-		props.onOpenChange?.(newOpen);
+		onOpenChange?.(newOpen);
 		if (!newOpen) {
 			form.reset();
-			props.onClose?.();
+			onClose?.();
 		}
 	};
 
@@ -53,11 +71,21 @@ export const useConfirmDialog = (props: ConfirmDialogProps) => {
 
 	return {
 		form,
-		open,
+		open: _open,
 		onOpenChange: handleOpenChange,
 		setInternalOpen,
 		formValue,
 		onSubmit,
-		...props,
+		confirmButtonText,
+		confirmAction,
+		confirmWithInput,
+		confirmWithInputValue,
+		placeholderText,
+		isLoading,
+		triggerButton,
+		title,
+		children,
+		text,
+		hideCancelButton,
 	};
 };

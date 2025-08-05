@@ -130,10 +130,16 @@ export const urls = {
 			prices: {
 				index: '/api/stripe/prices',
 				detail: ((id) => `/api/stripe/prices/${id}`) as DetailRoute,
+				getByProduct: {
+					index: '/api/stripe/prices/get-by-product',
+				},
 			},
 			products: {
 				index: '/api/stripe/products',
 				detail: ((id) => `/api/stripe/products/${id}`) as DetailRoute,
+			},
+			subscriptions: {
+				index: '/api/stripe/subscriptions',
 			},
 		},
 		userContactList: {
