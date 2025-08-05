@@ -8,6 +8,7 @@ import {
 import { ConfirmSendDialog } from '../../_dialogs/ConfirmSendDialog/ConfirmSendDialog';
 import ProgressIndicator from '@/components/molecules/ProgressIndicator/ProgressIndicator';
 import Spinner from '@/components/ui/spinner';
+import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 
 export const PrepareSendingSection: FC<PrepareSendingSectionProps> = (props) => {
 	const {
@@ -17,6 +18,8 @@ export const PrepareSendingSection: FC<PrepareSendingSectionProps> = (props) => 
 		sendingProgress,
 		setSendingProgress,
 		sentEmails,
+		isSendingDisabled,
+		isFreeTrial,
 	} = usePrepareSendingSection(props);
 
 	if (draftEmails.length === 0 && sentEmails.length === 0) {
@@ -39,11 +42,22 @@ export const PrepareSendingSection: FC<PrepareSendingSectionProps> = (props) => 
 					noDataMessage="No draft emails were found."
 					isEditable
 				/>
-				<ConfirmSendDialog
-					setSendingProgress={setSendingProgress}
-					campaign={campaign}
-					draftEmails={draftEmails}
-				/>
+				{isSendingDisabled ? (
+					<UpgradeSubscriptionDrawer
+						triggerButtonText="Proceed to Sending Confirmation"
+						message={
+							isFreeTrial
+								? `Your free trial subscription does not include the ability to send emails. To send the emails you've drafted, please upgrade your subscription to the paid version.`
+								: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
+						}
+					/>
+				) : (
+					<ConfirmSendDialog
+						setSendingProgress={setSendingProgress}
+						campaign={campaign}
+						draftEmails={draftEmails}
+					/>
+				)}
 				<ProgressIndicator
 					progress={sendingProgress}
 					total={draftEmails.length}

@@ -5,16 +5,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { PostPortalRequestData } from '@/app/api/stripe/portal/update-subscription/route';
 import { PostPortalManageSubscriptionData } from '@/app/api/stripe/portal/manage-subscription/route';
+import { PostCheckoutSessionData } from '@/app/api/stripe/checkout/route';
 
 const QUERY_KEYS = {
 	all: ['stripeCheckouts'] as const,
 	list: () => [...QUERY_KEYS.all, 'list'] as const,
 	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
 } as const;
-
-interface PostCheckoutSessionData {
-	priceId: string;
-}
 
 export const useCreateCheckoutSession = (options: CustomMutationOptions = {}) => {
 	const {

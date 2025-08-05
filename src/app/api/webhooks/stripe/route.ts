@@ -11,6 +11,7 @@ import {
 	apiServerError,
 	handleApiError,
 } from '@/app/api/_utils';
+import { StripeSubscriptionStatus } from '@/types';
 
 export async function POST(req: Request) {
 	const body = await req.text();
@@ -38,12 +39,18 @@ export async function POST(req: Request) {
 			const newSubscription = await stripe.subscriptions.retrieve(
 				session.subscription as string
 			);
+
 			const customer = await fulfillCheckout(newSubscription, session.id);
 
 			return apiResponse(customer);
 		} else if (event.type === 'customer.subscription.updated') {
 			try {
 				const subscription: Stripe.Subscription = event.data.object;
+				const canceled = subscription.canceled_at;
+				if (canceled) {
+					console.info('Subscription canceled');
+					return;
+				}
 				const priceId = subscription.items.data[0].price.id;
 				const subscriptionTier = getSubscriptionTierWithPriceId(priceId);
 
@@ -52,6 +59,8 @@ export async function POST(req: Request) {
 						stripeCustomerId: subscription.customer as string,
 					},
 				});
+
+				const isFreeTrial = subscription.status === StripeSubscriptionStatus.TRIALING;
 
 				if (!user) {
 					return apiNotFound(
@@ -67,9 +76,13 @@ export async function POST(req: Request) {
 						stripeSubscriptionStatus: subscription.status,
 						stripeSubscriptionId: subscription.id,
 						stripePriceId: priceId,
-						draftCredits: subscriptionTier?.draftCredits || 0,
-						sendingCredits: subscriptionTier?.sendingCredits || 0,
-						verificationCredits: subscriptionTier?.verificationCredits || 0,
+						draftCredits: isFreeTrial
+							? subscriptionTier?.trialDraftCredits || 0
+							: subscriptionTier?.draftCredits || 0,
+						sendingCredits:
+							subscriptionTier && !isFreeTrial ? subscriptionTier.sendingCredits : 0,
+						verificationCredits:
+							subscriptionTier && !isFreeTrial ? subscriptionTier.verificationCredits : 0,
 						lastCreditUpdate: new Date(),
 					},
 				});

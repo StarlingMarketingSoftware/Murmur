@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 export interface ConfirmDialogProps {
 	title: string;
 	open?: boolean;
+	onOpenChange?: (open: boolean) => void;
 	text?: string;
 	onClose?: () => void;
 	confirmAction: () => void;
@@ -13,7 +14,6 @@ export interface ConfirmDialogProps {
 	children?: ReactNode;
 	isLoading?: boolean;
 	triggerButton?: ReactNode;
-	onOpenChange?: (open: boolean) => void;
 }
 
 type ConfirmModalFormValues = {

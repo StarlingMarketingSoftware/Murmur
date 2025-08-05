@@ -1,6 +1,5 @@
 import { auth } from '@clerk/nextjs/server';
 import { stripe } from '../../../../stripe/client';
-import Stripe from 'stripe';
 import {
 	apiBadRequest,
 	apiNotFound,
@@ -11,7 +10,7 @@ import {
 } from '@/app/api/_utils';
 import { getUser } from '../../_utils';
 
-export async function POST(req: Request) {
+export async function PATCH(req: Request) {
 	try {
 		const { userId } = await auth();
 		if (!userId) {
@@ -43,24 +42,11 @@ export async function POST(req: Request) {
 			return apiServerError('No active subscription found');
 		}
 
-		const baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
+		const subscription = await stripe.subscriptions.update(currentSubscription.id, {
+			trial_end: 'now',
+		});
 
-		const session: Stripe.Response<Stripe.Checkout.Session> =
-			await stripe.checkout.sessions.create({
-				customer: user.stripeCustomerId,
-				payment_method_types: ['card'],
-				line_items: [
-					{
-						price: priceId,
-						quantity: 1,
-					},
-				],
-				mode: 'subscription',
-				success_url: `${baseUrl}/pricing?success=true`,
-				cancel_url: `${baseUrl}/pricing?canceled=true`,
-			});
-
-		return apiResponse({ url: session.url });
+		return apiResponse({ subscription });
 	} catch (error) {
 		return handleApiError(error);
 	}

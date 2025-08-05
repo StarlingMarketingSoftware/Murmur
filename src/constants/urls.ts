@@ -33,6 +33,9 @@ export const urls = {
 	},
 	pricing: {
 		index: '/pricing',
+		freeTrial: {
+			index: '/pricing/free-trial',
+		},
 		detail: ((id) => `/pricing/${id}`) as DetailRoute,
 	},
 	contact: {
@@ -131,9 +134,6 @@ export const urls = {
 			products: {
 				index: '/api/stripe/products',
 				detail: ((id) => `/api/stripe/products/${id}`) as DetailRoute,
-			},
-			updateSubscription: {
-				index: '/api/stripe/update-subscription',
 			},
 		},
 		userContactList: {
