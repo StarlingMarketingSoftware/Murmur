@@ -16,7 +16,10 @@ import { BASE_URL } from '@/constants';
 
 const stripeCheckoutRequestSchema = z.object({
 	priceId: z.string().min(1),
+	freeTrial: z.boolean().optional(),
 });
+
+export type PostCheckoutSessionData = z.infer<typeof stripeCheckoutRequestSchema>;
 
 export async function POST(req: Request) {
 	try {
@@ -32,7 +35,7 @@ export async function POST(req: Request) {
 			return apiBadRequest(validatedData.error);
 		}
 
-		const { priceId } = validatedData.data;
+		const { priceId, freeTrial } = validatedData.data;
 		if (!priceId) {
 			return apiBadRequest('Price ID is required');
 		}
@@ -58,6 +61,11 @@ export async function POST(req: Request) {
 				mode: 'subscription',
 				success_url: `${BASE_URL}${urls.murmur.dashboard.index}?success=true`,
 				cancel_url: `${BASE_URL}${urls.murmur.dashboard.index}?canceled=true`,
+				subscription_data: freeTrial
+					? {
+							trial_period_days: 7,
+					  }
+					: undefined,
 			});
 
 		return apiResponse({ url: session.url });

@@ -79,19 +79,22 @@ export async function GET(req: NextRequest) {
 
 		const locationResponse = await fetchOpenAi(
 			OPEN_AI_MODEL_OPTIONS.o4mini,
-			`You are a geography and language expert that can tell the difference between words that are city, states, or countries, and words that are not, based on knowledge about place names as well as semantics and context of a given sentence. You will be given a search query that may contain words that are city, states, or countries, amongst other non-location based terms. You will return the words that are city, states, or countries in a JSON string in the following format: {"city": "cityName", "state": "stateName", "country": "countryName"}. 
+			`You are a geography and language expert that can tell the difference between words that are city, states, or countries, and words that are not, based on knowledge about place names as well as semantics and context of a given sentence. You will be given a search query that may contain words that are city, states, or countries, amongst other non-location based terms. You will separate the location words from the rest of the query, and return the words that are city, state, or country, along with the rest of the query in a JSON string in the following format: {"city": "cityName", "state": "stateName", "country": "countryName", "restOfQuery": "restOfQuery"}. 
 			
 			Additional instructions:
-			- If there is no city, state, or country in the query, return null in the fields that are not found. For example: {"city": null, "state": "Pennsylvania", "country": null} 
-			- If any of the location terms are misspelled, returned the correct spelling. For example, if the query is "Pensylvania", return {"city": null, "state": "Pennsylvania", "country": null}
-			- If the query includes slang or abbreviations, return the official spelling. For example, if the query is "NYC", return {"city": "New York City", "state": null, "country": null}
+			- Do not include country unless it is specified.
+			- If the country in the query is some variant of the United States, return "United States of America". 
+			- If the search term contains "new york", specify the state. Only specify the city if it says "new york city" or "NYC".
+			- If there is no city, state, or country in the query, return null in the fields that are not found. For example: {"city": null, "state": "Pennsylvania", "country": null, "restOfQuery": "restOfQuery"} 
+			- If any of the location terms are misspelled, returned the correct spelling. For example, if the query is "Pensylvania", return {"city": null, "state": "Pennsylvania", "country": null, "restOfQuery": "restOfQuery"}
+			- If the query includes slang or abbreviations, return the official spelling. For example, if the query is "NYC", return {"city": "New York City", "state": null, "country": null, "restOfQuery": "restOfQuery"}
 			- Return a valid JSON string that can be parsed by a JSON.parse() in JavaScript. 
 			- There are some place names that can also be a word (such as buffalo steak house in new york) (Buffalo is a city in New York but it is also a general word for an animal). Use the context of the query to determine if the word is a place name or not.
 			- Return the JSON string and nothing else.`,
 			query || ''
 		);
 
-		const locationJson = JSON.parse(locationResponse);
+		const queryJson = JSON.parse(locationResponse);
 
 		const numberContactListIds: number[] =
 			contactListIds?.map((id) => Number(id)).filter((id) => !isNaN(id)) || [];
@@ -159,28 +162,28 @@ export async function GET(req: NextRequest) {
 						? [
 								{
 									OR: [
-										{ city: { contains: locationJson.city, mode: caseInsensitiveMode } },
+										{ city: { contains: queryJson.city, mode: caseInsensitiveMode } },
 										{
-											state: { contains: locationJson.state, mode: caseInsensitiveMode },
+											state: { contains: queryJson.state, mode: caseInsensitiveMode },
 										},
 										{
 											country: {
-												contains: locationJson.country,
+												contains: queryJson.country,
 												mode: caseInsensitiveMode,
 											},
 										},
 										{
-											address: { contains: locationJson.city, mode: caseInsensitiveMode },
+											address: { contains: queryJson.city, mode: caseInsensitiveMode },
 										},
 										{
 											address: {
-												contains: locationJson.state,
+												contains: queryJson.state,
 												mode: caseInsensitiveMode,
 											},
 										},
 										{
 											address: {
-												contains: locationJson.country,
+												contains: queryJson.country,
 												mode: caseInsensitiveMode,
 											},
 										},
@@ -197,7 +200,6 @@ export async function GET(req: NextRequest) {
 
 			return await prisma.contact.findMany({
 				where: whereConditions,
-
 				take: limit,
 				orderBy: {
 					userContactListCount: 'asc',
@@ -230,24 +232,29 @@ export async function GET(req: NextRequest) {
 		// If vector search is enabled and we have a query, use vector search
 		if (useVectorSearch && query) {
 			const vectorSearchResults = await searchSimilarContacts(
-				query,
+				queryJson,
 				VECTOR_SEARCH_LIMIT,
-				0.65
+				7.9
 			);
+			// 8.1 seemed like a good limit to keep noise out of music venues...but restrictive for
 
 			// Create a map of contactId to relevance score for efficient lookup
-			const relevanceMap = new Map<number, number>();
-			vectorSearchResults.matches.forEach((match, index) => {
-				const contactId = Number((match.metadata as { contactId: number }).contactId);
-				// Use the actual score from vector search, or fall back to rank-based scoring
-				const relevanceScore =
-					match.score || 1 - index / vectorSearchResults.matches.length;
-				relevanceMap.set(contactId, relevanceScore);
-			});
+			// const relevanceMap = new Map<number, number>();
+			// vectorSearchResults.matches.forEach((match, index) => {
+			// 	const contactId = Number((match.metadata as { contactId: number }).contactId);
+			// 	// Use the actual score from vector search, or fall back to rank-based scoring
+			// 	const relevanceScore =
+			// 		match.score || 1 - index / vectorSearchResults.matches.length;
+			// 	relevanceMap.set(contactId, relevanceScore);
+			// });
 
 			const vectorSearchContactIds = vectorSearchResults.matches.map((match) =>
-				Number((match.metadata as { contactId: number }).contactId)
+				Number(match.metadata.contactId)
 			);
+
+			// const vectorSearchContactEmails = vectorSearchResults.matches.map(
+			// 	(match) => match.metadata.email
+			// ); // for testing production data locally
 
 			contacts = await prisma.contact.findMany({
 				where: {
@@ -255,19 +262,13 @@ export async function GET(req: NextRequest) {
 						in: vectorSearchContactIds,
 						notIn: addedContactIds,
 					},
+					// email: { // for testing production data locally
+					// 	in: vectorSearchContactEmails,
+					// },
 					emailValidationStatus: verificationStatus
 						? {
 								equals: verificationStatus,
 						  }
-						: undefined,
-					city: locationJson.city
-						? { contains: locationJson.city, mode: 'insensitive' }
-						: undefined,
-					state: locationJson.state
-						? { contains: locationJson.state, mode: 'insensitive' }
-						: undefined,
-					country: locationJson.country
-						? { contains: locationJson.country, mode: 'insensitive' }
 						: undefined,
 				},
 			});
@@ -283,26 +284,26 @@ export async function GET(req: NextRequest) {
 			// }
 
 			// balanced sorting combining relevance and userContactListCount
-			const maxUserContactListCount = Math.max(
-				...contacts.map((c) => c.userContactListCount),
-				1
-			);
+			// const maxUserContactListCount = Math.max(
+			// 	...contacts.map((c) => c.userContactListCount),
+			// 	1
+			// );
 
-			contacts.sort((a, b) => {
-				const aRelevance = relevanceMap.get(a.id) || 0;
-				const bRelevance = relevanceMap.get(b.id) || 0;
+			// contacts.sort((a, b) => {
+			// 	const aRelevance = relevanceMap.get(a.id) || 0;
+			// 	const bRelevance = relevanceMap.get(b.id) || 0;
 
-				// Normalize userContactListCount (invert so lower count = higher score)
-				const aCountScore = 1 - a.userContactListCount / maxUserContactListCount;
-				const bCountScore = 1 - b.userContactListCount / maxUserContactListCount;
+			// 	// Normalize userContactListCount (invert so lower count = higher score)
+			// 	const aCountScore = 1 - a.userContactListCount / maxUserContactListCount;
+			// 	const bCountScore = 1 - b.userContactListCount / maxUserContactListCount;
 
-				// Weighted combination (70% relevance, 30% userContactListCount)
-				const aCompositeScore = 0.4 * aRelevance + 0.6 * aCountScore;
-				const bCompositeScore = 0.4 * bRelevance + 0.6 * bCountScore;
+			// 	// Weighted combination (70% relevance, 30% userContactListCount)
+			// 	const aCompositeScore = 0.4 * aRelevance + 0.6 * aCountScore;
+			// 	const bCompositeScore = 0.4 * bRelevance + 0.6 * bCountScore;
 
-				// Sort by composite score (descending - higher score first)
-				return bCompositeScore - aCompositeScore;
-			});
+			// 	// Sort by composite score (descending - higher score first)
+			// 	return bCompositeScore - aCompositeScore;
+			// });
 
 			return apiResponse(contacts.slice(0, limit));
 		} else {

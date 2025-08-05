@@ -73,7 +73,8 @@ export const useProductCard = (props: ProductCardProps) => {
 			return checkoutButton;
 		} else if (
 			user.stripePriceId === price.id &&
-			user.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE
+			(user.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE ||
+				user.stripeSubscriptionStatus === StripeSubscriptionStatus.TRIALING)
 		) {
 			return (
 				<ManageSubscriptionButton className="bg-primary hover:bg-primary/80 text-background" />

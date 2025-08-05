@@ -21,6 +21,7 @@ import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import Spinner from '@/components/ui/spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
+import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 
 const Dashboard = () => {
 	const {
@@ -37,6 +38,7 @@ const Dashboard = () => {
 		tableRef,
 		selectedContacts,
 		isPendingBatchUpdateContacts,
+		isFreeTrial,
 	} = useDashboard();
 	return (
 		<AppLayout>
@@ -72,7 +74,7 @@ const Dashboard = () => {
 									<FormControl>
 										<Input
 											className="!border-foreground"
-											placeholder="Who do you want to send to?  i.e  “Wedding Planners in North Carolina”"
+											placeholder="Who do you want to send to?  i.e  “Music venues in North Carolina”"
 											{...field}
 										/>
 									</FormControl>
@@ -80,25 +82,8 @@ const Dashboard = () => {
 								</FormItem>
 							)}
 						/>
-						<div className="flex flex-row gap-4 items-center justify-between">
+						<div className="flex flex-col md:flex-row gap-0 md:gap-4 items-center justify-between">
 							<div className="flex flex-row gap-4 items-center">
-								<FormField
-									control={form.control}
-									name="location"
-									render={({ field }) => (
-										<FormItem>
-											<FormControl>
-												<Input
-													className=""
-													placeholder="Location (optional)"
-													{...field}
-												/>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
-								/>
-
 								<FormField
 									control={form.control}
 									name="excludeUsedContacts"
@@ -139,16 +124,25 @@ const Dashboard = () => {
 								/>
 							</div>
 							<div className="flex items-center justify-end gap-2">
-								<ContactTSVUploadDialog
-									isAdmin={false}
-									triggerText="Import"
-									buttonVariant="light"
-								/>
+								{isFreeTrial ? (
+									<UpgradeSubscriptionDrawer
+										message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
+										triggerButtonText="Import"
+										buttonVariant="light"
+									/>
+								) : (
+									<ContactTSVUploadDialog
+										isAdmin={false}
+										triggerText="Import"
+										buttonVariant="light"
+									/>
+								)}
+
 								<Button
 									variant="primary-light"
 									type="submit"
 									bold
-									className="px-20"
+									className="px-10 md:px-20"
 									isLoading={isLoadingContacts || isRefetchingContacts}
 								>
 									Search

@@ -23,10 +23,11 @@ import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { twMerge } from 'tailwind-merge';
 import { capitalize } from '@/utils/string';
+import { TableCellTooltip } from '@/components/molecules/TableCellTooltip/TableCellTooltip';
+import { useMe } from '@/hooks/useMe';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
-	location: z.string().optional(),
 	excludeUsedContacts: z.boolean().optional().default(true),
 	exactMatchesOnly: z.boolean().optional().default(true),
 });
@@ -35,6 +36,8 @@ type FormData = z.infer<typeof formSchema>;
 
 export const useDashboard = () => {
 	/* UI */
+
+	const MAX_CELL_LENGTH = 35;
 	const columns: ColumnDef<ContactWithName>[] = [
 		{
 			id: 'select',
@@ -62,7 +65,9 @@ export const useDashboard = () => {
 				return <TableSortingButton column={column} label="Name" />;
 			},
 			cell: ({ row }) => {
-				return <div className="capitalize text-left">{row.getValue('name')}</div>;
+				return (
+					<TableCellTooltip text={row.getValue('name')} maxLength={MAX_CELL_LENGTH} />
+				);
 			},
 		},
 		{
@@ -98,7 +103,9 @@ export const useDashboard = () => {
 				return <TableSortingButton column={column} label="Company" />;
 			},
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('company')}</div>;
+				return (
+					<TableCellTooltip text={row.getValue('company')} maxLength={MAX_CELL_LENGTH} />
+				);
 			},
 		},
 		{
@@ -107,7 +114,9 @@ export const useDashboard = () => {
 				return <TableSortingButton column={column} label="Title" />;
 			},
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('title')}</div>;
+				return (
+					<TableCellTooltip text={row.getValue('title')} maxLength={MAX_CELL_LENGTH} />
+				);
 			},
 		},
 		{
@@ -116,7 +125,9 @@ export const useDashboard = () => {
 				return <TableSortingButton column={column} label="City" />;
 			},
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('city')}</div>;
+				return (
+					<TableCellTooltip text={row.getValue('city')} maxLength={MAX_CELL_LENGTH} />
+				);
 			},
 		},
 		{
@@ -140,7 +151,9 @@ export const useDashboard = () => {
 				return <TableSortingButton column={column} label="Address" />;
 			},
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('address')}</div>;
+				return (
+					<TableCellTooltip text={row.getValue('address')} maxLength={MAX_CELL_LENGTH} />
+				);
 			},
 		},
 		{
@@ -149,7 +162,9 @@ export const useDashboard = () => {
 				return <TableSortingButton column={column} label="Website" />;
 			},
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('website')}</div>;
+				return (
+					<TableCellTooltip text={row.getValue('website')} maxLength={MAX_CELL_LENGTH} />
+				);
 			},
 		},
 	];
@@ -176,19 +191,18 @@ export const useDashboard = () => {
 		resolver: zodResolver(formSchema),
 		defaultValues: {
 			searchText: '',
-			location: '',
 			excludeUsedContacts: true,
 			exactMatchesOnly: false,
 		},
 	});
 
 	/* HOOKS */
+	const { isFreeTrial } = useMe();
 	const [selectedContactListRows, setSelectedContactListRows] = useState<
 		UserContactList[]
 	>([]);
 	const [selectedContacts, setSelectedContacts] = useState<number[]>([]);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
-	const [activeLocation, setActiveLocation] = useState('');
 	const [activeExcludeUsedContacts, setActiveExcludeUsedContacts] = useState(true);
 	const [activeExactMatchesOnly, setActiveExactMatchesOnly] = useState(false);
 	const [currentTab, setCurrentTab] = useState<TabValue>('search');
@@ -211,7 +225,6 @@ export const useDashboard = () => {
 			useVectorSearch: !activeExactMatchesOnly,
 			limit,
 			excludeUsedContacts: activeExcludeUsedContacts,
-			location: activeLocation,
 		},
 		enabled: false,
 	});
@@ -245,7 +258,6 @@ export const useDashboard = () => {
 	/* HANDLERS */
 	const onSubmit = async (data: FormData) => {
 		setActiveSearchQuery(data.searchText);
-		setActiveLocation(data.location || '');
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? true);
 		setActiveExactMatchesOnly(data.exactMatchesOnly ?? false);
 		setLimit(100);
@@ -269,8 +281,8 @@ export const useDashboard = () => {
 
 		await batchUpdateContacts({ updates });
 
-		const defaultName = `${capitalize(activeSearchQuery)} ${capitalize(
-			activeLocation
+		const defaultName = `${capitalize(
+			activeSearchQuery
 		)} - ${new Date().toLocaleDateString()}`;
 		if (currentTab === 'search') {
 			const newUserContactList = await createContactList({
@@ -348,5 +360,6 @@ export const useDashboard = () => {
 		selectedContactListRows,
 		usedContactIdsSet,
 		isPendingBatchUpdateContacts,
+		isFreeTrial,
 	};
 };

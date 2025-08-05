@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { User } from '@prisma/client';
 
-const QUERY_KEYS = {
+export const QUERY_KEYS = {
 	all: ['users'] as const,
 	list: () => [...QUERY_KEYS.all, 'list'] as const,
 	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
