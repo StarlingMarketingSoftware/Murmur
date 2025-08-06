@@ -18,10 +18,12 @@ import { FC } from 'react';
 import { DialogDescription } from '@radix-ui/react-dialog';
 import { twMerge } from 'tailwind-merge';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
+import { Typography } from '@/components/ui/typography';
+import Spinner from '@/components/ui/spinner';
 
 export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) => {
 	const {
-		isPending,
+		isPendingSave,
 		isOpen,
 		setOpen,
 		columns,
@@ -39,6 +41,7 @@ export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) =
 		setIsOpenDrawer,
 		verificationCredits,
 		lastParsedDataLength,
+		uploadProgressState,
 	} = useContactTSVUploadDialog(props);
 
 	return (
@@ -51,15 +54,21 @@ export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) =
 			<DialogContent
 				className={twMerge(isAdmin ? '!max-w-98/100 !max-h-98/100' : '!max-w-70/100')}
 			>
+				{isPendingSave && uploadProgressState && (
+					<div className="absolute top-0 left-0 w-full h-full bg-background/50 backdrop-blur-xs z-50 flex flex-col items-center justify-center">
+						<div className="w-full h-full flex flex-col items-center justify-center">
+							<Typography variant="h3">{uploadProgressState}...</Typography>
+							<Spinner className="mt-3" />
+						</div>
+					</div>
+				)}
 				<DialogHeader>
 					<DialogTitle>Add Contacts by Excel Upload</DialogTitle>
 				</DialogHeader>
 				<DialogDescription>
 					Download the Excel file template below and open it in your preferred spreadsheet
 					software. Enter your data following the same format, save, then upload your
-					file. Email addresses are required. Please provide as many details as possible
-					to ensure high quality, personalized emails. You can upload 100 contacts at a
-					time.
+					file. Email addresses are required. You can upload 100 contacts at a time.
 				</DialogDescription>
 				<div className="flex flex-row gap-4">
 					<input
@@ -90,8 +99,8 @@ export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) =
 					<Button onClick={handleClear} type="button" variant="light">
 						Clear
 					</Button>
-					<Button onClick={handleSave} isLoading={isPending} type="submit">
-						Save
+					<Button onClick={handleSave} isLoading={isPendingSave} type="submit">
+						Create Campaign
 					</Button>
 				</DialogFooter>
 			</DialogContent>

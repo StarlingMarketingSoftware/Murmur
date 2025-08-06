@@ -164,9 +164,8 @@ export async function POST(req: NextRequest) {
 					}
 				} else {
 					console.log('Simulating ZeroBounce validation');
-					await new Promise((resolve) =>
-						setTimeout(resolve, 500 * contactsToVerify.length)
-					);
+					await new Promise((resolve) => setTimeout(resolve, 500 * 100));
+					// await new Promise((resolve) => setTimeout(resolve, 500 * contactsToVerify.length));
 					validatedContacts = contactsToVerify.map(
 						(contact: ContactPartialWithRequiredEmail) => ({
 							...contact,

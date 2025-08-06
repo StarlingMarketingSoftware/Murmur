@@ -14,6 +14,9 @@ import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists
 import { PostBatchContactData } from '@/app/api/contacts/batch/route';
 import { useMe } from '@/hooks/useMe';
 import { EllipsesWithTooltip } from '@/components/atoms/EllipsesWithTooltip/EllipsesWithTooltip';
+import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
+import { useRouter } from 'next/navigation';
+import { urls } from '@/constants/urls';
 
 export interface ContactTSVUploadDialogProps {
 	isAdmin: boolean;
@@ -297,15 +300,14 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 	}
 
 	/* HOOKS */
+	const router = useRouter();
 	const [isOpen, setOpen] = useState(false);
 	const [isOpenDrawer, setIsOpenDrawer] = useState(false);
 	const [tsvData, setTsvData] = useState<ContactInput[]>([]);
+	const [lastParsedDataLength, setLastParsedDataLength] = useState(0);
+	const [uploadProgressState, setUploadProgressState] = useState<string | null>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const { user } = useMe();
-	const [lastParsedDataLength, setLastParsedDataLength] = useState(0);
-
-	/* VARIALBES */
-	const verificationCredits = user?.verificationCredits || 0;
 
 	/* API */
 	const { mutateAsync: batchCreateContacts, isPending: isPendingBatchCreateContacts } =
@@ -315,6 +317,22 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		useCreateUserContactList({
 			suppressToasts: true,
 		});
+
+	const { mutateAsync: createCampaign, isPending: isPendingCreateCampaign } =
+		useCreateCampaign({
+			suppressToasts: true,
+		});
+
+	/* VARIABLES */
+	const verificationCredits = user?.verificationCredits || 0;
+	const UPLOAD_PROGRESS_STATES: string[] = [
+		'Parsing contact data',
+		'Checking for duplicates',
+		'Checking data against existing contacts in the database',
+		'Verifying email address validity',
+	];
+	const isPendingSave =
+		isPendingBatchCreateContacts || isPendingCreateContactList || isPendingCreateCampaign;
 
 	const trimKeywords = (keywords: string[]): string[] => {
 		return keywords.map((keyword) => keyword.trim());
@@ -338,12 +356,10 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 					return;
 				}
 
-				// Get headers from first row
 				const headers = (jsonData[0] as string[]).map(
 					(header) => header?.toString().trim().toLowerCase() || ''
 				);
 
-				// Process data rows (skip header row)
 				const parsedData = (jsonData.slice(1) as unknown[][])
 					.filter((row) =>
 						row.some((value) => value !== null && value !== undefined && value !== '')
@@ -360,7 +376,6 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 						const rowData: Record<string, string | undefined> = {};
 						headers.forEach((header, index) => {
 							const value = row[index];
-							// Convert empty strings to null/undefined
 							rowData[header] =
 								value === '' || value === null || value === undefined
 									? undefined
@@ -436,7 +451,6 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			return;
 		}
 
-		// only check verification if not isAdmin
 		if (!isAdmin && tsvData.length > verificationCredits) {
 			toast.error(
 				`You do not have enough upload credits to create this many contacts. Please upgrade your plan. Credits: ${verificationCredits} Number of contacts: ${tsvData.length}`
@@ -444,17 +458,35 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			return;
 		}
 
-		const { contacts, created } = await batchCreateContacts({
-			isPrivate: !isAdmin,
-			contacts: tsvData,
-		});
+		(async () => {
+			for (let i = 0; i < UPLOAD_PROGRESS_STATES.length; i++) {
+				await new Promise((resolve) => setTimeout(resolve, 3000));
+				setUploadProgressState(UPLOAD_PROGRESS_STATES[i]);
+			}
+		})();
 
-		if (created > 0) {
-			await createContactList({
-				name: `TSV Upload - ${new Date().toLocaleDateString()}`,
-				contactIds: contacts?.map((contact: Contact) => contact.id) || [],
+		const apiPromise = (async () => {
+			const { contacts, created } = await batchCreateContacts({
+				isPrivate: !isAdmin,
+				contacts: tsvData,
 			});
-		}
+
+			if (created > 0) {
+				const userContactList = await createContactList({
+					name: `Excel Upload - ${new Date().toLocaleDateString()}`,
+					contactIds: contacts?.map((contact: Contact) => contact.id) || [],
+				});
+				const campaign = await createCampaign({
+					name: `Excel Upload - ${new Date().toLocaleDateString()}`,
+					userContactLists: [userContactList.id],
+				});
+				router.push(urls.murmur.campaign.detail(campaign.id));
+			}
+			return { contacts, created };
+		})();
+
+		await apiPromise;
+
 		setTsvData([]);
 		setOpen(false);
 	};
@@ -472,10 +504,8 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		setTsvData([]);
 	};
 
-	const isPending = isPendingCreateContactList || isPendingBatchCreateContacts;
-
 	return {
-		isPending,
+		isPendingSave,
 		isOpen,
 		setOpen,
 		columns,
@@ -493,5 +523,6 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		setIsOpenDrawer,
 		verificationCredits,
 		lastParsedDataLength,
+		uploadProgressState,
 	};
 };
