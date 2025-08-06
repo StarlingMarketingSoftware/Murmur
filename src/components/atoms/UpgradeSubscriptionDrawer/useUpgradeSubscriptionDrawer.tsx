@@ -8,7 +8,7 @@ import { StripeSubscriptionStatus } from '@/types';
 import { ButtonVariants } from '@/components/ui/button';
 
 export interface UpgradeSubscriptionDrawerProps {
-	triggerButtonText: string;
+	triggerButtonText?: string;
 	message: string;
 	isOpen?: boolean;
 	setIsOpen?: Dispatch<SetStateAction<boolean>>;

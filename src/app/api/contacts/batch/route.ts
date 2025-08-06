@@ -5,6 +5,7 @@ import { z } from 'zod';
 import {
 	apiBadRequest,
 	apiCreated,
+	apiNotFound,
 	apiServerError,
 	apiUnauthorized,
 	handleApiError,
@@ -54,6 +55,8 @@ export type PostBatchContactDataResponse = {
 };
 
 export async function POST(req: NextRequest) {
+	const startTime = Date.now();
+
 	try {
 		const { userId } = await auth();
 		if (!userId) {
@@ -66,7 +69,23 @@ export async function POST(req: NextRequest) {
 			return apiBadRequest(validatedData.error);
 		}
 
+		const user = await prisma.user.findUnique({
+			where: {
+				clerkId: userId,
+			},
+		});
+
+		if (!user) {
+			return apiNotFound('User not found.');
+		}
+
 		const { contacts, isPrivate } = validatedData.data;
+
+		if (contacts.length > user.verificationCredits) {
+			return apiBadRequest(
+				'You do not have enough verification credits to create this many contacts.'
+			);
+		}
 
 		// Remove duplicate email addresses, keeping only the first occurrence of each email
 		const uniqueContacts = contacts.filter((contact, index, arr) => {
@@ -121,44 +140,71 @@ export async function POST(req: NextRequest) {
 
 			let validatedContacts: ContactPartialWithRequiredEmail[] = [];
 
+			const isProduction = process.env.NODE_ENV === 'production';
+
 			if (contactsToVerify.length > 0) {
-				const zeroBounceFileId = await verifyEmailsWithZeroBounce(contactsToVerify);
+				if (isProduction) {
+					console.log('Verifying emails with ZeroBounce');
+					const zeroBounceFileId = await verifyEmailsWithZeroBounce(contactsToVerify);
 
-				if (!zeroBounceFileId) {
-					return apiServerError('ZeroBounce validation initial request failed.');
-				}
+					if (!zeroBounceFileId) {
+						return apiServerError('ZeroBounce validation initial request failed.');
+					}
 
-				const validationCompleted = await waitForZeroBounceCompletion(
-					zeroBounceFileId,
-					10
-				); // 1 minute may be too short for larger datasets
-
-				if (validationCompleted) {
-					validatedContacts = await processZeroBounceResults(
+					const validationCompleted = await waitForZeroBounceCompletion(
 						zeroBounceFileId,
-						contactsToVerify
+						10
+					);
+
+					if (validationCompleted) {
+						validatedContacts = await processZeroBounceResults(
+							zeroBounceFileId,
+							contactsToVerify
+						);
+					}
+				} else {
+					console.log('Simulating ZeroBounce validation');
+					await new Promise((resolve) =>
+						setTimeout(resolve, 500 * contactsToVerify.length)
+					);
+					validatedContacts = contactsToVerify.map(
+						(contact: ContactPartialWithRequiredEmail) => ({
+							...contact,
+							emailValidationStatus: EmailVerificationStatus.valid,
+							emailValidatedAt: new Date(),
+						})
 					);
 				}
 			}
-			// if any emails are not valid, still create them and show them to the user. We want to track which emails are not valid. We also want the user to know what happened. These invalid emails will remain in the ContactList, but will not be drafted or sent to.
 
-			const results = await prisma.contact.createMany({
-				data: [...validatedContacts, ...alreadyValidatedContacts],
-			});
-
-			const createdContacts = await prisma.contact.findMany({
+			await prisma.user.update({
 				where: {
-					email: {
-						in: [...validatedContacts, ...alreadyValidatedContacts].map((c) => c.email),
+					clerkId: userId,
+				},
+				data: {
+					verificationCredits: {
+						decrement: contactsToVerify.length,
 					},
-					userId,
 				},
 			});
 
+			const createdContacts = await prisma.contact.createManyAndReturn({
+				data: [...validatedContacts, ...alreadyValidatedContacts],
+			});
+
+			const elapsedTime = Date.now() - startTime;
+			console.log(
+				`[Batch Contact Creation] Private contacts created: ${
+					createdContacts.length
+				}, skipped: ${
+					uniqueContacts.length - createdContacts.length
+				}, duplicates removed: ${duplicatesRemoved}, elapsed time: ${elapsedTime}ms`
+			);
+
 			return apiCreated({
 				contacts: createdContacts,
-				created: results.count,
-				skipped: uniqueContacts.length - results.count,
+				created: createdContacts.length,
+				skipped: uniqueContacts.length - createdContacts.length,
 				duplicatesRemoved,
 				skippedEmails: uniqueContacts
 					.filter((contact) => existingEmails.has(contact.email))
@@ -193,9 +239,19 @@ export async function POST(req: NextRequest) {
 				};
 			});
 
+			const elapsedTime = Date.now() - startTime;
+			console.log(
+				`[Batch Contact Creation] Public contacts created: ${result.created}, skipped: ${result.skipped}, duplicates removed: ${result.duplicatesRemoved}, elapsed time: ${elapsedTime}ms`
+			);
+
 			return apiCreated(result);
 		}
 	} catch (error) {
+		const elapsedTime = Date.now() - startTime;
+		console.error(
+			`[Batch Contact Creation] Error occurred after ${elapsedTime}ms:`,
+			error
+		);
 		return handleApiError(error);
 	}
 }

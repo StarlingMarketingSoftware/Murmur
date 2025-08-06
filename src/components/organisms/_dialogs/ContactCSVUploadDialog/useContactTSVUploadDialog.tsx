@@ -8,7 +8,7 @@ import {
 } from '@/components/molecules/CustomTable/CustomTable';
 import { useBatchCreateContacts } from '@/hooks/queryHooks/useContacts';
 import { toast } from 'sonner';
-import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { ButtonVariants } from '@/components/ui/button';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { PostBatchContactData } from '@/app/api/contacts/batch/route';
@@ -296,10 +296,16 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		columns.push(...adminColumns);
 	}
 
-	const [open, setOpen] = useState(false);
+	/* HOOKS */
+	const [isOpen, setOpen] = useState(false);
+	const [isOpenDrawer, setIsOpenDrawer] = useState(false);
 	const [tsvData, setTsvData] = useState<ContactInput[]>([]);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const { user } = useMe();
+	const [lastParsedDataLength, setLastParsedDataLength] = useState(0);
+
+	/* VARIALBES */
+	const verificationCredits = user?.verificationCredits || 0;
 
 	/* API */
 	const { mutateAsync: batchCreateContacts, isPending: isPendingBatchCreateContacts } =
@@ -318,56 +324,105 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		const file = event.target.files?.[0];
 		if (!file) return;
 
-		Papa.parse(file, {
-			header: true,
-			delimiter: '\t',
-			skipEmptyLines: true,
-			transformHeader: (header: string) => header.trim().toLowerCase(),
-			transform: (value: string) => value.trim(),
-			complete: (results) => {
-				if (results.errors.length > 0) {
-					console.error('TSV parsing errors:', results.errors);
-					toast.error('Error parsing TSV file. Please check the format.');
+		const reader = new FileReader();
+		reader.onload = (e) => {
+			try {
+				const data = new Uint8Array(e.target?.result as ArrayBuffer);
+				const workbook = XLSX.read(data, { type: 'array' });
+				const sheetName = workbook.SheetNames[0];
+				const worksheet = workbook.Sheets[sheetName];
+				const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+				if (jsonData.length < 2) {
+					toast.error('Excel file must contain at least a header row and one data row.');
 					return;
 				}
 
-				const parsedData = (results.data as Record<string, string>[])
-					.filter((row) => Object.values(row).some((value) => value !== ''))
-					.filter((row) => row.email !== undefined && row.email !== '')
-					.map((row) => ({
-						firstName: row.firstname || undefined,
-						lastName: row.lastname || undefined,
-						company: row.company || undefined,
-						email: row.email,
-						address: row.address || undefined,
-						city: row.city || undefined,
-						country: row.country || undefined,
-						state: row.state || undefined,
-						website: row.website || undefined,
-						phone: row.phone || undefined,
-						title: row.title || undefined,
-						headline: row.headline || undefined,
-						linkedInUrl: row.linkedinurl || undefined,
-						photoUrl: row.photourl || undefined,
-						metadata: row.metadata || undefined,
-						companyLinkedInUrl: row.companylinkedinurl || undefined,
-						companyFoundedYear: row.companyfoundedyear || undefined,
-						companyType: row.companytype || undefined,
-						companyTechStack: trimKeywords(row.companytechstack?.split(',') || []),
-						companyPostalCode: row.companypostalcode || undefined,
-						companyKeywords: trimKeywords(row.companykeywords?.split(',') || []),
-						companyIndustry: row.companyindustry || undefined,
-					}));
+				// Get headers from first row
+				const headers = (jsonData[0] as string[]).map(
+					(header) => header?.toString().trim().toLowerCase() || ''
+				);
+
+				// Process data rows (skip header row)
+				const parsedData = (jsonData.slice(1) as unknown[][])
+					.filter((row) =>
+						row.some((value) => value !== null && value !== undefined && value !== '')
+					)
+					.filter((row) => {
+						const emailIndex = headers.indexOf('email');
+						return (
+							emailIndex >= 0 &&
+							row[emailIndex] &&
+							row[emailIndex].toString().trim() !== ''
+						);
+					})
+					.map((row) => {
+						const rowData: Record<string, string | undefined> = {};
+						headers.forEach((header, index) => {
+							const value = row[index];
+							// Convert empty strings to null/undefined
+							rowData[header] =
+								value === '' || value === null || value === undefined
+									? undefined
+									: value.toString().trim();
+						});
+
+						return {
+							firstName: rowData.firstname || undefined,
+							lastName: rowData.lastname || undefined,
+							company: rowData.company || undefined,
+							email: rowData.email!,
+							address: rowData.address || undefined,
+							city: rowData.city || undefined,
+							country: rowData.country || undefined,
+							state: rowData.state || undefined,
+							website: rowData.website || undefined,
+							phone: rowData.phone || undefined,
+							title: rowData.title || undefined,
+							headline: rowData.headline || undefined,
+							linkedInUrl: rowData.linkedinurl || undefined,
+							photoUrl: rowData.photourl || undefined,
+							metadata: rowData.metadata || undefined,
+							companyLinkedInUrl: rowData.companylinkedinurl || undefined,
+							companyFoundedYear: rowData.companyfoundedyear || undefined,
+							companyType: rowData.companytype || undefined,
+							companyTechStack: trimKeywords(rowData.companytechstack?.split(',') || []),
+							companyPostalCode: rowData.companypostalcode || undefined,
+							companyKeywords: trimKeywords(rowData.companykeywords?.split(',') || []),
+							companyIndustry: rowData.companyindustry || undefined,
+						};
+					});
+
+				setLastParsedDataLength(parsedData.length);
+
+				if (parsedData.length > 100) {
+					toast.error(
+						`You can only upload 100 contacts at a time. Please reduce the number contacts in your file.`
+					);
+
+					return;
+				}
+
+				if (parsedData.length > verificationCredits) {
+					setOpen(false);
+					setIsOpenDrawer(true);
+
+					return;
+				}
 
 				setTsvData(parsedData);
 				toast.success(`Successfully parsed ${parsedData.length} contacts`);
-			},
-			error: (error) => {
-				console.error('TSV parsing failed:', error);
-				toast.error('Failed to parse TSV file');
-			},
-		});
+			} catch (error) {
+				console.error('Excel parsing failed:', error);
+				toast.error('Failed to parse Excel file. Please check the format.');
+			}
+		};
 
+		reader.onerror = () => {
+			toast.error('Failed to read Excel file');
+		};
+
+		reader.readAsArrayBuffer(file);
 		event.target.value = ''; // Reset input
 	};
 
@@ -380,10 +435,9 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			toast.error('No data to upload');
 			return;
 		}
-		const verificationCredits = user?.verificationCredits;
 
 		// only check verification if not isAdmin
-		if (!isAdmin && tsvData.length > (verificationCredits || 0)) {
+		if (!isAdmin && tsvData.length > verificationCredits) {
 			toast.error(
 				`You do not have enough upload credits to create this many contacts. Please upgrade your plan. Credits: ${verificationCredits} Number of contacts: ${tsvData.length}`
 			);
@@ -407,8 +461,8 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 
 	const handleTemplateDownload = () => {
 		const link = document.createElement('a');
-		link.href = '/sampleContactListTSV.tsv';
-		link.download = 'sampleContactListTSV.tsv';
+		link.href = '/sampleContactListExcel.xlsx';
+		link.download = 'sampleContactListExcel.xlsx';
 		document.body.appendChild(link);
 		link.click();
 		document.body.removeChild(link);
@@ -422,7 +476,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 
 	return {
 		isPending,
-		open,
+		isOpen,
 		setOpen,
 		columns,
 		tsvData,
@@ -435,5 +489,9 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		triggerText,
 		buttonVariant,
 		isAdmin,
+		isOpenDrawer,
+		setIsOpenDrawer,
+		verificationCredits,
+		lastParsedDataLength,
 	};
 };

@@ -9,7 +9,7 @@ export function Toaster() {
 			closeButton
 			position="bottom-right"
 			toastOptions={{
-				duration: 3000,
+				duration: 4500,
 				className: '!shadow-none border-1  border-solid border-primary',
 			}}
 		/>
