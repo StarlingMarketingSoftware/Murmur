@@ -18,8 +18,8 @@ const QUERY_KEYS = {
 export const useCreateStripeSubscription = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,
-		successMessage = 'Signature created successfully',
-		errorMessage = 'Failed to create signature',
+		successMessage = 'Subscription created successfully',
+		errorMessage = 'Failed to create subscription',
 		onSuccess: onSuccessCallback,
 	} = options;
 	const queryClient = useQueryClient();

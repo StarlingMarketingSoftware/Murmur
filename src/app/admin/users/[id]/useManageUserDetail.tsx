@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useCreateStripeSubscription } from '@/hooks/queryHooks/useStripeSubscriptions';
+import { toast } from 'sonner';
 
 const customDomainSchema = z.object({
 	domain: z
@@ -52,16 +53,34 @@ export const useManageUserDetail = () => {
 
 	const handleSignUpFreeSubscription = async () => {
 		const freeSubscriptionPriceId = process.env.NEXT_PUBLIC_PARTNER_MONTHLY_PRICE_ID;
-		if (!user || !user.stripeCustomerId || !freeSubscriptionPriceId) {
+		if (!user) {
+			toast.error('User data not available');
 			return;
 		}
+
+		if (!user.stripeCustomerId) {
+			toast.error('User does not have a Stripe customer ID');
+			return;
+		}
+
+		if (!freeSubscriptionPriceId) {
+			toast.error('Free subscription price ID not configured');
+			return;
+		}
+
 		const newSubscription = await createStripeSubscription({
 			customerId: user.stripeCustomerId,
 			priceId: freeSubscriptionPriceId,
 		});
 
+		if (!newSubscription) {
+			toast.error('Failed to create subscription');
+			return;
+		}
+
 		const subscriptionTier = getSubscriptionTierWithPriceId(freeSubscriptionPriceId);
-		editUser({
+
+		await editUser({
 			clerkId: user.clerkId,
 			data: {
 				stripeSubscriptionId: newSubscription.id,

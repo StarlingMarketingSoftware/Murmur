@@ -10,6 +10,7 @@ import {
 } from '@/app/api/_utils';
 import { getUser } from '../../_utils';
 import z from 'zod';
+import prisma from '@/lib/prisma';
 
 const patchStripeSubscriptionSchema = z.object({
 	trialEnd: z.union([z.literal('now'), z.number()]).optional(), // 'now' or UNIX timestamp
@@ -30,6 +31,21 @@ export async function POST(req: Request) {
 		if (!userId) {
 			return apiUnauthorized();
 		}
+
+		const user = await prisma.user.findUnique({
+			where: {
+				clerkId: userId,
+			},
+		});
+
+		if (!user) {
+			return apiNotFound('User not found');
+		}
+
+		if (user.role !== 'admin') {
+			return apiUnauthorized('Only admin users can create subscriptions');
+		}
+
 		const data = await req.json();
 		const validatedData = createStripeSubscriptionSchema.safeParse(data);
 		if (!validatedData.success) {
