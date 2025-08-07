@@ -25,6 +25,7 @@ const ManageUserDetail: FC = () => {
 		isEditingUser,
 		handleSignUpFreeSubscription,
 		isPendingCreateStripeSubscription,
+		hasPartnerSubscription,
 	} = useManageUserDetail();
 	return (
 		<>
@@ -57,8 +58,11 @@ const ManageUserDetail: FC = () => {
 								onClick={handleSignUpFreeSubscription}
 								variant="primary"
 								isLoading={isPendingCreateStripeSubscription}
+								disabled={hasPartnerSubscription}
 							>
-								Assign Free Subscription
+								{hasPartnerSubscription
+									? 'Partner Subscription Active'
+									: 'Assign Free Subscription'}
 							</Button>
 							{freeTrialCode && <Input value={freeTrialCode} readOnly />}
 						</CardContent>

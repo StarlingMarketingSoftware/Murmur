@@ -24,6 +24,10 @@ export const useManageUserDetail = () => {
 	const { data: user, isPending: isPendingUser } = useGetUser(userId);
 	const [freeTrialCode, setFreeTrialCode] = useState<string | null>(null);
 
+	const freeSubscriptionPriceId = process.env.NEXT_PUBLIC_PARTNER_MONTHLY_PRICE_ID;
+
+	const hasPartnerSubscription = user?.stripePriceId === freeSubscriptionPriceId;
+
 	const handleGenerateFreeTrialCode = () => {
 		if (!user) {
 			return;
@@ -52,7 +56,6 @@ export const useManageUserDetail = () => {
 	}, [user, form]);
 
 	const handleSignUpFreeSubscription = async () => {
-		const freeSubscriptionPriceId = process.env.NEXT_PUBLIC_PARTNER_MONTHLY_PRICE_ID;
 		if (!user) {
 			toast.error('User data not available');
 			return;
@@ -116,5 +119,6 @@ export const useManageUserDetail = () => {
 		isEditingUser,
 		handleSignUpFreeSubscription,
 		isPendingCreateStripeSubscription,
+		hasPartnerSubscription,
 	};
 };
