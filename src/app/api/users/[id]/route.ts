@@ -51,12 +51,17 @@ export const GET = async function GET(
 	}
 };
 
-export const PATCH = async function PATCH(request: Request) {
+export const PATCH = async function PATCH(
+	request: Request,
+	{ params }: { params: ApiRouteParams }
+) {
 	try {
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
 		}
+
+		const { id } = await params;
 
 		const data = await request.json();
 		const validatedData = patchUserSchema.safeParse(data);
@@ -66,7 +71,7 @@ export const PATCH = async function PATCH(request: Request) {
 		}
 
 		const updatedUser = await prisma.user.update({
-			where: { clerkId: userId },
+			where: { clerkId: id },
 			data: validatedData.data,
 		});
 

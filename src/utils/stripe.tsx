@@ -40,6 +40,15 @@ export const getSubscriptionTierWithPriceId = (
 				viewEmailAddresses: true,
 				trialDraftCredits: 375,
 			};
+		case process.env.NEXT_PUBLIC_PARTNER_MONTHLY_PRICE_ID:
+			return {
+				name: 'Partner',
+				draftCredits: 3000,
+				sendingCredits: 3000,
+				verificationCredits: 1000,
+				viewEmailAddresses: true,
+				trialDraftCredits: 375,
+			};
 		case process.env.NEXT_PUBLIC_ELITE_PRICE_ID:
 			return {
 				name: 'Elite',

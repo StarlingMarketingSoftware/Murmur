@@ -10,12 +10,60 @@ import {
 } from '@/app/api/_utils';
 import { getUser } from '../../_utils';
 import z from 'zod';
+import prisma from '@/lib/prisma';
 
 const patchStripeSubscriptionSchema = z.object({
 	trialEnd: z.union([z.literal('now'), z.number()]).optional(), // 'now' or UNIX timestamp
 });
 
 export type PatchStripeSubscriptionData = z.infer<typeof patchStripeSubscriptionSchema>;
+
+const createStripeSubscriptionSchema = z.object({
+	customerId: z.string().min(1),
+	priceId: z.string().min(1),
+});
+export type CreateStripeSubscriptionData = z.infer<typeof createStripeSubscriptionSchema>;
+
+export async function POST(req: Request) {
+	try {
+		const { userId } = await auth();
+
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const user = await prisma.user.findUnique({
+			where: {
+				clerkId: userId,
+			},
+		});
+
+		if (!user) {
+			return apiNotFound('User not found');
+		}
+
+		if (user.role !== 'admin') {
+			return apiUnauthorized('Only admin users can create subscriptions');
+		}
+
+		const data = await req.json();
+		const validatedData = createStripeSubscriptionSchema.safeParse(data);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
+
+		const { customerId, priceId } = validatedData.data;
+
+		const subscription = await stripe.subscriptions.create({
+			customer: customerId,
+			items: [{ price: priceId }],
+		});
+
+		return apiResponse(subscription);
+	} catch (error) {
+		return handleApiError(error);
+	}
+}
 
 export async function PATCH(req: Request) {
 	try {
