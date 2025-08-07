@@ -17,6 +17,38 @@ const patchStripeSubscriptionSchema = z.object({
 
 export type PatchStripeSubscriptionData = z.infer<typeof patchStripeSubscriptionSchema>;
 
+const createStripeSubscriptionSchema = z.object({
+	customerId: z.string().min(1),
+	priceId: z.string().min(1),
+});
+export type CreateStripeSubscriptionData = z.infer<typeof createStripeSubscriptionSchema>;
+
+export async function POST(req: Request) {
+	try {
+		const { userId } = await auth();
+
+		if (!userId) {
+			return apiUnauthorized();
+		}
+		const data = await req.json();
+		const validatedData = createStripeSubscriptionSchema.safeParse(data);
+		if (!validatedData.success) {
+			return apiBadRequest(validatedData.error);
+		}
+
+		const { customerId, priceId } = validatedData.data;
+
+		const subscription = await stripe.subscriptions.create({
+			customer: customerId,
+			items: [{ price: priceId }],
+		});
+
+		return apiResponse(subscription);
+	} catch (error) {
+		return handleApiError(error);
+	}
+}
+
 export async function PATCH(req: Request) {
 	try {
 		const { userId } = await auth();
