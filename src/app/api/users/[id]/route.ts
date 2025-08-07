@@ -63,18 +63,6 @@ export const PATCH = async function PATCH(
 
 		const { id } = await params;
 
-		const activeUser = await prisma.user.findUnique({
-			where: { clerkId: userId },
-		});
-
-		if (!activeUser) {
-			return apiUnauthorized();
-		}
-
-		if (activeUser.role !== 'admin') {
-			return apiUnauthorized('Only admin users can edit users.');
-		}
-
 		const data = await request.json();
 		const validatedData = patchUserSchema.safeParse(data);
 
