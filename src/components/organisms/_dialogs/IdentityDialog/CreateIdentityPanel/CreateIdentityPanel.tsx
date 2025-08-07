@@ -112,7 +112,10 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 							name="verificationCode"
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>Verification Code</FormLabel>
+									<div className="flex items-start gap-2">
+										<FormLabel>Verification Code</FormLabel>
+										<InfoTooltip message="If you did not receive a code, please check your spam folder or request a new code." />
+									</div>
 									<FormControl>
 										<InputOTP
 											maxLength={6}
