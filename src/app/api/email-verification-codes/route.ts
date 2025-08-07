@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
 			username: 'api',
 			key: process.env.MAILGUN_API_KEY || '',
 		});
-		const emailSubject = 'Your Murmur Verification Code';
+		const emailSubject = 'Confirm Your Murmur Identity';
 		const emailHtml = `
 <!DOCTYPE html>
 <html lang="en">
@@ -83,7 +83,6 @@ export async function POST(request: NextRequest) {
     </style>
 </head>
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
-    <!-- Preheader text -->
     <div style="display: none; max-height: 0; overflow: hidden; mso-hide: all;">
         Your Murmur email verification code: ${verificationCode}
     </div>
@@ -117,14 +116,11 @@ export async function POST(request: NextRequest) {
                             </p>
                         </td>
                     </tr>
-                    
-                    <!-- Footer -->
                     <tr>
                         <td style="padding: 20px 30px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;">
                             <p style="color: #999; font-size: 12px; margin: 0; font-family: Arial, sans-serif;">
                                 © ${new Date().getFullYear()} Murmur. All rights reserved.<br>
                                 This is an automated email, please do not reply.<br>
-                                <a href="mailto:unsubscribe@murmurmailbox.com" style="color: #999; text-decoration: none;">Unsubscribe</a>
                             </p>
                         </td>
                     </tr>
@@ -138,20 +134,25 @@ export async function POST(request: NextRequest) {
 
 		const emailText = `
 MURMUR - Email Verification
+---------------------------------------
 
-Thank you for signing up! Please use the verification code below to confirm your email address.
+Thank you for signing up! Please use this verification code to confirm your email address:
 
-Your verification code: ${verificationCode}
+Verification Code: ${verificationCode}
+Expires in: 10 minutes
 
-This code will expire in 10 minutes for security purposes.
+---------------------------------------
 
-If you didn't request this verification, please ignore this email.
+Need help? Contact our support team at support@yourdomain.com
 
-© ${new Date().getFullYear()} Murmur. All rights reserved.
+If you didn't request this, please ignore this email or contact us immediately.
+
+---------------------------------------
+© ${new Date().getFullYear()} Murmur
 `;
 
 		await mg.messages.create('murmurmailbox.com', {
-			from: 'Murmur Verification <postmaster@murmurmailbox.com>',
+			from: 'Murmur Verification <noreply@murmurmailbox.com>',
 			to: [email],
 			subject: emailSubject,
 			html: emailHtml,
