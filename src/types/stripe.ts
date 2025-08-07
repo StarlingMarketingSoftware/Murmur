@@ -28,6 +28,7 @@ export type SubscriptionName =
 	| 'Basic'
 	| 'Standard'
 	| 'Pro'
+	| 'Partner'
 	| 'Custom'
 	| 'Elite'
 	| 'Prophet'

@@ -1,7 +1,7 @@
 'use client';
 import { FC } from 'react';
 import Spinner from '@/components/ui/spinner';
-import { useManageUserDetail } from './useManageContactListDetail';
+import { useManageUserDetail } from './useManageUserDetail';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,15 +15,17 @@ import {
 } from '@/components/ui/form';
 import { Typography } from '@/components/ui/typography';
 
-const ManageContactListDetail: FC = () => {
+const ManageUserDetail: FC = () => {
 	const {
 		user,
 		isPendingUser,
-		handleGenerateFreeTrialCode,
 		freeTrialCode,
 		handleUpdateCustomDomain,
 		form,
 		isEditingUser,
+		handleSignUpFreeSubscription,
+		isPendingCreateStripeSubscription,
+		hasPartnerSubscription,
 	} = useManageUserDetail();
 	return (
 		<>
@@ -31,7 +33,7 @@ const ManageContactListDetail: FC = () => {
 				<Spinner />
 			) : (
 				<>
-					<Card size="lg">
+					{/* <Card size="lg">
 						<CardHeader>
 							<CardTitle>{user?.firstName + ' ' + user?.lastName}</CardTitle>
 						</CardHeader>
@@ -42,6 +44,25 @@ const ManageContactListDetail: FC = () => {
 								variant="primary"
 							>
 								Generate Free Trial Code
+							</Button>
+							{freeTrialCode && <Input value={freeTrialCode} readOnly />}
+						</CardContent>
+					</Card> */}
+					<Card size="lg">
+						<CardHeader>
+							<CardTitle>{user?.firstName + ' ' + user?.lastName}</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<Button
+								className="mb-2"
+								onClick={handleSignUpFreeSubscription}
+								variant="primary"
+								isLoading={isPendingCreateStripeSubscription}
+								disabled={hasPartnerSubscription}
+							>
+								{hasPartnerSubscription
+									? 'Partner Subscription Active'
+									: 'Assign Free Subscription'}
 							</Button>
 							{freeTrialCode && <Input value={freeTrialCode} readOnly />}
 						</CardContent>
@@ -90,4 +111,4 @@ const ManageContactListDetail: FC = () => {
 	);
 };
 
-export default ManageContactListDetail;
+export default ManageUserDetail;
