@@ -22,11 +22,11 @@ interface EditLeadData {
 	data: PatchLeadData;
 }
 
-export const useGetLeads = (options: LeadQueryOptions) => {
+export const useGetLeads = () => {
 	return useQuery<Lead[]>({
 		queryKey: QUERY_KEYS.list(),
 		queryFn: async () => {
-			const url = appendQueryParamsToUrl(urls.api.leads.index, options.filters);
+			const url = appendQueryParamsToUrl(urls.api.leads.index);
 			const response = await _fetch(url);
 			if (!response.ok) {
 				throw new Error('Failed to fetch leads');

@@ -93,11 +93,7 @@ export const useManageUsers = () => {
 	];
 
 	const { data: users, isPending: isPendingUsers } = useGetUsers();
-	const { data: leads, isPending: isPendingLeads } = useGetLeads({
-		filters: {
-			email: '',
-		},
-	});
+	const { data: leads, isPending: isPendingLeads } = useGetLeads();
 
 	const handleRowClick = (rowData: User) => {
 		router.push(urls.admin.users.detail(rowData.clerkId));
