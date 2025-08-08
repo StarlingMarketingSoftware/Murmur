@@ -1,3 +1,4 @@
+import { useCreateLead } from '@/hooks/queryHooks/useLeads';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -23,6 +24,10 @@ export const useLeadSender = () => {
 				'Thank you for your interest in Murmur! We will be in touch shortly.',
 		});
 
+	const { mutate: createLead, isPending: isPendingCreateLead } = useCreateLead({
+		suppressToasts: true,
+	});
+
 	const onSubmit = (values: z.infer<typeof leadFormSchema>) => {
 		const emailBody: string = `
 			<p>A new lead has submitted their email through Murmur.</p>
@@ -37,11 +42,17 @@ export const useLeadSender = () => {
 			subject: 'New Murmur Inquiry',
 			message: emailBody,
 		});
+
+		createLead({
+			email: values.email,
+		});
 	};
+
+	const isPending = isSendingMailgunMessage || isPendingCreateLead;
 
 	return {
 		form,
 		onSubmit,
-		isSendingMailgunMessage,
+		isPending,
 	};
 };

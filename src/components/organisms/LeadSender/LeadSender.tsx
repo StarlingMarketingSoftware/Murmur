@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Typography } from '@/components/ui/typography';
 
 export const LeadSender = () => {
-	const { form, onSubmit, isSendingMailgunMessage } = useLeadSender();
+	const { form, onSubmit, isPending } = useLeadSender();
 	return (
 		<Form {...form}>
 			<div className="flex flex-col items-center">
@@ -38,7 +38,7 @@ export const LeadSender = () => {
 					<Button
 						type="submit"
 						variant="ghost"
-						isLoading={isSendingMailgunMessage}
+						isLoading={isPending}
 						className="!h-[50px] !opacity-100 sm:!h-[68px] px-4 sm:px-6 bg-background hover:bg-gray-100 !border-foreground border-1 text-foreground !text-[16px] sm:!text-[20px] lg:!text-[25px] -translate-x-2"
 					>
 						Try for Free
