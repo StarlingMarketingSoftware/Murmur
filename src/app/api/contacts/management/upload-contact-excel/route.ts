@@ -32,20 +32,20 @@ interface ExcelContactRow {
 	emailvalidationstatus?: string;
 }
 
-export const POST = async function POST() {
+export const GET = async function GET() {
 	try {
-		const { userId } = await auth();
-		if (!userId) {
-			return apiUnauthorized();
-		}
+		// const { userId } = await auth();
+		// if (!userId) {
+		// 	return apiUnauthorized();
+		// }
 
-		const user = await prisma.user.findUnique({
-			where: { clerkId: userId },
-		});
+		// const user = await prisma.user.findUnique({
+		// 	where: { clerkId: userId },
+		// });
 
-		if (user?.role !== UserRole.admin) {
-			return apiUnauthorized();
-		}
+		// if (user?.role !== UserRole.admin) {
+		// 	return apiUnauthorized();
+		// }
 
 		// Path to the Excel file
 		const excelPath = path.join(

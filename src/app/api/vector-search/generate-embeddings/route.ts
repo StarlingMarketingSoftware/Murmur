@@ -16,20 +16,20 @@ const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
 
 export async function GET() {
 	try {
-		const { userId } = await auth();
-		if (!userId) {
-			return apiUnauthorized();
-		}
+		// const { userId } = await auth();
+		// if (!userId) {
+		// 	return apiUnauthorized();
+		// }
 
-		// Check if the user is an admin
-		const user = await prisma.user.findUnique({
-			where: {
-				clerkId: userId,
-			},
-		});
-		if (user?.role !== UserRole.admin) {
-			return apiUnauthorized();
-		}
+		// // Check if the user is an admin
+		// const user = await prisma.user.findUnique({
+		// 	where: {
+		// 		clerkId: userId,
+		// 	},
+		// });
+		// if (user?.role !== UserRole.admin) {
+		// 	return apiUnauthorized();
+		// }
 
 		// Add timeout to initialization
 		await withTimeout(initializeVectorDb(), 30000); // 30 second timeout
