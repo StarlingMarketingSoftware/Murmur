@@ -52,6 +52,7 @@ function filterAllowedContactFields(
 
 export const PATCH = async function PATCH() {
 	try {
+		console.log('hi');
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
