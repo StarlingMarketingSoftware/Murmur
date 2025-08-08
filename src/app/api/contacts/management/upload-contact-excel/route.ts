@@ -47,12 +47,18 @@ export const GET = async function GET() {
 		// 	return apiUnauthorized();
 		// }
 
+		console.log('Database URL:', process.env.POSTGRES_PRISMA_URL_PRODUCTION);
+
+		// Test database connection
+		await prisma.$connect();
+		console.log('Successfully connected to database');
+
 		// Path to the Excel file
 		const excelPath = path.join(
 			process.cwd(),
 			'public',
 			'contactLists',
-			'V1 Database pt. 4_valid.xlsx'
+			'test1Contact.xlsx'
 		);
 		const fileBuffer = fs.readFileSync(excelPath);
 
