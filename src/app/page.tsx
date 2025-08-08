@@ -16,6 +16,7 @@ import { GradientBanner } from '@/components/molecules/GradientBanner/GradientBa
 import { VideoPlayer } from '@/components/molecules/VideoPlayer/VideoPlayer';
 import { ComparisonTable } from '@/components/molecules/ComparisonTable/ComparisonTable';
 import { ScrollingReviews } from '@/components/molecules/ScrollingReviews/ScrollingReviews';
+import { LeadSender } from '@/components/organisms/LeadSender/LeadSender';
 
 const FAQS: FAQ[] = [
 	{
@@ -90,11 +91,12 @@ export default function HomePage() {
 					</div>
 					<Typography
 						variant="h2"
-						className="text-center text-[24px] sm:text-[37px] px-2 mt-8"
+						className="text-center text-[24px] sm:text-[37px] px-2 mt-8 mb-10 md:mb-20"
 					>
 						Cut Through The Noise.<br></br> Get Contacts. Get Work. Email Anyone.
 					</Typography>
-					<div className="mt-24 flex justify-center">
+					<LeadSender />
+					<div className="mt-10 md:mt-15 flex justify-center">
 						{!isSignedIn ? (
 							<SignUpButton mode="modal">
 								<Button
