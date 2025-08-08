@@ -80,7 +80,7 @@ export async function generateVectorEmbeddingsWithExcelLogging() {
 		console.log(`\n--- Starting iteration ${iteration}... ---`);
 
 		const response = await fetch(
-			'http://localhost:3001/api/vector-search/generate-embeddings',
+			'http://localhost:3000/api/vector-search/generate-embeddings',
 			{
 				method: 'GET',
 				headers: {
@@ -145,7 +145,7 @@ export async function generateVectorEmbeddings() {
 		console.log(`Starting iteration ${iteration}...`);
 
 		const response = await fetch(
-			'http://localhost:3001/api/vector-search/generate-embeddings',
+			'http://localhost:3000/api/vector-search/generate-embeddings',
 			{
 				method: 'GET',
 				headers: {
