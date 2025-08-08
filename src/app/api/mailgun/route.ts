@@ -1,13 +1,7 @@
 import FormData from 'form-data';
 import Mailgun from 'mailgun.js';
 import { formatHTMLForEmailClients, replacePTagsInSignature } from '@/utils';
-import { auth } from '@clerk/nextjs/server';
-import {
-	apiBadRequest,
-	apiResponse,
-	apiUnauthorized,
-	handleApiError,
-} from '@/app/api/_utils';
+import { apiBadRequest, apiResponse, handleApiError } from '@/app/api/_utils';
 import { z } from 'zod';
 
 const postMailgunSchema = z.object({
@@ -22,11 +16,6 @@ export type PostMailgunData = z.infer<typeof postMailgunSchema>;
 
 export async function POST(request: Request) {
 	try {
-		const { userId } = await auth();
-		if (!userId) {
-			return apiUnauthorized();
-		}
-
 		const data = await request.json();
 		const validatedData = postMailgunSchema.safeParse(data);
 		if (!validatedData.success) {

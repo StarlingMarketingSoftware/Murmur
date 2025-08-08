@@ -1,8 +1,9 @@
 'use client';
 import { TableSortingButton } from '@/components/molecules/CustomTable/CustomTable';
 import { urls } from '@/constants/urls';
+import { useGetLeads } from '@/hooks/queryHooks/useLeads';
 import { useGetUsers } from '@/hooks/queryHooks/useUsers';
-import { User } from '@prisma/client';
+import { Lead, User } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
 import { useRouter } from 'next/navigation';
 
@@ -76,7 +77,23 @@ export const useManageUsers = () => {
 		},
 	];
 
+	const leadsColumns: ColumnDef<Lead>[] = [
+		{
+			accessorKey: 'email',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Email" />;
+			},
+		},
+		{
+			accessorKey: 'createdAt',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Created At" />;
+			},
+		},
+	];
+
 	const { data: users, isPending: isPendingUsers } = useGetUsers();
+	const { data: leads, isPending: isPendingLeads } = useGetLeads();
 
 	const handleRowClick = (rowData: User) => {
 		router.push(urls.admin.users.detail(rowData.clerkId));
@@ -87,5 +104,8 @@ export const useManageUsers = () => {
 		handleRowClick,
 		users,
 		isPendingUsers,
+		leads,
+		isPendingLeads,
+		leadsColumns,
 	};
 };
