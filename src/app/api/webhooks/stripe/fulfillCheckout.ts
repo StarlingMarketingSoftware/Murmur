@@ -6,6 +6,7 @@ import { StripeSubscriptionStatus } from '@/types';
 
 type StripeSubscription = Stripe.Subscription;
 export async function fulfillCheckout(
+	promoCodeId: string | null | undefined,
 	subscription: StripeSubscription,
 	sessionId: string
 ) {
@@ -34,6 +35,7 @@ export async function fulfillCheckout(
 					stripePriceId: priceId,
 					stripeSubscriptionStatus: subscription.status,
 					lastCreditUpdate: new Date(),
+					stripePromoCode: promoCodeId,
 					draftCredits: isFreeTrial
 						? subscriptionTier?.trialDraftCredits || 0
 						: subscriptionTier?.draftCredits || 0,

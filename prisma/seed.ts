@@ -200,6 +200,7 @@ const userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
 		role: 'admin',
 		aiDraftCredits: 1000,
 		aiTestCredits: 100,
+		stripePromoCode: null,
 		customDomain: '',
 		stripeCustomerId: 'cus_SWKynJjTpn1Taw',
 		stripeSubscriptionId: 'sub_1RbINU02Nskp21xSVq5hb7x6',
@@ -219,6 +220,7 @@ const userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
 		role: 'user',
 		aiDraftCredits: 1000,
 		aiTestCredits: 100,
+		stripePromoCode: null,
 		customDomain: '',
 
 		stripeCustomerId: 'cus_SPE3wRaFWOtqDF',
@@ -240,6 +242,7 @@ const userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
 		customDomain: '',
 		aiDraftCredits: 1000,
 		aiTestCredits: 100,
+		stripePromoCode: null,
 		stripeCustomerId: 'cus_SWL0AB6nMvD5qb',
 		stripeSubscriptionId: null,
 		stripePriceId: null,
