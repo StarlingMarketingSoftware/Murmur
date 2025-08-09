@@ -9,14 +9,15 @@ const VECTOR_DIMENSION = 1536;
 const INDEX_NAME = 'contacts';
 
 const openai = new OpenAI({
-	apiKey: process.env.OPEN_AI_API_KEY!,
+	apiKey: process.env.OPEN_AI_API_KEY || process.env.OPENAI_API_KEY,
 });
 
 const elasticsearch = new Client({
 	node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
-	auth: {
-		apiKey: process.env.ELASTICSEARCH_API_KEY!,
-	},
+	// In local docker-compose we disable security, so auth may be omitted
+	auth: process.env.ELASTICSEARCH_API_KEY
+		? { apiKey: process.env.ELASTICSEARCH_API_KEY }
+		: undefined,
 });
 
 interface ContactDocument {
@@ -317,8 +318,7 @@ export type QueryJson = {
 };
 export const searchSimilarContacts = async (
 	queryJson: QueryJson,
-	limit: number = 10,
-	minScore: number = 0.3
+	limit: number = 10
 ) => {
 	const response = await openai.embeddings.create({
 		input: queryJson.restOfQuery,
@@ -358,30 +358,30 @@ export const searchSimilarContacts = async (
 					// Exact location matching using term queries
 					...(queryJson.state
 						? [
-								{
-									term: {
-										'state.keyword': queryJson.state.toLowerCase(),
-									},
+							{
+								term: {
+									'state.keyword': queryJson.state.toLowerCase(),
 								},
-						  ]
+							},
+						]
 						: []),
 					...(queryJson.city
 						? [
-								{
-									term: {
-										'city.keyword': queryJson.city.toLowerCase(),
-									},
+							{
+								term: {
+									'city.keyword': queryJson.city.toLowerCase(),
 								},
-						  ]
+							},
+						]
 						: []),
 					...(queryJson.country
 						? [
-								{
-									term: {
-										'country.keyword': queryJson.country.toLowerCase(),
-									},
+							{
+								term: {
+									'country.keyword': queryJson.country.toLowerCase(),
 								},
-						  ]
+							},
+						]
 						: []),
 				],
 			},
@@ -411,10 +411,10 @@ export const searchSimilarContacts = async (
 		_source: false,
 	});
 
-	const filteredHits = results.hits.hits.filter((hit) => (hit._score || 0) >= minScore);
+	const hits = results.hits.hits;
 
 	return {
-		matches: filteredHits.map((hit) => ({
+		matches: hits.map((hit) => ({
 			id: hit._id,
 			score: hit._score || 0,
 			metadata: {
@@ -439,8 +439,7 @@ export const searchSimilarContacts = async (
 				location: hit.fields?.location?.[0],
 			},
 		})),
-		totalFound: filteredHits.length,
-		minScoreApplied: minScore,
+		totalFound: hits.length,
 	};
 };
 

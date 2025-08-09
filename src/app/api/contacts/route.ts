@@ -233,10 +233,9 @@ export async function GET(req: NextRequest) {
 		if (useVectorSearch && query) {
 			const vectorSearchResults = await searchSimilarContacts(
 				queryJson,
-				VECTOR_SEARCH_LIMIT,
-				7.9
+				VECTOR_SEARCH_LIMIT
 			);
-			// 8.1 seemed like a good limit to keep noise out of music venues...but restrictive for
+			// removed score threshold; let ES ranking and downstream filters decide
 
 			// Create a map of contactId to relevance score for efficient lookup
 			// const relevanceMap = new Map<number, number>();
