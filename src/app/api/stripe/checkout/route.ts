@@ -61,6 +61,7 @@ export async function POST(req: Request) {
 				mode: 'subscription',
 				success_url: `${BASE_URL}${urls.murmur.dashboard.index}?success=true`,
 				cancel_url: `${BASE_URL}${urls.murmur.dashboard.index}?canceled=true`,
+				allow_promotion_codes: true,
 				subscription_data: freeTrial
 					? {
 							trial_period_days: 7,
