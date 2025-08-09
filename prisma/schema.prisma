@@ -86,6 +86,7 @@ model User {
   stripeSubscriptionId     String?
   stripeSubscriptionStatus String?
   stripePriceId            String?
+  stripePromoCode          String?
   createdAt                DateTime          @default(now())
   updatedAt                DateTime          @updatedAt
   emails                   Email[]

@@ -75,6 +75,12 @@ export const useManageUsers = () => {
 				);
 			},
 		},
+		{
+			accessorKey: 'stripePromoCode',
+			header: ({ column }) => {
+				return <TableSortingButton column={column} label="Promo Code ID" />;
+			},
+		},
 	];
 
 	const leadsColumns: ColumnDef<Lead>[] = [

@@ -35,12 +35,20 @@ export async function POST(req: Request) {
 
 	try {
 		if (event.type === 'checkout.session.completed') {
-			const session = event.data.object as Stripe.Checkout.Session;
+			const session = event.data.object as Stripe.Checkout.Session & {
+				discounts?: Array<{
+					promotion_code: string;
+				}>;
+			};
 			const newSubscription = await stripe.subscriptions.retrieve(
 				session.subscription as string
 			);
 
-			const customer = await fulfillCheckout(newSubscription, session.id);
+			const customer = await fulfillCheckout(
+				session.discounts?.[0].promotion_code as string,
+				newSubscription,
+				session.id
+			);
 
 			return apiResponse(customer);
 		} else if (event.type === 'customer.subscription.updated') {
