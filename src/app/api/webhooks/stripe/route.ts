@@ -45,7 +45,7 @@ export async function POST(req: Request) {
 			);
 
 			const customer = await fulfillCheckout(
-				session.discounts?.[0].promotion_code as string,
+				session.discounts?.[0]?.promotion_code,
 				newSubscription,
 				session.id
 			);

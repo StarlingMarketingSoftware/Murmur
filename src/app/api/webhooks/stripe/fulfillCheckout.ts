@@ -6,7 +6,7 @@ import { StripeSubscriptionStatus } from '@/types';
 
 type StripeSubscription = Stripe.Subscription;
 export async function fulfillCheckout(
-	promoCodeId: string,
+	promoCodeId: string | null | undefined,
 	subscription: StripeSubscription,
 	sessionId: string
 ) {
