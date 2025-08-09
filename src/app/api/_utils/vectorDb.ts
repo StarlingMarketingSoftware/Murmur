@@ -92,36 +92,6 @@ export const initializeVectorDb = async () => {
 				index: INDEX_NAME,
 				settings: {
 					analysis: {
-						analyzer: {
-							murmur_analyzer: {
-								type: 'custom',
-								tokenizer: 'standard',
-								filter: [
-									'lowercase',
-									'murmur_synonyms',
-									'english_stop',
-									'english_stemmer',
-								],
-							},
-						},
-						filter: {
-							english_stop: {
-								type: 'stop',
-								stopwords: '_english_',
-							},
-							english_stemmer: {
-								type: 'stemmer',
-								language: 'english',
-							},
-							murmur_synonyms: {
-								type: 'synonym_graph',
-								synonyms: [
-									'philly, philadelphia',
-									'dc, district of columbia, washington dc',
-									'nyc, new york city',
-								],
-							},
-						},
 						normalizer: {
 							lowercase: {
 								type: 'custom',
@@ -142,87 +112,75 @@ export const initializeVectorDb = async () => {
 						email: { type: 'keyword' },
 						firstName: {
 							type: 'text',
-							analyzer: 'murmur_analyzer',
 							fields: {
 								keyword: { type: 'keyword', normalizer: 'lowercase' },
 							},
 						},
 						lastName: {
 							type: 'text',
-							analyzer: 'murmur_analyzer',
 							fields: {
 								keyword: { type: 'keyword', normalizer: 'lowercase' },
 							},
 						},
 						company: {
 							type: 'text',
-							analyzer: 'murmur_analyzer',
 							fields: {
 								keyword: { type: 'keyword', normalizer: 'lowercase' },
 							},
 						},
 						title: {
 							type: 'text',
-							analyzer: 'murmur_analyzer',
 							fields: {
 								keyword: { type: 'keyword', normalizer: 'lowercase' },
 							},
 						},
-						headline: { type: 'text', analyzer: 'murmur_analyzer' },
+						headline: { type: 'text' },
 						city: {
 							type: 'text',
-							analyzer: 'murmur_analyzer',
 							fields: {
 								keyword: { type: 'keyword', normalizer: 'lowercase' },
 							},
 						},
 						state: {
 							type: 'text',
-							analyzer: 'murmur_analyzer',
 							fields: {
 								keyword: { type: 'keyword', normalizer: 'lowercase' },
 							},
 						},
 						country: {
 							type: 'text',
-							analyzer: 'murmur_analyzer',
 							fields: {
 								keyword: { type: 'keyword', normalizer: 'lowercase' },
 							},
 						},
-						address: { type: 'text', analyzer: 'murmur_analyzer' },
+						address: { type: 'text' },
 						location: {
 							type: 'text',
-							analyzer: 'murmur_analyzer',
 							fields: {
 								keyword: { type: 'keyword', normalizer: 'lowercase' },
 							},
 						},
 						website: { type: 'text' },
-						metadata: { type: 'text', analyzer: 'murmur_analyzer' },
+						metadata: { type: 'text' },
 						companyFoundedYear: { type: 'text' },
 						companyType: {
 							type: 'text',
-							analyzer: 'murmur_analyzer',
 							fields: {
 								keyword: { type: 'keyword', normalizer: 'lowercase' },
 							},
 						},
 						companyTechStack: {
 							type: 'text',
-							analyzer: 'murmur_analyzer',
 							fields: {
 								keyword: { type: 'keyword', normalizer: 'lowercase' },
 							},
 						},
 						companyKeywords: {
 							type: 'text',
-							analyzer: 'murmur_analyzer',
 							fields: { keyword: { type: 'keyword', normalizer: 'lowercase' } },
 						},
 						companyIndustry: {
 							type: 'text',
-							analyzer: 'murmur_analyzer',
 							fields: {
 								keyword: { type: 'keyword', normalizer: 'lowercase' },
 							},
@@ -395,25 +353,9 @@ export const searchSimilarContacts = async (
 							fuzziness: 'AUTO',
 						},
 					},
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> dc4e480c3d3cc968def84190420dffcbc8db5a02
-					{
-						multi_match: {
-							query: queryJson.restOfQuery,
-							fields: ['companyType^4', 'companyIndustry^4', 'title^4'],
-							type: 'phrase',
-						},
-					},
-<<<<<<< HEAD
-=======
 				],
 				must: [
 					// Exact location matching using term queries
->>>>>>> parent of 5a005d3 (part 2 commit)
-=======
->>>>>>> dc4e480c3d3cc968def84190420dffcbc8db5a02
 					...(queryJson.state
 						? [
 								{
