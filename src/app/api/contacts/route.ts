@@ -59,6 +59,10 @@ export type PostContactData = z.infer<typeof createContactSchema>;
 
 export async function GET(req: NextRequest) {
 	try {
+		console.log(
+			'--- DEBUG: API Key from env:',
+			process.env.OPENAI_API_KEY ? 'Exists' : 'MISSING!'
+		);
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
@@ -234,7 +238,7 @@ export async function GET(req: NextRequest) {
 			const vectorSearchResults = await searchSimilarContacts(
 				queryJson,
 				VECTOR_SEARCH_LIMIT,
-				7.9
+				0.1  // Reasonable threshold for kNN scores (0.0-1.0 range)
 			);
 			// 8.1 seemed like a good limit to keep noise out of music venues...but restrictive for
 
@@ -248,9 +252,9 @@ export async function GET(req: NextRequest) {
 			// 	relevanceMap.set(contactId, relevanceScore);
 			// });
 
-			const vectorSearchContactIds = vectorSearchResults.matches.map((match) =>
-				Number(match.metadata.contactId)
-			);
+			const vectorSearchContactIds = vectorSearchResults.matches
+				.map((match) => Number(match.metadata.contactId ?? match.id))
+				.filter((n) => Number.isFinite(n));
 
 			// const vectorSearchContactEmails = vectorSearchResults.matches.map(
 			// 	(match) => match.metadata.email
@@ -272,6 +276,66 @@ export async function GET(req: NextRequest) {
 						: undefined,
 				},
 			});
+
+			// Fallback: if local Postgres doesn't have these contacts, return minimal data from Elasticsearch directly
+			if (!contacts || contacts.length === 0) {
+				const fallbackContacts = vectorSearchResults.matches.map((match) => {
+					const md: any = match.metadata || {};
+					const parsedId = Number(md.contactId);
+					const toArray = (val: any) =>
+						Array.isArray(val)
+							? val
+							: val
+							? String(val)
+									.split(',')
+									.map((s) => s.trim())
+									.filter(Boolean)
+							: [];
+
+					return {
+						id: Number.isFinite(parsedId) ? parsedId : Math.floor(Math.random() * 1_000_000_000),
+						apolloPersonId: null,
+						firstName: md.firstName ?? null,
+						lastName: md.lastName ?? null,
+						email: md.email ?? '',
+						company: md.company ?? null,
+						city: md.city ?? null,
+						state: md.state ?? null,
+						country: md.country ?? null,
+						address: md.address ?? null,
+						phone: null,
+						website: md.website ?? null,
+						title: md.title ?? null,
+						headline: md.headline ?? null,
+						linkedInUrl: null,
+						photoUrl: null,
+						metadata: md.metadata ?? null,
+						companyLinkedInUrl: null,
+						companyFoundedYear: md.companyFoundedYear ?? null,
+						companyType: md.companyType ?? null,
+						companyTechStack: toArray(md.companyTechStack),
+						companyPostalCode: null,
+						companyKeywords: toArray(md.companyKeywords),
+						companyIndustry: md.companyIndustry ?? null,
+						latitude: null,
+						longitude: null,
+						isPrivate: false,
+						hasVectorEmbedding: true,
+						userContactListCount: 0,
+						manualDeselections: 0,
+						lastResearchedDate: null,
+						emailValidationStatus: 'valid',
+						emailValidationSubStatus: null,
+						emailValidatedAt: null,
+						createdAt: new Date().toISOString() as unknown as Date,
+						updatedAt: new Date().toISOString() as unknown as Date,
+						userId: null,
+						contactListId: null,
+					};
+				});
+
+				return apiResponse(fallbackContacts.slice(0, limit));
+			}
 
 			// if (contacts.length < 100) {
 			// 	const fallbackContacts = await substringSearch();

@@ -14,9 +14,12 @@ const openai = new OpenAI({
 
 const elasticsearch = new Client({
 	node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
-	auth: {
-		apiKey: process.env.ELASTICSEARCH_API_KEY!,
-	},
+	// Remove auth for local development
+	...(process.env.ELASTICSEARCH_API_KEY && {
+		auth: {
+			apiKey: process.env.ELASTICSEARCH_API_KEY,
+		},
+	}),
 });
 
 interface ContactDocument {
@@ -318,7 +321,8 @@ export type QueryJson = {
 export const searchSimilarContacts = async (
 	queryJson: QueryJson,
 	limit: number = 10,
-	minScore: number = 0.3
+	minScore: number = 0.3,
+	locationStrategy: 'strict' | 'flexible' | 'broad' = 'flexible'
 ) => {
 	const response = await openai.embeddings.create({
 		input: queryJson.restOfQuery,
@@ -326,65 +330,44 @@ export const searchSimilarContacts = async (
 	});
 	const queryEmbedding = response.data[0].embedding;
 
-	// Search Elasticsearch using kNN search
+	// Configure location boost strategy for post-processing
+	const locationBoosts = {
+		strict: { exact: 0.0, fuzzy: 0.0 }, // No post-processing boost for strict (uses filters)
+		flexible: { exact: 0.2, fuzzy: 0.1 }, // Moderate location preference
+		broad: { exact: 0.1, fuzzy: 0.05 }   // Light location preference
+	};
+	const boosts = locationBoosts[locationStrategy];
+
+	// Build location filters for kNN (only hard filters in strict mode)
+	const buildLocationFilters = () => {
+		if (locationStrategy !== 'strict') return [];
+		
+		const filters = [];
+		
+		if (queryJson.state) {
+			filters.push({ term: { 'state.keyword': queryJson.state.toLowerCase() } });
+		}
+		if (queryJson.city) {
+			filters.push({ term: { 'city.keyword': queryJson.city.toLowerCase() } });
+		}
+		if (queryJson.country) {
+			filters.push({ term: { 'country.keyword': queryJson.country.toLowerCase() } });
+		}
+		
+		return filters;
+	};
+
+	const locationFilters = buildLocationFilters();
+
+	// Pure kNN search - let vector embeddings handle semantic matching
 	const results = await elasticsearch.search<ContactDocument>({
 		index: INDEX_NAME,
 		knn: {
 			field: 'vector_field',
 			query_vector: queryEmbedding,
-			k: limit,
-			num_candidates: 10000, // maximum is 10,000
-		},
-		query: {
-			bool: {
-				should: [
-					// confirm that this emphasizes the correct fields
-					{
-						multi_match: {
-							query: queryJson.restOfQuery,
-							fields: [
-								'title',
-								'headline',
-								'company',
-								'companyIndustry',
-								'companyKeywords',
-							],
-							type: 'best_fields',
-							fuzziness: 'AUTO',
-						},
-					},
-				],
-				must: [
-					// Exact location matching using term queries
-					...(queryJson.state
-						? [
-								{
-									term: {
-										'state.keyword': queryJson.state.toLowerCase(),
-									},
-								},
-						  ]
-						: []),
-					...(queryJson.city
-						? [
-								{
-									term: {
-										'city.keyword': queryJson.city.toLowerCase(),
-									},
-								},
-						  ]
-						: []),
-					...(queryJson.country
-						? [
-								{
-									term: {
-										'country.keyword': queryJson.country.toLowerCase(),
-									},
-								},
-						  ]
-						: []),
-				],
-			},
+			k: locationStrategy === 'strict' ? limit : Math.min(limit * 3, 100), // Get more candidates for filtering
+			num_candidates: 10000,
+			filter: locationFilters.length > 0 ? locationFilters : undefined,
 		},
 		size: limit,
 		fields: [
@@ -411,10 +394,52 @@ export const searchSimilarContacts = async (
 		_source: false,
 	});
 
-	const filteredHits = results.hits.hits.filter((hit) => (hit._score || 0) >= minScore);
+	// Post-process results for location preferences (flexible/broad modes only)
+	const processResultsWithLocationBoost = (hits: any[]) => {
+		if (locationStrategy === 'strict' || boosts.exact === 0) {
+			return hits;
+		}
+
+		return hits.map(hit => {
+			let locationBoost = 0;
+			
+			// Check for exact location matches
+			if (queryJson.state && hit.fields?.state?.[0]?.toLowerCase() === queryJson.state.toLowerCase()) {
+				locationBoost += boosts.exact;
+			}
+			if (queryJson.city && hit.fields?.city?.[0]?.toLowerCase() === queryJson.city.toLowerCase()) {
+				locationBoost += boosts.exact;
+			}
+			if (queryJson.country && hit.fields?.country?.[0]?.toLowerCase() === queryJson.country.toLowerCase()) {
+				locationBoost += boosts.exact;
+			}
+			
+			// Check for fuzzy location matches
+			if (queryJson.state && hit.fields?.state?.[0]) {
+				const hitState = hit.fields.state[0].toLowerCase();
+				const queryState = queryJson.state.toLowerCase();
+				if (hitState.includes(queryState.substring(0, 2)) || queryState.includes(hitState.substring(0, 2))) {
+					locationBoost += boosts.fuzzy;
+				}
+			}
+			
+			// Apply location boost to score
+			const originalScore = hit._score || 0;
+			const boostedScore = originalScore + locationBoost;
+			
+			return {
+				...hit,
+				_score: boostedScore
+			};
+		})
+		.sort((a, b) => (b._score || 0) - (a._score || 0)) // Re-sort by boosted score
+		.slice(0, limit); // Apply final limit
+	};
+
+	const processedHits = processResultsWithLocationBoost(results.hits.hits);
 
 	return {
-		matches: filteredHits.map((hit) => ({
+		matches: processedHits.map((hit) => ({
 			id: hit._id,
 			score: hit._score || 0,
 			metadata: {
@@ -439,8 +464,8 @@ export const searchSimilarContacts = async (
 				location: hit.fields?.location?.[0],
 			},
 		})),
-		totalFound: filteredHits.length,
-		minScoreApplied: minScore,
+		totalFound: processedHits.length,
+		locationStrategy: locationStrategy,
 	};
 };
 
@@ -529,4 +554,32 @@ export const searchContactsByLocation = async (
 		totalFound: results.hits.hits.length,
 		distanceKm,
 	};
+};
+
+// Add this temporarily for debugging
+export const debugElasticsearch = async () => {
+	try {
+		// Check if index exists
+		const indexExists = await elasticsearch.indices.exists({ index: INDEX_NAME });
+		console.log(`Index '${INDEX_NAME}' exists:`, indexExists);
+		
+		if (indexExists) {
+			// Get document count
+			const count = await elasticsearch.count({ index: INDEX_NAME });
+			console.log(`Document count in '${INDEX_NAME}':`, count.count);
+			
+			// Get a sample document
+			const sample = await elasticsearch.search({
+				index: INDEX_NAME,
+				size: 1,
+				_source: true
+			});
+			console.log('Sample document:', JSON.stringify(sample.hits.hits[0], null, 2));
+		}
+		
+		return { indexExists, status: 'ok' };
+	} catch (error) {
+		console.error('Elasticsearch debug error:', error);
+		return { error: error.message };
+	}
 };
