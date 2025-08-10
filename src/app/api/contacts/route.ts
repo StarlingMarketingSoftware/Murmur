@@ -98,7 +98,8 @@ export async function GET(req: NextRequest) {
 			query || ''
 		);
 
-		const queryJson = JSON.parse(locationResponse);
+        const queryJson = JSON.parse(locationResponse);
+        const effectiveLocationStrategy = queryJson?.state ? 'strict' : 'flexible';
 
 		const numberContactListIds: number[] =
 			contactListIds?.map((id) => Number(id)).filter((id) => !isNaN(id)) || [];
@@ -234,11 +235,12 @@ export async function GET(req: NextRequest) {
 		}
 
 		// If vector search is enabled and we have a query, use vector search
-		if (useVectorSearch && query) {
+        if (useVectorSearch && query) {
 			const vectorSearchResults = await searchSimilarContacts(
 				queryJson,
 				VECTOR_SEARCH_LIMIT,
-				0.1  // Reasonable threshold for kNN scores (0.0-1.0 range)
+                0.1,  // Reasonable threshold for kNN scores (0.0-1.0 range)
+                effectiveLocationStrategy
 			);
 			// 8.1 seemed like a good limit to keep noise out of music venues...but restrictive for
 

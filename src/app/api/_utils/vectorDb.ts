@@ -338,36 +338,24 @@ export const searchSimilarContacts = async (
 	};
 	const boosts = locationBoosts[locationStrategy];
 
-	// Build location filters for kNN (only hard filters in strict mode)
-	const buildLocationFilters = () => {
-		if (locationStrategy !== 'strict') return [];
-		
-		const filters = [];
-		
-		if (queryJson.state) {
-			filters.push({ term: { 'state.keyword': queryJson.state.toLowerCase() } });
-		}
-		if (queryJson.city) {
-			filters.push({ term: { 'city.keyword': queryJson.city.toLowerCase() } });
-		}
-		if (queryJson.country) {
-			filters.push({ term: { 'country.keyword': queryJson.country.toLowerCase() } });
-		}
-		
-		return filters;
-	};
+    // Build strict state filter for kNN (enforce exact state only)
+    const buildStrictStateFilter = () => {
+        if (locationStrategy !== 'strict') return undefined;
+        if (!queryJson.state) return undefined;
+        return { term: { 'state.keyword': queryJson.state.toLowerCase() } } as const;
+    };
 
-	const locationFilters = buildLocationFilters();
+    const strictStateFilter = buildStrictStateFilter();
 
 	// Pure kNN search - let vector embeddings handle semantic matching
 	const results = await elasticsearch.search<ContactDocument>({
 		index: INDEX_NAME,
-		knn: {
+        knn: {
 			field: 'vector_field',
 			query_vector: queryEmbedding,
-			k: locationStrategy === 'strict' ? limit : Math.min(limit * 3, 100), // Get more candidates for filtering
+            k: locationStrategy === 'strict' ? limit : Math.min(limit * 3, 100), // Get more candidates for filtering
 			num_candidates: 10000,
-			filter: locationFilters.length > 0 ? locationFilters : undefined,
+            filter: strictStateFilter,
 		},
 		size: limit,
 		fields: [
@@ -578,8 +566,9 @@ export const debugElasticsearch = async () => {
 		}
 		
 		return { indexExists, status: 'ok' };
-	} catch (error) {
-		console.error('Elasticsearch debug error:', error);
-		return { error: error.message };
+    } catch (error) {
+        const err = error as Error;
+        console.error('Elasticsearch debug error:', err);
+        return { error: err.message };
 	}
 };
