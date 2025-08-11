@@ -10,6 +10,7 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { getValidatedParamsFromUrl } from '@/utils';
+import { applyHardcodedLocationOverrides } from '@/app/api/_utils/searchPreprocess';
 import { Contact, EmailVerificationStatus, Prisma } from '@prisma/client';
 import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vectorDb';
 import { OPEN_AI_MODEL_OPTIONS } from '@/constants';
@@ -98,7 +99,9 @@ export async function GET(req: NextRequest) {
 			query || ''
 		);
 
-        const queryJson = JSON.parse(locationResponse);
+        let queryJson = JSON.parse(locationResponse);
+        // Apply deterministic overrides (e.g., "manhattan" -> New York, NY)
+        queryJson = applyHardcodedLocationOverrides(query || '', queryJson);
         const effectiveLocationStrategy = queryJson?.state ? 'strict' : 'flexible';
 
 		const numberContactListIds: number[] =
