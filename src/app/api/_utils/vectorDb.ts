@@ -479,7 +479,7 @@ export const searchSimilarContacts = async (
 				_score: boostedScore
 			};
 		})
-		.sort((a, b) => (b._score || 0) - (a._score || 0)) // Re-sort by boosted score
+        .sort((a, b) => (b._score || 0) - (a._score || 0)) // Re-sort by boosted score
 		.slice(0, limit); // Apply final limit
 	};
 

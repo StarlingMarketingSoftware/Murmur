@@ -304,18 +304,35 @@ export async function GET(req: NextRequest) {
             let esMatches = vectorSearchResults.matches;
             if (prePostProfile.active && esMatches.length > 0) {
                 const excludeTerms = prePostProfile.excludeTerms.map((t) => t.toLowerCase());
+                const includeCompany = (prePostProfile.includeCompanyTerms || []).map((t) => t.toLowerCase());
+                const includeTitle = (prePostProfile.includeTitleTerms || []).map((t) => t.toLowerCase());
+                const includeWebsite = (prePostProfile.includeWebsiteTerms || []).map((t) => t.toLowerCase());
+                const includeIndustry = (prePostProfile.includeIndustryTerms || []).map((t) => t.toLowerCase());
+
                 const containsAny = (text: string | null | undefined, terms: string[]) => {
                     if (!text) return false;
                     const lc = String(text).toLowerCase();
                     return terms.some((t) => lc.includes(t));
                 };
+                const passesPositive = (md: any) => {
+                    if (!prePostProfile.requirePositive) return true;
+                    return (
+                        containsAny(md.company, includeCompany) ||
+                        containsAny(md.title, includeTitle) ||
+                        containsAny(md.headline, [...includeCompany, ...includeTitle]) ||
+                        containsAny(md.website, includeWebsite) ||
+                        containsAny(md.companyIndustry, includeIndustry) ||
+                        containsAny(md.metadata, [...includeCompany, ...includeTitle])
+                    );
+                };
                 esMatches = esMatches.filter((m) => {
                     const md: any = m.metadata || {};
-                    return !(
+                    const excluded =
                         containsAny(md.company, excludeTerms) ||
                         containsAny(md.title, excludeTerms) ||
-                        containsAny(md.headline, excludeTerms)
-                    );
+                        containsAny(md.headline, excludeTerms);
+                    if (excluded) return false;
+                    return passesPositive(md);
                 });
             }
 			// 8.1 seemed like a good limit to keep noise out of music venues...but restrictive for
@@ -370,39 +387,57 @@ export async function GET(req: NextRequest) {
                 });
             }
 
-            // Posttraining step: exclude or demote universities for music venue searches
+            // Posttraining step: exclude/demote and require positive venue signals when applicable
             const postProfile = getPostTrainingForQuery(query || '');
             if (postProfile.active && contacts.length > 0) {
                 const excludeTerms = postProfile.excludeTerms.map((t) => t.toLowerCase());
                 const demoteTerms = postProfile.demoteTerms.map((t) => t.toLowerCase());
+                const includeCompany = (postProfile.includeCompanyTerms || []).map((t) => t.toLowerCase());
+                const includeTitle = (postProfile.includeTitleTerms || []).map((t) => t.toLowerCase());
+                const includeWebsite = (postProfile.includeWebsiteTerms || []).map((t) => t.toLowerCase());
+                const includeIndustry = (postProfile.includeIndustryTerms || []).map((t) => t.toLowerCase());
 
                 const containsAny = (text: string | null | undefined, terms: string[]) => {
                     if (!text) return false;
                     const lc = text.toLowerCase();
                     return terms.some((t) => lc.includes(t));
                 };
+                const passesPositive = (c: Contact) => {
+                    if (!postProfile.requirePositive) return true;
+                    return (
+                        containsAny(c.company, includeCompany) ||
+                        containsAny(c.title, includeTitle) ||
+                        containsAny(c.headline as any, [...includeCompany, ...includeTitle]) ||
+                        containsAny(c.website as any, includeWebsite) ||
+                        containsAny(c.companyIndustry as any, includeIndustry) ||
+                        containsAny(c.metadata as any, [...includeCompany, ...includeTitle])
+                    );
+                };
 
-                // Exclude (hard if strictExclude=true)
+                // Exclude (hard if strictExclude=true), then require positive signals if configured
                 let filtered = contacts;
                 if (postProfile.strictExclude) {
-                    filtered = contacts.filter(
+                    filtered = filtered.filter(
                         (c) =>
                             !containsAny(c.company, excludeTerms) &&
                             !containsAny(c.title, excludeTerms) &&
                             !containsAny(c.headline as any, excludeTerms)
                     );
                 }
+                if (postProfile.requirePositive) {
+                    filtered = filtered.filter(passesPositive);
+                }
 
-                // If exclusion removed too many (e.g., fewer than limit), fill with demoted ones
+                // If exclusion removed too many (e.g., fewer than limit), fill with demoted ones that also pass positives (if required)
                 const finalLimit = limit ?? 100;
                 if (filtered.length < finalLimit) {
                     const demoted = contacts.filter(
                         (c) =>
-                            containsAny(c.company, demoteTerms) ||
-                            containsAny(c.title, demoteTerms) ||
-                            containsAny(c.headline as any, demoteTerms)
+                            (containsAny(c.company, demoteTerms) ||
+                                containsAny(c.title, demoteTerms) ||
+                                containsAny(c.headline as any, demoteTerms)) &&
+                            passesPositive(c)
                     );
-                    // append demoted at the end
                     filtered = [...filtered, ...demoted].slice(0, finalLimit);
                 }
 
@@ -505,6 +540,42 @@ export async function GET(req: NextRequest) {
 		} else {
 			// Use regular search if vector search is not enabled
 			contacts = await substringSearch();
+
+			// Apply post-training filters for substring search as well
+			const postProfile = getPostTrainingForQuery(query || '');
+			if (postProfile.active && contacts.length > 0) {
+				const excludeTerms = postProfile.excludeTerms.map((t) => t.toLowerCase());
+				const demoteTerms = postProfile.demoteTerms.map((t) => t.toLowerCase());
+
+				const containsAny = (text: string | null | undefined, terms: string[]) => {
+					if (!text) return false;
+					const lc = text.toLowerCase();
+					return terms.some((t) => lc.includes(t));
+				};
+
+				let filtered = contacts;
+				if (postProfile.strictExclude) {
+					filtered = contacts.filter(
+						(c) =>
+							!containsAny(c.company, excludeTerms) &&
+							!containsAny(c.title, excludeTerms) &&
+							!containsAny(c.headline as any, excludeTerms)
+					);
+				}
+
+				const finalLimit = limit ?? 100;
+				if (filtered.length < finalLimit) {
+					const demoted = contacts.filter(
+						(c) =>
+							containsAny(c.company, demoteTerms) ||
+							containsAny(c.title, demoteTerms) ||
+							containsAny(c.headline as any, demoteTerms)
+					);
+					filtered = [...filtered, ...demoted].slice(0, finalLimit);
+				}
+
+				contacts = filtered;
+			}
 
 			return apiResponse(contacts);
 		}
