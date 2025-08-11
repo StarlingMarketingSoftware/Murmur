@@ -28,19 +28,12 @@ const LOCATION_ALIASES: Record<string, HardcodedLocation> = {
   philadelphia: { city: 'Philadelphia', state: 'Pennsylvania', country: 'United States of America', forceExactCity: true },
   philly: { city: 'Philadelphia', state: 'Pennsylvania', country: 'United States of America', forceExactCity: true },
   phiadelphia: { city: 'Philadelphia', state: 'Pennsylvania', country: 'United States of America', forceExactCity: true },
-  // Brooklyn strict handling
   brooklyn: { city: 'Brooklyn', state: 'New York', country: 'United States of America', forceExactCity: true },
-  // Boston strict handling
   boston: { city: 'Boston', state: 'Massachusetts', country: 'United States of America', forceExactCity: true },
-  // Baltimore strict handling
   baltimore: { city: 'Baltimore', state: 'Maryland', country: 'United States of America', forceExactCity: true },
-  // Chicago strict handling
   chicago: { city: 'Chicago', state: 'Illinois', country: 'United States of America', forceExactCity: true },
-  // Nashville strict handling
   nashville: { city: 'Nashville', state: 'Tennessee', country: 'United States of America', forceExactCity: true },
-  // Memphis strict handling
   memphis: { city: 'Memphis', state: 'Tennessee', country: 'United States of America', forceExactCity: true },
-  // Washington, DC strict handling with common variations
   'washington dc': { city: 'Washington', state: 'District of Columbia', country: 'United States of America', forceExactCity: true },
   'washington, dc': { city: 'Washington', state: 'District of Columbia', country: 'United States of America', forceExactCity: true },
   'washingtondc': { city: 'Washington', state: 'District of Columbia', country: 'United States of America', forceExactCity: true },
@@ -48,19 +41,37 @@ const LOCATION_ALIASES: Record<string, HardcodedLocation> = {
   // Los Angeles: handle "LA" token elsewhere; include explicit alias forms here
   'los angeles': { city: 'Los Angeles', state: 'California', country: 'United States of America', forceExactCity: true },
   'losangeles': { city: 'Los Angeles', state: 'California', country: 'United States of America', forceExactCity: true },
-  // Las Vegas strict handling
   'las vegas': { city: 'Las Vegas', state: 'Nevada', country: 'United States of America', forceExactCity: true },
-  // Houston strict handling
+  'san antonio': { city: 'San Antonio', state: 'Texas', country: 'United States of America', forceExactCity: true },
+  'san diego': { city: 'San Diego', state: 'California', country: 'United States of America', forceExactCity: true },
+  'san jose': { city: 'San Jose', state: 'California', country: 'United States of America', forceExactCity: true },
+  'san francisco': { city: 'San Francisco', state: 'California', country: 'United States of America', forceExactCity: true },
+  'sanfrancisco': { city: 'San Francisco', state: 'California', country: 'United States of America', forceExactCity: true },
+  buffallo: { city: 'Buffalo', state: 'New York', country: 'United States of America', forceExactCity: true },
+  rochester: { city: 'Rochester', state: 'New York', country: 'United States of America', forceExactCity: true },
+  indianapolis: { city: 'Indianapolis', state: 'Indiana', country: 'United States of America', forceExactCity: true },
+  jacksonville: { city: 'Jacksonville', state: 'Florida', country: 'United States of America', forceExactCity: true },
   houston: { city: 'Houston', state: 'Texas', country: 'United States of America', forceExactCity: true },
-  // Austin strict handling
   austin: { city: 'Austin', state: 'Texas', country: 'United States of America', forceExactCity: true },
-  // Atlanta strict handling
+  dallas: { city: 'Dallas', state: 'Texas', country: 'United States of America', forceExactCity: true },
+  'fort worth': { city: 'Fort Worth', state: 'Texas', country: 'United States of America', forceExactCity: true },
+  'fortworth': { city: 'Fort Worth', state: 'Texas', country: 'United States of America', forceExactCity: true },
+  'el paso': { city: 'El Paso', state: 'Texas', country: 'United States of America', forceExactCity: true },
+  'elpaso': { city: 'El Paso', state: 'Texas', country: 'United States of America', forceExactCity: true },
   atlanta: { city: 'Atlanta', state: 'Georgia', country: 'United States of America', forceExactCity: true },
-  // Minneapolis strict handling
+  louisville: { city: 'Louisville', state: 'Kentucky', country: 'United States of America', forceExactCity: true },
+  charlotte: { city: 'Charlotte', state: 'North Carolina', country: 'United States of America', forceExactCity: true },
   minneapolis: { city: 'Minneapolis', state: 'Minnesota', country: 'United States of America', forceExactCity: true },
-  // Detroit strict handling
+  seattle: { city: 'Seattle', state: 'Washington', country: 'United States of America', forceExactCity: true },
+  denver: { city: 'Denver', state: 'Colorado', country: 'United States of America', forceExactCity: true },
+  hartford: { city: 'Hartford', state: 'Connecticut', country: 'United States of America', forceExactCity: true },
+  'kansas city': { city: 'Kansas City', state: 'Missouri', country: 'United States of America', forceExactCity: true },
+  'kansascity': { city: 'Kansas City', state: 'Missouri', country: 'United States of America', forceExactCity: true },
+  'oklahoma city': { city: 'Oklahoma City', state: 'Oklahoma', country: 'United States of America', forceExactCity: true },
+  'oklahomacity': { city: 'Oklahoma City', state: 'Oklahoma', country: 'United States of America', forceExactCity: true },
   detroit: { city: 'Detroit', state: 'Michigan', country: 'United States of America', forceExactCity: true },
-  // Phoenix strict handling (note: user requested spelling "Pheonix")
+  milwaukee: { city: 'Milwaukee', state: 'Wisconsin', country: 'United States of America', forceExactCity: true },
+  columbus: { city: 'Columbus', state: 'Ohio', country: 'United States of America', forceExactCity: true },
   pheonix: { city: 'Pheonix', state: 'Arizona', country: 'United States of America', forceExactCity: true },
   phoenix: { city: 'Phoenix', state: 'Arizona', country: 'United States of America', forceExactCity: true },
 };
