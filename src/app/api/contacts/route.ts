@@ -125,7 +125,7 @@ export async function GET(req: NextRequest) {
             }
         }
         // Apply deterministic overrides and tuning knobs
-        const { overrides, penaltyCities, forceCityExactCity, penaltyTerms, strictPenalty } = applyHardcodedLocationOverrides(query || '', queryJson);
+        const { overrides, penaltyCities, forceCityExactCity, forceStateAny, penaltyTerms, strictPenalty } = applyHardcodedLocationOverrides(query || '', queryJson);
         queryJson = overrides;
         const effectiveLocationStrategy = queryJson?.state ? 'strict' : 'flexible';
 
@@ -189,7 +189,11 @@ export async function GET(req: NextRequest) {
                 strictLocationAnd.push({ city: { equals: forceCityExactCity, mode: caseInsensitiveMode } });
             }
             if (forceCityExactCity && queryJson.state) {
-                strictLocationAnd.push({ state: { equals: queryJson.state, mode: caseInsensitiveMode } });
+                if (forceStateAny && forceStateAny.length > 0) {
+                    strictLocationAnd.push({ OR: forceStateAny.map((s) => ({ state: { equals: s, mode: caseInsensitiveMode } })) });
+                } else {
+                    strictLocationAnd.push({ state: { equals: queryJson.state, mode: caseInsensitiveMode } });
+                }
             }
 
             const whereConditions: Prisma.ContactWhereInput = {
@@ -276,7 +280,7 @@ export async function GET(req: NextRequest) {
                         effectiveVectorLimit,
                         0.1,
                         effectiveLocationStrategy,
-                        { penaltyCities, forceCityExactCity, penaltyTerms, strictPenalty }
+                        { penaltyCities, forceCityExactCity, forceStateAny, penaltyTerms, strictPenalty }
                     ),
                     new Promise<never>((_, reject) =>
                         setTimeout(() => reject(new Error('Vector search timed out')), timeoutMs)
@@ -347,6 +351,20 @@ export async function GET(req: NextRequest) {
 						: undefined,
 				},
 			});
+
+            // Defensive strict-location enforcement for vector results
+            if (forceCityExactCity && (queryJson.state || forceStateAny)) {
+                const allowedStates = forceStateAny && forceStateAny.length > 0
+                    ? new Set(forceStateAny.map((s) => s.toLowerCase()))
+                    : (queryJson.state ? new Set([queryJson.state.toLowerCase()]) : new Set<string>());
+                const targetCity = forceCityExactCity.toLowerCase();
+                contacts = contacts.filter((c) => {
+                    const cityOk = (c.city || '').toLowerCase() === targetCity;
+                    const stateVal = (c.state || '').toLowerCase();
+                    const stateOk = allowedStates.size === 0 ? true : allowedStates.has(stateVal);
+                    return cityOk && stateOk;
+                });
+            }
 
             // Posttraining step: exclude or demote universities for music venue searches
             const postProfile = getPostTrainingForQuery(query || '');

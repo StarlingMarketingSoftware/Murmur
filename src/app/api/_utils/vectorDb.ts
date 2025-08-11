@@ -327,7 +327,13 @@ export const searchSimilarContacts = async (
     limit: number = 10,
     minScore: number = 0.3,
     locationStrategy: 'strict' | 'flexible' | 'broad' = 'flexible',
-    options?: { penaltyCities?: string[]; forceCityExactCity?: string; penaltyTerms?: string[]; strictPenalty?: boolean }
+    options?: {
+        penaltyCities?: string[];
+        forceCityExactCity?: string;
+        forceStateAny?: string[];
+        penaltyTerms?: string[];
+        strictPenalty?: boolean;
+    }
 ) => {
 	const response = await openai.embeddings.create({
 		input: queryJson.restOfQuery,
@@ -343,11 +349,18 @@ export const searchSimilarContacts = async (
 	};
 	const boosts = locationBoosts[locationStrategy];
 
-    // Build strict state filter for kNN (enforce exact state only)
+    // Build strict state/city filter for kNN (enforce exact state and optional exact city)
     const buildStrictStateFilter = () => {
         if (locationStrategy !== 'strict') return undefined;
         const must: any[] = [];
-        if (queryJson.state) {
+        if (options?.forceStateAny && options.forceStateAny.length > 0) {
+            must.push({
+                bool: {
+                    should: options.forceStateAny.map((s) => ({ term: { 'state.keyword': s.toLowerCase() } })),
+                    minimum_should_match: 1,
+                },
+            });
+        } else if (queryJson.state) {
             must.push({ term: { 'state.keyword': queryJson.state.toLowerCase() } });
         }
         if (options?.forceCityExactCity) {
