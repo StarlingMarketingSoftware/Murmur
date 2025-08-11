@@ -38,6 +38,8 @@ const LOCATION_ALIASES: Record<string, HardcodedLocation> = {
   chicago: { city: 'Chicago', state: 'Illinois', country: 'United States of America', forceExactCity: true },
   // Nashville strict handling
   nashville: { city: 'Nashville', state: 'Tennessee', country: 'United States of America', forceExactCity: true },
+  // Memphis strict handling
+  memphis: { city: 'Memphis', state: 'Tennessee', country: 'United States of America', forceExactCity: true },
   // Washington, DC strict handling with common variations
   'washington dc': { city: 'Washington', state: 'District of Columbia', country: 'United States of America', forceExactCity: true },
   'washington, dc': { city: 'Washington', state: 'District of Columbia', country: 'United States of America', forceExactCity: true },
@@ -52,8 +54,12 @@ const LOCATION_ALIASES: Record<string, HardcodedLocation> = {
   houston: { city: 'Houston', state: 'Texas', country: 'United States of America', forceExactCity: true },
   // Austin strict handling
   austin: { city: 'Austin', state: 'Texas', country: 'United States of America', forceExactCity: true },
+  // Atlanta strict handling
+  atlanta: { city: 'Atlanta', state: 'Georgia', country: 'United States of America', forceExactCity: true },
   // Minneapolis strict handling
   minneapolis: { city: 'Minneapolis', state: 'Minnesota', country: 'United States of America', forceExactCity: true },
+  // Detroit strict handling
+  detroit: { city: 'Detroit', state: 'Michigan', country: 'United States of America', forceExactCity: true },
   // Phoenix strict handling (note: user requested spelling "Pheonix")
   pheonix: { city: 'Pheonix', state: 'Arizona', country: 'United States of America', forceExactCity: true },
   phoenix: { city: 'Phoenix', state: 'Arizona', country: 'United States of America', forceExactCity: true },
