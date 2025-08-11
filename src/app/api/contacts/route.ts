@@ -125,7 +125,7 @@ export async function GET(req: NextRequest) {
             }
         }
         // Apply deterministic overrides and tuning knobs
-        const { overrides, penaltyCities, forceCityExactCity, forceStateAny, penaltyTerms, strictPenalty } = applyHardcodedLocationOverrides(query || '', queryJson);
+        const { overrides, penaltyCities, forceCityExactCity, forceStateAny, forceCityAny, penaltyTerms, strictPenalty } = applyHardcodedLocationOverrides(query || '', queryJson);
         queryJson = overrides;
         const effectiveLocationStrategy = queryJson?.state ? 'strict' : 'flexible';
 
@@ -188,12 +188,15 @@ export async function GET(req: NextRequest) {
             if (forceCityExactCity) {
                 strictLocationAnd.push({ city: { equals: forceCityExactCity, mode: caseInsensitiveMode } });
             }
-            if (forceCityExactCity && queryJson.state) {
+            if ((forceCityExactCity || (forceCityAny && forceCityAny.length > 0)) && queryJson.state) {
                 if (forceStateAny && forceStateAny.length > 0) {
                     strictLocationAnd.push({ OR: forceStateAny.map((s) => ({ state: { equals: s, mode: caseInsensitiveMode } })) });
                 } else {
                     strictLocationAnd.push({ state: { equals: queryJson.state, mode: caseInsensitiveMode } });
                 }
+            }
+            if (forceCityAny && forceCityAny.length > 0) {
+                strictLocationAnd.push({ OR: forceCityAny.map((c) => ({ city: { equals: c, mode: caseInsensitiveMode } })) });
             }
 
             const whereConditions: Prisma.ContactWhereInput = {
@@ -280,7 +283,7 @@ export async function GET(req: NextRequest) {
                         effectiveVectorLimit,
                         0.1,
                         effectiveLocationStrategy,
-                        { penaltyCities, forceCityExactCity, forceStateAny, penaltyTerms, strictPenalty }
+                        { penaltyCities, forceCityExactCity, forceStateAny, forceCityAny, penaltyTerms, strictPenalty }
                     ),
                     new Promise<never>((_, reject) =>
                         setTimeout(() => reject(new Error('Vector search timed out')), timeoutMs)
@@ -353,13 +356,14 @@ export async function GET(req: NextRequest) {
 			});
 
             // Defensive strict-location enforcement for vector results
-            if (forceCityExactCity && (queryJson.state || forceStateAny)) {
+            if ((forceCityExactCity || (forceCityAny && forceCityAny.length > 0)) && (queryJson.state || forceStateAny)) {
                 const allowedStates = forceStateAny && forceStateAny.length > 0
                     ? new Set(forceStateAny.map((s) => s.toLowerCase()))
                     : (queryJson.state ? new Set([queryJson.state.toLowerCase()]) : new Set<string>());
-                const targetCity = forceCityExactCity.toLowerCase();
+                const targetCities = forceCityAny && forceCityAny.length > 0 ? new Set(forceCityAny.map((c) => c.toLowerCase())) : (forceCityExactCity ? new Set([forceCityExactCity.toLowerCase()]) : new Set<string>());
                 contacts = contacts.filter((c) => {
-                    const cityOk = (c.city || '').toLowerCase() === targetCity;
+                    const cityVal = (c.city || '').toLowerCase();
+                    const cityOk = targetCities.size === 0 ? true : targetCities.has(cityVal);
                     const stateVal = (c.state || '').toLowerCase();
                     const stateOk = allowedStates.size === 0 ? true : allowedStates.has(stateVal);
                     return cityOk && stateOk;

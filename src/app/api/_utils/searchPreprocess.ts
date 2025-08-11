@@ -12,6 +12,8 @@ export type LocationOverrideResult = {
   forceCityExactCity?: string;
   // When provided, downstream search should accept any of these state values as exact matches
   forceStateAny?: string[];
+  // When provided, downstream search should accept any of these city values as exact matches
+  forceCityAny?: string[];
   penaltyTerms: string[];
   strictPenalty?: boolean;
 };
@@ -20,6 +22,8 @@ export type LocationOverrideResult = {
 const LOCATION_ALIASES: Record<string, HardcodedLocation> = {
   // User request: "manhattan" corresponds to New York, New York
   manhattan: { city: 'New York', state: 'New York', country: 'United States of America' },
+  // NYC maps to multiple boroughs/cities; we enforce state strictly and allow multiple cities via forceCityAny
+  nyc: { city: null, state: 'New York', country: 'United States of America' },
   // Philadelphia strict handling (correct spelling, common nickname, and misspelling)
   philadelphia: { city: 'Philadelphia', state: 'Pennsylvania', country: 'United States of America', forceExactCity: true },
   philly: { city: 'Philadelphia', state: 'Pennsylvania', country: 'United States of America', forceExactCity: true },
@@ -44,6 +48,15 @@ const LOCATION_ALIASES: Record<string, HardcodedLocation> = {
   'losangeles': { city: 'Los Angeles', state: 'California', country: 'United States of America', forceExactCity: true },
   // Las Vegas strict handling
   'las vegas': { city: 'Las Vegas', state: 'Nevada', country: 'United States of America', forceExactCity: true },
+  // Houston strict handling
+  houston: { city: 'Houston', state: 'Texas', country: 'United States of America', forceExactCity: true },
+  // Austin strict handling
+  austin: { city: 'Austin', state: 'Texas', country: 'United States of America', forceExactCity: true },
+  // Minneapolis strict handling
+  minneapolis: { city: 'Minneapolis', state: 'Minnesota', country: 'United States of America', forceExactCity: true },
+  // Phoenix strict handling (note: user requested spelling "Pheonix")
+  pheonix: { city: 'Pheonix', state: 'Arizona', country: 'United States of America', forceExactCity: true },
+  phoenix: { city: 'Phoenix', state: 'Arizona', country: 'United States of America', forceExactCity: true },
 };
 
 function normalize(text: string): string {
@@ -235,6 +248,8 @@ export function applyHardcodedLocationOverrides(
   // If we have a known state, allow strict matching against any of its common synonyms/abbreviations
   const stateKey = (state || '').toLowerCase();
   const forceStateAny = stateKey && STATE_SYNONYMS[stateKey] ? STATE_SYNONYMS[stateKey] : undefined;
+  // NYC: allow both New York and Brooklyn as exact city matches
+  const forceCityAny = hit === 'nyc' ? ['New York', 'Brooklyn'] : undefined;
 
   return {
     overrides: {
@@ -247,6 +262,7 @@ export function applyHardcodedLocationOverrides(
     // Hint the downstream search to require an exact city match when appropriate
     forceCityExactCity: forceCityExact,
     forceStateAny,
+    forceCityAny,
     penaltyTerms: [],
     strictPenalty: false,
   };

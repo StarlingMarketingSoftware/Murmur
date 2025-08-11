@@ -331,6 +331,7 @@ export const searchSimilarContacts = async (
         penaltyCities?: string[];
         forceCityExactCity?: string;
         forceStateAny?: string[];
+        forceCityAny?: string[];
         penaltyTerms?: string[];
         strictPenalty?: boolean;
     }
@@ -349,7 +350,7 @@ export const searchSimilarContacts = async (
 	};
 	const boosts = locationBoosts[locationStrategy];
 
-    // Build strict state/city filter for kNN (enforce exact state and optional exact city)
+    // Build strict state/city filter for kNN (enforce exact state and exact city or any-of cities)
     const buildStrictStateFilter = () => {
         if (locationStrategy !== 'strict') return undefined;
         const must: any[] = [];
@@ -365,6 +366,14 @@ export const searchSimilarContacts = async (
         }
         if (options?.forceCityExactCity) {
             must.push({ term: { 'city.keyword': options.forceCityExactCity.toLowerCase() } });
+        }
+        if (options?.forceCityAny && options.forceCityAny.length > 0) {
+            must.push({
+                bool: {
+                    should: options.forceCityAny.map((c) => ({ term: { 'city.keyword': c.toLowerCase() } })),
+                    minimum_should_match: 1,
+                },
+            });
         }
         if (must.length === 0) return undefined;
         return { bool: { filter: must } } as const;
