@@ -20,10 +20,13 @@ export type LocationOverrideResult = {
 
 // Minimal, deterministic aliases. Extend as needed.
 const LOCATION_ALIASES: Record<string, HardcodedLocation> = {
-  // User request: "manhattan" corresponds to New York, New York
-  manhattan: { city: 'New York', state: 'New York', country: 'United States of America' },
+  // User request: "manhattan" corresponds to New York, New York (strict city match)
+  manhattan: { city: 'New York', state: 'New York', country: 'United States of America', forceExactCity: true },
   // NYC maps to multiple boroughs/cities; we enforce state strictly and allow multiple cities via forceCityAny
   nyc: { city: null, state: 'New York', country: 'United States of America' },
+  // Explicit handling for "New York City"
+  'new york city': { city: null, state: 'New York', country: 'United States of America' },
+  'newyorkcity': { city: null, state: 'New York', country: 'United States of America' },
   // Philadelphia strict handling (correct spelling, common nickname, and misspelling)
   philadelphia: { city: 'Philadelphia', state: 'Pennsylvania', country: 'United States of America', forceExactCity: true },
   philly: { city: 'Philadelphia', state: 'Pennsylvania', country: 'United States of America', forceExactCity: true },
@@ -261,8 +264,15 @@ export function applyHardcodedLocationOverrides(
     };
   }
 
-  // Find the first alias present in the query
-  const hit = Object.keys(LOCATION_ALIASES).find((key) => lowered.includes(key));
+  // Find alias present in the query using strict, word-boundary-aware matching.
+  // Prefer the longest matching alias to avoid partial overshadowing (e.g., "washington dc" over "dc").
+  const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const aliasKeys = Object.keys(LOCATION_ALIASES);
+  const matchingAliases = aliasKeys.filter((key) => {
+    const pattern = new RegExp(`\\b${escapeRegex(key)}\\b`, 'i');
+    return pattern.test(lowered);
+  });
+  const hit = matchingAliases.sort((a, b) => b.length - a.length)[0];
   if (!hit) {
     return {
       overrides: parsed,
@@ -278,10 +288,12 @@ export function applyHardcodedLocationOverrides(
   const state = alias.state ?? parsed.state;
   const country = alias.country ?? parsed.country;
 
-  // Remove the alias token from the restOfQuery to avoid diluting semantic intent
-  const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Remove the alias token from the restOfQuery using boundary-aware replacement
   const cleanedRest = parsed.restOfQuery
-    ? parsed.restOfQuery.replace(new RegExp(escapeRegex(hit), 'ig'), '').replace(/\s+/g, ' ').trim()
+    ? parsed.restOfQuery
+        .replace(new RegExp(`\\b${escapeRegex(hit)}\\b`, 'ig'), '')
+        .replace(/\s+/g, ' ')
+        .trim()
     : parsed.restOfQuery;
 
   const forceCityExact = alias.forceExactCity && city ? city : undefined;
@@ -289,7 +301,10 @@ export function applyHardcodedLocationOverrides(
   const stateKey = (state || '').toLowerCase();
   const forceStateAny = stateKey && STATE_SYNONYMS[stateKey] ? STATE_SYNONYMS[stateKey] : undefined;
   // NYC: allow both New York and Brooklyn as exact city matches
-  const forceCityAny = hit === 'nyc' ? ['New York', 'Brooklyn'] : undefined;
+  // NYC and "New York City": allow both New York and Brooklyn as exact city matches
+  const forceCityAny = (hit === 'nyc' || hit === 'new york city' || hit === 'newyorkcity')
+    ? ['New York', 'Brooklyn']
+    : undefined;
 
   return {
     overrides: {
