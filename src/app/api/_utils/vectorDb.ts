@@ -325,6 +325,8 @@ export type QueryJson = {
 export const searchSimilarContacts = async (
     queryJson: QueryJson,
     limit: number = 10,
+    // minScore reserved for future use
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     minScore: number = 0.3,
     locationStrategy: 'strict' | 'flexible' | 'broad' = 'flexible',
     options?: {
@@ -422,7 +424,8 @@ export const searchSimilarContacts = async (
 	});
 
     // Post-process results with optional location boosts and institutional penalties
-	const processResultsWithLocationBoost = (hits: any[]) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const processResultsWithLocationBoost = (hits: any[]): any[] => {
 		const skipBoosts = locationStrategy === 'strict' || boosts.exact === 0;
 
         const penalties = new Set((options?.penaltyCities || []).map((c) => c.toLowerCase()));
@@ -474,12 +477,12 @@ export const searchSimilarContacts = async (
             const originalScore = hit._score || 0;
             const boostedScore = originalScore + locationBoost - penalty;
 			
-			return {
-				...hit,
-				_score: boostedScore
-			};
+            return {
+                ...hit,
+                _score: boostedScore
+            };
 		})
-        .sort((a, b) => (b._score || 0) - (a._score || 0)) // Re-sort by boosted score
+		.sort((a, b) => (b._score || 0) - (a._score || 0)) // Re-sort by boosted score
 		.slice(0, limit); // Apply final limit
 	};
 

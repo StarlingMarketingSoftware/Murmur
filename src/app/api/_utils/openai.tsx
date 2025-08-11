@@ -1,3 +1,5 @@
+// kept for potential reuse
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
     return new Promise<T>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('OpenAI request timed out')), timeoutMs);

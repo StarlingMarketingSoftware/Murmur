@@ -8,6 +8,11 @@ export type PostTrainingProfile = {
   includeTitleTerms?: string[];
   includeWebsiteTerms?: string[];
   includeIndustryTerms?: string[];
+  // Auxiliary, lower-priority inclusion terms used to fill tail (e.g., bars/restaurants)
+  auxCompanyTerms?: string[];
+  auxTitleTerms?: string[];
+  auxWebsiteTerms?: string[];
+  auxIndustryTerms?: string[];
 };
 
 function normalize(text: string): string {
@@ -16,7 +21,7 @@ function normalize(text: string): string {
 
 export function getPostTrainingForQuery(rawQuery: string): PostTrainingProfile {
   const q = normalize(rawQuery);
-  const isMusicVenue = q.includes('music venue');
+  const isMusicVenue = q.startsWith('music venue') || q.startsWith('music venues');
   const isWeddingPlanner = q.includes('wedding planner') || q.includes('wedding planners');
 
   // Music venue specific post-training
@@ -24,7 +29,7 @@ export function getPostTrainingForQuery(rawQuery: string): PostTrainingProfile {
     // Basic, extensible config for excluding/demoting academic institutions
     const excludeTerms = [
       'university',
-      'university of',
+      'university of', 
       'state university',
       'community college',
       'college of',
@@ -79,15 +84,50 @@ export function getPostTrainingForQuery(rawQuery: string): PostTrainingProfile {
       'Bandleader',
       'Bandleader/Drummer',
       'IT manager',
+      'Director Of Event Technology',
+      'Senior Developer',
+      'co-founder',
+      'youth director',
+      'Director, Legal & Paralegal',
+      'Director of Operations',
+      'Director of Sales',
+      'Director of Marketing',
+      'Director of Finance',
+      'Director of Sales and Marketing',
+      'Director of Sales and Operations',
+      'Director of Sales and Finance',
+      'Director of Sales and Marketing and Operations',
+      'paralegal',  
+      'Controller',
+      'Social Media Specialist',
+      'Social Media Analyst',
+      'Social Media Strategist',
+      'Social Media Manager',
+      'Social Media Coordinator',
+      'PR Manager',
+      'PR Coordinator',
+      'PR Specialist',
+      'PR Analyst',
+      'PR Strategist',
+      'PR Manager',
+      'PR Coordinator',
+      'adjunct faculty',
+      'adjunct professor',
+      'adjunct professor of music',
+      'adjunct professor of musicology',
+      'adjunct professor of music theory',
+      'adjunct professor of music history',
+      'adjunct professor of music composition',
+      'director of public safety'
     ];
     const demoteTerms = [
       'college',
       'univ',
       'campus',
-      'academy',
       'department of music',
       'music department',
       'school',
+      'symphony',
     ];
     // Positive signals
     const includeCompanyTerms = [
@@ -110,6 +150,52 @@ export function getPostTrainingForQuery(rawQuery: string): PostTrainingProfile {
       'fillmore',
       'music venue',
       'live music',
+    ];
+    // Auxiliary terms that should be considered to fill results (lower priority than includeCompanyTerms)
+    const auxCompanyTerms = [
+      'bar',
+      'bars',
+      'pub',
+      'tavern',
+      'saloon',
+      'lounge',
+      'cocktail bar',
+      'wine bar',
+      'beer garden',
+      'brewery',
+      'microbrewery',
+      'brewpub',
+      'taproom',
+      'gastropub',
+      'restaurant',
+      'restaurants',
+      'bistro',
+      'brasserie',
+      'cafe',
+      'coffee',
+      'coffee shop',
+      'coffeehouse',
+      'diner',
+      'grill',
+      'cantina',
+      'taqueria',
+      'trattoria',
+      'pizzeria',
+      'bbq',
+      'barbecue',
+      'steakhouse',
+      'oyster bar',
+      'speakeasy',
+      'nightclub',
+      'night club',
+      'club',
+      'music bar',
+      'jazz club',
+      'blues club',
+      'piano bar',
+      'live music bar',
+      'karaoke',
+      'open mic',
     ];
     const includeTitleTerms = [
       'music venue',
@@ -145,11 +231,24 @@ export function getPostTrainingForQuery(rawQuery: string): PostTrainingProfile {
       'live',
       'music',
     ];
+    const auxWebsiteTerms = [
+      'menu',
+      'reservations',
+      'happy hour',
+      'bar',
+      'restaurant',
+    ];
     const includeIndustryTerms = [
       'performing arts',
       'entertainment',
       'music',
       'live events',
+    ];
+    const auxIndustryTerms = [
+      'hospitality',
+      'food and beverage',
+      'restaurants',
+      'bars',
     ];
     return {
       active: true,
@@ -161,6 +260,9 @@ export function getPostTrainingForQuery(rawQuery: string): PostTrainingProfile {
       includeTitleTerms,
       includeWebsiteTerms,
       includeIndustryTerms,
+      auxCompanyTerms,
+      auxWebsiteTerms,
+      auxIndustryTerms,
     };
   }
 

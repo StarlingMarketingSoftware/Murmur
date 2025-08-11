@@ -1,4 +1,4 @@
-import { User } from '@prisma/client';
+// import { User } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
 import { auth } from '@clerk/nextjs/server';
