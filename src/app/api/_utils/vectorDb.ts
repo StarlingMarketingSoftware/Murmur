@@ -394,35 +394,33 @@ export const searchSimilarContacts = async (
 		_source: false,
 	});
 
-	// Post-process results for location preferences (flexible/broad modes only)
-    const processResultsWithLocationBoost = (hits: any[]) => {
-		if (locationStrategy === 'strict' || boosts.exact === 0) {
-			return hits;
-		}
+	// Post-process results with optional location boosts and institutional penalties
+	const processResultsWithLocationBoost = (hits: any[]) => {
+		const skipBoosts = locationStrategy === 'strict' || boosts.exact === 0;
 
         const penalties = new Set((options?.penaltyCities || []).map((c) => c.toLowerCase()));
         const penaltyTerms = new Set((options?.penaltyTerms || []).map((t) => t.toLowerCase()));
 
-        return hits.map(hit => {
+		return hits.map(hit => {
 			let locationBoost = 0;
-			
-			// Check for exact location matches
-			if (queryJson.state && hit.fields?.state?.[0]?.toLowerCase() === queryJson.state.toLowerCase()) {
-				locationBoost += boosts.exact;
-			}
-			if (queryJson.city && hit.fields?.city?.[0]?.toLowerCase() === queryJson.city.toLowerCase()) {
-				locationBoost += boosts.exact;
-			}
-			if (queryJson.country && hit.fields?.country?.[0]?.toLowerCase() === queryJson.country.toLowerCase()) {
-				locationBoost += boosts.exact;
-			}
-			
-			// Check for fuzzy location matches
-			if (queryJson.state && hit.fields?.state?.[0]) {
-				const hitState = hit.fields.state[0].toLowerCase();
-				const queryState = queryJson.state.toLowerCase();
-				if (hitState.includes(queryState.substring(0, 2)) || queryState.includes(hitState.substring(0, 2))) {
-					locationBoost += boosts.fuzzy;
+			if (!skipBoosts) {
+				// Check for exact location matches
+				if (queryJson.state && hit.fields?.state?.[0]?.toLowerCase() === queryJson.state.toLowerCase()) {
+					locationBoost += boosts.exact;
+				}
+				if (queryJson.city && hit.fields?.city?.[0]?.toLowerCase() === queryJson.city.toLowerCase()) {
+					locationBoost += boosts.exact;
+				}
+				if (queryJson.country && hit.fields?.country?.[0]?.toLowerCase() === queryJson.country.toLowerCase()) {
+					locationBoost += boosts.exact;
+				}
+				// Check for fuzzy location matches
+				if (queryJson.state && hit.fields?.state?.[0]) {
+					const hitState = hit.fields.state[0].toLowerCase();
+					const queryState = queryJson.state.toLowerCase();
+					if (hitState.includes(queryState.substring(0, 2)) || queryState.includes(hitState.substring(0, 2))) {
+						locationBoost += boosts.fuzzy;
+					}
 				}
 			}
 			

@@ -10,6 +10,7 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { getValidatedParamsFromUrl } from '@/utils';
+import { getPostTrainingForQuery } from '@/app/api/_utils/postTraining';
 import { applyHardcodedLocationOverrides } from '@/app/api/_utils/searchPreprocess';
 import { Contact, EmailVerificationStatus, Prisma } from '@prisma/client';
 import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vectorDb';
@@ -247,6 +248,25 @@ export async function GET(req: NextRequest) {
                 effectiveLocationStrategy,
                 { penaltyCities, forceCityExactCity, penaltyTerms, strictPenalty }
 			);
+            // Pre-filter ES matches using post-training to remove academic institutions early
+            const prePostProfile = getPostTrainingForQuery(query || '');
+            let esMatches = vectorSearchResults.matches;
+            if (prePostProfile.active && esMatches.length > 0) {
+                const excludeTerms = prePostProfile.excludeTerms.map((t) => t.toLowerCase());
+                const containsAny = (text: string | null | undefined, terms: string[]) => {
+                    if (!text) return false;
+                    const lc = String(text).toLowerCase();
+                    return terms.some((t) => lc.includes(t));
+                };
+                esMatches = esMatches.filter((m) => {
+                    const md: any = m.metadata || {};
+                    return !(
+                        containsAny(md.company, excludeTerms) ||
+                        containsAny(md.title, excludeTerms) ||
+                        containsAny(md.headline, excludeTerms)
+                    );
+                });
+            }
 			// 8.1 seemed like a good limit to keep noise out of music venues...but restrictive for
 
 			// Create a map of contactId to relevance score for efficient lookup
@@ -259,7 +279,7 @@ export async function GET(req: NextRequest) {
 			// 	relevanceMap.set(contactId, relevanceScore);
 			// });
 
-			const vectorSearchContactIds = vectorSearchResults.matches
+            const vectorSearchContactIds = esMatches
 				.map((match) => Number(match.metadata.contactId ?? match.id))
 				.filter((n) => Number.isFinite(n));
 
@@ -267,7 +287,7 @@ export async function GET(req: NextRequest) {
 			// 	(match) => match.metadata.email
 			// ); // for testing production data locally
 
-			contacts = await prisma.contact.findMany({
+            contacts = await prisma.contact.findMany({
 				where: {
 					id: {
 						in: vectorSearchContactIds,
@@ -284,9 +304,48 @@ export async function GET(req: NextRequest) {
 				},
 			});
 
+            // Posttraining step: exclude or demote universities for music venue searches
+            const postProfile = getPostTrainingForQuery(query || '');
+            if (postProfile.active && contacts.length > 0) {
+                const excludeTerms = postProfile.excludeTerms.map((t) => t.toLowerCase());
+                const demoteTerms = postProfile.demoteTerms.map((t) => t.toLowerCase());
+
+                const containsAny = (text: string | null | undefined, terms: string[]) => {
+                    if (!text) return false;
+                    const lc = text.toLowerCase();
+                    return terms.some((t) => lc.includes(t));
+                };
+
+                // Exclude (hard if strictExclude=true)
+                let filtered = contacts;
+                if (postProfile.strictExclude) {
+                    filtered = contacts.filter(
+                        (c) =>
+                            !containsAny(c.company, excludeTerms) &&
+                            !containsAny(c.title, excludeTerms) &&
+                            !containsAny(c.headline as any, excludeTerms)
+                    );
+                }
+
+                // If exclusion removed too many (e.g., fewer than limit), fill with demoted ones
+                const finalLimit = limit ?? 100;
+                if (filtered.length < finalLimit) {
+                    const demoted = contacts.filter(
+                        (c) =>
+                            containsAny(c.company, demoteTerms) ||
+                            containsAny(c.title, demoteTerms) ||
+                            containsAny(c.headline as any, demoteTerms)
+                    );
+                    // append demoted at the end
+                    filtered = [...filtered, ...demoted].slice(0, finalLimit);
+                }
+
+                contacts = filtered;
+            }
+
 			// Fallback: if local Postgres doesn't have these contacts, return minimal data from Elasticsearch directly
 			if (!contacts || contacts.length === 0) {
-				const fallbackContacts = vectorSearchResults.matches.map((match) => {
+				const fallbackContacts = esMatches.map((match) => {
 					const md: any = match.metadata || {};
 					const parsedId = Number(md.contactId);
 					const toArray = (val: any) =>
