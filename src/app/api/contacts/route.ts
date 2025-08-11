@@ -61,8 +61,8 @@ export type PostContactData = z.infer<typeof createContactSchema>;
 export async function GET(req: NextRequest) {
 	try {
 		console.log(
-			'--- DEBUG: API Key from env:',
-			process.env.OPENAI_API_KEY ? 'Exists' : 'MISSING!'
+			'--- DEBUG: API Key from env (OPEN_AI_API_KEY):',
+			process.env.OPEN_AI_API_KEY ? 'Exists' : 'MISSING!'
 		);
 		const { userId } = await auth();
 		if (!userId) {
@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
 
         let queryJson = JSON.parse(locationResponse);
         // Apply deterministic overrides (e.g., "manhattan" -> New York, NY) and get penalty cities
-        const { overrides, penaltyCities, forceCityExactCity } = applyHardcodedLocationOverrides(query || '', queryJson);
+        const { overrides, penaltyCities, forceCityExactCity, penaltyTerms, strictPenalty } = applyHardcodedLocationOverrides(query || '', queryJson);
         queryJson = overrides;
         const effectiveLocationStrategy = queryJson?.state ? 'strict' : 'flexible';
 
@@ -245,7 +245,7 @@ export async function GET(req: NextRequest) {
 				VECTOR_SEARCH_LIMIT,
                 0.1,  // Reasonable threshold for kNN scores (0.0-1.0 range)
                 effectiveLocationStrategy,
-                { penaltyCities, forceCityExactCity }
+                { penaltyCities, forceCityExactCity, penaltyTerms, strictPenalty }
 			);
 			// 8.1 seemed like a good limit to keep noise out of music venues...but restrictive for
 

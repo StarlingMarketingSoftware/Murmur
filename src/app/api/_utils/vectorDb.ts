@@ -323,7 +323,7 @@ export const searchSimilarContacts = async (
     limit: number = 10,
     minScore: number = 0.3,
     locationStrategy: 'strict' | 'flexible' | 'broad' = 'flexible',
-    options?: { penaltyCities?: string[]; forceCityExactCity?: string }
+    options?: { penaltyCities?: string[]; forceCityExactCity?: string; penaltyTerms?: string[]; strictPenalty?: boolean }
 ) => {
 	const response = await openai.embeddings.create({
 		input: queryJson.restOfQuery,
@@ -356,12 +356,16 @@ export const searchSimilarContacts = async (
     const strictStateFilter = buildStrictStateFilter();
 
 	// Pure kNN search - let vector embeddings handle semantic matching
-	const results = await elasticsearch.search<ContactDocument>({
+    const kValue = options?.penaltyTerms && options.penaltyTerms.length > 0
+        ? (locationStrategy === 'strict' ? Math.min(limit * 2, 200) : Math.min(limit * 6, 200))
+        : (locationStrategy === 'strict' ? limit : Math.min(limit * 3, 100));
+
+    const results = await elasticsearch.search<ContactDocument>({
 		index: INDEX_NAME,
         knn: {
 			field: 'vector_field',
 			query_vector: queryEmbedding,
-            k: locationStrategy === 'strict' ? limit : Math.min(limit * 3, 100), // Get more candidates for filtering
+            k: kValue, // Get more candidates for filtering when we plan to demote results
 			num_candidates: 10000,
             filter: strictStateFilter,
 		},
@@ -397,6 +401,7 @@ export const searchSimilarContacts = async (
 		}
 
         const penalties = new Set((options?.penaltyCities || []).map((c) => c.toLowerCase()));
+        const penaltyTerms = new Set((options?.penaltyTerms || []).map((t) => t.toLowerCase()));
 
         return hits.map(hit => {
 			let locationBoost = 0;
@@ -423,7 +428,22 @@ export const searchSimilarContacts = async (
 			
             // Soft penalties for specific cities (e.g., when query contains "manhattan")
             const hitCity = String(hit.fields?.city?.[0] || '').toLowerCase();
-            const penalty = penalties.has(hitCity) ? 0.2 : 0; // small deduction
+            let penalty = penalties.has(hitCity) ? 0.2 : 0; // small deduction for cities
+
+            // Soft penalty for university/college when query starts with "music venue(s)"
+            const headline = String(hit.fields?.headline?.[0] || '').toLowerCase();
+            const title = String(hit.fields?.title?.[0] || '').toLowerCase();
+            const company = String(hit.fields?.company?.[0] || '').toLowerCase();
+            const textBlob = `${headline} ${title} ${company}`;
+            for (const term of penaltyTerms) {
+                if (!term) continue;
+                const exact = new RegExp(`(^|\b)${term.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}(\b|$)`, 'i');
+                if (exact.test(textBlob)) {
+                    penalty += options?.strictPenalty ? 0.6 : 0.35; // much stronger in strictPenalty mode
+                } else if (textBlob.includes(term)) {
+                    penalty += options?.strictPenalty ? 0.35 : 0.2; // stronger partial penalty in strictPenalty mode
+                }
+            }
 
             // Apply location boost and penalty to score
             const originalScore = hit._score || 0;
