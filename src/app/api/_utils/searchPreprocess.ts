@@ -32,6 +32,8 @@ const LOCATION_ALIASES: Record<string, HardcodedLocation> = {
   baltimore: { city: 'Baltimore', state: 'Maryland', country: 'United States of America', forceExactCity: true },
   // Chicago strict handling
   chicago: { city: 'Chicago', state: 'Illinois', country: 'United States of America', forceExactCity: true },
+  // Nashville strict handling
+  nashville: { city: 'Nashville', state: 'Tennessee', country: 'United States of America', forceExactCity: true },
   // Washington, DC strict handling with common variations
   'washington dc': { city: 'Washington', state: 'District of Columbia', country: 'United States of America', forceExactCity: true },
   'washington, dc': { city: 'Washington', state: 'District of Columbia', country: 'United States of America', forceExactCity: true },
@@ -40,6 +42,8 @@ const LOCATION_ALIASES: Record<string, HardcodedLocation> = {
   // Los Angeles: handle "LA" token elsewhere; include explicit alias forms here
   'los angeles': { city: 'Los Angeles', state: 'California', country: 'United States of America', forceExactCity: true },
   'losangeles': { city: 'Los Angeles', state: 'California', country: 'United States of America', forceExactCity: true },
+  // Las Vegas strict handling
+  'las vegas': { city: 'Las Vegas', state: 'Nevada', country: 'United States of America', forceExactCity: true },
 };
 
 function normalize(text: string): string {
@@ -181,11 +185,11 @@ export function applyHardcodedLocationOverrides(
     };
   }
 
-  // Special-case: standalone "LA" tokens that likely mean Los Angeles (avoid matching state code 'LA' for Louisiana by context)
-  // We scope this to queries that contain venue or job-like terms, or when no other state/city present.
+  // Special-case: standalone "LA" tokens that likely mean Los Angeles.
+  // Prefer Los Angeles unless Louisiana is explicitly referenced.
   const laTokenRegex = /(^|[^a-z])l\.?\s*a\.?([^a-z]|$)/i;
-  const hasSomeOtherState = Object.keys(STATE_SYNONYMS).some((k) => new RegExp(`(^|[^a-z])${k}([^a-z]|$)`, 'i').test(lowered));
-  if (laTokenRegex.test(lowered) && !hasSomeOtherState) {
+  const explicitLouisiana = /\blouisiana\b/i.test(lowered) || /\bnew orleans\b|\bbaton rouge\b|\bshreveport\b/i.test(lowered);
+  if (laTokenRegex.test(lowered) && !explicitLouisiana) {
     const cleanedRest = parsed.restOfQuery
       ? parsed.restOfQuery.replace(/\bL\.?\s*A\.?\b/gi, '').replace(/\s+/g, ' ').trim()
       : parsed.restOfQuery;
