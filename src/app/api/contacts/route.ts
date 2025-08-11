@@ -100,8 +100,9 @@ export async function GET(req: NextRequest) {
 		);
 
         let queryJson = JSON.parse(locationResponse);
-        // Apply deterministic overrides (e.g., "manhattan" -> New York, NY)
-        queryJson = applyHardcodedLocationOverrides(query || '', queryJson);
+        // Apply deterministic overrides (e.g., "manhattan" -> New York, NY) and get penalty cities
+        const { overrides, penaltyCities, forceCityExactCity } = applyHardcodedLocationOverrides(query || '', queryJson);
+        queryJson = overrides;
         const effectiveLocationStrategy = queryJson?.state ? 'strict' : 'flexible';
 
 		const numberContactListIds: number[] =
@@ -239,11 +240,12 @@ export async function GET(req: NextRequest) {
 
 		// If vector search is enabled and we have a query, use vector search
         if (useVectorSearch && query) {
-			const vectorSearchResults = await searchSimilarContacts(
+            const vectorSearchResults = await searchSimilarContacts(
 				queryJson,
 				VECTOR_SEARCH_LIMIT,
                 0.1,  // Reasonable threshold for kNN scores (0.0-1.0 range)
-                effectiveLocationStrategy
+                effectiveLocationStrategy,
+                { penaltyCities, forceCityExactCity }
 			);
 			// 8.1 seemed like a good limit to keep noise out of music venues...but restrictive for
 

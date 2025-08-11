@@ -319,10 +319,11 @@ export type QueryJson = {
 	restOfQuery: string;
 };
 export const searchSimilarContacts = async (
-	queryJson: QueryJson,
-	limit: number = 10,
-	minScore: number = 0.3,
-	locationStrategy: 'strict' | 'flexible' | 'broad' = 'flexible'
+    queryJson: QueryJson,
+    limit: number = 10,
+    minScore: number = 0.3,
+    locationStrategy: 'strict' | 'flexible' | 'broad' = 'flexible',
+    options?: { penaltyCities?: string[]; forceCityExactCity?: string }
 ) => {
 	const response = await openai.embeddings.create({
 		input: queryJson.restOfQuery,
@@ -341,8 +342,15 @@ export const searchSimilarContacts = async (
     // Build strict state filter for kNN (enforce exact state only)
     const buildStrictStateFilter = () => {
         if (locationStrategy !== 'strict') return undefined;
-        if (!queryJson.state) return undefined;
-        return { term: { 'state.keyword': queryJson.state.toLowerCase() } } as const;
+        const must: any[] = [];
+        if (queryJson.state) {
+            must.push({ term: { 'state.keyword': queryJson.state.toLowerCase() } });
+        }
+        if (options?.forceCityExactCity) {
+            must.push({ term: { 'city.keyword': options.forceCityExactCity.toLowerCase() } });
+        }
+        if (must.length === 0) return undefined;
+        return { bool: { filter: must } } as const;
     };
 
     const strictStateFilter = buildStrictStateFilter();
@@ -383,12 +391,14 @@ export const searchSimilarContacts = async (
 	});
 
 	// Post-process results for location preferences (flexible/broad modes only)
-	const processResultsWithLocationBoost = (hits: any[]) => {
+    const processResultsWithLocationBoost = (hits: any[]) => {
 		if (locationStrategy === 'strict' || boosts.exact === 0) {
 			return hits;
 		}
 
-		return hits.map(hit => {
+        const penalties = new Set((options?.penaltyCities || []).map((c) => c.toLowerCase()));
+
+        return hits.map(hit => {
 			let locationBoost = 0;
 			
 			// Check for exact location matches
@@ -411,9 +421,13 @@ export const searchSimilarContacts = async (
 				}
 			}
 			
-			// Apply location boost to score
-			const originalScore = hit._score || 0;
-			const boostedScore = originalScore + locationBoost;
+            // Soft penalties for specific cities (e.g., when query contains "manhattan")
+            const hitCity = String(hit.fields?.city?.[0] || '').toLowerCase();
+            const penalty = penalties.has(hitCity) ? 0.2 : 0; // small deduction
+
+            // Apply location boost and penalty to score
+            const originalScore = hit._score || 0;
+            const boostedScore = originalScore + locationBoost - penalty;
 			
 			return {
 				...hit,
