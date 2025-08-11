@@ -9,7 +9,8 @@ const VECTOR_DIMENSION = 1536;
 const INDEX_NAME = 'contacts';
 
 const openai = new OpenAI({
-	apiKey: process.env.OPEN_AI_API_KEY!,
+    apiKey: process.env.OPEN_AI_API_KEY!,
+    timeout: 15000, // 15s client timeout so embedding calls fail fast
 });
 
 const elasticsearch = new Client({
@@ -20,6 +21,9 @@ const elasticsearch = new Client({
 			apiKey: process.env.ELASTICSEARCH_API_KEY,
 		},
 	}),
+	// Add timeout configurations for local development
+	requestTimeout: 60000, // 60 seconds
+	maxRetries: 3,
 });
 
 interface ContactDocument {
@@ -366,10 +370,11 @@ export const searchSimilarContacts = async (
 			field: 'vector_field',
 			query_vector: queryEmbedding,
             k: kValue, // Get more candidates for filtering when we plan to demote results
-			num_candidates: 10000,
+            // Keep candidate space bounded; large values can stall ES locally
+            num_candidates: Math.min(1000, Math.max(kValue * 5, 100)),
             filter: strictStateFilter,
 		},
-		size: limit,
+        size: Math.min(limit, 500),
 		fields: [
 			'contactId',
 			'email',
@@ -394,35 +399,35 @@ export const searchSimilarContacts = async (
 		_source: false,
 	});
 
-	// Post-process results with optional location boosts and institutional penalties
+    // Post-process results with optional location boosts and institutional penalties
 	const processResultsWithLocationBoost = (hits: any[]) => {
 		const skipBoosts = locationStrategy === 'strict' || boosts.exact === 0;
 
         const penalties = new Set((options?.penaltyCities || []).map((c) => c.toLowerCase()));
         const penaltyTerms = new Set((options?.penaltyTerms || []).map((t) => t.toLowerCase()));
 
-		return hits.map(hit => {
-			let locationBoost = 0;
+        return hits.map(hit => {
+            let locationBoost = 0;
 			if (!skipBoosts) {
 				// Check for exact location matches
-				if (queryJson.state && hit.fields?.state?.[0]?.toLowerCase() === queryJson.state.toLowerCase()) {
-					locationBoost += boosts.exact;
-				}
-				if (queryJson.city && hit.fields?.city?.[0]?.toLowerCase() === queryJson.city.toLowerCase()) {
-					locationBoost += boosts.exact;
-				}
-				if (queryJson.country && hit.fields?.country?.[0]?.toLowerCase() === queryJson.country.toLowerCase()) {
-					locationBoost += boosts.exact;
-				}
+                if (queryJson.state && hit.fields?.state?.[0]?.toLowerCase() === queryJson.state.toLowerCase()) {
+                    locationBoost += boosts.exact;
+                }
+                if (queryJson.city && hit.fields?.city?.[0]?.toLowerCase() === queryJson.city.toLowerCase()) {
+                    locationBoost += boosts.exact;
+                }
+                if (queryJson.country && hit.fields?.country?.[0]?.toLowerCase() === queryJson.country.toLowerCase()) {
+                    locationBoost += boosts.exact;
+                }
 				// Check for fuzzy location matches
-				if (queryJson.state && hit.fields?.state?.[0]) {
-					const hitState = hit.fields.state[0].toLowerCase();
-					const queryState = queryJson.state.toLowerCase();
-					if (hitState.includes(queryState.substring(0, 2)) || queryState.includes(hitState.substring(0, 2))) {
-						locationBoost += boosts.fuzzy;
-					}
-				}
-			}
+                if (queryJson.state && hit.fields?.state?.[0]) {
+                    const hitState = hit.fields.state[0].toLowerCase();
+                    const queryState = queryJson.state.toLowerCase();
+                    if (hitState.includes(queryState.substring(0, 2)) || queryState.includes(hitState.substring(0, 2))) {
+                        locationBoost += boosts.fuzzy;
+                    }
+                }
+            }
 			
             // Soft penalties for specific cities (e.g., when query contains "manhattan")
             const hitCity = String(hit.fields?.city?.[0] || '').toLowerCase();

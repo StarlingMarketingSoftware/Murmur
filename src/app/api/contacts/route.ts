@@ -16,7 +16,7 @@ import { Contact, EmailVerificationStatus, Prisma } from '@prisma/client';
 import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vectorDb';
 import { OPEN_AI_MODEL_OPTIONS } from '@/constants';
 
-const VECTOR_SEARCH_LIMIT = 2000;
+const VECTOR_SEARCH_LIMIT_DEFAULT = 100;
 
 const createContactSchema = z.object({
 	firstName: z.string().optional(),
@@ -83,25 +83,48 @@ export async function GET(req: NextRequest) {
 			excludeUsedContacts,
 		} = validatedFilters.data;
 
-		const locationResponse = await fetchOpenAi(
-			OPEN_AI_MODEL_OPTIONS.o4mini,
-			`You are a geography and language expert that can tell the difference between words that are city, states, or countries, and words that are not, based on knowledge about place names as well as semantics and context of a given sentence. You will be given a search query that may contain words that are city, states, or countries, amongst other non-location based terms. You will separate the location words from the rest of the query, and return the words that are city, state, or country, along with the rest of the query in a JSON string in the following format: {"city": "cityName", "state": "stateName", "country": "countryName", "restOfQuery": "restOfQuery"}. 
-			
-			Additional instructions:
-			- Do not include country unless it is specified.
-			- If the country in the query is some variant of the United States, return "United States of America". 
-			- If the search term contains "new york", specify the state. Only specify the city if it says "new york city" or "NYC".
-			- If there is no city, state, or country in the query, return null in the fields that are not found. For example: {"city": null, "state": "Pennsylvania", "country": null, "restOfQuery": "restOfQuery"} 
-			- If any of the location terms are misspelled, returned the correct spelling. For example, if the query is "Pensylvania", return {"city": null, "state": "Pennsylvania", "country": null, "restOfQuery": "restOfQuery"}
-			- If the query includes slang or abbreviations, return the official spelling. For example, if the query is "NYC", return {"city": "New York City", "state": null, "country": null, "restOfQuery": "restOfQuery"}
-			- Return a valid JSON string that can be parsed by a JSON.parse() in JavaScript. 
-			- There are some place names that can also be a word (such as buffalo steak house in new york) (Buffalo is a city in New York but it is also a general word for an animal). Use the context of the query to determine if the word is a place name or not.
-			- Return the JSON string and nothing else.`,
-			query || ''
-		);
+        let locationResponse: string | null = null;
+        const rawQuery = query || '';
+        if (process.env.OPEN_AI_API_KEY && rawQuery) {
+            locationResponse = await fetchOpenAi(
+                OPEN_AI_MODEL_OPTIONS.o4mini,
+                `You are a geography and language expert that can tell the difference between words that are city, states, or countries, and words that are not, based on knowledge about place names as well as semantics and context of a given sentence. You will be given a search query that may contain words that are city, states, or countries, amongst other non-location based terms. You will separate the location words from the rest of the query, and return the words that are city, state, or country, along with the rest of the query in a JSON string in the following format: {"city": "cityName", "state": "stateName", "country": "countryName", "restOfQuery": "restOfQuery"}. 
+                
+                Additional instructions:
+                - Do not include country unless it is specified.
+                - If the country in the query is some variant of the United States, return "United States of America". 
+                - If the search term contains "new york", specify the state. Only specify the city if it says "new york city" or "NYC".
+                - If there is no city, state, or country in the query, return null in the fields that are not found. For example: {"city": null, "state": "Pennsylvania", "country": null, "restOfQuery": "restOfQuery"} 
+                - If any of the location terms are misspelled, returned the correct spelling. For example, if the query is "Pensylvania", return {"city": null, "state": "Pennsylvania", "country": null, "restOfQuery": "restOfQuery"}
+                - If the query includes slang or abbreviations, return the official spelling. For example, if the query is "NYC", return {"city": "New York City", "state": null, "country": null, "restOfQuery": "restOfQuery"}
+                - Return a valid JSON string that can be parsed by a JSON.parse() in JavaScript. 
+                - There are some place names that can also be a word (such as buffalo steak house in new york) (Buffalo is a city in New York but it is also a general word for an animal). Use the context of the query to determine if the word is a place name or not.
+                - Return the JSON string and nothing else.`,
+                rawQuery
+            );
+        }
 
-        let queryJson = JSON.parse(locationResponse);
-        // Apply deterministic overrides (e.g., "manhattan" -> New York, NY) and get penalty cities
+        // Parse location via LLM with a fast timeout and graceful fallback or no-LLM fallback
+        let queryJson: { city: string | null; state: string | null; country: string | null; restOfQuery: string } = {
+            city: null,
+            state: null,
+            country: null,
+            restOfQuery: rawQuery
+        };
+        if (locationResponse) {
+            try {
+                const parsed = JSON.parse(locationResponse);
+                queryJson = {
+                    city: parsed?.city ?? null,
+                    state: parsed?.state ?? null,
+                    country: parsed?.country ?? null,
+                    restOfQuery: typeof parsed?.restOfQuery === 'string' ? parsed.restOfQuery : rawQuery
+                };
+            } catch (e) {
+                console.warn('OpenAI location parsing failed, falling back to raw query.', e);
+            }
+        }
+        // Apply deterministic overrides and tuning knobs
         const { overrides, penaltyCities, forceCityExactCity, penaltyTerms, strictPenalty } = applyHardcodedLocationOverrides(query || '', queryJson);
         queryJson = overrides;
         const effectiveLocationStrategy = queryJson?.state ? 'strict' : 'flexible';
@@ -137,7 +160,39 @@ export async function GET(req: NextRequest) {
 					.split(/\s+/)
 					.filter((term) => term.length > 0) || [];
 			const caseInsensitiveMode = 'insensitive' as const;
-			const whereConditions: Prisma.ContactWhereInput = {
+            // Build location OR conditions only when parsed parts are present to satisfy Prisma types
+            const locationOr: Prisma.ContactWhereInput[] = [];
+            if (location) {
+                if (queryJson.city) {
+                    locationOr.push(
+                        { city: { contains: queryJson.city, mode: caseInsensitiveMode } },
+                        { address: { contains: queryJson.city, mode: caseInsensitiveMode } }
+                    );
+                }
+                if (queryJson.state) {
+                    locationOr.push(
+                        { state: { contains: queryJson.state, mode: caseInsensitiveMode } },
+                        { address: { contains: queryJson.state, mode: caseInsensitiveMode } }
+                    );
+                }
+                if (queryJson.country) {
+                    locationOr.push(
+                        { country: { contains: queryJson.country, mode: caseInsensitiveMode } },
+                        { address: { contains: queryJson.country, mode: caseInsensitiveMode } }
+                    );
+                }
+            }
+
+            // If preprocessing hinted an exact city (e.g., Philadelphia strict mode), enforce strict city/state
+            const strictLocationAnd: Prisma.ContactWhereInput[] = [];
+            if (forceCityExactCity) {
+                strictLocationAnd.push({ city: { equals: forceCityExactCity, mode: caseInsensitiveMode } });
+            }
+            if (forceCityExactCity && queryJson.state) {
+                strictLocationAnd.push({ state: { equals: queryJson.state, mode: caseInsensitiveMode } });
+            }
+
+            const whereConditions: Prisma.ContactWhereInput = {
 				AND: [
 					// Search terms condition (only if there are search terms)
 					...(searchTerms.length > 0
@@ -167,40 +222,10 @@ export async function GET(req: NextRequest) {
 					...(verificationStatus
 						? [{ emailValidationStatus: { equals: verificationStatus } }]
 						: []),
-					// Location condition (must match at least one location field)
-					...(location
-						? [
-								{
-									OR: [
-										{ city: { contains: queryJson.city, mode: caseInsensitiveMode } },
-										{
-											state: { contains: queryJson.state, mode: caseInsensitiveMode },
-										},
-										{
-											country: {
-												contains: queryJson.country,
-												mode: caseInsensitiveMode,
-											},
-										},
-										{
-											address: { contains: queryJson.city, mode: caseInsensitiveMode },
-										},
-										{
-											address: {
-												contains: queryJson.state,
-												mode: caseInsensitiveMode,
-											},
-										},
-										{
-											address: {
-												contains: queryJson.country,
-												mode: caseInsensitiveMode,
-											},
-										},
-									],
-								},
-						  ]
-						: []),
+                    // Location condition (must match at least one location field)
+                    ...(location && locationOr.length > 0 ? [{ OR: locationOr }] : []),
+                    // Strict city/state enforcement when we have forceCityExactCity from preprocessing (e.g., Philadelphia)
+                    ...(strictLocationAnd.length > 0 ? strictLocationAnd : []),
 					// Exclude used contacts condition
 					...(excludeUsedContacts && addedContactIds.length > 0
 						? [{ id: { notIn: addedContactIds } }]
@@ -241,13 +266,32 @@ export async function GET(req: NextRequest) {
 
 		// If vector search is enabled and we have a query, use vector search
         if (useVectorSearch && query) {
-            const vectorSearchResults = await searchSimilarContacts(
-				queryJson,
-				VECTOR_SEARCH_LIMIT,
-                0.1,  // Reasonable threshold for kNN scores (0.0-1.0 range)
-                effectiveLocationStrategy,
-                { penaltyCities, forceCityExactCity, penaltyTerms, strictPenalty }
-			);
+            const effectiveVectorLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200));
+            // Protect the vector path with a timeout and fallback to substring search
+            const vectorSearchWithTimeout = async () => {
+                const timeoutMs = 14000; // keep the UI snappy
+                return await Promise.race([
+                    searchSimilarContacts(
+                        queryJson,
+                        effectiveVectorLimit,
+                        0.1,
+                        effectiveLocationStrategy,
+                        { penaltyCities, forceCityExactCity, penaltyTerms, strictPenalty }
+                    ),
+                    new Promise<never>((_, reject) =>
+                        setTimeout(() => reject(new Error('Vector search timed out')), timeoutMs)
+                    ),
+                ]);
+            };
+
+            let vectorSearchResults;
+            try {
+                vectorSearchResults = await vectorSearchWithTimeout();
+            } catch (e) {
+                console.warn('Vector search timed out or failed, falling back to substring search.', e);
+                const fallback = await substringSearch();
+                return apiResponse(fallback);
+            }
             // Pre-filter ES matches using post-training to remove academic institutions early
             const prePostProfile = getPostTrainingForQuery(query || '');
             let esMatches = vectorSearchResults.matches;

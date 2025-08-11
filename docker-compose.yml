@@ -16,7 +16,7 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-      - 'ES_JAVA_OPTS=-Xms2g -Xmx2g'
+      - 'ES_JAVA_OPTS=-Xms4g -Xmx4g'
     ports:
       - '9200:9200'
     volumes:
@@ -26,6 +26,12 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+        reservations:
+          memory: 4G
 
 volumes:
   postgres_data:
