@@ -9,14 +9,21 @@ const VECTOR_DIMENSION = 1536;
 const INDEX_NAME = 'contacts';
 
 const openai = new OpenAI({
-	apiKey: process.env.OPEN_AI_API_KEY!,
+    apiKey: process.env.OPEN_AI_API_KEY!,
+    timeout: 15000, // 15s client timeout so embedding calls fail fast
 });
 
 const elasticsearch = new Client({
 	node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
-	auth: {
-		apiKey: process.env.ELASTICSEARCH_API_KEY!,
-	},
+	// Remove auth for local development
+	...(process.env.ELASTICSEARCH_API_KEY && {
+		auth: {
+			apiKey: process.env.ELASTICSEARCH_API_KEY,
+		},
+	}),
+	// Add timeout configurations for local development
+	requestTimeout: 60000, // 60 seconds
+	maxRetries: 3,
 });
 
 interface ContactDocument {
@@ -316,9 +323,20 @@ export type QueryJson = {
 	restOfQuery: string;
 };
 export const searchSimilarContacts = async (
-	queryJson: QueryJson,
-	limit: number = 10,
-	minScore: number = 0.3
+    queryJson: QueryJson,
+    limit: number = 10,
+    // minScore reserved for future use
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    minScore: number = 0.3,
+    locationStrategy: 'strict' | 'flexible' | 'broad' = 'flexible',
+    options?: {
+        penaltyCities?: string[];
+        forceCityExactCity?: string;
+        forceStateAny?: string[];
+        forceCityAny?: string[];
+        penaltyTerms?: string[];
+        strictPenalty?: boolean;
+    }
 ) => {
 	const response = await openai.embeddings.create({
 		input: queryJson.restOfQuery,
@@ -326,67 +344,61 @@ export const searchSimilarContacts = async (
 	});
 	const queryEmbedding = response.data[0].embedding;
 
-	// Search Elasticsearch using kNN search
-	const results = await elasticsearch.search<ContactDocument>({
+	// Configure location boost strategy for post-processing
+	const locationBoosts = {
+		strict: { exact: 0.0, fuzzy: 0.0 }, // No post-processing boost for strict (uses filters)
+		flexible: { exact: 0.2, fuzzy: 0.1 }, // Moderate location preference
+		broad: { exact: 0.1, fuzzy: 0.05 }   // Light location preference
+	};
+	const boosts = locationBoosts[locationStrategy];
+
+    // Build strict state/city filter for kNN (enforce exact state and exact city or any-of cities)
+    const buildStrictStateFilter = () => {
+        if (locationStrategy !== 'strict') return undefined;
+        const must: any[] = [];
+        if (options?.forceStateAny && options.forceStateAny.length > 0) {
+            must.push({
+                bool: {
+                    should: options.forceStateAny.map((s) => ({ term: { 'state.keyword': s.toLowerCase() } })),
+                    minimum_should_match: 1,
+                },
+            });
+        } else if (queryJson.state) {
+            must.push({ term: { 'state.keyword': queryJson.state.toLowerCase() } });
+        }
+        if (options?.forceCityExactCity) {
+            must.push({ term: { 'city.keyword': options.forceCityExactCity.toLowerCase() } });
+        }
+        if (options?.forceCityAny && options.forceCityAny.length > 0) {
+            must.push({
+                bool: {
+                    should: options.forceCityAny.map((c) => ({ term: { 'city.keyword': c.toLowerCase() } })),
+                    minimum_should_match: 1,
+                },
+            });
+        }
+        if (must.length === 0) return undefined;
+        return { bool: { filter: must } } as const;
+    };
+
+    const strictStateFilter = buildStrictStateFilter();
+
+	// Pure kNN search - let vector embeddings handle semantic matching
+    const kValue = options?.penaltyTerms && options.penaltyTerms.length > 0
+        ? (locationStrategy === 'strict' ? Math.min(limit * 2, 200) : Math.min(limit * 6, 200))
+        : (locationStrategy === 'strict' ? limit : Math.min(limit * 3, 100));
+
+    const results = await elasticsearch.search<ContactDocument>({
 		index: INDEX_NAME,
-		knn: {
+        knn: {
 			field: 'vector_field',
 			query_vector: queryEmbedding,
-			k: limit,
-			num_candidates: 10000, // maximum is 10,000
+            k: kValue, // Get more candidates for filtering when we plan to demote results
+            // Keep candidate space bounded; large values can stall ES locally
+            num_candidates: Math.min(1000, Math.max(kValue * 5, 100)),
+            filter: strictStateFilter,
 		},
-		query: {
-			bool: {
-				should: [
-					// confirm that this emphasizes the correct fields
-					{
-						multi_match: {
-							query: queryJson.restOfQuery,
-							fields: [
-								'title',
-								'headline',
-								'company',
-								'companyIndustry',
-								'companyKeywords',
-							],
-							type: 'best_fields',
-							fuzziness: 'AUTO',
-						},
-					},
-				],
-				must: [
-					// Exact location matching using term queries
-					...(queryJson.state
-						? [
-								{
-									term: {
-										'state.keyword': queryJson.state.toLowerCase(),
-									},
-								},
-						  ]
-						: []),
-					...(queryJson.city
-						? [
-								{
-									term: {
-										'city.keyword': queryJson.city.toLowerCase(),
-									},
-								},
-						  ]
-						: []),
-					...(queryJson.country
-						? [
-								{
-									term: {
-										'country.keyword': queryJson.country.toLowerCase(),
-									},
-								},
-						  ]
-						: []),
-				],
-			},
-		},
-		size: limit,
+        size: Math.min(limit, 500),
 		fields: [
 			'contactId',
 			'email',
@@ -411,10 +423,73 @@ export const searchSimilarContacts = async (
 		_source: false,
 	});
 
-	const filteredHits = results.hits.hits.filter((hit) => (hit._score || 0) >= minScore);
+    // Post-process results with optional location boosts and institutional penalties
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const processResultsWithLocationBoost = (hits: any[]): any[] => {
+		const skipBoosts = locationStrategy === 'strict' || boosts.exact === 0;
+
+        const penalties = new Set((options?.penaltyCities || []).map((c) => c.toLowerCase()));
+        const penaltyTerms = new Set((options?.penaltyTerms || []).map((t) => t.toLowerCase()));
+
+        return hits.map(hit => {
+            let locationBoost = 0;
+			if (!skipBoosts) {
+				// Check for exact location matches
+                if (queryJson.state && hit.fields?.state?.[0]?.toLowerCase() === queryJson.state.toLowerCase()) {
+                    locationBoost += boosts.exact;
+                }
+                if (queryJson.city && hit.fields?.city?.[0]?.toLowerCase() === queryJson.city.toLowerCase()) {
+                    locationBoost += boosts.exact;
+                }
+                if (queryJson.country && hit.fields?.country?.[0]?.toLowerCase() === queryJson.country.toLowerCase()) {
+                    locationBoost += boosts.exact;
+                }
+				// Check for fuzzy location matches
+                if (queryJson.state && hit.fields?.state?.[0]) {
+                    const hitState = hit.fields.state[0].toLowerCase();
+                    const queryState = queryJson.state.toLowerCase();
+                    if (hitState.includes(queryState.substring(0, 2)) || queryState.includes(hitState.substring(0, 2))) {
+                        locationBoost += boosts.fuzzy;
+                    }
+                }
+            }
+			
+            // Soft penalties for specific cities (e.g., when query contains "manhattan")
+            const hitCity = String(hit.fields?.city?.[0] || '').toLowerCase();
+            let penalty = penalties.has(hitCity) ? 0.2 : 0; // small deduction for cities
+
+            // Soft penalty for university/college when query starts with "music venue(s)"
+            const headline = String(hit.fields?.headline?.[0] || '').toLowerCase();
+            const title = String(hit.fields?.title?.[0] || '').toLowerCase();
+            const company = String(hit.fields?.company?.[0] || '').toLowerCase();
+            const textBlob = `${headline} ${title} ${company}`;
+            for (const term of penaltyTerms) {
+                if (!term) continue;
+                const exact = new RegExp(`(^|\b)${term.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}(\b|$)`, 'i');
+                if (exact.test(textBlob)) {
+                    penalty += options?.strictPenalty ? 0.6 : 0.35; // much stronger in strictPenalty mode
+                } else if (textBlob.includes(term)) {
+                    penalty += options?.strictPenalty ? 0.35 : 0.2; // stronger partial penalty in strictPenalty mode
+                }
+            }
+
+            // Apply location boost and penalty to score
+            const originalScore = hit._score || 0;
+            const boostedScore = originalScore + locationBoost - penalty;
+			
+            return {
+                ...hit,
+                _score: boostedScore
+            };
+		})
+		.sort((a, b) => (b._score || 0) - (a._score || 0)) // Re-sort by boosted score
+		.slice(0, limit); // Apply final limit
+	};
+
+	const processedHits = processResultsWithLocationBoost(results.hits.hits);
 
 	return {
-		matches: filteredHits.map((hit) => ({
+		matches: processedHits.map((hit) => ({
 			id: hit._id,
 			score: hit._score || 0,
 			metadata: {
@@ -439,8 +514,8 @@ export const searchSimilarContacts = async (
 				location: hit.fields?.location?.[0],
 			},
 		})),
-		totalFound: filteredHits.length,
-		minScoreApplied: minScore,
+		totalFound: processedHits.length,
+		locationStrategy: locationStrategy,
 	};
 };
 
@@ -529,4 +604,33 @@ export const searchContactsByLocation = async (
 		totalFound: results.hits.hits.length,
 		distanceKm,
 	};
+};
+
+// Add this temporarily for debugging
+export const debugElasticsearch = async () => {
+	try {
+		// Check if index exists
+		const indexExists = await elasticsearch.indices.exists({ index: INDEX_NAME });
+		console.log(`Index '${INDEX_NAME}' exists:`, indexExists);
+		
+		if (indexExists) {
+			// Get document count
+			const count = await elasticsearch.count({ index: INDEX_NAME });
+			console.log(`Document count in '${INDEX_NAME}':`, count.count);
+			
+			// Get a sample document
+			const sample = await elasticsearch.search({
+				index: INDEX_NAME,
+				size: 1,
+				_source: true
+			});
+			console.log('Sample document:', JSON.stringify(sample.hits.hits[0], null, 2));
+		}
+		
+		return { indexExists, status: 'ok' };
+    } catch (error) {
+        const err = error as Error;
+        console.error('Elasticsearch debug error:', err);
+        return { error: err.message };
+	}
 };
