@@ -8,12 +8,10 @@
 		"start": "next start",
 		"lint": "next lint",
 		"vercel-build": "prisma generate && prisma migrate deploy && next build",
-		"postinstall": "prisma generate",
-		"import-production-contacts": "tsx --tsconfig tsconfig.json scripts/import-production-contacts.ts",
-		"check-elasticsearch": "tsx --tsconfig tsconfig.json scripts/check-elasticsearch.tsx"
+		"postinstall": "prisma generate"
 	},
 	"prisma": {
-		"seed": "tsx --tsconfig tsconfig.json prisma/seed.ts"
+		"seed": "tsx prisma/seed.ts"
 	},
 	"type": "module",
 	"dependencies": {
@@ -95,7 +93,6 @@
 		"@types/nodemailer": "^6.4.17",
 		"@types/react": "^19",
 		"@types/react-dom": "^19",
-		"dotenv": "^17.2.1",
 		"eslint": "^9",
 		"eslint-config-next": "15.2.2",
 		"prisma": "^6.11.1",
