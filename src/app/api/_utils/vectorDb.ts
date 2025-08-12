@@ -324,7 +324,7 @@ export type QueryJson = {
 };
 export const searchSimilarContacts = async (
     queryJson: QueryJson,
-    limit: number = 10,
+    limit: number = 50,
     // minScore reserved for future use
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     minScore: number = 0.3,
@@ -523,7 +523,7 @@ export const searchContactsByLocation = async (
 	latitude: number,
 	longitude: number,
 	distanceKm: number = 50,
-	limit: number = 10
+    limit: number = 50
 ) => {
 	const results = await elasticsearch.search<ContactDocument>({
 		index: INDEX_NAME,

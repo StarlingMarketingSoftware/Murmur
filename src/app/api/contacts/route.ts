@@ -16,7 +16,7 @@ import { Contact, EmailVerificationStatus, Prisma } from '@prisma/client';
 import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vectorDb';
 import { OPEN_AI_MODEL_OPTIONS } from '@/constants';
 
-const VECTOR_SEARCH_LIMIT_DEFAULT = 100;
+const VECTOR_SEARCH_LIMIT_DEFAULT = 50;
 
 const createContactSchema = z.object({
 	firstName: z.string().optional(),
@@ -82,6 +82,12 @@ export async function GET(req: NextRequest) {
 			location,
 			excludeUsedContacts,
 		} = validatedFilters.data;
+
+		// Enforce a standard output size of 50 results maximum unless a smaller limit is requested
+		const effectiveReturnLimit = Math.min(
+			limit ?? VECTOR_SEARCH_LIMIT_DEFAULT,
+			VECTOR_SEARCH_LIMIT_DEFAULT
+		);
 
         let locationResponse: string | null = null;
         const rawQuery = query || '';
@@ -309,7 +315,7 @@ export async function GET(req: NextRequest) {
             } catch (e) {
                 console.warn('Vector search timed out or failed, falling back to substring search.', e);
                 const fallback = await substringSearch();
-                return apiResponse(fallback);
+                return apiResponse(fallback.slice(0, effectiveReturnLimit));
             }
             // Pre-filter ES matches using post-training to remove academic institutions early,
             // but allow a lenient tail to fill close-to-limit venue searches
@@ -381,7 +387,7 @@ export async function GET(req: NextRequest) {
                     ? strictlyAllowedTyped.filter((m) => passesPositive(m.metadata || {}))
                     : strictlyAllowed;
 
-                const finalLimit = limit ?? VECTOR_SEARCH_LIMIT_DEFAULT;
+                const finalLimit = effectiveReturnLimit;
 
                 if (prePostProfile.requirePositive) {
                     // Prioritize: positives -> aux -> remaining non-excluded
@@ -521,7 +527,7 @@ export async function GET(req: NextRequest) {
 
                 // If exclusion removed too many (e.g., fewer than limit), fill with demoted ones first;
                 // when near the cap, allow a lenient tail of non-excluded items even without positives
-                const finalLimit = limit ?? VECTOR_SEARCH_LIMIT_DEFAULT;
+                const finalLimit = effectiveReturnLimit;
                 if (filtered.length < finalLimit) {
                     // Prefer demoted positives first
                         const demotedPositives = strictlyAllowed.filter(
@@ -628,7 +634,7 @@ export async function GET(req: NextRequest) {
 					};
 				});
 
-				return apiResponse(fallbackContacts.slice(0, limit));
+				return apiResponse(fallbackContacts.slice(0, effectiveReturnLimit));
 			}
 
 			// if (contacts.length < 100) {
@@ -663,12 +669,12 @@ export async function GET(req: NextRequest) {
 			// 	return bCompositeScore - aCompositeScore;
 			// });
 
-			return apiResponse(contacts.slice(0, limit));
+			return apiResponse(contacts.slice(0, effectiveReturnLimit));
 		} else {
 			// Use regular search if vector search is not enabled
 			contacts = await substringSearch();
 
-			return apiResponse(contacts);
+			return apiResponse(contacts.slice(0, effectiveReturnLimit));
 		}
 	} catch (error) {
 		return handleApiError(error);
