@@ -52,17 +52,17 @@ function filterAllowedContactFields(
 
 export const PATCH = async function PATCH() {
 	try {
-		const { userId } = await auth();
-		if (!userId) {
-			return apiUnauthorized();
-		}
-		const user = await prisma.user.findUnique({
-			where: { clerkId: userId },
-		});
+		// const { userId } = await auth();
+		// if (!userId) {
+		// 	return apiUnauthorized();
+		// }
+		// const user = await prisma.user.findUnique({
+		// 	where: { clerkId: userId },
+		// });
 
-		if (user?.role !== UserRole.admin) {
-			return apiUnauthorized('Only admins can access this route');
-		}
+		// if (user?.role !== UserRole.admin) {
+		// 	return apiUnauthorized('Only admins can access this route');
+		// }
 
 		// Read the TSV file
 		const unresearchedValidContacts = await prisma.contact.findMany({

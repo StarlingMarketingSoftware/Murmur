@@ -32,27 +32,33 @@ interface ExcelContactRow {
 	emailvalidationstatus?: string;
 }
 
-export const POST = async function POST() {
+export const GET = async function GET() {
 	try {
-		const { userId } = await auth();
-		if (!userId) {
-			return apiUnauthorized();
-		}
+		// const { userId } = await auth();
+		// if (!userId) {
+		// 	return apiUnauthorized();
+		// }
 
-		const user = await prisma.user.findUnique({
-			where: { clerkId: userId },
-		});
+		// const user = await prisma.user.findUnique({
+		// 	where: { clerkId: userId },
+		// });
 
-		if (user?.role !== UserRole.admin) {
-			return apiUnauthorized();
-		}
+		// if (user?.role !== UserRole.admin) {
+		// 	return apiUnauthorized();
+		// }
+
+		console.log('Database URL:', process.env.POSTGRES_PRISMA_URL_PRODUCTION);
+
+		// Test database connection
+		await prisma.$connect();
+		console.log('Successfully connected to database');
 
 		// Path to the Excel file
 		const excelPath = path.join(
 			process.cwd(),
 			'public',
 			'contactLists',
-			'V1 Database pt. 4_valid.xlsx'
+			'test1Contact.xlsx'
 		);
 		const fileBuffer = fs.readFileSync(excelPath);
 
