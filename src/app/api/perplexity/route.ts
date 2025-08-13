@@ -31,15 +31,22 @@ export async function POST(request: NextRequest) {
 		const data = await request.json();
 		const validatedData = postPerplexitySchema.safeParse(data);
 		if (!validatedData.success) {
+			console.error('[API/Perplexity] Invalid request body:', validatedData.error);
 			return apiBadRequest(validatedData.error);
 		}
 
 		const { model, rolePrompt, userPrompt } = validatedData.data;
 
+		console.log(`[API/Perplexity] User ${userId} initiated call with model ${model}.`);
+		console.log('[API/Perplexity] System Prompt Snippet:', rolePrompt.substring(0, 200));
+
 		const response = await fetchPerplexity(model, rolePrompt, userPrompt);
+
+		console.log(`[API/Perplexity] Successfully received response for user ${userId}.`);
 
 		return apiResponse(response);
 	} catch (error) {
+		console.error('[API/Perplexity] Critical error in POST handler:', error);
 		return handleApiError(error);
 	}
 }
