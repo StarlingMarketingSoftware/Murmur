@@ -136,7 +136,7 @@ export function CustomTable<TData, TValue>({
 			setRowSelection(getInitialRowSelection());
 			setPagination({ pageIndex: 0, pageSize: rowsPerPage });
 		}
-	}, [dataKey, rowsPerPage]); // Using dataKey instead of data directly
+	}, [dataKey, rowsPerPage, data, getInitialRowSelection]);
 
 	const table = useReactTable({
 		data: data || [],
