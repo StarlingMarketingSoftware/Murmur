@@ -8,6 +8,7 @@ import {
 	apiUnauthorized,
 	fetchOpenAi,
 	handleApiError,
+	stripBothSidesOfBraces, // Add this import
 } from '@/app/api/_utils';
 import { getValidatedParamsFromUrl } from '@/utils';
 import { getPostTrainingForQuery } from '@/app/api/_utils/postTraining';
@@ -113,7 +114,7 @@ export async function GET(req: NextRequest) {
         };
         if (locationResponse) {
             try {
-                const parsed = JSON.parse(locationResponse);
+                const parsed = JSON.parse(stripBothSidesOfBraces(locationResponse));
                 queryJson = {
                     city: parsed?.city ?? null,
                     state: parsed?.state ?? null,
