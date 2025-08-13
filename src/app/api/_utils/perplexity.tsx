@@ -47,7 +47,7 @@ export const fetchPerplexity = async (
 			throw new Error(
 				parsedError.error?.message || `Perplexity AI request failed with status ${response.status}`
 			);
-		} catch (e) {
+		} catch {
 			throw new Error(`Perplexity AI request failed: ${response.status} - ${errorBody}`);
 		}
 	}
