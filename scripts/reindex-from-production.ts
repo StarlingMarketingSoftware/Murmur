@@ -119,9 +119,7 @@ async function verifyImport() {
 		const searchTest = await localClient.search({
 			index: INDEX_NAME,
 			size: 1,
-			body: {
-				query: { match_all: {} },
-			},
+			query: { match_all: {} },
 		});
 		
 		if (searchTest.hits.hits.length > 0) {

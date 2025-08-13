@@ -355,7 +355,7 @@ export const searchSimilarContacts = async (
     // Build strict state/city filter for kNN (enforce exact state and exact city or any-of cities)
     const buildStrictStateFilter = () => {
         if (locationStrategy !== 'strict') return undefined;
-        const must: any[] = [];
+        const must: Record<string, unknown>[] = [];
         if (options?.forceStateAny && options.forceStateAny.length > 0) {
             must.push({
                 bool: {
@@ -606,8 +606,11 @@ export const searchContactsByLocation = async (
 	};
 };
 
-// Add this temporarily for debugging
+// Debug function - only use in development
 export const debugElasticsearch = async () => {
+	if (process.env.NODE_ENV === 'production') {
+		return { error: 'Debug function disabled in production' };
+	}
 	try {
 		// Check if index exists
 		const indexExists = await elasticsearch.indices.exists({ index: INDEX_NAME });

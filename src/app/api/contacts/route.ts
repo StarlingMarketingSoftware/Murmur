@@ -8,8 +8,8 @@ import {
 	apiUnauthorized,
 	fetchOpenAi,
 	handleApiError,
-	stripBothSidesOfBraces, // Add this import
 } from '@/app/api/_utils';
+import { stripBothSidesOfBraces } from '@/utils/string';
 import { getValidatedParamsFromUrl } from '@/utils';
 import { getPostTrainingForQuery } from '@/app/api/_utils/postTraining';
 import { applyHardcodedLocationOverrides } from '@/app/api/_utils/searchPreprocess';
@@ -62,10 +62,11 @@ export type PostContactData = z.infer<typeof createContactSchema>;
 
 export async function GET(req: NextRequest) {
 	try {
-		console.log(
-			'--- DEBUG: API Key from env (OPEN_AI_API_KEY):',
-			process.env.OPEN_AI_API_KEY ? 'Exists' : 'MISSING!'
-		);
+		// Remove debug logging in production
+		// console.log(
+		// 	'--- DEBUG: API Key from env (OPEN_AI_API_KEY):',
+		// 	process.env.OPEN_AI_API_KEY ? 'Exists' : 'MISSING!'
+		// );
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
@@ -368,11 +369,11 @@ export async function GET(req: NextRequest) {
 
                 // Always enforce hard excludes first
                 const strictlyAllowed = esMatches.filter((m) => {
-                    const md: any = m.metadata || {};
+                    const md: Record<string, unknown> = m.metadata || {};
                     return !(
-                        containsAny(md.company, excludeTerms) ||
-                        containsAny(md.title, excludeTerms) ||
-                        containsAny(md.headline, excludeTerms)
+                        containsAny(md.company as string | null, excludeTerms) ||
+                        containsAny(md.title as string | null, excludeTerms) ||
+                        containsAny(md.headline as string | null, excludeTerms)
                     );
                 });
 
@@ -575,9 +576,9 @@ export async function GET(req: NextRequest) {
 			// Fallback: if local Postgres doesn't have these contacts, return minimal data from Elasticsearch directly
 			if (!contacts || contacts.length === 0) {
 				const fallbackContacts = esMatches.map((match) => {
-					const md: any = match.metadata || {};
+					const md: Record<string, unknown> = match.metadata || {};
 					const parsedId = Number(md.contactId);
-					const toArray = (val: any) =>
+					const toArray = (val: unknown) =>
 						Array.isArray(val)
 							? val
 							: val
