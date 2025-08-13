@@ -1,12 +1,13 @@
-import { User } from '@prisma/client';
+// import { User } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
 import { auth } from '@clerk/nextjs/server';
 import {
-	apiBadRequest,
-	apiResponse,
-	apiUnauthorized,
-	handleApiError,
+    apiBadRequest,
+    apiResponse,
+    apiUnauthorized,
+    apiNotFound,
+    handleApiError,
 } from '@/app/api/_utils';
 import { ApiRouteParams } from '@/types';
 import { NextRequest } from 'next/server';
@@ -37,15 +38,25 @@ export const GET = async function GET(
 			return apiUnauthorized();
 		}
 
-		const { id } = await params;
+        const { id } = await params;
 
-		const user: User = await prisma.user.findUniqueOrThrow({
-			where: {
-				clerkId: id,
-			},
-		});
+        let user = await prisma.user.findUnique({ where: { clerkId: id } });
 
-		return apiResponse(user);
+        if (!user) {
+            if (process.env.NODE_ENV !== 'production') {
+                // Auto-create a minimal local user record in development
+                user = await prisma.user.create({
+                    data: {
+                        clerkId: id,
+                        email: `${id}@local.dev`,
+                    },
+                });
+            } else {
+                return apiNotFound('User not found');
+            }
+        }
+
+        return apiResponse(user);
 	} catch (error) {
 		return handleApiError(error);
 	}

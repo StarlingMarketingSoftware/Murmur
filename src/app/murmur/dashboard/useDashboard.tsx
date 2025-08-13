@@ -221,7 +221,10 @@ export const useDashboard = () => {
 	} = useGetContacts({
 		filters: {
 			query: activeSearchQuery,
-			verificationStatus: EmailVerificationStatus.valid,
+			verificationStatus:
+				process.env.NODE_ENV === 'production'
+					? EmailVerificationStatus.valid
+					: undefined,
 			useVectorSearch: !activeExactMatchesOnly,
 			limit,
 			excludeUsedContacts: activeExcludeUsedContacts,
