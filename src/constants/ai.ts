@@ -80,7 +80,7 @@ Rules:
 Write this how you think Jensen Huang would write an email. This should feel like it's written by a top CEO
 
 OUTPUT FORMAT:
-Return the message and the subject line, without any signature or other text.`;
+Return ONLY the email body text, without any subject line, signature, or other text. Do not return JSON format - just the plain email body text.`;
 
 export const PERPLEXITY_HYBRID_PROMPT = `
 

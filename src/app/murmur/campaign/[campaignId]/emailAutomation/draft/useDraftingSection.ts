@@ -324,22 +324,45 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		console.log('[Full AI] Starting generation for contact:', recipient.id);
 		console.log('[Full AI] Perplexity prompt length:', perplexityPrompt.length);
 
-		const perplexityResponse: string = await callPerplexity({
-			model: 'sonar',
-			rolePrompt: PERPLEXITY_FULL_AI_PROMPT,
-			userPrompt: perplexityPrompt,
-			signal: signal,
-		});
+		let perplexityResponse: string;
+		try {
+			perplexityResponse = await callPerplexity({
+				model: 'sonar',
+				rolePrompt: PERPLEXITY_FULL_AI_PROMPT,
+				userPrompt: perplexityPrompt,
+				signal: signal,
+			});
+		} catch (error) {
+			console.error('[Full AI] Perplexity call failed:', error);
+			if (error instanceof Error && error.message.includes('cancelled')) {
+				throw error;
+			}
+			throw new Error(`Failed to generate email content: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		}
 
 		console.log('[Full AI] Perplexity response length:', perplexityResponse.length);
 		console.log('[Full AI] Perplexity response preview:', perplexityResponse.substring(0, 200));
 
-		const mistralResponse1 = await callMistralAgent({
-			prompt: getMistralTonePrompt(toneAgentType),
-			content: perplexityResponse,
-			agentType: toneAgentType,
-			signal: signal,
-		});
+		let mistralResponse1: string;
+		try {
+			mistralResponse1 = await callMistralAgent({
+				prompt: getMistralTonePrompt(toneAgentType),
+				content: perplexityResponse,
+				agentType: toneAgentType,
+				signal: signal,
+			});
+		} catch (error) {
+			console.error('[Full AI] Mistral tone agent call failed:', error);
+			if (error instanceof Error && error.message.includes('cancelled')) {
+				throw error;
+			}
+			// If Mistral fails, try to create a basic response with the Perplexity content
+			console.log('[Full AI] Falling back to Perplexity response due to Mistral error');
+			return {
+				subject: `Email for ${recipient.firstName || recipient.email}`,
+				message: perplexityResponse,
+			};
+		}
 
 		console.log('[Full AI] Mistral raw response:', mistralResponse1.substring(0, 500));
 		
@@ -401,17 +424,20 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 		if (paragraphs > 0) {
 			try {
+				console.log(`[Full AI] Applying paragraph formatting for ${paragraphs} paragraphs`);
 				mistralResponse2 = await callMistralAgent({
 					prompt: getMistralParagraphPrompt(paragraphs),
 					content: mistralResponse1Parsed.message,
 					agentType: `paragraph${paragraphs}` as MistralParagraphAgentType,
 					signal: signal,
 				});
+				console.log('[Full AI] Paragraph formatting applied successfully');
 			} catch (e) {
-				console.error('Mistral paragraphs failed:', e);
+				console.error('[Full AI] Mistral paragraph formatting failed:', e);
 				mistralResponse2 = mistralResponse1Parsed.message;
 			}
 		} else {
+			console.log('[Full AI] No paragraph formatting requested, returning parsed response');
 			return mistralResponse1Parsed;
 		}
 
