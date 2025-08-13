@@ -1,4 +1,4 @@
-import { MISTRAL_TONE_AGENT_KEYS } from '@/constants';
+import { MISTRAL_PARAGRAPH_AGENT_KEYS, MISTRAL_TONE_AGENT_KEYS } from '@/constants';
 
 export type ApiRouteParams = Promise<{ id: string }>;
 
@@ -15,5 +15,5 @@ export interface CustomMutationOptions {
 }
 
 export type MistralToneAgentType = (typeof MISTRAL_TONE_AGENT_KEYS)[number];
-export type MistralParagraphAgentType = (typeof MISTRAL_TONE_AGENT_KEYS)[number];
+export type MistralParagraphAgentType = (typeof MISTRAL_PARAGRAPH_AGENT_KEYS)[number];
 export type MistralAgentType = MistralToneAgentType | MistralParagraphAgentType;
