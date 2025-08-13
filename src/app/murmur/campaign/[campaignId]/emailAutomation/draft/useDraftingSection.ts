@@ -305,31 +305,38 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			throw new Error('Campaign identity is required');
 		}
 
-		const perplexityPrompt = `Recipient: ${stringifyJsonSubset<Contact>(recipient, [
-			'firstName',
+		// ROBUSTNESS FIX: Dynamically create the system prompt with real data.
+		const populatedSystemPrompt = PERPLEXITY_FULL_AI_PROMPT.replace(
+			'{recipient_first_name}',
+			recipient.firstName || ''
+		).replace('{company}', recipient.company || '');
+
+		const userPrompt = `Sender: ${stringifyJsonSubset<Identity>(campaign.identity, [
+			'name',
+			'website',
+		])}\n\nRecipient Additional Info: ${stringifyJsonSubset<Contact>(recipient, [
 			'lastName',
-			'company',
 			'address',
 			'city',
 			'state',
 			'country',
 			'website',
 			'phone',
-		])}\n\n Sender: ${stringifyJsonSubset<Identity>(campaign.identity, [
-			'name',
-			'website',
-		])}\n\n Prompt: ${prompt}`;
+		])}\n\nUser Goal: ${prompt}`;
 
 		// Debug logging for Full AI path
-		console.log('[Full AI] Starting generation for contact:', recipient.id);
-		console.log('[Full AI] Perplexity prompt length:', perplexityPrompt.length);
+		console.log(
+			`[Full AI] Starting generation for contact: ${recipient.id} (${recipient.email})`
+		);
+		console.log('[Full AI] Populated System Prompt:', populatedSystemPrompt.substring(0, 300));
+		console.log('[Full AI] User Prompt:', userPrompt.substring(0, 300));
 
 		let perplexityResponse: string;
 		try {
 			perplexityResponse = await callPerplexity({
 				model: 'sonar',
-				rolePrompt: PERPLEXITY_FULL_AI_PROMPT,
-				userPrompt: perplexityPrompt,
+				rolePrompt: populatedSystemPrompt, // Use the new, populated prompt
+				userPrompt: userPrompt,
 				signal: signal,
 			});
 		} catch (error) {
