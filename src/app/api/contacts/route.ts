@@ -17,7 +17,7 @@ import { Contact, EmailVerificationStatus, Prisma } from '@prisma/client';
 import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vectorDb';
 import { OPEN_AI_MODEL_OPTIONS } from '@/constants';
 
-const VECTOR_SEARCH_LIMIT_DEFAULT = 100;
+const VECTOR_SEARCH_LIMIT_DEFAULT = 50;
 
 const createContactSchema = z.object({
 	firstName: z.string().optional(),
