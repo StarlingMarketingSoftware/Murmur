@@ -244,7 +244,7 @@ export async function GET(req: NextRequest) {
 
             // Overshoot take for venue-like queries so we can fill tail with aux (bars/restaurants)
             const requestedLimit = limit ?? VECTOR_SEARCH_LIMIT_DEFAULT;
-            const preProfile = getPostTrainingForQuery(query || '');
+            const preProfile = await getPostTrainingForQuery(query || '');
             const effectiveTake = preProfile.requirePositive
                 ? Math.min(Math.max(requestedLimit + 50, Math.ceil(requestedLimit * 1.3)), 250)
                 : requestedLimit;
@@ -283,7 +283,7 @@ export async function GET(req: NextRequest) {
 		// If vector search is enabled and we have a query, use vector search
         if (useVectorSearch && query) {
             // Determine if this is a venue-like query that uses positive signals; overshoot to allow a lenient tail
-            const postTrainingProfile = getPostTrainingForQuery(query || '');
+            const postTrainingProfile = await getPostTrainingForQuery(query || '');
             const requestedLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200));
             const effectiveVectorLimit = postTrainingProfile.requirePositive
                 ? Math.min(Math.max(requestedLimit + 20, Math.ceil(requestedLimit * 1.2)), 200)
@@ -467,7 +467,7 @@ export async function GET(req: NextRequest) {
             }
 
             // Posttraining step: exclude or demote universities for music venue searches
-            const postProfile = getPostTrainingForQuery(query || '');
+            const postProfile = await getPostTrainingForQuery(query || '');
             if (postProfile.active && contacts.length > 0) {
                 const excludeTerms = postProfile.excludeTerms.map((t) => t.toLowerCase());
                 const demoteTerms = postProfile.demoteTerms.map((t) => t.toLowerCase());
