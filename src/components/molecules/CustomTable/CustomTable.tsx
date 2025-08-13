@@ -21,7 +21,7 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table';
-import { Dispatch, SetStateAction, useEffect, useState, useMemo } from 'react';
+import { Dispatch, SetStateAction, useEffect, useState, useMemo, useCallback } from 'react';
 import { twMerge } from 'tailwind-merge';
 import CustomPagination from '@/components/molecules/CustomPagination/CustomPagination';
 import { Input } from '@/components/ui/input';
@@ -111,13 +111,13 @@ export function CustomTable<TData, TValue>({
 	});
 
 	// Initialize all rows as selected
-	const getInitialRowSelection = () => {
+	const getInitialRowSelection = useCallback(() => {
 		if (!data || !isSelectable) return {};
 		return data.reduce((acc, _, index) => {
 			acc[index] = initialSelectAll;
 			return acc;
 		}, {} as Record<string, boolean>);
-	};
+	}, [data, isSelectable, initialSelectAll]);
 
 	const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 	const [sorting, setSorting] = useState<SortingState>([]);

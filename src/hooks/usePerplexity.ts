@@ -60,7 +60,7 @@ export const usePerplexity = () => {
 				console.log('[Perplexity] Response preview:', jsonString.substring(0, 200));
 				return jsonString;
 			} catch (e) {
-				console.error('[Perplexity] Failed to extract content from response:', data);
+				console.error('[Perplexity] Failed to extract content from response:', e, data);
 				throw new Error('Failed to parse Perplexity response. Please try again.');
 			}
 		},
