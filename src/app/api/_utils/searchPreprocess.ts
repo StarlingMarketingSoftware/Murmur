@@ -274,11 +274,54 @@ export function applyHardcodedLocationOverrides(
   });
   const hit = matchingAliases.sort((a, b) => b.length - a.length)[0];
   if (!hit) {
-    return {
-      overrides: parsed,
-      penaltyCities: [],
-      penaltyTerms: [],
-    };
+    // If LLM didn't parse a state, deterministically detect one from raw query using full state names (not 2-letter abbreviations)
+    let detectedStateCanonical: string | null = null;
+    let detectedKey: string | null = null;
+    const nonAbbrevStateKeys = Object.keys(STATE_SYNONYMS).filter((k) => k.length > 2);
+    for (const key of nonAbbrevStateKeys.sort((a, b) => b.length - a.length)) {
+      const pattern = new RegExp(`\\b${key.replace(/[.*+?^${}()|[\\]\\]/g, '\\\\$&')}\\b`, 'i');
+      if (pattern.test(lowered)) {
+        detectedKey = key;
+        detectedStateCanonical = STATE_SYNONYMS[key][0];
+        break;
+      }
+    }
+
+    if (detectedStateCanonical) {
+      const cleanedRest = parsed.restOfQuery
+        ? parsed.restOfQuery
+            .replace(new RegExp(`\\b${detectedKey!.replace(/[.*+?^${}()|[\\]\\]/g, '\\\\$&')}\\b`, 'ig'), '')
+            .replace(/\s+/g, ' ')
+            .trim()
+        : parsed.restOfQuery;
+
+      const forceStateAny = STATE_SYNONYMS[detectedKey!.toLowerCase()] || [detectedStateCanonical];
+
+      return {
+        overrides: {
+          city: parsed.city,
+          state: detectedStateCanonical,
+          country: parsed.country,
+          restOfQuery: cleanedRest,
+        },
+        penaltyCities: [],
+        forceStateAny,
+        penaltyTerms: [],
+        strictPenalty: false,
+      };
+    } else {
+      // Even without detected state or alias, provide state synonyms if parsed contains a state
+      const stateKey = (parsed.state || '').toLowerCase();
+      const forceStateAny = stateKey && STATE_SYNONYMS[stateKey] ? STATE_SYNONYMS[stateKey] : undefined;
+
+      return {
+        overrides: parsed,
+        penaltyCities: [],
+        forceStateAny,
+        penaltyTerms: [],
+        strictPenalty: false,
+      };
+    }
   }
 
   const alias = LOCATION_ALIASES[hit];
@@ -323,4 +366,26 @@ export function applyHardcodedLocationOverrides(
   };
 }
 
+
+// Build a canonical map from any known state token to its USPS abbreviation
+const STATE_ABBREV_MAP: Record<string, string> = (() => {
+  const map: Record<string, string> = {};
+  const normalizeKey = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '');
+  const entries = Object.entries(STATE_SYNONYMS);
+  for (const [key, values] of entries) {
+    const abbr = values.find((v) => /^[A-Z]{2}$/.test(v)) || values[1] || '';
+    if (!abbr) continue;
+    map[normalizeKey(key)] = abbr.toUpperCase();
+    for (const v of values) {
+      map[normalizeKey(v)] = abbr.toUpperCase();
+    }
+  }
+  return map;
+})();
+
+export function stateToAbbrev(state: string | null | undefined): string | null {
+  if (!state) return null;
+  const key = state.toLowerCase().replace(/[^a-z]/g, '');
+  return STATE_ABBREV_MAP[key] || null;
+}
 

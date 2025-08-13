@@ -12,7 +12,7 @@ import {
 import { stripBothSidesOfBraces } from '@/utils/string';
 import { getValidatedParamsFromUrl } from '@/utils';
 import { getPostTrainingForQuery } from '@/app/api/_utils/postTraining';
-import { applyHardcodedLocationOverrides } from '@/app/api/_utils/searchPreprocess';
+import { applyHardcodedLocationOverrides, stateToAbbrev } from '@/app/api/_utils/searchPreprocess';
 import { Contact, EmailVerificationStatus, Prisma } from '@prisma/client';
 import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vectorDb';
 import { OPEN_AI_MODEL_OPTIONS } from '@/constants';
@@ -48,7 +48,7 @@ const createContactSchema = z.object({
 
 const contactFilterSchema = z.object({
 	query: z.string().optional(),
-	limit: z.coerce.number().optional(),
+	limit: z.coerce.number().default(100),
 	verificationStatus: z.nativeEnum(EmailVerificationStatus).optional(),
 	contactListIds: z.array(z.number()).optional(),
 	useVectorSearch: z.boolean().optional(),
@@ -233,7 +233,15 @@ export async function GET(req: NextRequest) {
 						: []),
                     // Location condition (must match at least one location field)
                     ...(location && locationOr.length > 0 ? [{ OR: locationOr }] : []),
-                    // Strict city/state enforcement when we have forceCityExactCity from preprocessing (e.g., Philadelphia)
+                    // Enforce state strictly when present (from LLM or deterministic detection)
+                    ...((queryJson.state || (forceStateAny && forceStateAny.length > 0))
+                        ? [
+                            forceStateAny && forceStateAny.length > 0
+                              ? { OR: forceStateAny.map((s) => ({ state: { equals: s, mode: caseInsensitiveMode } })) }
+                              : { state: { equals: String(queryJson.state), mode: caseInsensitiveMode } }
+                          ]
+                        : []),
+                    // Strict city enforcement when hinted
                     ...(strictLocationAnd.length > 0 ? strictLocationAnd : []),
 					// Exclude used contacts condition
 					...(excludeUsedContacts && addedContactIds.length > 0
@@ -317,6 +325,7 @@ export async function GET(req: NextRequest) {
             // but allow a lenient tail to fill close-to-limit venue searches
             const prePostProfile = postTrainingProfile;
             let esMatches = vectorSearchResults.matches;
+            /*
             if (prePostProfile.active && esMatches.length > 0) {
                 type EsMatch = { id: string; score: number; metadata: Record<string, unknown> };
                 const excludeTerms = prePostProfile.excludeTerms.map((t) => t.toLowerCase());
@@ -414,6 +423,7 @@ export async function GET(req: NextRequest) {
                     esMatches = (positivesOnly.slice(0, finalLimit) as unknown) as typeof esMatches;
                 }
             }
+            */
 			// 8.1 seemed like a good limit to keep noise out of music venues...but restrictive for
 
 			// Create a map of contactId to relevance score for efficient lookup
@@ -451,20 +461,36 @@ export async function GET(req: NextRequest) {
 				},
 			});
 
-            // Defensive strict-location enforcement for vector results
-            if ((forceCityExactCity || (forceCityAny && forceCityAny.length > 0)) && (queryJson.state || forceStateAny)) {
-                const allowedStates = forceStateAny && forceStateAny.length > 0
-                    ? new Set(forceStateAny.map((s) => s.toLowerCase()))
-                    : (queryJson.state ? new Set([queryJson.state.toLowerCase()]) : new Set<string>());
-                const targetCities = forceCityAny && forceCityAny.length > 0 ? new Set(forceCityAny.map((c) => c.toLowerCase())) : (forceCityExactCity ? new Set([forceCityExactCity.toLowerCase()]) : new Set<string>());
-                contacts = contacts.filter((c) => {
-                    const cityVal = (c.city || '').toLowerCase();
-                    const cityOk = targetCities.size === 0 ? true : targetCities.has(cityVal);
-                    const stateVal = (c.state || '').toLowerCase();
-                    const stateOk = allowedStates.size === 0 ? true : allowedStates.has(stateVal);
-                    return cityOk && stateOk;
-                });
-            }
+			// Defensive strict-location enforcement for vector results: always enforce state if present
+			if (queryJson.state || (forceStateAny && forceStateAny.length > 0)) {
+				const lower = (s: string) => s.toLowerCase();
+				const stateAbbrev = stateToAbbrev(queryJson.state || null);
+				const allowedStates = new Set<string>(
+					(forceStateAny && forceStateAny.length > 0
+						? forceStateAny
+						: [queryJson.state || '']
+					)
+						.filter(Boolean)
+						.map((s) => lower(String(s)))
+				);
+				if (stateAbbrev) allowedStates.add(lower(stateAbbrev));
+				const targetCities = new Set<string>(
+					(forceCityAny && forceCityAny.length > 0
+						? forceCityAny
+						: (forceCityExactCity ? [forceCityExactCity] : []))
+						.map((c) => lower(c))
+				);
+				contacts = contacts.filter((c) => {
+					const cityVal = lower(String(c.city || ''));
+					const stateVal = lower(String(c.state || ''));
+					const abbrevVal = stateToAbbrev(String(c.state || ''));
+					const stateOk = allowedStates.size === 0
+						? true
+						: (allowedStates.has(stateVal) || (abbrevVal ? allowedStates.has(lower(abbrevVal)) : false));
+					const cityOk = targetCities.size === 0 ? true : targetCities.has(cityVal);
+					return stateOk && cityOk;
+				});
+			}
 
             // Posttraining step: exclude or demote universities for music venue searches
             const postProfile = getPostTrainingForQuery(query || '');
@@ -642,6 +668,96 @@ export async function GET(req: NextRequest) {
 
 			// 	contacts = [...contacts, ...uniqueFallbackContacts];
 			// }
+
+			// Top up with ES fallback (strict state/city) when contacts are fewer than limit
+			if (contacts && contacts.length < (limit ?? VECTOR_SEARCH_LIMIT_DEFAULT)) {
+				const toArray = (val: unknown) =>
+					Array.isArray(val)
+						? val
+						: val
+						? String(val)
+								.split(',')
+								.map((s) => s.trim())
+								.filter(Boolean)
+						: [];
+				const fallbackCandidates = esMatches.map((match) => {
+					const md: Record<string, unknown> = match.metadata || {};
+					const parsedId = Number(md.contactId);
+					return {
+						id: Number.isFinite(parsedId) ? parsedId : Math.floor(Math.random() * 1_000_000_000),
+						apolloPersonId: null,
+						firstName: (md.firstName as string | undefined) ?? null,
+						lastName: (md.lastName as string | undefined) ?? null,
+						email: (md.email as string | undefined) ?? '',
+						company: (md.company as string | undefined) ?? null,
+						city: (md.city as string | undefined) ?? null,
+						state: (md.state as string | undefined) ?? null,
+						country: (md.country as string | undefined) ?? null,
+						address: (md.address as string | undefined) ?? null,
+						phone: null,
+						website: (md.website as string | undefined) ?? null,
+						title: (md.title as string | undefined) ?? null,
+						headline: (md.headline as string | undefined) ?? null,
+						linkedInUrl: null,
+						photoUrl: null,
+						metadata: (md.metadata as string | undefined) ?? null,
+						companyLinkedInUrl: null,
+						companyFoundedYear: (md.companyFoundedYear as string | undefined) ?? null,
+						companyType: (md.companyType as string | undefined) ?? null,
+						companyTechStack: toArray(md.companyTechStack),
+						companyPostalCode: null,
+						companyKeywords: toArray(md.companyKeywords),
+						companyIndustry: (md.companyIndustry as string | undefined) ?? null,
+						latitude: null,
+						longitude: null,
+						isPrivate: false,
+						hasVectorEmbedding: true,
+						userContactListCount: 0,
+						manualDeselections: 0,
+						lastResearchedDate: null,
+						emailValidationStatus: 'valid' as unknown as EmailVerificationStatus,
+						emailValidationSubStatus: null,
+						emailValidatedAt: null,
+						createdAt: new Date().toISOString() as unknown as Date,
+						updatedAt: new Date().toISOString() as unknown as Date,
+						userId: null,
+						contactListId: null,
+					};
+				});
+				const normalizeToken = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '');
+				let filteredFallback = fallbackCandidates;
+				if (queryJson.state || (forceStateAny && forceStateAny.length > 0)) {
+					const canonicalStateAbbrev = stateToAbbrev(String(queryJson.state || ''));
+					const allowedStates = forceStateAny && forceStateAny.length > 0
+						? new Set(forceStateAny.map((s) => normalizeToken(s)))
+						: new Set([normalizeToken(String(queryJson.state))]);
+					const allowedCities = (forceCityExactCity || (forceCityAny && forceCityAny.length > 0))
+						? (forceCityAny && forceCityAny.length > 0
+							? new Set(forceCityAny.map((c) => normalizeToken(c)))
+							: new Set([normalizeToken(String(forceCityExactCity))]))
+						: null;
+					filteredFallback = fallbackCandidates.filter((c) => {
+						const stateTok = normalizeToken(String(c.state || ''));
+						const abbrev = stateToAbbrev(String(c.state || ''));
+						if (!allowedStates.has(stateTok) && (!canonicalStateAbbrev || abbrev !== canonicalStateAbbrev)) return false;
+						if (!allowedCities) return true;
+						const cityTok = normalizeToken(String(c.city || ''));
+						return allowedCities.has(cityTok);
+					});
+				}
+				const finalLimit = limit ?? VECTOR_SEARCH_LIMIT_DEFAULT;
+				const existingIds = new Set(contacts.map((c) => c.id));
+				const fillers: (Contact)[] = [];
+				for (const c of filteredFallback) {
+					if (existingIds.has(c.id)) continue;
+					fillers.push(c as unknown as Contact);
+					existingIds.add(c.id);
+					if (contacts.length + fillers.length >= finalLimit) break;
+				}
+				if (fillers.length > 0) {
+					contacts = [...contacts, ...fillers].slice(0, finalLimit);
+				}
+			}
 
 			// balanced sorting combining relevance and userContactListCount
 			// const maxUserContactListCount = Math.max(

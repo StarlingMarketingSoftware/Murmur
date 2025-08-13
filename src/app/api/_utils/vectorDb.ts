@@ -1,6 +1,7 @@
 import { Contact } from '@prisma/client';
 import { OpenAI } from 'openai';
 import { Client, estypes } from '@elastic/elasticsearch';
+import { stateToAbbrev } from './searchPreprocess';
 import prisma from '@/lib/prisma';
 
 type MappingProperty = estypes.MappingProperty;
@@ -347,8 +348,8 @@ export const searchSimilarContacts = async (
 	// Configure location boost strategy for post-processing
 	const locationBoosts = {
 		strict: { exact: 0.0, fuzzy: 0.0 }, // No post-processing boost for strict (uses filters)
-		flexible: { exact: 0.2, fuzzy: 0.1 }, // Moderate location preference
-		broad: { exact: 0.1, fuzzy: 0.05 }   // Light location preference
+		flexible: { exact: 0.2, fuzzy: 0.0 }, // Moderate location preference; no fuzzy to avoid cross-state confusion
+		broad: { exact: 0.1, fuzzy: 0.0 }   // Light location preference; no fuzzy
 	};
 	const boosts = locationBoosts[locationStrategy];
 
@@ -356,26 +357,31 @@ export const searchSimilarContacts = async (
     const buildStrictStateFilter = () => {
         if (locationStrategy !== 'strict') return undefined;
         const must: Record<string, unknown>[] = [];
+
+        // Helper to allow both keyword and non-keyword mappings and mixed casing
+        const buildFieldShould = (field: 'state' | 'city', values: string[]) => {
+            const shouldClauses: Record<string, unknown>[] = [];
+            for (const raw of values) {
+                const lower = raw.toLowerCase();
+                // Prefer keyword (with lowercase normalizer) when available
+                shouldClauses.push({ term: { [`${field}.keyword`]: lower } as Record<string, string> });
+                // Also try non-keyword exact matches to tolerate legacy mappings
+                shouldClauses.push({ term: { [field]: raw } });
+                shouldClauses.push({ term: { [field]: lower } });
+            }
+            return { bool: { should: shouldClauses, minimum_should_match: 1 } } as const;
+        };
+
         if (options?.forceStateAny && options.forceStateAny.length > 0) {
-            must.push({
-                bool: {
-                    should: options.forceStateAny.map((s) => ({ term: { 'state.keyword': s.toLowerCase() } })),
-                    minimum_should_match: 1,
-                },
-            });
+            must.push(buildFieldShould('state', options.forceStateAny));
         } else if (queryJson.state) {
-            must.push({ term: { 'state.keyword': queryJson.state.toLowerCase() } });
+            must.push(buildFieldShould('state', [queryJson.state]));
         }
         if (options?.forceCityExactCity) {
-            must.push({ term: { 'city.keyword': options.forceCityExactCity.toLowerCase() } });
+            must.push(buildFieldShould('city', [options.forceCityExactCity]));
         }
         if (options?.forceCityAny && options.forceCityAny.length > 0) {
-            must.push({
-                bool: {
-                    should: options.forceCityAny.map((c) => ({ term: { 'city.keyword': c.toLowerCase() } })),
-                    minimum_should_match: 1,
-                },
-            });
+            must.push(buildFieldShould('city', options.forceCityAny));
         }
         if (must.length === 0) return undefined;
         return { bool: { filter: must } } as const;
@@ -385,8 +391,8 @@ export const searchSimilarContacts = async (
 
 	// Pure kNN search - let vector embeddings handle semantic matching
     const kValue = options?.penaltyTerms && options.penaltyTerms.length > 0
-        ? (locationStrategy === 'strict' ? Math.min(limit * 2, 200) : Math.min(limit * 6, 200))
-        : (locationStrategy === 'strict' ? limit : Math.min(limit * 3, 100));
+        ? (locationStrategy === 'strict' ? Math.min(limit * 4, 200) : Math.min(limit * 8, 200))
+        : (locationStrategy === 'strict' ? Math.min(limit * 6, 200) : Math.min(limit * 4, 150));
 
     const results = await elasticsearch.search<ContactDocument>({
 		index: INDEX_NAME,
@@ -425,32 +431,35 @@ export const searchSimilarContacts = async (
 
     // Post-process results with optional location boosts and institutional penalties
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const processResultsWithLocationBoost = (hits: any[]): any[] => {
-		const skipBoosts = locationStrategy === 'strict' || boosts.exact === 0;
+    const processResultsWithLocationBoost = (hits: any[], strategyOverride?: 'strict' | 'flexible' | 'broad'): any[] => {
+		const localBoosts = strategyOverride ? locationBoosts[strategyOverride] : boosts;
+		const isStrict = strategyOverride ? strategyOverride === 'strict' : locationStrategy === 'strict';
+		const skipBoosts = isStrict || localBoosts.exact === 0;
 
         const penalties = new Set((options?.penaltyCities || []).map((c) => c.toLowerCase()));
         const penaltyTerms = new Set((options?.penaltyTerms || []).map((t) => t.toLowerCase()));
+        const normalizeToken = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '');
 
         return hits.map(hit => {
             let locationBoost = 0;
 			if (!skipBoosts) {
-				// Check for exact location matches
-                if (queryJson.state && hit.fields?.state?.[0]?.toLowerCase() === queryJson.state.toLowerCase()) {
-                    locationBoost += boosts.exact;
-                }
+				// Check for exact location matches (state), allowing USPS abbreviation equivalence
+				const queryStateRaw = queryJson.state || '';
+				const hitStateRaw = String(hit.fields?.state?.[0] || '');
+				if (queryStateRaw && hitStateRaw) {
+					const qTok = normalizeToken(queryStateRaw);
+					const hTok = normalizeToken(hitStateRaw);
+					const qAbbrev = (stateToAbbrev(queryStateRaw) || '').toLowerCase();
+					const hAbbrev = (stateToAbbrev(hitStateRaw) || '').toLowerCase();
+					if (qTok === hTok || (qAbbrev && hAbbrev && qAbbrev === hAbbrev)) {
+						locationBoost += localBoosts.exact;
+					}
+				}
                 if (queryJson.city && hit.fields?.city?.[0]?.toLowerCase() === queryJson.city.toLowerCase()) {
-                    locationBoost += boosts.exact;
+                    locationBoost += localBoosts.exact;
                 }
                 if (queryJson.country && hit.fields?.country?.[0]?.toLowerCase() === queryJson.country.toLowerCase()) {
-                    locationBoost += boosts.exact;
-                }
-				// Check for fuzzy location matches
-                if (queryJson.state && hit.fields?.state?.[0]) {
-                    const hitState = hit.fields.state[0].toLowerCase();
-                    const queryState = queryJson.state.toLowerCase();
-                    if (hitState.includes(queryState.substring(0, 2)) || queryState.includes(hitState.substring(0, 2))) {
-                        locationBoost += boosts.fuzzy;
-                    }
+                    locationBoost += localBoosts.exact;
                 }
             }
 			
@@ -486,7 +495,45 @@ export const searchSimilarContacts = async (
 		.slice(0, limit); // Apply final limit
 	};
 
-	const processedHits = processResultsWithLocationBoost(results.hits.hits);
+	let processedHits = processResultsWithLocationBoost(results.hits.hits);
+
+	// Fallback: if strict filtering yields no results, retry without strict filter using flexible boosts
+	if (processedHits.length === 0 && locationStrategy === 'strict') {
+		const fallbackK = Math.min(limit * 3, 100);
+		const fallbackResults = await elasticsearch.search<ContactDocument>({
+			index: INDEX_NAME,
+			knn: {
+				field: 'vector_field',
+				query_vector: queryEmbedding,
+				k: fallbackK,
+				num_candidates: Math.min(1000, Math.max(fallbackK * 5, 100)),
+			},
+			size: Math.min(limit, 500),
+			fields: [
+				'contactId',
+				'email',
+				'firstName',
+				'lastName',
+				'company',
+				'title',
+				'headline',
+				'city',
+				'state',
+				'country',
+				'address',
+				'website',
+				'metadata',
+				'companyFoundedYear',
+				'companyType',
+				'companyTechStack',
+				'companyKeywords',
+				'companyIndustry',
+				'location',
+			],
+			_source: false,
+		});
+		processedHits = processResultsWithLocationBoost(fallbackResults.hits.hits, 'flexible');
+	}
 
 	return {
 		matches: processedHits.map((hit) => ({
