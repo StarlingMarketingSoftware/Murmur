@@ -386,7 +386,7 @@ export const searchSimilarContacts = async (
 	// Pure kNN search - let vector embeddings handle semantic matching
     const kValue = options?.penaltyTerms && options.penaltyTerms.length > 0
         ? (locationStrategy === 'strict' ? Math.min(limit * 2, 200) : Math.min(limit * 6, 200))
-        : (locationStrategy === 'strict' ? limit : Math.min(limit * 3, 100));
+        : (locationStrategy === 'strict' ? limit : Math.min(limit * 3, 50));
 
     const results = await elasticsearch.search<ContactDocument>({
 		index: INDEX_NAME,
@@ -395,7 +395,7 @@ export const searchSimilarContacts = async (
 			query_vector: queryEmbedding,
             k: kValue, // Get more candidates for filtering when we plan to demote results
             // Keep candidate space bounded; large values can stall ES locally
-            num_candidates: Math.min(1000, Math.max(kValue * 5, 100)),
+            num_candidates: Math.min(1000, Math.max(kValue * 5, 50)),
             filter: strictStateFilter,
 		},
         size: Math.min(limit, 500),

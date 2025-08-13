@@ -206,7 +206,7 @@ export const useDashboard = () => {
 	const [activeExcludeUsedContacts, setActiveExcludeUsedContacts] = useState(true);
 	const [activeExactMatchesOnly, setActiveExactMatchesOnly] = useState(false);
 	const [currentTab, setCurrentTab] = useState<TabValue>('search');
-	const [limit, setLimit] = useState(100);
+	const [limit, setLimit] = useState(50);
 	const [apolloContacts, setApolloContacts] = useState<ContactWithName[]>([]);
 	const [tableInstance, setTableInstance] = useState<Table<ContactWithName>>();
 	const [usedContactIdsSet, setUsedContactIdsSet] = useState<Set<number>>(new Set());
@@ -263,7 +263,7 @@ export const useDashboard = () => {
 		setActiveSearchQuery(data.searchText);
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? true);
 		setActiveExactMatchesOnly(data.exactMatchesOnly ?? false);
-		setLimit(100);
+		setLimit(50);
 		setTimeout(() => {
 			refetchContacts();
 		}, 0);
