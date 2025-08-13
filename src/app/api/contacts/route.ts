@@ -62,10 +62,11 @@ export type PostContactData = z.infer<typeof createContactSchema>;
 
 export async function GET(req: NextRequest) {
 	try {
-		console.log(
-			'--- DEBUG: API Key from env (OPEN_AI_API_KEY):',
-			process.env.OPEN_AI_API_KEY ? 'Exists' : 'MISSING!'
-		);
+		// Remove debug logging in production
+		// console.log(
+		// 	'--- DEBUG: API Key from env (OPEN_AI_API_KEY):',
+		// 	process.env.OPEN_AI_API_KEY ? 'Exists' : 'MISSING!'
+		// );
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();

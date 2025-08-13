@@ -606,8 +606,11 @@ export const searchContactsByLocation = async (
 	};
 };
 
-// Add this temporarily for debugging
+// Debug function - only use in development
 export const debugElasticsearch = async () => {
+	if (process.env.NODE_ENV === 'production') {
+		return { error: 'Debug function disabled in production' };
+	}
 	try {
 		// Check if index exists
 		const indexExists = await elasticsearch.indices.exists({ index: INDEX_NAME });
