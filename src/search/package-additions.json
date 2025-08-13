@@ -1,0 +1,16 @@
+{
+  "description": "Add these to your root package.json if not already present",
+  "dependencies": {
+    "@elastic/elasticsearch": "^8.10.0"
+  },
+  "devDependencies": {
+    "vitest": "^1.0.0",
+    "@vitest/ui": "^1.0.0"
+  },
+  "scripts": {
+    "test:search": "vitest run tests/search",
+    "test:search:watch": "vitest watch tests/search",
+    "test:search:ui": "vitest --ui tests/search",
+    "search:debug": "DEBUG=search:* tsx src/search/debug.ts"
+  }
+}

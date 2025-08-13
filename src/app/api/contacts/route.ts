@@ -16,6 +16,8 @@ import { applyHardcodedLocationOverrides } from '@/app/api/_utils/searchPreproce
 import { Contact, EmailVerificationStatus, Prisma } from '@prisma/client';
 import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vectorDb';
 import { OPEN_AI_MODEL_OPTIONS } from '@/constants';
+// Import the new search system
+import { searchVenues } from '@/search/searchService';
 
 const VECTOR_SEARCH_LIMIT_DEFAULT = 100;
 
@@ -280,10 +282,57 @@ export async function GET(req: NextRequest) {
 			return apiResponse(contacts);
 		}
 
-		// If vector search is enabled and we have a query, use vector search
-        if (useVectorSearch && query) {
-            // Determine if this is a venue-like query that uses positive signals; overshoot to allow a lenient tail
-            const postTrainingProfile = getPostTrainingForQuery(query || '');
+		// If we have a query, use the new tiered search system
+        if (query) {
+            try {
+                // Use the new search system
+                const searchResult = await searchVenues({
+                    query,
+                    limit: limit ?? VECTOR_SEARCH_LIMIT_DEFAULT,
+                    verificationStatus: verificationStatus || undefined,
+                    excludeContactIds: addedContactIds,
+                });
+                
+                // Get full contact records from database if we have IDs
+                const contactIds = searchResult.contacts
+                    .map(c => Number(c.id))
+                    .filter(id => Number.isFinite(id) && id > 0);
+                
+                let contacts: Contact[] = [];
+                if (contactIds.length > 0) {
+                    contacts = await prisma.contact.findMany({
+                        where: {
+                            id: { in: contactIds },
+                            ...(verificationStatus && {
+                                emailValidationStatus: { equals: verificationStatus }
+                            }),
+                        },
+                    });
+                    
+                    // Preserve search order
+                    const contactMap = new Map(contacts.map(c => [c.id, c]));
+                    contacts = contactIds
+                        .map(id => contactMap.get(id))
+                        .filter(Boolean) as Contact[];
+                } else {
+                    // Use search results directly if no DB matches
+                    contacts = searchResult.contacts as any;
+                }
+                
+                return apiResponse({
+                    contacts,
+                    searchTier: searchResult.tierUsed,
+                    searchMessage: searchResult.message,
+                });
+                
+            } catch (error) {
+                console.error('Search failed:', error);
+                // Fall back to substring search
+                const fallbackContacts = await substringSearch();
+                return apiResponse(fallbackContacts);
+            }
+        }
+
             const requestedLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200));
             const effectiveVectorLimit = postTrainingProfile.requirePositive
                 ? Math.min(Math.max(requestedLimit + 20, Math.ceil(requestedLimit * 1.2)), 200)
