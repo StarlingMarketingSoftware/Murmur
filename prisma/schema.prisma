@@ -7,6 +7,237 @@ datasource db {
   url      = env("POSTGRES_PRISMA_URL")
 }
 
+model User {
+  clerkId                  String            @unique
+  email                    String            @unique
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  firstName                String?
+  lastName                 String?
+  stripeCustomerId         String?           @unique
+  stripePriceId            String?
+  stripeSubscriptionId     String?
+  stripeSubscriptionStatus String?
+  id                       Int               @id @default(autoincrement())
+  role                     UserRole          @default(user)
+  aiDraftCredits           Int               @default(5)
+  aiTestCredits            Int               @default(2)
+  murmurEmail              String?           @unique
+  customDomain             String?
+  draftCredits             Float             @default(0)
+  sendingCredits           Float             @default(0)
+  verificationCredits      Float             @default(0)
+  lastCreditUpdate         DateTime?
+  stripePromoCode          String?
+  campaigns                Campaign[]
+  contacts                 Contact[]
+  contactLists             ContactList[]
+  emails                   Email[]
+  identities               Identity[]
+  signatures               Signature[]
+  userContactLists         UserContactList[]
+}
+
+model ContactList {
+  name      String     @unique(map: "ContactList_category_key")
+  count     Int?       @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  id        Int        @id @default(autoincrement())
+  userId    String?
+  title     String     @default("Untitled Contact List")
+  contacts  Contact[]
+  user      User?      @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  campaigns Campaign[] @relation("CampaignToContactList")
+
+  @@index([userId])
+}
+
+model UserContactList {
+  id        Int        @id @default(autoincrement())
+  name      String
+  userId    String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  user      User       @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  campaigns Campaign[] @relation("CampaignToUserContactList")
+  contacts  Contact[]  @relation("ContactToUserContactList")
+
+  @@index([userId])
+}
+
+model Contact {
+  email                    String
+  company                  String?
+  country                  String?
+  createdAt                DateTime                @default(now())
+  phone                    String?
+  state                    String?
+  updatedAt                DateTime                @updatedAt
+  website                  String?
+  id                       Int                     @id @default(autoincrement())
+  contactListId            Int?
+  address                  String?
+  apolloPersonId           String?                 @unique
+  city                     String?
+  emailValidatedAt         DateTime?
+  emailValidationStatus    EmailVerificationStatus @default(unknown)
+  emailValidationSubStatus String?
+  firstName                String?
+  headline                 String?
+  lastName                 String?
+  linkedInUrl              String?
+  photoUrl                 String?
+  title                    String?
+  metadata                 String?
+  userId                   String?
+  isPrivate                Boolean                 @default(false)
+  hasVectorEmbedding       Boolean                 @default(false)
+  userContactListCount     Int                     @default(0)
+  manualDeselections       Int                     @default(0)
+  companyFoundedYear       String?
+  companyIndustry          String?
+  companyKeywords          String[]
+  companyLinkedInUrl       String?
+  companyPostalCode        String?
+  companyTechStack         String[]
+  companyType              String?
+  lastResearchedDate       DateTime?
+  latitude                 Float?
+  longitude                Float?
+  contactList              ContactList?            @relation(fields: [contactListId], references: [id], onDelete: Cascade)
+  user                     User?                   @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  Email                    Email[]
+  campaigns                Campaign[]              @relation("CampaignToContact")
+  userContactLists         UserContactList[]       @relation("ContactToUserContactList")
+
+  @@unique([email, contactListId])
+  @@index([contactListId])
+  @@index([userId])
+}
+
+model Email {
+  subject    String
+  message    String
+  status     EmailStatus @default(draft)
+  sentAt     DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  userId     String
+  id         Int         @id @default(autoincrement())
+  campaignId Int
+  contactId  Int
+  campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact    Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+
+  @@index([campaignId])
+}
+
+model Campaign {
+  name                  String
+  userId                String
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  id                    Int               @id @default(autoincrement())
+  fullAiPrompt          String?           @map("message")
+  subject               String?
+  testMessage           String?
+  testSubject           String?
+  senderEmail           String?
+  senderName            String?
+  status                Status            @default(active)
+  signatureId           Int?
+  font                  String            @default("Arial")
+  identityId            Int?
+  draftingMode          DraftingMode      @default(hybrid)
+  draftingTone          DraftingTone      @default(normal)
+  handwrittenPrompt     String?
+  hybridPrompt          String?
+  isAiSubject           Boolean           @default(true)
+  paragraphs            Int?              @default(0)
+  hybridBlockPrompts    Json?             @default("[{\"id\": \"introduction\", \"type\": \"introduction\", \"value\": \"\"}, {\"id\": \"research\", \"type\": \"research\", \"value\": \"\"}, {\"id\": \"action\", \"type\": \"action\", \"value\": \"\"}]")
+  hybridAvailableBlocks HybridBlock[]     @default([text])
+  identity              Identity?         @relation(fields: [identityId], references: [id])
+  signature             Signature?        @relation(fields: [signatureId], references: [id])
+  user                  User              @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  emails                Email[]
+  contacts              Contact[]         @relation("CampaignToContact")
+  contactLists          ContactList[]     @relation("CampaignToContactList")
+  userContactLists      UserContactList[] @relation("CampaignToUserContactList")
+
+  @@index([userId])
+}
+
+model Identity {
+  id        Int        @id @default(autoincrement())
+  name      String
+  website   String?
+  email     String
+  userId    String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  campaigns Campaign[]
+  user      User       @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Signature {
+  id        Int        @id @default(autoincrement())
+  content   String     @default("")
+  userId    String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  name      String
+  campaigns Campaign[]
+  user      User       @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model EmailVerificationCode {
+  id        Int      @id @default(autoincrement())
+  email     String
+  code      String
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([email, code])
+  @@index([email])
+  @@index([expiresAt])
+}
+
+model ContactVerificationRequest {
+  id                        Int                              @id @default(autoincrement())
+  fileId                    String                           @unique
+  estimatedTimeOfCompletion DateTime
+  limit                     Int?
+  notVerifiedSince          DateTime?
+  onlyUnverified            Boolean?
+  query                     String?
+  status                    ContactVerificationRequestStatus @default(processing)
+  createdAt                 DateTime                         @default(now())
+  updatedAt                 DateTime                         @updatedAt
+}
+
+model ApolloQuery {
+  id                  Int        @id @default(autoincrement())
+  query               String
+  apolloQuery         Json
+  maxPage             Int
+  pageLastFetched     Int
+  pageFetchTimeStamps DateTime[]
+}
+
+model Lead {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 enum EmailStatus {
   draft
   scheduled
@@ -65,246 +296,4 @@ enum DraftingTone {
   formal
   concise
   casual
-}
-
-model User {
-  id                  Int      @id @default(autoincrement())
-  clerkId             String   @unique
-  email               String   @unique
-  murmurEmail         String?  @unique
-  firstName           String?
-  lastName            String?
-  role                UserRole @default(user)
-  aiDraftCredits      Int      @default(5)
-  aiTestCredits       Int      @default(2)
-  draftCredits        Float    @default(0)
-  sendingCredits      Float    @default(0)
-  verificationCredits Float    @default(0)
-  customDomain        String?
-
-  stripeCustomerId         String?           @unique
-  stripeSubscriptionId     String?
-  stripeSubscriptionStatus String?
-  stripePriceId            String?
-  stripePromoCode          String?
-  createdAt                DateTime          @default(now())
-  updatedAt                DateTime          @updatedAt
-  emails                   Email[]
-  campaigns                Campaign[]
-  signatures               Signature[]
-  identities               Identity[]
-  contactLists             ContactList[]
-  userContactLists         UserContactList[]
-  contacts                 Contact[]
-  lastCreditUpdate         DateTime?
-}
-
-model ContactList {
-  id        Int        @id @default(autoincrement())
-  name      String     @unique
-  title     String     @default("Untitled Contact List")
-  count     Int?       @default(0)
-  contacts  Contact[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  userId    String?
-  user      User?      @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
-  campaigns Campaign[]
-
-  @@index([userId])
-}
-
-model UserContactList {
-  id   Int    @id @default(autoincrement())
-  name String
-
-  userId    String
-  user      User       @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
-  contacts  Contact[]
-  campaigns Campaign[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-}
-
-model Contact {
-  id                 Int      @id @default(autoincrement())
-  apolloPersonId     String?  @unique
-  firstName          String?
-  lastName           String?
-  email              String
-  company            String?
-  city               String?
-  state              String?
-  country            String?
-  address            String?
-  phone              String?
-  website            String?
-  title              String?
-  headline           String?
-  linkedInUrl        String?
-  photoUrl           String?
-  metadata           String?
-  companyLinkedInUrl String?
-  companyFoundedYear String?
-  companyType        String?
-  companyTechStack   String[]
-  companyPostalCode  String?
-  companyKeywords    String[]
-  companyIndustry    String?
-  latitude           Float?
-  longitude          Float?
-
-  isPrivate            Boolean   @default(false)
-  hasVectorEmbedding   Boolean   @default(false)
-  userContactListCount Int       @default(0)
-  manualDeselections   Int       @default(0)
-  lastResearchedDate   DateTime?
-
-  emailValidationStatus    EmailVerificationStatus @default(unknown)
-  emailValidationSubStatus String?
-  emailValidatedAt         DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  userId           String?
-  user             User?             @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
-  contactListId    Int?
-  contactList      ContactList?      @relation(fields: [contactListId], references: [id], onDelete: Cascade)
-  userContactLists UserContactList[]
-  campaigns        Campaign[]
-  Email            Email[]
-
-  @@unique([email, contactListId])
-  @@index([contactListId])
-  @@index([userId])
-}
-
-model Email {
-  id         Int         @id @default(autoincrement())
-  subject    String
-  message    String      @db.Text
-  status     EmailStatus @default(draft)
-  sentAt     DateTime?
-  userId     String
-  user       User        @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
-  campaignId Int
-  campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  contactId  Int
-  contact    Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-
-  @@index([campaignId])
-}
-
-model Campaign {
-  id                    Int               @id @default(autoincrement())
-  name                  String
-  status                Status            @default(active)
-  userId                String
-  user                  User              @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
-  contacts              Contact[]
-  draftingMode          DraftingMode      @default(hybrid)
-  draftingTone          DraftingTone      @default(normal)
-  paragraphs            Int?              @default(0)
-  subject               String?
-  isAiSubject           Boolean           @default(true)
-  fullAiPrompt          String?           @map("message") @db.Text
-  hybridPrompt          String?           @db.Text
-  hybridAvailableBlocks HybridBlock[]     @default([text])
-  hybridBlockPrompts    Json?             @default("[{\"id\": \"introduction\", \"type\": \"introduction\", \"value\": \"\"}, {\"id\": \"research\", \"type\": \"research\", \"value\": \"\"}, {\"id\": \"action\", \"type\": \"action\", \"value\": \"\"}]")
-  handwrittenPrompt     String?           @db.Text
-  font                  String            @default("Arial")
-  testMessage           String?           @db.Text
-  testSubject           String?
-  emails                Email[]
-  senderEmail           String?
-  senderName            String?
-  signatureId           Int?
-  signature             Signature?        @relation(fields: [signatureId], references: [id])
-  identityId            Int?
-  identity              Identity?         @relation(fields: [identityId], references: [id])
-  contactLists          ContactList[]
-  userContactLists      UserContactList[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-}
-
-model Identity {
-  id      Int     @id @default(autoincrement())
-  name    String
-  website String?
-  email   String
-
-  userId    String
-  user      User       @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
-  campaigns Campaign[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-
-  @@index([userId])
-}
-
-model Signature {
-  id        Int        @id @default(autoincrement())
-  name      String
-  content   String     @default("")
-  userId    String
-  user      User       @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
-  campaigns Campaign[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-}
-
-model EmailVerificationCode {
-  id        Int      @id @default(autoincrement())
-  email     String
-  code      String
-  expiresAt DateTime
-  verified  Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  @@unique([email, code])
-  @@index([email])
-  @@index([expiresAt])
-}
-
-model ContactVerificationRequest {
-  id                        Int                              @id @default(autoincrement())
-  fileId                    String                           @unique
-  estimatedTimeOfCompletion DateTime
-  status                    ContactVerificationRequestStatus @default(processing)
-  query                     String?
-  limit                     Int?
-  onlyUnverified            Boolean?
-  notVerifiedSince          DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model ApolloQuery {
-  id                  Int        @id @default(autoincrement())
-  query               String
-  apolloQuery         Json       @db.JsonB
-  maxPage             Int
-  pageLastFetched     Int
-  pageFetchTimeStamps DateTime[]
-}
-
-model Lead {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
