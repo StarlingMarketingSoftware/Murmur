@@ -190,7 +190,7 @@ export function ConsoleLoader({ className, searchQuery }: ConsoleLoaderProps) {
 		};
 	}, [searchQuery]);
 
-	const getLogStyle = (log: LogLine, index: number) => {
+	const getLogStyle = (log: LogLine) => {
 		const age = Date.now() - log.timestamp;
 		const fadeStart = 3000;
 		const fadeEnd = 5000;
@@ -247,10 +247,10 @@ export function ConsoleLoader({ className, searchQuery }: ConsoleLoaderProps) {
 						maxWidth: '90%' // Prevents edge-to-edge text
 					}}
 				>
-					{logs.map((log, index) => (
+					{logs.map((log) => (
 						<div
 							key={log.id}
-							style={getLogStyle(log, index)}
+							style={getLogStyle(log)}
 						>
 							<span 
 								className="inline-block text-gray-400/60 mr-3"
@@ -359,33 +359,7 @@ export function ConsoleLoader({ className, searchQuery }: ConsoleLoaderProps) {
 				</div>
 			</div>
 
-			{/* Inline styles */}
-			<style jsx>{`
-				@keyframes blink {
-					0%, 49% { opacity: 1; }
-					50%, 100% { opacity: 0; }
-				}
-				
-				@keyframes thinking-pulse {
-					0%, 100% { 
-						opacity: 0.2;
-						transform: scale(0.7);
-					}
-					50% { 
-						opacity: 0.8;
-						transform: scale(1.1);
-					}
-				}
-				
-				@keyframes gentle-fade {
-					0%, 100% { 
-						opacity: 0.15;
-					}
-					50% { 
-						opacity: 0.7;
-					}
-				}
-			`}</style>
+
 		</div>
 	);
 }
