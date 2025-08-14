@@ -229,6 +229,30 @@
 	}
 }
 
+/* Minimal dot loader - Steve Jobs perfection */
+@keyframes artistic-flow {
+	0%, 100% {
+		opacity: 0.3;
+		transform: scale(1);
+	}
+	50% {
+		opacity: 0.9;
+		transform: scale(1);
+	}
+}
+
+/* Alternative - for backwards compatibility */
+@keyframes elegant-pulse {
+	0%, 60%, 100% {
+		opacity: 0.6;
+		transform: scale(1) translateY(0);
+	}
+	30% {
+		opacity: 1;
+		transform: scale(1.1) translateY(-2px);
+	}
+}
+
 @layer base {
 	* {
 		@apply border-border outline-ring/50;
