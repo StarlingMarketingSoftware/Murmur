@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/form';
 import { Checkbox } from '@/components/ui/checkbox';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
-import Spinner from '@/components/ui/spinner';
+import ConsoleLoader from '@/components/ui/console-loader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
@@ -190,7 +190,7 @@ const Dashboard = () => {
 							</div>
 						</>
 					) : (
-						<Spinner />
+						<ConsoleLoader searchQuery={activeSearchQuery} />
 					)}
 				</>
 			)}
