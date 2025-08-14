@@ -103,6 +103,10 @@ const getNextDelay = (index: number): number => {
 	return Math.floor(baseDelay * (1 + variation));
 };
 
+// Golden ratio for perfect proportions
+const GOLDEN_RATIO = 1.618;
+const INVERSE_GOLDEN = 0.618;
+
 export function ConsoleLoader({ className, searchQuery }: ConsoleLoaderProps) {
 	const [logs, setLogs] = useState<LogLine[]>([]);
 	const [opsPerSec, setOpsPerSec] = useState(0);
@@ -144,9 +148,9 @@ export function ConsoleLoader({ className, searchQuery }: ConsoleLoaderProps) {
 
 			setLogs((prev) => {
 				const updated = [...prev, newLog];
-				// Keep maximum of 10 visible lines
-				if (updated.length > 10) {
-					return updated.slice(-10);
+				// Keep 8 lines for golden ratio balance
+				if (updated.length > 8) {
+					return updated.slice(-8);
 				}
 				return updated;
 			});
@@ -192,115 +196,165 @@ export function ConsoleLoader({ className, searchQuery }: ConsoleLoaderProps) {
 		const fadeEnd = 5000;
 		const opacity = age < fadeStart ? 1 : Math.max(0, 1 - (age - fadeStart) / (fadeEnd - fadeStart));
 		
-		// Color based on type
+		// Color based on type - subtle grays only
 		let color = 'rgba(75, 85, 99, 0.8)'; // default gray-600
 		switch (log.type) {
 			case 'success':
-				color = `rgba(55, 65, 81, ${opacity * 0.95})`; // gray-700
+				color = `rgba(45, 55, 72, ${opacity * 0.9})`; // darker gray
 				break;
 			case 'process':
-				color = `rgba(31, 41, 55, ${opacity * 0.9})`; // gray-800
+				color = `rgba(26, 32, 44, ${opacity * 0.85})`; // near black
 				break;
 			case 'detail':
-				color = `rgba(107, 114, 128, ${opacity * 0.6})`; // gray-500
+				color = `rgba(113, 128, 150, ${opacity * 0.6})`; // lighter gray
 				break;
 			case 'info':
-				color = `rgba(75, 85, 99, ${opacity * 0.7})`; // gray-600
+				color = `rgba(74, 85, 104, ${opacity * 0.75})`; // medium gray
 				break;
 		}
 		
 		// Subtle entrance animation
 		const isNew = age < 100;
-		const translateY = isNew ? 2 : (age > 4000 ? -2 : 0);
+		const translateY = isNew ? 1 : (age > 4000 ? -1 : 0);
 		
 		return {
 			color,
 			transform: `translateY(${translateY}px)`,
 			opacity: isNew ? 0.8 : (age > 4500 ? 0 : 1),
-			transition: `all ${isNew ? '0.3s' : '0.7s'} ease-out`,
+			transition: `all ${isNew ? '0.2s' : '0.5s'} cubic-bezier(0.4, 0, 0.2, 1)`,
 		};
 	};
 
-	return (
-		<div className={twMerge('max-w-5xl mx-auto py-16 px-8', className)}>
-			{/* Console output area */}
-			<div className="font-mono text-[13px] leading-[1.8] space-y-[3px] min-h-[320px]">
-				{logs.map((log, index) => (
-					<div
-						key={log.id}
-						style={getLogStyle(log, index)}
-					>
-						<span className="inline-block w-4 text-gray-400/70 mr-3">
-							{log.type === 'success' ? '✓' : 
-							 log.type === 'process' ? '◆' : 
-							 log.type === 'detail' ? '·' : '›'}
-						</span>
-						<span style={{ 
-							letterSpacing: log.type === 'detail' ? '0.02em' : '0.01em',
-							fontSize: log.type === 'detail' ? '12px' : '13px',
-						}}>
-							{log.text}
-						</span>
-					</div>
-				))}
-				
-				{/* Thinking indicator or active cursor */}
-				<div className="text-gray-500 h-5">
-					{isThinking ? (
-						<span className="text-gray-400 text-[12px]">
-							<span className="inline-block w-4 mr-3">◆</span>
-							<span className="opacity-60">Processing</span>
-							<span className="inline-flex ml-2">
-								{[...Array(3)].map((_, i) => (
-									<span
-										key={i}
-										className="inline-block w-1 h-1 bg-gray-400 rounded-full mx-0.5"
-										style={{
-											animation: 'thinking-pulse 1.4s ease-in-out infinite',
-											animationDelay: `${i * 0.15}s`,
-										}}
-									/>
-								))}
-							</span>
-						</span>
-					) : (
-						<>
-							<span className="inline-block w-4 mr-3">›</span>
-							<span 
-								className="inline-block w-[2px] h-4 bg-gray-500"
-								style={{
-									animation: 'blink 1.2s steps(2, start) infinite'
-								}}
-							/>
-						</>
-					)}
-				</div>
-			</div>
+	// Golden ratio spacing: base unit 16px
+	const baseUnit = 16;
+	const goldenLarge = Math.round(baseUnit * GOLDEN_RATIO); // 26px
+	const goldenSmall = Math.round(baseUnit * INVERSE_GOLDEN); // 10px
 
-			{/* Sophisticated progress indicator */}
-			<div className="mt-12 flex justify-center">
-				<div className="flex items-center gap-8">
-					<div className="text-[11px] text-gray-500 font-mono uppercase tracking-wider">
-						Processing
-					</div>
+	return (
+		<div className={twMerge('relative', className)}>
+			{/* Main container with golden ratio padding */}
+			<div style={{ 
+				padding: `${goldenLarge * 2}px ${goldenLarge * 3}px`,
+				minHeight: `${baseUnit * 21}px` // 21 is fibonacci number
+			}}>
+				{/* Console output area - slightly offset for visual interest */}
+				<div 
+					className="font-mono text-[13px] space-y-[2px]"
+					style={{ 
+						lineHeight: GOLDEN_RATIO,
+						minHeight: `${baseUnit * 13}px`, // 13 is fibonacci number
+						marginLeft: `${baseUnit * 5}px`, // Intentional asymmetry
+						maxWidth: '90%' // Prevents edge-to-edge text
+					}}
+				>
+					{logs.map((log, index) => (
+						<div
+							key={log.id}
+							style={getLogStyle(log, index)}
+						>
+							<span 
+								className="inline-block text-gray-400/60 mr-3"
+								style={{ width: `${goldenSmall * 2}px` }}
+							>
+								{log.type === 'success' ? '✓' : 
+								 log.type === 'process' ? '◆' : 
+								 log.type === 'detail' ? '·' : '›'}
+							</span>
+							<span style={{ 
+								letterSpacing: log.type === 'detail' ? '0.015em' : '0.005em',
+								fontSize: log.type === 'detail' ? '12px' : '13px',
+							}}>
+								{log.text}
+							</span>
+						</div>
+					))}
 					
-					<div className="relative">
-						<div className="flex gap-1">
-							{[...Array(7)].map((_, i) => (
+					{/* Thinking indicator or active cursor */}
+					<div 
+						className="text-gray-500"
+						style={{ height: `${goldenSmall * 2}px` }}
+					>
+						{isThinking ? (
+							<span className="text-gray-400 text-[11px]">
+								<span 
+									className="inline-block mr-3"
+									style={{ width: `${goldenSmall * 2}px` }}
+								>◆</span>
+								<span className="opacity-50">Analyzing</span>
+								<span className="inline-flex ml-2">
+									{[...Array(3)].map((_, i) => (
+										<span
+											key={i}
+											className="inline-block w-[2px] h-[2px] bg-gray-400/60 rounded-full mx-[1px]"
+											style={{
+												animation: 'thinking-pulse 1.4s ease-in-out infinite',
+												animationDelay: `${i * 0.15}s`,
+											}}
+										/>
+									))}
+								</span>
+							</span>
+						) : (
+							<>
+								<span 
+									className="inline-block mr-3"
+									style={{ width: `${goldenSmall * 2}px` }}
+								>›</span>
+								<span 
+									className="inline-block w-[2px] bg-gray-400"
+									style={{
+										height: `${Math.round(baseUnit * INVERSE_GOLDEN)}px`,
+										animation: 'blink 1.2s steps(2, start) infinite'
+									}}
+								/>
+							</>
+						)}
+					</div>
+				</div>
+
+				{/* Ultra-minimal progress indicator - positioned with golden ratio */}
+				<div 
+					className="flex justify-center"
+					style={{ marginTop: `${goldenLarge}px` }}
+				>
+					<div className="flex items-center" style={{ gap: `${goldenLarge}px` }}>
+						{/* Left indicator */}
+						<div className="flex gap-[3px]">
+							{[...Array(3)].map((_, i) => (
 								<div
 									key={i}
-									className="w-[2px] h-[2px] bg-gray-400 rounded-full"
+									className="w-[1.5px] h-[1.5px] bg-gray-300 rounded-full"
 									style={{
-										animation: 'wave 2s ease-in-out infinite',
-										animationDelay: `${i * 0.1}s`,
+										animation: 'gentle-fade 2.4s ease-in-out infinite',
+										animationDelay: `${i * 0.2}s`,
 									}}
 								/>
 							))}
 						</div>
-					</div>
-					
-					<div className="text-[11px] text-gray-500 font-mono tabular-nums">
-						{opsPerSec.toLocaleString()} ops/sec
+						
+						{/* Center text */}
+						<div 
+							className="text-[10px] text-gray-400 font-mono tracking-wider uppercase"
+							style={{ minWidth: `${baseUnit * 8}px` }}
+						>
+							<span className="tabular-nums">
+								{(opsPerSec / 1000).toFixed(1)}k ops
+							</span>
+						</div>
+						
+						{/* Right indicator */}
+						<div className="flex gap-[3px]">
+							{[...Array(3)].map((_, i) => (
+								<div
+									key={i}
+									className="w-[1.5px] h-[1.5px] bg-gray-300 rounded-full"
+									style={{
+										animation: 'gentle-fade 2.4s ease-in-out infinite',
+										animationDelay: `${(2 - i) * 0.2}s`,
+									}}
+								/>
+							))}
+						</div>
 					</div>
 				</div>
 			</div>
@@ -314,31 +368,21 @@ export function ConsoleLoader({ className, searchQuery }: ConsoleLoaderProps) {
 				
 				@keyframes thinking-pulse {
 					0%, 100% { 
-						opacity: 0.3;
-						transform: scale(0.8);
+						opacity: 0.2;
+						transform: scale(0.7);
 					}
 					50% { 
-						opacity: 1;
-						transform: scale(1.2);
+						opacity: 0.8;
+						transform: scale(1.1);
 					}
 				}
 				
-				@keyframes wave {
+				@keyframes gentle-fade {
 					0%, 100% { 
-						transform: translateY(0) scale(1);
-						opacity: 0.3;
-					}
-					25% {
-						transform: translateY(-3px) scale(1.1);
-						opacity: 0.6;
+						opacity: 0.15;
 					}
 					50% { 
-						transform: translateY(0) scale(1);
-						opacity: 1;
-					}
-					75% {
-						transform: translateY(3px) scale(0.9);
-						opacity: 0.6;
+						opacity: 0.7;
 					}
 				}
 			`}</style>

@@ -190,7 +190,20 @@ const Dashboard = () => {
 							</div>
 						</>
 					) : (
-						<ConsoleLoader searchQuery={activeSearchQuery} />
+						<div className="mt-10">
+							<div className="max-w-[1174px] mx-auto">
+								{/* Subtle container that echoes Card design but lighter */}
+								<div className="relative">
+									{/* Ultra-subtle top border to anchor the space */}
+									<div className="absolute top-0 left-[10%] right-[10%] h-[1px] bg-gradient-to-r from-transparent via-gray-200/50 to-transparent" />
+									
+									<ConsoleLoader searchQuery={activeSearchQuery} />
+									
+									{/* Bottom fade to transition to campaigns table */}
+									<div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white/80 to-transparent pointer-events-none" />
+								</div>
+							</div>
+						</div>
 					)}
 				</>
 			)}
