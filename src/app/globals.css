@@ -353,17 +353,9 @@ mux-player {
 		0 4px 16px rgba(0, 0, 0, 0.04);
 }
 
-/* Darker gray on hover - premium feel */
+/* Subtle motion on hover - no color change */
 .search-wave-container:hover {
-	background: linear-gradient(
-		135deg,
-		rgba(0, 0, 0, 0.12),
-		rgba(0, 0, 0, 0.06)
-	);
-	box-shadow: 
-		0 0 0 1px rgba(0, 0, 0, 0.12),
-		0 4px 12px rgba(0, 0, 0, 0.08),
-		0 8px 24px rgba(0, 0, 0, 0.04);
+	transition: all 0.8s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 /* Premium inner border gradient - very subtle */
@@ -401,23 +393,40 @@ mux-player {
 	box-shadow: none !important;
 	backdrop-filter: blur(10px);
 	-webkit-backdrop-filter: blur(10px);
+	color: rgb(31, 41, 55) !important; /* Dark gray text color */
 }
 
 .search-wave-input:hover {
-	background: linear-gradient(
-		90deg,
-		rgba(243, 244, 246, 1),
-		rgba(229, 231, 235, 0.95),
-		rgba(243, 244, 246, 1),
-		rgba(229, 231, 235, 0.95)
-	);
-	background-size: 200% 100%;
-	animation: gradient-shift 8s ease-in-out infinite;
+	animation: gradient-shift 6s ease-in-out infinite;
+	transition: all 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
+	color: rgb(31, 41, 55) !important; /* Maintain dark gray text color */
 }
 
 .search-wave-input:focus {
 	background: rgba(255, 255, 255, 1);
 	animation: none;
+	color: rgb(31, 41, 55) !important; /* Maintain dark gray text color */
+}
+
+/* Ensure placeholder text is also styled consistently */
+.search-wave-input::placeholder {
+	color: rgba(107, 114, 128, 0.6) !important; /* Gray placeholder */
+}
+
+.search-wave-input::-webkit-input-placeholder {
+	color: rgba(107, 114, 128, 0.6) !important;
+}
+
+.search-wave-input::-moz-placeholder {
+	color: rgba(107, 114, 128, 0.6) !important;
+}
+
+.search-wave-input:-ms-input-placeholder {
+	color: rgba(107, 114, 128, 0.6) !important;
+}
+
+.search-wave-input:-moz-placeholder {
+	color: rgba(107, 114, 128, 0.6) !important;
 }
 
 /* Focus state - very subtle accent */
@@ -481,19 +490,16 @@ mux-player {
 	animation: gradient-flow 12s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
 	pointer-events: none;
 	opacity: 0.7;
+	transition: animation-duration 0.6s ease;
+}
+
+/* Speed up shimmer on hover */
+.search-wave-container:hover .search-wave-overlay::before {
+	animation: gradient-flow 8s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
 }
 
 .search-wave-container:hover .search-wave-overlay {
-	background: linear-gradient(
-		90deg,
-		transparent,
-		rgba(107, 114, 128, 0.12),
-		rgba(156, 163, 175, 0.15),
-		rgba(107, 114, 128, 0.12),
-		transparent
-	);
-	background-size: 250% 100%;
-	animation: gradient-shift 6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	animation: gradient-shift 5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 /* Subtle overlay on focus - reduce distraction after search */
@@ -594,15 +600,7 @@ mux-player {
 }
 
 .dark .search-wave-container:hover {
-	background: linear-gradient(
-		135deg,
-		rgba(255, 255, 255, 0.1),
-		rgba(255, 255, 255, 0.06)
-	);
-	box-shadow: 
-		0 0 0 1px rgba(255, 255, 255, 0.15),
-		0 4px 12px rgba(0, 0, 0, 0.25),
-		0 8px 24px rgba(0, 0, 0, 0.15);
+	transition: all 0.8s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 .dark .search-wave-container::before {
@@ -625,23 +623,40 @@ mux-player {
 	animation: gradient-shift 10s ease-in-out infinite;
 	backdrop-filter: blur(10px);
 	-webkit-backdrop-filter: blur(10px);
+	color: rgb(243, 244, 246) !important; /* Light gray/white text color in dark mode */
 }
 
 .dark .search-wave-input:hover {
-	background: linear-gradient(
-		90deg,
-		rgba(55, 65, 81, 1),
-		rgba(31, 41, 55, 0.95),
-		rgba(55, 65, 81, 1),
-		rgba(31, 41, 55, 0.95)
-	);
-	background-size: 200% 100%;
-	animation: gradient-shift 8s ease-in-out infinite;
+	animation: gradient-shift 6s ease-in-out infinite;
+	transition: all 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
+	color: rgb(243, 244, 246) !important; /* Maintain light gray/white text color */
 }
 
 .dark .search-wave-input:focus {
 	background: rgba(17, 24, 39, 1);
 	animation: none;
+	color: rgb(243, 244, 246) !important; /* Maintain light gray/white text color */
+}
+
+/* Dark mode placeholder text */
+.dark .search-wave-input::placeholder {
+	color: rgba(156, 163, 175, 0.5) !important; /* Lighter gray placeholder in dark mode */
+}
+
+.dark .search-wave-input::-webkit-input-placeholder {
+	color: rgba(156, 163, 175, 0.5) !important;
+}
+
+.dark .search-wave-input::-moz-placeholder {
+	color: rgba(156, 163, 175, 0.5) !important;
+}
+
+.dark .search-wave-input:-ms-input-placeholder {
+	color: rgba(156, 163, 175, 0.5) !important;
+}
+
+.dark .search-wave-input:-moz-placeholder {
+	color: rgba(156, 163, 175, 0.5) !important;
 }
 
 .dark .search-wave-container:has(.search-wave-input:focus) {
@@ -738,18 +753,16 @@ mux-player {
 	);
 	animation: gradient-flow 12s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
 	opacity: 0.6;
+	transition: animation-duration 0.6s ease;
+}
+
+/* Speed up shimmer on hover in dark mode */
+.dark .search-wave-container:hover .search-wave-overlay::before {
+	animation: gradient-flow 8s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
 }
 
 .dark .search-wave-container:hover .search-wave-overlay {
-	background: linear-gradient(
-		90deg,
-		transparent,
-		rgba(156, 163, 175, 0.15),
-		rgba(209, 213, 219, 0.18),
-		rgba(156, 163, 175, 0.15),
-		transparent
-	);
-	animation: gradient-shift 6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	animation: gradient-shift 5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 /* Subtle overlay on focus in dark mode */
