@@ -42,21 +42,23 @@ const Dashboard = () => {
 	} = useDashboard();
 	return (
 		<AppLayout>
-			<div className="mt-32">
-				<LogoIcon width="106px" height="84px" />
-				<Typography variant="h1" className="text-center mt-3 !text-[80px] leading-[0.8]">
+			<div className="mt-32 premium-hero-section text-center">
+				<div className="premium-logo-container inline-block">
+					<LogoIcon width="106px" height="84px" />
+				</div>
+				<Typography variant="h1" className="text-center mt-3 !text-[80px] leading-[0.8] premium-gradient-text" data-text="Murmur">
 					Murmur
 				</Typography>
 				<Typography
 					font="secondary"
-					className="mt-18 text-[19px] text-center"
+					className="mt-18 text-[19px] text-center premium-subtitle-gradient"
 					color="light"
 				>
-					Let&apos;s <strong>start</strong> by creating a campaign.
+					Let&apos;s <strong className="premium-accent">start</strong> by creating a campaign.
 				</Typography>
 				<Typography
 					font="secondary"
-					className="mt-7 text-[19px] text-center"
+					className="mt-7 text-[19px] text-center premium-subtitle-gradient"
 					color="light"
 				>
 					Who do you want to contact?
@@ -72,11 +74,14 @@ const Dashboard = () => {
 							render={({ field }) => (
 								<FormItem>
 									<FormControl>
-										<Input
-											className="!border-foreground"
-											placeholder="Who do you want to send to?  i.e  “Music venues in North Carolina”"
-											{...field}
-										/>
+										<div className={`search-wave-container ${isLoadingContacts || isRefetchingContacts ? 'search-wave-loading' : ''}`}>
+											<Input
+												className="search-wave-input !border-none"
+												placeholder='Who do you want to send to?  i.e  "Music venues in North Carolina"'
+												{...field}
+											/>
+											<div className="search-wave-overlay" />
+										</div>
 									</FormControl>
 									<FormMessage />
 								</FormItem>
@@ -142,10 +147,10 @@ const Dashboard = () => {
 									variant="primary-light"
 									type="submit"
 									bold
-									className="px-10 md:px-20"
+									className="px-10 md:px-20 gradient-button gradient-button-green"
 									isLoading={isLoadingContacts || isRefetchingContacts}
 								>
-									Search
+									Generate
 								</Button>
 							</div>
 						</div>
