@@ -437,6 +437,23 @@ mux-player {
 	color: rgba(107, 114, 128, 0.6) !important;
 }
 
+/* Remove browser default accent color and autofill styles */
+.search-wave-input {
+	accent-color: transparent !important;
+	caret-color: rgb(31, 41, 55) !important;
+}
+
+/* Override webkit autofill background to prevent purple/blue */
+.search-wave-input:-webkit-autofill,
+.search-wave-input:-webkit-autofill:hover,
+.search-wave-input:-webkit-autofill:focus,
+.search-wave-input:-webkit-autofill:active {
+	-webkit-box-shadow: 0 0 0 30px white inset !important;
+	-webkit-text-fill-color: rgb(31, 41, 55) !important;
+	box-shadow: 0 0 0 30px white inset !important;
+	transition: background-color 5000s ease-in-out 0s;
+}
+
 /* Focus state - subtle glow effect */
 .search-wave-container:has(.search-wave-input:focus) {
 	background: linear-gradient(
@@ -700,6 +717,23 @@ mux-player {
 
 .dark .search-wave-input:-moz-placeholder {
 	color: rgba(156, 163, 175, 0.5) !important;
+}
+
+/* Dark mode: Remove browser default accent color and autofill styles */
+.dark .search-wave-input {
+	accent-color: transparent !important;
+	caret-color: rgb(243, 244, 246) !important;
+}
+
+/* Dark mode: Override webkit autofill background to prevent purple/blue */
+.dark .search-wave-input:-webkit-autofill,
+.dark .search-wave-input:-webkit-autofill:hover,
+.dark .search-wave-input:-webkit-autofill:focus,
+.dark .search-wave-input:-webkit-autofill:active {
+	-webkit-box-shadow: 0 0 0 30px rgb(17, 24, 39) inset !important;
+	-webkit-text-fill-color: rgb(243, 244, 246) !important;
+	box-shadow: 0 0 0 30px rgb(17, 24, 39) inset !important;
+	transition: background-color 5000s ease-in-out 0s;
 }
 
 .dark .search-wave-container:has(.search-wave-input:focus) {
