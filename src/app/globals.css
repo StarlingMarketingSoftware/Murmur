@@ -259,6 +259,7 @@
 	}
 	body {
 		@apply bg-background text-foreground;
+		overflow-x: hidden;
 	}
 	h1 {
 		@apply text-2xl font-bold;
@@ -1112,6 +1113,369 @@ mux-player {
 
 .dark .search-wave-container:has(.search-wave-input:focus) .search-wave-overlay::before {
 	opacity: 0;
+}
+
+/* Premium text gradient animations - Apple/PointOne inspired */
+@keyframes premium-gradient-move {
+	0%, 100% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+}
+
+@keyframes premium-text-flow {
+	0%, 100% {
+		background-position: -100% 50%;
+	}
+	50% {
+		background-position: 200% 50%;
+	}
+}
+
+@keyframes premium-shimmer {
+	0% {
+		transform: translateX(-50%);
+		opacity: 0;
+	}
+	50% {
+		opacity: 1;
+	}
+	100% {
+		transform: translateX(50%);
+		opacity: 0;
+	}
+}
+
+
+
+@keyframes premium-float {
+	0%, 100% {
+		transform: translateY(0px);
+	}
+	50% {
+		transform: translateY(-3px);
+	}
+}
+
+/* Hero section - continuous ambient animation */
+.premium-hero-section {
+	position: relative;
+	z-index: 1;
+	overflow: hidden;
+}
+
+.premium-hero-section::before {
+	content: '';
+	position: absolute;
+	top: -50%;
+	left: -50%;
+	right: -50%;
+	bottom: -50%;
+	background: 
+		radial-gradient(circle at 20% 50%, rgba(107, 114, 128, 0.015) 0%, transparent 50%),
+		radial-gradient(circle at 80% 50%, rgba(156, 163, 175, 0.015) 0%, transparent 50%),
+		radial-gradient(circle at 50% 50%, rgba(75, 85, 99, 0.01) 0%, transparent 70%);
+	animation: premium-ambient-flow 25s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	pointer-events: none;
+	z-index: -1;
+}
+
+/* Continuous page-wide shimmer */
+.premium-hero-section::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: -100%;
+	right: -100%;
+	bottom: 0;
+	background: linear-gradient(
+		105deg,
+		transparent 40%,
+		rgba(255, 255, 255, 0.03) 50%,
+		transparent 60%
+	);
+	animation: premium-page-shimmer 15s linear infinite;
+	pointer-events: none;
+	z-index: 2;
+}
+
+@keyframes premium-page-shimmer {
+	0% {
+		transform: translateX(-100%);
+	}
+	100% {
+		transform: translateX(100%);
+	}
+}
+
+@keyframes premium-ambient-flow {
+	0%, 100% {
+		transform: rotate(0deg) scale(1.2);
+	}
+	33% {
+		transform: rotate(120deg) scale(1.3);
+	}
+	66% {
+		transform: rotate(240deg) scale(1.2);
+	}
+}
+
+/* Logo container - subtle float only */
+.premium-logo-container {
+	position: relative;
+	display: inline-block;
+	animation: premium-float 8s ease-in-out infinite;
+	opacity: 0.9;
+}
+
+/* Main title gradient - Murmur */
+.premium-gradient-text {
+	position: relative;
+	background: linear-gradient(
+		135deg,
+		rgba(0, 0, 0, 0.95) 0%,
+		rgba(71, 85, 105, 0.85) 25%,
+		rgba(0, 0, 0, 0.9) 50%,
+		rgba(100, 116, 139, 0.85) 75%,
+		rgba(0, 0, 0, 0.95) 100%
+	);
+	background-size: 400% 400%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: premium-gradient-move 10s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	will-change: background-position;
+	letter-spacing: -0.02em;
+	transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Background glow for title */
+.premium-gradient-text::before {
+	content: '';
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 120%;
+	height: 150%;
+	background: radial-gradient(
+		ellipse at center,
+		rgba(107, 114, 128, 0.06) 0%,
+		transparent 50%
+	);
+	filter: blur(20px);
+	animation: premium-text-glow 8s ease-in-out infinite;
+	pointer-events: none;
+	z-index: -1;
+}
+
+@keyframes premium-text-glow {
+	0%, 100% {
+		opacity: 0.3;
+		transform: translate(-50%, -50%) scale(1);
+	}
+	50% {
+		opacity: 0.6;
+		transform: translate(-50%, -50%) scale(1.1);
+	}
+}
+
+/* Subtitle text - subtle continuous animation */
+.premium-subtitle-gradient {
+	position: relative;
+	transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+	color: rgb(107, 114, 128);
+	background: linear-gradient(
+		120deg,
+		rgba(107, 114, 128, 0.6) 0%,
+		rgba(107, 114, 128, 1) 40%,
+		rgba(107, 114, 128, 0.6) 100%
+	);
+	background-size: 200% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: premium-text-flow 12s ease-in-out infinite;
+}
+
+/* Subtle moving highlight behind subtitle */
+.premium-subtitle-gradient::after {
+	content: '';
+	position: absolute;
+	top: -10px;
+	left: -10%;
+	right: -10%;
+	bottom: -10px;
+	background: linear-gradient(
+		90deg,
+		transparent 0%,
+		rgba(156, 163, 175, 0.04) 50%,
+		transparent 100%
+	);
+	transform: translateX(-100%);
+	animation: premium-subtitle-sweep 10s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	pointer-events: none;
+	z-index: -1;
+}
+
+@keyframes premium-subtitle-sweep {
+	0% {
+		transform: translateX(-100%);
+	}
+	100% {
+		transform: translateX(100%);
+	}
+}
+
+/* Accent word - "start" */
+.premium-accent {
+	position: relative;
+	display: inline-block;
+	font-weight: 600;
+	color: rgb(75, 85, 99);
+	opacity: 1;
+	-webkit-text-fill-color: initial !important;
+	background: none !important;
+	-webkit-background-clip: initial !important;
+	background-clip: initial !important;
+}
+
+/* Hover effects for premium elements */
+.premium-gradient-text:hover {
+	background: linear-gradient(
+		135deg,
+		rgba(0, 0, 0, 1) 0%,
+		rgba(107, 114, 128, 0.8) 25%,
+		rgba(0, 0, 0, 0.95) 50%,
+		rgba(156, 163, 175, 0.8) 75%,
+		rgba(0, 0, 0, 1) 100%
+	);
+	background-size: 400% 400%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation-duration: 3s;
+}
+
+.premium-subtitle-gradient:hover {
+	background: linear-gradient(
+		120deg,
+		rgba(75, 85, 99, 0.7) 0%,
+		rgba(107, 114, 128, 1) 50%,
+		rgba(156, 163, 175, 0.7) 100%
+	);
+	background-size: 200% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation-duration: 4s;
+}
+
+/* Dark mode hover effects */
+.dark .premium-gradient-text:hover {
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 1) 0%,
+		rgba(209, 213, 219, 0.8) 25%,
+		rgba(255, 255, 255, 0.95) 50%,
+		rgba(156, 163, 175, 0.8) 75%,
+		rgba(255, 255, 255, 1) 100%
+	);
+	background-size: 400% 400%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation-duration: 3s;
+}
+
+.dark .premium-subtitle-gradient:hover {
+	background: linear-gradient(
+		120deg,
+		rgba(156, 163, 175, 0.7) 0%,
+		rgba(209, 213, 219, 1) 50%,
+		rgba(229, 231, 235, 0.7) 100%
+	);
+	background-size: 200% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation-duration: 4s;
+}
+
+/* Dark mode adjustments for premium text */
+.dark .premium-hero-section::before {
+	background: 
+		radial-gradient(circle at 30% 50%, rgba(156, 163, 175, 0.012) 0%, transparent 50%),
+		radial-gradient(circle at 70% 50%, rgba(209, 213, 219, 0.012) 0%, transparent 50%),
+		radial-gradient(circle at 50% 50%, rgba(229, 231, 235, 0.008) 0%, transparent 70%);
+}
+
+.dark .premium-hero-section::after {
+	background: linear-gradient(
+		105deg,
+		transparent 40%,
+		rgba(255, 255, 255, 0.02) 50%,
+		transparent 60%
+	);
+}
+
+.dark .premium-gradient-text {
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.95) 0%,
+		rgba(209, 213, 219, 0.85) 25%,
+		rgba(255, 255, 255, 0.9) 50%,
+		rgba(156, 163, 175, 0.85) 75%,
+		rgba(255, 255, 255, 0.95) 100%
+	);
+	background-size: 400% 400%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: premium-gradient-move 10s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.dark .premium-gradient-text::before {
+	background: radial-gradient(
+		ellipse at center,
+		rgba(209, 213, 219, 0.04) 0%,
+		transparent 50%
+	);
+}
+
+.dark .premium-subtitle-gradient {
+	background: linear-gradient(
+		120deg,
+		rgba(209, 213, 219, 0.6) 0%,
+		rgba(209, 213, 219, 1) 40%,
+		rgba(209, 213, 219, 0.6) 100%
+	);
+	background-size: 200% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: premium-text-flow 12s ease-in-out infinite;
+}
+
+.dark .premium-subtitle-gradient::after {
+	background: linear-gradient(
+		90deg,
+		transparent 0%,
+		rgba(243, 244, 246, 0.03) 50%,
+		transparent 100%
+	);
+}
+
+.dark .premium-accent {
+	opacity: 1;
+	font-weight: 600;
+	color: rgb(229, 231, 235);
+	-webkit-text-fill-color: initial !important;
+	background: none !important;
+	-webkit-background-clip: initial !important;
+	background-clip: initial !important;
 }
 
 /* Dark mode loading state - elegant minimal */
