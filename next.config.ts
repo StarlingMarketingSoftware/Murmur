@@ -21,7 +21,6 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: process.env.VERCEL ? true : false,
   },
   // Optimize production builds
-  swcMinify: true,
   productionBrowserSourceMaps: false,
 };
 
