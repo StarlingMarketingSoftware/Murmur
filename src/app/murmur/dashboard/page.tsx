@@ -216,9 +216,9 @@ const Dashboard = () => {
 							<span className="search-back-text">Back</span>
 						</button>
 						<div className="search-query-display-text">
-							<span className="search-query-quote-left">"</span>
+							<span className="search-query-quote-left">&ldquo;</span>
 							{activeSearchQuery}
-							<span className="search-query-quote-right">"</span>
+							<span className="search-query-quote-right">&rdquo;</span>
 						</div>
 					</div>
 				</div>

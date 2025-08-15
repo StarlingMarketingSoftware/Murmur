@@ -40,7 +40,7 @@ export const useGetContacts = (options: ContactQueryOptions) => {
 				try {
 					const errorData = await response.json();
 					errorMessage = errorData.error || errorMessage;
-				} catch (parseError) {
+				} catch {
 					// If response is not JSON (e.g., plain text "Internal Server Error")
 					// try to get the text content
 					try {
@@ -72,7 +72,7 @@ export const useGetUsedContactIds = () => {
 				try {
 					const errorData = await response.json();
 					errorMessage = errorData.error || errorMessage;
-				} catch (parseError) {
+				} catch {
 					// If response is not JSON (e.g., plain text "Internal Server Error")
 					// try to get the text content
 					try {
@@ -108,7 +108,7 @@ export const useCreateContact = (options: CustomMutationOptions = {}) => {
 				try {
 					const errorData = await response.json();
 					errorMessage = errorData.error || errorMessage;
-				} catch (parseError) {
+				} catch {
 					try {
 						const textError = await response.text();
 						errorMessage = textError || `HTTP ${response.status} error`;
@@ -154,7 +154,7 @@ export const useBatchCreateContacts = (options: CustomMutationOptions = {}) => {
 				try {
 					const errorData = await response.json();
 					errorMessage = errorData.error || errorMessage;
-				} catch (parseError) {
+				} catch {
 					try {
 						const textError = await response.text();
 						errorMessage = textError || `HTTP ${response.status} error`;
@@ -200,7 +200,7 @@ export const useEditContact = (options: CustomMutationOptions = {}) => {
 				try {
 					const errorData = await response.json();
 					errorMessage = errorData.error || errorMessage;
-				} catch (parseError) {
+				} catch {
 					try {
 						const textError = await response.text();
 						errorMessage = textError || `HTTP ${response.status} error`;
@@ -248,7 +248,7 @@ export const useDeleteContact = (options: CustomMutationOptions = {}) => {
 				try {
 					const errorData = await response.json();
 					errorMessage = errorData.error || errorMessage;
-				} catch (parseError) {
+				} catch {
 					try {
 						const textError = await response.text();
 						errorMessage = textError || `HTTP ${response.status} error`;
@@ -291,7 +291,7 @@ export const useBatchUpdateContacts = (options: CustomMutationOptions = {}) => {
 				try {
 					const errorData = await response.json();
 					errorMessage = errorData.error || errorMessage;
-				} catch (parseError) {
+				} catch {
 					try {
 						const textError = await response.text();
 						errorMessage = textError || `HTTP ${response.status} error`;
