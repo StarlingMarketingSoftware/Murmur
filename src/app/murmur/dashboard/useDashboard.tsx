@@ -218,6 +218,7 @@ export const useDashboard = () => {
 		error,
 		refetch: refetchContacts,
 		isRefetching: isRefetchingContacts,
+		isError,
 	} = useGetContacts({
 		filters: {
 			query: activeSearchQuery,
@@ -240,6 +241,18 @@ export const useDashboard = () => {
 			setSelectedContacts(contacts.map((contact) => contact.id));
 		}
 	}, [contacts]);
+
+	// Handle errors
+	useEffect(() => {
+		if (isError && error) {
+			console.error('Contact search error:', error);
+			if (error instanceof Error && error.message.includes('timeout')) {
+				toast.error('Search timed out after 25 seconds. Please try a more specific search query.');
+			} else {
+				toast.error('Failed to load contacts. Please try again.');
+			}
+		}
+	}, [isError, error]);
 
 	const { mutateAsync: createContactList, isPending: isPendingCreateContactList } =
 		useCreateUserContactList({
@@ -265,7 +278,14 @@ export const useDashboard = () => {
 		setActiveExactMatchesOnly(data.exactMatchesOnly ?? false);
 		setLimit(50);
 		setTimeout(() => {
-			refetchContacts();
+			refetchContacts().catch((err) => {
+				console.error('Search failed:', err);
+				if (err instanceof Error && err.message.includes('timeout')) {
+					toast.error('Search timed out. Please try again with a more specific query.');
+				} else {
+					toast.error('Search failed. Please try again.');
+				}
+			});
 		}, 0);
 	};
 
@@ -342,6 +362,7 @@ export const useDashboard = () => {
 		isPendingContacts,
 		isLoadingContacts,
 		error,
+		isError,
 		handleImportApolloContacts,
 		setSelectedContactListRows,
 		handleCreateCampaign,

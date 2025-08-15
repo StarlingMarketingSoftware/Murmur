@@ -60,6 +60,9 @@ export type ContactFilterData = z.infer<typeof contactFilterSchema>;
 
 export type PostContactData = z.infer<typeof createContactSchema>;
 
+// Set maximum duration for Vercel serverless function
+export const maxDuration = 60;
+
 export async function GET(req: NextRequest) {
 	try {
 		// Remove debug logging in production

@@ -39,6 +39,8 @@ const Dashboard = () => {
 		selectedContacts,
 		isPendingBatchUpdateContacts,
 		isFreeTrial,
+		isError,
+		error,
 	} = useDashboard();
 	return (
 		<AppLayout>
@@ -168,7 +170,31 @@ const Dashboard = () => {
 
 			{activeSearchQuery && (
 				<>
-					{contacts ? (
+					{isError ? (
+						<div className="mt-10">
+							<Card className="max-w-[1174px] mx-auto">
+								<CardContent className="py-8">
+									<div className="text-center">
+										<Typography variant="h3" className="text-red-600 mb-2">
+											Search Failed
+										</Typography>
+										<Typography className="text-gray-600 mb-4">
+											{error instanceof Error && error.message.includes('timeout')
+												? 'The search took too long to complete. Please try a more specific query.'
+												: 'Unable to complete your search. Please try again.'}
+										</Typography>
+										<Button
+											onClick={() => form.handleSubmit(onSubmit)()}
+											variant="primary-light"
+											className="mt-4"
+										>
+											Retry Search
+										</Button>
+									</div>
+								</CardContent>
+							</Card>
+						</div>
+					) : contacts ? (
 						<>
 							<Card>
 								<CardHeader>
