@@ -72,11 +72,14 @@ const Dashboard = () => {
 							render={({ field }) => (
 								<FormItem>
 									<FormControl>
-										<Input
-											className="!border-foreground"
-											placeholder="Who do you want to send to?  i.e  “Music venues in North Carolina”"
-											{...field}
-										/>
+										<div className="search-wave-container">
+											<Input
+												className="search-wave-input !border-none"
+												placeholder='Who do you want to send to?  i.e  "Music venues in North Carolina"'
+												{...field}
+											/>
+											<div className="search-wave-overlay" />
+										</div>
 									</FormControl>
 									<FormMessage />
 								</FormItem>
@@ -142,10 +145,10 @@ const Dashboard = () => {
 									variant="primary-light"
 									type="submit"
 									bold
-									className="px-10 md:px-20"
+									className="px-10 md:px-20 gradient-button gradient-button-green"
 									isLoading={isLoadingContacts || isRefetchingContacts}
 								>
-									Search
+									Generate
 								</Button>
 							</div>
 						</div>

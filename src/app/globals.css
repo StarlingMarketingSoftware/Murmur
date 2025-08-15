@@ -289,4 +289,744 @@ mux-player {
 	height: 0;
 }
 
+/* Premium Apple-style animated gradient for search bar */
+@keyframes gradient-shift {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
+}
+
+@keyframes gradient-flow {
+	0% {
+		transform: translateX(-100%);
+	}
+	100% {
+		transform: translateX(100%);
+	}
+}
+
+@keyframes subtle-glow {
+	0%, 100% {
+		opacity: 0.4;
+		filter: blur(80px);
+	}
+	50% {
+		opacity: 0.6;
+		filter: blur(60px);
+	}
+}
+
+.search-wave-container {
+	position: relative;
+	overflow: hidden;
+	border-radius: 0.75rem;
+	padding: 1px;
+	background: linear-gradient(
+		135deg,
+		rgba(0, 0, 0, 0.08),
+		rgba(0, 0, 0, 0.04)
+	);
+	transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+	box-shadow: 
+		0 0 0 1px rgba(0, 0, 0, 0.08),
+		0 2px 8px rgba(0, 0, 0, 0.06),
+		0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+/* Darker gray on hover - premium feel */
+.search-wave-container:hover {
+	background: linear-gradient(
+		135deg,
+		rgba(0, 0, 0, 0.12),
+		rgba(0, 0, 0, 0.06)
+	);
+	box-shadow: 
+		0 0 0 1px rgba(0, 0, 0, 0.12),
+		0 4px 12px rgba(0, 0, 0, 0.08),
+		0 8px 24px rgba(0, 0, 0, 0.04);
+}
+
+/* Premium inner border gradient - very subtle */
+.search-wave-container::before {
+	content: '';
+	position: absolute;
+	inset: 1px;
+	border-radius: calc(0.75rem - 1px);
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.8),
+		rgba(255, 255, 255, 0.4)
+	);
+	pointer-events: none;
+	z-index: 1;
+	transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Premium input field with visible gradient animation */
+.search-wave-input {
+	position: relative;
+	z-index: 2;
+	background: linear-gradient(
+		90deg,
+		rgba(249, 250, 251, 1),
+		rgba(243, 244, 246, 0.95),
+		rgba(249, 250, 251, 1),
+		rgba(243, 244, 246, 0.95)
+	);
+	background-size: 200% 100%;
+	animation: gradient-shift 10s ease-in-out infinite;
+	transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+	border: none !important;
+	outline: none !important;
+	box-shadow: none !important;
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+}
+
+.search-wave-input:hover {
+	background: linear-gradient(
+		90deg,
+		rgba(243, 244, 246, 1),
+		rgba(229, 231, 235, 0.95),
+		rgba(243, 244, 246, 1),
+		rgba(229, 231, 235, 0.95)
+	);
+	background-size: 200% 100%;
+	animation: gradient-shift 8s ease-in-out infinite;
+}
+
+.search-wave-input:focus {
+	background: rgba(255, 255, 255, 1);
+	animation: none;
+}
+
+/* Focus state with subtle blue accent */
+.search-wave-container:has(.search-wave-input:focus) {
+	background: linear-gradient(
+		135deg,
+		rgba(59, 130, 246, 0.06),
+		rgba(96, 165, 250, 0.04)
+	);
+	box-shadow: 
+		0 0 0 1.5px rgba(59, 130, 246, 0.12),
+		0 8px 32px rgba(59, 130, 246, 0.04),
+		0 16px 48px rgba(59, 130, 246, 0.02);
+}
+
+.search-wave-container:has(.search-wave-input:focus)::before {
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.9),
+		rgba(243, 244, 246, 0.5)
+	);
+}
+
+/* Premium moving gradient overlay - visible but subtle */
+.search-wave-overlay {
+	position: absolute;
+	inset: 1px;
+	border-radius: calc(0.75rem - 1px);
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(120, 119, 198, 0.08),
+		rgba(168, 85, 247, 0.12),
+		rgba(120, 119, 198, 0.08),
+		transparent
+	);
+	background-size: 250% 100%;
+	animation: gradient-shift 8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	pointer-events: none;
+	z-index: 3;
+	mix-blend-mode: normal;
+}
+
+/* Additional shimmer effect - more visible */
+.search-wave-overlay::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background: linear-gradient(
+		105deg,
+		transparent 30%,
+		rgba(255, 255, 255, 0.5) 50%,
+		transparent 70%
+	);
+	background-size: 200% 100%;
+	animation: gradient-flow 12s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+	pointer-events: none;
+	opacity: 0.7;
+}
+
+.search-wave-container:hover .search-wave-overlay {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(107, 114, 128, 0.12),
+		rgba(156, 163, 175, 0.15),
+		rgba(107, 114, 128, 0.12),
+		transparent
+	);
+	background-size: 250% 100%;
+	animation: gradient-shift 6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Pause animations on focus for better UX */
+.search-wave-container:has(.search-wave-input:focus) .search-wave-overlay {
+	animation-play-state: paused;
+}
+
+.search-wave-container:has(.search-wave-input:focus) .search-wave-overlay::before {
+	animation-play-state: paused;
+}
+
+/* Dark mode adjustments - premium feel */
+.dark .search-wave-container {
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.08),
+		rgba(255, 255, 255, 0.04)
+	);
+	box-shadow: 
+		0 0 0 1px rgba(255, 255, 255, 0.1),
+		0 2px 8px rgba(0, 0, 0, 0.2),
+		0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.dark .search-wave-container:hover {
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.1),
+		rgba(255, 255, 255, 0.06)
+	);
+	box-shadow: 
+		0 0 0 1px rgba(255, 255, 255, 0.15),
+		0 4px 12px rgba(0, 0, 0, 0.25),
+		0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.dark .search-wave-container::before {
+	background: linear-gradient(
+		135deg,
+		rgba(31, 41, 55, 0.9),
+		rgba(17, 24, 39, 0.7)
+	);
+}
+
+.dark .search-wave-input {
+	background: linear-gradient(
+		90deg,
+		rgba(31, 41, 55, 1),
+		rgba(17, 24, 39, 0.95),
+		rgba(31, 41, 55, 1),
+		rgba(17, 24, 39, 0.95)
+	);
+	background-size: 200% 100%;
+	animation: gradient-shift 10s ease-in-out infinite;
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+}
+
+.dark .search-wave-input:hover {
+	background: linear-gradient(
+		90deg,
+		rgba(55, 65, 81, 1),
+		rgba(31, 41, 55, 0.95),
+		rgba(55, 65, 81, 1),
+		rgba(31, 41, 55, 0.95)
+	);
+	background-size: 200% 100%;
+	animation: gradient-shift 8s ease-in-out infinite;
+}
+
+.dark .search-wave-input:focus {
+	background: rgba(17, 24, 39, 1);
+	animation: none;
+}
+
+.dark .search-wave-container:has(.search-wave-input:focus) {
+	background: linear-gradient(
+		135deg,
+		rgba(96, 165, 250, 0.08),
+		rgba(147, 197, 253, 0.05)
+	);
+	box-shadow: 
+		0 0 0 1.5px rgba(96, 165, 250, 0.18),
+		0 8px 32px rgba(96, 165, 250, 0.06),
+		0 16px 48px rgba(96, 165, 250, 0.03);
+}
+
+.dark .search-wave-container:has(.search-wave-input:focus)::before {
+	background: linear-gradient(
+		135deg,
+		rgba(31, 41, 55, 0.95),
+		rgba(55, 65, 81, 0.5)
+	);
+}
+
+/* Premium button gradient animations */
+@keyframes button-gradient-shift {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
+}
+
+@keyframes button-gradient-subtle {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
+}
+
+.gradient-button {
+	position: relative;
+	overflow: hidden;
+	transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+	z-index: 1;
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.05),
+		rgba(255, 255, 255, 0.02)
+	);
+}
+
+/* Main gradient overlay - always visible but subtle */
+.gradient-button::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(255, 255, 255, 0.08),
+		rgba(255, 255, 255, 0.12),
+		rgba(255, 255, 255, 0.08),
+		transparent
+	);
+	background-size: 300% 100%;
+	opacity: 0.6;
+	animation: button-gradient-subtle 12s ease infinite;
+	pointer-events: none;
+	z-index: -1;
+}
+
+.gradient-button:hover::before {
+	opacity: 1;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(255, 255, 255, 0.15),
+		rgba(255, 255, 255, 0.25),
+		rgba(255, 255, 255, 0.15),
+		transparent
+	);
+	background-size: 200% 100%;
+	animation: button-gradient-shift 3s ease infinite;
+}
+
+/* Green gradient accent - always visible but subtle */
+.gradient-button::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		135deg,
+		transparent 20%,
+		rgba(34, 197, 94, 0.06) 50%,
+		transparent 80%
+	);
+	background-size: 300% 300%;
+	opacity: 0.5;
+	animation: button-gradient-subtle 15s ease infinite;
+	pointer-events: none;
+	z-index: -1;
+}
+
+.gradient-button:hover::after {
+	opacity: 1;
+	background: linear-gradient(
+		135deg,
+		transparent 20%,
+		rgba(34, 197, 94, 0.15) 50%,
+		transparent 80%
+	);
+	background-size: 200% 200%;
+	animation: button-gradient-shift 4s ease infinite;
+}
+
+/* Extra shimmer effect for premium feel */
+.gradient-button:hover {
+	background: linear-gradient(
+		135deg,
+		rgba(34, 197, 94, 0.03),
+		rgba(16, 185, 129, 0.02)
+	);
+	box-shadow: 
+		0 4px 12px rgba(34, 197, 94, 0.1),
+		0 8px 24px rgba(34, 197, 94, 0.05);
+	transform: translateY(-1px);
+}
+
+/* Dark mode button gradients */
+.dark .gradient-button {
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.03),
+		rgba(255, 255, 255, 0.01)
+	);
+}
+
+.dark .gradient-button::before {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(255, 255, 255, 0.04),
+		rgba(255, 255, 255, 0.06),
+		rgba(255, 255, 255, 0.04),
+		transparent
+	);
+	opacity: 0.7;
+	animation: button-gradient-subtle 12s ease infinite;
+}
+
+.dark .gradient-button:hover::before {
+	opacity: 1;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(255, 255, 255, 0.08),
+		rgba(255, 255, 255, 0.12),
+		rgba(255, 255, 255, 0.08),
+		transparent
+	);
+	animation: button-gradient-shift 3s ease infinite;
+}
+
+.dark .gradient-button::after {
+	background: linear-gradient(
+		135deg,
+		transparent 20%,
+		rgba(34, 197, 94, 0.08) 50%,
+		transparent 80%
+	);
+	opacity: 0.6;
+	animation: button-gradient-subtle 15s ease infinite;
+}
+
+.dark .gradient-button:hover::after {
+	opacity: 1;
+	background: linear-gradient(
+		135deg,
+		transparent 20%,
+		rgba(34, 197, 94, 0.2) 50%,
+		transparent 80%
+	);
+	animation: button-gradient-shift 4s ease infinite;
+}
+
+.dark .gradient-button:hover {
+	background: linear-gradient(
+		135deg,
+		rgba(34, 197, 94, 0.05),
+		rgba(16, 185, 129, 0.03)
+	);
+	box-shadow: 
+		0 4px 12px rgba(34, 197, 94, 0.15),
+		0 8px 24px rgba(34, 197, 94, 0.08);
+}
+
+/* Generate button - green variant */
+.gradient-button-green {
+	background: linear-gradient(
+		135deg,
+		rgba(34, 197, 94, 0.08),
+		rgba(16, 185, 129, 0.05)
+	) !important;
+}
+
+.gradient-button-green::before {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(34, 197, 94, 0.1),
+		rgba(16, 185, 129, 0.15),
+		rgba(34, 197, 94, 0.1),
+		transparent
+	) !important;
+	opacity: 0.7 !important;
+}
+
+.gradient-button-green::after {
+	background: linear-gradient(
+		135deg,
+		transparent 20%,
+		rgba(34, 197, 94, 0.12) 50%,
+		transparent 80%
+	) !important;
+	opacity: 0.8 !important;
+}
+
+.gradient-button-green:hover {
+	background: linear-gradient(
+		135deg,
+		rgba(34, 197, 94, 0.12),
+		rgba(16, 185, 129, 0.08)
+	) !important;
+	box-shadow: 
+		0 4px 16px rgba(34, 197, 94, 0.15),
+		0 8px 32px rgba(34, 197, 94, 0.08) !important;
+}
+
+.gradient-button-green:hover::before {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(34, 197, 94, 0.15),
+		rgba(16, 185, 129, 0.25),
+		rgba(34, 197, 94, 0.15),
+		transparent
+	) !important;
+	opacity: 1 !important;
+}
+
+.gradient-button-green:hover::after {
+	background: linear-gradient(
+		135deg,
+		transparent 20%,
+		rgba(34, 197, 94, 0.2) 50%,
+		transparent 80%
+	) !important;
+	opacity: 1 !important;
+}
+
+/* Dark mode green button */
+.dark .gradient-button-green {
+	background: linear-gradient(
+		135deg,
+		rgba(34, 197, 94, 0.1),
+		rgba(16, 185, 129, 0.06)
+	) !important;
+}
+
+.dark .gradient-button-green::before {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(34, 197, 94, 0.08),
+		rgba(16, 185, 129, 0.12),
+		rgba(34, 197, 94, 0.08),
+		transparent
+	) !important;
+	opacity: 0.8 !important;
+}
+
+.dark .gradient-button-green::after {
+	background: linear-gradient(
+		135deg,
+		transparent 20%,
+		rgba(34, 197, 94, 0.15) 50%,
+		transparent 80%
+	) !important;
+	opacity: 0.7 !important;
+}
+
+.dark .gradient-button-green:hover {
+	background: linear-gradient(
+		135deg,
+		rgba(34, 197, 94, 0.15),
+		rgba(16, 185, 129, 0.1)
+	) !important;
+	box-shadow: 
+		0 4px 16px rgba(34, 197, 94, 0.2),
+		0 8px 32px rgba(34, 197, 94, 0.12) !important;
+}
+
+.dark .gradient-button-green:hover::before {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(34, 197, 94, 0.12),
+		rgba(16, 185, 129, 0.2),
+		rgba(34, 197, 94, 0.12),
+		transparent
+	) !important;
+	opacity: 1 !important;
+}
+
+.dark .gradient-button-green:hover::after {
+	background: linear-gradient(
+		135deg,
+		transparent 20%,
+		rgba(34, 197, 94, 0.25) 50%,
+		transparent 80%
+	) !important;
+	opacity: 1 !important;
+}
+
+/* Import button - blue variant */
+.gradient-button-blue::before {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(59, 130, 246, 0.08),
+		rgba(96, 165, 250, 0.12),
+		rgba(59, 130, 246, 0.08),
+		transparent
+	) !important;
+}
+
+.gradient-button-blue::after {
+	background: linear-gradient(
+		135deg,
+		transparent 20%,
+		rgba(59, 130, 246, 0.06) 50%,
+		transparent 80%
+	) !important;
+}
+
+.gradient-button-blue:hover {
+	background: linear-gradient(
+		135deg,
+		rgba(59, 130, 246, 0.08),
+		rgba(96, 165, 250, 0.05)
+	) !important;
+	box-shadow: 
+		0 4px 12px rgba(59, 130, 246, 0.12),
+		0 8px 24px rgba(59, 130, 246, 0.06) !important;
+	transform: translateY(-1px);
+}
+
+.gradient-button-blue:hover::before {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(59, 130, 246, 0.15),
+		rgba(96, 165, 250, 0.25),
+		rgba(59, 130, 246, 0.15),
+		transparent
+	) !important;
+	opacity: 1 !important;
+	animation: button-gradient-shift 3s ease infinite;
+}
+
+.gradient-button-blue:hover::after {
+	background: linear-gradient(
+		135deg,
+		transparent 20%,
+		rgba(59, 130, 246, 0.15) 50%,
+		transparent 80%
+	) !important;
+	opacity: 1 !important;
+	animation: button-gradient-shift 4s ease infinite;
+}
+
+/* Dark mode blue button */
+.dark .gradient-button-blue::before {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(96, 165, 250, 0.06),
+		rgba(147, 197, 253, 0.1),
+		rgba(96, 165, 250, 0.06),
+		transparent
+	) !important;
+}
+
+.dark .gradient-button-blue::after {
+	background: linear-gradient(
+		135deg,
+		transparent 20%,
+		rgba(96, 165, 250, 0.08) 50%,
+		transparent 80%
+	) !important;
+}
+
+.dark .gradient-button-blue:hover {
+	background: linear-gradient(
+		135deg,
+		rgba(59, 130, 246, 0.1),
+		rgba(96, 165, 250, 0.06)
+	) !important;
+	box-shadow: 
+		0 4px 16px rgba(59, 130, 246, 0.18),
+		0 8px 32px rgba(59, 130, 246, 0.1) !important;
+}
+
+.dark .gradient-button-blue:hover::before {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(96, 165, 250, 0.12),
+		rgba(147, 197, 253, 0.2),
+		rgba(96, 165, 250, 0.12),
+		transparent
+	) !important;
+	opacity: 1 !important;
+}
+
+.dark .gradient-button-blue:hover::after {
+	background: linear-gradient(
+		135deg,
+		transparent 20%,
+		rgba(96, 165, 250, 0.2) 50%,
+		transparent 80%
+	) !important;
+	opacity: 1 !important;
+}
+
+/* Dark mode overlay - more visible */
+.dark .search-wave-overlay {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(147, 197, 253, 0.1),
+		rgba(196, 181, 253, 0.15),
+		rgba(147, 197, 253, 0.1),
+		transparent
+	);
+	background-size: 250% 100%;
+	animation: gradient-shift 8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.dark .search-wave-overlay::before {
+	background: linear-gradient(
+		105deg,
+		transparent 30%,
+		rgba(255, 255, 255, 0.25) 50%,
+		transparent 70%
+	);
+	animation: gradient-flow 12s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+	opacity: 0.6;
+}
+
+.dark .search-wave-container:hover .search-wave-overlay {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(156, 163, 175, 0.15),
+		rgba(209, 213, 219, 0.18),
+		rgba(156, 163, 175, 0.15),
+		transparent
+	);
+	animation: gradient-shift 6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 

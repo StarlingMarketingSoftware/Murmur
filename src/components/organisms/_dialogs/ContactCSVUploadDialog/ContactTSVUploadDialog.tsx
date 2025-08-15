@@ -39,7 +39,7 @@ export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) =
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
-				<Button variant={buttonVariant || 'primary-light'} className="w-fit" bold>
+				<Button variant={buttonVariant || 'primary-light'} className="w-fit gradient-button gradient-button-blue" bold>
 					{triggerText}
 				</Button>
 			</DialogTrigger>
