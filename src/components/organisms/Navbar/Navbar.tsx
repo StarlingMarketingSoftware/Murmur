@@ -1,192 +1,257 @@
 'use client';
-import { SignUpButton, useAuth, UserButton } from '@clerk/nextjs';
-import { SignInButton } from '@clerk/nextjs';
+import { useAuth, UserButton, SignUpButton, SignInButton } from '@clerk/nextjs';
 import { urls } from '@/constants/urls';
-import { Button } from '@/components/ui/button';
-import LogoIcon from '@/components/atoms/_svg/LogoIcon';
-import { MenuIcon } from 'lucide-react';
+import { Menu, X, ChevronRight } from 'lucide-react';
 import { useMe } from '@/hooks/useMe';
 import Link from 'next/link';
 import { cn } from '@/utils';
-import { NavigationMenuLink } from '@/components/ui/navigation-menu';
-import { forwardRef, useState, useEffect } from 'react';
-import { Typography } from '@/components/ui/typography';
+import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { twMerge } from 'tailwind-merge';
+
 export const Navbar = () => {
 	const { user } = useMe();
 	const { isSignedIn } = useAuth();
 	const pathname = usePathname();
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
-	const [isNavbarVisible, setIsNavbarVisible] = useState(true);
-	const [lastScrollY, setLastScrollY] = useState(0);
-
-	const controlNavbar = () => {
-		if (window.scrollY > lastScrollY) {
-			// if scroll down hide the navbar
-			setIsNavbarVisible(false);
-		} else {
-			// if scroll up show the navbar
-			setIsNavbarVisible(true);
-		}
-
-		// remember current page location to use in the next move
-		setLastScrollY(window.scrollY);
-	};
+	const [scrolled, setScrolled] = useState(false);
 
 	useEffect(() => {
-		window.addEventListener('scroll', controlNavbar);
-
-		// cleanup function
-		return () => {
-			window.removeEventListener('scroll', controlNavbar);
+		const handleScroll = () => {
+			setScrolled(window.scrollY > 20);
 		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
+
+		window.addEventListener('scroll', handleScroll);
+		return () => window.removeEventListener('scroll', handleScroll);
 	}, []);
 
-	type UrlList = {
+	// Close mobile menu on route change
+	useEffect(() => {
+		setMobileMenuOpen(false);
+	}, [pathname]);
+
+	// Prevent body scroll when mobile menu is open
+	useEffect(() => {
+		if (isMobileMenuOpen) {
+			document.body.style.overflow = 'hidden';
+		} else {
+			document.body.style.overflow = 'unset';
+		}
+		return () => {
+			document.body.style.overflow = 'unset';
+		};
+	}, [isMobileMenuOpen]);
+
+	type NavItem = {
 		path: string;
 		label: string;
 	};
-	const urlList: UrlList[] = [
+
+	const navItems: NavItem[] = [
 		{ path: urls.home.index, label: 'Home' },
 		{ path: urls.pricing.index, label: 'Pricing' },
 		{ path: urls.contact.index, label: 'Help' },
 		{ path: urls.admin.index, label: 'Admin' },
-	].filter((url) => !(user?.role !== 'admin' && url.path === '/admin'));
+	].filter((item) => !(user?.role !== 'admin' && item.path === '/admin'));
+
 	return (
 		<>
-			<div
-				className={twMerge(
-					'sticky top-0 bg-muted z-50 transition-all duration-300',
-					!isNavbarVisible ? 'h-[55px]' : 'h-[110px]'
+			{/* Main Navigation Bar - Light Apple Style */}
+			<nav
+				className={cn(
+					'fixed top-0 left-0 right-0 z-50 transition-all duration-500',
+					scrolled 
+						? 'bg-gray-100/90 backdrop-blur-xl border-b border-gray-200/50' 
+						: 'bg-white/70 backdrop-blur-lg'
 				)}
 			>
-				{/* Desktop Menu */}
-				<div className="flex flex-col h-full justify-center items-center z-50">
-					{/* Logo Section - Hidden when scrolling down */}
-					<div
-						className={twMerge(
-							'w-fit mx-auto flex items-center pt-2 justify-center transition-all duration-300 overflow-hidden',
-							!isNavbarVisible ? 'h-0 opacity-0' : 'h-55/100 opacity-100'
-						)}
-					>
-						<Link href={urls.murmur.dashboard.index} className="w-[200px] items-center">
-							<LogoIcon
-								height="48px"
-								width="59px"
-								pathClassName="fill-background stroke-background"
-							/>
-						</Link>
-					</div>
+				<div className="w-full px-6 lg:px-8">
+					<div className="relative flex items-center justify-between h-11">
+						{/* Mobile Menu Button */}
+						<button
+							onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}
+							className={cn(
+								"lg:hidden relative w-5 h-5",
+								"transition-all duration-300"
+							)}
+							aria-label="Toggle menu"
+						>
+							<span className={cn(
+								"absolute block h-[1.5px] w-5 bg-gray-600 transition-all duration-300 ease-out",
+								isMobileMenuOpen ? "rotate-45 top-[9px]" : "top-[5px]"
+							)} />
+							<span className={cn(
+								"absolute block h-[1.5px] w-5 bg-gray-600 transition-all duration-300 ease-out top-[9px]",
+								isMobileMenuOpen ? "opacity-0" : "opacity-100"
+							)} />
+							<span className={cn(
+								"absolute block h-[1.5px] w-5 bg-gray-600 transition-all duration-300 ease-out",
+								isMobileMenuOpen ? "-rotate-45 top-[9px]" : "top-[13px]"
+							)} />
+						</button>
 
-					{/* Navigation Section - Always visible */}
-					<div
-						className={twMerge(
-							'flex items-center justify-center transition-all duration-300',
-							!isNavbarVisible ? 'h-full' : 'h-45/100'
-						)}
-					>
-						<div className="hidden lg:flex flex-row gap-13 ">
-							{urlList.map((url) => {
-								return (
-									<Link className="hover:cursor-pointer" key={url.path} href={url.path}>
-										<Typography
-											className={twMerge(
-												'!text-[16px] transition duration-300',
-												pathname === url.path
-													? '-translate-y-[2px] opacity-100'
-													: 'translate-y-0 opacity-80'
-											)}
-											color="background"
-										>
-											{url.label}
-										</Typography>
+						{/* Desktop Navigation - Absolutely Centered */}
+						<div className="absolute inset-0 hidden lg:flex items-center justify-center pointer-events-none">
+							<nav className="pointer-events-auto flex items-center gap-7">
+								{navItems.map((item) => (
+									<Link
+										key={item.path}
+										href={item.path}
+										className={cn(
+											'px-2.5 h-7 inline-flex items-center rounded-full text-[12px] font-normal tracking-[-0.01em] transition-colors duration-150',
+											pathname === item.path 
+												? 'text-gray-900' 
+												: 'text-gray-600 hover:text-gray-900 hover:bg-black/5'
+										)}
+									>
+										{item.label}
 									</Link>
-								);
-							})}
+								))}
+							</nav>
 						</div>
 
-						<div className="absolute right-5 ml-auto flex items-center space-x-4">
+						{/* Auth Section - Right Aligned */}
+						<div className="flex items-center ml-auto">
 							{isSignedIn ? (
-								<UserButton />
+								<UserButton
+									afterSignOutUrl="/"
+									appearance={{
+										elements: {
+											avatarBox: 'w-7 h-7',
+											userButtonTrigger: 'opacity-80 hover:opacity-100 transition-opacity duration-200'
+										}
+									}}
+								/>
 							) : (
-								<>
+								<div className="flex items-center gap-3">
 									<SignInButton mode="modal">
-										<Button variant="light" size="sm">
+										<button className="inline-flex items-center justify-center h-7 px-3 text-[12px] font-normal tracking-[-0.01em] text-gray-700 hover:text-gray-900 transition-colors">
 											Sign In
-										</Button>
+										</button>
 									</SignInButton>
 									<SignUpButton mode="modal">
-										<Button variant="light" size="sm">
+										<button className="inline-flex items-center justify-center h-7 px-4 text-[12px] font-normal tracking-[-0.01em] rounded-full border border-black/5 bg-white/70 hover:bg-white/90 text-gray-900 transition-colors">
 											Sign Up
-										</Button>
+										</button>
 									</SignUpButton>
-								</>
+								</div>
 							)}
-							<Button
-								outline
-								variant="light"
-								size="icon"
-								className="lg:hidden"
-								onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}
-							>
-								<MenuIcon />
-							</Button>
 						</div>
 					</div>
 				</div>
-			</div>
+			</nav>
 
-			{/* Mobile Menu */}
+			{/* Mobile Menu Overlay - Light Theme */}
 			<div
 				className={cn(
-					'fixed z-40 top-13 right-0 w-full h-screen -webkit-transform transition-opacity duration-500 ease-in-out lg:hidden bg-background',
-					isMobileMenuOpen
-						? 'pointer-events-auto opacity-100'
-						: 'pointer-events-none opacity-0'
+					'fixed inset-0 z-40 lg:hidden',
+					isMobileMenuOpen ? 'pointer-events-auto' : 'pointer-events-none'
 				)}
 			>
-				<nav className="flex flex-col p-4 items-center justify-evenly h-full space-y-2">
-					{urlList.map((url, index) => {
-						return (
-							<Link
-								key={index}
-								href={url.path}
-								className="px-4 py-6 rounded-md text-center hover:bg-gray-100 transition-all duration-500 text-2xl md:text-4xl font-primary"
-								onClick={() => setMobileMenuOpen(false)}
-							>
-								{url.label}
-							</Link>
-						);
-					})}
-				</nav>
+				{/* Backdrop */}
+				<div
+					className={cn(
+						'absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity duration-500',
+						isMobileMenuOpen ? 'opacity-100' : 'opacity-0'
+					)}
+					onClick={() => setMobileMenuOpen(false)}
+				/>
+
+				{/* Menu Panel - Slides from top */}
+				<div
+					className={cn(
+						'absolute top-0 left-0 right-0 bg-white/95 backdrop-blur-xl',
+						'transition-transform duration-500 ease-out shadow-lg',
+						isMobileMenuOpen ? 'translate-y-0' : '-translate-y-full'
+					)}
+				>
+					{/* Mobile Header */}
+					<div className="flex items-center justify-between h-11 px-6">
+						<button
+							onClick={() => setMobileMenuOpen(false)}
+							className="relative w-5 h-5"
+							aria-label="Close menu"
+						>
+							<span className="absolute block h-[1.5px] w-5 bg-gray-600 rotate-45 top-[9px]" />
+							<span className="absolute block h-[1.5px] w-5 bg-gray-600 -rotate-45 top-[9px]" />
+						</button>
+
+						{isSignedIn ? (
+							<UserButton
+								afterSignOutUrl="/"
+								appearance={{
+									elements: {
+										avatarBox: 'w-7 h-7',
+										userButtonTrigger: 'opacity-80'
+									}
+								}}
+							/>
+						) : (
+							<div className="flex items-center gap-3">
+								<SignInButton mode="modal">
+									<button className="text-[13px] font-medium text-gray-600 hover:text-gray-900 transition-colors">
+										Sign In
+									</button>
+								</SignInButton>
+								<SignUpButton mode="modal">
+									<button className="text-[13px] font-medium px-3 py-1 rounded-full bg-gray-900/5 text-gray-900">
+										Sign Up
+									</button>
+								</SignUpButton>
+							</div>
+						)}
+					</div>
+
+					{/* Divider */}
+					<div className="h-[0.5px] bg-gray-200 mx-6" />
+
+					{/* Mobile Navigation Links */}
+					<nav className="px-6 py-4">
+						<ul className="space-y-0">
+							{navItems.map((item) => (
+								<li key={item.path}>
+									<Link
+										href={item.path}
+										className={cn(
+											'flex items-center justify-between py-3 text-[17px] font-medium',
+											'transition-colors duration-200',
+											'border-b border-gray-100',
+											pathname === item.path 
+												? 'text-gray-900' 
+												: 'text-gray-600 hover:text-gray-900'
+										)}
+										onClick={() => setMobileMenuOpen(false)}
+									>
+										<span>{item.label}</span>
+										<ChevronRight className="w-4 h-4 text-gray-400" />
+									</Link>
+								</li>
+							))}
+						</ul>
+					</nav>
+
+					{/* Mobile Auth Section if not signed in */}
+					{!isSignedIn && (
+						<>
+							<div className="h-[0.5px] bg-gray-200 mx-6" />
+							<div className="px-6 py-6 space-y-3">
+								<SignInButton mode="modal">
+									<button className="w-full py-3 text-center text-[15px] font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+										Sign In to Your Account
+									</button>
+								</SignInButton>
+								<SignUpButton mode="modal">
+									<button className="w-full py-3 text-center text-[15px] font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors">
+										Create New Account
+									</button>
+								</SignUpButton>
+							</div>
+						</>
+					)}
+				</div>
 			</div>
+
+			{/* Spacer */}
+			<div className="h-11" />
 		</>
 	);
 };
-
-const ListItem = forwardRef<React.ElementRef<'a'>, React.ComponentPropsWithoutRef<'a'>>(
-	({ className, title, children, ...props }, ref) => {
-		return (
-			<li>
-				<NavigationMenuLink asChild>
-					<a
-						ref={ref}
-						className={cn(
-							'block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground',
-							className
-						)}
-						{...props}
-					>
-						<div className="text-sm font-medium leading-none">{title}</div>
-						<p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-							{children}
-						</p>
-					</a>
-				</NavigationMenuLink>
-			</li>
-		);
-	}
-);
-ListItem.displayName = 'ListItem';
