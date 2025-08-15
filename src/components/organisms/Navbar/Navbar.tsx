@@ -141,7 +141,7 @@ export const Navbar = () => {
 			{/* Mobile Menu */}
 			<div
 				className={cn(
-					'fixed z-40 top-13 right-0 w-full h-screen transform transition-opacity duration-500 ease-in-out lg:hidden bg-background',
+					'fixed z-40 top-13 right-0 w-full h-screen -webkit-transform transition-opacity duration-500 ease-in-out lg:hidden bg-background',
 					isMobileMenuOpen
 						? 'pointer-events-auto opacity-100'
 						: 'pointer-events-none opacity-0'
