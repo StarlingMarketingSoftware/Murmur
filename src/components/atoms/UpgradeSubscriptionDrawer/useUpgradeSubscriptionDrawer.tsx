@@ -14,6 +14,7 @@ export interface UpgradeSubscriptionDrawerProps {
 	setIsOpen?: Dispatch<SetStateAction<boolean>>;
 	hideTriggerButton?: boolean;
 	buttonVariant?: ButtonVariants['variant'];
+	className?: string;
 }
 
 export const useUpgradeSubscriptionDrawer = (props: UpgradeSubscriptionDrawerProps) => {

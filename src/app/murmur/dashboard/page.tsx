@@ -128,30 +128,36 @@ const Dashboard = () => {
 									)}
 								/>
 							</div>
-							<div className="flex items-center justify-end gap-2">
-								{isFreeTrial ? (
-									<UpgradeSubscriptionDrawer
-										message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
-										triggerButtonText="Import"
-										buttonVariant="light"
-									/>
-								) : (
-									<ContactTSVUploadDialog
-										isAdmin={false}
-										triggerText="Import"
-										buttonVariant="light"
-									/>
-								)}
+							<div className="flex items-center justify-end" style={{ width: '368px' }}>
+								<div className="flex-1">
+									{isFreeTrial ? (
+										<UpgradeSubscriptionDrawer
+											message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
+											triggerButtonText="Import"
+											buttonVariant="light"
+											className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
+										/>
+									) : (
+										<ContactTSVUploadDialog
+											isAdmin={false}
+											triggerText="Import"
+											buttonVariant="light"
+											className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
+										/>
+									)}
+								</div>
 
-								<Button
-									variant="primary-light"
-									type="submit"
-									bold
-									className="px-10 md:px-20 gradient-button gradient-button-green"
-									isLoading={isLoadingContacts || isRefetchingContacts}
-								>
-									Generate
-								</Button>
+								<div className="flex-1 flex justify-end">
+									<Button
+										variant="primary-light"
+										type="submit"
+										bold
+										className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
+										isLoading={isLoadingContacts || isRefetchingContacts}
+									>
+										Generate
+									</Button>
+								</div>
 							</div>
 						</div>
 					</form>
