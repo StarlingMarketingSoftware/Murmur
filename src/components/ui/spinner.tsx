@@ -7,9 +7,6 @@ interface SpinnerProps {
 	color?: 'foreground' | 'background' | 'primary';
 }
 
-// Golden ratio for perfect proportions
-const GOLDEN_RATIO = 1.618;
-
 export function Spinner({ className, size = 'xl', color = 'primary' }: SpinnerProps) {
 	// Calculate base size
 	const getBaseSize = (): number => {

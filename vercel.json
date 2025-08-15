@@ -1,8 +1,18 @@
 {
+	"buildCommand": "npm run vercel-build",
+	"outputDirectory": ".next",
 	"crons": [
 		{
 			"path": "/api/webhooks/stripe/cron",
 			"schedule": "0 0 * * *"
 		}
-	]
+	],
+	"functions": {
+		"src/app/api/**/*.ts": {
+			"maxDuration": 30
+		}
+	},
+	"env": {
+		"NODE_OPTIONS": "--max-old-space-size=8192"
+	}
 }
