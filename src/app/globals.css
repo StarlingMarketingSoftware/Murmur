@@ -406,24 +406,24 @@ mux-player {
 	animation: none;
 }
 
-/* Focus state with subtle blue accent */
+/* Focus state - very subtle accent */
 .search-wave-container:has(.search-wave-input:focus) {
 	background: linear-gradient(
 		135deg,
-		rgba(59, 130, 246, 0.06),
-		rgba(96, 165, 250, 0.04)
+		rgba(0, 0, 0, 0.09),
+		rgba(0, 0, 0, 0.05)
 	);
 	box-shadow: 
-		0 0 0 1.5px rgba(59, 130, 246, 0.12),
-		0 8px 32px rgba(59, 130, 246, 0.04),
-		0 16px 48px rgba(59, 130, 246, 0.02);
+		0 0 0 1px rgba(0, 0, 0, 0.1),
+		0 4px 12px rgba(0, 0, 0, 0.06),
+		0 8px 24px rgba(0, 0, 0, 0.04);
 }
 
 .search-wave-container:has(.search-wave-input:focus)::before {
 	background: linear-gradient(
 		135deg,
-		rgba(255, 255, 255, 0.9),
-		rgba(243, 244, 246, 0.5)
+		rgba(255, 255, 255, 0.6),
+		rgba(243, 244, 246, 0.3)
 	);
 }
 
@@ -478,13 +478,88 @@ mux-player {
 	animation: gradient-shift 6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Pause animations on focus for better UX */
+/* Subtle overlay on focus - reduce distraction after search */
 .search-wave-container:has(.search-wave-input:focus) .search-wave-overlay {
-	animation-play-state: paused;
+	opacity: 0.3;
+	animation: gradient-shift 12s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 .search-wave-container:has(.search-wave-input:focus) .search-wave-overlay::before {
-	animation-play-state: paused;
+	opacity: 0;
+}
+
+/* Loading state animations - minimalist Apple style */
+@keyframes loading-breathe {
+	0%, 100% {
+		opacity: 0.3;
+	}
+	50% {
+		opacity: 0.6;
+	}
+}
+
+@keyframes loading-slide {
+	0% {
+		transform: translateX(-100%);
+		opacity: 0;
+	}
+	50% {
+		opacity: 0.5;
+	}
+	100% {
+		transform: translateX(100%);
+		opacity: 0;
+	}
+}
+
+/* Loading state - elegant and minimal */
+.search-wave-loading {
+	transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+	background: linear-gradient(
+		135deg,
+		rgba(0, 0, 0, 0.06),
+		rgba(0, 0, 0, 0.04)
+	);
+	animation: loading-breathe 4s ease-in-out infinite;
+}
+
+.search-wave-loading .search-wave-overlay {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(0, 0, 0, 0.03),
+		transparent
+	);
+	background-size: 200% 100%;
+	animation: gradient-shift 3s ease-in-out infinite !important;
+	opacity: 1 !important;
+}
+
+.search-wave-loading .search-wave-overlay::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		90deg,
+		transparent 30%,
+		rgba(0, 0, 0, 0.05) 50%,
+		transparent 70%
+	);
+	animation: loading-slide 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	opacity: 1 !important;
+}
+
+.search-wave-loading .search-wave-overlay::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: radial-gradient(
+		ellipse at center,
+		rgba(0, 0, 0, 0.02) 0%,
+		transparent 70%
+	);
+	animation: loading-breathe 2s ease-in-out infinite;
+	opacity: 1;
 }
 
 /* Dark mode adjustments - premium feel */
@@ -554,20 +629,20 @@ mux-player {
 .dark .search-wave-container:has(.search-wave-input:focus) {
 	background: linear-gradient(
 		135deg,
-		rgba(96, 165, 250, 0.08),
-		rgba(147, 197, 253, 0.05)
+		rgba(255, 255, 255, 0.08),
+		rgba(255, 255, 255, 0.04)
 	);
 	box-shadow: 
-		0 0 0 1.5px rgba(96, 165, 250, 0.18),
-		0 8px 32px rgba(96, 165, 250, 0.06),
-		0 16px 48px rgba(96, 165, 250, 0.03);
+		0 0 0 1px rgba(255, 255, 255, 0.12),
+		0 4px 12px rgba(0, 0, 0, 0.2),
+		0 8px 24px rgba(0, 0, 0, 0.1);
 }
 
 .dark .search-wave-container:has(.search-wave-input:focus)::before {
 	background: linear-gradient(
 		135deg,
-		rgba(31, 41, 55, 0.95),
-		rgba(55, 65, 81, 0.5)
+		rgba(31, 41, 55, 0.8),
+		rgba(55, 65, 81, 0.3)
 	);
 }
 
@@ -1027,6 +1102,60 @@ mux-player {
 		transparent
 	);
 	animation: gradient-shift 6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Subtle overlay on focus in dark mode */
+.dark .search-wave-container:has(.search-wave-input:focus) .search-wave-overlay {
+	opacity: 0.2;
+	animation: gradient-shift 14s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.dark .search-wave-container:has(.search-wave-input:focus) .search-wave-overlay::before {
+	opacity: 0;
+}
+
+/* Dark mode loading state - elegant minimal */
+.dark .search-wave-loading {
+	transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.06),
+		rgba(255, 255, 255, 0.03)
+	);
+	animation: loading-breathe 4s ease-in-out infinite;
+}
+
+.dark .search-wave-loading .search-wave-overlay {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(255, 255, 255, 0.04),
+		transparent
+	);
+	background-size: 200% 100%;
+	animation: gradient-shift 3s ease-in-out infinite !important;
+	opacity: 1 !important;
+}
+
+.dark .search-wave-loading .search-wave-overlay::before {
+	background: linear-gradient(
+		90deg,
+		transparent 30%,
+		rgba(255, 255, 255, 0.06) 50%,
+		transparent 70%
+	);
+	animation: loading-slide 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	opacity: 1 !important;
+}
+
+.dark .search-wave-loading .search-wave-overlay::after {
+	background: radial-gradient(
+		ellipse at center,
+		rgba(255, 255, 255, 0.03) 0%,
+		transparent 70%
+	);
+	animation: loading-breathe 2s ease-in-out infinite;
+	opacity: 1;
 }
 
 

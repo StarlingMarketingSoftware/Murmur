@@ -72,7 +72,7 @@ const Dashboard = () => {
 							render={({ field }) => (
 								<FormItem>
 									<FormControl>
-										<div className="search-wave-container">
+										<div className={`search-wave-container ${isLoadingContacts || isRefetchingContacts ? 'search-wave-loading' : ''}`}>
 											<Input
 												className="search-wave-input !border-none"
 												placeholder='Who do you want to send to?  i.e  "Music venues in North Carolina"'
