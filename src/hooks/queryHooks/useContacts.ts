@@ -28,18 +28,22 @@ interface EditContactData {
 export const useGetContacts = (options: ContactQueryOptions) => {
 	return useQuery<ContactWithName[]>({
 		queryKey: [...QUERY_KEYS.list(), options.filters],
-		queryFn: async () => {
+		queryFn: async ({ signal }) => {
 			const url = appendQueryParamsToUrl(urls.api.contacts.index, options.filters);
-			const response = await _fetch(url);
+			const response = await _fetch(url, undefined, undefined, { 
+				signal,
+				timeout: 25000 // 25 second timeout for contact searches
+			});
 
 			if (!response.ok) {
 				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to _fetch contacts');
+				throw new Error(errorData.error || 'Failed to fetch contacts');
 			}
 
 			return response.json() as Promise<ContactWithName[]>;
 		},
 		enabled: options.enabled === undefined ? true : options.enabled,
+		gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
 	});
 };
 
