@@ -42,30 +42,32 @@ const Dashboard = () => {
 	} = useDashboard();
 	return (
 		<AppLayout>
-			<div className="mt-16 premium-hero-section text-center">
-				<div className="premium-logo-container inline-block">
-					<LogoIcon width="106px" height="84px" />
+			<div className="mt-4 flex justify-center">
+				<div className="premium-hero-section text-center" style={{ width: '470px', height: '286px', overflow: 'hidden' }}>
+					<div className="premium-logo-container inline-block">
+						<LogoIcon width="106px" height="84px" />
+					</div>
+					<Typography variant="h1" className="text-center mt-2 !text-[80px] leading-[0.8] premium-gradient-text" data-text="Murmur">
+						Murmur
+					</Typography>
+					<Typography
+						font="secondary"
+						className="mt-12 text-[19px] text-center premium-subtitle-gradient"
+						color="light"
+					>
+						Let&apos;s <strong className="premium-accent">start</strong> by creating a campaign.
+					</Typography>
+					<Typography
+						font="secondary"
+						className="mt-6 text-[19px] text-center premium-subtitle-gradient"
+						color="light"
+					>
+						Who do you want to contact?
+					</Typography>
 				</div>
-				<Typography variant="h1" className="text-center mt-3 !text-[80px] leading-[0.8] premium-gradient-text" data-text="Murmur">
-					Murmur
-				</Typography>
-				<Typography
-					font="secondary"
-					className="mt-18 text-[19px] text-center premium-subtitle-gradient"
-					color="light"
-				>
-					Let&apos;s <strong className="premium-accent">start</strong> by creating a campaign.
-				</Typography>
-				<Typography
-					font="secondary"
-					className="mt-7 text-[19px] text-center premium-subtitle-gradient"
-					color="light"
-				>
-					Who do you want to contact?
-				</Typography>
 			</div>
 
-			<div className="mt-12 max-w-[1174px] mx-auto">
+			<div className="mt-36 max-w-[1174px] mx-auto">
 				<Form {...form}>
 					<form onSubmit={form.handleSubmit(onSubmit)}>
 						<FormField
