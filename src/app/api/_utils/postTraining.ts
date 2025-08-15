@@ -338,28 +338,163 @@ General Guidelines:
  * @returns PostTrainingProfile with appropriate filters for the query type
  */
 export async function getPostTrainingForQuery(rawQuery: string): Promise<PostTrainingProfile> {
-  // Use LLM to intelligently classify the query type
-  const queryType = await classifyQueryType(rawQuery);
-  
-  // If it's a general query with no specific filtering needs, return inactive profile
-  if (queryType === 'general') {
-    // Still check if the query might benefit from filtering
-    const q = normalize(rawQuery);
-    const mightNeedFiltering = q.includes('service') || 
-                               q.includes('provider') ||
-                               q.includes('consultant') ||
-                               q.includes('agency') ||
-                               q.includes('company');
-    
-    if (mightNeedFiltering) {
-      return await generateFiltersWithLLM(rawQuery, 'general');
+  try {
+    // Skip LLM if no API key
+    if (!process.env.OPEN_AI_API_KEY) {
+      return getFallbackPostTraining(rawQuery);
     }
     
-    return { active: false, excludeTerms: [], demoteTerms: [] };
+    // Use LLM to intelligently classify the query type
+    const queryType = await classifyQueryType(rawQuery);
+    
+    // If it's a general query with no specific filtering needs, return inactive profile
+    if (queryType === 'general') {
+      // Still check if the query might benefit from filtering
+      const q = normalize(rawQuery);
+      const mightNeedFiltering = q.includes('service') || 
+                                 q.includes('provider') ||
+                                 q.includes('consultant') ||
+                                 q.includes('agency') ||
+                                 q.includes('company');
+      
+      if (mightNeedFiltering) {
+        return await generateFiltersWithLLM(rawQuery, 'general');
+      }
+      
+      return { active: false, excludeTerms: [], demoteTerms: [] };
+    }
+    
+    // Generate appropriate filters for the classified query type
+    return await generateFiltersWithLLM(rawQuery, queryType);
+  } catch (error) {
+    console.error('Error in getPostTrainingForQuery, falling back:', error);
+    return getFallbackPostTraining(rawQuery);
+  }
+}
+
+// Get the music venue profile with all the exclusions
+function getMusicVenueProfile(): PostTrainingProfile {
+  const excludeTerms = [
+    'university',
+    'university of', 
+    'state university',
+    'community college',
+    'college of',
+    'school of music',
+    'conservatory',
+    'institute of technology',
+    'polytechnic',
+    'CEO',
+    'president',
+    'vice president',
+    'director of sales',
+    'director of marketing',
+    'faculty',
+    'professor',
+    'lawyer',
+    'partner',
+    'law firm',
+    'songwriter',
+    'drummer',
+    'guitarist',
+    'producer',
+    'band',
+    'bandleader'
+  ];
+  
+  const includeCompanyTerms = [
+    'theatre',
+    'theater',
+    'performing arts center',
+    'concert hall',
+    'music hall',
+    'auditorium',
+    'amphitheater',
+    'amphitheatre',
+    'opera house',
+    'pavilion',
+    'arena',
+    'ballroom',
+    'civic center',
+    'playhouse',
+    'house of blues',
+    'fillmore',
+    'music venue',
+    'live music'
+  ];
+  
+  const auxCompanyTerms = [
+    'bar',
+    'pub',
+    'tavern',
+    'lounge',
+    'brewery',
+    'restaurant',
+    'bistro',
+    'cafe',
+    'nightclub',
+    'club',
+    'jazz club',
+    'blues club'
+  ];
+  
+  const includeTitleTerms = [
+    'music venue',
+    'talent buyer',
+    'talent booker',
+    'booker',
+    'booking',
+    'promoter',
+    'venue manager',
+    'general manager',
+    'production manager',
+    'events manager',
+    'event coordinator',
+    'programming director',
+    'entertainment director',
+    'box office',
+    'house manager',
+    'stage manager',
+    'technical director'
+  ];
+  
+  return {
+    active: true,
+    excludeTerms,
+    demoteTerms: ['college', 'univ', 'campus', 'school', 'symphony'],
+    strictExclude: true,
+    requirePositive: true,
+    includeCompanyTerms,
+    includeTitleTerms,
+    includeWebsiteTerms: ['tickets', 'ticketing', 'theatre', 'theater', 'venue', 'concert', 'events', 'calendar', 'live', 'music'],
+    includeIndustryTerms: ['performing arts', 'entertainment', 'music', 'live events'],
+    auxCompanyTerms,
+    auxWebsiteTerms: ['menu', 'reservations', 'happy hour', 'bar', 'restaurant'],
+    auxIndustryTerms: ['hospitality', 'food and beverage', 'restaurants', 'bars']
+  };
+}
+
+// Synchronous fallback for when LLM is not available
+function getFallbackPostTraining(rawQuery: string): PostTrainingProfile {
+  const q = normalize(rawQuery);
+  
+  // Music venue specific post-training
+  if (q.includes('music venue') || q.includes('music venues') || 
+      q.includes('concert') || q.includes('performance') || q.includes('live music')) {
+    return getMusicVenueProfile();
   }
   
-  // Generate appropriate filters for the classified query type
-  return await generateFiltersWithLLM(rawQuery, queryType);
+  // Wedding planner specific
+  if (q.includes('wedding planner') || q.includes('wedding planners')) {
+    return {
+      active: true,
+      excludeTerms: ['weddingwire'],
+      demoteTerms: [],
+      strictExclude: true
+    };
+  }
+  
+  return { active: false, excludeTerms: [], demoteTerms: [] };
 }
 
 
