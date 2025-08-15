@@ -42,7 +42,7 @@ const Dashboard = () => {
 	} = useDashboard();
 	return (
 		<AppLayout>
-			<div className="mt-32 premium-hero-section text-center">
+			<div className="mt-16 premium-hero-section text-center">
 				<div className="premium-logo-container inline-block">
 					<LogoIcon width="106px" height="84px" />
 				</div>
