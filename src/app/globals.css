@@ -525,7 +525,10 @@ mux-player {
 	-webkit-animation: gradient-shift 10s ease-in-out infinite;
 	animation: gradient-shift 10s ease-in-out infinite;
 	transition: all 0.3s ease;
-	border: none !important;
+	/* CLEAR BLACK BORDER - RESTING STATE */
+	border: 2px solid #000000 !important;
+	box-sizing: border-box;
+	border-radius: 0.75rem;
 	outline: none !important;
 	box-shadow: none !important;
 	-webkit-backdrop-filter: blur(10px);
@@ -540,13 +543,18 @@ mux-player {
 .search-wave-input:hover {
 	-webkit-animation: gradient-shift 6s ease-in-out infinite;
 	animation: gradient-shift 6s ease-in-out infinite;
+	/* CLEAR BLACK BORDER - HOVER STATE */
+	border: 2px solid #000000 !important;
 	box-shadow: none !important;
 }
 
 .search-wave-input:focus {
 	background: rgba(255, 255, 255, 1);
 	animation: none;
+	/* CLEAR BLACK BORDER - FOCUS/CLICKED STATE */
+	border: 2px solid #000000 !important;
 	box-shadow: none !important;
+	outline: none;
 }
 
 /* Ensure placeholder text is also styled consistently */
@@ -895,6 +903,9 @@ mux-player {
 	background-size: 200% 100%;
 	-webkit-animation: gradient-shift 10s ease-in-out infinite;
 	animation: gradient-shift 10s ease-in-out infinite;
+	/* CLEAR BLACK BORDER - DARK MODE RESTING STATE */
+	border: 2px solid #000000 !important;
+	box-sizing: border-box;
 	-webkit-backdrop-filter: blur(10px);
 	backdrop-filter: blur(10px);
 	color: rgb(243, 244, 246) !important; /* Light gray/white text color in dark mode */
@@ -904,12 +915,17 @@ mux-player {
 	-webkit-animation: gradient-shift 6s ease-in-out infinite;
 	animation: gradient-shift 6s ease-in-out infinite;
 	transition: all 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
+	/* CLEAR BLACK BORDER - DARK MODE HOVER STATE */
+	border: 2px solid #000000 !important;
 	color: rgb(243, 244, 246) !important; /* Maintain light gray/white text color */
 }
 
 .dark .search-wave-input:focus {
 	background: rgba(17, 24, 39, 1);
 	animation: none;
+	/* CLEAR BLACK BORDER - DARK MODE FOCUS/CLICKED STATE */
+	border: 2px solid #000000 !important;
+	outline: none;
 	color: rgb(243, 244, 246) !important; /* Maintain light gray/white text color */
 }
 
@@ -2140,6 +2156,9 @@ mux-player {
 .search-wave-input:focus {
 	transform: none;
 	transition: background 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+	/* CLEAR BLACK BORDER - ADDITIONAL FOCUS STATE */
+	border: 2px solid #000000 !important;
+	outline: none;
 }
 
 .search-wave-input:focus ~ .search-wave-overlay {
