@@ -851,9 +851,9 @@ mux-player {
 	position: relative;
 	background: linear-gradient(
 		135deg,
-		rgba(0, 0, 0, 0.95) 0%,
-		rgba(71, 85, 105, 0.85) 50%,
-		rgba(0, 0, 0, 0.95) 100%
+		rgba(0, 0, 0, 1) 0%,
+		rgba(17, 24, 39, 1) 50%,
+		rgba(0, 0, 0, 1) 100%
 	);
 	background-size: 200% 200%;
 	-webkit-background-clip: text;
@@ -877,11 +877,11 @@ mux-player {
 	z-index: -3;
 	background: linear-gradient(
 		135deg,
-		rgba(156, 163, 175, 0.6) 0%,
-		rgba(107, 114, 128, 0.8) 25%,
-		rgba(156, 163, 175, 0.6) 50%,
-		rgba(107, 114, 128, 0.8) 75%,
-		rgba(156, 163, 175, 0.6) 100%
+		rgba(31, 41, 55, 0.3) 0%,
+		rgba(17, 24, 39, 0.4) 25%,
+		rgba(31, 41, 55, 0.3) 50%,
+		rgba(17, 24, 39, 0.4) 75%,
+		rgba(31, 41, 55, 0.3) 100%
 	);
 	background-size: 400% 400%;
 	-webkit-background-clip: text;
@@ -889,7 +889,7 @@ mux-player {
 	-webkit-text-fill-color: transparent;
 	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 	filter: blur(25px);
-	opacity: 0.2;
+	opacity: 0.15;
 	pointer-events: none;
 }
 
@@ -902,9 +902,9 @@ mux-player {
 	z-index: -2;
 	background: linear-gradient(
 		90deg,
-		rgba(107, 114, 128, 0.4) 0%,
-		rgba(156, 163, 175, 0.6) 50%,
-		rgba(107, 114, 128, 0.4) 100%
+		rgba(17, 24, 39, 0.3) 0%,
+		rgba(31, 41, 55, 0.4) 50%,
+		rgba(17, 24, 39, 0.3) 100%
 	);
 	background-size: 300% 100%;
 	-webkit-background-clip: text;
@@ -912,7 +912,7 @@ mux-player {
 	-webkit-text-fill-color: transparent;
 	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite reverse;
 	filter: blur(12px);
-	opacity: 0.3;
+	opacity: 0.2;
 	pointer-events: none;
 }
 
