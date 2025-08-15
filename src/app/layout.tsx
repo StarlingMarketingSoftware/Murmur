@@ -7,7 +7,6 @@ import SubLayout from './sublayout';
 import localFont from 'next/font/local';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import StoreProvider from './StoreProvider';
-import { Navbar } from '@/components/organisms/Navbar/Navbar';
 
 const inter = Inter({
 	variable: '--font-inter',
@@ -60,7 +59,6 @@ export default function RootLayout({
 				<body className={`antialiased min-h-screen flex flex-col`}>
 					<ThemeProvider attribute="class" defaultTheme="light">
 						<SubLayout>
-							<Navbar />
 							<main className="flex-1">{children}</main>
 							<Footer />
 							<Toaster />
