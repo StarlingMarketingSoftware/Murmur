@@ -65,11 +65,11 @@ export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
 	try {
-		// Remove debug logging in production
-		// console.log(
-		// 	'--- DEBUG: API Key from env (OPEN_AI_API_KEY):',
-		// 	process.env.OPEN_AI_API_KEY ? 'Exists' : 'MISSING!'
-		// );
+		// Debug logging for environment variables
+		console.log(
+			'--- DEBUG: API Key from env (OPEN_AI_API_KEY):',
+			process.env.OPEN_AI_API_KEY ? 'Exists' : 'MISSING!'
+		);
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();
@@ -91,22 +91,30 @@ export async function GET(req: NextRequest) {
         let locationResponse: string | null = null;
         const rawQuery = query || '';
         if (process.env.OPEN_AI_API_KEY && rawQuery) {
-            locationResponse = await fetchOpenAi(
-                OPEN_AI_MODEL_OPTIONS.o4mini,
-                `You are a geography and language expert that can tell the difference between words that are city, states, or countries, and words that are not, based on knowledge about place names as well as semantics and context of a given sentence. You will be given a search query that may contain words that are city, states, or countries, amongst other non-location based terms. You will separate the location words from the rest of the query, and return the words that are city, state, or country, along with the rest of the query in a JSON string in the following format: {"city": "cityName", "state": "stateName", "country": "countryName", "restOfQuery": "restOfQuery"}. 
-                
-                Additional instructions:
-                - Do not include country unless it is specified.
-                - If the country in the query is some variant of the United States, return "United States of America". 
-                - If the search term contains "new york", specify the state. Only specify the city if it says "new york city" or "NYC".
-                - If there is no city, state, or country in the query, return null in the fields that are not found. For example: {"city": null, "state": "Pennsylvania", "country": null, "restOfQuery": "restOfQuery"} 
-                - If any of the location terms are misspelled, returned the correct spelling. For example, if the query is "Pensylvania", return {"city": null, "state": "Pennsylvania", "country": null, "restOfQuery": "restOfQuery"}
-                - If the query includes slang or abbreviations, return the official spelling. For example, if the query is "NYC", return {"city": "New York City", "state": null, "country": null, "restOfQuery": "restOfQuery"}
-                - Return a valid JSON string that can be parsed by a JSON.parse() in JavaScript. 
-                - There are some place names that can also be a word (such as buffalo steak house in new york) (Buffalo is a city in New York but it is also a general word for an animal). Use the context of the query to determine if the word is a place name or not.
-                - Return the JSON string and nothing else.`,
-                rawQuery
-            );
+            try {
+                locationResponse = await fetchOpenAi(
+                    OPEN_AI_MODEL_OPTIONS.o4mini,
+                    `You are a geography and language expert that can tell the difference between words that are city, states, or countries, and words that are not, based on knowledge about place names as well as semantics and context of a given sentence. You will be given a search query that may contain words that are city, states, or countries, amongst other non-location based terms. You will separate the location words from the rest of the query, and return the words that are city, state, or country, along with the rest of the query in a JSON string in the following format: {"city": "cityName", "state": "stateName", "country": "countryName", "restOfQuery": "restOfQuery"}. 
+                    
+                    Additional instructions:
+                    - Do not include country unless it is specified.
+                    - If the country in the query is some variant of the United States, return "United States of America". 
+                    - If the search term contains "new york", specify the state. Only specify the city if it says "new york city" or "NYC".
+                    - If there is no city, state, or country in the query, return null in the fields that are not found. For example: {"city": null, "state": "Pennsylvania", "country": null, "restOfQuery": "restOfQuery"} 
+                    - If any of the location terms are misspelled, returned the correct spelling. For example, if the query is "Pensylvania", return {"city": null, "state": "Pennsylvania", "country": null, "restOfQuery": "restOfQuery"}
+                    - If the query includes slang or abbreviations, return the official spelling. For example, if the query is "NYC", return {"city": "New York City", "state": null, "country": null, "restOfQuery": "restOfQuery"}
+                    - Return a valid JSON string that can be parsed by a JSON.parse() in JavaScript. 
+                    - There are some place names that can also be a word (such as buffalo steak house in new york) (Buffalo is a city in New York but it is also a general word for an animal). Use the context of the query to determine if the word is a place name or not.
+                    - Return the JSON string and nothing else.`,
+                    rawQuery
+                );
+            } catch (openAiError) {
+                console.error('OpenAI location parsing failed:', openAiError);
+                // Continue without location parsing if OpenAI fails
+                locationResponse = null;
+            }
+        } else if (!process.env.OPEN_AI_API_KEY) {
+            console.warn('OPEN_AI_API_KEY is not set. Location parsing will be skipped.');
         }
 
         // Parse location via LLM with a fast timeout and graceful fallback or no-LLM fallback
@@ -247,10 +255,7 @@ export async function GET(req: NextRequest) {
 
             // Overshoot take for venue-like queries so we can fill tail with aux (bars/restaurants)
             const requestedLimit = limit ?? VECTOR_SEARCH_LIMIT_DEFAULT;
-            const preProfile = await getPostTrainingForQuery(query || '');
-            const effectiveTake = preProfile.requirePositive
-                ? Math.min(Math.max(requestedLimit + 50, Math.ceil(requestedLimit * 1.3)), 250)
-                : requestedLimit;
+            const effectiveTake = requestedLimit;
 
             return await prisma.contact.findMany({
 				where: whereConditions,
@@ -283,10 +288,16 @@ export async function GET(req: NextRequest) {
 			return apiResponse(contacts);
 		}
 
-		// If vector search is enabled and we have a query, use vector search
+		        // If vector search is enabled and we have a query, use vector search
         if (useVectorSearch && query) {
             // Determine if this is a venue-like query that uses positive signals; overshoot to allow a lenient tail
-            const postTrainingProfile = await getPostTrainingForQuery(query || '');
+            let postTrainingProfile;
+            try {
+                postTrainingProfile = await getPostTrainingForQuery(query || '');
+            } catch (error) {
+                console.error('Error getting post training profile:', error);
+                postTrainingProfile = { active: false, excludeTerms: [], demoteTerms: [] };
+            }
             const requestedLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200));
             const effectiveVectorLimit = postTrainingProfile.requirePositive
                 ? Math.min(Math.max(requestedLimit + 20, Math.ceil(requestedLimit * 1.2)), 200)
@@ -470,7 +481,13 @@ export async function GET(req: NextRequest) {
             }
 
             // Posttraining step: exclude or demote universities for music venue searches
-            const postProfile = await getPostTrainingForQuery(query || '');
+            let postProfile;
+            try {
+                postProfile = await getPostTrainingForQuery(query || '');
+            } catch (error) {
+                console.error('Error getting post training profile for filtering:', error);
+                postProfile = { active: false, excludeTerms: [], demoteTerms: [] };
+            }
             if (postProfile.active && contacts.length > 0) {
                 const excludeTerms = postProfile.excludeTerms.map((t) => t.toLowerCase());
                 const demoteTerms = postProfile.demoteTerms.map((t) => t.toLowerCase());
@@ -676,6 +693,12 @@ export async function GET(req: NextRequest) {
 			return apiResponse(contacts);
 		}
 	} catch (error) {
+		console.error('Contact search API error:', {
+			error,
+			message: error instanceof Error ? error.message : 'Unknown error',
+			stack: error instanceof Error ? error.stack : undefined,
+			hasOpenAiKey: !!process.env.OPEN_AI_API_KEY,
+		});
 		return handleApiError(error);
 	}
 }

@@ -160,6 +160,18 @@ export function DotMorph({ className, size = 'xl', color = 'primary' }: DotLoade
 				/>
 			))}
 			<style jsx>{`
+				@-webkit-keyframes dot-morph {
+					0%, 80%, 100% {
+						-webkit-transform: scale(1);
+						transform: scale(1);
+						opacity: 0.25;
+					}
+					40% {
+						-webkit-transform: scale(1.3);
+						transform: scale(1.3);
+						opacity: 0.9;
+					}
+				}
 				@keyframes dot-morph {
 					0%, 80%, 100% {
 						transform: scale(1);

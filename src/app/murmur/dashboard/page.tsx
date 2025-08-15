@@ -41,132 +41,188 @@ const Dashboard = () => {
 		isFreeTrial,
 		isError,
 		error,
+		hasSearched,
+		handleResetSearch,
 	} = useDashboard();
 	return (
 		<AppLayout>
-			<div className="mt-4 flex justify-center">
-				<div className="premium-hero-section text-center" style={{ width: '470px', height: '286px', overflow: 'hidden' }}>
-					<div className="premium-logo-container inline-block">
-						<LogoIcon width="106px" height="84px" />
+			<div className={`dashboard-container ${hasSearched ? 'search-active' : ''}`}>
+				<div className="hero-wrapper">
+					<div className="mt-4 flex justify-center">
+						<div className="premium-hero-section text-center" style={{ width: '470px', height: '286px', overflow: 'hidden' }}>
+							<div className="premium-logo-container inline-block">
+								<LogoIcon width="106px" height="84px" />
+							</div>
+							<Typography variant="h1" className="text-center mt-2 !text-[80px] leading-[0.8] premium-gradient-text" data-text="Murmur">
+								Murmur
+							</Typography>
+							<Typography
+								font="secondary"
+								className="mt-12 text-[19px] text-center premium-subtitle-gradient"
+								color="light"
+							>
+								Let&apos;s <strong className="premium-accent">start</strong> by creating a campaign.
+							</Typography>
+							<Typography
+								font="secondary"
+								className="mt-6 text-[19px] text-center premium-subtitle-gradient"
+								color="light"
+							>
+								Who do you want to contact?
+							</Typography>
+						</div>
 					</div>
-					<Typography variant="h1" className="text-center mt-2 !text-[80px] leading-[0.8] premium-gradient-text" data-text="Murmur">
-						Murmur
-					</Typography>
-					<Typography
-						font="secondary"
-						className="mt-12 text-[19px] text-center premium-subtitle-gradient"
-						color="light"
-					>
-						Let&apos;s <strong className="premium-accent">start</strong> by creating a campaign.
-					</Typography>
-					<Typography
-						font="secondary"
-						className="mt-6 text-[19px] text-center premium-subtitle-gradient"
-						color="light"
-					>
-						Who do you want to contact?
-					</Typography>
 				</div>
-			</div>
 
-			<div className="mt-36 max-w-[1174px] mx-auto">
-				<Form {...form}>
-					<form onSubmit={form.handleSubmit(onSubmit)}>
+			<div
+				className={`search-bar-wrapper ${hasSearched ? 'search-bar-active' : ''}`}
+			>
+				<div className="search-bar-inner">
+					{hasSearched && activeSearchQuery && (
+						<div className="search-context-label">
+							<span className="search-query-text">{activeSearchQuery}</span>
+						</div>
+					)}
+					<Form {...form}>
+						<form onSubmit={form.handleSubmit(onSubmit)} className={hasSearched ? 'search-form-active' : ''}>
 						<FormField
 							control={form.control}
 							name="searchText"
 							render={({ field }) => (
 								<FormItem>
 									<FormControl>
-										<div className={`search-wave-container ${isLoadingContacts || isRefetchingContacts ? 'search-wave-loading' : ''}`}>
-											<Input
-												className="search-wave-input !border-none"
-												placeholder='Who do you want to send to?  i.e  "Music venues in North Carolina"'
-												{...field}
-											/>
-											<div className="search-wave-overlay" />
+										<div className={`search-input-group ${hasSearched ? 'search-input-group-active' : ''}`}>
+											<div className={`search-wave-container ${isLoadingContacts || isRefetchingContacts ? 'search-wave-loading' : ''}`}>
+												<Input
+													className="search-wave-input !border-none !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent"
+													placeholder='Who do you want to send to?  i.e  "Music venues in North Carolina"'
+													style={{ accentColor: 'transparent' }}
+													{...field}
+												/>
+												<div className="search-wave-overlay" />
+											</div>
+											{/* Buttons hidden during active search */}
 										</div>
 									</FormControl>
 									<FormMessage />
 								</FormItem>
 							)}
 						/>
-						<div className="flex flex-col md:flex-row gap-0 md:gap-4 items-center justify-between">
-							<div className="flex flex-row gap-4 items-center">
-								<FormField
-									control={form.control}
-									name="excludeUsedContacts"
-									render={({ field }) => (
-										<FormItem className="flex flex-row items-start space-x-3 space-y-0">
-											<FormControl>
-												<Checkbox
-													checked={field.value}
-													onCheckedChange={field.onChange}
-												/>
-											</FormControl>
-											<div className="space-y-1 leading-none">
-												<FormLabel className="text-sm font-medium cursor-pointer">
-													Exclude Used Contacts
-												</FormLabel>
-											</div>
-										</FormItem>
-									)}
-								/>
-								<FormField
-									control={form.control}
-									name="exactMatchesOnly"
-									render={({ field }) => (
-										<FormItem className="flex flex-row items-start space-x-3 space-y-0">
-											<FormControl>
-												<Checkbox
-													checked={field.value}
-													onCheckedChange={field.onChange}
-												/>
-											</FormControl>
-											<div className="space-y-1 leading-none">
-												<FormLabel className="text-sm font-medium cursor-pointer">
-													Exact Matches Only
-												</FormLabel>
-											</div>
-										</FormItem>
-									)}
-								/>
-							</div>
-							<div className="flex items-center justify-end" style={{ width: '368px' }}>
-								<div className="flex-1">
-									{isFreeTrial ? (
-										<UpgradeSubscriptionDrawer
-											message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
-											triggerButtonText="Import"
-											buttonVariant="light"
-											className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-										/>
-									) : (
-										<ContactTSVUploadDialog
-											isAdmin={false}
-											triggerText="Import"
-											buttonVariant="light"
-											className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-										/>
-									)}
+						{!hasSearched && (
+							<div className="flex flex-col md:flex-row gap-0 md:gap-4 items-center justify-between">
+								<div className="flex flex-row gap-4 items-center">
+									<FormField
+										control={form.control}
+										name="excludeUsedContacts"
+										render={({ field }) => (
+											<FormItem className="flex flex-row items-start space-x-3 space-y-0">
+												<FormControl>
+													<Checkbox
+														checked={field.value}
+														onCheckedChange={field.onChange}
+													/>
+												</FormControl>
+												<div className="space-y-1 leading-none">
+													<FormLabel className="text-sm font-medium cursor-pointer">
+														Exclude Used Contacts
+													</FormLabel>
+												</div>
+											</FormItem>
+										)}
+									/>
+									<FormField
+										control={form.control}
+										name="exactMatchesOnly"
+										render={({ field }) => (
+											<FormItem className="flex flex-row items-start space-x-3 space-y-0">
+												<FormControl>
+													<Checkbox
+														checked={field.value}
+														onCheckedChange={field.onChange}
+													/>
+												</FormControl>
+												<div className="space-y-1 leading-none">
+													<FormLabel className="text-sm font-medium cursor-pointer">
+														Exact Matches Only
+													</FormLabel>
+												</div>
+											</FormItem>
+										)}
+									/>
 								</div>
+								<div className="flex items-center justify-end" style={{ width: '368px' }}>
+									<div className="flex-1">
+										{isFreeTrial ? (
+											<UpgradeSubscriptionDrawer
+												message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
+												triggerButtonText="Import"
+												buttonVariant="light"
+												className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
+											/>
+										) : (
+											<ContactTSVUploadDialog
+												isAdmin={false}
+												triggerText="Import"
+												buttonVariant="light"
+												className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
+											/>
+										)}
+									</div>
 
-								<div className="flex-1 flex justify-end">
-									<Button
-										variant="primary-light"
-										type="submit"
-										bold
-										className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
-										isLoading={isLoadingContacts || isRefetchingContacts}
-									>
-										Generate
-									</Button>
+									<div className="flex-1 flex justify-end">
+										<Button
+											variant="primary-light"
+											type="submit"
+											bold
+											className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
+											isLoading={isLoadingContacts || isRefetchingContacts}
+										>
+											Generate
+										</Button>
+									</div>
 								</div>
 							</div>
-						</div>
+						)}
 					</form>
-				</Form>
+					</Form>
+				</div>
 			</div>
+
+			{/* Elegant search query display with back button */}
+			{hasSearched && activeSearchQuery && (
+				<div className="search-query-display">
+					<div className="search-query-display-inner">
+						<button 
+							onClick={handleResetSearch}
+							className="search-back-button"
+							aria-label="Back to search"
+						>
+							<svg 
+								width="20" 
+								height="20" 
+								viewBox="0 0 20 20" 
+								fill="none" 
+								xmlns="http://www.w3.org/2000/svg"
+								className="search-back-icon"
+							>
+								<path 
+									d="M12 16L6 10L12 4" 
+									stroke="currentColor" 
+									strokeWidth="1.5" 
+									strokeLinecap="round" 
+									strokeLinejoin="round"
+								/>
+							</svg>
+							<span className="search-back-text">Back</span>
+						</button>
+						<div className="search-query-display-text">
+							<span className="search-query-quote-left">&ldquo;</span>
+							{activeSearchQuery}
+							<span className="search-query-quote-right">&rdquo;</span>
+						</div>
+					</div>
+				</div>
+			)}
 
 			{activeSearchQuery && (
 				<>
@@ -181,7 +237,9 @@ const Dashboard = () => {
 										<Typography className="text-gray-600 mb-4">
 											{error instanceof Error && error.message.includes('timeout')
 												? 'The search took too long to complete. Please try a more specific query.'
-												: 'Unable to complete your search. Please try again.'}
+												: error instanceof Error 
+													? error.message
+													: 'Unable to complete your search. Please try again.'}
 										</Typography>
 										<Button
 											onClick={() => form.handleSubmit(onSubmit)()}
@@ -194,7 +252,11 @@ const Dashboard = () => {
 								</CardContent>
 							</Card>
 						</div>
-					) : contacts ? (
+					) : (isLoadingContacts || isRefetchingContacts) ? (
+						<div className="mt-10 max-w-[1174px] mx-auto py-8">
+							<ConsoleLoader searchQuery={activeSearchQuery} />
+						</div>
+					) : contacts && contacts.length > 0 ? (
 						<>
 							<Card>
 								<CardHeader>
@@ -228,27 +290,28 @@ const Dashboard = () => {
 								</Button>
 							</div>
 						</>
-					) : (
+					) : hasSearched && (contacts === undefined || (Array.isArray(contacts) && contacts.length === 0)) ? (
 						<div className="mt-10">
-							<div className="max-w-[1174px] mx-auto">
-								{/* Subtle container that echoes Card design but lighter */}
-								<div className="relative">
-									{/* Ultra-subtle top border to anchor the space */}
-									<div className="absolute top-0 left-[10%] right-[10%] h-[1px] bg-gradient-to-r from-transparent via-gray-200/50 to-transparent" />
-									
-									<ConsoleLoader searchQuery={activeSearchQuery} />
-									
-									{/* Bottom fade to transition to campaigns table */}
-									<div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white/80 to-transparent pointer-events-none" />
-								</div>
-							</div>
+							<Card className="max-w-[1174px] mx-auto">
+								<CardContent className="py-8">
+									<div className="text-center">
+										<Typography variant="h3" className="mb-2">
+											No Results Found
+										</Typography>
+										<Typography className="text-gray-600">
+											No contacts match your search criteria. Try a different search term.
+										</Typography>
+									</div>
+								</CardContent>
+							</Card>
 						</div>
-					)}
+					) : null}
 				</>
 			)}
 
 			<div className="mt-76">
 				<CampaignsTable />
+			</div>
 			</div>
 		</AppLayout>
 	);

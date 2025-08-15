@@ -36,6 +36,7 @@ type FormData = z.infer<typeof formSchema>;
 
 export const useDashboard = () => {
 	/* UI */
+	const [hasSearched, setHasSearched] = useState(false);
 
 	const MAX_CELL_LENGTH = 35;
 	const columns: ColumnDef<ContactWithName>[] = [
@@ -216,7 +217,7 @@ export const useDashboard = () => {
 		isPending: isPendingContacts,
 		isLoading: isLoadingContacts,
 		error,
-		refetch: refetchContacts,
+		refetch: refetchContacts,  // eslint-disable-line @typescript-eslint/no-unused-vars
 		isRefetching: isRefetchingContacts,
 		isError,
 	} = useGetContacts({
@@ -230,7 +231,7 @@ export const useDashboard = () => {
 			limit,
 			excludeUsedContacts: activeExcludeUsedContacts,
 		},
-		enabled: false,
+		enabled: hasSearched && !!activeSearchQuery && activeSearchQuery.trim().length > 0,
 	});
 	const { mutateAsync: importApolloContacts, isPending: isPendingImportApolloContacts } =
 		useCreateApolloContacts({});
@@ -242,17 +243,37 @@ export const useDashboard = () => {
 		}
 	}, [contacts]);
 
+	// Trigger search when parameters change
+	useEffect(() => {
+		if (hasSearched && activeSearchQuery && activeSearchQuery.trim().length > 0) {
+			// Query should automatically run when enabled
+			console.log('Search triggered with query:', activeSearchQuery);
+		}
+	}, [hasSearched, activeSearchQuery, activeExcludeUsedContacts, activeExactMatchesOnly, limit]);
+
 	// Handle errors
 	useEffect(() => {
-		if (isError && error) {
-			console.error('Contact search error:', error);
+		// Only show error if we've actually searched (not on initial load)
+		if (isError && error && hasSearched && activeSearchQuery) {
+			console.error('Contact search error details:', {
+				error,
+				message: error instanceof Error ? error.message : 'Unknown error',
+				query: activeSearchQuery,
+				filters: {
+					excludeUsedContacts: activeExcludeUsedContacts,
+					exactMatchesOnly: activeExactMatchesOnly,
+					limit,
+				}
+			});
 			if (error instanceof Error && error.message.includes('timeout')) {
 				toast.error('Search timed out after 25 seconds. Please try a more specific search query.');
+			} else if (error instanceof Error) {
+				toast.error(`Search failed: ${error.message}`);
 			} else {
 				toast.error('Failed to load contacts. Please try again.');
 			}
 		}
-	}, [isError, error]);
+	}, [isError, error, hasSearched, activeSearchQuery, activeExcludeUsedContacts, activeExactMatchesOnly, limit]);
 
 	const { mutateAsync: createContactList, isPending: isPendingCreateContactList } =
 		useCreateUserContactList({
@@ -273,20 +294,25 @@ export const useDashboard = () => {
 
 	/* HANDLERS */
 	const onSubmit = async (data: FormData) => {
+		// Validate search query
+		if (!data.searchText || data.searchText.trim().length === 0) {
+			toast.error('Please enter a search query');
+			return;
+		}
+		
+		// Update search parameters
 		setActiveSearchQuery(data.searchText);
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? true);
 		setActiveExactMatchesOnly(data.exactMatchesOnly ?? false);
 		setLimit(50);
-		setTimeout(() => {
-			refetchContacts().catch((err) => {
-				console.error('Search failed:', err);
-				if (err instanceof Error && err.message.includes('timeout')) {
-					toast.error('Search timed out. Please try again with a more specific query.');
-				} else {
-					toast.error('Search failed. Please try again.');
-				}
-			});
-		}, 0);
+		setHasSearched(true);
+		// The query will automatically run when the state updates enable it
+	};
+
+	const handleResetSearch = () => {
+		setHasSearched(false);
+		setActiveSearchQuery('');
+		form.reset();
 	};
 
 	const handleCreateCampaign = async () => {
@@ -385,5 +411,7 @@ export const useDashboard = () => {
 		usedContactIdsSet,
 		isPendingBatchUpdateContacts,
 		isFreeTrial,
+		hasSearched,
+		handleResetSearch,
 	};
 };
