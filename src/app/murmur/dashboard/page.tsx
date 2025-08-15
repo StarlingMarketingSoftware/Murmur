@@ -46,7 +46,7 @@ const Dashboard = () => {
 				<div className="premium-logo-container inline-block">
 					<LogoIcon width="106px" height="84px" />
 				</div>
-				<Typography variant="h1" className="text-center mt-3 !text-[80px] leading-[0.8] premium-gradient-text">
+				<Typography variant="h1" className="text-center mt-3 !text-[80px] leading-[0.8] premium-gradient-text" data-text="Murmur">
 					Murmur
 				</Typography>
 				<Typography

@@ -260,6 +260,12 @@
 	body {
 		@apply bg-background text-foreground;
 		overflow-x: hidden;
+		position: relative;
+		/* Subtle noise texture for premium depth */
+		background-image: 
+			repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,.01) 35px, rgba(255,255,255,.01) 70px),
+			repeating-linear-gradient(-45deg, transparent, transparent 35px, rgba(0,0,0,.01) 35px, rgba(0,0,0,.01) 70px);
+		background-attachment: fixed;
 	}
 	h1 {
 		@apply text-2xl font-bold;
@@ -291,6 +297,18 @@ mux-player {
 }
 
 /* Premium Apple-style animated gradient for search bar */
+@-webkit-keyframes gradient-shift {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
+}
+
 @keyframes gradient-shift {
 	0% {
 		background-position: 0% 50%;
@@ -333,7 +351,7 @@ mux-player {
 		rgba(0, 0, 0, 0.08),
 		rgba(0, 0, 0, 0.04)
 	);
-	transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 	box-shadow: 
 		0 0 0 1px rgba(0, 0, 0, 0.08),
 		0 2px 8px rgba(0, 0, 0, 0.06),
@@ -366,7 +384,7 @@ mux-player {
 	);
 	pointer-events: none;
 	z-index: 1;
-	transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 /* Premium input field with visible gradient animation */
@@ -382,7 +400,7 @@ mux-player {
 	);
 	background-size: 200% 100%;
 	animation: gradient-shift 10s ease-in-out infinite;
-	transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+	transition: all 1s cubic-bezier(0.25, 0.1, 0.25, 1);
 	border: none !important;
 	outline: none !important;
 	box-shadow: none !important;
@@ -436,16 +454,20 @@ mux-player {
 	background: linear-gradient(
 		90deg,
 		transparent,
-		rgba(120, 119, 198, 0.08),
-		rgba(168, 85, 247, 0.12),
-		rgba(120, 119, 198, 0.08),
+		rgba(107, 114, 128, 0.08),
+		rgba(156, 163, 175, 0.12),
+		rgba(107, 114, 128, 0.08),
 		transparent
 	);
 	background-size: 250% 100%;
+	-webkit-animation: gradient-shift 8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 	animation: gradient-shift 8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 	pointer-events: none;
 	z-index: 3;
 	mix-blend-mode: normal;
+	isolation: isolate; /* Safari fix for mix-blend-mode */
+	-webkit-transform: translateZ(0); /* Safari hardware acceleration */
+	transform: translateZ(0);
 }
 
 /* Additional shimmer effect - more visible */
@@ -515,7 +537,7 @@ mux-player {
 
 /* Loading state - elegant and minimal */
 .search-wave-loading {
-	transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 	background: linear-gradient(
 		135deg,
 		rgba(0, 0, 0, 0.06),
@@ -675,7 +697,7 @@ mux-player {
 .gradient-button {
 	position: relative;
 	overflow: hidden;
-	transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+	transition: all 1s cubic-bezier(0.25, 0.1, 0.25, 1);
 	z-index: 1;
 	background: linear-gradient(
 		135deg,
@@ -758,7 +780,7 @@ mux-player {
 	box-shadow: 
 		0 4px 12px rgba(34, 197, 94, 0.1),
 		0 8px 24px rgba(34, 197, 94, 0.05);
-	transform: translateY(-1px);
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 /* Dark mode button gradients */
@@ -827,6 +849,7 @@ mux-player {
 	box-shadow: 
 		0 4px 12px rgba(34, 197, 94, 0.15),
 		0 8px 24px rgba(34, 197, 94, 0.08);
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 /* Generate button - green variant */
@@ -869,6 +892,7 @@ mux-player {
 	box-shadow: 
 		0 4px 16px rgba(34, 197, 94, 0.15),
 		0 8px 32px rgba(34, 197, 94, 0.08) !important;
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 .gradient-button-green:hover::before {
@@ -933,6 +957,7 @@ mux-player {
 	box-shadow: 
 		0 4px 16px rgba(34, 197, 94, 0.2),
 		0 8px 32px rgba(34, 197, 94, 0.12) !important;
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 .dark .gradient-button-green:hover::before {
@@ -987,7 +1012,7 @@ mux-player {
 	box-shadow: 
 		0 4px 12px rgba(59, 130, 246, 0.12),
 		0 8px 24px rgba(59, 130, 246, 0.06) !important;
-	transform: translateY(-1px);
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 .gradient-button-blue:hover::before {
@@ -1044,6 +1069,7 @@ mux-player {
 	box-shadow: 
 		0 4px 16px rgba(59, 130, 246, 0.18),
 		0 8px 32px rgba(59, 130, 246, 0.1) !important;
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 .dark .gradient-button-blue:hover::before {
@@ -1073,9 +1099,9 @@ mux-player {
 	background: linear-gradient(
 		90deg,
 		transparent,
-		rgba(147, 197, 253, 0.1),
-		rgba(196, 181, 253, 0.15),
-		rgba(147, 197, 253, 0.1),
+		rgba(156, 163, 175, 0.1),
+		rgba(209, 213, 219, 0.15),
+		rgba(156, 163, 175, 0.1),
 		transparent
 	);
 	background-size: 250% 100%;
@@ -1115,7 +1141,86 @@ mux-player {
 	opacity: 0;
 }
 
+/* Premium full-page background gradient - Steve Jobs aesthetic */
+body::before {
+	content: '';
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: 
+		/* Vignette effect */
+		radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.02) 100%),
+		/* Color gradients */
+		radial-gradient(ellipse 120% 100% at 15% -10%, rgba(107, 114, 128, 0.08) 0%, transparent 35%),
+		radial-gradient(ellipse 120% 100% at 85% 110%, rgba(156, 163, 175, 0.06) 0%, transparent 35%),
+		radial-gradient(circle at 50% 50%, rgba(107, 114, 128, 0.03) 0%, transparent 50%),
+		linear-gradient(135deg, rgba(255, 255, 255, 0) 0%, rgba(0, 0, 0, 0.02) 100%);
+	pointer-events: none;
+	z-index: -1;
+	filter: contrast(1.1) brightness(1.02);
+}
+
+/* Apple-style mesh gradient overlay */
+body::after {
+	content: '';
+	position: fixed;
+	top: -50%;
+	left: -50%;
+	width: 200%;
+	height: 200%;
+	background: 
+		radial-gradient(circle at 30% 30%, rgba(107, 114, 128, 0.04) 0%, transparent 25%),
+		radial-gradient(circle at 70% 70%, rgba(156, 163, 175, 0.035) 0%, transparent 25%),
+		radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.02) 0%, rgba(0, 0, 0, 0.015) 70%);
+	animation: premium-background-drift 180s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	pointer-events: none;
+	z-index: -1;
+	opacity: 0.5;
+}
+
+@keyframes premium-background-drift {
+	0%, 100% {
+		transform: rotate(0deg) scale(1);
+	}
+	50% {
+		transform: rotate(180deg) scale(1.05);
+	}
+}
+
+/* Dark mode full-page background - premium visibility */
+.dark body::before {
+	background: 
+		/* Vignette effect */
+		radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.03) 100%),
+		/* Color gradients */
+		radial-gradient(ellipse 120% 100% at 15% -10%, rgba(156, 163, 175, 0.05) 0%, transparent 35%),
+		radial-gradient(ellipse 120% 100% at 85% 110%, rgba(107, 114, 128, 0.04) 0%, transparent 35%),
+		radial-gradient(circle at 50% 50%, rgba(209, 213, 219, 0.02) 0%, transparent 50%),
+		linear-gradient(135deg, rgba(0, 0, 0, 0) 0%, rgba(255, 255, 255, 0.012) 100%);
+	filter: contrast(1.05) brightness(0.98);
+}
+
+.dark body::after {
+	background: 
+		radial-gradient(circle at 30% 30%, rgba(209, 213, 219, 0.025) 0%, transparent 25%),
+		radial-gradient(circle at 70% 70%, rgba(243, 244, 246, 0.02) 0%, transparent 25%),
+		radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0.01) 0%, rgba(255, 255, 255, 0.008) 70%);
+	opacity: 0.4;
+	animation: premium-background-drift 180s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 /* Premium text gradient animations - Apple/PointOne inspired */
+@-webkit-keyframes premium-gradient-move {
+	0%, 100% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+}
+
 @keyframes premium-gradient-move {
 	0%, 100% {
 		background-position: 0% 50%;
@@ -1125,14 +1230,7 @@ mux-player {
 	}
 }
 
-@keyframes premium-text-flow {
-	0%, 100% {
-		background-position: -100% 50%;
-	}
-	50% {
-		background-position: 200% 50%;
-	}
-}
+/* Removed text-flow animation for cleaner appearance */
 
 @keyframes premium-shimmer {
 	0% {
@@ -1155,7 +1253,7 @@ mux-player {
 		transform: translateY(0px);
 	}
 	50% {
-		transform: translateY(-3px);
+		transform: translateY(-2px);
 	}
 }
 
@@ -1177,56 +1275,19 @@ mux-player {
 		radial-gradient(circle at 20% 50%, rgba(107, 114, 128, 0.015) 0%, transparent 50%),
 		radial-gradient(circle at 80% 50%, rgba(156, 163, 175, 0.015) 0%, transparent 50%),
 		radial-gradient(circle at 50% 50%, rgba(75, 85, 99, 0.01) 0%, transparent 70%);
-	animation: premium-ambient-flow 25s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 	pointer-events: none;
 	z-index: -1;
 }
 
-/* Continuous page-wide shimmer */
-.premium-hero-section::after {
-	content: '';
-	position: absolute;
-	top: 0;
-	left: -100%;
-	right: -100%;
-	bottom: 0;
-	background: linear-gradient(
-		105deg,
-		transparent 40%,
-		rgba(255, 255, 255, 0.03) 50%,
-		transparent 60%
-	);
-	animation: premium-page-shimmer 15s linear infinite;
-	pointer-events: none;
-	z-index: 2;
-}
+/* Removed page-wide shimmer for cleaner look */
 
-@keyframes premium-page-shimmer {
-	0% {
-		transform: translateX(-100%);
-	}
-	100% {
-		transform: translateX(100%);
-	}
-}
-
-@keyframes premium-ambient-flow {
-	0%, 100% {
-		transform: rotate(0deg) scale(1.2);
-	}
-	33% {
-		transform: rotate(120deg) scale(1.3);
-	}
-	66% {
-		transform: rotate(240deg) scale(1.2);
-	}
-}
+/* Removed ambient flow animation for cleaner appearance */
 
 /* Logo container - subtle float only */
 .premium-logo-container {
 	position: relative;
 	display: inline-block;
-	animation: premium-float 8s ease-in-out infinite;
+	animation: premium-float 12s ease-in-out infinite;
 	opacity: 0.9;
 }
 
@@ -1236,98 +1297,79 @@ mux-player {
 	background: linear-gradient(
 		135deg,
 		rgba(0, 0, 0, 0.95) 0%,
-		rgba(71, 85, 105, 0.85) 25%,
-		rgba(0, 0, 0, 0.9) 50%,
-		rgba(100, 116, 139, 0.85) 75%,
+		rgba(71, 85, 105, 0.85) 50%,
 		rgba(0, 0, 0, 0.95) 100%
+	);
+	background-size: 200% 200%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	will-change: auto; /* Changed from background-position for Safari performance */
+	-webkit-transform: translateZ(0); /* Safari GPU acceleration */
+	transform: translateZ(0);
+	letter-spacing: -0.02em;
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+	/* Text shadow doesn't work with transparent text, so we use ::before for the outline effect */
+}
+
+/* NYC high society gradient outline - Layer 1: Soft outer glow */
+.premium-gradient-text::before {
+	content: attr(data-text);
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: -3;
+	background: linear-gradient(
+		135deg,
+		rgba(156, 163, 175, 0.6) 0%,
+		rgba(107, 114, 128, 0.8) 25%,
+		rgba(156, 163, 175, 0.6) 50%,
+		rgba(107, 114, 128, 0.8) 75%,
+		rgba(156, 163, 175, 0.6) 100%
 	);
 	background-size: 400% 400%;
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 10s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-	will-change: background-position;
-	letter-spacing: -0.02em;
-	transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-/* Background glow for title */
-.premium-gradient-text::before {
-	content: '';
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	transform: translate(-50%, -50%);
-	width: 120%;
-	height: 150%;
-	background: radial-gradient(
-		ellipse at center,
-		rgba(107, 114, 128, 0.06) 0%,
-		transparent 50%
-	);
-	filter: blur(20px);
-	animation: premium-text-glow 8s ease-in-out infinite;
+	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	filter: blur(25px);
+	opacity: 0.2;
 	pointer-events: none;
-	z-index: -1;
 }
 
-@keyframes premium-text-glow {
-	0%, 100% {
-		opacity: 0.3;
-		transform: translate(-50%, -50%) scale(1);
-	}
-	50% {
-		opacity: 0.6;
-		transform: translate(-50%, -50%) scale(1.1);
-	}
-}
-
-/* Subtitle text - subtle continuous animation */
-.premium-subtitle-gradient {
-	position: relative;
-	transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
-	color: rgb(107, 114, 128);
+/* NYC high society gradient outline - Layer 2: Mid glow */
+.premium-gradient-text::after {
+	content: attr(data-text);
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: -2;
 	background: linear-gradient(
-		120deg,
-		rgba(107, 114, 128, 0.6) 0%,
-		rgba(107, 114, 128, 1) 40%,
-		rgba(107, 114, 128, 0.6) 100%
+		90deg,
+		rgba(107, 114, 128, 0.4) 0%,
+		rgba(156, 163, 175, 0.6) 50%,
+		rgba(107, 114, 128, 0.4) 100%
 	);
-	background-size: 200% 100%;
+	background-size: 300% 100%;
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-text-flow 12s ease-in-out infinite;
-}
-
-/* Subtle moving highlight behind subtitle */
-.premium-subtitle-gradient::after {
-	content: '';
-	position: absolute;
-	top: -10px;
-	left: -10%;
-	right: -10%;
-	bottom: -10px;
-	background: linear-gradient(
-		90deg,
-		transparent 0%,
-		rgba(156, 163, 175, 0.04) 50%,
-		transparent 100%
-	);
-	transform: translateX(-100%);
-	animation: premium-subtitle-sweep 10s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite reverse;
+	filter: blur(12px);
+	opacity: 0.3;
 	pointer-events: none;
-	z-index: -1;
 }
 
-@keyframes premium-subtitle-sweep {
-	0% {
-		transform: translateX(-100%);
-	}
-	100% {
-		transform: translateX(100%);
-	}
+/* Subtitle text - clean and static */
+.premium-subtitle-gradient {
+	position: relative;
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+	color: rgb(107, 114, 128);
+	opacity: 0.9;
 }
+
+/* Removed subtitle sweep animation for cleaner text */
 
 /* Accent word - "start" */
 .premium-accent {
@@ -1356,21 +1398,15 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation-duration: 3s;
+	animation-duration: 40s;
+	transition: all 1.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+
 }
 
 .premium-subtitle-gradient:hover {
-	background: linear-gradient(
-		120deg,
-		rgba(75, 85, 99, 0.7) 0%,
-		rgba(107, 114, 128, 1) 50%,
-		rgba(156, 163, 175, 0.7) 100%
-	);
-	background-size: 200% 100%;
-	-webkit-background-clip: text;
-	background-clip: text;
-	-webkit-text-fill-color: transparent;
-	animation-duration: 4s;
+	opacity: 1;
+	color: rgb(75, 85, 99);
+	transition: all 1.5s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 /* Dark mode hover effects */
@@ -1387,21 +1423,14 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation-duration: 3s;
+	animation-duration: 40s;
+	transition: all 1.5s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 .dark .premium-subtitle-gradient:hover {
-	background: linear-gradient(
-		120deg,
-		rgba(156, 163, 175, 0.7) 0%,
-		rgba(209, 213, 219, 1) 50%,
-		rgba(229, 231, 235, 0.7) 100%
-	);
-	background-size: 200% 100%;
-	-webkit-background-clip: text;
-	background-clip: text;
-	-webkit-text-fill-color: transparent;
-	animation-duration: 4s;
+	opacity: 1;
+	color: rgb(229, 231, 235);
+	transition: all 1.5s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 /* Dark mode adjustments for premium text */
@@ -1425,47 +1454,56 @@ mux-player {
 	background: linear-gradient(
 		135deg,
 		rgba(255, 255, 255, 0.95) 0%,
-		rgba(209, 213, 219, 0.85) 25%,
-		rgba(255, 255, 255, 0.9) 50%,
-		rgba(156, 163, 175, 0.85) 75%,
+		rgba(209, 213, 219, 0.85) 50%,
 		rgba(255, 255, 255, 0.95) 100%
+	);
+	background-size: 200% 200%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+}
+
+/* Dark mode NYC high society gradient outline - Layer 1 */
+.dark .premium-gradient-text::before {
+	background: linear-gradient(
+		135deg,
+		rgba(243, 244, 246, 0.5) 0%,
+		rgba(209, 213, 219, 0.7) 25%,
+		rgba(243, 244, 246, 0.5) 50%,
+		rgba(209, 213, 219, 0.7) 75%,
+		rgba(243, 244, 246, 0.5) 100%
 	);
 	background-size: 400% 400%;
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 10s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	filter: blur(25px);
+	opacity: 0.15;
 }
 
-.dark .premium-gradient-text::before {
-	background: radial-gradient(
-		ellipse at center,
-		rgba(209, 213, 219, 0.04) 0%,
-		transparent 50%
-	);
-}
-
-.dark .premium-subtitle-gradient {
+/* Dark mode NYC high society gradient outline - Layer 2 */
+.dark .premium-gradient-text::after {
 	background: linear-gradient(
-		120deg,
-		rgba(209, 213, 219, 0.6) 0%,
-		rgba(209, 213, 219, 1) 40%,
-		rgba(209, 213, 219, 0.6) 100%
+		90deg,
+		rgba(209, 213, 219, 0.3) 0%,
+		rgba(243, 244, 246, 0.5) 50%,
+		rgba(209, 213, 219, 0.3) 100%
 	);
-	background-size: 200% 100%;
+	background-size: 300% 100%;
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-text-flow 12s ease-in-out infinite;
+	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite reverse;
+	filter: blur(12px);
+	opacity: 0.25;
 }
 
-.dark .premium-subtitle-gradient::after {
-	background: linear-gradient(
-		90deg,
-		transparent 0%,
-		rgba(243, 244, 246, 0.03) 50%,
-		transparent 100%
-	);
+.dark .premium-subtitle-gradient {
+	color: rgb(209, 213, 219);
+	opacity: 0.9;
 }
 
 .dark .premium-accent {
@@ -1480,7 +1518,7 @@ mux-player {
 
 /* Dark mode loading state - elegant minimal */
 .dark .search-wave-loading {
-	transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 	background: linear-gradient(
 		135deg,
 		rgba(255, 255, 255, 0.06),
