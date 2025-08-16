@@ -32,7 +32,7 @@ function Table({
 }
 
 const tableHeaderVariants = cva(
-	'[&_tr]:border-b [&_tr]:border-black',
+	'[&_tr]:border-b-2 [&_tr]:border-black',
 	{
 		variants: {
 			variant: {
@@ -127,11 +127,11 @@ function TableFooter({
 }
 
 const tableRowVariants = cva(
-	'hover:bg-primary/15 transition-colors data-[state=selected]:pointer-events-all border  border-t',
+	'hover:bg-primary/20 transition-all duration-200 cursor-pointer border border-t',
 	{
 		variants: {
 			variant: {
-				primary: 'text-[15px] odd:bg-gray-50 even:bg-white border-black',
+				primary: 'text-[15px] odd:bg-gray-50 even:bg-white border-black data-[state=selected]:!bg-primary/30 data-[state=selected]:shadow-inner data-[state=selected]:font-medium data-[state=selected]:scale-[1.005]',
 				secondary: 'text-[15px] font-secondary bg-background border-gray-200',
 			},
 		},
@@ -156,7 +156,7 @@ function TableRow({
 }
 
 const tableHeadVariants = cva(
-	'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] bg-background',
+	'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] bg-background border-b-2 border-black',
 	{
 		variants: {
 			variant: {

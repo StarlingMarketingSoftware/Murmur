@@ -258,10 +258,15 @@ const Dashboard = () => {
 						</div>
 					) : contacts && contacts.length > 0 ? (
 						<>
+							<div className="select-prompt-container">
+								<div className="select-prompt-text">
+									Select who you want to contact
+								</div>
+							</div>
 							<Card className="border-0 shadow-none">
 								<CardContent>
 									<CustomTable
-										initialSelectAll
+										initialSelectAll={false}
 										isSelectable
 										setSelectedRows={setSelectedContacts}
 										data={contacts}

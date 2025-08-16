@@ -255,7 +255,7 @@ export function CustomTable<TData, TValue>({
 			</div>
 			<div
 				className={twMerge(
-					'border-2 border-black relative overflow-y-auto overflow-x-hidden',
+					'border-2 border-black relative overflow-y-auto overflow-x-hidden custom-scrollbar',
 					constrainHeight && 'max-h-[750px]'
 				)}
 			>
@@ -264,14 +264,13 @@ export function CustomTable<TData, TValue>({
 						{table.getHeaderGroups().map((headerGroup) => (
 							<TableRow className="sticky top-0" key={headerGroup.id} variant={variant}>
 								{headerGroup.headers.map((header) => {
-									const isSelectColumn = header.id === 'select';
-									const totalDataColumns = headerGroup.headers.length - 1; // Subtract 1 for select column
-									const dataColumnWidth = `${95 / totalDataColumns}%`; // 95% divided by number of data columns
+									const totalColumns = headerGroup.headers.length;
+									const columnWidth = `${100 / totalColumns}%`; // Evenly distribute width
 									return (
 										<TableHead 
 											key={header.id} 
 											variant={variant}
-											style={{ width: isSelectColumn ? '5%' : dataColumnWidth }}
+											style={{ width: columnWidth }}
 										>
 											{header.isPlaceholder
 												? null
@@ -302,14 +301,13 @@ export function CustomTable<TData, TValue>({
 									data-state={row.getIsSelected() && 'selected'}
 								>
 									{row.getVisibleCells().map((cell) => {
-										const isSelectColumn = cell.column.id === 'select';
-										const totalDataColumns = row.getVisibleCells().length - 1; // Subtract 1 for select column
-										const dataColumnWidth = `${95 / totalDataColumns}%`; // 95% divided by number of data columns
+										const totalColumns = row.getVisibleCells().length;
+										const columnWidth = `${100 / totalColumns}%`; // Evenly distribute width
 										return (
 											<TableCell 
 												key={cell.id} 
 												variant={variant}
-												style={{ width: isSelectColumn ? '5%' : dataColumnWidth }}
+												style={{ width: columnWidth }}
 											>
 												{flexRender(cell.column.columnDef.cell, cell.getContext())}
 											</TableCell>

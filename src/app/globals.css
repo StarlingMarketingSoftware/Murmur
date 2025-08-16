@@ -2266,6 +2266,119 @@ mux-player {
 	animation: fadeOut 0.5s ease-in-out forwards;
 }
 
+/* Apple-style Select Prompt Animation */
+@keyframes appleSlideIn {
+	0% {
+		opacity: 0;
+		transform: translateY(20px) scale(0.95);
+		filter: blur(10px);
+	}
+	50% {
+		opacity: 0.5;
+		filter: blur(5px);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+		filter: blur(0);
+	}
+}
+
+@keyframes appleFadeGlow {
+	0%, 100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.85;
+	}
+}
+
+.select-prompt-container {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	margin-bottom: 12px;
+	margin-top: 0;
+	animation: appleSlideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	animation-delay: 0.2s;
+	opacity: 0;
+}
+
+.select-prompt-text {
+	font-family: 'Times New Roman', Times, serif;
+	font-size: 20px;
+	font-weight: 400;
+	letter-spacing: 0.02em;
+	color: #000000;
+	position: relative;
+	transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+	animation: appleFadeGlow 3s ease-in-out infinite;
+}
+
+.select-prompt-text:hover {
+	transform: translateY(-1px);
+}
+
+/* Dark mode support */
+.dark .select-prompt-text {
+	color: #ffffff;
+}
+
+/* Custom Scrollbar Styles for Search Results Table */
+.custom-scrollbar {
+	scrollbar-width: thin;
+	scrollbar-color: #333333 #f0f0f0;
+}
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+.custom-scrollbar::-webkit-scrollbar {
+	width: 12px;
+	height: 12px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+	background: #f5f5f5;
+	border-left: 1px solid #e0e0e0;
+	box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.1);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+	background: linear-gradient(180deg, #666666 0%, #333333 100%);
+	border-radius: 6px;
+	border: 2px solid #f5f5f5;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+	transition: all 0.3s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+	background: linear-gradient(180deg, #555555 0%, #222222 100%);
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:active {
+	background: linear-gradient(180deg, #444444 0%, #111111 100%);
+	box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Dark mode scrollbar */
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+	background: #1a1a1a;
+	border-left: 1px solid #333333;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+	background: linear-gradient(180deg, #888888 0%, #666666 100%);
+	border: 2px solid #1a1a1a;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+	background: linear-gradient(180deg, #999999 0%, #777777 100%);
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:active {
+	background: linear-gradient(180deg, #aaaaaa 0%, #888888 100%);
+}
+
 /* Dark mode enhancements with glass morphism */
 .dark .search-bar-wrapper.search-bar-active {
 	background: linear-gradient(

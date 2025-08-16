@@ -15,7 +15,6 @@ import {
 } from '@/hooks/queryHooks/useContacts';
 import { ColumnDef, Table } from '@tanstack/react-table';
 import { ContactWithName } from '@/types/contact';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateApolloContacts } from '@/hooks/queryHooks/useApollo';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { toast } from 'sonner';
@@ -105,10 +104,10 @@ export const useDashboard = () => {
 	const { mutateAsync: importApolloContacts, isPending: isPendingImportApolloContacts } =
 		useCreateApolloContacts({});
 
-	// Initialize selected contacts when contacts load
+	// Initialize selected contacts as empty (no contacts selected by default)
 	useEffect(() => {
 		if (contacts) {
-			setSelectedContacts(contacts.map((contact) => contact.id));
+			setSelectedContacts([]); // Start with no contacts selected
 		}
 	}, [contacts]);
 
@@ -291,27 +290,6 @@ export const useDashboard = () => {
 			contacts.some(contact => contactHasName(contact));
 		
 		const allColumns: ColumnDef<ContactWithName>[] = [
-			{
-				id: 'select',
-				size: 50,
-				header: ({ table }) => (
-					<Checkbox
-						checked={
-							table.getIsAllPageRowsSelected() ||
-							(table.getIsSomePageRowsSelected() && 'indeterminate')
-						}
-						onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-						aria-label="Select all"
-					/>
-				),
-				cell: ({ row }) => (
-					<Checkbox
-						checked={row.getIsSelected()}
-						onCheckedChange={(value) => row.toggleSelected(!!value)}
-						aria-label="Select row"
-					/>
-				),
-			},
 			{
 				accessorKey: 'company',
 				size: 150,
