@@ -1,4 +1,5 @@
 /** @type {import('tailwindcss').Config} */
+const { amber, cyan, green, rose, stone } = require('tailwindcss/colors');
 
 module.exports = {
 	content: [
