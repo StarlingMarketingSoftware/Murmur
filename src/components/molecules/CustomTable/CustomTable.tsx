@@ -48,6 +48,7 @@ interface DataTableProps<TData, TValue> {
 	rowsPerPage?: number;
 	displayRowsPerPage?: boolean;
 	constrainHeight?: boolean;
+	hidePagination?: boolean;
 }
 
 interface TableSortingButtonProps<TData> {
@@ -104,6 +105,7 @@ export function CustomTable<TData, TValue>({
 	rowsPerPage = 20,
 	displayRowsPerPage = true,
 	constrainHeight = false,
+	hidePagination = false,
 }: CustomTableProps<TData, TValue>) {
 	const [pagination, setPagination] = useState({
 		pageIndex: 0,
@@ -253,17 +255,24 @@ export function CustomTable<TData, TValue>({
 			</div>
 			<div
 				className={twMerge(
-					'rounded-md border relative overflow-y-auto',
+					'border-2 border-black relative overflow-y-auto overflow-x-hidden',
 					constrainHeight && 'max-h-[750px]'
 				)}
 			>
-				<Table className="relative" variant={variant}>
+				<Table className="relative w-full table-fixed" variant={variant}>
 					<TableHeader variant={variant} sticky>
 						{table.getHeaderGroups().map((headerGroup) => (
 							<TableRow className="sticky top-0" key={headerGroup.id} variant={variant}>
 								{headerGroup.headers.map((header) => {
+									const isSelectColumn = header.id === 'select';
+									const totalDataColumns = headerGroup.headers.length - 1; // Subtract 1 for select column
+									const dataColumnWidth = `${95 / totalDataColumns}%`; // 95% divided by number of data columns
 									return (
-										<TableHead key={header.id} variant={variant}>
+										<TableHead 
+											key={header.id} 
+											variant={variant}
+											style={{ width: isSelectColumn ? '5%' : dataColumnWidth }}
+										>
 											{header.isPlaceholder
 												? null
 												: flexRender(header.column.columnDef.header, header.getContext())}
@@ -293,8 +302,15 @@ export function CustomTable<TData, TValue>({
 									data-state={row.getIsSelected() && 'selected'}
 								>
 									{row.getVisibleCells().map((cell) => {
+										const isSelectColumn = cell.column.id === 'select';
+										const totalDataColumns = row.getVisibleCells().length - 1; // Subtract 1 for select column
+										const dataColumnWidth = `${95 / totalDataColumns}%`; // 95% divided by number of data columns
 										return (
-											<TableCell key={cell.id} variant={variant}>
+											<TableCell 
+												key={cell.id} 
+												variant={variant}
+												style={{ width: isSelectColumn ? '5%' : dataColumnWidth }}
+											>
 												{flexRender(cell.column.columnDef.cell, cell.getContext())}
 											</TableCell>
 										);
@@ -315,7 +331,7 @@ export function CustomTable<TData, TValue>({
 					</TableBody>
 				</Table>
 			</div>
-			<CustomPagination<TData> currentPage={pagination.pageIndex} table={table} />
+			{!hidePagination && <CustomPagination<TData> currentPage={pagination.pageIndex} table={table} />}
 		</div>
 	);
 }

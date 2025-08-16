@@ -258,10 +258,7 @@ const Dashboard = () => {
 						</div>
 					) : contacts && contacts.length > 0 ? (
 						<>
-							<Card>
-								<CardHeader>
-									<CardTitle>Contacts</CardTitle>
-								</CardHeader>
+							<Card className="border-0 shadow-none">
 								<CardContent>
 									<CustomTable
 										initialSelectAll
@@ -274,6 +271,7 @@ const Dashboard = () => {
 										rowsPerPage={100}
 										displayRowsPerPage={false}
 										constrainHeight
+										hidePagination
 									/>
 								</CardContent>
 							</Card>

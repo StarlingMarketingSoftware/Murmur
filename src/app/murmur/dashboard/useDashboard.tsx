@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { EmailVerificationStatus, UserContactList } from '@prisma/client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
@@ -13,7 +13,6 @@ import {
 	useGetContacts,
 	useGetUsedContactIds,
 } from '@/hooks/queryHooks/useContacts';
-import { TableSortingButton } from '@/components/molecules/CustomTable/CustomTable';
 import { ColumnDef, Table } from '@tanstack/react-table';
 import { ContactWithName } from '@/types/contact';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -39,136 +38,6 @@ export const useDashboard = () => {
 	const [hasSearched, setHasSearched] = useState(false);
 
 	const MAX_CELL_LENGTH = 35;
-	const columns: ColumnDef<ContactWithName>[] = [
-		{
-			id: 'select',
-			header: ({ table }) => (
-				<Checkbox
-					checked={
-						table.getIsAllPageRowsSelected() ||
-						(table.getIsSomePageRowsSelected() && 'indeterminate')
-					}
-					onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-					aria-label="Select all"
-				/>
-			),
-			cell: ({ row }) => (
-				<Checkbox
-					checked={row.getIsSelected()}
-					onCheckedChange={(value) => row.toggleSelected(!!value)}
-					aria-label="Select row"
-				/>
-			),
-		},
-		{
-			accessorKey: 'name',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Name" />;
-			},
-			cell: ({ row }) => {
-				return (
-					<TableCellTooltip text={row.getValue('name')} maxLength={MAX_CELL_LENGTH} />
-				);
-			},
-		},
-		{
-			accessorKey: 'email',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Email" />;
-			},
-			cell: ({ row }) => {
-				const isUsed = usedContactIdsSet.has(row.original.id);
-				return (
-					<div className="flex">
-						{isUsed ? (
-							<Tooltip>
-								<TooltipTrigger>
-									<div className="text-left bg-secondary/20 px-2 rounded-md">
-										{row.getValue('email')}
-									</div>
-								</TooltipTrigger>
-								<TooltipContent side="right">
-									This contact has been used in a campaign.
-								</TooltipContent>
-							</Tooltip>
-						) : (
-							<div className={twMerge('text-left')}>{row.getValue('email')}</div>
-						)}
-					</div>
-				);
-			},
-		},
-		{
-			accessorKey: 'company',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Company" />;
-			},
-			cell: ({ row }) => {
-				return (
-					<TableCellTooltip text={row.getValue('company')} maxLength={MAX_CELL_LENGTH} />
-				);
-			},
-		},
-		{
-			accessorKey: 'title',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Title" />;
-			},
-			cell: ({ row }) => {
-				return (
-					<TableCellTooltip text={row.getValue('title')} maxLength={MAX_CELL_LENGTH} />
-				);
-			},
-		},
-		{
-			accessorKey: 'city',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="City" />;
-			},
-			cell: ({ row }) => {
-				return (
-					<TableCellTooltip text={row.getValue('city')} maxLength={MAX_CELL_LENGTH} />
-				);
-			},
-		},
-		{
-			accessorKey: 'state',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="State" />;
-			},
-		},
-		{
-			accessorKey: 'country',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Country" />;
-			},
-			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('country')}</div>;
-			},
-		},
-		{
-			accessorKey: 'address',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Address" />;
-			},
-			cell: ({ row }) => {
-				return (
-					<TableCellTooltip text={row.getValue('address')} maxLength={MAX_CELL_LENGTH} />
-				);
-			},
-		},
-		{
-			accessorKey: 'website',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Website" />;
-			},
-			cell: ({ row }) => {
-				return (
-					<TableCellTooltip text={row.getValue('website')} maxLength={MAX_CELL_LENGTH} />
-				);
-			},
-		},
-	];
 
 	type TabValue = 'search' | 'list';
 	type TabOption = {
@@ -380,6 +249,194 @@ export const useDashboard = () => {
 			setUsedContactIdsSet(new Set(usedContactIds));
 		}
 	}, [usedContactIds]);
+
+	// Helper function to compute name from firstName and lastName
+	const computeName = useCallback((contact: ContactWithName): string => {
+		const firstName = contact.firstName || '';
+		const lastName = contact.lastName || '';
+		return `${firstName} ${lastName}`.trim();
+	}, []);
+	
+	// Helper to check if a contact has a name
+	const contactHasName = useCallback((contact: ContactWithName): boolean => {
+		const firstName = contact.firstName || '';
+		const lastName = contact.lastName || '';
+		return firstName.length > 0 || lastName.length > 0;
+	}, []);
+
+	// Since pagination is disabled, check if majority of contacts have names
+	const visibleRowsHaveNames = useMemo(() => {
+		if (!contacts || contacts.length === 0) return false;
+		
+		// Check what percentage of contacts have names
+		const contactsWithNames = contacts.filter(contact => contactHasName(contact));
+		const ratio = contactsWithNames.length / contacts.length;
+		const threshold = 0.7; // 70% threshold for header to be fully visible
+		
+		console.log('🎨 Name column fade effect:', {
+			totalContacts: contacts.length,
+			contactsWithNames: contactsWithNames.length,
+			percentage: (ratio * 100).toFixed(1) + '%',
+			headerStatus: ratio > threshold ? '✅ VISIBLE' : '🌫️ FADED',
+			threshold: (threshold * 100) + '%'
+		});
+		
+		return ratio > threshold; // Header is visible if more than 70% have names
+	}, [contacts, contactHasName]);
+
+	// Dynamically build columns based on whether names exist in contacts
+	const columns = useMemo(() => {
+		// Check if any contact has a firstName or lastName
+		const hasNames = contacts && contacts.length > 0 && 
+			contacts.some(contact => contactHasName(contact));
+		
+		const allColumns: ColumnDef<ContactWithName>[] = [
+			{
+				id: 'select',
+				size: 50,
+				header: ({ table }) => (
+					<Checkbox
+						checked={
+							table.getIsAllPageRowsSelected() ||
+							(table.getIsSomePageRowsSelected() && 'indeterminate')
+						}
+						onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+						aria-label="Select all"
+					/>
+				),
+				cell: ({ row }) => (
+					<Checkbox
+						checked={row.getIsSelected()}
+						onCheckedChange={(value) => row.toggleSelected(!!value)}
+						aria-label="Select row"
+					/>
+				),
+			},
+			{
+				accessorKey: 'company',
+				size: 150,
+				header: () => <span className="font-bold">Company</span>,
+				cell: ({ row }) => {
+					return (
+						<div className="truncate">
+							<TableCellTooltip text={row.getValue('company')} maxLength={MAX_CELL_LENGTH} />
+						</div>
+					);
+				},
+			},
+			{
+				accessorKey: 'email',
+				size: 150,
+				header: () => <span className="font-bold">Email</span>,
+				cell: ({ row }) => {
+					const isUsed = usedContactIdsSet.has(row.original.id);
+					return (
+						<div className="flex truncate">
+							{isUsed ? (
+								<Tooltip>
+									<TooltipTrigger>
+										<div className="text-left bg-secondary/20 px-2 rounded-md truncate">
+											{row.getValue('email')}
+										</div>
+									</TooltipTrigger>
+									<TooltipContent side="right">
+										This contact has been used in a campaign.
+									</TooltipContent>
+								</Tooltip>
+							) : (
+								<div className={twMerge('text-left truncate')}>{row.getValue('email')}</div>
+							)}
+						</div>
+					);
+				},
+			},
+			// Name column - conditionally included (always show if ANY contact has names)
+			...(hasNames ? [{
+				accessorKey: 'firstName' as const,  // Use firstName as key but display computed name
+				id: 'name',  // Custom id for the column
+				size: 150,
+				header: () => {
+					return (
+						<span 
+							className={`font-bold transition-all duration-700 ease-in-out ${
+								visibleRowsHaveNames 
+									? 'text-black dark:text-white' 
+									: 'text-gray-300 dark:text-gray-600'
+							}`}
+							style={{ 
+								opacity: visibleRowsHaveNames ? 1 : 0.25,
+								transform: visibleRowsHaveNames ? 'scale(1) translateY(0)' : 'scale(0.9) translateY(2px)',
+								filter: visibleRowsHaveNames ? 'blur(0px)' : 'blur(0.5px)'
+							}}
+							title={visibleRowsHaveNames 
+								? 'Most contacts have names' 
+								: 'Most contacts lack names - column faded'}
+						>
+							Name
+						</span>
+					);
+				},
+				cell: ({ row }: any) => {
+					const contact = row.original as ContactWithName;
+					const hasName = contactHasName(contact);
+					const nameValue = hasName ? computeName(contact) : '';
+					return (
+						<div 
+							className={`truncate transition-all duration-500 ease-in-out hover:scale-105 ${
+								hasName 
+									? 'text-black dark:text-white' 
+									: 'text-gray-300 dark:text-gray-700'
+							}`}
+							style={{
+								opacity: hasName ? 1 : 0.2,
+								transform: hasName ? 'scale(1)' : 'scale(0.85)',
+							}}
+						>
+							{hasName ? (
+								<TableCellTooltip text={nameValue} maxLength={MAX_CELL_LENGTH} />
+							) : (
+								<span className="select-none">—</span>
+							)}
+						</div>
+					);
+				},
+			}] : []),
+			{
+				accessorKey: 'city',
+				size: 150,
+				header: () => <span className="font-bold">City</span>,
+				cell: ({ row }) => {
+					return (
+						<div className="truncate">
+							<TableCellTooltip text={row.getValue('city')} maxLength={MAX_CELL_LENGTH} />
+						</div>
+					);
+				},
+			},
+			{
+				accessorKey: 'state',
+				size: 150,
+				header: () => <span className="font-bold">State</span>,
+				cell: ({ row }) => {
+					return <div className="text-left truncate">{row.getValue('state')}</div>;
+				},
+			},
+			{
+				accessorKey: 'title',
+				size: 150,
+				header: () => <span className="font-bold">Description</span>,
+				cell: ({ row }) => {
+					return (
+						<div className="truncate">
+							<TableCellTooltip text={row.getValue('title')} maxLength={MAX_CELL_LENGTH} />
+						</div>
+					);
+				},
+			}
+		];
+
+		return allColumns;
+	}, [contacts, usedContactIdsSet, visibleRowsHaveNames, contactHasName, computeName, MAX_CELL_LENGTH]);
 
 	return {
 		form,

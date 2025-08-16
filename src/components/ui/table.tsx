@@ -32,8 +32,7 @@ function Table({
 }
 
 const tableHeaderVariants = cva(
-	'',
-	// '[&_tr]:border-b',
+	'[&_tr]:border-b [&_tr]:border-black',
 	{
 		variants: {
 			variant: {
@@ -132,7 +131,7 @@ const tableRowVariants = cva(
 	{
 		variants: {
 			variant: {
-				primary: 'text-[15px] odd:bg-gray-50 even:bg-white border-primary/20',
+				primary: 'text-[15px] odd:bg-gray-50 even:bg-white border-black',
 				secondary: 'text-[15px] font-secondary bg-background border-gray-200',
 			},
 		},
