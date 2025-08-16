@@ -580,6 +580,10 @@ mux-player {
 
 /* Remove browser default accent color and autofill styles */
 .search-wave-input {
+	/* Safari fallback for accent-color */
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	appearance: none;
 	accent-color: transparent !important;
 	caret-color: rgb(31, 41, 55) !important;
 }
@@ -596,8 +600,8 @@ mux-player {
 }
 
 /* Focus state - subtle glow effect */
-.search-wave-container:focus-within,
-.search-wave-container:has(.search-wave-input:focus) {
+/* Safari fallback: :has() is not supported in Safari < 15.4 */
+.search-wave-container:focus-within {
 	background: linear-gradient(
 		135deg,
 		rgba(0, 0, 0, 0.09),
@@ -607,13 +611,36 @@ mux-player {
 	transition: all 0.3s ease;
 }
 
-.search-wave-container:focus-within::before,
-.search-wave-container:has(.search-wave-input:focus)::before {
+/* Modern browsers with :has() support */
+@supports selector(:has(*)) {
+	.search-wave-container:has(.search-wave-input:focus) {
+		background: linear-gradient(
+			135deg,
+			rgba(0, 0, 0, 0.09),
+			rgba(0, 0, 0, 0.05)
+		);
+		box-shadow: none;
+		transition: all 0.3s ease;
+	}
+}
+
+.search-wave-container:focus-within::before {
 	background: linear-gradient(
 		135deg,
 		rgba(255, 255, 255, 0.6),
 		rgba(243, 244, 246, 0.3)
 	);
+}
+
+/* Modern browsers with :has() support */
+@supports selector(:has(*)) {
+	.search-wave-container:has(.search-wave-input:focus)::before {
+		background: linear-gradient(
+			135deg,
+			rgba(255, 255, 255, 0.6),
+			rgba(243, 244, 246, 0.3)
+		);
+	}
 }
 
 /* Premium moving gradient overlay - visible but subtle */
@@ -730,12 +757,21 @@ mux-player {
 }
 
 /* Subtle overlay on focus with Apple-style fade - no width change */
-.search-wave-container:focus-within .search-wave-overlay,
-.search-wave-container:has(.search-wave-input:focus) .search-wave-overlay {
+.search-wave-container:focus-within .search-wave-overlay {
 	opacity: 0.15;
 	-webkit-animation: focusBreath 2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
 	animation: focusBreath 2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
 	transform: none;
+}
+
+/* Modern browsers with :has() support */
+@supports selector(:has(*)) {
+	.search-wave-container:has(.search-wave-input:focus) .search-wave-overlay {
+		opacity: 0.15;
+		-webkit-animation: focusBreath 2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+		animation: focusBreath 2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+		transform: none;
+	}
 }
 
 @-webkit-keyframes focusBreath {
@@ -756,12 +792,21 @@ mux-player {
 	}
 }
 
-.search-wave-container:focus-within .search-wave-overlay::before,
-.search-wave-container:has(.search-wave-input:focus) .search-wave-overlay::before {
+.search-wave-container:focus-within .search-wave-overlay::before {
 	opacity: 0;
 	animation: none;
 	transform: none;
 	transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Modern browsers with :has() support */
+@supports selector(:has(*)) {
+	.search-wave-container:has(.search-wave-input:focus) .search-wave-overlay::before {
+		opacity: 0;
+		animation: none;
+		transform: none;
+		transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
 }
 
 /* Loading state animations - minimalist Apple style */
@@ -952,6 +997,10 @@ mux-player {
 
 /* Dark mode: Remove browser default accent color and autofill styles */
 .dark .search-wave-input {
+	/* Safari fallback for accent-color */
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	appearance: none;
 	accent-color: transparent !important;
 	caret-color: rgb(243, 244, 246) !important;
 }
@@ -967,8 +1016,7 @@ mux-player {
 	transition: background-color 5000s ease-in-out 0s;
 }
 
-.dark .search-wave-container:focus-within,
-.search-wave-container:has(.search-wave-input:focus) {
+.dark .search-wave-container:focus-within {
 	background: linear-gradient(
 		135deg,
 		rgba(255, 255, 255, 0.08),
@@ -977,13 +1025,35 @@ mux-player {
 	box-shadow: none;
 }
 
-.dark .search-wave-container:focus-within::before,
-.search-wave-container:has(.search-wave-input:focus)::before {
+/* Modern browsers with :has() support */
+@supports selector(:has(*)) {
+	.dark .search-wave-container:has(.search-wave-input:focus) {
+		background: linear-gradient(
+			135deg,
+			rgba(255, 255, 255, 0.08),
+			rgba(255, 255, 255, 0.04)
+		);
+		box-shadow: none;
+	}
+}
+
+.dark .search-wave-container:focus-within::before {
 	background: linear-gradient(
 		135deg,
 		rgba(31, 41, 55, 0.8),
 		rgba(55, 65, 81, 0.3)
 	);
+}
+
+/* Modern browsers with :has() support */
+@supports selector(:has(*)) {
+	.dark .search-wave-container:has(.search-wave-input:focus)::before {
+		background: linear-gradient(
+			135deg,
+			rgba(31, 41, 55, 0.8),
+			rgba(55, 65, 81, 0.3)
+		);
+	}
 }
 
 /* Premium button gradient animations */
@@ -1074,15 +1144,28 @@ mux-player {
 }
 
 /* Subtle overlay on focus in dark mode */
-.dark .search-wave-container:focus-within .search-wave-overlay,
-.search-wave-container:has(.search-wave-input:focus) .search-wave-overlay {
+.dark .search-wave-container:focus-within .search-wave-overlay {
 	opacity: 0.2;
 	animation: gradient-shift 14s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-.dark .search-wave-container:focus-within .search-wave-overlay::before,
-.search-wave-container:has(.search-wave-input:focus) .search-wave-overlay::before {
+/* Modern browsers with :has() support */
+@supports selector(:has(*)) {
+	.dark .search-wave-container:has(.search-wave-input:focus) .search-wave-overlay {
+		opacity: 0.2;
+		animation: gradient-shift 14s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	}
+}
+
+.dark .search-wave-container:focus-within .search-wave-overlay::before {
 	opacity: 0;
+}
+
+/* Modern browsers with :has() support */
+@supports selector(:has(*)) {
+	.dark .search-wave-container:has(.search-wave-input:focus) .search-wave-overlay::before {
+		opacity: 0;
+	}
 }
 
 /* Removed excessive background gradients for cleaner appearance */
@@ -1427,9 +1510,11 @@ mux-player {
 /* Hero wrapper - contains logo and text that will fade out */
 .hero-wrapper {
 	opacity: 1;
+	-webkit-transform: translateY(0);
 	transform: translateY(0);
 	transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
-		transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+		transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 	position: relative;
 	z-index: 1;
 	height: 320px;
@@ -1439,6 +1524,7 @@ mux-player {
 /* When search is active - hero elegantly fades away */
 .search-active .hero-wrapper {
 	opacity: 0;
+	-webkit-transform: translateY(-20px);
 	transform: translateY(-20px);
 	pointer-events: none;
 	height: 0;
@@ -1446,6 +1532,7 @@ mux-player {
 	margin-bottom: 0;
 	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+		-webkit-transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
 }
 
@@ -1453,9 +1540,11 @@ mux-player {
 .search-bar-wrapper {
 	position: relative;
 	opacity: 1;
+	-webkit-transform: translateY(0);
 	transform: translateY(0);
 	transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
-		transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+		transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 	z-index: 20;
 	margin-top: clamp(3rem, calc((100vh - var(--hero-height, 320px)) * 0.35), 26vh);
 	width: 100%;
@@ -1464,6 +1553,7 @@ mux-player {
 /* Search bar when active - elegantly disappears */
 .search-bar-wrapper.search-bar-active {
 	opacity: 0;
+	-webkit-transform: translateY(-30px);
 	transform: translateY(-30px);
 	pointer-events: none;
 	height: 0;
@@ -1471,6 +1561,7 @@ mux-player {
 	margin: 0;
 	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+		-webkit-transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
 }
 
@@ -2245,6 +2336,282 @@ mux-player {
 	100% {
 		transform: rotate(360deg) scale3d(1, 1, 1);
 	}
+}
+
+/* Table header fade effects */
+@-webkit-keyframes fadeIn {
+	from { opacity: 0.2; }
+	to { opacity: 1; }
+}
+
+@keyframes fadeIn {
+	from { opacity: 0.2; }
+	to { opacity: 1; }
+}
+
+@-webkit-keyframes fadeOut {
+	from { opacity: 1; }
+	to { opacity: 0.2; }
+}
+
+@keyframes fadeOut {
+	from { opacity: 1; }
+	to { opacity: 0.2; }
+}
+
+.name-header-fade-in {
+	-webkit-animation: fadeIn 0.5s ease-in-out forwards;
+	animation: fadeIn 0.5s ease-in-out forwards;
+}
+
+.name-header-fade-out {
+	-webkit-animation: fadeOut 0.5s ease-in-out forwards;
+	animation: fadeOut 0.5s ease-in-out forwards;
+}
+
+/* Apple-style Select Prompt Animation */
+@-webkit-keyframes appleSlideIn {
+	0% {
+		opacity: 0;
+		-webkit-transform: translateY(20px) scale(0.95);
+		transform: translateY(20px) scale(0.95);
+		-webkit-filter: blur(10px);
+		filter: blur(10px);
+	}
+	50% {
+		opacity: 0.5;
+		-webkit-filter: blur(5px);
+		filter: blur(5px);
+	}
+	100% {
+		opacity: 1;
+		-webkit-transform: translateY(0) scale(1);
+		transform: translateY(0) scale(1);
+		-webkit-filter: blur(0);
+		filter: blur(0);
+	}
+}
+
+@keyframes appleSlideIn {
+	0% {
+		opacity: 0;
+		transform: translateY(20px) scale(0.95);
+		filter: blur(10px);
+	}
+	50% {
+		opacity: 0.5;
+		filter: blur(5px);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+		filter: blur(0);
+	}
+}
+
+@-webkit-keyframes appleFadeGlow {
+	0%, 100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.85;
+	}
+}
+
+@keyframes appleFadeGlow {
+	0%, 100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.85;
+	}
+}
+
+.select-prompt-container {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	margin-bottom: 12px;
+	margin-top: 0;
+	-webkit-animation: appleSlideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	animation: appleSlideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	-webkit-animation-delay: 0.2s;
+	animation-delay: 0.2s;
+	opacity: 0;
+}
+
+.select-prompt-text {
+	font-family: 'Times New Roman', Times, serif;
+	font-size: 20px;
+	font-weight: 400;
+	letter-spacing: 0.02em;
+	color: #000000;
+	position: relative;
+	transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+	-webkit-animation: appleFadeGlow 3s ease-in-out infinite;
+	animation: appleFadeGlow 3s ease-in-out infinite;
+}
+
+/* Unified results appear animation wrapper */
+.results-appear {
+	opacity: 0;
+	-webkit-animation: appleSlideIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.05s forwards;
+	animation: appleSlideIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.05s forwards;
+}
+
+/* Align results with search input width */
+.results-align {
+	max-width: 1185px; /* enforce exact table width */
+	margin-left: auto;
+	margin-right: auto;
+	padding-left: 0;
+	padding-right: 0;
+}
+
+.select-prompt-text:hover {
+	transform: translateY(-1px);
+}
+
+/* Dark mode support */
+.dark .select-prompt-text {
+	color: #ffffff;
+}
+
+/* Obfuscated email local-part style */
+.email-obfuscated-local {
+	font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+	color: rgba(0, 0, 0, 0.4);
+	background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+	border-radius: 4px;
+	padding: 1px 4px;
+	letter-spacing: 0.05em;
+	font-weight: 400;
+	filter: blur(2.5px);
+	text-shadow: 
+		0 0 3px rgba(0, 0, 0, 0.5),
+		0 0 6px rgba(0, 0, 0, 0.3),
+		0 0 10px rgba(0, 0, 0, 0.2);
+	transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+	position: relative;
+	overflow: hidden;
+	/* Hide the bullet placeholders and show CSS-generated content instead */
+	font-size: 0;
+}
+
+/* Use CSS generated content from the custom property */
+.email-obfuscated-local::after {
+	content: var(--text, '•••••');  /* Safari fallback */
+	font-size: 14px;
+	display: inline-block;
+}
+
+.email-obfuscated-local::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: -100%;
+	width: 100%;
+	height: 100%;
+	background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+	-webkit-animation: shimmer 2s infinite;
+	animation: shimmer 2s infinite;
+}
+
+.email-obfuscated-local:hover {
+	color: rgba(0, 0, 0, 0.8);
+	background: rgba(255, 255, 255, 0.2);
+	backdrop-filter: blur(2px);
+	-webkit-backdrop-filter: blur(2px);
+	transform: scale(1.02);
+	text-shadow: none;
+	filter: blur(0.5px);
+}
+
+.dark .email-obfuscated-local {
+	color: rgba(255, 255, 255, 0.4);
+	background: linear-gradient(135deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.1));
+	filter: blur(2.5px);
+	text-shadow: 
+		0 0 3px rgba(255, 255, 255, 0.5),
+		0 0 6px rgba(255, 255, 255, 0.3),
+		0 0 10px rgba(255, 255, 255, 0.2);
+}
+
+.dark .email-obfuscated-local:hover {
+	color: rgba(255, 255, 255, 0.9);
+	background: rgba(0, 0, 0, 0.3);
+	text-shadow: none;
+	filter: blur(0.5px);
+}
+
+@-webkit-keyframes shimmer {
+	0% { left: -100%; }
+	100% { left: 100%; }
+}
+
+@keyframes shimmer {
+	0% { left: -100%; }
+	100% { left: 100%; }
+}
+
+/* Custom Scrollbar Styles for Search Results Table */
+.custom-scrollbar {
+	/* Firefox */
+	scrollbar-width: thin;
+	scrollbar-color: #333333 #f0f0f0;
+	/* Safari requires WebKit-specific scrollbar styling */
+	-webkit-overflow-scrolling: touch;
+}
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+.custom-scrollbar::-webkit-scrollbar {
+	width: 12px;
+	height: 12px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+	background: #f5f5f5;
+	border-left: 1px solid #e0e0e0;
+	box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.1);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+	background: linear-gradient(180deg, #666666 0%, #333333 100%);
+	border-radius: 6px;
+	border: 2px solid #f5f5f5;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+	transition: all 0.3s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+	background: linear-gradient(180deg, #555555 0%, #222222 100%);
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:active {
+	background: linear-gradient(180deg, #444444 0%, #111111 100%);
+	box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Dark mode scrollbar */
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+	background: #1a1a1a;
+	border-left: 1px solid #333333;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+	background: linear-gradient(180deg, #888888 0%, #666666 100%);
+	border: 2px solid #1a1a1a;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+	background: linear-gradient(180deg, #999999 0%, #777777 100%);
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:active {
+	background: linear-gradient(180deg, #aaaaaa 0%, #888888 100%);
 }
 
 /* Dark mode enhancements with glass morphism */

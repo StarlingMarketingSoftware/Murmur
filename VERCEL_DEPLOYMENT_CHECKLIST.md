@@ -14,14 +14,14 @@
   "outputDirectory": ".next",
   "crons": [
     {
-      "path": "/api/webhooks/stripe/cron",
+      "path": "/api/stripe/cron?secret=<CRON_SECRET>",
       "schedule": "0 0 * * *"
     }
   ],
   "functions": {
-    "src/app/api/**/*.ts": {
-      "maxDuration": 30
-    }
+    "src/app/api/contacts/route.ts": { "maxDuration": 60 },
+    "src/app/api/mistral/route.ts": { "maxDuration": 60 },
+    "src/app/api/**/route.ts": { "maxDuration": 30 }
   },
   "env": {
     "NODE_OPTIONS": "--max-old-space-size=8192"
@@ -56,8 +56,7 @@ You need to set these in your Vercel project settings:
 ### Essential Variables
 ```env
 # Database
-DATABASE_URL=your_database_url
-DIRECT_URL=your_direct_database_url
+POSTGRES_PRISMA_URL=your_database_url
 
 # Clerk Authentication
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
@@ -122,7 +121,7 @@ MAILGUN_DOMAIN=your_mailgun_domain
 
 1. **Memory Usage**: The build uses increased Node.js memory (8GB) due to the project size
 2. **Database Migrations**: Ensure your database is accessible from Vercel's network
-3. **API Routes**: All API routes have a 30-second timeout configured
+3. **API Routes**: Contacts and Mistral have 60s timeouts; others 30s
 4. **Cron Jobs**: Stripe webhook cron runs daily at midnight
 
 ## 🔍 Testing Checklist

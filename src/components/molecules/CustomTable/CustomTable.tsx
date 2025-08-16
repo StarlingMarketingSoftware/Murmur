@@ -48,6 +48,7 @@ interface DataTableProps<TData, TValue> {
 	rowsPerPage?: number;
 	displayRowsPerPage?: boolean;
 	constrainHeight?: boolean;
+	hidePagination?: boolean;
 }
 
 interface TableSortingButtonProps<TData> {
@@ -104,6 +105,7 @@ export function CustomTable<TData, TValue>({
 	rowsPerPage = 20,
 	displayRowsPerPage = true,
 	constrainHeight = false,
+	hidePagination = false,
 }: CustomTableProps<TData, TValue>) {
 	const [pagination, setPagination] = useState({
 		pageIndex: 0,
@@ -253,17 +255,24 @@ export function CustomTable<TData, TValue>({
 			</div>
 			<div
 				className={twMerge(
-					'rounded-md border relative overflow-y-auto',
+					'border-2 border-black relative overflow-y-auto overflow-x-hidden custom-scrollbar',
 					constrainHeight && 'max-h-[750px]'
 				)}
+				style={{ width: '1185px' }}
 			>
-				<Table className="relative" variant={variant}>
+				<Table className="relative w-full table-fixed" variant={variant}>
 					<TableHeader variant={variant} sticky>
 						{table.getHeaderGroups().map((headerGroup) => (
 							<TableRow className="sticky top-0" key={headerGroup.id} variant={variant}>
 								{headerGroup.headers.map((header) => {
+									const totalColumns = headerGroup.headers.length;
+									const columnWidth = `${100 / totalColumns}%`; // Evenly distribute width
 									return (
-										<TableHead key={header.id} variant={variant}>
+										<TableHead 
+											key={header.id} 
+											variant={variant}
+											style={{ width: columnWidth }}
+										>
 											{header.isPlaceholder
 												? null
 												: flexRender(header.column.columnDef.header, header.getContext())}
@@ -293,8 +302,14 @@ export function CustomTable<TData, TValue>({
 									data-state={row.getIsSelected() && 'selected'}
 								>
 									{row.getVisibleCells().map((cell) => {
+										const totalColumns = row.getVisibleCells().length;
+										const columnWidth = `${100 / totalColumns}%`; // Evenly distribute width
 										return (
-											<TableCell key={cell.id} variant={variant}>
+											<TableCell 
+												key={cell.id} 
+												variant={variant}
+												style={{ width: columnWidth }}
+											>
 												{flexRender(cell.column.columnDef.cell, cell.getContext())}
 											</TableCell>
 										);
@@ -315,7 +330,7 @@ export function CustomTable<TData, TValue>({
 					</TableBody>
 				</Table>
 			</div>
-			<CustomPagination<TData> currentPage={pagination.pageIndex} table={table} />
+			{!hidePagination && <CustomPagination<TData> currentPage={pagination.pageIndex} table={table} />}
 		</div>
 	);
 }
