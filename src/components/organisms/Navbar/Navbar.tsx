@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { cn } from '@/utils';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import LogoIcon from '@/components/atoms/_svg/LogoIcon';
 
 export const Navbar = () => {
 	const { user } = useMe();
@@ -55,52 +56,53 @@ export const Navbar = () => {
 
 	return (
 		<>
-			{/* Main Navigation Bar - Light Apple Style */}
+			{/* Main Navigation Bar - Artistic Glass */}
 			<nav
 				className={cn(
-					'fixed top-0 left-0 right-0 z-50 transition-all duration-500',
+					'fixed top-0 left-0 right-0 z-50 transition-all duration-700 font-inter',
 					scrolled 
-						? 'bg-gray-100/90 backdrop-blur-xl border-b border-gray-200/50' 
-						: 'bg-white/70 backdrop-blur-lg'
+						? 'bg-white/30 backdrop-blur-3xl backdrop-saturate-200 border-b border-white/10' 
+						: 'bg-white/10 backdrop-blur-2xl backdrop-saturate-150'
 				)}
 			>
-				<div className="w-full px-6 lg:px-8">
-					<div className="relative flex items-center justify-between h-11">
-						{/* Mobile Menu Button */}
-						<button
-							onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}
-							className={cn(
-								"lg:hidden relative w-5 h-5",
-								"transition-all duration-300"
+				<div className="w-full">
+					<div className="flex items-center justify-between h-12 px-5 sm:px-6 lg:px-12">
+						{/* Left Section - UserButton on mobile, empty on desktop */}
+						<div className="lg:hidden flex items-center">
+							{isSignedIn ? (
+								<UserButton
+									afterSignOutUrl="/"
+									appearance={{
+										elements: {
+											avatarBox: 'w-7 h-7',
+											userButtonTrigger: 'opacity-70 hover:opacity-100 transition-opacity duration-300'
+										}
+									}}
+								/>
+							) : (
+								<div className="w-7 h-7" /> /* Empty spacer */
 							)}
-							aria-label="Toggle menu"
-						>
-							<span className={cn(
-								"absolute block h-[1.5px] w-5 bg-gray-600 transition-all duration-300 ease-out",
-								isMobileMenuOpen ? "rotate-45 top-[9px]" : "top-[5px]"
-							)} />
-							<span className={cn(
-								"absolute block h-[1.5px] w-5 bg-gray-600 transition-all duration-300 ease-out top-[9px]",
-								isMobileMenuOpen ? "opacity-0" : "opacity-100"
-							)} />
-							<span className={cn(
-								"absolute block h-[1.5px] w-5 bg-gray-600 transition-all duration-300 ease-out",
-								isMobileMenuOpen ? "-rotate-45 top-[9px]" : "top-[13px]"
-							)} />
-						</button>
+						</div>
+						<div className="hidden lg:block w-7 h-7" /> {/* Spacer for desktop */}
 
-						{/* Desktop Navigation - Absolutely Centered */}
+						{/* Desktop Navigation - Premium Center */}
 						<div className="absolute inset-0 hidden lg:flex items-center justify-center pointer-events-none">
-							<nav className="pointer-events-auto flex items-center gap-7">
+							<nav className="pointer-events-auto flex items-center gap-14">
 								{navItems.map((item) => (
 									<Link
 										key={item.path}
 										href={item.path}
 										className={cn(
-											'px-2.5 h-7 inline-flex items-center rounded-full text-[12px] font-normal tracking-[-0.01em] transition-colors duration-150',
+											'relative text-[13px] font-medium tracking-[0.02em] transition-all duration-300',
 											pathname === item.path 
 												? 'text-gray-900' 
-												: 'text-gray-600 hover:text-gray-900 hover:bg-black/5'
+												: 'text-gray-700/70 hover:text-gray-900',
+											'after:absolute after:bottom-[-8px] after:left-0 after:right-0 after:h-[1px]',
+											'after:bg-gray-900',
+											pathname === item.path
+												? 'after:scale-x-100'
+												: 'after:scale-x-0 hover:after:scale-x-100',
+											'after:transition-transform after:duration-300 after:origin-center'
 										)}
 									>
 										{item.label}
@@ -109,38 +111,69 @@ export const Navbar = () => {
 							</nav>
 						</div>
 
-						{/* Auth Section - Right Aligned */}
-						<div className="flex items-center ml-auto">
-							{isSignedIn ? (
-								<UserButton
-									afterSignOutUrl="/"
-									appearance={{
-										elements: {
-											avatarBox: 'w-7 h-7',
-											userButtonTrigger: 'opacity-80 hover:opacity-100 transition-opacity duration-200'
-										}
-									}}
+						{/* Right Section - Hamburger on mobile, Auth on desktop */}
+						<div className="flex items-center">
+							{/* Mobile - Hamburger Menu */}
+							<button
+								onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}
+								className={cn(
+									"lg:hidden relative w-7 h-7 flex items-center justify-center",
+									"transition-all duration-300"
+								)}
+								aria-label="Toggle menu"
+							>
+								<span
+									className={cn(
+										"absolute block h-[1.5px] w-[18px] bg-gray-700 transition-all duration-300",
+										isMobileMenuOpen 
+											? "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45" 
+											: "top-[11px] left-1/2 -translate-x-1/2"
+									)}
 								/>
-							) : (
-								<div className="flex items-center gap-3">
-									<SignInButton mode="modal">
-										<button className="inline-flex items-center justify-center h-7 px-3 text-[12px] font-normal tracking-[-0.01em] text-gray-700 hover:text-gray-900 transition-colors">
-											Sign In
-										</button>
-									</SignInButton>
-									<SignUpButton mode="modal">
-										<button className="inline-flex items-center justify-center h-7 px-4 text-[12px] font-normal tracking-[-0.01em] rounded-full border border-black/5 bg-white/70 hover:bg-white/90 text-gray-900 transition-colors">
-											Sign Up
-										</button>
-									</SignUpButton>
-								</div>
-							)}
+								<span
+									className={cn(
+										"absolute block h-[1.5px] w-[18px] bg-gray-700 transition-all duration-300",
+										isMobileMenuOpen 
+											? "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-45" 
+											: "bottom-[10px] left-1/2 -translate-x-1/2"
+									)}
+								/>
+							</button>
+
+							{/* Desktop - Show auth buttons */}
+							<div className="hidden lg:flex items-center">
+								{isSignedIn ? (
+									<UserButton
+										afterSignOutUrl="/"
+										appearance={{
+											elements: {
+												avatarBox: 'w-7 h-7 ring-1 ring-black/10',
+												userButtonTrigger: 'opacity-80 hover:opacity-100 transition-opacity duration-500'
+											}
+										}}
+									/>
+								) : (
+									<div className="flex items-center">
+										<SignInButton mode="modal">
+											<button className="relative px-4 text-[12px] font-medium tracking-[0.02em] text-gray-700/70 hover:text-gray-900 transition-all duration-300 after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px] after:bg-gray-900 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center">
+												Sign in
+											</button>
+										</SignInButton>
+										<div className="w-[1px] h-4 bg-gray-300/50 mx-3" />
+										<SignUpButton mode="modal">
+											<button className="relative px-4 text-[12px] font-medium tracking-[0.02em] text-gray-700/70 hover:text-gray-900 transition-all duration-300 after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px] after:bg-gray-900 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center">
+												Sign up
+											</button>
+										</SignUpButton>
+									</div>
+								)}
+							</div>
 						</div>
 					</div>
 				</div>
 			</nav>
 
-			{/* Mobile Menu Overlay - Light Theme */}
+			{/* Mobile Menu Overlay - Glass Art */}
 			<div
 				className={cn(
 					'fixed inset-0 z-40 lg:hidden',
@@ -150,108 +183,103 @@ export const Navbar = () => {
 				{/* Backdrop */}
 				<div
 					className={cn(
-						'absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity duration-500',
+						'absolute inset-0 bg-black/30 transition-opacity duration-500',
 						isMobileMenuOpen ? 'opacity-100' : 'opacity-0'
 					)}
 					onClick={() => setMobileMenuOpen(false)}
 				/>
 
-				{/* Menu Panel - Slides from top */}
+				{/* Menu Panel - Apple Glass effect */}
 				<div
 					className={cn(
-						'absolute top-0 left-0 right-0 bg-white/95 backdrop-blur-xl',
-						'transition-transform duration-500 ease-out shadow-lg',
+						'absolute top-0 left-0 right-0 h-screen',
+						'bg-white backdrop-blur-3xl',
+						'transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]',
 						isMobileMenuOpen ? 'translate-y-0' : '-translate-y-full'
 					)}
 				>
 					{/* Mobile Header */}
-					<div className="flex items-center justify-between h-11 px-6">
-						<button
-							onClick={() => setMobileMenuOpen(false)}
-							className="relative w-5 h-5"
-							aria-label="Close menu"
-						>
-							<span className="absolute block h-[1.5px] w-5 bg-gray-600 rotate-45 top-[9px]" />
-							<span className="absolute block h-[1.5px] w-5 bg-gray-600 -rotate-45 top-[9px]" />
-						</button>
-
+					<div className="flex items-center justify-between h-12 px-5 pt-2">
 						{isSignedIn ? (
 							<UserButton
 								afterSignOutUrl="/"
 								appearance={{
 									elements: {
-										avatarBox: 'w-7 h-7',
-										userButtonTrigger: 'opacity-80'
+										avatarBox: 'w-6 h-6',
+										userButtonTrigger: 'opacity-60'
 									}
 								}}
 							/>
 						) : (
-							<div className="flex items-center gap-3">
-								<SignInButton mode="modal">
-									<button className="text-[13px] font-medium text-gray-600 hover:text-gray-900 transition-colors">
-										Sign In
-									</button>
-								</SignInButton>
-								<SignUpButton mode="modal">
-									<button className="text-[13px] font-medium px-3 py-1 rounded-full bg-gray-900/5 text-gray-900">
-										Sign Up
-									</button>
-								</SignUpButton>
-							</div>
+							<div className="w-6 h-6" />
 						)}
+						
+						<button
+							onClick={() => setMobileMenuOpen(false)}
+							className="relative w-8 h-8 flex items-center justify-center"
+							aria-label="Close menu"
+						>
+							<span className="absolute block h-[1.5px] w-[20px] bg-gray-700 rotate-45" />
+							<span className="absolute block h-[1.5px] w-[20px] bg-gray-700 -rotate-45" />
+						</button>
 					</div>
 
-					{/* Divider */}
-					<div className="h-[0.5px] bg-gray-200 mx-6" />
+
 
 					{/* Mobile Navigation Links */}
-					<nav className="px-6 py-4">
-						<ul className="space-y-0">
-							{navItems.map((item) => (
-								<li key={item.path}>
-									<Link
-										href={item.path}
-										className={cn(
-											'flex items-center justify-between py-3 text-[17px] font-medium',
-											'transition-colors duration-200',
-											'border-b border-gray-100',
-											pathname === item.path 
-												? 'text-gray-900' 
-												: 'text-gray-600 hover:text-gray-900'
-										)}
-										onClick={() => setMobileMenuOpen(false)}
-									>
-										<span>{item.label}</span>
-										<ChevronRight className="w-4 h-4 text-gray-400" />
-									</Link>
-								</li>
-							))}
-						</ul>
-					</nav>
+					<div className="px-5 pt-8">
+						<nav>
+							<ul className="space-y-0">
+								{navItems.map((item) => (
+									<li key={item.path}>
+										<Link
+											href={item.path}
+																				className={cn(
+												'block py-4 text-[28px] font-normal text-gray-800',
+												'transition-colors duration-200',
+												pathname === item.path 
+													? 'text-gray-900' 
+													: 'hover:text-gray-900'
+											)}
+											style={{ fontFamily: "'Times New Roman', Times, serif" }}
+											onClick={() => setMobileMenuOpen(false)}
+										>
+											{item.label}
+										</Link>
+									</li>
+								))}
+							</ul>
+						</nav>
+					</div>
 
-					{/* Mobile Auth Section if not signed in */}
+					{/* Mobile Auth Section */}
 					{!isSignedIn && (
-						<>
-							<div className="h-[0.5px] bg-gray-200 mx-6" />
-							<div className="px-6 py-6 space-y-3">
+						<div className="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-200/20">
+							<div className="flex space-x-6">
 								<SignInButton mode="modal">
-									<button className="w-full py-3 text-center text-[15px] font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-										Sign In to Your Account
+									<button 
+										className="flex-1 py-3 text-center text-[16px] font-normal text-gray-600 hover:text-gray-900 transition-colors duration-200"
+										style={{ fontFamily: "'Times New Roman', Times, serif" }}
+									>
+										Sign in
 									</button>
 								</SignInButton>
 								<SignUpButton mode="modal">
-									<button className="w-full py-3 text-center text-[15px] font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors">
-										Create New Account
+									<button 
+										className="flex-1 py-3 text-center text-[16px] font-normal text-gray-600 hover:text-gray-900 transition-colors duration-200"
+										style={{ fontFamily: "'Times New Roman', Times, serif" }}
+									>
+										Sign up
 									</button>
 								</SignUpButton>
 							</div>
-						</>
+						</div>
 					)}
 				</div>
 			</div>
 
 			{/* Spacer */}
-			<div className="h-11" />
+			<div className="h-12" />
 		</>
 	);
 };
