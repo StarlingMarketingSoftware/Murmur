@@ -173,6 +173,14 @@ export async function GET(req: NextRequest) {
 					.split(/\s+/)
 					.filter((term) => term.length > 0) || [];
 			const caseInsensitiveMode = 'insensitive' as const;
+			
+			console.log('Substring search details:', {
+				searchTerms,
+				excludeUsedContacts,
+				addedContactIds: addedContactIds.length,
+				verificationStatus,
+				queryJson
+			});
             // Build location OR conditions only when parsed parts are present to satisfy Prisma types
             const locationOr: Prisma.ContactWhereInput[] = [];
             if (location) {
@@ -257,13 +265,16 @@ export async function GET(req: NextRequest) {
             const requestedLimit = limit ?? VECTOR_SEARCH_LIMIT_DEFAULT;
             const effectiveTake = requestedLimit;
 
-            return await prisma.contact.findMany({
+            const results = await prisma.contact.findMany({
 				where: whereConditions,
                 take: effectiveTake,
 				orderBy: {
 					userContactListCount: 'asc',
 				},
 			});
+			
+			console.log(`Database query returned ${results.length} contacts`);
+			return results;
 		};
 
 		// if it's a search by ContactListId, only filter by this ContactList.id and validation status
@@ -290,6 +301,14 @@ export async function GET(req: NextRequest) {
 
 		        // If vector search is enabled and we have a query, use vector search
         if (useVectorSearch && query) {
+            // Check if OpenAI API key is configured
+            if (!process.env.OPEN_AI_API_KEY) {
+                console.warn('Vector search requested but OpenAI API key is not configured. Falling back to substring search.');
+                const fallback = await substringSearch();
+                console.log(`Substring search for "${query}" returned ${fallback.length} results`);
+                return apiResponse(fallback);
+            }
+            
             // Determine if this is a venue-like query that uses positive signals; overshoot to allow a lenient tail
             let postTrainingProfile;
             try {
@@ -323,7 +342,14 @@ export async function GET(req: NextRequest) {
             try {
                 vectorSearchResults = await vectorSearchWithTimeout();
             } catch (e) {
-                console.warn('Vector search timed out or failed, falling back to substring search.', e);
+                const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+                console.warn('Vector search failed, falling back to substring search:', errorMessage);
+                
+                // If it's specifically because of OpenAI API key, provide a helpful message
+                if (errorMessage.includes('OpenAI API key is not configured')) {
+                    console.warn('To enable vector search, please set the OPEN_AI_API_KEY environment variable.');
+                }
+                
                 const fallback = await substringSearch();
                 return apiResponse(fallback);
             }
@@ -689,7 +715,7 @@ export async function GET(req: NextRequest) {
 		} else {
 			// Use regular search if vector search is not enabled
 			contacts = await substringSearch();
-
+			console.log(`Non-vector search for "${query}" returned ${contacts.length} results`);
 			return apiResponse(contacts);
 		}
 	} catch (error) {

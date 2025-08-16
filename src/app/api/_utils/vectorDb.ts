@@ -8,10 +8,13 @@ type MappingProperty = estypes.MappingProperty;
 const VECTOR_DIMENSION = 1536;
 const INDEX_NAME = 'contacts';
 
-const openai = new OpenAI({
-    apiKey: process.env.OPEN_AI_API_KEY!,
-    timeout: 15000, // 15s client timeout so embedding calls fail fast
-});
+// Create OpenAI client only if API key is available
+const openai = process.env.OPEN_AI_API_KEY 
+    ? new OpenAI({
+        apiKey: process.env.OPEN_AI_API_KEY,
+        timeout: 15000, // 15s client timeout so embedding calls fail fast
+    })
+    : null;
 
 const elasticsearch = new Client({
 	node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
@@ -54,6 +57,10 @@ interface ContactDocument {
 }
 
 export const generateContactEmbedding = async (contact: Contact) => {
+	if (!openai) {
+		throw new Error('OpenAI API key is not configured. Vector search is not available.');
+	}
+	
 	const locationString =
 		[contact.city, contact.state, contact.country].filter(Boolean).join(', ') || null;
 
@@ -338,6 +345,10 @@ export const searchSimilarContacts = async (
         strictPenalty?: boolean;
     }
 ) => {
+	if (!openai) {
+		throw new Error('OpenAI API key is not configured. Vector search is not available.');
+	}
+	
 	const response = await openai.embeddings.create({
 		input: queryJson.restOfQuery,
 		model: 'text-embedding-3-small',

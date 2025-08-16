@@ -239,9 +239,12 @@ export const useDashboard = () => {
 	// Initialize selected contacts when contacts load
 	useEffect(() => {
 		if (contacts) {
+			console.log(`Received ${contacts.length} contacts from API`);
 			setSelectedContacts(contacts.map((contact) => contact.id));
+		} else if (hasSearched && activeSearchQuery) {
+			console.log('No contacts received from API');
 		}
-	}, [contacts]);
+	}, [contacts, hasSearched, activeSearchQuery]);
 
 	// Trigger search when parameters change
 	useEffect(() => {
