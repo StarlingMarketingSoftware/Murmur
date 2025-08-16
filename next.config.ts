@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
   eslint: {
     // During development, we want to see all errors
     // But for production builds on Vercel, we can skip to save memory
-    ignoreDuringBuilds: process.env.VERCEL ? true : false,
+    ignoreDuringBuilds: true,
   },
   // Optimize production builds
   productionBrowserSourceMaps: false,

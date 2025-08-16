@@ -1,13 +1,13 @@
 'use client';
 import { useAuth, UserButton, SignUpButton, SignInButton } from '@clerk/nextjs';
 import { urls } from '@/constants/urls';
-import { Menu, X, ChevronRight } from 'lucide-react';
+// import { Menu, X, ChevronRight } from 'lucide-react';
 import { useMe } from '@/hooks/useMe';
 import Link from 'next/link';
 import { cn } from '@/utils';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import LogoIcon from '@/components/atoms/_svg/LogoIcon';
+// import LogoIcon from '@/components/atoms/_svg/LogoIcon';
 
 export const Navbar = () => {
 	const { user } = useMe();
