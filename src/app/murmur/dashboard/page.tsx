@@ -94,7 +94,7 @@ const Dashboard = () => {
 										<div className={`search-input-group ${hasSearched ? 'search-input-group-active' : ''}`}>
 											<div className={`search-wave-container ${isLoadingContacts || isRefetchingContacts ? 'search-wave-loading' : ''}`}>
 												<Input
-													className="search-wave-input !border-none !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent"
+													className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent"
 													placeholder='Who do you want to send to?  i.e  "Music venues in North Carolina"'
 													style={{ accentColor: 'transparent' }}
 													{...field}
