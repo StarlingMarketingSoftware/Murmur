@@ -258,6 +258,7 @@ export function CustomTable<TData, TValue>({
 					'border-2 border-black relative overflow-y-auto overflow-x-hidden custom-scrollbar',
 					constrainHeight && 'max-h-[750px]'
 				)}
+				style={{ width: '1185px' }}
 			>
 				<Table className="relative w-full table-fixed" variant={variant}>
 					<TableHeader variant={variant} sticky>

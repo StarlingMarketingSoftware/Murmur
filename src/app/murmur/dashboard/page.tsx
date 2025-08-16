@@ -91,18 +91,26 @@ const Dashboard = () => {
 							render={({ field }) => (
 								<FormItem>
 									<FormControl>
-										<div className={`search-input-group ${hasSearched ? 'search-input-group-active' : ''}`}>
-											<div className={`search-wave-container ${isLoadingContacts || isRefetchingContacts ? 'search-wave-loading' : ''}`}>
-												<Input
-													className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent"
-													placeholder='Who do you want to send to?  i.e  "Music venues in North Carolina"'
-													style={{ accentColor: 'transparent' }}
-													{...field}
-												/>
-												<div className="search-wave-overlay" />
+																					<div className={`search-input-group ${hasSearched ? 'search-input-group-active' : ''}`}>
+												<div className={`search-wave-container ${isLoadingContacts || isRefetchingContacts ? 'search-wave-loading' : ''}`}>
+													<Input
+														className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent"
+														placeholder='Who do you want to send to?  i.e  "Music venues in North Carolina"'
+														style={{ 
+															accentColor: 'transparent',
+															WebkitAppearance: 'none',
+															MozAppearance: 'none'
+														}}
+														autoComplete="off"
+														autoCorrect="off"
+														autoCapitalize="off"
+														spellCheck="false"
+														{...field}
+													/>
+													<div className="search-wave-overlay" />
+												</div>
+												{/* Buttons hidden during active search */}
 											</div>
-											{/* Buttons hidden during active search */}
-										</div>
 									</FormControl>
 									<FormMessage />
 								</FormItem>
@@ -258,39 +266,41 @@ const Dashboard = () => {
 						</div>
 					) : contacts && contacts.length > 0 ? (
 						<>
-							<div className="select-prompt-container">
-								<div className="select-prompt-text">
-									Select who you want to contact
+							<div className="results-appear results-align">
+								<div className="select-prompt-container">
+									<div className="select-prompt-text">
+										Select who you want to contact
+									</div>
 								</div>
-							</div>
-							<Card className="border-0 shadow-none">
-								<CardContent>
-									<CustomTable
-										initialSelectAll={false}
-										isSelectable
-										setSelectedRows={setSelectedContacts}
-										data={contacts}
-										columns={columns}
-										searchable={false}
-										tableRef={tableRef}
-										rowsPerPage={100}
-										displayRowsPerPage={false}
-										constrainHeight
-										hidePagination
-									/>
-								</CardContent>
-							</Card>
-							<div className="flex items-center">
-								<Button
-									onClick={handleCreateCampaign}
-									isLoading={isPendingCreateCampaign || isPendingBatchUpdateContacts}
-									variant="primary-light"
-									bold
-									className="w-8/10 mx-auto mt-5"
-									disabled={selectedContacts.length === 0}
-								>
-									Create Campaign
-								</Button>
+								<Card className="border-0 shadow-none !p-0">
+									<CardContent className="!p-0">
+										<CustomTable
+											initialSelectAll={false}
+											isSelectable
+											setSelectedRows={setSelectedContacts}
+											data={contacts}
+											columns={columns}
+											searchable={false}
+											tableRef={tableRef}
+											rowsPerPage={100}
+											displayRowsPerPage={false}
+											constrainHeight
+											hidePagination
+										/>
+									</CardContent>
+								</Card>
+								<div className="flex items-center">
+									<Button
+										onClick={handleCreateCampaign}
+										isLoading={isPendingCreateCampaign || isPendingBatchUpdateContacts}
+										variant="primary-light"
+										bold
+										className="w-8/10 mx-auto mt-5"
+										disabled={selectedContacts.length === 0}
+									>
+										Create Campaign
+									</Button>
+								</div>
 							</div>
 						</>
 					) : hasSearched && (contacts === undefined || (Array.isArray(contacts) && contacts.length === 0)) ? (

@@ -308,21 +308,56 @@ export const useDashboard = () => {
 				header: () => <span className="font-bold">Email</span>,
 				cell: ({ row }) => {
 					const isUsed = usedContactIdsSet.has(row.original.id);
+					const email = (row.getValue('email') as string) || '';
+					const [local, domain] = email.includes('@') ? email.split('@') : [email, ''];
+					const rowIndex = row.index;
+					const showFull = rowIndex < 3; // First three rows show full email
+					if (showFull) {
+						return (
+							<div className="flex truncate">
+								{isUsed ? (
+									<Tooltip>
+										<TooltipTrigger>
+											<div className="text-left bg-secondary/20 px-2 rounded-md truncate">
+												{email}
+											</div>
+										</TooltipTrigger>
+										<TooltipContent side="right">
+											This contact has been used in a campaign.
+										</TooltipContent>
+									</Tooltip>
+								) : (
+									<div className={twMerge('text-left truncate')}>{email}</div>
+								)}
+							</div>
+						);
+					}
+					// Obfuscate by showing an outlined version of the actual local-part and a clear domain
+					// Use data attributes and CSS content to prevent scraping
+					const obfuscatedLocal = local.split('').map((char, i) => 
+						String.fromCharCode(char.charCodeAt(0) + 1)
+					).join('');
+					
 					return (
-						<div className="flex truncate">
-							{isUsed ? (
-								<Tooltip>
-									<TooltipTrigger>
-										<div className="text-left bg-secondary/20 px-2 rounded-md truncate">
-											{row.getValue('email')}
-										</div>
-									</TooltipTrigger>
-									<TooltipContent side="right">
-										This contact has been used in a campaign.
-									</TooltipContent>
-								</Tooltip>
-							) : (
-								<div className={twMerge('text-left truncate')}>{row.getValue('email')}</div>
+						<div className="text-left flex items-center whitespace-nowrap truncate">
+							<span 
+								className="email-obfuscated-local mr-1 select-none" 
+								aria-hidden="true"
+								data-text={obfuscatedLocal}
+								style={{ 
+									// Safari-compatible CSS custom property
+									['--text' as any]: `"${local}"`,
+									WebkitUserSelect: 'none',
+									MozUserSelect: 'none',
+									msUserSelect: 'none',
+									userSelect: 'none'
+								}}
+							>
+								{/* Render misleading text that gets hidden by CSS */}
+								{'•'.repeat(local.length)}
+							</span>
+							{domain && (
+								<span className="truncate">@{domain}</span>
 							)}
 						</div>
 					);
