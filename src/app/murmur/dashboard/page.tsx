@@ -268,7 +268,7 @@ const Dashboard = () => {
 							<ConsoleLoader searchQuery={activeSearchQuery} />
 						</div>
 					) : contacts && contacts.length > 0 ? (
-						<>
+						<div className="flex justify-center">
 							<div className="results-appear results-align">
 								<div className="select-prompt-container">
 									<div className="select-prompt-text">
@@ -321,7 +321,7 @@ const Dashboard = () => {
 									</Button>
 								</div>
 							</div>
-						</>
+						</div>
 					) : hasSearched && (contacts === undefined || (Array.isArray(contacts) && contacts.length === 0)) ? (
 						<div className="mt-10">
 							<Card className="max-w-[1174px] mx-auto">
