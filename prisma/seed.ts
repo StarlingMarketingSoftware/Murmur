@@ -1,4 +1,4 @@
-import { User, Contact } from '@prisma/client';
+import { User, Contact, Status, DraftingMode, DraftingTone, HybridBlock } from '@prisma/client';
 import prisma from '../src/lib/prisma';
 import { parse } from 'csv-parse/sync';
 import { promises as fs } from 'fs';
@@ -254,6 +254,104 @@ const userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
 	},
 ];
 
+const seedCampaigns = async () => {
+	console.log('Seeding campaigns...');
+	
+	const campaignData = [
+		{
+			name: 'Spring Music Festival Outreach',
+			userId: 'user_2yfwTts2NJrPFiydjSimNx9HW4r',
+			subject: 'Exciting Partnership Opportunity for Spring Festival',
+			fullAiPrompt: 'Write an engaging email about partnering for our spring music festival',
+			senderEmail: 'events@musicfest.com',
+			senderName: 'Festival Team',
+			status: Status.active,
+			draftingMode: DraftingMode.hybrid,
+			draftingTone: DraftingTone.excited,
+			hybridPrompt: 'Emphasize the mutual benefits and audience reach',
+			isAiSubject: true,
+			paragraphs: 3,
+			font: 'Arial',
+			hybridBlockPrompts: [
+				{ id: 'introduction', type: 'introduction', value: 'Introduce our festival and its reach' },
+				{ id: 'research', type: 'research', value: 'Mention their venue specifics' },
+				{ id: 'action', type: 'action', value: 'Schedule a partnership call' },
+			],
+			hybridAvailableBlocks: [HybridBlock.text, HybridBlock.research],
+		},
+		{
+			name: 'Venue Booking Campaign',
+			userId: 'user_2yfwTts2NJrPFiydjSimNx9HW4r',
+			subject: 'Book Your Next Event at Premium Venues',
+			fullAiPrompt: 'Create a compelling venue booking email for event planners',
+			senderEmail: 'bookings@venueconnect.com',
+			senderName: 'Venue Connect',
+			status: Status.active,
+			draftingMode: DraftingMode.ai,
+			draftingTone: DraftingTone.normal,
+			isAiSubject: false,
+			paragraphs: 2,
+			font: 'Times New Roman',
+			hybridBlockPrompts: [
+				{ id: 'introduction', type: 'introduction', value: '' },
+				{ id: 'research', type: 'research', value: '' },
+				{ id: 'action', type: 'action', value: '' },
+			],
+			hybridAvailableBlocks: [HybridBlock.text],
+		},
+		{
+			name: 'Artist Collaboration Initiative',
+			userId: 'user_2yfwfFMcWIho4NSUT25o8V1LYHu',
+			subject: 'Collaborate with Rising Artists',
+			fullAiPrompt: 'Draft an email about artist collaboration opportunities',
+			senderEmail: 'artists@musicconnect.com',
+			senderName: 'Artist Relations',
+			status: Status.active,
+			draftingMode: DraftingMode.handwritten,
+			draftingTone: DraftingTone.casual,
+			handwrittenPrompt: 'Hey! We love your venue and would like to bring amazing artists...',
+			isAiSubject: true,
+			paragraphs: 4,
+			font: 'Georgia',
+			hybridBlockPrompts: [
+				{ id: 'introduction', type: 'introduction', value: '' },
+				{ id: 'research', type: 'research', value: '' },
+				{ id: 'action', type: 'action', value: '' },
+			],
+			hybridAvailableBlocks: [HybridBlock.text],
+		},
+		{
+			name: 'Equipment Rental Promotion',
+			userId: 'user_2yfwfFMcWIho4NSUT25o8V1LYHu',
+			subject: 'Professional Audio Equipment - Special Rates',
+			fullAiPrompt: 'Write about our audio equipment rental services for venues',
+			senderEmail: 'rentals@soundpro.com',
+			senderName: 'SoundPro Rentals',
+			status: Status.inactive,
+			draftingMode: DraftingMode.hybrid,
+			draftingTone: DraftingTone.normal,
+			hybridPrompt: 'Focus on quality, reliability, and competitive pricing',
+			isAiSubject: true,
+			paragraphs: 3,
+			font: 'Arial',
+			hybridBlockPrompts: [
+				{ id: 'introduction', type: 'introduction', value: 'Professional equipment for venues' },
+				{ id: 'research', type: 'research', value: 'Venue-specific needs' },
+				{ id: 'action', type: 'action', value: 'Get a custom quote' },
+			],
+			hybridAvailableBlocks: [HybridBlock.text, HybridBlock.research, HybridBlock.action],
+		},
+	];
+
+	for (const campaign of campaignData) {
+		await prisma.campaign.create({
+			data: campaign as any,
+		});
+	}
+	
+	console.log(`Created ${campaignData.length} test campaigns`);
+};
+
 const seedElasticsearchEmbeddings = async (contacts: Contact[]) => {
 	// First, ensure the index exists
 	await initializeVectorDb();
@@ -279,6 +377,9 @@ async function main() {
 
 	/* Seed contacts */
 	importCSVWithSubcategories('contactLists/musicVenuesDemo4106.csv', 'Music Venues');
+
+	/* Seed campaigns */
+	await seedCampaigns();
 
 	/* Seed embeddings */
 	const allContacts = await prisma.contact.findMany();
