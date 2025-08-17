@@ -45,6 +45,7 @@ const Dashboard = () => {
 		handleResetSearch,
 		handleSelectAll,
 		isAllSelected,
+		hoveredText,
 	} = useDashboard();
 	return (
 		<AppLayout>
@@ -272,6 +273,13 @@ const Dashboard = () => {
 								<div className="select-prompt-container">
 									<div className="select-prompt-text">
 										Select who you want to contact
+									</div>
+									<div className="static-tooltip-container">
+										{hoveredText && (
+											<div className="static-tooltip-text">
+												{hoveredText}
+											</div>
+										)}
 									</div>
 								</div>
 								<Card className="border-0 shadow-none !p-0">
