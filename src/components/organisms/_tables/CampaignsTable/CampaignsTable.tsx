@@ -26,7 +26,7 @@ export const CampaignsTable: FC = () => {
 
 	return (
 		<>
-			<Card className="relative  border-none bg-gradient-to-l from-gray-100 via-background to-gray-100 max-w-]1250px] ">
+			<Card className="relative border-none bg-gradient-to-l from-gray-100 via-background to-gray-100 w-full max-w-full mx-4">
 				{isPending && <Spinner size="medium" className="absolute top-2 right-2" />}
 				<CardHeader>
 					<CardTitle className="text-center text-3xl">Your Campaigns</CardTitle>
@@ -34,7 +34,7 @@ export const CampaignsTable: FC = () => {
 						Campaigns you have created.
 					</CardDescription>
 				</CardHeader>
-				<CardContent className="space-y-2">
+				<CardContent className="space-y-2 w-full">
 					<CustomTable
 						variant="secondary"
 						handleRowClick={handleRowClick}

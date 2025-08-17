@@ -213,19 +213,21 @@ export function CustomTable<TData, TValue>({
 	}, [pagination.pageIndex, pagination.pageSize, data]);
 
 	const tableContainerStyle = {
-		width: '1185px',
+		width: '100%',
+		maxWidth: '100%',
 		height: constrainHeight ? '429px' : undefined,
-	  };
+	};
 
 	return (
-		<div className=" [&_::-webkit-scrollbar]:h-[4px] [&_::-webkit-scrollbar]:md:h-[7px] [&_::-webkit-scrollbar-thumb]:bg-gray-300 [&_::-webkit-scrollbar-thumb]:rounded-full [&_::-webkit-scrollbar]:w-[4px] [&_::-webkit-scrollbar]:md:w-[7px]">
-			<div className="flex items-center justify-between py-4 gap-4" style={{ width: '1185px' }}>
-				<div className="flex items-center gap-4">
+		<div className="w-full [&_::-webkit-scrollbar]:h-[4px] [&_::-webkit-scrollbar]:md:h-[7px] [&_::-webkit-scrollbar-thumb]:bg-gray-300 [&_::-webkit-scrollbar-thumb]:rounded-full [&_::-webkit-scrollbar]:w-[4px] [&_::-webkit-scrollbar]:md:w-[7px]">
+			<div className="flex items-center justify-between py-4 gap-4 w-full">
+				<div className="flex items-center gap-4 flex-wrap">
 					{searchable && (
 						<Input
 							placeholder="Search all columns..."
 							value={globalFilter ?? ''}
 							onChange={(event) => setGlobalFilter(event.target.value)}
+							className="min-w-[200px]"
 						/>
 					)}
 					{displayRowsPerPage && (
@@ -263,11 +265,11 @@ export function CustomTable<TData, TValue>({
 			</div>
 			<div
 				className={twMerge(
-					'border-2 border-black relative overflow-y-auto overflow-x-hidden custom-scrollbar',
+					'border-2 border-black relative overflow-y-auto overflow-x-auto custom-scrollbar w-full',
 				)}
 				style={tableContainerStyle}
 			>
-				<Table className="relative w-full table-fixed" variant={variant}>
+				<Table className="relative w-full min-w-full table-fixed" variant={variant}>
 					<TableHeader variant={variant} sticky>
 						{table.getHeaderGroups().map((headerGroup) => (
 							<TableRow className="sticky top-0" key={headerGroup.id} variant={variant}>
@@ -278,7 +280,8 @@ export function CustomTable<TData, TValue>({
 										<TableHead 
 											key={header.id} 
 											variant={variant}
-											style={{ width: columnWidth }}
+											style={{ width: columnWidth, minWidth: '120px' }}
+											className="whitespace-nowrap"
 										>
 											{header.isPlaceholder
 												? null
@@ -315,7 +318,8 @@ export function CustomTable<TData, TValue>({
 											<TableCell 
 												key={cell.id} 
 												variant={variant}
-												style={{ width: columnWidth }}
+												style={{ width: columnWidth, minWidth: '120px' }}
+												className="whitespace-nowrap"
 											>
 												{flexRender(cell.column.columnDef.cell, cell.getContext())}
 											</TableCell>

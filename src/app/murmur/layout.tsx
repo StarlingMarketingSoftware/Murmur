@@ -20,16 +20,17 @@ export default function MurmurLayout({
 
 	return (
 		<>
-			<nav className="w-full px-8 py-5">
-				<div className="max-w-[1174px] mx-auto flex items-center justify-between">
-					<div className="flex items-center gap-8">
+			<nav className="w-full px-4 md:px-8 py-5">
+				<div className="w-full max-w-full mx-auto flex items-center justify-between">
+					<div className="flex items-center gap-4 md:gap-8">
 						{/* Back to Home button */}
 						<Link
 							href={urls.home.index}
 							className="flex items-center gap-2 text-[13px] font-normal transition-all duration-200 font-secondary tracking-[0.02em] text-gray-600 opacity-60 hover:opacity-100 hover:text-black"
 						>
 							<ArrowLeft className="w-4 h-4" />
-							Back to Home
+							<span className="hidden sm:inline">Back to Home</span>
+							<span className="sm:hidden">Home</span>
 						</Link>
 						
 						{/* Admin link - only show if user is admin */}
