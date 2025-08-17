@@ -2477,14 +2477,14 @@ mux-player {
 	color: #ffffff;
 }
 
-/* Obfuscated email style - traditional blur */
+/* Traditional, simple email blur */
 .email-obfuscated-local {
 	font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Arial, sans-serif;
-	color: rgba(0, 0, 0, 0.5);
-	filter: blur(4px);
-	-webkit-filter: blur(4px);
 	display: inline-block;
 	font-size: 14px;
+	color: inherit;
+	filter: blur(4px);
+	-webkit-filter: blur(4px);
 	user-select: none;
 	-webkit-user-select: none;
 	-moz-user-select: none;
@@ -2493,26 +2493,23 @@ mux-player {
 }
 
 .email-obfuscated-local:hover {
-	/* Keep the same blur on hover - no reveal */
-	color: rgba(0, 0, 0, 0.5);
 	filter: blur(4px);
 	-webkit-filter: blur(4px);
 	cursor: default;
 }
 
 .dark .email-obfuscated-local {
-	color: rgba(255, 255, 255, 0.5);
 	filter: blur(4px);
 	-webkit-filter: blur(4px);
 }
 
 .dark .email-obfuscated-local:hover {
-	/* Keep the same blur on hover in dark mode - no reveal */
-	color: rgba(255, 255, 255, 0.5);
 	filter: blur(4px);
 	-webkit-filter: blur(4px);
 	cursor: default;
 }
+
+/* Clean table cells: no special glass styles for blurred emails */
 
 
 
