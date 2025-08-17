@@ -43,6 +43,8 @@ const Dashboard = () => {
 		error,
 		hasSearched,
 		handleResetSearch,
+		handleSelectAll,
+		isAllSelected,
 	} = useDashboard();
 	return (
 		<AppLayout>
@@ -286,6 +288,15 @@ const Dashboard = () => {
 											displayRowsPerPage={false}
 											constrainHeight
 											hidePagination
+											headerAction={
+												<button
+													onClick={handleSelectAll}
+													className="select-all-button"
+													type="button"
+												>
+													{isAllSelected ? 'Unselect all' : 'Select all'}
+												</button>
+											}
 										/>
 									</CardContent>
 								</Card>

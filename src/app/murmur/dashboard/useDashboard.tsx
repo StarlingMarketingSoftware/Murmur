@@ -71,6 +71,7 @@ export const useDashboard = () => {
 		UserContactList[]
 	>([]);
 	const [selectedContacts, setSelectedContacts] = useState<number[]>([]);
+	const [isAllSelected, setIsAllSelected] = useState(false);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
 	const [activeExcludeUsedContacts, setActiveExcludeUsedContacts] = useState(true);
 	const [activeExactMatchesOnly, setActiveExactMatchesOnly] = useState(false);
@@ -110,6 +111,15 @@ export const useDashboard = () => {
 			setSelectedContacts([]); // Start with no contacts selected
 		}
 	}, [contacts]);
+
+	// Watch for changes in selectedContacts to update isAllSelected
+	useEffect(() => {
+		if (contacts && selectedContacts.length > 0) {
+			setIsAllSelected(selectedContacts.length === contacts.length);
+		} else {
+			setIsAllSelected(false);
+		}
+	}, [selectedContacts, contacts]);
 
 	// Trigger search when parameters change
 	useEffect(() => {
@@ -181,6 +191,18 @@ export const useDashboard = () => {
 		setHasSearched(false);
 		setActiveSearchQuery('');
 		form.reset();
+	};
+
+	const handleSelectAll = () => {
+		if (!contacts || !tableInstance) return;
+		
+		if (isAllSelected) {
+			// Unselect all
+			tableInstance.toggleAllRowsSelected(false);
+		} else {
+			// Select all rows
+			tableInstance.toggleAllRowsSelected(true);
+		}
 	};
 
 	const handleCreateCampaign = async () => {
@@ -332,33 +354,12 @@ export const useDashboard = () => {
 							</div>
 						);
 					}
-					// Obfuscate by showing an outlined version of the actual local-part and a clear domain
-					// Use data attributes and CSS content to prevent scraping
-					const obfuscatedLocal = local.split('').map((char, i) => 
-						String.fromCharCode(char.charCodeAt(0) + 1)
-					).join('');
-					
+					// Obfuscate the entire email address with a simple blur
 					return (
-						<div className="text-left flex items-center whitespace-nowrap truncate">
-							<span 
-								className="email-obfuscated-local mr-1 select-none" 
-								aria-hidden="true"
-								data-text={obfuscatedLocal}
-								style={{ 
-									// Safari-compatible CSS custom property
-									['--text' as any]: `"${local}"`,
-									WebkitUserSelect: 'none',
-									MozUserSelect: 'none',
-									msUserSelect: 'none',
-									userSelect: 'none'
-								}}
-							>
-								{/* Render misleading text that gets hidden by CSS */}
-								{'•'.repeat(local.length)}
+						<div className="text-left whitespace-nowrap truncate">
+							<span className="email-obfuscated-local">
+								{email}
 							</span>
-							{domain && (
-								<span className="truncate">@{domain}</span>
-							)}
 						</div>
 					);
 				},
@@ -466,6 +467,8 @@ export const useDashboard = () => {
 		columns,
 		setSelectedContacts,
 		selectedContacts,
+		handleSelectAll,
+		isAllSelected,
 		isRefetchingContacts,
 		activeSearchQuery,
 		tabOptions,
