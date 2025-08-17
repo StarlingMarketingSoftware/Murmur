@@ -8,8 +8,14 @@ interface TableCellTooltipProps {
 
 export const TableCellTooltip: FC<TableCellTooltipProps> = ({ text, maxLength = 40 }) => {
 	return (
-		<div className="text-left">
-			<EllipsesWithTooltip tooltipPlacement="right" text={text} maxLength={maxLength} />
+		<div className="text-left transition-all duration-200 ease-out">
+			<EllipsesWithTooltip 
+				tooltipPlacement="right" 
+				text={text} 
+				maxLength={maxLength} 
+				tooltipDelay={200}
+				className="transition-opacity duration-150"
+			/>
 		</div>
 	);
 };

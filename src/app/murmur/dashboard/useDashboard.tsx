@@ -318,7 +318,7 @@ export const useDashboard = () => {
 				header: () => <span className="font-bold">Company</span>,
 				cell: ({ row }) => {
 					return (
-						<div className="truncate">
+						<div className="truncate transition-all duration-200 hover:opacity-80">
 							<TableCellTooltip text={row.getValue('company')} maxLength={MAX_CELL_LENGTH} />
 						</div>
 					);
@@ -407,7 +407,7 @@ export const useDashboard = () => {
 							}}
 						>
 							{hasName ? (
-								<TableCellTooltip text={nameValue} maxLength={MAX_CELL_LENGTH} />
+								<span className="truncate">{nameValue}</span>
 							) : (
 								<span className="select-none">—</span>
 							)}
@@ -420,11 +420,7 @@ export const useDashboard = () => {
 				size: 150,
 				header: () => <span className="font-bold">City</span>,
 				cell: ({ row }) => {
-					return (
-						<div className="truncate">
-							<TableCellTooltip text={row.getValue('city')} maxLength={MAX_CELL_LENGTH} />
-						</div>
-					);
+					return <div className="text-left truncate">{row.getValue('city')}</div>;
 				},
 			},
 			{
@@ -441,7 +437,7 @@ export const useDashboard = () => {
 				header: () => <span className="font-bold">Description</span>,
 				cell: ({ row }) => {
 					return (
-						<div className="truncate">
+						<div className="truncate transition-all duration-200 hover:opacity-80">
 							<TableCellTooltip text={row.getValue('title')} maxLength={MAX_CELL_LENGTH} />
 						</div>
 					);

@@ -2566,6 +2566,39 @@ mux-player {
 	border-color: #ffffff;
 }
 
+/* Smooth Tooltip Animations */
+[data-radix-popper-content-wrapper] {
+	animation: slideIn 0.2s ease-out;
+	transform-origin: var(--radix-tooltip-content-transform-origin);
+}
+
+@keyframes slideIn {
+	from {
+		opacity: 0;
+		transform: scale(0.96) translateY(-2px);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1) translateY(0);
+	}
+}
+
+/* Smoother tooltip content transitions */
+[role="tooltip"] {
+	animation: tooltipFadeIn 0.15s ease-out;
+}
+
+@keyframes tooltipFadeIn {
+	from {
+		opacity: 0;
+		filter: blur(2px);
+	}
+	to {
+		opacity: 1;
+		filter: blur(0);
+	}
+}
+
 /* Custom Scrollbar Styles for Search Results Table */
 .custom-scrollbar {
 	/* Firefox */
