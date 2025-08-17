@@ -51,8 +51,8 @@ const Dashboard = () => {
 		<AppLayout>
 			<div className={`dashboard-container ${hasSearched ? 'search-active' : ''}`}>
 				<div className="hero-wrapper">
-					<div className="mt-4 flex justify-center">
-						<div className="premium-hero-section text-center" style={{ width: '470px', height: '286px', overflow: 'hidden' }}>
+					<div className="mt-4 flex justify-center w-full px-4">
+						<div className="premium-hero-section text-center w-full max-w-[470px] h-[286px] overflow-hidden">
 							<div className="premium-logo-container inline-block">
 								<LogoIcon width="106px" height="84px" />
 							</div>
@@ -161,36 +161,32 @@ const Dashboard = () => {
 										)}
 									/>
 								</div>
-								<div className="flex items-center justify-end" style={{ width: '368px' }}>
-									<div className="flex-1">
-										{isFreeTrial ? (
-											<UpgradeSubscriptionDrawer
-												message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
-												triggerButtonText="Import"
-												buttonVariant="light"
-												className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-											/>
-										) : (
-											<ContactTSVUploadDialog
-												isAdmin={false}
-												triggerText="Import"
-												buttonVariant="light"
-												className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-											/>
-										)}
-									</div>
-
-									<div className="flex-1 flex justify-end">
-										<Button
-											variant="primary-light"
-											type="submit"
-											bold
-											className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
-											isLoading={isLoadingContacts || isRefetchingContacts}
-										>
-											Generate
-										</Button>
-									</div>
+								<div className="flex items-center justify-end w-full max-w-full">
+									{isFreeTrial ? (
+										<UpgradeSubscriptionDrawer
+											message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
+											triggerButtonText="Import"
+											buttonVariant="light"
+											className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
+										/>
+									) : (
+										<ContactTSVUploadDialog
+											isAdmin={false}
+											triggerText="Import"
+											buttonVariant="light"
+											className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
+										/>
+									)}
+									<div className="w-[19px]"></div>
+									<Button
+										variant="primary-light"
+										type="submit"
+										bold
+										className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
+										isLoading={isLoadingContacts || isRefetchingContacts}
+									>
+										Generate
+									</Button>
 								</div>
 							</div>
 						)}
@@ -238,8 +234,8 @@ const Dashboard = () => {
 			{activeSearchQuery && (
 				<>
 					{isError ? (
-						<div className="mt-10">
-							<Card className="max-w-[1174px] mx-auto">
+						<div className="mt-10 w-full px-4">
+							<Card className="w-full max-w-full mx-auto">
 								<CardContent className="py-8">
 									<div className="text-center">
 										<Typography variant="h3" className="text-red-600 mb-2">
@@ -264,12 +260,12 @@ const Dashboard = () => {
 							</Card>
 						</div>
 					) : (isLoadingContacts || isRefetchingContacts) ? (
-						<div className="mt-10 max-w-[1174px] mx-auto py-8">
+						<div className="mt-10 w-full px-4 py-8">
 							<ConsoleLoader searchQuery={activeSearchQuery} />
 						</div>
 					) : contacts && contacts.length > 0 ? (
-						<div className="flex justify-center">
-							<div className="results-appear results-align">
+						<div className="flex justify-center w-full px-4">
+							<div className="w-full max-w-full results-appear results-align">
 								<div className="select-prompt-container">
 									<div className="select-prompt-text">
 										Select who you want to contact
@@ -282,8 +278,8 @@ const Dashboard = () => {
 										)}
 									</div>
 								</div>
-								<Card className="border-0 shadow-none !p-0">
-									<CardContent className="!p-0">
+								<Card className="border-0 shadow-none !p-0 w-full">
+									<CardContent className="!p-0 w-full">
 										<CustomTable
 											initialSelectAll={false}
 											isSelectable
@@ -308,13 +304,13 @@ const Dashboard = () => {
 										/>
 									</CardContent>
 								</Card>
-								<div className="flex items-center">
+								<div className="flex items-center w-full">
 									<Button
 										onClick={handleCreateCampaign}
 										isLoading={isPendingCreateCampaign || isPendingBatchUpdateContacts}
 										variant="primary-light"
 										bold
-										className="w-full max-w-[1308px] h-[39px] mx-auto mt-5"
+										className="w-full max-w-full h-[39px] mx-auto mt-5"
 										disabled={selectedContacts.length === 0}
 									>
 										Create Campaign
@@ -323,8 +319,8 @@ const Dashboard = () => {
 							</div>
 						</div>
 					) : hasSearched && (contacts === undefined || (Array.isArray(contacts) && contacts.length === 0)) ? (
-						<div className="mt-10">
-							<Card className="max-w-[1174px] mx-auto">
+						<div className="mt-10 w-full px-4">
+							<Card className="w-full max-w-full mx-auto">
 								<CardContent className="py-8">
 									<div className="text-center">
 										<Typography variant="h3" className="mb-2">

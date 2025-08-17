@@ -367,10 +367,10 @@ export const useDashboard = () => {
 							</div>
 						);
 					}
-					// Obfuscate the entire email address with a simple blur
+					// Obfuscate the entire email address with a smooth fading blur
 					return (
-						<div className="text-left whitespace-nowrap overflow-hidden">
-							<span className="email-obfuscated-local">
+						<div className="text-left whitespace-nowrap overflow-visible relative">
+							<span className="email-obfuscated-local inline-block">
 								{email}
 							</span>
 						</div>
