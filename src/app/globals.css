@@ -1062,14 +1062,19 @@ mux-player {
 /* Generate button - #5DAB68 */
 .gradient-button-green {
 	background: rgba(93, 171, 104, 0.49) !important;
-	border: 1px solid rgba(93, 171, 104, 1) !important;
-	transition: all 0.2s ease;
+	border: 1px solid #5DAB68 !important;
+	color: black !important;
+	transition: all 0.3s ease;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	text-align: center !important;
+	line-height: 39px !important; /* match button height for perfect vertical centering */
+	padding: 0 16px !important; /* symmetric padding for clean horizontal center */
 }
-
 .gradient-button-green:hover {
-	background: rgba(93, 171, 104, 0.65) !important;
-	border: 1px solid rgba(93, 171, 104, 1) !important;
-	transition: all 0.2s ease;
+	background: rgba(93, 171, 104, 0.65) !important; /* Slightly more opaque on hover */
+	border-color: #5DAB68 !important;
 }
 
 /* Dark mode green button */
@@ -1087,13 +1092,24 @@ mux-player {
 .gradient-button-blue {
 	background: rgba(226, 226, 226, 0.49) !important;
 	border: 1px solid #B6B6B6 !important;
-	transition: all 0.2s ease;
+	color: #333 !important;
+	transition: background 0.2s ease;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	text-align: center !important;
+	line-height: 39px !important; /* match button height */
+	padding: 0 16px !important; /* symmetric padding */
 }
 
 .gradient-button-blue:hover {
 	background: rgba(226, 226, 226, 0.65) !important;
-	border: 1px solid #B6B6B6 !important;
-	transition: all 0.2s ease;
+	border-color: #ababab !important;
+}
+
+.gradient-button-blue:active {
+	background: rgba(226, 226, 226, 0.8) !important;
+	border-color: #9d9d9d !important;
 }
 
 /* Dark mode blue button */

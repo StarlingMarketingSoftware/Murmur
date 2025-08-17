@@ -314,7 +314,7 @@ const Dashboard = () => {
 										isLoading={isPendingCreateCampaign || isPendingBatchUpdateContacts}
 										variant="primary-light"
 										bold
-										className="w-8/10 mx-auto mt-5"
+										className="w-full max-w-[1308px] h-[39px] mx-auto mt-5"
 										disabled={selectedContacts.length === 0}
 									>
 										Create Campaign
