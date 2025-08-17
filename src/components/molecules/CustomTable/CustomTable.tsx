@@ -49,6 +49,7 @@ interface DataTableProps<TData, TValue> {
 	displayRowsPerPage?: boolean;
 	constrainHeight?: boolean;
 	hidePagination?: boolean;
+	headerAction?: React.ReactNode;
 }
 
 interface TableSortingButtonProps<TData> {
@@ -106,6 +107,7 @@ export function CustomTable<TData, TValue>({
 	displayRowsPerPage = true,
 	constrainHeight = false,
 	hidePagination = false,
+	headerAction,
 }: CustomTableProps<TData, TValue>) {
 	const [pagination, setPagination] = useState({
 		pageIndex: 0,
@@ -212,8 +214,8 @@ export function CustomTable<TData, TValue>({
 
 	return (
 		<div className=" [&_::-webkit-scrollbar]:h-[4px] [&_::-webkit-scrollbar]:md:h-[7px] [&_::-webkit-scrollbar-thumb]:bg-gray-300 [&_::-webkit-scrollbar-thumb]:rounded-full [&_::-webkit-scrollbar]:w-[4px] [&_::-webkit-scrollbar]:md:w-[7px]">
-			<div className="flex items-center justify-between py-4 gap-4">
-				<div className="flex flex-col sm:flex-row items-center gap-4">
+			<div className="flex items-center justify-between py-4 gap-4" style={{ width: '1185px' }}>
+				<div className="flex items-center gap-4">
 					{searchable && (
 						<Input
 							placeholder="Search all columns..."
@@ -245,13 +247,14 @@ export function CustomTable<TData, TValue>({
 							</Select>
 						</div>
 					)}
+					{isSelectable && (
+						<div className="text-sm text-muted-foreground">
+							{table.getFilteredSelectedRowModel().rows.length} of{' '}
+							{table.getFilteredRowModel().rows.length} rows selected.
+						</div>
+					)}
 				</div>
-				{isSelectable && (
-					<div className="flex-1 gap-4 text-sm text-muted-foreground">
-						{table.getFilteredSelectedRowModel().rows.length} of{' '}
-						{table.getFilteredRowModel().rows.length} rows selected.
-					</div>
-				)}
+				{isSelectable && headerAction ? headerAction : null}
 			</div>
 			<div
 				className={twMerge(
