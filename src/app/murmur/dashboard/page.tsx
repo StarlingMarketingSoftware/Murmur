@@ -45,6 +45,7 @@ const Dashboard = () => {
 		handleResetSearch,
 		handleSelectAll,
 		isAllSelected,
+		hoveredText,
 	} = useDashboard();
 	return (
 		<AppLayout>
@@ -267,11 +268,18 @@ const Dashboard = () => {
 							<ConsoleLoader searchQuery={activeSearchQuery} />
 						</div>
 					) : contacts && contacts.length > 0 ? (
-						<>
+						<div className="flex justify-center">
 							<div className="results-appear results-align">
 								<div className="select-prompt-container">
 									<div className="select-prompt-text">
 										Select who you want to contact
+									</div>
+									<div className="static-tooltip-container">
+										{hoveredText && (
+											<div className="static-tooltip-text">
+												{hoveredText}
+											</div>
+										)}
 									</div>
 								</div>
 								<Card className="border-0 shadow-none !p-0">
@@ -306,14 +314,14 @@ const Dashboard = () => {
 										isLoading={isPendingCreateCampaign || isPendingBatchUpdateContacts}
 										variant="primary-light"
 										bold
-										className="w-8/10 mx-auto mt-5"
+										className="w-full max-w-[1308px] h-[39px] mx-auto mt-5"
 										disabled={selectedContacts.length === 0}
 									>
 										Create Campaign
 									</Button>
 								</div>
 							</div>
-						</>
+						</div>
 					) : hasSearched && (contacts === undefined || (Array.isArray(contacts) && contacts.length === 0)) ? (
 						<div className="mt-10">
 							<Card className="max-w-[1174px] mx-auto">

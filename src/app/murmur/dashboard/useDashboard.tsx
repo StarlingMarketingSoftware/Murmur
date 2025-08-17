@@ -80,6 +80,7 @@ export const useDashboard = () => {
 	const [apolloContacts, setApolloContacts] = useState<ContactWithName[]>([]);
 	const [tableInstance, setTableInstance] = useState<Table<ContactWithName>>();
 	const [usedContactIdsSet, setUsedContactIdsSet] = useState<Set<number>>(new Set());
+	const [hoveredText, setHoveredText] = useState('');
 
 	const {
 		data: contacts,
@@ -264,6 +265,10 @@ export const useDashboard = () => {
 		setTableInstance(table);
 	};
 
+	const handleCellHover = (text: string | null) => {
+		setHoveredText(text || '');
+	};
+
 	/* EFFECTS */
 	useEffect(() => {
 		if (usedContactIds) {
@@ -317,11 +322,14 @@ export const useDashboard = () => {
 				size: 150,
 				header: () => <span className="font-bold">Company</span>,
 				cell: ({ row }) => {
-					return (
-						<div className="truncate transition-all duration-200 hover:opacity-80">
-							<TableCellTooltip text={row.getValue('company')} maxLength={MAX_CELL_LENGTH} />
-						</div>
-					);
+											return (
+							<TableCellTooltip 
+								text={row.getValue('company')} 
+								maxLength={MAX_CELL_LENGTH} 
+								positioning="below-right"
+								onHover={handleCellHover}
+							/>
+						);
 				},
 			},
 			{
@@ -345,18 +353,23 @@ export const useDashboard = () => {
 											</div>
 										</TooltipTrigger>
 										<TooltipContent side="right">
-											This contact has been used in a campaign.
+											<div className="font-normal">{email}</div>
 										</TooltipContent>
 									</Tooltip>
 								) : (
-									<div className={twMerge('text-left truncate')}>{email}</div>
+									<TableCellTooltip 
+										text={email} 
+										maxLength={MAX_CELL_LENGTH} 
+										positioning="below-right"
+										onHover={handleCellHover}
+									/>
 								)}
 							</div>
 						);
 					}
 					// Obfuscate the entire email address with a simple blur
 					return (
-						<div className="text-left whitespace-nowrap truncate">
+						<div className="text-left whitespace-nowrap overflow-hidden">
 							<span className="email-obfuscated-local">
 								{email}
 							</span>
@@ -407,7 +420,12 @@ export const useDashboard = () => {
 							}}
 						>
 							{hasName ? (
-								<span className="truncate">{nameValue}</span>
+								<TableCellTooltip 
+									text={nameValue} 
+									maxLength={MAX_CELL_LENGTH} 
+									positioning="below-right"
+									onHover={handleCellHover}
+								/>
 							) : (
 								<span className="select-none">—</span>
 							)}
@@ -420,7 +438,14 @@ export const useDashboard = () => {
 				size: 150,
 				header: () => <span className="font-bold">City</span>,
 				cell: ({ row }) => {
-					return <div className="text-left truncate">{row.getValue('city')}</div>;
+											return (
+							<TableCellTooltip 
+								text={row.getValue('city')} 
+								maxLength={MAX_CELL_LENGTH} 
+								positioning="below-right"
+								onHover={handleCellHover}
+							/>
+						);
 				},
 			},
 			{
@@ -428,7 +453,14 @@ export const useDashboard = () => {
 				size: 150,
 				header: () => <span className="font-bold">State</span>,
 				cell: ({ row }) => {
-					return <div className="text-left truncate">{row.getValue('state')}</div>;
+											return (
+							<TableCellTooltip 
+								text={row.getValue('state')} 
+								maxLength={MAX_CELL_LENGTH} 
+								positioning="below-right"
+								onHover={handleCellHover}
+							/>
+						);
 				},
 			},
 			{
@@ -437,9 +469,12 @@ export const useDashboard = () => {
 				header: () => <span className="font-bold">Description</span>,
 				cell: ({ row }) => {
 					return (
-						<div className="truncate transition-all duration-200 hover:opacity-80">
-							<TableCellTooltip text={row.getValue('title')} maxLength={MAX_CELL_LENGTH} />
-						</div>
+						<TableCellTooltip 
+							text={row.getValue('title')} 
+							maxLength={MAX_CELL_LENGTH} 
+							positioning="below-left"
+							onHover={handleCellHover}
+						/>
 					);
 				},
 			}
@@ -482,5 +517,6 @@ export const useDashboard = () => {
 		isFreeTrial,
 		hasSearched,
 		handleResetSearch,
+		hoveredText,
 	};
 };

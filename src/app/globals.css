@@ -1062,14 +1062,27 @@ mux-player {
 /* Generate button - #5DAB68 */
 .gradient-button-green {
 	background: rgba(93, 171, 104, 0.49) !important;
-	border: 1px solid rgba(93, 171, 104, 1) !important;
-	transition: all 0.2s ease;
+	border: 1px solid #5DAB68 !important;
+	color: black !important;
+	-webkit-transition: all 0.3s ease;
+	-moz-transition: all 0.3s ease;
+	transition: all 0.3s ease;
+	display: -webkit-flex !important;
+	display: -moz-box !important;
+	display: flex !important;
+	-webkit-align-items: center !important;
+	-moz-box-align: center !important;
+	align-items: center !important;
+	-webkit-justify-content: center !important;
+	-moz-box-pack: center !important;
+	justify-content: center !important;
+	text-align: center !important;
+	line-height: 39px !important; /* match button height for perfect vertical centering */
+	padding: 0 16px !important; /* symmetric padding for clean horizontal center */
 }
-
 .gradient-button-green:hover {
-	background: rgba(93, 171, 104, 0.65) !important;
-	border: 1px solid rgba(93, 171, 104, 1) !important;
-	transition: all 0.2s ease;
+	background: rgba(93, 171, 104, 0.65) !important; /* Slightly more opaque on hover */
+	border-color: #5DAB68 !important;
 }
 
 /* Dark mode green button */
@@ -1087,13 +1100,32 @@ mux-player {
 .gradient-button-blue {
 	background: rgba(226, 226, 226, 0.49) !important;
 	border: 1px solid #B6B6B6 !important;
-	transition: all 0.2s ease;
+	color: #333 !important;
+	-webkit-transition: background 0.2s ease;
+	-moz-transition: background 0.2s ease;
+	transition: background 0.2s ease;
+	display: -webkit-flex !important;
+	display: -moz-box !important;
+	display: flex !important;
+	-webkit-align-items: center !important;
+	-moz-box-align: center !important;
+	align-items: center !important;
+	-webkit-justify-content: center !important;
+	-moz-box-pack: center !important;
+	justify-content: center !important;
+	text-align: center !important;
+	line-height: 39px !important; /* match button height */
+	padding: 0 16px !important; /* symmetric padding */
 }
 
 .gradient-button-blue:hover {
 	background: rgba(226, 226, 226, 0.65) !important;
-	border: 1px solid #B6B6B6 !important;
-	transition: all 0.2s ease;
+	border-color: #ababab !important;
+}
+
+.gradient-button-blue:active {
+	background: rgba(226, 226, 226, 0.8) !important;
+	border-color: #9d9d9d !important;
 }
 
 /* Dark mode blue button */
@@ -2428,262 +2460,46 @@ mux-player {
 }
 
 .select-prompt-container {
+	display: -webkit-flex;
+	display: -moz-box;
 	display: flex;
-	justify-content: center;
+	-webkit-flex-direction: column;
+	-moz-box-orient: vertical;
+	-moz-box-direction: normal;
+	flex-direction: column;
+	-webkit-align-items: center;
+	-moz-box-align: center;
 	align-items: center;
-	margin-bottom: 12px;
-	margin-top: 0;
-	-webkit-animation: appleSlideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-	animation: appleSlideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-	-webkit-animation-delay: 0.2s;
-	animation-delay: 0.2s;
-	opacity: 0;
+	margin-bottom: 1rem; /* Adjust as needed */
 }
 
 .select-prompt-text {
 	font-family: 'Times New Roman', Times, serif;
-	font-size: 20px;
-	font-weight: 400;
-	letter-spacing: 0.02em;
-	color: #000000;
-	position: relative;
-	transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-	-webkit-animation: appleFadeGlow 3s ease-in-out infinite;
-	animation: appleFadeGlow 3s ease-in-out infinite;
+	font-size: 1.25rem; /* 20px */
+	color: #333; /* Dark gray for readability */
 }
 
-/* Unified results appear animation wrapper */
-.results-appear {
-	opacity: 0;
-	-webkit-animation: appleSlideIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.05s forwards;
-	animation: appleSlideIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.05s forwards;
+.static-tooltip-container {
+	height: 2.5rem; /* Allocate space for the text */
+	display: -webkit-flex;
+	display: -moz-box;
+	display: flex;
+	-webkit-align-items: center;
+	-moz-box-align: center;
+	align-items: center;
+	-webkit-justify-content: center;
+	-moz-box-pack: center;
+	justify-content: center;
+	margin-top: 0.5rem; /* Lower the text vertically */
 }
 
-/* Align results with search input width */
-.results-align {
-	max-width: 1185px; /* enforce exact table width */
-	margin-left: auto;
-	margin-right: auto;
-	padding-left: 0;
-	padding-right: 0;
-}
-
-.select-prompt-text:hover {
-	transform: translateY(-1px);
-}
-
-/* Dark mode support */
-.dark .select-prompt-text {
-	color: #ffffff;
-}
-
-/* Obfuscated email style - traditional blur */
-.email-obfuscated-local {
-	font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Arial, sans-serif;
-	color: rgba(0, 0, 0, 0.5);
-	filter: blur(4px);
-	-webkit-filter: blur(4px);
-	display: inline-block;
-	font-size: 14px;
-	user-select: none;
-	-webkit-user-select: none;
-	-moz-user-select: none;
-	-ms-user-select: none;
-	pointer-events: none;
-}
-
-.email-obfuscated-local:hover {
-	/* Keep the same blur on hover - no reveal */
-	color: rgba(0, 0, 0, 0.5);
-	filter: blur(4px);
-	-webkit-filter: blur(4px);
-	cursor: default;
-}
-
-.dark .email-obfuscated-local {
-	color: rgba(255, 255, 255, 0.5);
-	filter: blur(4px);
-	-webkit-filter: blur(4px);
-}
-
-.dark .email-obfuscated-local:hover {
-	/* Keep the same blur on hover in dark mode - no reveal */
-	color: rgba(255, 255, 255, 0.5);
-	filter: blur(4px);
-	-webkit-filter: blur(4px);
-	cursor: default;
-}
-
-
-
-/* Select All Button - Times New Roman */
-.select-all-button {
-	font-family: "Times New Roman", Times, serif;
-	font-size: 14px;
-	font-weight: 400;
-	color: #000000;
-	background: #ffffff;
-	border: 1px solid #000000;
-	border-radius: 4px;
-	padding: 5px 14px;
-	margin: 0;
-	cursor: pointer;
-	letter-spacing: 0;
-	text-decoration: none;
-	transition: all 0.15s ease;
-	outline: none;
-	user-select: none;
-	-webkit-user-select: none;
-	-moz-user-select: none;
-	-ms-user-select: none;
-	line-height: 1.4;
-}
-
-.select-all-button:hover {
-	background: #f0f0f0;
-	border-color: #000000;
-}
-
-.select-all-button:active {
-	background: #e0e0e0;
-	border-color: #000000;
-	transform: translateY(0.5px);
-}
-
-.dark .select-all-button {
-	color: #ffffff;
-	background: #1a1a1a;
-	border: 1px solid #ffffff;
-}
-
-.dark .select-all-button:hover {
-	background: #2a2a2a;
-	border-color: #ffffff;
-}
-
-.dark .select-all-button:active {
-	background: #333333;
-	border-color: #ffffff;
-}
-
-/* Smooth Tooltip Animations */
-[data-radix-popper-content-wrapper] {
-	animation: slideIn 0.2s ease-out;
-	transform-origin: var(--radix-tooltip-content-transform-origin);
-}
-
-@keyframes slideIn {
-	from {
-		opacity: 0;
-		transform: scale(0.96) translateY(-2px);
-	}
-	to {
-		opacity: 1;
-		transform: scale(1) translateY(0);
-	}
-}
-
-/* Smoother tooltip content transitions */
-[role="tooltip"] {
-	animation: tooltipFadeIn 0.15s ease-out;
-}
-
-@keyframes tooltipFadeIn {
-	from {
-		opacity: 0;
-		filter: blur(2px);
-	}
-	to {
-		opacity: 1;
-		filter: blur(0);
-	}
-}
-
-/* Custom Scrollbar Styles for Search Results Table */
-.custom-scrollbar {
-	/* Firefox */
-	scrollbar-width: thin;
-	scrollbar-color: #333333 #f0f0f0;
-	/* Safari requires WebKit-specific scrollbar styling */
-	-webkit-overflow-scrolling: touch;
-}
-
-/* Webkit browsers (Chrome, Safari, Edge) */
-.custom-scrollbar::-webkit-scrollbar {
-	width: 12px;
-	height: 12px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-	background: #f5f5f5;
-	border-left: 1px solid #e0e0e0;
-	box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.1);
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-	background: linear-gradient(180deg, #666666 0%, #333333 100%);
-	border-radius: 6px;
-	border: 2px solid #f5f5f5;
-	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-	transition: all 0.3s ease;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-	background: linear-gradient(180deg, #555555 0%, #222222 100%);
-	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:active {
-	background: linear-gradient(180deg, #444444 0%, #111111 100%);
-	box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-/* Dark mode scrollbar */
-.dark .custom-scrollbar::-webkit-scrollbar-track {
-	background: #1a1a1a;
-	border-left: 1px solid #333333;
-}
-
-.dark .custom-scrollbar::-webkit-scrollbar-thumb {
-	background: linear-gradient(180deg, #888888 0%, #666666 100%);
-	border: 2px solid #1a1a1a;
-}
-
-.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-	background: linear-gradient(180deg, #999999 0%, #777777 100%);
-}
-
-.dark .custom-scrollbar::-webkit-scrollbar-thumb:active {
-	background: linear-gradient(180deg, #aaaaaa 0%, #888888 100%);
-}
-
-/* Dark mode enhancements with glass morphism */
-.dark .search-bar-wrapper.search-bar-active {
-	background: linear-gradient(
-		180deg,
-		rgba(17, 24, 39, 0.72) 0%,
-		rgba(17, 24, 39, 0.68) 40%,
-		rgba(17, 24, 39, 0.45) 70%,
-		rgba(17, 24, 39, 0) 100%
-	);
-	backdrop-filter: blur(30px) saturate(150%) brightness(1.1);
-	-webkit-backdrop-filter: blur(30px) saturate(150%) brightness(1.1);
-	padding: 2rem 0 1.5rem 0;
-	width: 100%;
-	box-shadow: none;
-}
-
-.dark .search-bar-active .search-wave-container {
-	box-shadow: none;
-}
-
-.dark .search-bar-active .search-wave-input {
-	animation: inputGlowPulse 2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-	transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-/* Dark mode loading spinner */
-.dark .search-wave-loading::after {
-	border-color: rgba(255, 255, 255, 0.1);
-	border-top-color: rgba(255, 255, 255, 0.4);
+.static-tooltip-text {
+	font-family: 'Times New Roman', Times, serif;
+	font-size: 1rem; /* 16px - Smaller font size */
+	color: #888888; /* A nice gray color */
+	padding: 0.5rem 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
 }

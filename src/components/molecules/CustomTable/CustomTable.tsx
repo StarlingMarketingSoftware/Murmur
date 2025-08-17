@@ -212,6 +212,11 @@ export function CustomTable<TData, TValue>({
 		}
 	}, [pagination.pageIndex, pagination.pageSize, data]);
 
+	const tableContainerStyle = {
+		width: '1185px',
+		height: constrainHeight ? '429px' : undefined,
+	  };
+
 	return (
 		<div className=" [&_::-webkit-scrollbar]:h-[4px] [&_::-webkit-scrollbar]:md:h-[7px] [&_::-webkit-scrollbar-thumb]:bg-gray-300 [&_::-webkit-scrollbar-thumb]:rounded-full [&_::-webkit-scrollbar]:w-[4px] [&_::-webkit-scrollbar]:md:w-[7px]">
 			<div className="flex items-center justify-between py-4 gap-4" style={{ width: '1185px' }}>
@@ -259,9 +264,8 @@ export function CustomTable<TData, TValue>({
 			<div
 				className={twMerge(
 					'border-2 border-black relative overflow-y-auto overflow-x-hidden custom-scrollbar',
-					constrainHeight && 'max-h-[750px]'
 				)}
-				style={{ width: '1185px' }}
+				style={tableContainerStyle}
 			>
 				<Table className="relative w-full table-fixed" variant={variant}>
 					<TableHeader variant={variant} sticky>
