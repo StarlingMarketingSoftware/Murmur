@@ -7,13 +7,15 @@ config();
 // Local Elasticsearch client (will act as the target)
 const localClient = new Client({
 	node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
-	auth: process.env.ELASTICSEARCH_API_KEY ? {
-		apiKey: process.env.ELASTICSEARCH_API_KEY,
-	} : undefined, // No auth for local development if no API key
+	auth: process.env.ELASTICSEARCH_API_KEY
+		? {
+				apiKey: process.env.ELASTICSEARCH_API_KEY,
+		  }
+		: undefined, // No auth for local development if no API key
 });
 
 const INDEX_NAME = 'contacts';
-const PRODUCTION_ES_URL = process.env.PRODUCTION_ELASTICSEARCH_URL || 'https://0ede66e587f64b5e81a1dcb22ab8459d.us-central1.gcp.cloud.es.io:443';
+const PRODUCTION_ES_URL = process.env.ELASTICSEARCH_URL_PRODUCTION;
 
 async function checkLocalConnection() {
 	try {
@@ -28,7 +30,7 @@ async function checkLocalConnection() {
 
 async function prepareLocalIndex() {
 	console.log('🏗️  Preparing local index...');
-	
+
 	try {
 		// Check if index exists and delete it for clean import
 		const exists = await localClient.indices.exists({ index: INDEX_NAME });
@@ -36,7 +38,7 @@ async function prepareLocalIndex() {
 			console.log('⚠️  Deleting existing local index for clean import...');
 			await localClient.indices.delete({ index: INDEX_NAME });
 		}
-		
+
 		// Create index with basic settings - the reindex operation will copy the mapping
 		await localClient.indices.create({
 			index: INDEX_NAME,
@@ -45,7 +47,7 @@ async function prepareLocalIndex() {
 				number_of_replicas: 0, // No replicas needed for local dev
 			},
 		});
-		
+
 		console.log('✅ Local index prepared');
 	} catch (error) {
 		console.error('❌ Failed to prepare local index:', error);
@@ -65,6 +67,11 @@ async function reindexFromProduction() {
 		);
 	}
 
+	if (!PRODUCTION_ES_URL) {
+		console.error('ELASTICSEARCH_URL_PRODUCTION is not set');
+		process.exit(1);
+	}
+
 	try {
 		const reindexResponse = await localClient.reindex({
 			wait_for_completion: true,
@@ -72,7 +79,7 @@ async function reindexFromProduction() {
 				remote: {
 					host: PRODUCTION_ES_URL,
 					headers: {
-						'Authorization': `ApiKey ${productionApiKey}`,
+						Authorization: `ApiKey ${productionApiKey}`,
 					},
 					socket_timeout: '10m',
 					connect_timeout: '10s',
@@ -84,7 +91,7 @@ async function reindexFromProduction() {
 				index: INDEX_NAME,
 			},
 		});
-		
+
 		console.log('📊 Reindex completed:');
 		console.log(`   Total documents: ${reindexResponse.total}`);
 		console.log(`   Created documents: ${reindexResponse.created}`);
@@ -93,14 +100,14 @@ async function reindexFromProduction() {
 		console.log(`   Batches: ${reindexResponse.batches}`);
 		console.log(`   Failures: ${reindexResponse.version_conflicts || 0}`);
 		console.log(`   Duration: ${reindexResponse.took}ms`);
-		
+
 		if (reindexResponse.failures && reindexResponse.failures.length > 0) {
 			console.log('\n❌ Failures encountered:');
-			reindexResponse.failures.forEach((failure: any, index: number) => {
+			reindexResponse.failures.forEach((failure, index: number) => {
 				console.log(`${index + 1}. ${JSON.stringify(failure, null, 2)}`);
 			});
 		}
-		
+
 		return reindexResponse;
 	} catch (error) {
 		console.error('❌ Reindex failed:', error);
@@ -110,23 +117,26 @@ async function reindexFromProduction() {
 
 async function verifyImport() {
 	console.log('🔍 Verifying import...');
-	
+
 	try {
 		const count = await localClient.count({ index: INDEX_NAME });
 		console.log(`✅ Local documents count: ${count.count}`);
-		
+
 		// Test search functionality
 		const searchTest = await localClient.search({
 			index: INDEX_NAME,
 			size: 1,
 			query: { match_all: {} },
 		});
-		
+
 		if (searchTest.hits.hits.length > 0) {
 			console.log('✅ Search test successful');
-			console.log('📄 Sample document fields:', Object.keys(searchTest.hits.hits[0]._source || {}));
+			console.log(
+				'📄 Sample document fields:',
+				Object.keys(searchTest.hits.hits[0]._source || {})
+			);
 		}
-		
+
 		return count.count;
 	} catch (error) {
 		console.error('❌ Verification failed:', error);
@@ -144,33 +154,36 @@ async function main() {
 		if (!connectionOk) {
 			throw new Error('Local connection check failed');
 		}
-		
+
 		// Step 2: Prepare local index
 		await prepareLocalIndex();
-		
+
 		// Step 3: Reindex from production
 		const reindexResult = await reindexFromProduction();
-		
+
 		// Step 4: Verify
 		const finalCount = await verifyImport();
-		
+
 		// Step 5: Summary
 		console.log('\n🎉 Reindex Summary:');
 		console.log('===================');
 		console.log(`Documents copied: ${reindexResult.created}`);
 		console.log(`Final local count: ${finalCount}`);
 		console.log(`Success: ${reindexResult.created === finalCount ? '✅' : '❌'}`);
-		
+
 		if (reindexResult.created === finalCount && finalCount > 0) {
 			console.log('\n🎉 Successfully copied production contacts to local Elasticsearch!');
 			console.log('You can now test your search implementation with real data.');
 		}
-		
 	} catch (error) {
 		console.error('💥 Fatal error:', error);
 		console.error('\n💡 Troubleshooting tips:');
-		console.error('1. Make sure you provided the correct production API key as a command line argument.');
-		console.error('2. Make sure your local Docker Elasticsearch is running: docker-compose up -d');
+		console.error(
+			'1. Make sure you provided the correct production API key as a command line argument.'
+		);
+		console.error(
+			'2. Make sure your local Docker Elasticsearch is running: docker-compose up -d'
+		);
 		console.error('3. Verify your production API key has read permissions');
 		console.error('4. Check that the production URL is accessible from your network');
 		process.exit(1);

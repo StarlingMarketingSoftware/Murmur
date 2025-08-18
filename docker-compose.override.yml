@@ -1,7 +1,0 @@
-services:
-  elasticsearch:
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - 'ES_JAVA_OPTS=-Xms4g -Xmx4g'
-      - reindex.remote.whitelist=0ede66e587f64b5e81a1dcb22ab8459d.us-central1.gcp.cloud.es.io:443
