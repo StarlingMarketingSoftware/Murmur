@@ -29,12 +29,23 @@ export const useMistral = (options: CustomMutationOptions = {}) => {
 			});
 
 			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(
-					errorData.error?.message || 'Failed to get response from Mistral Agent'
-				);
+				let errorMsg = 'Failed to get response from Mistral Agent';
+				try {
+					const errorData = await response.json();
+					if (errorData.error?.message) {
+						errorMsg = `Mistral API error: ${errorData.error.message}`;
+					} else if (errorData.message) {
+						errorMsg = `Mistral error: ${errorData.message}`;
+					}
+					console.error('[Mistral] API error response:', errorData);
+				} catch {
+					errorMsg = `Mistral API error: ${response.status} ${response.statusText}`;
+				}
+				throw new Error(errorMsg);
 			}
 			const res = await response.json();
+			console.log('[Mistral] Response type:', typeof res);
+			console.log('[Mistral] Response preview:', typeof res === 'string' ? res.substring(0, 200) : JSON.stringify(res).substring(0, 200));
 
 			return removeMarkdownCodeBlocks(res);
 		},

@@ -305,35 +305,123 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			throw new Error('Campaign identity is required');
 		}
 
-		const perplexityPrompt = `Recipient: ${stringifyJsonSubset<Contact>(recipient, [
-			'firstName',
+		// ROBUSTNESS FIX: Dynamically create the system prompt with real data.
+		const populatedSystemPrompt = PERPLEXITY_FULL_AI_PROMPT.replace(
+			'{recipient_first_name}',
+			recipient.firstName || ''
+		).replace('{company}', recipient.company || '');
+
+		const userPrompt = `Sender: ${stringifyJsonSubset<Identity>(campaign.identity, [
+			'name',
+			'website',
+		])}\n\nRecipient Additional Info: ${stringifyJsonSubset<Contact>(recipient, [
 			'lastName',
-			'company',
 			'address',
 			'city',
 			'state',
 			'country',
 			'website',
 			'phone',
-		])}\n\n Sender: ${stringifyJsonSubset<Identity>(campaign.identity, [
-			'name',
-			'website',
-		])}\n\n Prompt: ${prompt}`;
+		])}\n\nUser Goal: ${prompt}`;
 
-		const perplexityResponse: string = await callPerplexity({
-			model: 'sonar',
-			rolePrompt: PERPLEXITY_FULL_AI_PROMPT,
-			userPrompt: perplexityPrompt,
-			signal: signal,
-		});
+		// Debug logging for Full AI path
+		console.log(
+			`[Full AI] Starting generation for contact: ${recipient.id} (${recipient.email})`
+		);
+		console.log('[Full AI] Populated System Prompt:', populatedSystemPrompt.substring(0, 300));
+		console.log('[Full AI] User Prompt:', userPrompt.substring(0, 300));
 
-		const mistralResponse1 = await callMistralAgent({
-			prompt: getMistralTonePrompt(toneAgentType),
-			content: perplexityResponse,
-			agentType: toneAgentType,
-			signal: signal,
-		});
-		const mistralResponse1Parsed: DraftEmailResponse = JSON.parse(mistralResponse1);
+		let perplexityResponse: string;
+		try {
+			perplexityResponse = await callPerplexity({
+				model: 'sonar',
+				rolePrompt: populatedSystemPrompt, // Use the new, populated prompt
+				userPrompt: userPrompt,
+				signal: signal,
+			});
+		} catch (error) {
+			console.error('[Full AI] Perplexity call failed:', error);
+			if (error instanceof Error && error.message.includes('cancelled')) {
+				throw error;
+			}
+			throw new Error(`Failed to generate email content: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		}
+
+		console.log('[Full AI] Perplexity response length:', perplexityResponse.length);
+		console.log('[Full AI] Perplexity response preview:', perplexityResponse.substring(0, 200));
+
+		let mistralResponse1: string;
+		try {
+			mistralResponse1 = await callMistralAgent({
+				prompt: getMistralTonePrompt(toneAgentType),
+				content: perplexityResponse,
+				agentType: toneAgentType,
+				signal: signal,
+			});
+		} catch (error) {
+			console.error('[Full AI] Mistral tone agent call failed:', error);
+			if (error instanceof Error && error.message.includes('cancelled')) {
+				throw error;
+			}
+			// If Mistral fails, try to create a basic response with the Perplexity content
+			console.log('[Full AI] Falling back to Perplexity response due to Mistral error');
+			return {
+				subject: `Email for ${recipient.firstName || recipient.email}`,
+				message: perplexityResponse,
+			};
+		}
+
+		console.log('[Full AI] Mistral raw response:', mistralResponse1.substring(0, 500));
+		
+		let mistralResponse1Parsed: DraftEmailResponse;
+		try {
+			// Robust JSON parsing: handle markdown blocks, extra text, etc.
+			let cleanedResponse = mistralResponse1;
+			
+			// Remove markdown code blocks if present
+			cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+			
+			// Try to extract JSON object from the response
+			const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+			if (jsonMatch) {
+				cleanedResponse = jsonMatch[0];
+			}
+			
+			// Remove any trailing commas before closing braces/brackets (common LLM mistake)
+			cleanedResponse = cleanedResponse.replace(/,(\s*[}\]])/g, '$1');
+			
+			console.log('[Full AI] Attempting to parse cleaned JSON:', cleanedResponse.substring(0, 200));
+			mistralResponse1Parsed = JSON.parse(cleanedResponse);
+			
+			// Validate the parsed object has required fields
+			if (!mistralResponse1Parsed.message || !mistralResponse1Parsed.subject) {
+				throw new Error('Parsed JSON missing required fields (message or subject)');
+			}
+			
+			console.log('[Full AI] Successfully parsed Mistral response');
+		} catch (e) {
+			console.error('[Full AI] Mistral JSON parse failed:', e);
+			console.error('[Full AI] Failed response was:', mistralResponse1);
+			
+			// Better fallback: try to extract subject and message as plain text
+			const subjectMatch = mistralResponse1.match(/subject[:\s]+["']?([^"'\n]+)["']?/i);
+			const messageMatch = mistralResponse1.match(/message[:\s]+["']?([\s\S]+?)["']?(?:\}|$)/i);
+			
+			if (subjectMatch && messageMatch) {
+				mistralResponse1Parsed = {
+					subject: subjectMatch[1].trim(),
+					message: messageMatch[1].trim(),
+				};
+				console.log('[Full AI] Extracted from plain text fallback');
+			} else {
+				// Last resort: use the perplexity response directly
+				mistralResponse1Parsed = {
+					subject: `Email regarding ${recipient.company || 'your inquiry'}`,
+					message: perplexityResponse,
+				};
+				console.log('[Full AI] Using perplexity response as fallback');
+			}
+		}
 
 		if (!mistralResponse1Parsed.message || !mistralResponse1Parsed.subject) {
 			throw new Error('No message or subject generated by Mistral Agent');
@@ -342,13 +430,21 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		let mistralResponse2 = mistralResponse1;
 
 		if (paragraphs > 0) {
-			mistralResponse2 = await callMistralAgent({
-				prompt: getMistralParagraphPrompt(paragraphs),
-				content: mistralResponse1Parsed.message,
-				agentType: `paragraph${paragraphs}` as MistralParagraphAgentType,
-				signal: signal,
-			});
+			try {
+				console.log(`[Full AI] Applying paragraph formatting for ${paragraphs} paragraphs`);
+				mistralResponse2 = await callMistralAgent({
+					prompt: getMistralParagraphPrompt(paragraphs),
+					content: mistralResponse1Parsed.message,
+					agentType: `paragraph${paragraphs}` as MistralParagraphAgentType,
+					signal: signal,
+				});
+				console.log('[Full AI] Paragraph formatting applied successfully');
+			} catch (e) {
+				console.error('[Full AI] Mistral paragraph formatting failed:', e);
+				mistralResponse2 = mistralResponse1Parsed.message;
+			}
 		} else {
+			console.log('[Full AI] No paragraph formatting requested, returning parsed response');
 			return mistralResponse1Parsed;
 		}
 
@@ -407,7 +503,50 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			signal: signal,
 		});
 
-		const mistralResponseParsed: DraftEmailResponse = JSON.parse(mistralResponse);
+		console.log('[Hybrid] Mistral raw response:', mistralResponse.substring(0, 500));
+
+		let mistralResponseParsed: DraftEmailResponse;
+		try {
+			// Apply same robust JSON parsing as Full AI mode
+			let cleanedResponse = mistralResponse;
+			
+			// Remove markdown code blocks if present
+			cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+			
+			// Try to extract JSON object from the response
+			const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+			if (jsonMatch) {
+				cleanedResponse = jsonMatch[0];
+			}
+			
+			// Remove any trailing commas before closing braces/brackets
+			cleanedResponse = cleanedResponse.replace(/,(\s*[}\]])/g, '$1');
+			
+			mistralResponseParsed = JSON.parse(cleanedResponse);
+			
+			if (!mistralResponseParsed.message || !mistralResponseParsed.subject) {
+				throw new Error('Parsed JSON missing required fields');
+			}
+		} catch (e) {
+			console.error('[Hybrid] Mistral JSON parse failed:', e);
+			
+			// Fallback: try to extract from plain text
+			const subjectMatch = mistralResponse.match(/subject[:\s]+["']?([^"'\n]+)["']?/i);
+			const messageMatch = mistralResponse.match(/message[:\s]+["']?([\s\S]+?)["']?(?:\}|$)/i);
+			
+			if (subjectMatch && messageMatch) {
+				mistralResponseParsed = {
+					subject: subjectMatch[1].trim(),
+					message: messageMatch[1].trim(),
+				};
+			} else {
+				// Use perplexity response as fallback
+				mistralResponseParsed = {
+					subject: `Email for ${recipient.company || recipient.firstName || 'recipient'}`,
+					message: perplexityResponse,
+				};
+			}
+		}
 
 		if (!mistralResponseParsed.message || !mistralResponseParsed.subject) {
 			throw new Error('No message or subject generated by Mistral Agent');

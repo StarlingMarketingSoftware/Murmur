@@ -1,192 +1,285 @@
 'use client';
-import { SignUpButton, useAuth, UserButton } from '@clerk/nextjs';
-import { SignInButton } from '@clerk/nextjs';
+import { useAuth, UserButton, SignUpButton, SignInButton } from '@clerk/nextjs';
 import { urls } from '@/constants/urls';
-import { Button } from '@/components/ui/button';
-import LogoIcon from '@/components/atoms/_svg/LogoIcon';
-import { MenuIcon } from 'lucide-react';
+// import { Menu, X, ChevronRight } from 'lucide-react';
 import { useMe } from '@/hooks/useMe';
 import Link from 'next/link';
 import { cn } from '@/utils';
-import { NavigationMenuLink } from '@/components/ui/navigation-menu';
-import { forwardRef, useState, useEffect } from 'react';
-import { Typography } from '@/components/ui/typography';
+import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { twMerge } from 'tailwind-merge';
+// import LogoIcon from '@/components/atoms/_svg/LogoIcon';
+
 export const Navbar = () => {
 	const { user } = useMe();
 	const { isSignedIn } = useAuth();
 	const pathname = usePathname();
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
-	const [isNavbarVisible, setIsNavbarVisible] = useState(true);
-	const [lastScrollY, setLastScrollY] = useState(0);
-
-	const controlNavbar = () => {
-		if (window.scrollY > lastScrollY) {
-			// if scroll down hide the navbar
-			setIsNavbarVisible(false);
-		} else {
-			// if scroll up show the navbar
-			setIsNavbarVisible(true);
-		}
-
-		// remember current page location to use in the next move
-		setLastScrollY(window.scrollY);
-	};
+	const [scrolled, setScrolled] = useState(false);
 
 	useEffect(() => {
-		window.addEventListener('scroll', controlNavbar);
-
-		// cleanup function
-		return () => {
-			window.removeEventListener('scroll', controlNavbar);
+		const handleScroll = () => {
+			setScrolled(window.scrollY > 20);
 		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
+
+		window.addEventListener('scroll', handleScroll);
+		return () => window.removeEventListener('scroll', handleScroll);
 	}, []);
 
-	type UrlList = {
+	// Close mobile menu on route change
+	useEffect(() => {
+		setMobileMenuOpen(false);
+	}, [pathname]);
+
+	// Prevent body scroll when mobile menu is open
+	useEffect(() => {
+		if (isMobileMenuOpen) {
+			document.body.style.overflow = 'hidden';
+		} else {
+			document.body.style.overflow = 'unset';
+		}
+		return () => {
+			document.body.style.overflow = 'unset';
+		};
+	}, [isMobileMenuOpen]);
+
+	type NavItem = {
 		path: string;
 		label: string;
 	};
-	const urlList: UrlList[] = [
+
+	const navItems: NavItem[] = [
 		{ path: urls.home.index, label: 'Home' },
 		{ path: urls.pricing.index, label: 'Pricing' },
 		{ path: urls.contact.index, label: 'Help' },
 		{ path: urls.admin.index, label: 'Admin' },
-	].filter((url) => !(user?.role !== 'admin' && url.path === '/admin'));
+	].filter((item) => !(user?.role !== 'admin' && item.path === '/admin'));
+
 	return (
 		<>
-			<div
-				className={twMerge(
-					'sticky top-0 bg-muted z-50 transition-all duration-300',
-					!isNavbarVisible ? 'h-[55px]' : 'h-[110px]'
+			{/* Main Navigation Bar - Artistic Glass */}
+			<nav
+				className={cn(
+					'fixed top-0 left-0 right-0 z-50 transition-all duration-700 font-inter',
+					scrolled 
+						? 'bg-white/30 backdrop-blur-3xl backdrop-saturate-200 border-b border-white/10' 
+						: 'bg-white/10 backdrop-blur-2xl backdrop-saturate-150'
 				)}
 			>
-				{/* Desktop Menu */}
-				<div className="flex flex-col h-full justify-center items-center z-50">
-					{/* Logo Section - Hidden when scrolling down */}
-					<div
-						className={twMerge(
-							'w-fit mx-auto flex items-center pt-2 justify-center transition-all duration-300 overflow-hidden',
-							!isNavbarVisible ? 'h-0 opacity-0' : 'h-55/100 opacity-100'
-						)}
-					>
-						<Link href={urls.murmur.dashboard.index} className="w-[200px] items-center">
-							<LogoIcon
-								height="48px"
-								width="59px"
-								pathClassName="fill-background stroke-background"
-							/>
-						</Link>
-					</div>
+				<div className="w-full">
+					<div className="flex items-center justify-between h-12 px-5 sm:px-6 lg:px-12">
+						{/* Left Section - UserButton on mobile, empty on desktop */}
+						<div className="lg:hidden flex items-center">
+							{isSignedIn ? (
+								<UserButton
+									afterSignOutUrl="/"
+									appearance={{
+										elements: {
+											avatarBox: 'w-7 h-7',
+											userButtonTrigger: 'opacity-70 hover:opacity-100 transition-opacity duration-300'
+										}
+									}}
+								/>
+							) : (
+								<div className="w-7 h-7" /> /* Empty spacer */
+							)}
+						</div>
+						<div className="hidden lg:block w-7 h-7" /> {/* Spacer for desktop */}
 
-					{/* Navigation Section - Always visible */}
-					<div
-						className={twMerge(
-							'flex items-center justify-center transition-all duration-300',
-							!isNavbarVisible ? 'h-full' : 'h-45/100'
-						)}
-					>
-						<div className="hidden lg:flex flex-row gap-13 ">
-							{urlList.map((url) => {
-								return (
-									<Link className="hover:cursor-pointer" key={url.path} href={url.path}>
-										<Typography
-											className={twMerge(
-												'!text-[16px] transition duration-300',
-												pathname === url.path
-													? '-translate-y-[2px] opacity-100'
-													: 'translate-y-0 opacity-80'
-											)}
-											color="background"
-										>
-											{url.label}
-										</Typography>
+						{/* Desktop Navigation - Premium Center */}
+						<div className="absolute inset-0 hidden lg:flex items-center justify-center pointer-events-none">
+							<nav className="pointer-events-auto flex items-center gap-14">
+								{navItems.map((item) => (
+									<Link
+										key={item.path}
+										href={item.path}
+										className={cn(
+											'relative text-[13px] font-medium tracking-[0.02em] transition-all duration-300',
+											pathname === item.path 
+												? 'text-gray-900' 
+												: 'text-gray-700/70 hover:text-gray-900',
+											'after:absolute after:bottom-[-8px] after:left-0 after:right-0 after:h-[1px]',
+											'after:bg-gray-900',
+											pathname === item.path
+												? 'after:scale-x-100'
+												: 'after:scale-x-0 hover:after:scale-x-100',
+											'after:transition-transform after:duration-300 after:origin-center'
+										)}
+									>
+										{item.label}
 									</Link>
-								);
-							})}
+								))}
+							</nav>
 						</div>
 
-						<div className="absolute right-5 ml-auto flex items-center space-x-4">
-							{isSignedIn ? (
-								<UserButton />
-							) : (
-								<>
-									<SignInButton mode="modal">
-										<Button variant="light" size="sm">
-											Sign In
-										</Button>
-									</SignInButton>
-									<SignUpButton mode="modal">
-										<Button variant="light" size="sm">
-											Sign Up
-										</Button>
-									</SignUpButton>
-								</>
-							)}
-							<Button
-								outline
-								variant="light"
-								size="icon"
-								className="lg:hidden"
+						{/* Right Section - Hamburger on mobile, Auth on desktop */}
+						<div className="flex items-center">
+							{/* Mobile - Hamburger Menu */}
+							<button
 								onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}
+								className={cn(
+									"lg:hidden relative w-7 h-7 flex items-center justify-center",
+									"transition-all duration-300"
+								)}
+								aria-label="Toggle menu"
 							>
-								<MenuIcon />
-							</Button>
+								<span
+									className={cn(
+										"absolute block h-[1.5px] w-[18px] bg-gray-700 transition-all duration-300",
+										isMobileMenuOpen 
+											? "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45" 
+											: "top-[11px] left-1/2 -translate-x-1/2"
+									)}
+								/>
+								<span
+									className={cn(
+										"absolute block h-[1.5px] w-[18px] bg-gray-700 transition-all duration-300",
+										isMobileMenuOpen 
+											? "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-45" 
+											: "bottom-[10px] left-1/2 -translate-x-1/2"
+									)}
+								/>
+							</button>
+
+							{/* Desktop - Show auth buttons */}
+							<div className="hidden lg:flex items-center">
+								{isSignedIn ? (
+									<UserButton
+										afterSignOutUrl="/"
+										appearance={{
+											elements: {
+												avatarBox: 'w-7 h-7 ring-1 ring-black/10',
+												userButtonTrigger: 'opacity-80 hover:opacity-100 transition-opacity duration-500'
+											}
+										}}
+									/>
+								) : (
+									<div className="flex items-center">
+										<SignInButton mode="modal">
+											<button className="relative px-4 text-[12px] font-medium tracking-[0.02em] text-gray-700/70 hover:text-gray-900 transition-all duration-300 after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px] after:bg-gray-900 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center">
+												Sign in
+											</button>
+										</SignInButton>
+										<div className="w-[1px] h-4 bg-gray-300/50 mx-3" />
+										<SignUpButton mode="modal">
+											<button className="relative px-4 text-[12px] font-medium tracking-[0.02em] text-gray-700/70 hover:text-gray-900 transition-all duration-300 after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px] after:bg-gray-900 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center">
+												Sign up
+											</button>
+										</SignUpButton>
+									</div>
+								)}
+							</div>
 						</div>
 					</div>
 				</div>
-			</div>
+			</nav>
 
-			{/* Mobile Menu */}
+			{/* Mobile Menu Overlay - Glass Art */}
 			<div
 				className={cn(
-					'fixed z-40 top-13 right-0 w-full h-screen transform transition-opacity duration-500 ease-in-out lg:hidden bg-background',
-					isMobileMenuOpen
-						? 'pointer-events-auto opacity-100'
-						: 'pointer-events-none opacity-0'
+					'fixed inset-0 z-40 lg:hidden',
+					isMobileMenuOpen ? 'pointer-events-auto' : 'pointer-events-none'
 				)}
 			>
-				<nav className="flex flex-col p-4 items-center justify-evenly h-full space-y-2">
-					{urlList.map((url, index) => {
-						return (
-							<Link
-								key={index}
-								href={url.path}
-								className="px-4 py-6 rounded-md text-center hover:bg-gray-100 transition-all duration-500 text-2xl md:text-4xl font-primary"
-								onClick={() => setMobileMenuOpen(false)}
-							>
-								{url.label}
-							</Link>
-						);
-					})}
-				</nav>
+				{/* Backdrop */}
+				<div
+					className={cn(
+						'absolute inset-0 bg-black/30 transition-opacity duration-500',
+						isMobileMenuOpen ? 'opacity-100' : 'opacity-0'
+					)}
+					onClick={() => setMobileMenuOpen(false)}
+				/>
+
+				{/* Menu Panel - Apple Glass effect */}
+				<div
+					className={cn(
+						'absolute top-0 left-0 right-0 h-screen',
+						'bg-white backdrop-blur-3xl',
+						'transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]',
+						isMobileMenuOpen ? 'translate-y-0' : '-translate-y-full'
+					)}
+				>
+					{/* Mobile Header */}
+					<div className="flex items-center justify-between h-12 px-5 pt-2">
+						{isSignedIn ? (
+							<UserButton
+								afterSignOutUrl="/"
+								appearance={{
+									elements: {
+										avatarBox: 'w-6 h-6',
+										userButtonTrigger: 'opacity-60'
+									}
+								}}
+							/>
+						) : (
+							<div className="w-6 h-6" />
+						)}
+						
+						<button
+							onClick={() => setMobileMenuOpen(false)}
+							className="relative w-8 h-8 flex items-center justify-center"
+							aria-label="Close menu"
+						>
+							<span className="absolute block h-[1.5px] w-[20px] bg-gray-700 rotate-45" />
+							<span className="absolute block h-[1.5px] w-[20px] bg-gray-700 -rotate-45" />
+						</button>
+					</div>
+
+
+
+					{/* Mobile Navigation Links */}
+					<div className="px-5 pt-8">
+						<nav>
+							<ul className="space-y-0">
+								{navItems.map((item) => (
+									<li key={item.path}>
+										<Link
+											href={item.path}
+																				className={cn(
+												'block py-4 text-[28px] font-normal text-gray-800',
+												'transition-colors duration-200',
+												pathname === item.path 
+													? 'text-gray-900' 
+													: 'hover:text-gray-900'
+											)}
+											style={{ fontFamily: "'Times New Roman', Times, serif" }}
+											onClick={() => setMobileMenuOpen(false)}
+										>
+											{item.label}
+										</Link>
+									</li>
+								))}
+							</ul>
+						</nav>
+					</div>
+
+					{/* Mobile Auth Section */}
+					{!isSignedIn && (
+						<div className="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-200/20">
+							<div className="flex space-x-6">
+								<SignInButton mode="modal">
+									<button 
+										className="flex-1 py-3 text-center text-[16px] font-normal text-gray-600 hover:text-gray-900 transition-colors duration-200"
+										style={{ fontFamily: "'Times New Roman', Times, serif" }}
+									>
+										Sign in
+									</button>
+								</SignInButton>
+								<SignUpButton mode="modal">
+									<button 
+										className="flex-1 py-3 text-center text-[16px] font-normal text-gray-600 hover:text-gray-900 transition-colors duration-200"
+										style={{ fontFamily: "'Times New Roman', Times, serif" }}
+									>
+										Sign up
+									</button>
+								</SignUpButton>
+							</div>
+						</div>
+					)}
+				</div>
 			</div>
+
+			{/* Spacer */}
+			<div className="h-12" />
 		</>
 	);
 };
-
-const ListItem = forwardRef<React.ElementRef<'a'>, React.ComponentPropsWithoutRef<'a'>>(
-	({ className, title, children, ...props }, ref) => {
-		return (
-			<li>
-				<NavigationMenuLink asChild>
-					<a
-						ref={ref}
-						className={cn(
-							'block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground',
-							className
-						)}
-						{...props}
-					>
-						<div className="text-sm font-medium leading-none">{title}</div>
-						<p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-							{children}
-						</p>
-					</a>
-				</NavigationMenuLink>
-			</li>
-		);
-	}
-);
-ListItem.displayName = 'ListItem';

@@ -38,16 +38,30 @@ export const usePerplexity = () => {
 
 			clearTimeout(timeoutId);
 			if (!response || !response.ok) {
-				throw new Error('Failed to generate email.');
+				let errorMsg = 'Failed to generate email';
+				try {
+					const errorData = await response.json();
+					if (errorData.error?.message) {
+						errorMsg = `Perplexity API error: ${errorData.error.message}`;
+					} else if (errorData.message) {
+						errorMsg = `Perplexity error: ${errorData.message}`;
+					}
+					console.error('[Perplexity] API error response:', errorData);
+				} catch {
+					errorMsg = `Perplexity API error: ${response.status} ${response.statusText}`;
+				}
+				throw new Error(errorMsg);
 			}
 
 			const data = await response.json();
 
 			try {
 				const jsonString: string = data.choices[0].message.content;
+				console.log('[Perplexity] Response preview:', jsonString.substring(0, 200));
 				return jsonString;
-			} catch {
-				throw new Error('Failed to parse AI response. Please try again.');
+			} catch (e) {
+				console.error('[Perplexity] Failed to extract content from response:', e, data);
+				throw new Error('Failed to parse Perplexity response. Please try again.');
 			}
 		},
 	});

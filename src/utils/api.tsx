@@ -1,31 +1,63 @@
 type FetchMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
+// Default timeout in milliseconds
+const DEFAULT_TIMEOUT = 30000; // 30 seconds
+
 export const _fetch = async <TBody = unknown,>(
 	url: string,
 	method?: FetchMethod,
-	body?: TBody
+	body?: TBody,
+	options?: { timeout?: number; signal?: AbortSignal }
 ): Promise<Response> => {
-	switch (method) {
-		case 'POST':
-			return fetch(url, {
-				method,
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(body),
-			});
-		case 'PATCH':
-			return fetch(url, {
-				method,
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(body),
-			});
-		case 'DELETE':
-			return fetch(url, { method });
-		case 'GET':
-		default:
-			return fetch(url);
+	const timeout = options?.timeout ?? DEFAULT_TIMEOUT;
+	
+	// Create an AbortController for timeout
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), timeout);
+	
+	// Use provided signal or timeout signal
+	const signal = options?.signal ?? controller.signal;
+		
+	try {
+		let response: Response;
+		
+		switch (method) {
+			case 'POST':
+				response = await fetch(url, {
+					method,
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify(body),
+					signal,
+				});
+				break;
+			case 'PATCH':
+				response = await fetch(url, {
+					method,
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify(body),
+					signal,
+				});
+				break;
+			case 'DELETE':
+				response = await fetch(url, { method, signal });
+				break;
+			case 'GET':
+			default:
+				response = await fetch(url, { signal });
+				break;
+		}
+		
+		clearTimeout(timeoutId);
+		return response;
+	} catch (error) {
+		clearTimeout(timeoutId);
+		if (error instanceof Error && error.name === 'AbortError') {
+			throw new Error(`Request timeout after ${timeout}ms`);
+		}
+		throw error;
 	}
 };

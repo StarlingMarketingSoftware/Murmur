@@ -37,7 +37,7 @@ const ProgressIndicator: FC<ProgressIndicatorProps> = (props) => {
 					{isComplete ? finalCompleteMessage : finalPendingMessage}
 				</Typography>
 				{isComplete ? (
-					<CheckCircle2 size="20px" className="text-success animate-pulse" />
+					<CheckCircle2 size="20px" className="text-success" />
 				) : (
 					<>
 						<Spinner size="small" className="!m-0 min-h-[20px]" />

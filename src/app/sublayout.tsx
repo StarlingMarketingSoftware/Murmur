@@ -9,9 +9,20 @@ const queryClient = new QueryClient({
 	defaultOptions: {
 		queries: {
 			refetchOnMount: true,
-			refetchOnWindowFocus: true,
+			refetchOnWindowFocus: false, // Prevent refetch on window focus to avoid stuck queries
 			refetchOnReconnect: true,
-			retry: 1,
+			retry: (failureCount, error) => {
+				// Don't retry on timeout errors or after 2 attempts
+				if (error instanceof Error && error.message.includes('timeout')) {
+					return false;
+				}
+				return failureCount < 2;
+			},
+			retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+			staleTime: 1000 * 60 * 5, // Consider data stale after 5 minutes
+		},
+		mutations: {
+			retry: false, // Don't retry mutations by default
 		},
 	},
 });

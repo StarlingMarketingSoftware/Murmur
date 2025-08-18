@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { EmailVerificationStatus, UserContactList } from '@prisma/client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
@@ -13,161 +13,29 @@ import {
 	useGetContacts,
 	useGetUsedContactIds,
 } from '@/hooks/queryHooks/useContacts';
-import { TableSortingButton } from '@/components/molecules/CustomTable/CustomTable';
 import { ColumnDef, Table } from '@tanstack/react-table';
 import { ContactWithName } from '@/types/contact';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateApolloContacts } from '@/hooks/queryHooks/useApollo';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { twMerge } from 'tailwind-merge';
 import { capitalize } from '@/utils/string';
 import { TableCellTooltip } from '@/components/molecules/TableCellTooltip/TableCellTooltip';
 import { useMe } from '@/hooks/useMe';
+import { StripeSubscriptionStatus } from '@/types';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
-	excludeUsedContacts: z.boolean().optional().default(true),
-	exactMatchesOnly: z.boolean().optional().default(true),
+	excludeUsedContacts: z.boolean().optional().default(false),
 });
 
 type FormData = z.infer<typeof formSchema>;
 
 export const useDashboard = () => {
 	/* UI */
+	const [hasSearched, setHasSearched] = useState(false);
 
 	const MAX_CELL_LENGTH = 35;
-	const columns: ColumnDef<ContactWithName>[] = [
-		{
-			id: 'select',
-			header: ({ table }) => (
-				<Checkbox
-					checked={
-						table.getIsAllPageRowsSelected() ||
-						(table.getIsSomePageRowsSelected() && 'indeterminate')
-					}
-					onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-					aria-label="Select all"
-				/>
-			),
-			cell: ({ row }) => (
-				<Checkbox
-					checked={row.getIsSelected()}
-					onCheckedChange={(value) => row.toggleSelected(!!value)}
-					aria-label="Select row"
-				/>
-			),
-		},
-		{
-			accessorKey: 'name',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Name" />;
-			},
-			cell: ({ row }) => {
-				return (
-					<TableCellTooltip text={row.getValue('name')} maxLength={MAX_CELL_LENGTH} />
-				);
-			},
-		},
-		{
-			accessorKey: 'email',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Email" />;
-			},
-			cell: ({ row }) => {
-				const isUsed = usedContactIdsSet.has(row.original.id);
-				return (
-					<div className="flex">
-						{isUsed ? (
-							<Tooltip>
-								<TooltipTrigger>
-									<div className="text-left bg-secondary/20 px-2 rounded-md">
-										{row.getValue('email')}
-									</div>
-								</TooltipTrigger>
-								<TooltipContent side="right">
-									This contact has been used in a campaign.
-								</TooltipContent>
-							</Tooltip>
-						) : (
-							<div className={twMerge('text-left')}>{row.getValue('email')}</div>
-						)}
-					</div>
-				);
-			},
-		},
-		{
-			accessorKey: 'company',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Company" />;
-			},
-			cell: ({ row }) => {
-				return (
-					<TableCellTooltip text={row.getValue('company')} maxLength={MAX_CELL_LENGTH} />
-				);
-			},
-		},
-		{
-			accessorKey: 'title',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Title" />;
-			},
-			cell: ({ row }) => {
-				return (
-					<TableCellTooltip text={row.getValue('title')} maxLength={MAX_CELL_LENGTH} />
-				);
-			},
-		},
-		{
-			accessorKey: 'city',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="City" />;
-			},
-			cell: ({ row }) => {
-				return (
-					<TableCellTooltip text={row.getValue('city')} maxLength={MAX_CELL_LENGTH} />
-				);
-			},
-		},
-		{
-			accessorKey: 'state',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="State" />;
-			},
-		},
-		{
-			accessorKey: 'country',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Country" />;
-			},
-			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('country')}</div>;
-			},
-		},
-		{
-			accessorKey: 'address',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Address" />;
-			},
-			cell: ({ row }) => {
-				return (
-					<TableCellTooltip text={row.getValue('address')} maxLength={MAX_CELL_LENGTH} />
-				);
-			},
-		},
-		{
-			accessorKey: 'website',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Website" />;
-			},
-			cell: ({ row }) => {
-				return (
-					<TableCellTooltip text={row.getValue('website')} maxLength={MAX_CELL_LENGTH} />
-				);
-			},
-		},
-	];
 
 	type TabValue = 'search' | 'list';
 	type TabOption = {
@@ -191,52 +59,101 @@ export const useDashboard = () => {
 		resolver: zodResolver(formSchema),
 		defaultValues: {
 			searchText: '',
-			excludeUsedContacts: true,
-			exactMatchesOnly: false,
+			excludeUsedContacts: false,
 		},
 	});
 
 	/* HOOKS */
-	const { isFreeTrial } = useMe();
+	// useMe will return undefined values for unauthenticated users
+	const { isFreeTrial, user } = useMe() || { isFreeTrial: false, user: null };
+	
+	// User can search if they have an active subscription OR are on a free trial
+	const canSearch = user?.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE || 
+	                  user?.stripeSubscriptionStatus === StripeSubscriptionStatus.TRIALING;
 	const [selectedContactListRows, setSelectedContactListRows] = useState<
 		UserContactList[]
 	>([]);
 	const [selectedContacts, setSelectedContacts] = useState<number[]>([]);
+	const [isAllSelected, setIsAllSelected] = useState(false);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
-	const [activeExcludeUsedContacts, setActiveExcludeUsedContacts] = useState(true);
-	const [activeExactMatchesOnly, setActiveExactMatchesOnly] = useState(false);
+	const [activeExcludeUsedContacts, setActiveExcludeUsedContacts] = useState(false);
 	const [currentTab, setCurrentTab] = useState<TabValue>('search');
-	const [limit, setLimit] = useState(100);
+	const [limit, setLimit] = useState(50);
 	const [apolloContacts, setApolloContacts] = useState<ContactWithName[]>([]);
 	const [tableInstance, setTableInstance] = useState<Table<ContactWithName>>();
 	const [usedContactIdsSet, setUsedContactIdsSet] = useState<Set<number>>(new Set());
+	const [hoveredText, setHoveredText] = useState('');
 
 	const {
 		data: contacts,
 		isPending: isPendingContacts,
 		isLoading: isLoadingContacts,
 		error,
-		refetch: refetchContacts,
+		refetch: refetchContacts,  // eslint-disable-line @typescript-eslint/no-unused-vars
 		isRefetching: isRefetchingContacts,
+		isError,
 	} = useGetContacts({
 		filters: {
 			query: activeSearchQuery,
-			verificationStatus: EmailVerificationStatus.valid,
-			useVectorSearch: !activeExactMatchesOnly,
+			verificationStatus:
+				process.env.NODE_ENV === 'production'
+					? EmailVerificationStatus.valid
+					: undefined,
+			useVectorSearch: true,
 			limit,
 			excludeUsedContacts: activeExcludeUsedContacts,
 		},
-		enabled: false,
+		enabled: hasSearched && !!activeSearchQuery && activeSearchQuery.trim().length > 0,
 	});
 	const { mutateAsync: importApolloContacts, isPending: isPendingImportApolloContacts } =
 		useCreateApolloContacts({});
 
-	// Initialize selected contacts when contacts load
+	// Initialize selected contacts as empty (no contacts selected by default)
 	useEffect(() => {
 		if (contacts) {
-			setSelectedContacts(contacts.map((contact) => contact.id));
+			setSelectedContacts([]); // Start with no contacts selected
 		}
 	}, [contacts]);
+
+	// Watch for changes in selectedContacts to update isAllSelected
+	useEffect(() => {
+		if (contacts && selectedContacts.length > 0) {
+			setIsAllSelected(selectedContacts.length === contacts.length);
+		} else {
+			setIsAllSelected(false);
+		}
+	}, [selectedContacts, contacts]);
+
+	// Trigger search when parameters change
+	useEffect(() => {
+		if (hasSearched && activeSearchQuery && activeSearchQuery.trim().length > 0) {
+			// Query should automatically run when enabled
+			console.log('Search triggered with query:', activeSearchQuery);
+		}
+	}, [hasSearched, activeSearchQuery, activeExcludeUsedContacts, limit]);
+
+	// Handle errors
+	useEffect(() => {
+		// Only show error if we've actually searched (not on initial load)
+		if (isError && error && hasSearched && activeSearchQuery) {
+			console.error('Contact search error details:', {
+				error,
+				message: error instanceof Error ? error.message : 'Unknown error',
+				query: activeSearchQuery,
+				filters: {
+					excludeUsedContacts: activeExcludeUsedContacts,
+					limit,
+				}
+			});
+			if (error instanceof Error && error.message.includes('timeout')) {
+				toast.error('Search timed out after 25 seconds. Please try a more specific search query.');
+			} else if (error instanceof Error) {
+				toast.error(`Search failed: ${error.message}`);
+			} else {
+				toast.error('Failed to load contacts. Please try again.');
+			}
+		}
+	}, [isError, error, hasSearched, activeSearchQuery, activeExcludeUsedContacts, limit]);
 
 	const { mutateAsync: createContactList, isPending: isPendingCreateContactList } =
 		useCreateUserContactList({
@@ -257,13 +174,36 @@ export const useDashboard = () => {
 
 	/* HANDLERS */
 	const onSubmit = async (data: FormData) => {
+		// Validate search query
+		if (!data.searchText || data.searchText.trim().length === 0) {
+			toast.error('Please enter a search query');
+			return;
+		}
+		
+		// Update search parameters
 		setActiveSearchQuery(data.searchText);
-		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? true);
-		setActiveExactMatchesOnly(data.exactMatchesOnly ?? false);
-		setLimit(100);
-		setTimeout(() => {
-			refetchContacts();
-		}, 0);
+		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? false);
+		setLimit(50);
+		setHasSearched(true);
+		// The query will automatically run when the state updates enable it
+	};
+
+	const handleResetSearch = () => {
+		setHasSearched(false);
+		setActiveSearchQuery('');
+		form.reset();
+	};
+
+	const handleSelectAll = () => {
+		if (!contacts || !tableInstance) return;
+		
+		if (isAllSelected) {
+			// Unselect all
+			tableInstance.toggleAllRowsSelected(false);
+		} else {
+			// Select all rows
+			tableInstance.toggleAllRowsSelected(true);
+		}
 	};
 
 	const handleCreateCampaign = async () => {
@@ -325,12 +265,223 @@ export const useDashboard = () => {
 		setTableInstance(table);
 	};
 
+	const handleCellHover = (text: string | null) => {
+		setHoveredText(text || '');
+	};
+
 	/* EFFECTS */
 	useEffect(() => {
 		if (usedContactIds) {
 			setUsedContactIdsSet(new Set(usedContactIds));
 		}
 	}, [usedContactIds]);
+
+	// Helper function to compute name from firstName and lastName
+	const computeName = useCallback((contact: ContactWithName): string => {
+		const firstName = contact.firstName || '';
+		const lastName = contact.lastName || '';
+		return `${firstName} ${lastName}`.trim();
+	}, []);
+	
+	// Helper to check if a contact has a name
+	const contactHasName = useCallback((contact: ContactWithName): boolean => {
+		const firstName = contact.firstName || '';
+		const lastName = contact.lastName || '';
+		return firstName.length > 0 || lastName.length > 0;
+	}, []);
+
+	// Since pagination is disabled, check if majority of contacts have names
+	const visibleRowsHaveNames = useMemo(() => {
+		if (!contacts || contacts.length === 0) return false;
+		
+		// Check what percentage of contacts have names
+		const contactsWithNames = contacts.filter(contact => contactHasName(contact));
+		const ratio = contactsWithNames.length / contacts.length;
+		const threshold = 0.7; // 70% threshold for header to be fully visible
+		
+		console.log('🎨 Name column fade effect:', {
+			totalContacts: contacts.length,
+			contactsWithNames: contactsWithNames.length,
+			percentage: (ratio * 100).toFixed(1) + '%',
+			headerStatus: ratio > threshold ? '✅ VISIBLE' : '🌫️ FADED',
+			threshold: (threshold * 100) + '%'
+		});
+		
+		return ratio > threshold; // Header is visible if more than 70% have names
+	}, [contacts, contactHasName]);
+
+	// Dynamically build columns based on whether names exist in contacts
+	const columns = useMemo(() => {
+		// Check if any contact has a firstName or lastName
+		const hasNames = contacts && contacts.length > 0 && 
+			contacts.some(contact => contactHasName(contact));
+		
+		const allColumns: ColumnDef<ContactWithName>[] = [
+			{
+				accessorKey: 'company',
+				size: 150,
+				header: () => <span className="font-bold">Company</span>,
+				cell: ({ row }) => {
+											return (
+							<TableCellTooltip 
+								text={row.getValue('company')} 
+								maxLength={MAX_CELL_LENGTH} 
+								positioning="below-right"
+								onHover={handleCellHover}
+							/>
+						);
+				},
+			},
+			{
+				accessorKey: 'email',
+				size: 150,
+				header: () => <span className="font-bold">Email</span>,
+				cell: ({ row }) => {
+					const isUsed = usedContactIdsSet.has(row.original.id);
+					const email = (row.getValue('email') as string) || '';
+					const [local, domain] = email.includes('@') ? email.split('@') : [email, ''];
+					const rowIndex = row.index;
+					const showFull = rowIndex < 3; // First three rows show full email
+					if (showFull) {
+						return (
+							<div className="flex truncate">
+								{isUsed ? (
+									<Tooltip>
+										<TooltipTrigger>
+											<div className="text-left bg-secondary/20 px-2 rounded-md truncate">
+												{email}
+											</div>
+										</TooltipTrigger>
+										<TooltipContent side="right">
+											<div className="font-normal">{email}</div>
+										</TooltipContent>
+									</Tooltip>
+								) : (
+									<TableCellTooltip 
+										text={email} 
+										maxLength={MAX_CELL_LENGTH} 
+										positioning="below-right"
+										onHover={handleCellHover}
+									/>
+								)}
+							</div>
+						);
+					}
+					// Obfuscate the entire email address with a smooth fading blur
+					return (
+						<div className="text-left whitespace-nowrap overflow-visible relative">
+							<span className="email-obfuscated-local inline-block">
+								{email}
+							</span>
+						</div>
+					);
+				},
+			},
+			// Name column - conditionally included (always show if ANY contact has names)
+			...(hasNames ? [{
+				accessorKey: 'firstName' as const,  // Use firstName as key but display computed name
+				id: 'name',  // Custom id for the column
+				size: 150,
+				header: () => {
+					return (
+						<span 
+							className={`font-bold transition-all duration-700 ease-in-out ${
+								visibleRowsHaveNames 
+									? 'text-black dark:text-white' 
+									: 'text-gray-300 dark:text-gray-600'
+							}`}
+							style={{ 
+								opacity: visibleRowsHaveNames ? 1 : 0.25,
+								transform: visibleRowsHaveNames ? 'scale(1) translateY(0)' : 'scale(0.9) translateY(2px)',
+								filter: visibleRowsHaveNames ? 'blur(0px)' : 'blur(0.5px)'
+							}}
+							title={visibleRowsHaveNames 
+								? 'Most contacts have names' 
+								: 'Most contacts lack names - column faded'}
+						>
+							Name
+						</span>
+					);
+				},
+				cell: ({ row }: any) => {
+					const contact = row.original as ContactWithName;
+					const hasName = contactHasName(contact);
+					const nameValue = hasName ? computeName(contact) : '';
+					return (
+						<div 
+							className={`truncate transition-all duration-500 ease-in-out hover:scale-105 ${
+								hasName 
+									? 'text-black dark:text-white' 
+									: 'text-gray-300 dark:text-gray-700'
+							}`}
+							style={{
+								opacity: hasName ? 1 : 0.2,
+								transform: hasName ? 'scale(1)' : 'scale(0.85)',
+							}}
+						>
+							{hasName ? (
+								<TableCellTooltip 
+									text={nameValue} 
+									maxLength={MAX_CELL_LENGTH} 
+									positioning="below-right"
+									onHover={handleCellHover}
+								/>
+							) : (
+								<span className="select-none">—</span>
+							)}
+						</div>
+					);
+				},
+			}] : []),
+			{
+				accessorKey: 'city',
+				size: 150,
+				header: () => <span className="font-bold">City</span>,
+				cell: ({ row }) => {
+											return (
+							<TableCellTooltip 
+								text={row.getValue('city')} 
+								maxLength={MAX_CELL_LENGTH} 
+								positioning="below-right"
+								onHover={handleCellHover}
+							/>
+						);
+				},
+			},
+			{
+				accessorKey: 'state',
+				size: 150,
+				header: () => <span className="font-bold">State</span>,
+				cell: ({ row }) => {
+											return (
+							<TableCellTooltip 
+								text={row.getValue('state')} 
+								maxLength={MAX_CELL_LENGTH} 
+								positioning="below-right"
+								onHover={handleCellHover}
+							/>
+						);
+				},
+			},
+			{
+				accessorKey: 'title',
+				size: 150,
+				header: () => <span className="font-bold">Description</span>,
+				cell: ({ row }) => {
+					return (
+						<TableCellTooltip 
+							text={row.getValue('title')} 
+							maxLength={MAX_CELL_LENGTH} 
+							positioning="below-left"
+							onHover={handleCellHover}
+						/>
+					);
+				},
+			}
+		];
+
+		return allColumns;
+	}, [contacts, usedContactIdsSet, visibleRowsHaveNames, contactHasName, computeName, MAX_CELL_LENGTH]);
 
 	return {
 		form,
@@ -339,6 +490,7 @@ export const useDashboard = () => {
 		isPendingContacts,
 		isLoadingContacts,
 		error,
+		isError,
 		handleImportApolloContacts,
 		setSelectedContactListRows,
 		handleCreateCampaign,
@@ -346,6 +498,8 @@ export const useDashboard = () => {
 		columns,
 		setSelectedContacts,
 		selectedContacts,
+		handleSelectAll,
+		isAllSelected,
 		isRefetchingContacts,
 		activeSearchQuery,
 		tabOptions,
@@ -361,5 +515,9 @@ export const useDashboard = () => {
 		usedContactIdsSet,
 		isPendingBatchUpdateContacts,
 		isFreeTrial,
+		canSearch,
+		hasSearched,
+		handleResetSearch,
+		hoveredText,
 	};
 };

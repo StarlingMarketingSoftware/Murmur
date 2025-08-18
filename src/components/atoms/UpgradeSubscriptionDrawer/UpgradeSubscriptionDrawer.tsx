@@ -15,6 +15,7 @@ import {
 import { FC } from 'react';
 import { ConfirmDialog } from '@/components/organisms/_dialogs/ConfirmDialog/ConfirmDialog';
 import { Typography } from '@/components/ui/typography';
+import { twMerge } from 'tailwind-merge';
 
 export const UpgradeSubscriptionDrawer: FC<UpgradeSubscriptionDrawerProps> = (props) => {
 	const {
@@ -44,7 +45,13 @@ export const UpgradeSubscriptionDrawer: FC<UpgradeSubscriptionDrawerProps> = (pr
 		>
 			{!hideTriggerButton && (
 				<DrawerTrigger asChild>
-					<Button variant={buttonVariant ? buttonVariant : 'primary'}>
+					<Button 
+						variant={buttonVariant ? buttonVariant : 'primary'} 
+						className={twMerge(
+							`gradient-button ${triggerButtonText === 'Import' ? 'gradient-button-blue' : ''}`,
+							props.className
+						)}
+					>
 						{triggerButtonText}
 					</Button>
 				</DrawerTrigger>

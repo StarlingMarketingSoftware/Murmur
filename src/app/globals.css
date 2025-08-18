@@ -70,81 +70,92 @@
 
 :root {
 	--radius: 0.625rem;
-	--foreground: oklch(0.25 0.03 270)
-	--background: oklch(0.98 0.005 270);
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.145 0 0);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.145 0 0);
-	--primary: oklch(0.6795 0.1263 147.14);
-	--primary-foreground: oklch(1 0 147.14);
-	--secondary: oklch(0.6231 0.188 259.81);
-	--secondary-foreground: oklch(1 0 0);
-	--secondary-light: oklch(0.7906 0.1089 252.45);
-	--secondary-light-foreground: oklch(0 0 0);
-	--light:oklch(0.9642 0 0);
-	--light-foreground: oklch(55.553% 0.00006 271.152);
-	--medium: oklch(0.8853 0 0);
-	--muted: oklch(0.3211 0 0);
-	--accent: oklch(0.923 0.003 48.717);
-	--accent-foreground: oklch(0.205 0 0);
-	--destructive: oklch(59.157% 0.24065 26.32);
-	--warning: oklch(0.77 0.16 70);
-	--success: oklch(0.4953 0.1037 140.3);
-	--navy: oklch(0.4865 0.17 266.18);
+	--foreground: rgb(48, 50, 64); /* oklch(0.25 0.03 270) */
+	--background: rgb(250, 250, 251); /* oklch(0.98 0.005 270) */;
+	--card: rgb(255, 255, 255); /* oklch(1 0 0) */
+	--card-foreground: rgb(37, 37, 37); /* oklch(0.145 0 0) */
+	--popover: rgb(255, 255, 255); /* oklch(1 0 0) */
+	--popover-foreground: rgb(37, 37, 37); /* oklch(0.145 0 0) */;
+	--primary: rgb(93, 192, 104); /* oklch(0.6795 0.1263 147.14) */
+	--primary-foreground: rgb(255, 255, 255); /* oklch(1 0 147.14) */;
+	--secondary: rgb(134, 134, 229); /* oklch(0.6231 0.188 259.81) */
+	--secondary-foreground: rgb(255, 255, 255); /* oklch(1 0 0) */;
+	--secondary-light: rgb(178, 187, 243); /* oklch(0.7906 0.1089 252.45) */
+	--secondary-light-foreground: rgb(0, 0, 0); /* oklch(0 0 0) */;
+	--light: rgb(246, 246, 246); /* oklch(0.9642 0 0) */
+	--light-foreground: rgb(117, 117, 119); /* oklch(55.553% 0.00006 271.152) */;
+	--medium: rgb(226, 226, 226); /* oklch(0.8853 0 0) */
+	--muted: rgb(82, 82, 82); /* oklch(0.3211 0 0) */;
+	--accent: rgb(235, 235, 233); /* oklch(0.923 0.003 48.717) */
+	--accent-foreground: rgb(52, 52, 52); /* oklch(0.205 0 0) */;
+	--destructive: rgb(223, 62, 62); /* oklch(59.157% 0.24065 26.32) */
+	--warning: rgb(228, 177, 0); /* oklch(0.77 0.16 70) */
+	--success: rgb(60, 136, 60); /* oklch(0.4953 0.1037 140.3) */
+	--navy: rgb(95, 83, 182); /* oklch(0.4865 0.17 266.18) */;
 
-	--border: oklch(83.591% 0.0001 271.152);
-	--input: oklch(0.922 0 0);
-	--ring: oklch(0.708 0 0);
-	--chart-1: oklch(12.953% 0.00351 69.753);
-	--chart-2: oklch(0.6 0.118 184.704);
-	--chart-3: oklch(0.398 0.07 227.392);
-	--chart-4: oklch(0.828 0.189 84.429);
-	--chart-5: oklch(0.769 0.188 70.08);
-	--sidebar: oklch(0.985 0 0);
-	--sidebar-foreground: oklch(0.145 0 0);
-	--sidebar-primary: oklch(0.205 0 0);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.97 0 0);
-	--sidebar-accent-foreground: oklch(0.205 0 0);
-	--sidebar-border: oklch(0.922 0 0);
-	--sidebar-ring: oklch(0.708 0 0);
-	--background: oklch(1 0 0);
-	--foreground: oklch(0.147 0.004 49.25);
+	--border: rgb(213, 213, 213); /* oklch(83.591% 0.0001 271.152) */
+	--input: rgb(235, 235, 235); /* oklch(0.922 0 0) */
+	--ring: rgb(180, 180, 180); /* oklch(0.708 0 0) */;
+	--chart-1: rgb(33, 33, 32); /* oklch(12.953% 0.00351 69.753) */
+	--chart-2: rgb(0, 163, 191); /* oklch(0.6 0.118 184.704) */
+	--chart-3: rgb(65, 85, 125); /* oklch(0.398 0.07 227.392) */
+	--chart-4: rgb(255, 179, 0); /* oklch(0.828 0.189 84.429) */
+	--chart-5: rgb(255, 158, 0); /* oklch(0.769 0.188 70.08) */;
+	--sidebar: rgb(251, 251, 251); /* oklch(0.985 0 0) */
+	--sidebar-foreground: rgb(37, 37, 37); /* oklch(0.145 0 0) */
+	--sidebar-primary: rgb(52, 52, 52); /* oklch(0.205 0 0) */
+	--sidebar-primary-foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
+	--sidebar-accent: rgb(247, 247, 247); /* oklch(0.97 0 0) */
+	--sidebar-accent-foreground: rgb(52, 52, 52); /* oklch(0.205 0 0) */
+	--sidebar-border: rgb(235, 235, 235); /* oklch(0.922 0 0) */
+	--sidebar-ring: rgb(180, 180, 180); /* oklch(0.708 0 0) */
+	--background: rgb(255, 255, 255); /* oklch(1 0 0) */
+	--foreground: rgb(37, 37, 38); /* oklch(0.147 0.004 49.25) */;
 }
 
 .dark {
-	--background: oklch(0.145 0 0);
-	--foreground: oklch(0.985 0 0);
-	--card: oklch(0.205 0 0);
-	--card-foreground: oklch(0.985 0 0);
-	--popover: oklch(0.205 0 0);
-	--popover-foreground: oklch(0.985 0 0);
-	--primary: oklch(0.922 0 0);
-	--primary-foreground: oklch(0.205 0 0);
-	--secondary: oklch(0.268 0.007 34.298);
-	--secondary-foreground: oklch(0.985 0 0);
-	--muted: oklch(0.269 0 0);
-	--muted-foreground: oklch(0.708 0 0);
-	--accent: oklch(0.269 0 0);
-	--accent-foreground: oklch(0.985 0 0);
-	--destructive: oklch(0.704 0.191 22.216);
-	--border: oklch(1 0 0 / 10%);
-	--input: oklch(1 0 0 / 15%);
-	--ring: oklch(0.556 0 0);
-	--chart-1: oklch(0.488 0.243 264.376);
-	--chart-2: oklch(0.696 0.17 162.48);
-	--chart-3: oklch(0.769 0.188 70.08);
-	--chart-4: oklch(0.627 0.265 303.9);
-	--chart-5: oklch(0.645 0.246 16.439);
-	--sidebar: oklch(0.205 0 0);
-	--sidebar-foreground: oklch(0.985 0 0);
-	--sidebar-primary: oklch(0.488 0.243 264.376);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.269 0 0);
-	--sidebar-accent-foreground: oklch(0.985 0 0);
-	--sidebar-border: oklch(1 0 0 / 10%);
-	--sidebar-ring: oklch(0.556 0 0);
+	--background: rgb(37, 37, 37); /* oklch(0.145 0 0) */
+	--foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
+	--card: rgb(52, 52, 52); /* oklch(0.205 0 0) */
+	--card-foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
+	--popover: rgb(52, 52, 52); /* oklch(0.205 0 0) */
+	--popover-foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
+	--primary: rgb(235, 235, 235); /* oklch(0.922 0 0) */
+	--primary-foreground: rgb(52, 52, 52); /* oklch(0.205 0 0) */
+	--secondary: rgb(68, 68, 68); /* oklch(0.268 0.007 34.298) */
+	--secondary-foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
+	--muted: rgb(69, 69, 69); /* oklch(0.269 0 0) */
+	--muted-foreground: rgb(180, 180, 180); /* oklch(0.708 0 0) */
+	--accent: rgb(69, 69, 69); /* oklch(0.269 0 0) */
+	--accent-foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
+	--destructive: rgb(239, 68, 68); /* oklch(0.704 0.191 22.216) */;
+	--border: rgba(255, 255, 255, 0.1); /* oklch(1 0 0 / 10%) */
+	--input: rgba(255, 255, 255, 0.15); /* oklch(1 0 0 / 15%) */
+	--ring: rgb(142, 142, 142); /* oklch(0.556 0 0) */;
+	--chart-1: rgb(94, 83, 243); /* oklch(0.488 0.243 264.376) */
+	--chart-2: rgb(71, 207, 115); /* oklch(0.696 0.17 162.48) */
+	--chart-3: rgb(255, 158, 0); /* oklch(0.769 0.188 70.08) */
+	--chart-4: rgb(225, 78, 202); /* oklch(0.627 0.265 303.9) */
+	--chart-5: rgb(245, 83, 83); /* oklch(0.645 0.246 16.439) */;
+	--sidebar: rgb(52, 52, 52); /* oklch(0.205 0 0) */
+	--sidebar-foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
+	--sidebar-primary: rgb(94, 83, 243); /* oklch(0.488 0.243 264.376) */
+	--sidebar-primary-foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
+	--sidebar-accent: rgb(69, 69, 69); /* oklch(0.269 0 0) */
+	--sidebar-accent-foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
+	--sidebar-border: rgba(255, 255, 255, 0.1); /* oklch(1 0 0 / 10%) */
+	--sidebar-ring: rgb(142, 142, 142); /* oklch(0.556 0 0) */;
+}
+
+@-webkit-keyframes scroll {
+	0% {
+		-webkit-transform: translate(0);
+		transform: translate(0);
+	}
+	100% {
+		-webkit-transform: translateX(calc(-50% - 2.75rem)); /* Safari supports calc in transforms */
+		transform: translate(calc(-50% - 2.75rem));
+	}
 }
 
 @keyframes scroll {
@@ -152,11 +163,80 @@
 		transform: translate(0);
 	}
 	100% {
-		transform: translate(calc(-50% - 2.75rem));
+		transform: translateX(calc(-50% - 2.75rem)); /* Safari supports calc in transforms */
+	}
+}
+
+@-webkit-keyframes shimmer {
+	0% {
+		-webkit-transform: translateX(-100%);
+		transform: translateX(-100%);
+	}
+	100% {
+		-webkit-transform: translateX(100%);
+		transform: translateX(100%);
+	}
+}
+
+@keyframes shimmer {
+	0% {
+		transform: translateX(-100%);
+	}
+	100% {
+		transform: translateX(100%);
+	}
+}
+
+@-webkit-keyframes fade-in {
+	0% {
+		opacity: 0;
+		-webkit-transform: translateY(-10px);
+		transform: translateY(-10px);
+	}
+	100% {
+		opacity: 1;
+		-webkit-transform: translateY(0);
+		transform: translateY(0);
+	}
+}
+
+@keyframes fade-in {
+	0% {
+		opacity: 0;
+		transform: translateY(-10px);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@-webkit-keyframes pulse-once {
+	0%, 100% {
+		opacity: 1;
+		-webkit-transform: scale(1);
+		transform: scale(1);
+	}
+	50% {
+		opacity: 0.8;
+		-webkit-transform: scale(1.2);
+		transform: scale(1.2);
+	}
+}
+
+@keyframes pulse-once {
+	0%, 100% {
+		opacity: 1;
+		transform: scale(1);
+	}
+	50% {
+		opacity: 0.8;
+		transform: scale(1.2);
 	}
 }
 
 .animate-scroll {
+	-webkit-animation: scroll 50s linear infinite;
 	animation: scroll 50s linear infinite;
 }
 
@@ -164,6 +244,264 @@
 	animation-play-state: paused;
 }
 
+.animate-fade-in {
+	-webkit-animation: fade-in 0.6s ease-out forwards;
+	animation: fade-in 0.6s ease-out forwards;
+}
+
+.animate-pulse-once {
+	-webkit-animation: pulse-once 0.4s ease-out;
+	animation: pulse-once 0.4s ease-out;
+}
+
+/* Console loader animations */
+@-webkit-keyframes blink {
+	0%, 49% { opacity: 1; }
+	50%, 100% { opacity: 0; }
+}
+
+@keyframes blink {
+	0%, 49% { opacity: 1; }
+	50%, 100% { opacity: 0; }
+}
+
+@-webkit-keyframes thinking-pulse {
+	0%, 100% { 
+		opacity: 0.2;
+		-webkit-transform: scale(0.7);
+		transform: scale(0.7);
+	}
+	50% { 
+		opacity: 0.8;
+		-webkit-transform: scale(1.1);
+		transform: scale(1.1);
+	}
+}
+
+@keyframes thinking-pulse {
+	0%, 100% { 
+		opacity: 0.2;
+		transform: scale(0.7);
+	}
+	50% { 
+		opacity: 0.8;
+		transform: scale(1.1);
+	}
+}
+
+@-webkit-keyframes gentle-fade {
+	0%, 100% { 
+		opacity: 0.15;
+	}
+	50% { 
+		opacity: 0.7;
+	}
+}
+
+@keyframes gentle-fade {
+	0%, 100% { 
+		opacity: 0.15;
+	}
+	50% { 
+		opacity: 0.7;
+	}
+}
+
+/* Minimal dot loader - Steve Jobs perfection */
+@-webkit-keyframes artistic-flow {
+	0%, 100% {
+		opacity: 0.3;
+		-webkit-transform: scale(1);
+		transform: scale(1);
+	}
+	50% {
+		opacity: 0.9;
+		-webkit-transform: scale(1);
+		transform: scale(1);
+	}
+}
+
+@keyframes artistic-flow {
+	0%, 100% {
+		opacity: 0.3;
+		transform: scale(1);
+	}
+	50% {
+		opacity: 0.9;
+		transform: scale(1);
+	}
+}
+
+/* Alternative - for backwards compatibility */
+@-webkit-keyframes elegant-pulse {
+	0%, 60%, 100% {
+		opacity: 0.6;
+		-webkit-transform: scale(1) translateY(0);
+		transform: scale(1) translateY(0);
+	}
+	30% {
+		opacity: 1;
+		-webkit-transform: scale(1.1) translateY(-2px);
+		transform: scale(1.1) translateY(-2px);
+	}
+}
+
+@keyframes elegant-pulse {
+	0%, 60%, 100% {
+		opacity: 0.6;
+		transform: scale(1) translateY(0);
+	}
+	30% {
+		opacity: 1;
+		transform: scale(1.1) translateY(-2px);
+	}
+}
+
+/* Simple dialog fade animations */
+@keyframes dialog-fade-in {
+	0% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
+}
+
+@keyframes dialog-fade-out {
+	0% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+/* Dialog smooth fade class */
+.dialog-smooth-fade {
+	animation: dialog-fade-in 0.4s ease-out;
+}
+
+.dialog-smooth-fade[data-state="closed"] {
+	animation: dialog-fade-out 0.3s ease-in;
+}
+
+/* Smooth dialog entrance animation */
+@-webkit-keyframes dialog-smooth-in {
+	0% {
+		opacity: 0;
+		background-color: rgba(255, 255, 255, 1);
+	}
+	100% {
+		opacity: 1;
+		background-color: rgba(255, 255, 255, 1);
+	}
+}
+@keyframes dialog-smooth-in {
+	0% {
+		opacity: 0;
+		background-color: rgba(255, 255, 255, 1);
+	}
+	100% {
+		opacity: 1;
+		background-color: rgba(255, 255, 255, 1);
+	}
+}
+
+/* White overlay fade animations */
+@keyframes white-fade-out {
+	0% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+@keyframes white-fade-in {
+	0% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
+}
+
+.animate-white-fade-out {
+	animation: white-fade-out 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+	animation-delay: 0.1s;
+}
+
+.animate-white-fade-in {
+	animation: white-fade-in 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* Gentle content fade animations */
+@keyframes gentle-fade-in {
+	0% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
+}
+
+@keyframes gentle-fade-out {
+	0% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+.animate-gentle-fade-in {
+	animation: gentle-fade-in 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-gentle-fade-out {
+	animation: gentle-fade-out 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* Apple-style overlay animation */
+.dialog-overlay-apple {
+	background: rgba(0, 0, 0, 0.3);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+}
+
+.dialog-overlay-apple[data-state="open"] {
+	animation: apple-overlay-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.dialog-overlay-apple[data-state="closed"] {
+	animation: apple-overlay-out 0.35s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+
+@keyframes apple-overlay-in {
+	0% {
+		opacity: 0;
+		backdrop-filter: blur(0);
+		-webkit-backdrop-filter: blur(0);
+	}
+	100% {
+		opacity: 1;
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
+	}
+}
+
+@keyframes apple-overlay-out {
+	0% {
+		opacity: 1;
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
+	}
+	100% {
+		opacity: 0;
+		backdrop-filter: blur(0);
+		-webkit-backdrop-filter: blur(0);
+	}
+}
 
 @layer base {
 	* {
@@ -171,6 +509,8 @@
 	}
 	body {
 		@apply bg-background text-foreground;
+		overflow-x: hidden;
+		position: relative;
 	}
 	h1 {
 		@apply text-2xl font-bold;
@@ -201,4 +541,2525 @@ mux-player {
 	height: 0;
 }
 
+/* Premium Apple-style animated gradient for search bar */
+@-webkit-keyframes gradient-shift {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
+}
 
+@keyframes gradient-shift {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
+}
+
+@-webkit-keyframes gradient-flow {
+	0% {
+		-webkit-transform: translateX(-100%);
+		transform: translateX(-100%);
+	}
+	100% {
+		-webkit-transform: translateX(100%);
+		transform: translateX(100%);
+	}
+}
+
+@keyframes gradient-flow {
+	0% {
+		transform: translateX(-100%);
+	}
+	100% {
+		transform: translateX(100%);
+	}
+}
+
+@-webkit-keyframes subtle-glow {
+	0%, 100% {
+		opacity: 0.4;
+		-webkit-filter: blur(80px);
+		filter: blur(80px);
+	}
+	50% {
+		opacity: 0.6;
+		-webkit-filter: blur(60px);
+		filter: blur(60px);
+	}
+}
+
+@keyframes subtle-glow {
+	0%, 100% {
+		opacity: 0.4;
+		filter: blur(80px);
+	}
+	50% {
+		opacity: 0.6;
+		filter: blur(60px);
+	}
+}
+
+.search-wave-container {
+	position: relative;
+	overflow: hidden;
+	border-radius: 0.75rem;
+	padding: 1px;
+	width: 100% !important;
+	min-width: 100% !important;
+	max-width: 100% !important;
+	background: linear-gradient(
+		135deg,
+		rgba(0, 0, 0, 0.08),
+		rgba(0, 0, 0, 0.04)
+	);
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+	box-shadow: none;
+	transform: none !important;
+}
+
+/* Subtle motion on hover - no color change */
+.search-wave-container:hover {
+	transition: all 0.8s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* Premium inner border gradient - very subtle */
+.search-wave-container::before {
+	content: '';
+	position: absolute;
+	top: 1px;
+	right: 1px;
+	bottom: 1px;
+	left: 1px;
+	border-radius: calc(0.75rem - 1px); /* Safari supports calc for border-radius */
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.8),
+		rgba(255, 255, 255, 0.4)
+	);
+	pointer-events: none;
+	z-index: 1;
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* Clean and elegant input field */
+.search-wave-input {
+	position: relative;
+	z-index: 2;
+	width: 100%;
+	height: 48px;
+	padding: 0 1rem;
+	font-size: 1rem;
+	background: linear-gradient(
+		90deg,
+		rgba(249, 250, 251, 1),
+		rgba(243, 244, 246, 0.95),
+		rgba(249, 250, 251, 1),
+		rgba(243, 244, 246, 0.95)
+	);
+	background-size: 200% 100%;
+	-webkit-animation: gradient-shift 10s ease-in-out infinite;
+	animation: gradient-shift 10s ease-in-out infinite;
+	transition: all 0.3s ease;
+	/* CLEAR BLACK BORDER - RESTING STATE */
+	border: 2px solid #000000 !important;
+	box-sizing: border-box;
+	border-radius: 0.75rem;
+	outline: none !important;
+	box-shadow: none !important;
+	-webkit-backdrop-filter: blur(10px);
+	backdrop-filter: blur(10px);
+	color: rgb(31, 41, 55) !important;
+	letter-spacing: 0.02em;
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+.search-wave-input:hover {
+	-webkit-animation: gradient-shift 6s ease-in-out infinite;
+	animation: gradient-shift 6s ease-in-out infinite;
+	/* CLEAR BLACK BORDER - HOVER STATE */
+	border: 2px solid #000000 !important;
+	box-shadow: none !important;
+}
+
+.search-wave-input:focus {
+	background: rgba(255, 255, 255, 1);
+	animation: none;
+	/* CLEAR BLACK BORDER - FOCUS/CLICKED STATE */
+	border: 2px solid #000000 !important;
+	box-shadow: none !important;
+	outline: none;
+}
+
+/* Ensure placeholder text is also styled consistently */
+.search-wave-input::placeholder {
+	color: rgba(107, 114, 128, 0.6) !important; /* Gray placeholder */
+}
+
+.search-wave-input::-webkit-input-placeholder {
+	color: rgba(107, 114, 128, 0.6) !important;
+}
+
+.search-wave-input::-moz-placeholder {
+	color: rgba(107, 114, 128, 0.6) !important;
+}
+
+.search-wave-input:-ms-input-placeholder {
+	color: rgba(107, 114, 128, 0.6) !important;
+}
+
+.search-wave-input:-moz-placeholder {
+	color: rgba(107, 114, 128, 0.6) !important;
+}
+
+/* Remove browser default accent color and autofill styles */
+.search-wave-input {
+	/* Safari fallback for accent-color */
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	appearance: none;
+	accent-color: transparent !important;
+	caret-color: rgb(31, 41, 55) !important;
+}
+
+/* Override webkit autofill background to prevent purple/blue */
+.search-wave-input:-webkit-autofill,
+.search-wave-input:-webkit-autofill:hover,
+.search-wave-input:-webkit-autofill:focus,
+.search-wave-input:-webkit-autofill:active {
+	-webkit-box-shadow: 0 0 0 30px white inset !important;
+	-webkit-text-fill-color: rgb(31, 41, 55) !important;
+	box-shadow: 0 0 0 30px white inset !important;
+	transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Focus state - subtle glow effect */
+/* Safari fallback: :has() is not supported in Safari < 15.4 */
+.search-wave-container:focus-within {
+	background: linear-gradient(
+		135deg,
+		rgba(0, 0, 0, 0.09),
+		rgba(0, 0, 0, 0.05)
+	);
+	box-shadow: none;
+	transition: all 0.3s ease;
+}
+
+/* Modern browsers with :has() support */
+@supports selector(:has(*)) {
+	.search-wave-container:has(.search-wave-input:focus) {
+		background: linear-gradient(
+			135deg,
+			rgba(0, 0, 0, 0.09),
+			rgba(0, 0, 0, 0.05)
+		);
+		box-shadow: none;
+		transition: all 0.3s ease;
+	}
+}
+
+.search-wave-container:focus-within::before {
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.6),
+		rgba(243, 244, 246, 0.3)
+	);
+}
+
+/* Modern browsers with :has() support */
+@supports selector(:has(*)) {
+	.search-wave-container:has(.search-wave-input:focus)::before {
+		background: linear-gradient(
+			135deg,
+			rgba(255, 255, 255, 0.6),
+			rgba(243, 244, 246, 0.3)
+		);
+	}
+}
+
+/* Premium moving gradient overlay - visible but subtle */
+.search-wave-overlay {
+	position: absolute;
+	top: 1px;
+	right: 1px;
+	bottom: 1px;
+	left: 1px;
+	border-radius: calc(0.75rem - 1px); /* Safari supports calc for border-radius */
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(107, 114, 128, 0.08),
+		rgba(156, 163, 175, 0.12),
+		rgba(107, 114, 128, 0.08),
+		transparent
+	);
+	background-size: 250% 100%;
+	-webkit-animation: gradient-shift 8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	animation: gradient-shift 8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	pointer-events: none;
+	z-index: 3;
+	mix-blend-mode: normal;
+	isolation: isolate; /* Safari fix for mix-blend-mode */
+	-webkit-transform: translate3d(0, 0, 0); /* Enhanced hardware acceleration */
+	transform: translate3d(0, 0, 0);
+	-webkit-backface-visibility: hidden; /* Safari performance fix */
+	backface-visibility: hidden;
+	will-change: auto; /* Changed from 'transform, opacity' for Safari performance */
+	transition: opacity 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Apple-style shimmer effect with spring bounce */
+.search-wave-overlay::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	border-radius: inherit;
+	background: linear-gradient(
+		105deg,
+		transparent 30%,
+		rgba(255, 255, 255, 0.5) 50%,
+		transparent 70%
+	);
+	background-size: 200% 100%;
+	-webkit-animation: shimmerFlow 12s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+	animation: shimmerFlow 12s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+	pointer-events: none;
+	opacity: 0.7;
+	transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+	transform: translate3d(0, 0, 0);
+	will-change: auto; /* Changed from 'transform, opacity' for Safari performance */
+}
+
+@-webkit-keyframes shimmerFlow {
+	0% {
+		-webkit-transform: translateX(-100%);
+		transform: translateX(-100%);
+		opacity: 0;
+	}
+	20% {
+		opacity: 0.7;
+	}
+	50% {
+		-webkit-transform: translateX(0%);
+		transform: translateX(0%);
+		opacity: 0.9;
+	}
+	80% {
+		opacity: 0.7;
+	}
+	100% {
+		-webkit-transform: translateX(100%);
+		transform: translateX(100%);
+		opacity: 0;
+	}
+}
+
+@keyframes shimmerFlow {
+	0% {
+		transform: translateX(-100%);
+		opacity: 0;
+	}
+	20% {
+		opacity: 0.7;
+	}
+	50% {
+		transform: translateX(0%);
+		opacity: 0.9;
+	}
+	80% {
+		opacity: 0.7;
+	}
+	100% {
+		transform: translateX(100%);
+		opacity: 0;
+	}
+}
+
+/* Speed up shimmer on hover */
+.search-wave-container:hover .search-wave-overlay::before {
+	-webkit-animation: shimmerFlow 6s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+	animation: shimmerFlow 6s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+	transform: none;
+}
+
+.search-wave-container:hover .search-wave-overlay {
+	-webkit-animation: gradient-shift 5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	animation: gradient-shift 5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Subtle overlay on focus with Apple-style fade - no width change */
+.search-wave-container:focus-within .search-wave-overlay {
+	opacity: 0.15;
+	-webkit-animation: focusBreath 2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+	animation: focusBreath 2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+	transform: none;
+}
+
+/* Modern browsers with :has() support */
+@supports selector(:has(*)) {
+	.search-wave-container:has(.search-wave-input:focus) .search-wave-overlay {
+		opacity: 0.15;
+		-webkit-animation: focusBreath 2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+		animation: focusBreath 2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+		transform: none;
+	}
+}
+
+@-webkit-keyframes focusBreath {
+	0%, 100% {
+		opacity: 0.15;
+	}
+	50% {
+		opacity: 0.25;
+	}
+}
+
+@keyframes focusBreath {
+	0%, 100% {
+		opacity: 0.15;
+	}
+	50% {
+		opacity: 0.25;
+	}
+}
+
+.search-wave-container:focus-within .search-wave-overlay::before {
+	opacity: 0;
+	animation: none;
+	transform: none;
+	transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Modern browsers with :has() support */
+@supports selector(:has(*)) {
+	.search-wave-container:has(.search-wave-input:focus) .search-wave-overlay::before {
+		opacity: 0;
+		animation: none;
+		transform: none;
+		transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+}
+
+/* Loading state animations - minimalist Apple style */
+@-webkit-keyframes loading-breathe {
+	0%, 100% {
+		opacity: 0.3;
+	}
+	50% {
+		opacity: 0.6;
+	}
+}
+
+@keyframes loading-breathe {
+	0%, 100% {
+		opacity: 0.3;
+	}
+	50% {
+		opacity: 0.6;
+	}
+}
+
+@-webkit-keyframes loading-slide {
+	0% {
+		-webkit-transform: translateX(-100%);
+		transform: translateX(-100%);
+		opacity: 0;
+	}
+	50% {
+		opacity: 0.5;
+	}
+	100% {
+		-webkit-transform: translateX(100%);
+		transform: translateX(100%);
+		opacity: 0;
+	}
+}
+
+@keyframes loading-slide {
+	0% {
+		transform: translateX(-100%);
+		opacity: 0;
+	}
+	50% {
+		opacity: 0.5;
+	}
+	100% {
+		transform: translateX(100%);
+		opacity: 0;
+	}
+}
+
+/* Loading state - elegant and minimal */
+.search-wave-loading {
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+	background: linear-gradient(
+		135deg,
+		rgba(0, 0, 0, 0.06),
+		rgba(0, 0, 0, 0.04)
+	);
+	animation: loading-breathe 4s ease-in-out infinite;
+}
+
+.search-wave-loading .search-wave-overlay {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(0, 0, 0, 0.03),
+		transparent
+	);
+	background-size: 200% 100%;
+	animation: gradient-shift 3s ease-in-out infinite !important;
+	opacity: 1 !important;
+}
+
+.search-wave-loading .search-wave-overlay::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	background: linear-gradient(
+		90deg,
+		transparent 30%,
+		rgba(0, 0, 0, 0.05) 50%,
+		transparent 70%
+	);
+	animation: loading-slide 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	opacity: 1 !important;
+}
+
+.search-wave-loading .search-wave-overlay::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	background: radial-gradient(
+		ellipse at center,
+		rgba(0, 0, 0, 0.02) 0%,
+		transparent 70%
+	);
+	animation: loading-breathe 2s ease-in-out infinite;
+	opacity: 1;
+}
+
+/* Dark mode adjustments - premium feel */
+.dark .search-wave-container {
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.08),
+		rgba(255, 255, 255, 0.04)
+	);
+	box-shadow: none;
+}
+
+.dark .search-wave-container:hover {
+	transition: all 0.8s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.dark .search-wave-container::before {
+	background: linear-gradient(
+		135deg,
+		rgba(31, 41, 55, 0.9),
+		rgba(17, 24, 39, 0.7)
+	);
+}
+
+.dark .search-wave-input {
+	/* Inherits sizing from base .search-wave-input */
+	background: linear-gradient(
+		90deg,
+		rgba(31, 41, 55, 1),
+		rgba(17, 24, 39, 0.95),
+		rgba(31, 41, 55, 1),
+		rgba(17, 24, 39, 0.95)
+	);
+	background-size: 200% 100%;
+	-webkit-animation: gradient-shift 10s ease-in-out infinite;
+	animation: gradient-shift 10s ease-in-out infinite;
+	/* CLEAR BLACK BORDER - DARK MODE RESTING STATE */
+	border: 2px solid #000000 !important;
+	box-sizing: border-box;
+	-webkit-backdrop-filter: blur(10px);
+	backdrop-filter: blur(10px);
+	color: rgb(243, 244, 246) !important; /* Light gray/white text color in dark mode */
+}
+
+.dark .search-wave-input:hover {
+	-webkit-animation: gradient-shift 6s ease-in-out infinite;
+	animation: gradient-shift 6s ease-in-out infinite;
+	transition: all 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
+	/* CLEAR BLACK BORDER - DARK MODE HOVER STATE */
+	border: 2px solid #000000 !important;
+	color: rgb(243, 244, 246) !important; /* Maintain light gray/white text color */
+}
+
+.dark .search-wave-input:focus {
+	background: rgba(17, 24, 39, 1);
+	animation: none;
+	/* CLEAR BLACK BORDER - DARK MODE FOCUS/CLICKED STATE */
+	border: 2px solid #000000 !important;
+	outline: none;
+	color: rgb(243, 244, 246) !important; /* Maintain light gray/white text color */
+}
+
+/* Dark mode placeholder text */
+.dark .search-wave-input::placeholder {
+	color: rgba(156, 163, 175, 0.5) !important; /* Lighter gray placeholder in dark mode */
+}
+
+.dark .search-wave-input::-webkit-input-placeholder {
+	color: rgba(156, 163, 175, 0.5) !important;
+}
+
+.dark .search-wave-input::-moz-placeholder {
+	color: rgba(156, 163, 175, 0.5) !important;
+}
+
+.dark .search-wave-input:-ms-input-placeholder {
+	color: rgba(156, 163, 175, 0.5) !important;
+}
+
+.dark .search-wave-input:-moz-placeholder {
+	color: rgba(156, 163, 175, 0.5) !important;
+}
+
+/* Dark mode: Remove browser default accent color and autofill styles */
+.dark .search-wave-input {
+	/* Safari fallback for accent-color */
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	appearance: none;
+	accent-color: transparent !important;
+	caret-color: rgb(243, 244, 246) !important;
+}
+
+/* Dark mode: Override webkit autofill background to prevent purple/blue */
+.dark .search-wave-input:-webkit-autofill,
+.dark .search-wave-input:-webkit-autofill:hover,
+.dark .search-wave-input:-webkit-autofill:focus,
+.dark .search-wave-input:-webkit-autofill:active {
+	-webkit-box-shadow: 0 0 0 30px rgb(17, 24, 39) inset !important;
+	-webkit-text-fill-color: rgb(243, 244, 246) !important;
+	box-shadow: 0 0 0 30px rgb(17, 24, 39) inset !important;
+	transition: background-color 5000s ease-in-out 0s;
+}
+
+.dark .search-wave-container:focus-within {
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.08),
+		rgba(255, 255, 255, 0.04)
+	);
+	box-shadow: none;
+}
+
+/* Modern browsers with :has() support */
+@supports selector(:has(*)) {
+	.dark .search-wave-container:has(.search-wave-input:focus) {
+		background: linear-gradient(
+			135deg,
+			rgba(255, 255, 255, 0.08),
+			rgba(255, 255, 255, 0.04)
+		);
+		box-shadow: none;
+	}
+}
+
+.dark .search-wave-container:focus-within::before {
+	background: linear-gradient(
+		135deg,
+		rgba(31, 41, 55, 0.8),
+		rgba(55, 65, 81, 0.3)
+	);
+}
+
+/* Modern browsers with :has() support */
+@supports selector(:has(*)) {
+	.dark .search-wave-container:has(.search-wave-input:focus)::before {
+		background: linear-gradient(
+			135deg,
+			rgba(31, 41, 55, 0.8),
+			rgba(55, 65, 81, 0.3)
+		);
+	}
+}
+
+/* Premium button gradient animations */
+/* Button styles with 49% opacity backgrounds and 100% opacity stroke outlines */
+
+/* Generate button - #5DAB68 */
+.gradient-button-green {
+	background: rgba(93, 171, 104, 0.49) !important;
+	border: 1px solid #5DAB68 !important;
+	color: black !important;
+	-webkit-transition: all 0.3s ease;
+	-moz-transition: all 0.3s ease;
+	transition: all 0.3s ease;
+	display: -webkit-flex !important;
+	display: -moz-box !important;
+	display: flex !important;
+	-webkit-align-items: center !important;
+	-moz-box-align: center !important;
+	align-items: center !important;
+	-webkit-justify-content: center !important;
+	-moz-box-pack: center !important;
+	justify-content: center !important;
+	text-align: center !important;
+	line-height: 39px !important; /* match button height for perfect vertical centering */
+	padding: 0 16px !important; /* symmetric padding for clean horizontal center */
+}
+.gradient-button-green:hover {
+	background: rgba(93, 171, 104, 0.65) !important; /* Slightly more opaque on hover */
+	border-color: #5DAB68 !important;
+}
+
+/* Dark mode green button */
+.dark .gradient-button-green {
+	background: rgba(93, 171, 104, 0.49) !important;
+	border: 1px solid rgba(93, 171, 104, 1) !important;
+}
+
+.dark .gradient-button-green:hover {
+	background: rgba(93, 171, 104, 0.65) !important;
+	border: 1px solid rgba(93, 171, 104, 1) !important;
+}
+
+/* Import button - #E2E2E2 */
+.gradient-button-blue {
+	background: rgba(226, 226, 226, 0.49) !important;
+	border: 1px solid #B6B6B6 !important;
+	color: #333 !important;
+	-webkit-transition: background 0.2s ease;
+	-moz-transition: background 0.2s ease;
+	transition: background 0.2s ease;
+	display: -webkit-flex !important;
+	display: -moz-box !important;
+	display: flex !important;
+	-webkit-align-items: center !important;
+	-moz-box-align: center !important;
+	align-items: center !important;
+	-webkit-justify-content: center !important;
+	-moz-box-pack: center !important;
+	justify-content: center !important;
+	text-align: center !important;
+	line-height: 39px !important; /* match button height */
+	padding: 0 16px !important; /* symmetric padding */
+}
+
+.gradient-button-blue:hover {
+	background: rgba(226, 226, 226, 0.65) !important;
+	border-color: #ababab !important;
+}
+
+.gradient-button-blue:active {
+	background: rgba(226, 226, 226, 0.8) !important;
+	border-color: #9d9d9d !important;
+}
+
+/* Dark mode blue button */
+.dark .gradient-button-blue {
+	background: rgba(226, 226, 226, 0.49) !important;
+	border: 1px solid #B6B6B6 !important;
+}
+
+.dark .gradient-button-blue:hover {
+	background: rgba(226, 226, 226, 0.65) !important;
+	border: 1px solid #B6B6B6 !important;
+}
+
+/* Dark mode overlay - more visible */
+.dark .search-wave-overlay {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(156, 163, 175, 0.1),
+		rgba(209, 213, 219, 0.15),
+		rgba(156, 163, 175, 0.1),
+		transparent
+	);
+	background-size: 250% 100%;
+	animation: gradient-shift 8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.dark .search-wave-overlay::before {
+	background: linear-gradient(
+		105deg,
+		transparent 30%,
+		rgba(255, 255, 255, 0.25) 50%,
+		transparent 70%
+	);
+	animation: gradient-flow 12s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+	opacity: 0.6;
+	transition: animation-duration 0.6s ease;
+}
+
+/* Speed up shimmer on hover in dark mode */
+.dark .search-wave-container:hover .search-wave-overlay::before {
+	animation: gradient-flow 8s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+}
+
+.dark .search-wave-container:hover .search-wave-overlay {
+	-webkit-animation: gradient-shift 5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	animation: gradient-shift 5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Subtle overlay on focus in dark mode */
+.dark .search-wave-container:focus-within .search-wave-overlay {
+	opacity: 0.2;
+	animation: gradient-shift 14s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Modern browsers with :has() support */
+@supports selector(:has(*)) {
+	.dark .search-wave-container:has(.search-wave-input:focus) .search-wave-overlay {
+		opacity: 0.2;
+		animation: gradient-shift 14s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	}
+}
+
+.dark .search-wave-container:focus-within .search-wave-overlay::before {
+	opacity: 0;
+}
+
+/* Modern browsers with :has() support */
+@supports selector(:has(*)) {
+	.dark .search-wave-container:has(.search-wave-input:focus) .search-wave-overlay::before {
+		opacity: 0;
+	}
+}
+
+/* Removed excessive background gradients for cleaner appearance */
+
+/* Removed dark mode excessive background gradients for cleaner appearance */
+
+/* Premium text gradient animations - Apple/PointOne inspired */
+@-webkit-keyframes premium-gradient-move {
+	0%, 100% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+}
+
+@-webkit-keyframes premium-gradient-move {
+	0%, 100% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+}
+
+@keyframes premium-gradient-move {
+	0%, 100% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+}
+
+/* Removed text-flow animation for cleaner appearance */
+
+@-webkit-keyframes premium-shimmer {
+	0% {
+		-webkit-transform: translateX(-50%);
+		transform: translateX(-50%);
+		opacity: 0;
+	}
+	50% {
+		opacity: 1;
+	}
+	100% {
+		-webkit-transform: translateX(50%);
+		transform: translateX(50%);
+		opacity: 0;
+	}
+}
+
+@keyframes premium-shimmer {
+	0% {
+		transform: translateX(-50%);
+		opacity: 0;
+	}
+	50% {
+		opacity: 1;
+	}
+	100% {
+		transform: translateX(50%);
+		opacity: 0;
+	}
+}
+
+
+
+@-webkit-keyframes premium-float {
+	0%, 100% {
+		-webkit-transform: translateY(0px);
+		transform: translateY(0px);
+	}
+	50% {
+		-webkit-transform: translateY(-2px);
+		transform: translateY(-2px);
+	}
+}
+
+@keyframes premium-float {
+	0%, 100% {
+		transform: translateY(0px);
+	}
+	50% {
+		transform: translateY(-2px);
+	}
+}
+
+/* Hero section - continuous ambient animation */
+.premium-hero-section {
+	position: relative;
+	z-index: 1;
+	overflow: hidden;
+}
+
+/* Removed hero section gradient overlay */
+
+/* Removed page-wide shimmer for cleaner look */
+
+/* Removed ambient flow animation for cleaner appearance */
+
+/* Logo container - subtle float only */
+.premium-logo-container {
+	position: relative;
+	display: inline-block;
+	animation: premium-float 12s ease-in-out infinite;
+	opacity: 0.9;
+}
+
+/* Main title gradient - Murmur */
+.premium-gradient-text {
+	position: relative;
+	background: linear-gradient(
+		135deg,
+		rgba(0, 0, 0, 1) 0%,
+		rgba(17, 24, 39, 1) 50%,
+		rgba(0, 0, 0, 1) 100%
+	);
+	background-size: 200% 200%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	will-change: auto; /* Changed from background-position for Safari performance */
+	-webkit-transform: translateZ(0); /* Safari GPU acceleration */
+	transform: translateZ(0);
+	letter-spacing: -0.02em;
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+	/* Text shadow doesn't work with transparent text, so we use ::before for the outline effect */
+}
+
+/* NYC high society gradient outline - Layer 1: Soft outer glow */
+.premium-gradient-text::before {
+	content: attr(data-text);
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: -3;
+	background: linear-gradient(
+		135deg,
+		rgba(31, 41, 55, 0.3) 0%,
+		rgba(17, 24, 39, 0.4) 25%,
+		rgba(31, 41, 55, 0.3) 50%,
+		rgba(17, 24, 39, 0.4) 75%,
+		rgba(31, 41, 55, 0.3) 100%
+	);
+	background-size: 400% 400%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	filter: blur(25px);
+	opacity: 0.15;
+	pointer-events: none;
+}
+
+/* NYC high society gradient outline - Layer 2: Mid glow */
+.premium-gradient-text::after {
+	content: attr(data-text);
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: -2;
+	background: linear-gradient(
+		90deg,
+		rgba(17, 24, 39, 0.3) 0%,
+		rgba(31, 41, 55, 0.4) 50%,
+		rgba(17, 24, 39, 0.3) 100%
+	);
+	background-size: 300% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite reverse;
+	filter: blur(12px);
+	opacity: 0.2;
+	pointer-events: none;
+}
+
+/* Subtitle text - clean and static */
+.premium-subtitle-gradient {
+	position: relative;
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+	color: rgb(107, 114, 128);
+	opacity: 0.9;
+}
+
+/* Removed subtitle sweep animation for cleaner text */
+
+/* Accent word - "start" */
+.premium-accent {
+	position: relative;
+	display: inline-block;
+	font-weight: 600;
+	color: rgb(75, 85, 99);
+	opacity: 1;
+	-webkit-text-fill-color: initial !important;
+	background: none !important;
+	-webkit-background-clip: initial !important;
+	background-clip: initial !important;
+}
+
+/* Hover effects removed for Murmur text - no interaction effects */
+
+.premium-subtitle-gradient:hover {
+	opacity: 1;
+	color: rgb(75, 85, 99);
+	transition: all 1.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* Dark mode hover effects removed for Murmur text */
+
+.dark .premium-subtitle-gradient:hover {
+	opacity: 1;
+	color: rgb(229, 231, 235);
+	transition: all 1.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* Removed dark mode hero section gradient overlays */
+
+.dark .premium-gradient-text {
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.95) 0%,
+		rgba(209, 213, 219, 0.85) 50%,
+		rgba(255, 255, 255, 0.95) 100%
+	);
+	background-size: 200% 200%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+}
+
+/* Dark mode NYC high society gradient outline - Layer 1 */
+.dark .premium-gradient-text::before {
+	background: linear-gradient(
+		135deg,
+		rgba(243, 244, 246, 0.5) 0%,
+		rgba(209, 213, 219, 0.7) 25%,
+		rgba(243, 244, 246, 0.5) 50%,
+		rgba(209, 213, 219, 0.7) 75%,
+		rgba(243, 244, 246, 0.5) 100%
+	);
+	background-size: 400% 400%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	filter: blur(25px);
+	opacity: 0.15;
+}
+
+/* Dark mode NYC high society gradient outline - Layer 2 */
+.dark .premium-gradient-text::after {
+	background: linear-gradient(
+		90deg,
+		rgba(209, 213, 219, 0.3) 0%,
+		rgba(243, 244, 246, 0.5) 50%,
+		rgba(209, 213, 219, 0.3) 100%
+	);
+	background-size: 300% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite reverse;
+	filter: blur(12px);
+	opacity: 0.25;
+}
+
+.dark .premium-subtitle-gradient {
+	color: rgb(209, 213, 219);
+	opacity: 0.9;
+}
+
+.dark .premium-accent {
+	opacity: 1;
+	font-weight: 600;
+	color: rgb(229, 231, 235);
+	-webkit-text-fill-color: initial !important;
+	background: none !important;
+	-webkit-background-clip: initial !important;
+	background-clip: initial !important;
+}
+
+/* Dark mode loading state - elegant minimal */
+.dark .search-wave-loading {
+	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+	background: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.06),
+		rgba(255, 255, 255, 0.03)
+	);
+	animation: loading-breathe 4s ease-in-out infinite;
+}
+
+.dark .search-wave-loading .search-wave-overlay {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(255, 255, 255, 0.04),
+		transparent
+	);
+	background-size: 200% 100%;
+	animation: gradient-shift 3s ease-in-out infinite !important;
+	opacity: 1 !important;
+}
+
+.dark .search-wave-loading .search-wave-overlay::before {
+	background: linear-gradient(
+		90deg,
+		transparent 30%,
+		rgba(255, 255, 255, 0.06) 50%,
+		transparent 70%
+	);
+	animation: loading-slide 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	opacity: 1 !important;
+}
+
+.dark .search-wave-loading .search-wave-overlay::after {
+	background: radial-gradient(
+		ellipse at center,
+		rgba(255, 255, 255, 0.03) 0%,
+		transparent 70%
+	);
+	animation: loading-breathe 2s ease-in-out infinite;
+	opacity: 1;
+}
+
+/* ========================================
+   Elegant Search Animation - Simple & Beautiful
+   ======================================== */
+
+/* Dashboard container - holds the entire search experience */
+.dashboard-container {
+	position: relative;
+	min-height: 100vh;
+	transition: all 0.6s ease;
+}
+
+/* Hero wrapper - contains logo and text that will fade out */
+.hero-wrapper {
+	opacity: 1;
+	-webkit-transform: translateY(0);
+	transform: translateY(0);
+	transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+		transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+	position: relative;
+	z-index: 1;
+	height: 320px;
+	--hero-height: 320px;
+}
+
+/* When search is active - hero elegantly fades away */
+.search-active .hero-wrapper {
+	opacity: 0;
+	-webkit-transform: translateY(-20px);
+	transform: translateY(-20px);
+	pointer-events: none;
+	height: 0;
+	overflow: hidden;
+	margin-bottom: 0;
+	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+		-webkit-transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+		height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
+}
+
+/* Search bar wrapper - default state */
+.search-bar-wrapper {
+	position: relative;
+	opacity: 1;
+	-webkit-transform: translateY(0);
+	transform: translateY(0);
+	transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+		transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+	z-index: 20;
+	margin-top: clamp(3rem, calc((100vh - var(--hero-height, 320px)) * 0.35), 26vh);
+	width: 100%;
+}
+
+/* Search bar when active - elegantly disappears */
+.search-bar-wrapper.search-bar-active {
+	opacity: 0;
+	-webkit-transform: translateY(-30px);
+	transform: translateY(-30px);
+	pointer-events: none;
+	height: 0;
+	overflow: hidden;
+	margin: 0;
+	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+		-webkit-transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+		height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
+}
+
+/* Inner container - centered and clean */
+.search-bar-inner {
+	width: 1132px;
+	max-width: 100%;
+	margin-left: auto;
+	margin-right: auto;
+	transition: inherit;
+}
+
+/* Removed - handled by search-input-group-active now */
+
+
+
+
+
+@-webkit-keyframes inputGlowPulse {
+	0% {
+		box-shadow: none;
+	}
+	50% {
+		box-shadow: none;
+	}
+	100% {
+		box-shadow: none;
+	}
+}
+
+@keyframes inputGlowPulse {
+	0% {
+		box-shadow: none;
+	}
+	50% {
+		box-shadow: none;
+	}
+	100% {
+		box-shadow: none;
+	}
+}
+
+/* Elegant fade effect for hero elements */
+.search-active .premium-logo-container {
+	opacity: 0;
+	transform: translateY(-10px);
+	transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+		transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-active .premium-gradient-text {
+	opacity: 0;
+	transform: translateY(-10px);
+	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.05s,
+		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.05s;
+}
+
+.search-active .premium-subtitle-gradient {
+	opacity: 0;
+	transform: translateY(-10px);
+	transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.1s,
+		transform 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.1s;
+}
+
+/* Elegant content reveal after search */
+.search-active .mt-10 {
+	animation: elegantFadeIn 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+	animation-delay: 0.8s;
+	opacity: 0;
+}
+
+/* Campaigns table fade out when search is triggered */
+.campaigns-table-wrapper {
+	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+	opacity: 1;
+	transform: translateY(0);
+}
+
+.search-active ~ .campaigns-table-wrapper {
+	opacity: 0;
+	transform: translateY(20px);
+	pointer-events: none;
+}
+
+/* Campaigns table container with fixed height */
+.campaigns-table-container {
+	max-height: 382px;
+	overflow: hidden;
+}
+
+/* Override the default constrainHeight of 429px */
+.campaigns-table-container > div > div:last-child {
+	height: 382px !important;
+	max-height: 382px !important;
+}
+
+/* Hide rows per page and search in campaigns table header */
+.campaigns-table-container > div > .flex.items-center.justify-between.py-4 {
+	display: none !important;
+}
+
+/* Hide pagination that appears after the table wrapper div */
+.campaigns-table-container > div > nav {
+	display: none !important;
+}
+
+/* Also hide if pagination is rendered as sibling */
+.campaigns-table-container ~ nav {
+	display: none !important;
+}
+
+/* Target the specific pagination structure */
+.campaigns-table-wrapper .flex.items-center.justify-center.gap-2:has(button) {
+	display: none !important;
+}
+
+/* Fallback for Safari versions that don't support :has() */
+@supports not (selector(:has(*))) {
+	.campaigns-table-wrapper nav,
+	.campaigns-table-wrapper [role="navigation"] {
+		display: none !important;
+	}
+}
+
+/* Handle text overflow in campaigns table cells */
+.campaigns-table-container td:not(:nth-child(4)) {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 8px 12px;
+}
+
+/* Also apply text clipping to table headers */
+.campaigns-table-container th:not(:nth-child(4)) {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 8px 12px;
+}
+
+/* Ensure the delete column header is centered */
+.campaigns-table-container th:nth-child(4) {
+	text-align: center;
+}
+
+/* Ensure table layout is fixed for proper column width control */
+.campaigns-table-container table {
+	table-layout: fixed !important;
+	width: 100%;
+	-webkit-text-size-adjust: 100%; /* Prevent Safari text size issues */
+}
+
+/* Safari-specific table fixes */
+@supports (-webkit-hyphens: none) {
+	.campaigns-table-container {
+		-webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS Safari */
+	}
+}
+
+/* First three columns share the space evenly */
+.campaigns-table-container th:nth-child(1),
+.campaigns-table-container td:nth-child(1),
+.campaigns-table-container th:nth-child(2),
+.campaigns-table-container td:nth-child(2),
+.campaigns-table-container th:nth-child(3),
+.campaigns-table-container td:nth-child(3) {
+	width: calc((100% - 60px) / 3) !important;
+	width: -webkit-calc((100% - 60px) / 3) !important;
+	min-width: 0 !important;
+	max-width: calc((100% - 60px) / 3) !important;
+	max-width: -webkit-calc((100% - 60px) / 3) !important;
+}
+
+/* Delete button column - small fixed width at far right */
+.campaigns-table-container th:nth-child(4),
+.campaigns-table-container td:nth-child(4) {
+	width: 60px !important;
+	min-width: 60px !important;
+	max-width: 60px !important;
+	overflow: visible; /* Allow button to be fully visible */
+	text-align: center;
+	padding: 8px;
+}
+
+/* Hide the header text for delete column */
+.campaigns-table-container th:nth-child(4) button {
+	visibility: hidden;
+}
+
+/* Override any generic selectors for the specific columns */
+.campaigns-table-container [role="columnheader"]:not(:nth-child(4)),
+.campaigns-table-container [role="cell"]:not(:nth-child(4)) {
+	width: calc((100% - 60px) / 3) !important;
+	width: -webkit-calc((100% - 60px) / 3) !important;
+	min-width: 0 !important;
+	max-width: calc((100% - 60px) / 3) !important;
+	max-width: -webkit-calc((100% - 60px) / 3) !important;
+}
+
+/* Ensure buttons in the last column are not clipped */
+.campaigns-table-container td:last-child button {
+	position: relative;
+	z-index: 1;
+}
+
+/* Exclude contacts box styling */
+.exclude-contacts-box {
+	transition: box-shadow 0.2s ease;
+	-webkit-transition: box-shadow 0.2s ease;
+	flex-shrink: 0;
+	-webkit-flex-shrink: 0;
+}
+
+.exclude-contacts-box:hover {
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	-webkit-box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Ensure consistent layout during horizontal compression */
+.search-bar-wrapper .flex-wrap {
+	min-height: 39px;
+	align-items: center;
+}
+
+/* Prevent overlapping on medium screens */
+@media (max-width: 768px) and (min-width: 640px) {
+	.search-bar-wrapper .flex-wrap {
+		gap: 1rem;
+	}
+}
+
+/* Ensure even vertical alignment */
+.exclude-contacts-box label {
+	line-height: 1;
+	display: flex;
+	align-items: center;
+}
+
+/* Custom toggle switch styles */
+.exclude-contacts-box input[type="checkbox"]:checked + div {
+	background-color: #E5E5E5 !important;
+}
+
+.exclude-contacts-box input[type="checkbox"]:checked + div::after {
+	transform: translateX(10px);
+	-webkit-transform: translateX(10px);
+}
+
+/* Safari-specific fixes for toggle */
+@supports (-webkit-appearance: none) {
+	.exclude-contacts-box input[type="checkbox"] + div::after {
+		-webkit-transition: all 0.2s ease;
+		transition: all 0.2s ease;
+	}
+}
+
+/* Keep exclude contacts box consistent on smaller screens */
+@media (max-width: 640px) {
+	.exclude-contacts-box {
+		width: 227px !important;
+		min-width: 227px !important;
+		flex-shrink: 0;
+	}
+}
+
+/* Only on very small screens, allow some flexibility */
+@media (max-width: 380px) {
+	.exclude-contacts-box {
+		width: calc(100% - 32px) !important;
+		width: -webkit-calc(100% - 32px) !important;
+		min-width: 200px !important;
+	}
+}
+
+/* Elegant staggered fade in for search results */
+.search-active .search-result-item:nth-child(1) {
+	animation: gentleFadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+	animation-delay: 0.9s;
+	opacity: 0;
+}
+
+.search-active .search-result-item:nth-child(2) {
+	animation: gentleFadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+	animation-delay: 1s;
+	opacity: 0;
+}
+
+.search-active .search-result-item:nth-child(3) {
+	animation: gentleFadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+	animation-delay: 1.1s;
+	opacity: 0;
+}
+
+.search-active .search-result-item:nth-child(n+4) {
+	animation: gentleFadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+	animation-delay: 1.2s;
+	opacity: 0;
+}
+
+@-webkit-keyframes gentleFadeIn {
+	0% {
+		opacity: 0;
+		-webkit-transform: translateY(10px);
+		transform: translateY(10px);
+	}
+	100% {
+		opacity: 1;
+		-webkit-transform: translateY(0);
+		transform: translateY(0);
+	}
+}
+
+@keyframes gentleFadeIn {
+	0% {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Form controls positioning when active */
+.search-bar-active form {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	width: 100% !important;
+	min-width: 100% !important;
+	max-width: 100% !important;
+}
+
+/* Ensure form maintains width */
+.search-bar-inner form {
+	width: 100% !important;
+	min-width: 100% !important;
+	max-width: 100% !important;
+}
+
+/* Search input group - container for input and button */
+.search-input-group {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	width: 100%;
+	min-width: 100%;
+	max-width: 100%;
+}
+
+.search-input-group-active {
+	width: 100% !important;
+	min-width: 100% !important;
+	max-width: 100% !important;
+	margin: 0;
+	padding: 0;
+}
+
+
+
+
+
+
+
+/* Search button with elastic entrance - no width change on parent */
+.search-button-active {
+	height: 48px;
+	padding: 0 1.75rem;
+	font-size: 0.9375rem;
+	font-weight: 500;
+	background: linear-gradient(
+		135deg,
+		rgba(93, 171, 104, 0.9),
+		rgba(93, 171, 104, 1)
+	);
+	border: 1px solid rgba(93, 171, 104, 0.3);
+	color: white;
+	border-radius: 0.75rem;
+	transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+	opacity: 0;
+	animation: searchButtonElasticIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+	animation-delay: 0.4s;
+	white-space: nowrap;
+	transform: translate3d(0, 0, 0);
+	will-change: auto; /* Changed from 'transform, opacity' for Safari performance */
+}
+
+.search-button-active:hover {
+	background: linear-gradient(
+		135deg,
+		rgba(93, 171, 104, 1),
+		rgba(73, 151, 84, 1)
+	);
+	transform: translate3d(0, -2px, 0);
+	box-shadow: none;
+	transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.search-button-active:active {
+	transform: translate3d(0, 0, 0);
+	transition: all 0.1s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@-webkit-keyframes searchButtonElasticIn {
+	0% {
+		opacity: 0;
+		-webkit-transform: translate3d(30px, 0, 0);
+		transform: translate3d(30px, 0, 0);
+	}
+	40% {
+		opacity: 1;
+		-webkit-transform: translate3d(-3px, 0, 0);
+		transform: translate3d(-3px, 0, 0);
+	}
+	70% {
+		-webkit-transform: translate3d(1px, 0, 0);
+		transform: translate3d(1px, 0, 0);
+	}
+	100% {
+		opacity: 1;
+		-webkit-transform: translate3d(0, 0, 0);
+		transform: translate3d(0, 0, 0);
+	}
+}
+
+@keyframes searchButtonElasticIn {
+	0% {
+		opacity: 0;
+		transform: translate3d(30px, 0, 0);
+	}
+	40% {
+		opacity: 1;
+		transform: translate3d(-3px, 0, 0);
+	}
+	70% {
+		transform: translate3d(1px, 0, 0);
+	}
+	100% {
+		opacity: 1;
+		transform: translate3d(0, 0, 0);
+	}
+}
+
+/* Dark mode search button */
+.dark .search-button-active {
+	background: linear-gradient(
+		135deg,
+		rgba(93, 171, 104, 0.8),
+		rgba(93, 171, 104, 0.9)
+	);
+	border: 1px solid rgba(93, 171, 104, 0.5);
+}
+
+.dark .search-button-active:hover {
+	background: linear-gradient(
+		135deg,
+		rgba(93, 171, 104, 0.9),
+		rgba(73, 151, 84, 0.95)
+	);
+	transform: translateY(-1px);
+	box-shadow: none;
+}
+
+/* Search context label - Elegant Times New Roman display */
+.search-context-label {
+	display: none; /* Hide when inside the disappearing wrapper */
+}
+
+/* Elegant search query display - Apple-inspired with Times New Roman */
+.search-active .search-query-display {
+	position: relative;
+	z-index: 50;
+	background: linear-gradient(
+		to bottom,
+		rgba(255, 255, 255, 0.98) 0%,
+		rgba(255, 255, 255, 0.95) 50%,
+		rgba(255, 255, 255, 0.88) 100%
+	);
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
+	padding: 2rem 0 1.5rem 0;
+	box-shadow: none;
+	animation: elegantSlideDown 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+	animation-delay: 0.6s;
+	opacity: 0;
+}
+
+@-webkit-keyframes elegantSlideDown {
+	0% {
+		opacity: 0;
+		-webkit-transform: translateY(-20px);
+		transform: translateY(-20px);
+	}
+	100% {
+		opacity: 1;
+		-webkit-transform: translateY(0);
+		transform: translateY(0);
+	}
+}
+
+@keyframes elegantSlideDown {
+	0% {
+		opacity: 0;
+		transform: translateY(-20px);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.search-query-display-inner {
+	max-width: 1132px;
+	margin: 0 auto;
+	padding: 0 2rem;
+	text-align: center;
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 60px;
+}
+
+.search-query-display-text {
+	font-family: 'Times New Roman', 'Times', serif;
+	font-size: 1.75rem;
+	font-weight: 400;
+	color: #000000;
+	letter-spacing: 0.01em;
+	line-height: 1.4;
+	opacity: 0;
+	animation: fadeInText 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+	animation-delay: 0.9s;
+	max-width: 800px;
+	margin: 0 auto;
+	position: relative;
+	display: flex;
+	align-items: baseline;
+}
+
+/* Subtle underline decoration */
+.search-query-display-text::after {
+	content: '';
+	position: absolute;
+	bottom: -8px;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 60px;
+	height: 1px;
+	background: rgba(0, 0, 0, 0.2);
+	animation: expandLine 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+	animation-delay: 1.2s;
+	opacity: 0;
+}
+
+@-webkit-keyframes expandLine {
+	0% {
+		opacity: 0;
+		width: 0;
+	}
+	100% {
+		opacity: 1;
+		width: 60px;
+	}
+}
+
+@keyframes expandLine {
+	0% {
+		opacity: 0;
+		width: 0;
+	}
+	100% {
+		opacity: 1;
+		width: 60px;
+	}
+}
+
+/* Minimal Apple-style back button */
+.search-back-button {
+	position: absolute;
+	left: 2rem;
+	top: 50%;
+	transform: translateY(-50%);
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.375rem 0.75rem;
+	background: transparent;
+	border: none;
+	border-radius: 8px;
+	color: rgba(0, 0, 0, 0.6);
+	font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+	font-size: 0.9rem;
+	font-weight: 400;
+	line-height: 1.4;
+	cursor: pointer;
+	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+	opacity: 0;
+	animation: fadeInButton 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+	animation-delay: 0.8s;
+}
+
+.search-back-button:hover {
+	background: rgba(0, 0, 0, 0.05);
+	color: rgba(0, 0, 0, 0.9);
+	transform: translateY(-50%) translateX(-2px);
+}
+
+.search-back-button:active {
+	transform: translateY(-50%) scale(0.98);
+}
+
+.search-back-icon {
+	width: 18px;
+	height: 18px;
+	transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+	vertical-align: middle;
+	display: inline-block;
+}
+
+.search-back-button:hover .search-back-icon {
+	transform: translateX(-2px);
+}
+
+.search-back-text {
+	letter-spacing: 0.01em;
+	vertical-align: middle;
+	display: inline-block;
+}
+
+@-webkit-keyframes fadeInButton {
+	0% {
+		opacity: 0;
+		-webkit-transform: translateY(-50%) translateX(10px);
+		transform: translateY(-50%) translateX(10px);
+	}
+	100% {
+		opacity: 1;
+		-webkit-transform: translateY(-50%) translateX(0);
+		transform: translateY(-50%) translateX(0);
+	}
+}
+
+@keyframes fadeInButton {
+	0% {
+		opacity: 0;
+		transform: translateY(-50%) translateX(10px);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(-50%) translateX(0);
+	}
+}
+
+/* Quotation marks styling */
+.search-query-quote-left,
+.search-query-quote-right {
+	color: #B8BCC3;
+	opacity: 1;
+	display: inline;
+	font-family: 'Times New Roman', 'Times', serif;
+	font-size: inherit;
+	line-height: inherit;
+	vertical-align: baseline;
+}
+
+@-webkit-keyframes fadeInText {
+	0% {
+		opacity: 0;
+		-webkit-transform: translateY(5px);
+		transform: translateY(5px);
+	}
+	100% {
+		opacity: 1;
+		-webkit-transform: translateY(0);
+		transform: translateY(0);
+	}
+}
+
+@keyframes fadeInText {
+	0% {
+		opacity: 0;
+		transform: translateY(5px);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Dark mode search query display */
+.dark .search-active .search-query-display {
+	background: linear-gradient(
+		to bottom,
+		rgba(17, 24, 39, 0.98) 0%,
+		rgba(17, 24, 39, 0.95) 50%,
+		rgba(17, 24, 39, 0.88) 100%
+	);
+	box-shadow: none;
+}
+
+.dark .search-query-display-text {
+	color: #FFFFFF;
+}
+
+.dark .search-query-quote-left,
+.dark .search-query-quote-right {
+	color: #9CA3AF;
+	opacity: 1;
+}
+
+.dark .search-query-display-text::after {
+	background: rgba(255, 255, 255, 0.2);
+}
+
+/* Dark mode back button */
+.dark .search-back-button {
+	color: rgba(255, 255, 255, 0.6);
+}
+
+.dark .search-back-button:hover {
+	background: rgba(255, 255, 255, 0.05);
+	color: rgba(255, 255, 255, 0.9);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+	.search-query-display-text {
+		font-size: 1.5rem;
+		padding: 0 1rem;
+	}
+	
+	.search-back-button {
+		left: 1rem;
+		padding: 0.4rem 0.6rem;
+		font-size: 0.85rem;
+	}
+	
+	.search-back-icon {
+		width: 16px;
+		height: 16px;
+	}
+}
+
+@media (max-width: 480px) {
+	.search-query-display-text {
+		font-size: 1.25rem;
+	}
+	
+	.search-back-button .search-back-text {
+		display: none;
+	}
+	
+	.search-back-button {
+		padding: 0.5rem;
+	}
+}
+
+@-webkit-keyframes contextLabelBounceIn {
+	0% {
+		opacity: 0;
+		-webkit-transform: translate3d(0, -20px, 0);
+		transform: translate3d(0, -20px, 0);
+	}
+	50% {
+		opacity: 0.9;
+		-webkit-transform: translate3d(0, 2px, 0);
+		transform: translate3d(0, 2px, 0);
+	}
+	80% {
+		-webkit-transform: translate3d(0, -1px, 0);
+		transform: translate3d(0, -1px, 0);
+	}
+	100% {
+		opacity: 1;
+		-webkit-transform: translate3d(0, 0, 0);
+		transform: translate3d(0, 0, 0);
+	}
+}
+
+@keyframes contextLabelBounceIn {
+	0% {
+		opacity: 0;
+		transform: translate3d(0, -20px, 0);
+	}
+	50% {
+		opacity: 0.9;
+		transform: translate3d(0, 2px, 0);
+	}
+	80% {
+		transform: translate3d(0, -1px, 0);
+	}
+	100% {
+		opacity: 1;
+		transform: translate3d(0, 0, 0);
+	}
+}
+
+.search-label-text {
+	font-weight: 400;
+	color: rgba(107, 114, 128, 0.5);
+	font-size: 0.8rem;
+}
+
+.search-query-text {
+	font-weight: 500;
+	color: rgba(31, 41, 55, 0.8);
+	font-size: 0.8rem;
+	max-width: 400px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+
+
+/* Dark mode search context label */
+.dark .search-context-label {
+	color: rgba(209, 213, 219, 0.8);
+}
+
+.dark .search-label-text {
+	color: rgba(156, 163, 175, 0.8);
+}
+
+.dark .search-query-text {
+	color: rgba(243, 244, 246, 0.95);
+}
+
+/* Elegant fade in animation */
+@-webkit-keyframes elegantFadeIn {
+	0% {
+		opacity: 0;
+		-webkit-transform: translateY(20px);
+		transform: translateY(20px);
+	}
+	100% {
+		opacity: 1;
+		-webkit-transform: translateY(0);
+		transform: translateY(0);
+	}
+}
+
+@keyframes elegantFadeIn {
+	0% {
+		opacity: 0;
+		transform: translateY(20px);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Enhanced overlay with micro-interactions - no width change */
+.search-bar-active .search-wave-overlay {
+	opacity: 0.2;
+	animation: searchOverlayPulse 3s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+	transform: none;
+}
+
+@-webkit-keyframes searchOverlayPulse {
+	0%, 100% {
+		opacity: 0.2;
+	}
+	50% {
+		opacity: 0.35;
+	}
+}
+
+@keyframes searchOverlayPulse {
+	0%, 100% {
+		opacity: 0.2;
+	}
+	50% {
+		opacity: 0.35;
+	}
+}
+
+.search-bar-active .search-wave-overlay::before {
+	opacity: 0;
+	animation: none;
+}
+
+/* Micro-interaction for input focus - no width change */
+.search-wave-input:focus {
+	transform: none;
+	transition: background 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+	/* CLEAR BLACK BORDER - ADDITIONAL FOCUS STATE */
+	border: 2px solid #000000 !important;
+	outline: none;
+}
+
+.search-wave-input:focus ~ .search-wave-overlay {
+	animation: focusFade 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@-webkit-keyframes focusFade {
+	0% {
+		-webkit-transform: translate3d(0, 0, 0);
+		transform: translate3d(0, 0, 0);
+		opacity: 0.3;
+	}
+	50% {
+		-webkit-transform: translate3d(0, 0, 0);
+		transform: translate3d(0, 0, 0);
+		opacity: 0.1;
+	}
+	100% {
+		-webkit-transform: translate3d(0, 0, 0);
+		transform: translate3d(0, 0, 0);
+		opacity: 0;
+	}
+}
+
+@keyframes focusFade {
+	0% {
+		transform: translate3d(0, 0, 0);
+		opacity: 0.3;
+	}
+	50% {
+		transform: translate3d(0, 0, 0);
+		opacity: 0.1;
+	}
+	100% {
+		transform: translate3d(0, 0, 0);
+		opacity: 0;
+	}
+}
+
+/* Ensure console loader area is clearly visible */
+.search-active ~ * {
+	position: relative;
+	z-index: 5;
+}
+
+/* Loading state with Apple-style spinner animation */
+.search-wave-loading::after {
+	content: '';
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 20px;
+	height: 20px;
+	margin: -10px 0 0 -10px;
+	border: 2px solid rgba(0, 0, 0, 0.1);
+	border-top-color: rgba(0, 0, 0, 0.3);
+	border-radius: 50%;
+	animation: appleSpinner 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+	z-index: 10;
+}
+
+@-webkit-keyframes appleSpinner {
+	0% {
+		-webkit-transform: rotate(0deg) scale3d(1, 1, 1);
+		transform: rotate(0deg) scale3d(1, 1, 1);
+	}
+	50% {
+		-webkit-transform: rotate(180deg) scale3d(1.1, 1.1, 1);
+		transform: rotate(180deg) scale3d(1.1, 1.1, 1);
+	}
+	100% {
+		-webkit-transform: rotate(360deg) scale3d(1, 1, 1);
+		transform: rotate(360deg) scale3d(1, 1, 1);
+	}
+}
+
+@keyframes appleSpinner {
+	0% {
+		transform: rotate(0deg) scale3d(1, 1, 1);
+	}
+	50% {
+		transform: rotate(180deg) scale3d(1.1, 1.1, 1);
+	}
+	100% {
+		transform: rotate(360deg) scale3d(1, 1, 1);
+	}
+}
+
+/* Table header fade effects */
+@-webkit-keyframes fadeIn {
+	from { opacity: 0.2; }
+	to { opacity: 1; }
+}
+
+@keyframes fadeIn {
+	from { opacity: 0.2; }
+	to { opacity: 1; }
+}
+
+@-webkit-keyframes fadeOut {
+	from { opacity: 1; }
+	to { opacity: 0.2; }
+}
+
+@keyframes fadeOut {
+	from { opacity: 1; }
+	to { opacity: 0.2; }
+}
+
+.name-header-fade-in {
+	-webkit-animation: fadeIn 0.5s ease-in-out forwards;
+	animation: fadeIn 0.5s ease-in-out forwards;
+}
+
+.name-header-fade-out {
+	-webkit-animation: fadeOut 0.5s ease-in-out forwards;
+	animation: fadeOut 0.5s ease-in-out forwards;
+}
+
+/* Apple-style Select Prompt Animation */
+@-webkit-keyframes appleSlideIn {
+	0% {
+		opacity: 0;
+		-webkit-transform: translateY(20px) scale(0.95);
+		transform: translateY(20px) scale(0.95);
+		-webkit-filter: blur(10px);
+		filter: blur(10px);
+	}
+	50% {
+		opacity: 0.5;
+		-webkit-filter: blur(5px);
+		filter: blur(5px);
+	}
+	100% {
+		opacity: 1;
+		-webkit-transform: translateY(0) scale(1);
+		transform: translateY(0) scale(1);
+		-webkit-filter: blur(0);
+		filter: blur(0);
+	}
+}
+
+@keyframes appleSlideIn {
+	0% {
+		opacity: 0;
+		transform: translateY(20px) scale(0.95);
+		filter: blur(10px);
+	}
+	50% {
+		opacity: 0.5;
+		filter: blur(5px);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+		filter: blur(0);
+	}
+}
+
+@-webkit-keyframes appleFadeGlow {
+	0%, 100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.85;
+	}
+}
+
+@keyframes appleFadeGlow {
+	0%, 100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.85;
+	}
+}
+
+.select-prompt-container {
+	display: -webkit-flex;
+	display: -moz-box;
+	display: flex;
+	-webkit-flex-direction: column;
+	-moz-box-orient: vertical;
+	-moz-box-direction: normal;
+	flex-direction: column;
+	-webkit-align-items: center;
+	-moz-box-align: center;
+	align-items: center;
+	margin-bottom: 1rem; /* Adjust as needed */
+}
+
+.select-prompt-text {
+	font-family: 'Times New Roman', Times, serif;
+	font-size: 1.25rem; /* 20px */
+	color: #333; /* Dark gray for readability */
+}
+
+.static-tooltip-container {
+	height: 2.5rem; /* Allocate space for the text */
+	display: -webkit-flex;
+	display: -moz-box;
+	display: flex;
+	-webkit-align-items: center;
+	-moz-box-align: center;
+	align-items: center;
+	-webkit-justify-content: center;
+	-moz-box-pack: center;
+	justify-content: center;
+	margin-top: 0.5rem; /* Lower the text vertically */
+}
+
+.static-tooltip-text {
+	font-family: 'Times New Roman', Times, serif;
+	font-size: 1rem; /* 16px - Smaller font size */
+	color: #888888; /* A nice gray color */
+	padding: 0.5rem 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+}
+
+/* Responsive table layout */
+.results-appear {
+	width: 100%;
+	max-width: 100%;
+}
+
+.results-align {
+	width: 100%;
+	max-width: 100%;
+}
+
+/* Ensure table is responsive on all screen sizes */
+@media (max-width: 1200px) {
+	.results-appear,
+	.results-align {
+		padding: 0 1rem;
+	}
+}
+
+@media (max-width: 768px) {
+	.results-appear,
+	.results-align {
+		padding: 0 0.5rem;
+	}
+}
+
+/* Table container responsive behavior */
+.table-responsive-container {
+	width: 100%;
+	max-width: 100%;
+	overflow-x: auto;
+	overflow-y: auto;
+}
+
+/* Ensure table cells don't break on small screens */
+.table-cell-responsive {
+	min-width: 120px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Dashboard responsive improvements */
+.dashboard-container {
+	width: 100%;
+	max-width: 100%;
+}
+
+.hero-wrapper {
+	width: 100%;
+	max-width: 100%;
+}
+
+.search-bar-wrapper {
+	width: 100%;
+	max-width: 100%;
+}
+
+.search-bar-inner {
+	width: 100%;
+	max-width: 100%;
+}
+
+/* Ensure search form is responsive */
+.search-form-active {
+	width: 100%;
+	max-width: 100%;
+}
+
+/* Responsive button layouts */
+@media (max-width: 640px) {
+	.search-form-active .flex.flex-col.md\\:flex-row {
+		flex-direction: column;
+		gap: 1rem;
+	}
+	
+	.search-form-active .flex.flex-col.md\\:flex-row > div {
+		width: 100%;
+	}
+}
+
+/* Table scroll improvements for vertical monitors */
+@media (max-height: 800px) {
+	.table-responsive-container {
+		max-height: 60vh;
+	}
+}
+
+@media (max-height: 600px) {
+	.table-responsive-container {
+		max-height: 50vh;
+	}
+}
+
+/* CampaignsTable responsive improvements */
+@media (max-width: 768px) {
+	.mx-4 {
+		margin-left: 1rem;
+		margin-right: 1rem;
+	}
+}
+
+@media (max-width: 640px) {
+	.mx-4 {
+		margin-left: 0.5rem;
+		margin-right: 0.5rem;
+	}
+}
+
+/* Navigation responsive improvements */
+@media (max-width: 640px) {
+	nav {
+		padding-left: 1rem;
+		padding-right: 1rem;
+	}
+}
+
+@media (max-width: 480px) {
+	nav {
+		padding-left: 0.5rem;
+		padding-right: 0.5rem;
+	}
+}
+
+/* Email obfuscation for rows past the first 3 - Apple-style aesthetic blur */
+.email-obfuscated-local {
+	display: inline-block;
+	filter: blur(3px);
+	opacity: 0.5;
+	transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+	user-select: none;
+	pointer-events: none;
+	position: relative;
+	transform: scale(0.98);
+	letter-spacing: 0.5px;
+	padding: 0 40px;
+	margin: 0 -40px;
+	background: linear-gradient(
+		90deg,
+		rgba(255, 255, 255, 0.9) 0%,
+		rgba(255, 255, 255, 0) 15%,
+		rgba(255, 255, 255, 0) 85%,
+		rgba(255, 255, 255, 0.9) 100%
+	);
+	background-clip: text;
+	-webkit-background-clip: text;
+	mask-image: linear-gradient(
+		90deg,
+		transparent 0%,
+		rgba(0, 0, 0, 0.1) 5%,
+		rgba(0, 0, 0, 0.3) 10%,
+		rgba(0, 0, 0, 0.6) 15%,
+		rgba(0, 0, 0, 0.8) 20%,
+		rgba(0, 0, 0, 1) 30%,
+		rgba(0, 0, 0, 1) 70%,
+		rgba(0, 0, 0, 0.8) 80%,
+		rgba(0, 0, 0, 0.6) 85%,
+		rgba(0, 0, 0, 0.3) 90%,
+		rgba(0, 0, 0, 0.1) 95%,
+		transparent 100%
+	);
+	-webkit-mask-image: linear-gradient(
+		90deg,
+		transparent 0%,
+		rgba(0, 0, 0, 0.1) 5%,
+		rgba(0, 0, 0, 0.3) 10%,
+		rgba(0, 0, 0, 0.6) 15%,
+		rgba(0, 0, 0, 0.8) 20%,
+		rgba(0, 0, 0, 1) 30%,
+		rgba(0, 0, 0, 1) 70%,
+		rgba(0, 0, 0, 0.8) 80%,
+		rgba(0, 0, 0, 0.6) 85%,
+		rgba(0, 0, 0, 0.3) 90%,
+		rgba(0, 0, 0, 0.1) 95%,
+		transparent 100%
+	);
+}
+
+/* Apple-style glass morphism effect with smooth horizontal edges */
+.email-obfuscated-local::before {
+	content: '';
+	position: absolute;
+	top: -2px;
+	left: 0;
+	right: 0;
+	bottom: -2px;
+	background: linear-gradient(
+		90deg,
+		transparent 0%,
+		rgba(255, 255, 255, 0.02) 5%,
+		rgba(255, 255, 255, 0.03) 12%,
+		rgba(255, 255, 255, 0.05) 25%,
+		rgba(255, 255, 255, 0.05) 75%,
+		rgba(255, 255, 255, 0.03) 88%,
+		rgba(255, 255, 255, 0.02) 95%,
+		transparent 100%
+	);
+	border-radius: 8px;
+	backdrop-filter: blur(1px);
+	pointer-events: none;
+	z-index: 1;
+}
+
+/* Subtle hover state for the entire row (not the blurred email itself) */
+tr:hover .email-obfuscated-local {
+	filter: blur(2px);
+	opacity: 0.75;
+	transform: scale(1);
+}

@@ -1,5 +1,6 @@
 import { MistralAgentType } from '@/types';
 import { Mistral } from '@mistralai/mistralai';
+import './checkEnvVariables';
 
 const MISTRAL_AGENT_IDS = {
 	normal: process.env.MISTRAL_AGENT_ID,
@@ -23,8 +24,14 @@ export const fetchMistral = async (
 	const agentId = MISTRAL_AGENT_IDS[agentType];
 	const apiKey = process.env.MISTRAL_API_KEY;
 
-	if (!agentId || !apiKey) {
-		throw new Error('Mistral environment variables are not set');
+	if (!agentId) {
+		console.error(`[Mistral] Agent ID not found for type: ${agentType}`);
+		console.error('[Mistral] Available agent IDs:', Object.keys(MISTRAL_AGENT_IDS));
+		throw new Error(`Mistral agent ID not configured for type: ${agentType}`);
+	}
+	
+	if (!apiKey) {
+		throw new Error('Mistral API key is not set');
 	}
 
 	const mistral = new Mistral({
@@ -32,29 +39,45 @@ export const fetchMistral = async (
 	});
 
 	const userMessage = `${prompt}\n\n${content}`;
-	console.log({
-		messages: [
-			{
-				content: userMessage,
-				role: 'user',
-			},
-		],
+	console.log('[Mistral] Request details:', {
+		agentType,
 		agentId,
+		promptLength: prompt.length,
+		contentLength: content.length,
+		messagePreview: userMessage.substring(0, 200)
 	});
 
-	const response = await mistral.agents.complete({
-		messages: [
-			{
-				content: userMessage,
-				role: 'user',
-			},
-		],
-		agentId,
-	});
-	const message = response.choices[0].message.content?.toString();
+	let response;
+	try {
+		response = await mistral.agents.complete({
+			messages: [
+				{
+					content: userMessage,
+					role: 'user',
+				},
+			],
+			agentId,
+		});
+	} catch (error) {
+		console.error('[Mistral] API call failed:', error);
+		if (error instanceof Error) {
+			throw new Error(`Mistral API error: ${error.message}`);
+		}
+		throw new Error('Mistral API call failed');
+	}
+	
+	if (!response || !response.choices || !response.choices[0]) {
+		console.error('[Mistral] Invalid response structure:', response);
+		throw new Error('Invalid response from Mistral Agent');
+	}
+	
+	const message = response.choices[0].message?.content?.toString();
 	if (!message) {
+		console.error('[Mistral] No message content in response:', response.choices[0]);
 		throw new Error('No message content received from Mistral Agent');
 	}
 
+	console.log('[Mistral] Response received, length:', message.length);
+	console.log('[Mistral] Response preview:', message.substring(0, 200));
 	return message;
 };

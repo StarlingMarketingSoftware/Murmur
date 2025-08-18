@@ -21,7 +21,7 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table';
-import { Dispatch, SetStateAction, useEffect, useState, useMemo } from 'react';
+import { Dispatch, SetStateAction, useEffect, useState, useMemo, useCallback } from 'react';
 import { twMerge } from 'tailwind-merge';
 import CustomPagination from '@/components/molecules/CustomPagination/CustomPagination';
 import { Input } from '@/components/ui/input';
@@ -48,6 +48,8 @@ interface DataTableProps<TData, TValue> {
 	rowsPerPage?: number;
 	displayRowsPerPage?: boolean;
 	constrainHeight?: boolean;
+	hidePagination?: boolean;
+	headerAction?: React.ReactNode;
 }
 
 interface TableSortingButtonProps<TData> {
@@ -104,6 +106,8 @@ export function CustomTable<TData, TValue>({
 	rowsPerPage = 20,
 	displayRowsPerPage = true,
 	constrainHeight = false,
+	hidePagination = false,
+	headerAction,
 }: CustomTableProps<TData, TValue>) {
 	const [pagination, setPagination] = useState({
 		pageIndex: 0,
@@ -111,13 +115,13 @@ export function CustomTable<TData, TValue>({
 	});
 
 	// Initialize all rows as selected
-	const getInitialRowSelection = () => {
+	const getInitialRowSelection = useCallback(() => {
 		if (!data || !isSelectable) return {};
 		return data.reduce((acc, _, index) => {
 			acc[index] = initialSelectAll;
 			return acc;
 		}, {} as Record<string, boolean>);
-	};
+	}, [data, isSelectable, initialSelectAll]);
 
 	const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 	const [sorting, setSorting] = useState<SortingState>([]);
@@ -136,7 +140,7 @@ export function CustomTable<TData, TValue>({
 			setRowSelection(getInitialRowSelection());
 			setPagination({ pageIndex: 0, pageSize: rowsPerPage });
 		}
-	}, [dataKey, rowsPerPage]); // Using dataKey instead of data directly
+	}, [dataKey, rowsPerPage, data, getInitialRowSelection]);
 
 	const table = useReactTable({
 		data: data || [],
@@ -208,15 +212,22 @@ export function CustomTable<TData, TValue>({
 		}
 	}, [pagination.pageIndex, pagination.pageSize, data]);
 
+	const tableContainerStyle = {
+		width: '100%',
+		maxWidth: '100%',
+		height: constrainHeight ? '429px' : undefined,
+	};
+
 	return (
-		<div className=" [&_::-webkit-scrollbar]:h-[4px] [&_::-webkit-scrollbar]:md:h-[7px] [&_::-webkit-scrollbar-thumb]:bg-gray-300 [&_::-webkit-scrollbar-thumb]:rounded-full [&_::-webkit-scrollbar]:w-[4px] [&_::-webkit-scrollbar]:md:w-[7px]">
-			<div className="flex items-center justify-between py-4 gap-4">
-				<div className="flex flex-col sm:flex-row items-center gap-4">
+		<div className="w-full [&_::-webkit-scrollbar]:h-[4px] [&_::-webkit-scrollbar]:md:h-[7px] [&_::-webkit-scrollbar-thumb]:bg-gray-300 [&_::-webkit-scrollbar-thumb]:rounded-full [&_::-webkit-scrollbar]:w-[4px] [&_::-webkit-scrollbar]:md:w-[7px]">
+			<div className="flex items-center justify-between py-4 gap-4 w-full">
+				<div className="flex items-center gap-4 flex-wrap">
 					{searchable && (
 						<Input
 							placeholder="Search all columns..."
 							value={globalFilter ?? ''}
 							onChange={(event) => setGlobalFilter(event.target.value)}
+							className="min-w-[200px]"
 						/>
 					)}
 					{displayRowsPerPage && (
@@ -243,27 +254,35 @@ export function CustomTable<TData, TValue>({
 							</Select>
 						</div>
 					)}
+					{isSelectable && (
+						<div className="text-sm text-muted-foreground">
+							{table.getFilteredSelectedRowModel().rows.length} of{' '}
+							{table.getFilteredRowModel().rows.length} rows selected.
+						</div>
+					)}
 				</div>
-				{isSelectable && (
-					<div className="flex-1 gap-4 text-sm text-muted-foreground">
-						{table.getFilteredSelectedRowModel().rows.length} of{' '}
-						{table.getFilteredRowModel().rows.length} rows selected.
-					</div>
-				)}
+				{isSelectable && headerAction ? headerAction : null}
 			</div>
 			<div
 				className={twMerge(
-					'rounded-md border relative overflow-y-auto',
-					constrainHeight && 'max-h-[750px]'
+					'border-2 border-black relative overflow-y-auto overflow-x-auto custom-scrollbar w-full',
 				)}
+				style={tableContainerStyle}
 			>
-				<Table className="relative" variant={variant}>
+				<Table className="relative w-full min-w-full table-fixed" variant={variant}>
 					<TableHeader variant={variant} sticky>
 						{table.getHeaderGroups().map((headerGroup) => (
 							<TableRow className="sticky top-0" key={headerGroup.id} variant={variant}>
 								{headerGroup.headers.map((header) => {
+									const totalColumns = headerGroup.headers.length;
+									const columnWidth = `${100 / totalColumns}%`; // Evenly distribute width
 									return (
-										<TableHead key={header.id} variant={variant}>
+										<TableHead 
+											key={header.id} 
+											variant={variant}
+											style={{ width: columnWidth, minWidth: '120px' }}
+											className="whitespace-nowrap"
+										>
 											{header.isPlaceholder
 												? null
 												: flexRender(header.column.columnDef.header, header.getContext())}
@@ -293,8 +312,15 @@ export function CustomTable<TData, TValue>({
 									data-state={row.getIsSelected() && 'selected'}
 								>
 									{row.getVisibleCells().map((cell) => {
+										const totalColumns = row.getVisibleCells().length;
+										const columnWidth = `${100 / totalColumns}%`; // Evenly distribute width
 										return (
-											<TableCell key={cell.id} variant={variant}>
+											<TableCell 
+												key={cell.id} 
+												variant={variant}
+												style={{ width: columnWidth, minWidth: '120px' }}
+												className="whitespace-nowrap"
+											>
 												{flexRender(cell.column.columnDef.cell, cell.getContext())}
 											</TableCell>
 										);
@@ -315,7 +341,7 @@ export function CustomTable<TData, TValue>({
 					</TableBody>
 				</Table>
 			</div>
-			<CustomPagination<TData> currentPage={pagination.pageIndex} table={table} />
+			{!hidePagination && <CustomPagination<TData> currentPage={pagination.pageIndex} table={table} />}
 		</div>
 	);
 }

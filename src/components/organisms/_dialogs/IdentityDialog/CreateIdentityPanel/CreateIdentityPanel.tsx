@@ -98,7 +98,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 												? 'Reset'
 												: isEmailVerificationCodeSent && !isCodeExpired
 												? 'Resend Code'
-												: 'Verify Email'}
+												: 'Verify'}
 										</Button>
 									</div>
 								</FormControl>

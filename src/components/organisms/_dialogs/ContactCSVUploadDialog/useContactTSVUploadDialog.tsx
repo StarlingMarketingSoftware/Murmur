@@ -19,6 +19,7 @@ export interface ContactTSVUploadDialogProps {
 	isAdmin: boolean;
 	triggerText: string;
 	buttonVariant?: ButtonVariants['variant'];
+	className?: string;
 }
 
 type ContactInput = PostBatchContactData['contacts'][number];
@@ -435,5 +436,6 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		triggerText,
 		buttonVariant,
 		isAdmin,
+		className: props.className,
 	};
 };

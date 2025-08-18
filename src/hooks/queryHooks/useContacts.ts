@@ -28,18 +28,35 @@ interface EditContactData {
 export const useGetContacts = (options: ContactQueryOptions) => {
 	return useQuery<ContactWithName[]>({
 		queryKey: [...QUERY_KEYS.list(), options.filters],
-		queryFn: async () => {
+		queryFn: async ({ signal }) => {
 			const url = appendQueryParamsToUrl(urls.api.contacts.index, options.filters);
-			const response = await _fetch(url);
+			const response = await _fetch(url, undefined, undefined, { 
+				signal,
+				timeout: 25000 // 25 second timeout for contact searches
+			});
 
 			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to _fetch contacts');
+				let errorMessage = 'Failed to fetch contacts';
+				try {
+					const errorData = await response.json();
+					errorMessage = errorData.error || errorMessage;
+				} catch {
+					// If response is not JSON (e.g., plain text "Internal Server Error")
+					// try to get the text content
+					try {
+						const textError = await response.text();
+						errorMessage = textError || `HTTP ${response.status} error`;
+					} catch {
+						errorMessage = `HTTP ${response.status} error`;
+					}
+				}
+				throw new Error(errorMessage);
 			}
 
 			return response.json() as Promise<ContactWithName[]>;
 		},
 		enabled: options.enabled === undefined ? true : options.enabled,
+		gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
 	});
 };
 
@@ -51,8 +68,21 @@ export const useGetUsedContactIds = () => {
 			const response = await _fetch(url);
 
 			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to fetch used contacts');
+				let errorMessage = 'Failed to fetch used contacts';
+				try {
+					const errorData = await response.json();
+					errorMessage = errorData.error || errorMessage;
+				} catch {
+					// If response is not JSON (e.g., plain text "Internal Server Error")
+					// try to get the text content
+					try {
+						const textError = await response.text();
+						errorMessage = textError || `HTTP ${response.status} error`;
+					} catch {
+						errorMessage = `HTTP ${response.status} error`;
+					}
+				}
+				throw new Error(errorMessage);
 			}
 
 			return response.json() as Promise<number[]>;
@@ -74,8 +104,19 @@ export const useCreateContact = (options: CustomMutationOptions = {}) => {
 		mutationFn: async (data: PostContactData) => {
 			const response = await _fetch(urls.api.contacts.index, 'POST', data);
 			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to create contact');
+				let errorMessage = 'Failed to create contact';
+				try {
+					const errorData = await response.json();
+					errorMessage = errorData.error || errorMessage;
+				} catch {
+					try {
+						const textError = await response.text();
+						errorMessage = textError || `HTTP ${response.status} error`;
+					} catch {
+						errorMessage = `HTTP ${response.status} error`;
+					}
+				}
+				throw new Error(errorMessage);
 			}
 
 			return response.json();
@@ -109,8 +150,19 @@ export const useBatchCreateContacts = (options: CustomMutationOptions = {}) => {
 		mutationFn: async (data: PostBatchContactData) => {
 			const response = await _fetch(urls.api.contacts.batch.index, 'POST', data);
 			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to create contacts');
+				let errorMessage = 'Failed to create contacts';
+				try {
+					const errorData = await response.json();
+					errorMessage = errorData.error || errorMessage;
+				} catch {
+					try {
+						const textError = await response.text();
+						errorMessage = textError || `HTTP ${response.status} error`;
+					} catch {
+						errorMessage = `HTTP ${response.status} error`;
+					}
+				}
+				throw new Error(errorMessage);
 			}
 
 			return response.json();
@@ -144,8 +196,19 @@ export const useEditContact = (options: CustomMutationOptions = {}) => {
 		mutationFn: async ({ data, id }: EditContactData) => {
 			const response = await _fetch(urls.api.contacts.detail(id), 'PATCH', data);
 			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to update contact');
+				let errorMessage = 'Failed to update contact';
+				try {
+					const errorData = await response.json();
+					errorMessage = errorData.error || errorMessage;
+				} catch {
+					try {
+						const textError = await response.text();
+						errorMessage = textError || `HTTP ${response.status} error`;
+					} catch {
+						errorMessage = `HTTP ${response.status} error`;
+					}
+				}
+				throw new Error(errorMessage);
 			}
 
 			return response.json();
@@ -181,8 +244,19 @@ export const useDeleteContact = (options: CustomMutationOptions = {}) => {
 		mutationFn: async (id: number) => {
 			const response = await _fetch(urls.api.contacts.detail(id), 'DELETE');
 			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to delete contact');
+				let errorMessage = 'Failed to delete contact';
+				try {
+					const errorData = await response.json();
+					errorMessage = errorData.error || errorMessage;
+				} catch {
+					try {
+						const textError = await response.text();
+						errorMessage = textError || `HTTP ${response.status} error`;
+					} catch {
+						errorMessage = `HTTP ${response.status} error`;
+					}
+				}
+				throw new Error(errorMessage);
 			}
 		},
 		onSuccess: () => {
@@ -213,8 +287,19 @@ export const useBatchUpdateContacts = (options: CustomMutationOptions = {}) => {
 		mutationFn: async (data: PostBulkUpdateContactData) => {
 			const response = await _fetch(urls.api.contacts.bulkUpdate.index, 'PATCH', data);
 			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to update contacts');
+				let errorMessage = 'Failed to update contacts';
+				try {
+					const errorData = await response.json();
+					errorMessage = errorData.error || errorMessage;
+				} catch {
+					try {
+						const textError = await response.text();
+						errorMessage = textError || `HTTP ${response.status} error`;
+					} catch {
+						errorMessage = `HTTP ${response.status} error`;
+					}
+				}
+				throw new Error(errorMessage);
 			}
 
 			return response.json();
