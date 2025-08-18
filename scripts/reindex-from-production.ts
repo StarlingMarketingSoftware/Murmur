@@ -15,7 +15,7 @@ const localClient = new Client({
 });
 
 const INDEX_NAME = 'contacts';
-const PRODUCTION_ES_URL = process.env.PRODUCTION_ELASTICSEARCH_URL;
+const PRODUCTION_ES_URL = process.env.ELASTICSEARCH_URL_PRODUCTION;
 
 async function checkLocalConnection() {
 	try {
@@ -65,6 +65,11 @@ async function reindexFromProduction() {
 		throw new Error(
 			'API Key was not provided. Please pass the key as an argument to the script.'
 		);
+	}
+
+	if (!PRODUCTION_ES_URL) {
+		console.error('ELASTICSEARCH_URL_PRODUCTION is not set');
+		process.exit(1);
 	}
 
 	try {

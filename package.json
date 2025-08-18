@@ -10,7 +10,8 @@
 		"vercel-build": "cross-env NODE_OPTIONS=--max-old-space-size=8192 prisma generate && prisma migrate deploy && next build",
 		"postinstall": "prisma generate",
 		"import-production-contacts": "tsx --tsconfig tsconfig.json scripts/import-production-contacts.ts",
-		"check-elasticsearch": "tsx --tsconfig tsconfig.json scripts/check-elasticsearch.tsx"
+		"check-elasticsearch": "tsx --tsconfig tsconfig.json scripts/check-elasticsearch.tsx",
+		"reindex-from-production": "tsx --tsconfig tsconfig.json scripts/reindex-from-production.ts"
 	},
 	"prisma": {
 		"seed": "tsx --tsconfig tsconfig.json prisma/seed.ts"

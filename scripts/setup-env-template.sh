@@ -16,8 +16,8 @@ ELASTICSEARCH_URL=http://localhost:9200
 # ELASTICSEARCH_API_KEY=  # Usually not needed for local development
 
 # Production Elasticsearch (get these from your team)
-PRODUCTION_ELASTICSEARCH_URL=your_production_url
-PRODUCTION_ELASTICSEARCH_API_KEY=your_production_api_key_here
+ELASTICSEARCH_URL_PRODUCTION=your_production_url
+ELASTICSEARCH_API_KEY=your_production_api_key_here
 
 # OpenAI (needed for vector embeddings)
 OPEN_AI_API_KEY=your_openai_api_key_here

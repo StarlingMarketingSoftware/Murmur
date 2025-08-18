@@ -23,8 +23,8 @@ This guide explains how to load the production `contacts` index (60,000+ documen
    ELASTICSEARCH_API_KEY=your_local_api_key_if_needed
 
    # Production Elasticsearch
-   PRODUCTION_ELASTICSEARCH_URL=your_production_elastic_search_url
-   PRODUCTION_ELASTICSEARCH_API_KEY=your_production_api_key
+   ELASTICSEARCH_URL_PRODUCTION=your_production_elastic_search_url
+   ELASTICSEARCH_API_KEY=your_production_api_key
    ```
 
 ## Migration Options
@@ -69,8 +69,8 @@ Contact your team to get the production Elasticsearch API key with read permissi
 Add to your `.env` file:
 
 ```bash
-PRODUCTION_ELASTICSEARCH_URL=your_production_url
-PRODUCTION_ELASTICSEARCH_API_KEY=your_api_key_here
+ELASTICSEARCH_URL_PRODUCTION=your_production_url
+ELASTICSEARCH_API_KEY=your_api_key_here
 ```
 
 ### 3. Ensure Local Elasticsearch is Running
