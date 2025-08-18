@@ -3,11 +3,10 @@ import prisma from '@/lib/prisma';
 import { z } from 'zod';
 import { auth } from '@clerk/nextjs/server';
 import {
-    apiBadRequest,
-    apiResponse,
-    apiUnauthorized,
-    apiNotFound,
-    handleApiError,
+	apiBadRequest,
+	apiResponse,
+	apiUnauthorized,
+	handleApiError,
 } from '@/app/api/_utils';
 import { ApiRouteParams } from '@/types';
 import { NextRequest } from 'next/server';
@@ -24,6 +23,7 @@ const patchUserSchema = z.object({
 	customDomain: z.string().optional().nullable(),
 	draftCredits: z.number().optional(),
 	sendingCredits: z.number().optional(),
+
 	verificationCredits: z.number().optional(),
 });
 export type PatchUserData = z.infer<typeof patchUserSchema>;
@@ -38,25 +38,11 @@ export const GET = async function GET(
 			return apiUnauthorized();
 		}
 
-        const { id } = await params;
+		const { id } = await params;
 
-        let user = await prisma.user.findUnique({ where: { clerkId: id } });
+		const user = await prisma.user.findUniqueOrThrow({ where: { clerkId: id } });
 
-        if (!user) {
-            if (process.env.NODE_ENV !== 'production') {
-                // Auto-create a minimal local user record in development
-                user = await prisma.user.create({
-                    data: {
-                        clerkId: id,
-                        email: `${id}@local.dev`,
-                    },
-                });
-            } else {
-                return apiNotFound('User not found');
-            }
-        }
-
-        return apiResponse(user);
+		return apiResponse(user);
 	} catch (error) {
 		return handleApiError(error);
 	}
