@@ -3,7 +3,7 @@ import { Campaign, Status, DraftingMode, DraftingTone, HybridBlock } from '@pris
 
 // Toggle this to enable/disable test data
 export const USE_TEST_DATA = {
-  campaigns: false, // Set to false to use real data
+  campaigns: true, // Set to false to use real data
 };
 
 // Generate test campaigns with realistic data

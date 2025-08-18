@@ -30,10 +30,18 @@ const Murmur = () => {
 	if (isPendingCampaign || !campaign) {
 		return <Spinner />;
 	}
+
+	// Hide underlying content and show a white overlay when we require the user to set up an identity
+	// or while the full-screen User Settings dialog is open. This prevents any visual "glimpses" and
+	// ensures a premium, smooth transition with no scale effects.
+	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
 	return (
 		<AppLayout>
 			<NoMobilePage />
-			<div className="hidden lg:block">
+			{shouldHideContent && (
+				<div className="fixed inset-0 bg-white z-40" />
+			)}
+			<div className={`hidden lg:block transition-opacity duration-200 ${shouldHideContent ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}>
 				<CampaignName campaign={campaign} />
 				<Card className="mt-38 border-border !border-2">
 					<CardContent>
