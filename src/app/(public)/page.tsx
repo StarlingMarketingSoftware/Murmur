@@ -1,6 +1,5 @@
-'use client';
-import LogoIcon from '@/components/atoms/_svg/LogoIcon';
-import { StarlingLogo } from '@/components/atoms/_svg/StarlingLogo';
+ 'use client';
+ import LogoIcon from '@/components/atoms/_svg/LogoIcon';
 import { Button } from '@/components/ui/button';
 import { Typography } from '@/components/ui/typography';
 import { urls } from '@/constants/urls';
@@ -47,37 +46,41 @@ export default function HomePage() {
 				<div className="relative justify-items-center h-full gap-0 flex flex-col items-center justify-start pt-9">
 					{/* Exact dashboard structure */}
 					<div className="mt-4 flex justify-center w-full px-4">
-						<div className="text-center w-full max-w-[470px] h-[286px] overflow-hidden">
+						<div className="text-center w-full max-w-[900px]">
 							<div className="inline-block">
 								<LogoIcon width="106px" height="84px" />
 							</div>
 							<Typography variant="h1" className="text-center mt-2 !text-[80px] leading-[0.8]">
 								Murmur
 							</Typography>
+							<Typography variant="h2" className="text-center !text-[34px] leading-[1] mt-[72px] whitespace-nowrap" style={{ fontFamily: 'var(--font-zen-antique)' }}>
+								Get Contacts. Get Work. Email Anyone.
+							</Typography>
+							<div className="w-[764px] h-[40px] mx-auto mt-2 flex items-center justify-center">
+								<Typography className="text-center text-black font-inter !text-[26px] font-light">
+									The Ultimate Database + Email Tool for Musicians
+								</Typography>
+							</div>
 						</div>
 					</div>
-					<div className="flex items-center gap-8 sm:gap-14 mt-6 mx-auto text-center justify-center">
-						<Typography className="!text-[12px]">by</Typography>
-						<StarlingLogo width="110px" />
-					</div>
-					<Typography
-						variant="h2"
-						className="text-center text-[24px] sm:text-[37px] px-2 mt-8 mb-10 md:mb-20"
-					>
-						Cut Through The Noise.<br></br> Get Contacts. Get Work. Email Anyone.
-					</Typography>
-					<LeadSender />
-					<div className="mt-10 md:mt-15 flex justify-center">
-						<Link href={urls.murmur.dashboard.index}>
+					
+					<div className="mt-10 flex flex-col items-center">
+						<LeadSender />
+						<Link href={urls.murmur.dashboard.index} className="mt-0 mx-auto">
 							<Button
 								variant="primary"
 								size="lg"
 								font="secondary"
-								className="w-[155px]"
+								noPadding
+								className="!w-[490px] !h-[42px] !min-h-0 !py-0 !px-0 !font-normal"
+								style={{ backgroundColor: '#289137', borderRadius: '7px', fontWeight: 400 }}
 							>
-								START
+								<span className="!font-normal">Launch</span>
 							</Button>
 						</Link>
+						<Typography variant="p" className="text-center mt-4 tracking-[0.08em]">
+							Full access for 7 days. Start today.
+						</Typography>
 					</div>
 				</div>
 			</div>
