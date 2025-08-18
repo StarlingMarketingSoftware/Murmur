@@ -1,7 +1,0 @@
-services:
-  elasticsearch:
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - 'ES_JAVA_OPTS=-Xms4g -Xmx4g'
-      - reindex.remote.whitelist=your_production_elastic_search_url
