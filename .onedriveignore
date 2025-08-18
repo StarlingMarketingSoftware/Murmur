@@ -1,7 +1,0 @@
-# Ignore Next.js build folder
-.next/
-.next/**
-node_modules/
-node_modules/**
-*.log
-.env.local

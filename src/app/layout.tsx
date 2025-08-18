@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Zen_Antique } from 'next/font/google';
 import { Footer } from '@/components/molecules/Footer/Footer';
 import { Toaster } from '@/components/ui/toast';
 import './globals.css';
@@ -10,6 +10,12 @@ import StoreProvider from './StoreProvider';
 
 const inter = Inter({
 	variable: '--font-inter',
+	subsets: ['latin'],
+});
+
+const zenAntique = Zen_Antique({
+	weight: '400',
+	variable: '--font-zen-antique',
 	subsets: ['latin'],
 });
 
@@ -53,7 +59,7 @@ export default function RootLayout({
 		<StoreProvider>
 			<html
 				lang="en"
-				className={`${inter.variable} ${timesNewRoman.variable}`}
+				className={`${inter.variable} ${timesNewRoman.variable} ${zenAntique.variable}`}
 				suppressHydrationWarning
 			>
 				<body className={`antialiased min-h-screen flex flex-col`}>

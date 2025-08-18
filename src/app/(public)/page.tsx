@@ -1,7 +1,5 @@
-'use client';
-import { Birds } from '@/components/atoms/_svg/Birds';
-import LogoIcon from '@/components/atoms/_svg/LogoIcon';
-import { StarlingLogo } from '@/components/atoms/_svg/StarlingLogo';
+ 'use client';
+ import LogoIcon from '@/components/atoms/_svg/LogoIcon';
 import { Button } from '@/components/ui/button';
 import { Typography } from '@/components/ui/typography';
 import { urls } from '@/constants/urls';
@@ -9,7 +7,7 @@ import { SignUpButton, useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { PromotionLogos } from '@/components/molecules/PromotionLogos/PromotionLogos';
 import { FAQ } from '@/types';
-import Image from 'next/image';
+// import Image from 'next/image';
 import { ProductList } from '@/components/organisms/ProductList/ProductList';
 import { FaqSection } from '@/components/molecules/FaqSection/FaqSection';
 import { GradientBanner } from '@/components/molecules/GradientBanner/GradientBanner';
@@ -43,79 +41,110 @@ export default function HomePage() {
 
 	return (
 		<main className="overflow-hidden">
-			<div className="relative h-fit sm:min-h-screen w-screen overflow-hidden">
-				{/* Background layer with Birds */}
-				<div className="absolute inset-0 z-0">
-					<div
-						className="absolute inset-0 overflow-hidden"
-						style={{
-							maskImage:
-								'linear-gradient(to left, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)',
-							WebkitMaskImage:
-								'linear-gradient(to left, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
-						}}
-					>
-						<Birds
-							width="150%"
-							height="150%"
-							className="-translate-y-75 md:-translate-y-65 lg:-translate-y-44 -translate-x-65 min-w-[1500px]"
-						/>
-					</div>
-				</div>
-
-				{/* Backdrop blur overlay */}
-				<div
-					className="absolute inset-0 backdrop-blur-lg z-10"
-					style={{
-						maskImage:
-							'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 30%, rgba(0,0,0,0.6) 70%, rgba(0,0,0,0.4) 100%)',
-						WebkitMaskImage:
-							'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 30%, rgba(0,0,0,0.6) 70%, rgba(0,0,0,0.4) 100%)',
-					}}
-				/>
-
+			<div className="relative w-screen bg-white py-12 sm:py-16 md:py-20 lg:py-24">
 				{/* Content layer */}
-				<div className="relative z-20 justify-items-center h-full gap-0">
-					<div className="w-[55px] sm:w-[75px] md:w-[90px] lg:!w-[96px] h-[44px] sm:h-[60px] md:h-[72px] lg:h-[80px] mt-18 sm:mt-24 md:mt-30 lg:mt-36 mx-auto">
-						<LogoIcon />
+				<div className="relative justify-items-center gap-0 flex flex-col items-center justify-start">
+					{/* Exact dashboard structure */}
+					<div className="flex justify-center w-full px-4">
+						<div className="text-center w-full max-w-[900px]">
+							<div className="inline-block">
+								<LogoIcon width="106px" height="84px" />
+							</div>
+							<Typography variant="h1" className="text-center mt-2 !text-[60px] sm:!text-[70px] md:!text-[80px] leading-[0.8]">
+								Murmur
+							</Typography>
+							<Typography variant="h2" className="text-center !text-[24px] sm:!text-[28px] md:!text-[34px] leading-[1] mt-8 sm:mt-12 md:mt-16 lg:mt-[72px] whitespace-normal sm:whitespace-nowrap" style={{ fontFamily: 'var(--font-zen-antique)' }}>
+								Get Contacts. Get Work. Email Anyone.
+							</Typography>
+							<div className="w-full max-w-[764px] mx-auto mt-2 flex items-center justify-center px-4">
+								<Typography className="text-center text-black font-inter !text-[14px] sm:!text-[22px] md:!text-[26px] font-light whitespace-nowrap">
+									The Ultimate Database + Email Tool for Musicians
+								</Typography>
+							</div>
+						</div>
 					</div>
-					<Typography
-						variant="h1"
-						className="!text-[52px] sm:!text-[80px] leading-[0.8] text-center"
-					>
-						Murmur
-					</Typography>
-					<div className="flex items-center gap-8 sm:gap-14 mt-6 mx-auto text-center justify-center">
-						<Typography className="!text-[12px]">by</Typography>
-						<StarlingLogo width="110px" />
-					</div>
-					<Typography
-						variant="h2"
-						className="text-center text-[24px] sm:text-[37px] px-2 mt-8 mb-10 md:mb-20"
-					>
-						Cut Through The Noise.<br></br> Get Contacts. Get Work. Email Anyone.
-					</Typography>
-					<LeadSender />
-					<div className="mt-10 md:mt-15 flex justify-center">
-						<Link href={urls.murmur.dashboard.index}>
+					
+					<div className="mt-8 sm:mt-10 md:mt-12 flex flex-col items-center">
+						<LeadSender />
+						<Link href={urls.murmur.dashboard.index} className="mt-0 mx-auto w-full max-w-[490px] px-4">
 							<Button
 								variant="primary"
 								size="lg"
 								font="secondary"
-								className="w-[155px]"
+								noPadding
+								className="!w-full !h-[42px] !min-h-0 !py-0 !px-0 !font-normal"
+								style={{ backgroundColor: '#289137', borderRadius: '7px', fontWeight: 400 }}
 							>
-								START
+								<span className="!font-normal">Launch</span>
 							</Button>
 						</Link>
+						<Typography variant="p" className="text-center mt-4 tracking-[0.08em]">
+							Full access for 7 days. Start today.
+						</Typography>
+					</div>
+				</div>
+				<div className="h-16 sm:h-20 md:h-24"></div>
+			</div>
+			{/* Explanation */}
+			<div className="w-full bg-[#EBEBEB] pt-16 pb-4">
+				{/* Video Section */}
+				<div className="pt-0 pb-6 px-4">
+					<div className="mx-auto max-w-[943px] flex items-center justify-center flex-col">
+						<Typography variant="h2" className="text-center sm:text-left text-[30px] sm:text-[42px] w-full mb-8" style={{ fontFamily: 'var(--font-zen-antique)' }}>
+							Not Another Email Tool.
+						</Typography>
+						<div className="relative max-w-[943px] w-full h-full aspect-video">
+							<VideoPlayer
+								playbackId="aBYYjecc99ZfIWP016iEXTwZvyg1HQV700haM1c6Ll9wQ"
+								className="h-full w-full"
+								thumbnailTime={1.5}
+								metadata={{
+									video_title: 'Murmur Testimonials',
+								}}
+							/>
+						</div>
+						<Typography className="mt-8 mx-auto max-w-[943px]" variant="promoP" style={{ textAlign: 'justify' }}>
+							{`Murmur serves an entirely different purpose. While other email marketing tools like Mailchimp are great for keeping up an email newsletter, Murmur is designed specifically for musicians and managers in the music industry. We've trained our system on industry knowledge to help you succeed`}
+						</Typography>
+						<div className="flex justify-center mt-24">
+							<Link href={urls.contact.index}>
+								<Button 
+									size="lg"
+									className="bg-[#000000] text-white hover:bg-[#000000]/90 px-12"
+									style={{ fontFamily: 'var(--font-zen-antique)', borderRadius: '5.59px' }}
+								>
+									Book a demo
+								</Button>
+							</Link>
+						</div>
 					</div>
 				</div>
 			</div>
-			{/* Explanation */}
-			<div className="mx-auto max-w-[1059px] text-center px-3 mt-16">
-				<Typography variant="h2" className="text-center text-[30px] sm:text-[42px]">
-					Murmur helps you draft.<br></br> No ChatGPT. We built our own.
-				</Typography>
-				<Typography className="!mt-[42px]" variant="promoP">
+			{/* Removed promo banner */}
+
+			{/* Moved: Send without Limits + second video + description */}
+			<div className="w-full bg-[#1C1C1C] pt-14 sm:pt-28 pb-2 sm:pb-4 px-4">
+				<div className="mx-auto max-w-[943px] flex items-center justify-center flex-col">
+					<Typography variant="h2" className="text-center sm:text-left w-full text-white text-[30px] sm:text-[42px]" style={{ fontFamily: 'var(--font-zen-antique)' }}>
+						Send without Limits.<br></br> Dream without Boundaries.
+					</Typography>
+					<div className="relative max-w-[943px] w-full h-full aspect-video mt-8 sm:mt-12">
+						<VideoPlayer
+							playbackId="z015rWLTn4mlDbMX0021ale02ieVwttxqtZvzc2Z02nVotA"
+							className="h-full w-full"
+							thumbnailTime={0}
+							metadata={{
+								video_title: 'Murmur Demo Video',
+								video_id: 'murmur-demo-2',
+							}}
+						/>
+					</div>
+				</div>
+				<Typography
+					variant="promoP"
+					className="w-full max-w-[943px] mx-auto !mt-16 sm:!mt-32 text-white"
+					style={{ textAlign: 'justify' }}
+				>
 					{`Our software gathers data on each contact every time you draft an email with
 					advanced search algorithms. This allows Murmur to craft customized emails,
 					getting you more responses and more work. Our algorithms are trained on many
@@ -124,113 +153,59 @@ export default function HomePage() {
 				</Typography>
 			</div>
 
-			{/* Video Section */}
-			<div className="py-16 mt-2 sm:mt-32 px-4">
-				<div className="mx-auto w-9/10 flex items-center justify-center flex-col">
-					<div className="relative max-w-[943px] w-full h-full aspect-video">
-						<VideoPlayer
-							playbackId="aBYYjecc99ZfIWP016iEXTwZvyg1HQV700haM1c6Ll9wQ"
-							className="h-full w-full"
-							thumbnailTime={1.5}
-							metadata={{
-								video_title: 'Murmur Testimonials',
-							}}
-						/>
-					</div>
-					<div className="flex justify-center mt-12">
-						<Link href={urls.contact.index}>
-							<Button variant="muted" size="lg">
-								Book a demo
-							</Button>
-						</Link>
-					</div>
-				</div>
-			</div>
-
-			<GradientBanner className="mx-auto mt-4 sm:mt-24 flex justify-center items-center">
-				<Typography variant="banner" className="text-center">
-					Generate accurate contact lists in seconds.<br></br> Save countless hours.
-				</Typography>
-			</GradientBanner>
-
-			<div className="mt-24 bg-light">
+			<div className="mt-0 bg-[#1C1C1C] pb-8 sm:pb-12 overflow-hidden">
 				<ComparisonTable />
 			</div>
 
-			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-28 px-4">
-				<div className="mx-auto w-9/10 flex items-center justify-center flex-col">
-					<Typography variant="banner" className="text-left w-full">
-						Send without Limits.<br></br> Dream without Boundaries.
+
+			<div className="w-full bg-white">
+				<div className="max-w-[1608px] mx-auto pt-18 sm:pt-24">
+					<Typography variant="h3" className="text-center text-[27px] font-inter">
+						Trusted by countless professionals
 					</Typography>
-					<div className="relative max-w-[943px] w-full h-full aspect-video mt-16 sm:mt-32">
-						<VideoPlayer
-							playbackId="z015rWLTn4mlDbMX0021ale02ieVwttxqtZvzc2Z02nVotA"
-							className="h-full w-full"
-							thumbnailTime={1.5}
-							metadata={{
-								video_title: 'Murmur Testimonials',
+					<div className="pt-16 pb-16 sm:pb-48 w-full mt-8 sm:mt-14 h-fit flex justify-center">
+						<div
+							className="w-full max-w-[1000px]"
+							style={{
+								maskImage:
+									'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.2) 100%)',
+								WebkitMaskImage:
+									'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 100%)',
 							}}
-						/>
+						>
+							<PromotionLogos />
+						</div>
 					</div>
 				</div>
-				<Typography
-					variant="promoP"
-					className="w-full max-w-[1130px] mx-auto !mt-16 sm:!mt-32 text-center"
-				>
-					Major email providers have tight sending restrictions, our server has none.
-					Focus your time and energy where it matters most, and leave the volume to us.
-					With Murmur you no longer have to compromise between mass email and custom AI
-					personalization, it does it all. Nothing else like it, Murmur helps you make
-					meaningful connections, not forgettable spam, at a scale previously
-					unimaginable. Dream big, we&apos;ve got you.
-				</Typography>
-			</div>
 
-			<ScrollingReviews />
-
-			<div className="max-w-[1608px] mx-auto mt-18 sm:mt-24">
-				<Typography variant="h3" className="text-center text-[27px]">
-					Trusted by countless businesses
-				</Typography>
-				<div className="bg-gradient-to-b from-gray-100 to-white pt-16 pb-16 sm:pb-48 rounded-md w-full mt-8 sm:mt-14 h-fit ">
-					<div
-						style={{
-							maskImage:
-								'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.2) 100%)',
-							WebkitMaskImage:
-								'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 100%)',
-						}}
-					>
-						<PromotionLogos />
-					</div>
-				</div>
+				<ScrollingReviews />
 			</div>
 
 			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-25 px-4">
-				<Typography variant="banner" className="text-center mx-auto">
-					Not Another Email Tool.
-				</Typography>
+				<div className="mx-auto max-w-[943px]">
+					<Typography variant="h2" className="text-center sm:text-left text-[30px] sm:text-[42px]" style={{ fontFamily: 'var(--font-zen-antique)' }}>
+						Murmur helps you draft.<br></br> No ChatGPT. We built our own.
+					</Typography>
+				</div>
 				<Typography
 					variant="promoP"
-					className="w-full max-w-[1233px] mx-auto !mt-10 text-center"
+					className="w-full max-w-[943px] mx-auto !mt-10"
+					style={{ textAlign: 'justify' }}
 				>
-					{`Murmur serves an entirely different purpose. While other email marketing tools like Mailchimp are great for keeping up an email newsletter, Murmur is designed specifically for entrepreneurs, business owners, and those with a vision to bring in leads and sell to new customers. Each email in a campaign is deeply personalized, and written in your own voice rather than using a stock template that falls through the cracks.
-`}
+					{`Our software gathers data on each contact every time you draft an email with
+					advanced search algorithms. This allows Murmur to craft customized emails,
+					getting you more responses and more work. Our algorithms are trained on many
+					thousands of successful emails. We've made technology that lets you build a
+					campaign that cuts through the noise. We know what it takes to succeed.`}
 				</Typography>
-				<Image
-					src="/photos/frontPhoto1.jpg"
-					alt="Personalized Email"
-					width={943}
-					height={626}
-					className="mx-auto mt-12 rounded-sm"
-				/>
+
 			</div>
 
-			<GradientBanner gloss className="mt-24 !py-3">
-				<Typography variant="banner" className="text-center mx-auto py-8">
+			<div className="mt-24">
+				<Typography variant="h2" className="text-center mx-auto py-8 text-[30px] sm:text-[42px]" style={{ fontFamily: 'var(--font-zen-antique)' }}>
 					{`Find the plan that's right for`} <span className="italic">you</span>
 				</Typography>
-			</GradientBanner>
+			</div>
 
 			<div className="flex justify-center mt-18 lg:hidden">
 				<Link href={urls.pricing.index}>
@@ -244,21 +219,27 @@ export default function HomePage() {
 				<ProductList billingCycle="year" />
 				<div className="mt-16 flex justify-center">
 					<Link href={urls.pricing.index}>
-						<Button variant="muted" size="lg">
+						<Button 
+							size="lg"
+							className="bg-[#000000] text-white hover:bg-[#000000]/90 px-12"
+							style={{ fontFamily: 'var(--font-zen-antique)', borderRadius: '5.59px' }}
+						>
 							Learn More
 						</Button>
 					</Link>
 				</div>
 			</div>
 
-			<FaqSection
-				faqs={FAQS}
-				header="Support"
-				title="FAQs"
-				description="Everything you need to know about Murmur!"
-				showMoreLink={urls.contact.index}
-			/>
-			<div className="h-24" />
+			<div className="w-full bg-[#2B2B2B]">
+				<FaqSection
+					faqs={FAQS}
+					header=""
+					title="FAQs"
+					description="Everything you need to know about Murmur!"
+					showMoreLink=""
+				/>
+				<div className="h-24" />
+			</div>
 		</main>
 	);
 }

@@ -8,22 +8,23 @@ This guide explains how to load the production `contacts` index (60,000+ documen
    ```bash
    docker-compose up -d
    ```
-   
 2. **Verify Local Elasticsearch:**
+
    - Access http://localhost:9200 in browser
    - Should see Elasticsearch cluster info
    - Verify in Elasticvue: http://localhost:8080 (if you have it running)
 
 3. **Environment Variables:**
    You need these environment variables in your `.env` file:
+
    ```
    # Local Elasticsearch (should work without API key for development)
    ELASTICSEARCH_URL=http://localhost:9200
    ELASTICSEARCH_API_KEY=your_local_api_key_if_needed
-   
+
    # Production Elasticsearch
-   PRODUCTION_ELASTICSEARCH_URL=https://0ede66e587f64b5e81a1dcb22ab8459d.us-central1.gcp.cloud.es.io:443
-   PRODUCTION_ELASTICSEARCH_API_KEY=your_production_api_key
+   ELASTICSEARCH_URL_PRODUCTION=your_production_elastic_search_url
+   ELASTICSEARCH_API_KEY=your_production_api_key
    ```
 
 ## Migration Options
@@ -37,6 +38,7 @@ npx tsx scripts/reindex-from-production.ts
 ```
 
 **Advantages:**
+
 - Very fast (handled internally by Elasticsearch)
 - Preserves exact mapping and data structure
 - Minimal memory usage
@@ -51,6 +53,7 @@ npx tsx scripts/import-production-contacts.ts
 ```
 
 **Advantages:**
+
 - More control over the process
 - Better error reporting
 - Can transform data during import if needed
@@ -64,9 +67,10 @@ Contact your team to get the production Elasticsearch API key with read permissi
 ### 2. Set Environment Variables
 
 Add to your `.env` file:
+
 ```bash
-PRODUCTION_ELASTICSEARCH_URL=https://0ede66e587f64b5e81a1dcb22ab8459d.us-central1.gcp.cloud.es.io:443
-PRODUCTION_ELASTICSEARCH_API_KEY=your_api_key_here
+ELASTICSEARCH_URL_PRODUCTION=your_production_url
+ELASTICSEARCH_API_KEY=your_api_key_here
 ```
 
 ### 3. Ensure Local Elasticsearch is Running
@@ -104,6 +108,7 @@ npx tsx scripts/check-elasticsearch.tsx
 ### Common Issues
 
 1. **Connection Refused (Local)**
+
    ```bash
    # Restart Docker services
    docker-compose down
@@ -111,12 +116,14 @@ npx tsx scripts/check-elasticsearch.tsx
    ```
 
 2. **Authentication Error (Production)**
+
    - Verify your API key has read permissions
    - Check the API key format (should be base64 encoded)
 
 3. **Network/Firewall Issues**
+
    - Ensure you can reach the production URL
-   - Try: `curl -I https://0ede66e587f64b5e81a1dcb22ab8459d.us-central1.gcp.cloud.es.io:443`
+   - Try: `curl -I your_elastic_search_production_url`
 
 4. **Memory Issues (Large Dataset)**
    - The reindex script handles large datasets efficiently
@@ -141,16 +148,19 @@ curl http://localhost:9200/contacts/_mapping?pretty
 ## Important Notes
 
 1. **Index Structure:**
+
    - Index name: `contacts`
    - Vector dimensions: 1536 (OpenAI embeddings)
    - Document structure includes: contactId, email, company, location, vectors, etc.
 
 2. **Data Size:**
+
    - 60,000+ documents
    - Each document ~2-3KB average
    - Total index size: ~120-180MB
 
 3. **Local Development:**
+
    - No replicas needed (set to 0 for faster imports)
    - Single shard sufficient for local testing
 

@@ -17,6 +17,7 @@ services:
       - discovery.type=single-node
       - xpack.security.enabled=false
       - 'ES_JAVA_OPTS=-Xms4g -Xmx4g'
+      - reindex.remote.whitelist=your_production_elastic_search_url
     ports:
       - '9200:9200'
     volumes:
@@ -38,5 +39,3 @@ volumes:
     name: murmur_postgres_data
   elasticsearch_data:
     name: murmur_elasticsearch_data
-
-

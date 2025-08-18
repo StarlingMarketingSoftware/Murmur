@@ -22,9 +22,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { useClerk, SignInButton } from '@clerk/nextjs';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { MobileAppComingSoon } from '@/components/molecules/MobileAppComingSoon/MobileAppComingSoon';
 
 const Dashboard = () => {
 	const { isSignedIn, openSignIn } = useClerk();
+	const isMobile = useIsMobile();
 	const {
 		form,
 		onSubmit,
@@ -49,6 +52,17 @@ const Dashboard = () => {
 		isAllSelected,
 		hoveredText,
 	} = useDashboard();
+
+	// Show mobile app coming soon page on mobile devices
+	// Return null during initial load to prevent hydration mismatch
+	if (isMobile === null) {
+		return null;
+	}
+	
+	if (isMobile) {
+		return <MobileAppComingSoon />;
+	}
+
 	return (
 		<AppLayout>
 			<div className={`dashboard-container ${hasSearched ? 'search-active' : ''}`}>
