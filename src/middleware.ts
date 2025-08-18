@@ -7,7 +7,8 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 const isProtectedRoute = createRouteMatcher([
 	// Protect all API routes except webhooks and the cron endpoint
 	'/api/((?!webhooks|stripe/cron).*)$',
-	'/murmur/(.*)',
+	// Protect all murmur routes except the dashboard
+	'/murmur/((?!dashboard).*)$',
 	'/admin/(.*)',
 ]);
 

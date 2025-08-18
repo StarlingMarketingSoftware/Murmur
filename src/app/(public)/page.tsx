@@ -97,29 +97,16 @@ export default function HomePage() {
 					</Typography>
 					<LeadSender />
 					<div className="mt-10 md:mt-15 flex justify-center">
-						{!isSignedIn ? (
-							<SignUpButton mode="modal">
-								<Button
-									variant="primary"
-									font="secondary"
-									size="lg"
-									className="w-[155px]"
-								>
-									START
-								</Button>
-							</SignUpButton>
-						) : (
-							<Link href={urls.murmur.dashboard.index}>
-								<Button
-									variant="primary"
-									size="lg"
-									font="secondary"
-									className="w-[155px]"
-								>
-									START
-								</Button>
-							</Link>
-						)}
+						<Link href={urls.murmur.dashboard.index}>
+							<Button
+								variant="primary"
+								size="lg"
+								font="secondary"
+								className="w-[155px]"
+							>
+								START
+							</Button>
+						</Link>
 					</div>
 				</div>
 			</div>

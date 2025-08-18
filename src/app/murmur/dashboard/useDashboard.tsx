@@ -22,6 +22,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { capitalize } from '@/utils/string';
 import { TableCellTooltip } from '@/components/molecules/TableCellTooltip/TableCellTooltip';
 import { useMe } from '@/hooks/useMe';
+import { StripeSubscriptionStatus } from '@/types';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -63,7 +64,12 @@ export const useDashboard = () => {
 	});
 
 	/* HOOKS */
-	const { isFreeTrial } = useMe();
+	// useMe will return undefined values for unauthenticated users
+	const { isFreeTrial, user } = useMe() || { isFreeTrial: false, user: null };
+	
+	// User can search if they have an active subscription OR are on a free trial
+	const canSearch = user?.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE || 
+	                  user?.stripeSubscriptionStatus === StripeSubscriptionStatus.TRIALING;
 	const [selectedContactListRows, setSelectedContactListRows] = useState<
 		UserContactList[]
 	>([]);
@@ -509,6 +515,7 @@ export const useDashboard = () => {
 		usedContactIdsSet,
 		isPendingBatchUpdateContacts,
 		isFreeTrial,
+		canSearch,
 		hasSearched,
 		handleResetSearch,
 		hoveredText,
