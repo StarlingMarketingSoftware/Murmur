@@ -1,5 +1,4 @@
 'use client';
-import { Birds } from '@/components/atoms/_svg/Birds';
 import LogoIcon from '@/components/atoms/_svg/LogoIcon';
 import { StarlingLogo } from '@/components/atoms/_svg/StarlingLogo';
 import { Button } from '@/components/ui/button';
@@ -43,48 +42,20 @@ export default function HomePage() {
 
 	return (
 		<main className="overflow-hidden">
-			<div className="relative h-fit sm:min-h-screen w-screen overflow-hidden">
-				{/* Background layer with Birds */}
-				<div className="absolute inset-0 z-0">
-					<div
-						className="absolute inset-0 overflow-hidden"
-						style={{
-							maskImage:
-								'linear-gradient(to left, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)',
-							WebkitMaskImage:
-								'linear-gradient(to left, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
-						}}
-					>
-						<Birds
-							width="150%"
-							height="150%"
-							className="-translate-y-75 md:-translate-y-65 lg:-translate-y-44 -translate-x-65 min-w-[1500px]"
-						/>
-					</div>
-				</div>
-
-				{/* Backdrop blur overlay */}
-				<div
-					className="absolute inset-0 backdrop-blur-lg z-10"
-					style={{
-						maskImage:
-							'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 30%, rgba(0,0,0,0.6) 70%, rgba(0,0,0,0.4) 100%)',
-						WebkitMaskImage:
-							'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 30%, rgba(0,0,0,0.6) 70%, rgba(0,0,0,0.4) 100%)',
-					}}
-				/>
-
+			<div className="relative h-[1011px] w-screen overflow-hidden bg-white">
 				{/* Content layer */}
-				<div className="relative z-20 justify-items-center h-full gap-0">
-					<div className="w-[55px] sm:w-[75px] md:w-[90px] lg:!w-[96px] h-[44px] sm:h-[60px] md:h-[72px] lg:h-[80px] mt-18 sm:mt-24 md:mt-30 lg:mt-36 mx-auto">
-						<LogoIcon />
+				<div className="relative justify-items-center h-full gap-0 flex flex-col items-center justify-start pt-9">
+					{/* Exact dashboard structure */}
+					<div className="mt-4 flex justify-center w-full px-4">
+						<div className="text-center w-full max-w-[470px] h-[286px] overflow-hidden">
+							<div className="inline-block">
+								<LogoIcon width="106px" height="84px" />
+							</div>
+							<Typography variant="h1" className="text-center mt-2 !text-[80px] leading-[0.8]">
+								Murmur
+							</Typography>
+						</div>
 					</div>
-					<Typography
-						variant="h1"
-						className="!text-[52px] sm:!text-[80px] leading-[0.8] text-center"
-					>
-						Murmur
-					</Typography>
 					<div className="flex items-center gap-8 sm:gap-14 mt-6 mx-auto text-center justify-center">
 						<Typography className="!text-[12px]">by</Typography>
 						<StarlingLogo width="110px" />

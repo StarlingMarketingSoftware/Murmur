@@ -61,8 +61,8 @@ export const Navbar = () => {
 				className={cn(
 					'fixed top-0 left-0 right-0 z-50 transition-all duration-700 font-inter',
 					scrolled 
-						? 'bg-white/30 backdrop-blur-3xl backdrop-saturate-200 border-b border-white/10' 
-						: 'bg-white/10 backdrop-blur-2xl backdrop-saturate-150'
+						? 'bg-white border-b border-gray-200' 
+						: 'bg-white'
 				)}
 			>
 				<div className="w-full">
