@@ -119,8 +119,8 @@ const Dashboard = () => {
 							)}
 						/>
 						{!hasSearched && (
-							<div className="flex flex-col md:flex-row gap-0 md:gap-4 items-center justify-between w-full">
-								<div className="flex flex-row gap-4 items-center h-[39px] justify-start">
+							<div className="flex flex-row gap-4 items-center justify-between w-full flex-wrap">
+								<div className="flex flex-row gap-4 items-center h-[39px] justify-start flex-shrink-0">
 									<div 
 										className="exclude-contacts-box flex items-center"
 										style={{
@@ -171,7 +171,7 @@ const Dashboard = () => {
 										/>
 									</div>
 								</div>
-								<div className="flex items-center justify-end w-full max-w-full">
+								<div className="flex items-center justify-end flex-shrink-0 ml-auto">
 									{isFreeTrial ? (
 										<UpgradeSubscriptionDrawer
 											message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."

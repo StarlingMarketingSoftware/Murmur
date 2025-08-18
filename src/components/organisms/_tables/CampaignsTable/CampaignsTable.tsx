@@ -2,7 +2,6 @@ import { FC } from 'react';
 import {
 	Card,
 	CardHeader,
-	CardDescription,
 	CardContent,
 	CardTitle,
 } from '@/components/ui/card';
@@ -29,10 +28,7 @@ export const CampaignsTable: FC = () => {
 			<Card className="relative border-none bg-gradient-to-l from-gray-100 via-background to-gray-100 w-full max-w-[1132px] mx-auto">
 				{isPending && <Spinner size="medium" className="absolute top-2 right-2" />}
 				<CardHeader>
-					<CardTitle className="text-center text-3xl">Your Campaigns</CardTitle>
-					<CardDescription className="text-center !text-[15px] mt-2">
-						Campaigns you have created.
-					</CardDescription>
+					<CardTitle className="text-center text-2xl">Campaigns</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-2 w-full px-6 pb-6 pt-0">
 					<div className="campaigns-table-container">

@@ -1783,10 +1783,24 @@ mux-player {
 /* Exclude contacts box styling */
 .exclude-contacts-box {
 	transition: box-shadow 0.2s ease;
+	flex-shrink: 0;
 }
 
 .exclude-contacts-box:hover {
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Ensure consistent layout during horizontal compression */
+.search-bar-wrapper .flex-wrap {
+	min-height: 39px;
+	align-items: center;
+}
+
+/* Prevent overlapping on medium screens */
+@media (max-width: 768px) and (min-width: 640px) {
+	.search-bar-wrapper .flex-wrap {
+		gap: 1rem;
+	}
 }
 
 /* Ensure even vertical alignment */
@@ -1805,10 +1819,19 @@ mux-player {
 	transform: translateX(10px);
 }
 
-/* Make exclude contacts box responsive on smaller screens */
-@media (max-width: 480px) {
+/* Keep exclude contacts box consistent on smaller screens */
+@media (max-width: 640px) {
 	.exclude-contacts-box {
-		width: 100% !important;
+		width: 227px !important;
+		min-width: 227px !important;
+		flex-shrink: 0;
+	}
+}
+
+/* Only on very small screens, allow some flexibility */
+@media (max-width: 380px) {
+	.exclude-contacts-box {
+		width: calc(100% - 32px) !important;
 		min-width: 200px !important;
 	}
 }
