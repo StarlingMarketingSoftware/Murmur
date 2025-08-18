@@ -41,7 +41,7 @@ export default function HomePage() {
 
 	return (
 		<main className="overflow-hidden">
-			<div className="relative h-[1011px] w-screen overflow-hidden bg-white">
+			<div className="relative w-screen min-h-screen bg-white">
 				{/* Content layer */}
 				<div className="relative justify-items-center h-full gap-0 flex flex-col items-center justify-start pt-9">
 					{/* Exact dashboard structure */}
@@ -64,7 +64,7 @@ export default function HomePage() {
 						</div>
 					</div>
 					
-					<div className="mt-10 flex flex-col items-center">
+					<div className="mt-4 flex flex-col items-center">
 						<LeadSender />
 						<Link href={urls.murmur.dashboard.index} className="mt-0 mx-auto">
 							<Button
@@ -85,7 +85,7 @@ export default function HomePage() {
 				</div>
 			</div>
 			{/* Explanation */}
-			<div className="w-full bg-[#EBEBEB] pt-28 pb-8">
+			<div className="w-full bg-[#EBEBEB] pt-16 pb-8">
 				<div className="mx-auto max-w-[1059px] text-center px-3 mt-0">
 					<Typography variant="h2" className="text-center text-[30px] sm:text-[42px]">
 						Murmur helps you draft.<br></br> No ChatGPT. We built our own.
