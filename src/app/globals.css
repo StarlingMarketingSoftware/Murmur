@@ -240,8 +240,30 @@
 	animation: scroll 50s linear infinite;
 }
 
-.animate-scroll:hover {
-	animation-play-state: paused;
+/* Safari-specific fixes */
+@supports (-webkit-appearance: none) {
+	/* Fix for aspect-ratio in Safari < 15 */
+	.aspect-video {
+		padding-bottom: 56.25%; /* 16:9 aspect ratio fallback */
+		height: 0;
+		position: relative;
+	}
+	
+	.aspect-video > * {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+	}
+	
+	/* Fix for gap property in older Safari */
+	.gap-8 {
+		margin: -1rem;
+	}
+	.gap-8 > * {
+		margin: 1rem;
+	}
 }
 
 .animate-fade-in {

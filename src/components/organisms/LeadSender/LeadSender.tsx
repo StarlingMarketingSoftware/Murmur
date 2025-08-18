@@ -14,19 +14,20 @@ export const LeadSender = () => {
 	const { form, onSubmit, isPending } = useLeadSender();
 	return (
 		<Form {...form}>
-			<div className="flex flex-col items-center">
+			<div className="flex flex-col items-center w-full px-4">
 				<form
 					onSubmit={form.handleSubmit(onSubmit)}
-					className="flex flex-row justify-center w-full max-w-2xl"
+					className="flex flex-row justify-center w-full max-w-[500px] relative mx-auto"
 				>
 					<FormField
 						control={form.control}
 						name="email"
 						render={({ field }) => (
-							<FormItem className="w-full translate-x-2">
+							<FormItem className="relative w-full">
 								<FormControl>
 									<Input
-										className="!h-[50px] sm:!h-[68px] !w-full !min-w-0 sm:!min-w-[400px] lg:!min-w-[500px] !bg-gray-200 !border-black !rounded-md font-primary !text-[16px] sm:!text-[20px] lg:!text-[25px] !text-foreground placeholder:!text-black"
+										className="!h-[42px] !w-full !bg-gray-200 !border-black font-primary !text-[14px] sm:!text-[18px] !text-foreground placeholder:!text-black !pr-[120px] sm:!pr-[160px]"
+										style={{ borderRadius: '7px' }}
 										{...field}
 										placeholder="Enter your email"
 									/>
@@ -39,14 +40,12 @@ export const LeadSender = () => {
 						type="submit"
 						variant="ghost"
 						isLoading={isPending}
-						className="!h-[50px] !opacity-100 sm:!h-[68px] px-4 sm:px-6 bg-background hover:bg-gray-100 !border-foreground border-1 text-foreground !text-[16px] sm:!text-[20px] lg:!text-[25px] -translate-x-2"
+						className="!absolute !right-[2px] !top-[2px] !h-[38px] !opacity-100 !w-[100px] sm:!w-[150px] px-3 sm:px-6 hover:bg-gray-100 !border-l !border-l-black !border-r-0 !border-t-0 !border-b-0 text-foreground !text-[14px] sm:!text-[18px]"
+						style={{ backgroundColor: '#FFFFFF', borderRadius: '7px' }}
 					>
 						Try for Free
 					</Button>
 				</form>
-				<Typography variant="p" className="text-center -mt-4">
-					Full access for 7 days. Start today.
-				</Typography>
 			</div>
 		</Form>
 	);
