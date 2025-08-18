@@ -56,9 +56,16 @@ export const useIdentityDialog = (props: IdentityDialogProps) => {
 		},
 	});
 
+	const formIdentityId = form.watch('identityId');
 	const selectedIdentity = identities?.find(
-		(identity) => identity.id === Number(form.watch('identityId'))
+		(identity) => identity.id === Number(formIdentityId)
 	);
+	
+	// Debug logging
+	console.log('Form identityId value:', formIdentityId);
+	console.log('Parsed identityId:', Number(formIdentityId));
+	console.log('Available identities:', identities?.map(i => ({ id: i.id, name: i.name })));
+	console.log('Selected identity:', selectedIdentity);
 
 	const handleOpenChange = (newOpen: boolean) => {
 		if (!isControlled) {
@@ -71,7 +78,13 @@ export const useIdentityDialog = (props: IdentityDialogProps) => {
 	};
 
 	const handleAssignIdentity = () => {
+		console.log('handleAssignIdentity called');
+		console.log('selectedIdentity:', selectedIdentity);
+		console.log('form.watch("identityId"):', form.watch('identityId'));
+		console.log('identities:', identities);
+		
 		if (selectedIdentity) {
+			console.log('Assigning identity:', selectedIdentity.id, 'to campaign:', campaign.id);
 			assignIdentity({
 				id: campaign.id,
 				data: {
@@ -79,6 +92,7 @@ export const useIdentityDialog = (props: IdentityDialogProps) => {
 				},
 			});
 		} else {
+			console.log('No selectedIdentity found');
 			toast.error('Please select an identity to assign.');
 		}
 	};

@@ -80,7 +80,8 @@ export const useCampaignsTable = () => {
 	const { mutateAsync: deleteCampaign, isPending: isPendingDelete } = useDeleteCampaign();
 
 	const handleRowClick = (rowData: Campaign) => {
-		router.push(urls.murmur.campaign.detail(rowData.id));
+		const target = `${urls.murmur.campaign.detail(rowData.id)}?silent=1`;
+		router.push(target);
 	};
 
 	return {

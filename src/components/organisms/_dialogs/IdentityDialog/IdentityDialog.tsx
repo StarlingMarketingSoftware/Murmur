@@ -16,7 +16,7 @@ import {
 import { CreateIdentityPanel } from './CreateIdentityPanel/CreateIdentityPanel';
 import { twMerge } from 'tailwind-merge';
 import { Button } from '@/components/ui/button';
-import { ArrowDown, ChevronLeft } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import Spinner from '@/components/ui/spinner';
 import { urls } from '@/constants/urls';
 
@@ -52,7 +52,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 			<DialogContent
 				disableEscapeKeyDown
 				disableOutsideClick
-				className="!fixed !inset-0 !translate-x-0 !translate-y-0 !top-0 !left-0 !max-w-none !max-h-none !h-full !w-full !rounded-none !border-0 !p-0 overflow-hidden"
+				className="!fixed !inset-0 !translate-x-0 !translate-y-0 !top-0 !left-0 !max-w-none !max-h-none !h-full !w-full !rounded-none !border-0 !p-0 overflow-hidden data-[state=open]:!animate-none data-[state=closed]:!animate-none"
 				hideCloseButton={true}
 			>
 				{/* Immediate white background to prevent flash */}
@@ -163,7 +163,10 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 														<FormControl>
 															<RadioGroup
 																value={field.value}
-																onValueChange={field.onChange}
+																onValueChange={(value) => {
+																	console.log('RadioGroup onValueChange:', value);
+																	field.onChange(value);
+																}}
 																className="space-y-4"
 															>
 																{identities.map((identity) => (
@@ -239,8 +242,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 								disabled={!selectedIdentity}
 								className="min-w-[200px]"
 							>
-								<ArrowDown /> Use Selected Profile
-								<ArrowDown />
+								Continue
 							</Button>
 						)}
 					</div>

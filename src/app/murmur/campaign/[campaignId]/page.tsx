@@ -19,6 +19,7 @@ import { urls } from '@/constants/urls';
 import Link from 'next/link';
 import { ManageCampaignContactListDialog } from '@/components/organisms/_dialogs/ManageCampaignContactListDialog/ManageCampaignContactListDialog';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { NoMobilePage } from '@/components/atoms/NoMobilePage/NoMobilePage';
 
 const Murmur = () => {
@@ -26,9 +27,11 @@ const Murmur = () => {
 		useCampaignDetail();
 
 	const [isContactListDialogOpen, setIsContactListDialogOpen] = useState(false);
+	const searchParams = useSearchParams();
+	const silentLoad = searchParams.get('silent') === '1';
 
 	if (isPendingCampaign || !campaign) {
-		return <Spinner />;
+		return silentLoad ? null : <Spinner />;
 	}
 
 	// Hide underlying content and show a white overlay when we require the user to set up an identity
