@@ -7,7 +7,7 @@ import { SignUpButton, useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { PromotionLogos } from '@/components/molecules/PromotionLogos/PromotionLogos';
 import { FAQ } from '@/types';
-import Image from 'next/image';
+// import Image from 'next/image';
 import { ProductList } from '@/components/organisms/ProductList/ProductList';
 import { FaqSection } from '@/components/molecules/FaqSection/FaqSection';
 import { GradientBanner } from '@/components/molecules/GradientBanner/GradientBanner';
@@ -41,7 +41,7 @@ export default function HomePage() {
 
 	return (
 		<main className="overflow-hidden">
-			<div className="relative h-auto w-screen overflow-hidden bg-white pb-0">
+			<div className="relative h-[1011px] w-screen overflow-hidden bg-white">
 				{/* Content layer */}
 				<div className="relative justify-items-center h-full gap-0 flex flex-col items-center justify-start pt-9">
 					{/* Exact dashboard structure */}
@@ -85,42 +85,42 @@ export default function HomePage() {
 				</div>
 			</div>
 			{/* Explanation */}
-			<div className="mx-auto max-w-[1059px] text-center px-3 mt-28">
-				<Typography variant="h2" className="text-center text-[30px] sm:text-[42px]">
-					Murmur helps you draft.<br></br> No ChatGPT. We built our own.
-				</Typography>
-				<Typography className="!mt-[42px]" variant="promoP">
-					{`Our software gathers data on each contact every time you draft an email with
-					advanced search algorithms. This allows Murmur to craft customized emails,
-					getting you more responses and more work. Our algorithms are trained on many
-					thousands of successful emails. We've made technology that lets you build a
-					campaign that cuts through the noise. We know what it takes to succeed.`}
-				</Typography>
-			</div>
-
-			{/* Video Section */}
-			<div className="py-16 mt-2 sm:mt-32 px-4">
-				<div className="mx-auto w-9/10 flex items-center justify-center flex-col">
-					<div className="relative max-w-[943px] w-full h-full aspect-video">
-						<VideoPlayer
-							playbackId="aBYYjecc99ZfIWP016iEXTwZvyg1HQV700haM1c6Ll9wQ"
-							className="h-full w-full"
-							thumbnailTime={1.5}
-							metadata={{
-								video_title: 'Murmur Testimonials',
-							}}
-						/>
-					</div>
-					<div className="flex justify-center mt-12">
-						<Link href={urls.contact.index}>
-							<Button variant="muted" size="lg">
-								Book a demo
-							</Button>
-						</Link>
+			<div className="w-full bg-[#EBEBEB] pt-28 pb-8">
+				<div className="mx-auto max-w-[1059px] text-center px-3 mt-0">
+					<Typography variant="h2" className="text-center text-[30px] sm:text-[42px]">
+						Murmur helps you draft.<br></br> No ChatGPT. We built our own.
+					</Typography>
+					<Typography className="!mt-[42px]" variant="promoP">
+						{`Our software gathers data on each contact every time you draft an email with
+						advanced search algorithms. This allows Murmur to craft customized emails,
+						getting you more responses and more work. Our algorithms are trained on many
+						thousands of successful emails. We've made technology that lets you build a
+						campaign that cuts through the noise. We know what it takes to succeed.`}
+					</Typography>
+				</div>
+				{/* Video Section */}
+				<div className="py-16 mt-2 sm:mt-32 px-4">
+					<div className="mx-auto w-9/10 flex items-center justify-center flex-col">
+						<div className="relative max-w-[943px] w-full h-full aspect-video">
+							<VideoPlayer
+								playbackId="aBYYjecc99ZfIWP016iEXTwZvyg1HQV700haM1c6Ll9wQ"
+								className="h-full w-full"
+								thumbnailTime={1.5}
+								metadata={{
+									video_title: 'Murmur Testimonials',
+								}}
+							/>
+						</div>
+						<div className="flex justify-center mt-12">
+							<Link href={urls.contact.index}>
+								<Button variant="muted" size="lg">
+									Book a demo
+								</Button>
+							</Link>
+						</div>
 					</div>
 				</div>
 			</div>
-
 			{/* Removed promo banner */}
 
 			{/* Moved: Send without Limits + second video + description */}
@@ -158,8 +158,6 @@ export default function HomePage() {
 			</div>
 
 
-			<ScrollingReviews />
-
 			<div className="max-w-[1608px] mx-auto mt-18 sm:mt-24">
 				<Typography variant="h3" className="text-center text-[27px]">
 					Trusted by countless businesses
@@ -178,6 +176,8 @@ export default function HomePage() {
 				</div>
 			</div>
 
+			<ScrollingReviews />
+
 			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-25 px-4">
 				<Typography variant="banner" className="text-center mx-auto">
 					Not Another Email Tool.
@@ -189,13 +189,7 @@ export default function HomePage() {
 					{`Murmur serves an entirely different purpose. While other email marketing tools like Mailchimp are great for keeping up an email newsletter, Murmur is designed specifically for entrepreneurs, business owners, and those with a vision to bring in leads and sell to new customers. Each email in a campaign is deeply personalized, and written in your own voice rather than using a stock template that falls through the cracks.
 `}
 				</Typography>
-				<Image
-					src="/photos/frontPhoto1.jpg"
-					alt="Personalized Email"
-					width={943}
-					height={626}
-					className="mx-auto mt-12 rounded-sm"
-				/>
+
 			</div>
 
 			<GradientBanner gloss className="mt-24 !py-3">
