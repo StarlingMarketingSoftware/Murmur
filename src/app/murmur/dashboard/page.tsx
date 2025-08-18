@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/form';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import ConsoleLoader from '@/components/ui/console-loader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 
@@ -99,9 +99,7 @@ const Dashboard = () => {
 														className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent"
 														placeholder='Who do you want to send to?  i.e  "Music venues in North Carolina"'
 														style={{ 
-															accentColor: 'transparent',
-															WebkitAppearance: 'none',
-															MozAppearance: 'none'
+															accentColor: 'transparent'
 														}}
 														autoComplete="off"
 														autoCorrect="off"

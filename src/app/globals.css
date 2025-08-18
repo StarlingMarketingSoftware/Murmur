@@ -1711,6 +1711,14 @@ mux-player {
 	display: none !important;
 }
 
+/* Fallback for Safari versions that don't support :has() */
+@supports not (selector(:has(*))) {
+	.campaigns-table-wrapper nav,
+	.campaigns-table-wrapper [role="navigation"] {
+		display: none !important;
+	}
+}
+
 /* Handle text overflow in campaigns table cells */
 .campaigns-table-container td:not(:nth-child(4)) {
 	overflow: hidden;
@@ -1736,6 +1744,14 @@ mux-player {
 .campaigns-table-container table {
 	table-layout: fixed !important;
 	width: 100%;
+	-webkit-text-size-adjust: 100%; /* Prevent Safari text size issues */
+}
+
+/* Safari-specific table fixes */
+@supports (-webkit-hyphens: none) {
+	.campaigns-table-container {
+		-webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS Safari */
+	}
 }
 
 /* First three columns share the space evenly */
@@ -1746,8 +1762,10 @@ mux-player {
 .campaigns-table-container th:nth-child(3),
 .campaigns-table-container td:nth-child(3) {
 	width: calc((100% - 60px) / 3) !important;
+	width: -webkit-calc((100% - 60px) / 3) !important;
 	min-width: 0 !important;
 	max-width: calc((100% - 60px) / 3) !important;
+	max-width: -webkit-calc((100% - 60px) / 3) !important;
 }
 
 /* Delete button column - small fixed width at far right */
@@ -1770,8 +1788,10 @@ mux-player {
 .campaigns-table-container [role="columnheader"]:not(:nth-child(4)),
 .campaigns-table-container [role="cell"]:not(:nth-child(4)) {
 	width: calc((100% - 60px) / 3) !important;
+	width: -webkit-calc((100% - 60px) / 3) !important;
 	min-width: 0 !important;
 	max-width: calc((100% - 60px) / 3) !important;
+	max-width: -webkit-calc((100% - 60px) / 3) !important;
 }
 
 /* Ensure buttons in the last column are not clipped */
@@ -1783,11 +1803,14 @@ mux-player {
 /* Exclude contacts box styling */
 .exclude-contacts-box {
 	transition: box-shadow 0.2s ease;
+	-webkit-transition: box-shadow 0.2s ease;
 	flex-shrink: 0;
+	-webkit-flex-shrink: 0;
 }
 
 .exclude-contacts-box:hover {
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	-webkit-box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* Ensure consistent layout during horizontal compression */
@@ -1817,6 +1840,15 @@ mux-player {
 
 .exclude-contacts-box input[type="checkbox"]:checked + div::after {
 	transform: translateX(10px);
+	-webkit-transform: translateX(10px);
+}
+
+/* Safari-specific fixes for toggle */
+@supports (-webkit-appearance: none) {
+	.exclude-contacts-box input[type="checkbox"] + div::after {
+		-webkit-transition: all 0.2s ease;
+		transition: all 0.2s ease;
+	}
 }
 
 /* Keep exclude contacts box consistent on smaller screens */
@@ -1832,6 +1864,7 @@ mux-player {
 @media (max-width: 380px) {
 	.exclude-contacts-box {
 		width: calc(100% - 32px) !important;
+		width: -webkit-calc(100% - 32px) !important;
 		min-width: 200px !important;
 	}
 }
