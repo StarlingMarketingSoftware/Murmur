@@ -41,7 +41,7 @@ export default function HomePage() {
 
 	return (
 		<main className="overflow-hidden">
-			<div className="relative h-[1011px] w-screen overflow-hidden bg-white">
+			<div className="relative h-auto w-screen overflow-hidden bg-white pb-0">
 				{/* Content layer */}
 				<div className="relative justify-items-center h-full gap-0 flex flex-col items-center justify-start pt-9">
 					{/* Exact dashboard structure */}
@@ -85,7 +85,7 @@ export default function HomePage() {
 				</div>
 			</div>
 			{/* Explanation */}
-			<div className="mx-auto max-w-[1059px] text-center px-3 mt-16">
+			<div className="mx-auto max-w-[1059px] text-center px-3 mt-28">
 				<Typography variant="h2" className="text-center text-[30px] sm:text-[42px]">
 					Murmur helps you draft.<br></br> No ChatGPT. We built our own.
 				</Typography>
@@ -121,16 +121,9 @@ export default function HomePage() {
 				</div>
 			</div>
 
-			<GradientBanner className="mx-auto mt-4 sm:mt-24 flex justify-center items-center">
-				<Typography variant="banner" className="text-center">
-					Generate accurate contact lists in seconds.<br></br> Save countless hours.
-				</Typography>
-			</GradientBanner>
+			{/* Removed promo banner */}
 
-			<div className="mt-24 bg-light">
-				<ComparisonTable />
-			</div>
-
+			{/* Moved: Send without Limits + second video + description */}
 			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-28 px-4">
 				<div className="mx-auto w-9/10 flex items-center justify-center flex-col">
 					<Typography variant="banner" className="text-left w-full">
@@ -159,6 +152,11 @@ export default function HomePage() {
 					unimaginable. Dream big, we&apos;ve got you.
 				</Typography>
 			</div>
+
+			<div className="mt-24 bg-light">
+				<ComparisonTable />
+			</div>
+
 
 			<ScrollingReviews />
 
