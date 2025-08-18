@@ -4,7 +4,7 @@
 	"private": true,
 	"scripts": {
 		"dev": "next dev --port 3000",
-		"build": "next build",
+		"build": "node --max-old-space-size=4096 node_modules/.bin/next build",
 		"start": "next start",
 		"lint": "next lint",
 		"vercel-build": "cross-env NODE_OPTIONS=--max-old-space-size=8192 prisma generate && prisma migrate deploy && next build",
