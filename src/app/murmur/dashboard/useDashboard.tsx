@@ -26,8 +26,7 @@ import { useMe } from '@/hooks/useMe';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
-	excludeUsedContacts: z.boolean().optional().default(true),
-	exactMatchesOnly: z.boolean().optional().default(true),
+	excludeUsedContacts: z.boolean().optional().default(false),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -60,8 +59,7 @@ export const useDashboard = () => {
 		resolver: zodResolver(formSchema),
 		defaultValues: {
 			searchText: '',
-			excludeUsedContacts: true,
-			exactMatchesOnly: false,
+			excludeUsedContacts: false,
 		},
 	});
 
@@ -73,8 +71,7 @@ export const useDashboard = () => {
 	const [selectedContacts, setSelectedContacts] = useState<number[]>([]);
 	const [isAllSelected, setIsAllSelected] = useState(false);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
-	const [activeExcludeUsedContacts, setActiveExcludeUsedContacts] = useState(true);
-	const [activeExactMatchesOnly, setActiveExactMatchesOnly] = useState(false);
+	const [activeExcludeUsedContacts, setActiveExcludeUsedContacts] = useState(false);
 	const [currentTab, setCurrentTab] = useState<TabValue>('search');
 	const [limit, setLimit] = useState(50);
 	const [apolloContacts, setApolloContacts] = useState<ContactWithName[]>([]);
@@ -97,7 +94,7 @@ export const useDashboard = () => {
 				process.env.NODE_ENV === 'production'
 					? EmailVerificationStatus.valid
 					: undefined,
-			useVectorSearch: !activeExactMatchesOnly,
+			useVectorSearch: true,
 			limit,
 			excludeUsedContacts: activeExcludeUsedContacts,
 		},
@@ -128,7 +125,7 @@ export const useDashboard = () => {
 			// Query should automatically run when enabled
 			console.log('Search triggered with query:', activeSearchQuery);
 		}
-	}, [hasSearched, activeSearchQuery, activeExcludeUsedContacts, activeExactMatchesOnly, limit]);
+	}, [hasSearched, activeSearchQuery, activeExcludeUsedContacts, limit]);
 
 	// Handle errors
 	useEffect(() => {
@@ -140,7 +137,6 @@ export const useDashboard = () => {
 				query: activeSearchQuery,
 				filters: {
 					excludeUsedContacts: activeExcludeUsedContacts,
-					exactMatchesOnly: activeExactMatchesOnly,
 					limit,
 				}
 			});
@@ -152,7 +148,7 @@ export const useDashboard = () => {
 				toast.error('Failed to load contacts. Please try again.');
 			}
 		}
-	}, [isError, error, hasSearched, activeSearchQuery, activeExcludeUsedContacts, activeExactMatchesOnly, limit]);
+	}, [isError, error, hasSearched, activeSearchQuery, activeExcludeUsedContacts, limit]);
 
 	const { mutateAsync: createContactList, isPending: isPendingCreateContactList } =
 		useCreateUserContactList({
@@ -181,8 +177,7 @@ export const useDashboard = () => {
 		
 		// Update search parameters
 		setActiveSearchQuery(data.searchText);
-		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? true);
-		setActiveExactMatchesOnly(data.exactMatchesOnly ?? false);
+		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? false);
 		setLimit(50);
 		setHasSearched(true);
 		// The query will automatically run when the state updates enable it

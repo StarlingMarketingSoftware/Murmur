@@ -1780,6 +1780,39 @@ mux-player {
 	z-index: 1;
 }
 
+/* Exclude contacts box styling */
+.exclude-contacts-box {
+	transition: box-shadow 0.2s ease;
+}
+
+.exclude-contacts-box:hover {
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Ensure even vertical alignment */
+.exclude-contacts-box label {
+	line-height: 1;
+	display: flex;
+	align-items: center;
+}
+
+/* Custom toggle switch styles */
+.exclude-contacts-box input[type="checkbox"]:checked + div {
+	background-color: #E5E5E5 !important;
+}
+
+.exclude-contacts-box input[type="checkbox"]:checked + div::after {
+	transform: translateX(10px);
+}
+
+/* Make exclude contacts box responsive on smaller screens */
+@media (max-width: 480px) {
+	.exclude-contacts-box {
+		width: 100% !important;
+		min-width: 200px !important;
+	}
+}
+
 /* Elegant staggered fade in for search results */
 .search-active .search-result-item:nth-child(1) {
 	animation: gentleFadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;

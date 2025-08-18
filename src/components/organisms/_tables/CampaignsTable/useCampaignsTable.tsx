@@ -3,7 +3,6 @@ import { Campaign } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
 import { X } from 'lucide-react';
 import { Typography } from '@/components/ui/typography';
-import { TableSortingButton } from '../../../molecules/CustomTable/CustomTable';
 import { useDeleteCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { MMddyyyyHHmm } from '@/utils';
 import { useRouter } from 'next/navigation';
@@ -14,9 +13,7 @@ export const useCampaignsTable = () => {
 	const columns: ColumnDef<Campaign>[] = [
 		{
 			accessorKey: 'name',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Name" />;
-			},
+			header: "Name",
 			cell: ({ row }) => {
 				const name: string = row.getValue('name');
 				return name ? (
@@ -30,9 +27,7 @@ export const useCampaignsTable = () => {
 		},
 		{
 			accessorKey: 'createdAt',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Created At" />;
-			},
+			header: "Created At",
 			cell: ({ row }) => {
 				const date = new Date(row.getValue('createdAt'));
 				return date ? (
@@ -46,9 +41,7 @@ export const useCampaignsTable = () => {
 		},
 		{
 			accessorKey: 'updatedAt',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Updated At" />;
-			},
+			header: "Updated At",
 			cell: ({ row }) => {
 				const date = new Date(row.getValue('updatedAt'));
 				return date ? (
