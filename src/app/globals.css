@@ -1665,6 +1665,121 @@ mux-player {
 	opacity: 0;
 }
 
+/* Campaigns table fade out when search is triggered */
+.campaigns-table-wrapper {
+	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+	opacity: 1;
+	transform: translateY(0);
+}
+
+.search-active ~ .campaigns-table-wrapper {
+	opacity: 0;
+	transform: translateY(20px);
+	pointer-events: none;
+}
+
+/* Campaigns table container with fixed height */
+.campaigns-table-container {
+	max-height: 382px;
+	overflow: hidden;
+}
+
+/* Override the default constrainHeight of 429px */
+.campaigns-table-container > div > div:last-child {
+	height: 382px !important;
+	max-height: 382px !important;
+}
+
+/* Hide rows per page and search in campaigns table header */
+.campaigns-table-container > div > .flex.items-center.justify-between.py-4 {
+	display: none !important;
+}
+
+/* Hide pagination that appears after the table wrapper div */
+.campaigns-table-container > div > nav {
+	display: none !important;
+}
+
+/* Also hide if pagination is rendered as sibling */
+.campaigns-table-container ~ nav {
+	display: none !important;
+}
+
+/* Target the specific pagination structure */
+.campaigns-table-wrapper .flex.items-center.justify-center.gap-2:has(button) {
+	display: none !important;
+}
+
+/* Handle text overflow in campaigns table cells */
+.campaigns-table-container td:not(:nth-child(4)) {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 8px 12px;
+}
+
+/* Also apply text clipping to table headers */
+.campaigns-table-container th:not(:nth-child(4)) {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 8px 12px;
+}
+
+/* Ensure the delete column header is centered */
+.campaigns-table-container th:nth-child(4) {
+	text-align: center;
+}
+
+/* Ensure table layout is fixed for proper column width control */
+.campaigns-table-container table {
+	table-layout: fixed !important;
+	width: 100%;
+}
+
+/* First three columns share the space evenly */
+.campaigns-table-container th:nth-child(1),
+.campaigns-table-container td:nth-child(1),
+.campaigns-table-container th:nth-child(2),
+.campaigns-table-container td:nth-child(2),
+.campaigns-table-container th:nth-child(3),
+.campaigns-table-container td:nth-child(3) {
+	width: calc((100% - 60px) / 3) !important;
+	min-width: 0 !important;
+	max-width: calc((100% - 60px) / 3) !important;
+}
+
+/* Delete button column - small fixed width at far right */
+.campaigns-table-container th:nth-child(4),
+.campaigns-table-container td:nth-child(4) {
+	width: 60px !important;
+	min-width: 60px !important;
+	max-width: 60px !important;
+	overflow: visible; /* Allow button to be fully visible */
+	text-align: center;
+	padding: 8px;
+}
+
+/* Hide the header text for delete column */
+.campaigns-table-container th:nth-child(4) button {
+	visibility: hidden;
+}
+
+/* Override any generic selectors for the specific columns */
+.campaigns-table-container [role="columnheader"]:not(:nth-child(4)),
+.campaigns-table-container [role="cell"]:not(:nth-child(4)) {
+	width: calc((100% - 60px) / 3) !important;
+	min-width: 0 !important;
+	max-width: calc((100% - 60px) / 3) !important;
+}
+
+/* Ensure buttons in the last column are not clipped */
+.campaigns-table-container td:last-child button {
+	position: relative;
+	z-index: 1;
+}
+
 /* Elegant staggered fade in for search results */
 .search-active .search-result-item:nth-child(1) {
 	animation: gentleFadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;

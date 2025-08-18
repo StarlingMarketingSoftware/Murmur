@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Campaign } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
-import { TrashIcon } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Typography } from '@/components/ui/typography';
 import { TableSortingButton } from '../../../molecules/CustomTable/CustomTable';
 import { useDeleteCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
@@ -73,7 +73,7 @@ export const useCampaignsTable = () => {
 						setIsConfirmDialogOpen(true);
 					}}
 				>
-					<TrashIcon className="h-3 w-2 text-destructive" />
+					<X className="h-4 w-4 text-destructive" />
 				</Button>
 			),
 		},

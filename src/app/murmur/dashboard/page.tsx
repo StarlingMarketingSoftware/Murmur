@@ -337,9 +337,11 @@ const Dashboard = () => {
 				</>
 			)}
 
-			<div className="mt-76">
-				<CampaignsTable />
-			</div>
+			{!hasSearched && (
+				<div className="mt-76 campaigns-table-wrapper">
+					<CampaignsTable />
+				</div>
+			)}
 			</div>
 		</AppLayout>
 	);
