@@ -155,25 +155,27 @@ export default function HomePage() {
 			</div>
 
 
-			<div className="max-w-[1608px] mx-auto mt-18 sm:mt-24">
-				<Typography variant="h3" className="text-center text-[27px]">
-					Trusted by countless businesses
-				</Typography>
-				<div className="bg-gradient-to-b from-gray-100 to-white pt-16 pb-16 sm:pb-48 rounded-md w-full mt-8 sm:mt-14 h-fit ">
-					<div
-						style={{
-							maskImage:
-								'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.2) 100%)',
-							WebkitMaskImage:
-								'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 100%)',
-						}}
-					>
-						<PromotionLogos />
+			<div className="w-full bg-white">
+				<div className="max-w-[1608px] mx-auto pt-18 sm:pt-24">
+					<Typography variant="h3" className="text-center text-[27px]">
+						Trusted by countless businesses
+					</Typography>
+					<div className="pt-16 pb-16 sm:pb-48 w-full mt-8 sm:mt-14 h-fit">
+						<div
+							style={{
+								maskImage:
+									'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.2) 100%)',
+								WebkitMaskImage:
+									'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 100%)',
+							}}
+						>
+							<PromotionLogos />
+						</div>
 					</div>
 				</div>
-			</div>
 
-			<ScrollingReviews />
+				<ScrollingReviews />
+			</div>
 
 			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-25 px-4">
 				<Typography variant="banner" className="text-center mx-auto">

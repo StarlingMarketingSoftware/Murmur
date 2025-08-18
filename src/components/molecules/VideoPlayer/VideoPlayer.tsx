@@ -24,13 +24,11 @@ export function VideoPlayer({
 	return (
 		<div
 			className={cn(
-				'rounded-lg w-fit h-fit aspect-video max-h-fit overflow-hidden',
+				'w-fit h-fit aspect-video max-h-fit overflow-hidden',
 				className
 			)}
 		>
 			<MuxPlayer
-				style={{ borderRadius: '100%' }}
-				className="!rounded-full"
 				accentColor="var(--color-primary)"
 				playbackId={playbackId}
 				thumbnailTime={thumbnailTime}
