@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { ReviewCard } from '../ReviewCard/ReviewCard';
 import { Review } from '@/types';
 import {
@@ -46,6 +46,26 @@ export const ScrollingReviews = () => {
 	const scrollerRef = useRef<HTMLDivElement>(null);
 	const scrollerInnerRef = useRef<HTMLDivElement>(null);
 
+	const handleMouseEnter = () => {
+		if (scrollerInnerRef.current) {
+			// Slow down the animation by adjusting playback rate
+			const animations = scrollerInnerRef.current.getAnimations();
+			animations.forEach(animation => {
+				(animation as Animation).playbackRate = 0.3; // Slow to 30% speed
+			});
+		}
+	};
+
+	const handleMouseLeave = () => {
+		if (scrollerInnerRef.current) {
+			// Return to normal speed
+			const animations = scrollerInnerRef.current.getAnimations();
+			animations.forEach(animation => {
+				(animation as Animation).playbackRate = 1; // Normal speed
+			});
+		}
+	};
+
 	return (
 		<>
 			<Carousel className="sm:hidden block w-7/10 mx-auto">
@@ -64,6 +84,8 @@ export const ScrollingReviews = () => {
 			<div
 				ref={scrollerRef}
 				className="w-full pt-17 pb-11 overflow-hidden sm:block hidden"
+				onMouseEnter={handleMouseEnter}
+				onMouseLeave={handleMouseLeave}
 				style={{
 					maskImage:
 						'linear-gradient(to right, transparent, white 20%, white 80%, transparent 100%)',
@@ -73,7 +95,7 @@ export const ScrollingReviews = () => {
 			>
 				<div
 					ref={scrollerInnerRef}
-					className="animate-scroll hover:animate-none w-fit flex gap-22 py-2"
+					className="animate-scroll w-fit flex gap-22 py-2"
 				>
 					{REVIEWS.map((review, index) => (
 						<div key={index}>

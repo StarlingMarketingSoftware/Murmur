@@ -240,10 +240,6 @@
 	animation: scroll 50s linear infinite;
 }
 
-.animate-scroll:hover {
-	animation-play-state: paused;
-}
-
 .animate-fade-in {
 	-webkit-animation: fade-in 0.6s ease-out forwards;
 	animation: fade-in 0.6s ease-out forwards;
