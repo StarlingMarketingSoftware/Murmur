@@ -85,21 +85,15 @@ export default function HomePage() {
 				</div>
 			</div>
 			{/* Explanation */}
-			<div className="w-full bg-[#EBEBEB] pt-16 pb-8">
+			<div className="w-full bg-[#EBEBEB] pt-16 pb-4">
 				<div className="mx-auto max-w-[1059px] text-center px-3 mt-0">
 					<Typography variant="h2" className="text-center text-[30px] sm:text-[42px]">
-						Murmur helps you draft.<br></br> No ChatGPT. We built our own.
+						Not Another Email Tool.
 					</Typography>
-					<Typography className="!mt-[42px]" variant="promoP">
-						{`Our software gathers data on each contact every time you draft an email with
-						advanced search algorithms. This allows Murmur to craft customized emails,
-						getting you more responses and more work. Our algorithms are trained on many
-						thousands of successful emails. We've made technology that lets you build a
-						campaign that cuts through the noise. We know what it takes to succeed.`}
-					</Typography>
+
 				</div>
 				{/* Video Section */}
-				<div className="py-16 mt-2 sm:mt-32 px-4">
+				<div className="pt-8 pb-6 mt-0 sm:mt-6 px-4">
 					<div className="mx-auto w-9/10 flex items-center justify-center flex-col">
 						<div className="relative max-w-[943px] w-full h-full aspect-video">
 							<VideoPlayer
@@ -111,7 +105,10 @@ export default function HomePage() {
 								}}
 							/>
 						</div>
-						<div className="flex justify-center mt-12">
+						<Typography className="mt-8 mx-auto max-w-[943px]" variant="promoP" style={{ textAlign: 'justify' }}>
+							{`Murmur serves an entirely different purpose. While other email marketing tools like Mailchimp are great for keeping up an email newsletter, Murmur is designed specifically for musicians and managers in the music industry. We've trained our system on industry knowledge to help you succeed`}
+						</Typography>
+						<div className="flex justify-center mt-24">
 							<Link href={urls.contact.index}>
 								<Button variant="muted" size="lg">
 									Book a demo
@@ -142,14 +139,14 @@ export default function HomePage() {
 				</div>
 				<Typography
 					variant="promoP"
-					className="w-full max-w-[1130px] mx-auto !mt-16 sm:!mt-32 text-center text-white"
+					className="w-full max-w-[943px] mx-auto !mt-16 sm:!mt-32 text-white"
+					style={{ textAlign: 'justify' }}
 				>
-					Major email providers have tight sending restrictions, our server has none.
-					Focus your time and energy where it matters most, and leave the volume to us.
-					With Murmur you no longer have to compromise between mass email and custom AI
-					personalization, it does it all. Nothing else like it, Murmur helps you make
-					meaningful connections, not forgettable spam, at a scale previously
-					unimaginable. Dream big, we&apos;ve got you.
+					{`Our software gathers data on each contact every time you draft an email with
+					advanced search algorithms. This allows Murmur to craft customized emails,
+					getting you more responses and more work. Our algorithms are trained on many
+					thousands of successful emails. We've made technology that lets you build a
+					campaign that cuts through the noise. We know what it takes to succeed.`}
 				</Typography>
 			</div>
 
@@ -180,23 +177,27 @@ export default function HomePage() {
 
 			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-25 px-4">
 				<Typography variant="banner" className="text-center mx-auto">
-					Not Another Email Tool.
+					Murmur helps you draft.<br></br> No ChatGPT. We built our own.
 				</Typography>
 				<Typography
 					variant="promoP"
-					className="w-full max-w-[1233px] mx-auto !mt-10 text-center"
+					className="w-full max-w-[943px] mx-auto !mt-10"
+					style={{ textAlign: 'justify' }}
 				>
-					{`Murmur serves an entirely different purpose. While other email marketing tools like Mailchimp are great for keeping up an email newsletter, Murmur is designed specifically for entrepreneurs, business owners, and those with a vision to bring in leads and sell to new customers. Each email in a campaign is deeply personalized, and written in your own voice rather than using a stock template that falls through the cracks.
-`}
+					{`Our software gathers data on each contact every time you draft an email with
+					advanced search algorithms. This allows Murmur to craft customized emails,
+					getting you more responses and more work. Our algorithms are trained on many
+					thousands of successful emails. We've made technology that lets you build a
+					campaign that cuts through the noise. We know what it takes to succeed.`}
 				</Typography>
 
 			</div>
 
-			<GradientBanner gloss className="mt-24 !py-3">
+			<div className="mt-24">
 				<Typography variant="banner" className="text-center mx-auto py-8">
 					{`Find the plan that's right for`} <span className="italic">you</span>
 				</Typography>
-			</GradientBanner>
+			</div>
 
 			<div className="flex justify-center mt-18 lg:hidden">
 				<Link href={urls.pricing.index}>
@@ -217,14 +218,16 @@ export default function HomePage() {
 				</div>
 			</div>
 
-			<FaqSection
-				faqs={FAQS}
-				header="Support"
-				title="FAQs"
-				description="Everything you need to know about Murmur!"
-				showMoreLink={urls.contact.index}
-			/>
-			<div className="h-24" />
+			<div className="w-full bg-[#2B2B2B]">
+				<FaqSection
+					faqs={FAQS}
+					header=""
+					title="FAQs"
+					description="Everything you need to know about Murmur!"
+					showMoreLink=""
+				/>
+				<div className="h-24" />
+			</div>
 		</main>
 	);
 }
