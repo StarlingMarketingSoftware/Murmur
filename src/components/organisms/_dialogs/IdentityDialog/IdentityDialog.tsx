@@ -66,6 +66,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 					className="flex flex-col h-full w-full bg-white"
 					style={{ 
 						fontFamily: "'Times New Roman', Times, serif",
+						WebkitAnimation: "dialog-smooth-in 0.3s ease-out forwards",
 						animation: "dialog-smooth-in 0.3s ease-out forwards"
 					}}
 				>
@@ -163,10 +164,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 														<FormControl>
 															<RadioGroup
 																value={field.value}
-																onValueChange={(value) => {
-																	console.log('RadioGroup onValueChange:', value);
-																	field.onChange(value);
-																}}
+																onValueChange={field.onChange}
 																className="space-y-4"
 															>
 																{identities.map((identity) => (
