@@ -2978,6 +2978,14 @@ mux-player {
 	}
 }
 
+/* Safari-specific mobile app coming soon page styles */
+@supports (-webkit-touch-callout: none) {
+	/* iOS Safari specific styles */
+	.fixed.inset-0 {
+		min-height: -webkit-fill-available;
+	}
+}
+
 /* Email obfuscation for rows past the first 3 - Apple-style aesthetic blur */
 .email-obfuscated-local {
 	display: inline-block;
