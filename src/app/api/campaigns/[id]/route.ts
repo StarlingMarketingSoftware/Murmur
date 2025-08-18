@@ -107,35 +107,52 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 			hybridBlockPrompts,
 			...updateData
 		} = validatedData.data;
+		
+		// Verify that the identity belongs to the current user
+		if (identityId) {
+			const identity = await prisma.identity.findUnique({
+				where: { id: identityId },
+			});
+			
+			if (!identity) {
+				return apiBadRequest('Identity not found');
+			}
+			
+			if (identity.userId !== userId) {
+				return apiUnauthorized('You do not have permission to use this identity');
+			}
+		}
 
+		const updatePayload = {
+			...updateData,
+			// Handle null values for array fields - convert null to undefined to omit the field
+			...(hybridAvailableBlocks !== null && { hybridAvailableBlocks }),
+			...(hybridBlockPrompts !== null && { hybridBlockPrompts }),
+			signature: connectOrDisconnectId(signatureId),
+			identity: connectOrDisconnectId(identityId),
+			...(contactOperation && {
+				contacts: {
+					[contactOperation.action]: contactOperation.contactIds.map((id: number) => {
+						return { id };
+					}),
+				},
+			}),
+			...(userContactListOperation && {
+				userContactLists: {
+					[userContactListOperation.action]:
+						userContactListOperation.userContactListIds.map((id: number) => {
+							return { id };
+						}),
+				},
+			}),
+		};
+		
 		const updatedCampaign = await prisma.campaign.update({
 			where: {
 				id: Number(id),
 				userId,
 			},
-			data: {
-				...updateData,
-				// Handle null values for array fields - convert null to undefined to omit the field
-				...(hybridAvailableBlocks !== null && { hybridAvailableBlocks }),
-				...(hybridBlockPrompts !== null && { hybridBlockPrompts }),
-				signature: connectOrDisconnectId(signatureId),
-				identity: connectOrDisconnectId(identityId),
-				...(contactOperation && {
-					contacts: {
-						[contactOperation.action]: contactOperation.contactIds.map((id: number) => {
-							return { id };
-						}),
-					},
-				}),
-				...(userContactListOperation && {
-					userContactLists: {
-						[userContactListOperation.action]:
-							userContactListOperation.userContactListIds.map((id: number) => {
-								return { id };
-							}),
-					},
-				}),
-			},
+			data: updatePayload,
 			include: {
 				contacts: true,
 				userContactLists: true,

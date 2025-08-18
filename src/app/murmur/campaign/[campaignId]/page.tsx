@@ -19,6 +19,7 @@ import { urls } from '@/constants/urls';
 import Link from 'next/link';
 import { ManageCampaignContactListDialog } from '@/components/organisms/_dialogs/ManageCampaignContactListDialog/ManageCampaignContactListDialog';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { NoMobilePage } from '@/components/atoms/NoMobilePage/NoMobilePage';
 
 const Murmur = () => {
@@ -26,14 +27,24 @@ const Murmur = () => {
 		useCampaignDetail();
 
 	const [isContactListDialogOpen, setIsContactListDialogOpen] = useState(false);
+	const searchParams = useSearchParams();
+	const silentLoad = searchParams.get('silent') === '1';
 
 	if (isPendingCampaign || !campaign) {
-		return <Spinner />;
+		return silentLoad ? null : <Spinner />;
 	}
+
+	// Hide underlying content and show a white overlay when we require the user to set up an identity
+	// or while the full-screen User Settings dialog is open. This prevents any visual "glimpses" and
+	// ensures a premium, smooth transition with no scale effects.
+	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
 	return (
 		<AppLayout>
 			<NoMobilePage />
-			<div className="hidden lg:block">
+			{shouldHideContent && (
+				<div className="fixed inset-0 bg-white z-40" />
+			)}
+			<div className={`hidden lg:block transition-opacity duration-200 ${shouldHideContent ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}>
 				<CampaignName campaign={campaign} />
 				<Card className="mt-38 border-border !border-2">
 					<CardContent>

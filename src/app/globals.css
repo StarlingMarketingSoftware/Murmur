@@ -357,6 +357,152 @@
 	}
 }
 
+/* Simple dialog fade animations */
+@keyframes dialog-fade-in {
+	0% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
+}
+
+@keyframes dialog-fade-out {
+	0% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+/* Dialog smooth fade class */
+.dialog-smooth-fade {
+	animation: dialog-fade-in 0.4s ease-out;
+}
+
+.dialog-smooth-fade[data-state="closed"] {
+	animation: dialog-fade-out 0.3s ease-in;
+}
+
+/* Smooth dialog entrance animation */
+@-webkit-keyframes dialog-smooth-in {
+	0% {
+		opacity: 0;
+		background-color: rgba(255, 255, 255, 1);
+	}
+	100% {
+		opacity: 1;
+		background-color: rgba(255, 255, 255, 1);
+	}
+}
+@keyframes dialog-smooth-in {
+	0% {
+		opacity: 0;
+		background-color: rgba(255, 255, 255, 1);
+	}
+	100% {
+		opacity: 1;
+		background-color: rgba(255, 255, 255, 1);
+	}
+}
+
+/* White overlay fade animations */
+@keyframes white-fade-out {
+	0% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+@keyframes white-fade-in {
+	0% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
+}
+
+.animate-white-fade-out {
+	animation: white-fade-out 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+	animation-delay: 0.1s;
+}
+
+.animate-white-fade-in {
+	animation: white-fade-in 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* Gentle content fade animations */
+@keyframes gentle-fade-in {
+	0% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
+}
+
+@keyframes gentle-fade-out {
+	0% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+.animate-gentle-fade-in {
+	animation: gentle-fade-in 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-gentle-fade-out {
+	animation: gentle-fade-out 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* Apple-style overlay animation */
+.dialog-overlay-apple {
+	background: rgba(0, 0, 0, 0.3);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+}
+
+.dialog-overlay-apple[data-state="open"] {
+	animation: apple-overlay-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.dialog-overlay-apple[data-state="closed"] {
+	animation: apple-overlay-out 0.35s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+
+@keyframes apple-overlay-in {
+	0% {
+		opacity: 0;
+		backdrop-filter: blur(0);
+		-webkit-backdrop-filter: blur(0);
+	}
+	100% {
+		opacity: 1;
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
+	}
+}
+
+@keyframes apple-overlay-out {
+	0% {
+		opacity: 1;
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
+	}
+	100% {
+		opacity: 0;
+		backdrop-filter: blur(0);
+		-webkit-backdrop-filter: blur(0);
+	}
+}
+
 @layer base {
 	* {
 		@apply border-border outline-ring/50;
