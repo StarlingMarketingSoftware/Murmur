@@ -74,6 +74,18 @@ export async function GET(req: NextRequest) {
 		if (!userId) {
 			return apiUnauthorized();
 		}
+		
+		// Check subscription status
+		const user = await prisma.user.findUnique({
+			where: { clerkId: userId },
+			select: { stripeSubscriptionStatus: true }
+		});
+		
+		// Allow both active subscriptions and free trials
+		if (!user || (user.stripeSubscriptionStatus !== 'active' && user.stripeSubscriptionStatus !== 'trialing')) {
+			return apiBadRequest('An active subscription or free trial is required to search for contacts');
+		}
+		
 		const validatedFilters = getValidatedParamsFromUrl(req.url, contactFilterSchema);
 		if (!validatedFilters.success) {
 			return apiBadRequest(validatedFilters.error);

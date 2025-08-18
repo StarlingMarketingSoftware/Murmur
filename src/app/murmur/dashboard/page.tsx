@@ -21,8 +21,10 @@ import ConsoleLoader from '@/components/ui/console-loader';
 import { Card, CardContent } from '@/components/ui/card';
 import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
+import { useClerk, SignInButton } from '@clerk/nextjs';
 
 const Dashboard = () => {
+	const { isSignedIn, openSignIn } = useClerk();
 	const {
 		form,
 		onSubmit,
@@ -38,6 +40,7 @@ const Dashboard = () => {
 		selectedContacts,
 		isPendingBatchUpdateContacts,
 		isFreeTrial,
+		canSearch,
 		isError,
 		error,
 		hasSearched,
@@ -86,7 +89,14 @@ const Dashboard = () => {
 						</div>
 					)}
 					<Form {...form}>
-						<form onSubmit={form.handleSubmit(onSubmit)} className={hasSearched ? 'search-form-active' : ''}>
+						<form onSubmit={(e) => {
+							e.preventDefault();
+							if (!isSignedIn) {
+								openSignIn();
+							} else {
+								form.handleSubmit(onSubmit)(e);
+							}
+						}} className={hasSearched ? 'search-form-active' : ''}>
 						<FormField
 							control={form.control}
 							name="searchText"
@@ -186,15 +196,24 @@ const Dashboard = () => {
 										/>
 									)}
 									<div className="w-[19px]"></div>
-									<Button
-										variant="primary-light"
-										type="submit"
-										bold
-										className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
-										isLoading={isLoadingContacts || isRefetchingContacts}
-									>
-										Generate
-									</Button>
+									{!canSearch ? (
+										<UpgradeSubscriptionDrawer
+											message="Searching for contacts requires an active subscription or free trial. Please upgrade your plan to proceed."
+											triggerButtonText="Generate"
+											buttonVariant="primary-light"
+											className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
+										/>
+									) : (
+										<Button
+											variant="primary-light"
+											type="submit"
+											bold
+											className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
+											isLoading={isLoadingContacts || isRefetchingContacts}
+										>
+											Generate
+										</Button>
+									)}
 								</div>
 							</div>
 						)}
