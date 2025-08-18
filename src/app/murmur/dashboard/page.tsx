@@ -16,10 +16,9 @@ import {
 	FormLabel,
 	FormMessage,
 } from '@/components/ui/form';
-import { Checkbox } from '@/components/ui/checkbox';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import ConsoleLoader from '@/components/ui/console-loader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 
@@ -61,14 +60,14 @@ const Dashboard = () => {
 							</Typography>
 							<Typography
 								font="secondary"
-								className="mt-12 text-[19px] text-center premium-subtitle-gradient"
+								className="mt-8 text-[19px] text-center premium-subtitle-gradient"
 								color="light"
 							>
 								Let&apos;s <strong className="premium-accent">start</strong> by creating a campaign.
 							</Typography>
 							<Typography
 								font="secondary"
-								className="mt-6 text-[19px] text-center premium-subtitle-gradient"
+								className="mt-4 text-[19px] text-center premium-subtitle-gradient"
 								color="light"
 							>
 								Who do you want to contact?
@@ -100,9 +99,7 @@ const Dashboard = () => {
 														className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent"
 														placeholder='Who do you want to send to?  i.e  "Music venues in North Carolina"'
 														style={{ 
-															accentColor: 'transparent',
-															WebkitAppearance: 'none',
-															MozAppearance: 'none'
+															accentColor: 'transparent'
 														}}
 														autoComplete="off"
 														autoCorrect="off"
@@ -120,48 +117,59 @@ const Dashboard = () => {
 							)}
 						/>
 						{!hasSearched && (
-							<div className="flex flex-col md:flex-row gap-0 md:gap-4 items-center justify-between">
-								<div className="flex flex-row gap-4 items-center">
-									<FormField
-										control={form.control}
-										name="excludeUsedContacts"
-										render={({ field }) => (
-											<FormItem className="flex flex-row items-start space-x-3 space-y-0">
-												<FormControl>
-													<Checkbox
-														checked={field.value}
-														onCheckedChange={field.onChange}
-													/>
-												</FormControl>
-												<div className="space-y-1 leading-none">
-													<FormLabel className="text-sm font-medium cursor-pointer">
-														Exclude Used Contacts
-													</FormLabel>
-												</div>
-											</FormItem>
-										)}
-									/>
-									<FormField
-										control={form.control}
-										name="exactMatchesOnly"
-										render={({ field }) => (
-											<FormItem className="flex flex-row items-start space-x-3 space-y-0">
-												<FormControl>
-													<Checkbox
-														checked={field.value}
-														onCheckedChange={field.onChange}
-													/>
-												</FormControl>
-												<div className="space-y-1 leading-none">
-													<FormLabel className="text-sm font-medium cursor-pointer">
-														Exact Matches Only
-													</FormLabel>
-												</div>
-											</FormItem>
-										)}
-									/>
+							<div className="flex flex-row gap-4 items-center justify-between w-full flex-wrap">
+								<div className="flex flex-row gap-4 items-center h-[39px] justify-start flex-shrink-0">
+									<div 
+										className="exclude-contacts-box flex items-center"
+										style={{
+											backgroundColor: '#EFEFEF',
+											width: '227px',
+											height: '32px',
+											borderRadius: '8px',
+											display: 'flex',
+											alignItems: 'center',
+											paddingLeft: '16px',
+											paddingRight: '16px',
+											margin: 'auto 0'
+										}}
+									>
+										<FormField
+											control={form.control}
+											name="excludeUsedContacts"
+											render={({ field }) => (
+												<FormItem className="flex flex-row items-center justify-between space-y-0 m-0 w-full gap-3">
+													<div className="leading-none flex items-center">
+														<FormLabel className="font-bold cursor-pointer select-none whitespace-nowrap" style={{ fontSize: '14px', lineHeight: '16px' }}>
+															Exclude Used Contacts
+														</FormLabel>
+													</div>
+													<FormControl>
+														<label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+															<input
+																type="checkbox"
+																className="sr-only peer"
+																checked={field.value}
+																onChange={(e) => field.onChange(e.target.checked)}
+															/>
+															<div 
+																className="peer-checked:after:translate-x-[10px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[#050505] after:rounded-full after:h-[12px] after:w-[12px] after:transition-all"
+																style={{
+																	width: '26px',
+																	height: '16px',
+																	backgroundColor: '#E5E5E5',
+																	borderRadius: '9999px',
+																	position: 'relative',
+																	transition: 'background-color 0.2s',
+																}}
+															></div>
+														</label>
+													</FormControl>
+												</FormItem>
+											)}
+										/>
+									</div>
 								</div>
-								<div className="flex items-center justify-end w-full max-w-full">
+								<div className="flex items-center justify-end flex-shrink-0 ml-auto">
 									{isFreeTrial ? (
 										<UpgradeSubscriptionDrawer
 											message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
@@ -337,9 +345,11 @@ const Dashboard = () => {
 				</>
 			)}
 
-			<div className="mt-76">
-				<CampaignsTable />
-			</div>
+			{!hasSearched && (
+				<div className="mt-32 campaigns-table-wrapper">
+					<CampaignsTable />
+				</div>
+			)}
 			</div>
 		</AppLayout>
 	);

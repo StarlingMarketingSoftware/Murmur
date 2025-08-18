@@ -11,8 +11,7 @@ export function Footer() {
 					<div>
 						<h3 className="font-semibold text-lg mb-4">Murmur</h3>
 						<p className="text-muted">
-							AI-powered marketing automation platform that helps you create, manage, and
-							optimize your email campaigns effortlessly.
+							Murmur is for the musicians who want to clear out the clutter of admin work and focus on performing more.
 						</p>
 					</div>
 
