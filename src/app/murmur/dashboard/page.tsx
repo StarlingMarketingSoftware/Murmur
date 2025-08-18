@@ -60,14 +60,14 @@ const Dashboard = () => {
 							</Typography>
 							<Typography
 								font="secondary"
-								className="mt-12 text-[19px] text-center premium-subtitle-gradient"
+								className="mt-8 text-[19px] text-center premium-subtitle-gradient"
 								color="light"
 							>
 								Let&apos;s <strong className="premium-accent">start</strong> by creating a campaign.
 							</Typography>
 							<Typography
 								font="secondary"
-								className="mt-6 text-[19px] text-center premium-subtitle-gradient"
+								className="mt-4 text-[19px] text-center premium-subtitle-gradient"
 								color="light"
 							>
 								Who do you want to contact?
@@ -348,7 +348,7 @@ const Dashboard = () => {
 			)}
 
 			{!hasSearched && (
-				<div className="mt-76 campaigns-table-wrapper">
+				<div className="mt-32 campaigns-table-wrapper">
 					<CampaignsTable />
 				</div>
 			)}
