@@ -1,6 +1,10 @@
 import { HybridBlockPrompt } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 import { HybridBlock } from '@prisma/client';
 
+export const normalizeTextCaseAndWhitespace = (text: string): string => {
+	return text.trim().toLowerCase();
+};
+
 /**
  * Truncates text to a specified length and adds ellipses
  * Tries to break at word boundaries when possible for better readability
