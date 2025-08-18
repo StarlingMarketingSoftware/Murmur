@@ -124,9 +124,9 @@ export default function HomePage() {
 			{/* Removed promo banner */}
 
 			{/* Moved: Send without Limits + second video + description */}
-			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-28 px-4">
+			<div className="w-full bg-[#1C1C1C] pt-14 sm:pt-28 pb-2 sm:pb-4 px-4">
 				<div className="mx-auto w-9/10 flex items-center justify-center flex-col">
-					<Typography variant="banner" className="text-left w-full">
+					<Typography variant="banner" className="text-left w-full text-white">
 						Send without Limits.<br></br> Dream without Boundaries.
 					</Typography>
 					<div className="relative max-w-[943px] w-full h-full aspect-video mt-16 sm:mt-32">
@@ -142,7 +142,7 @@ export default function HomePage() {
 				</div>
 				<Typography
 					variant="promoP"
-					className="w-full max-w-[1130px] mx-auto !mt-16 sm:!mt-32 text-center"
+					className="w-full max-w-[1130px] mx-auto !mt-16 sm:!mt-32 text-center text-white"
 				>
 					Major email providers have tight sending restrictions, our server has none.
 					Focus your time and energy where it matters most, and leave the volume to us.
@@ -153,7 +153,7 @@ export default function HomePage() {
 				</Typography>
 			</div>
 
-			<div className="mt-24 bg-light">
+			<div className="mt-0 bg-[#1C1C1C] pb-8 sm:pb-12">
 				<ComparisonTable />
 			</div>
 
