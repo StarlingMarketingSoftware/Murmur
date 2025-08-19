@@ -60,8 +60,8 @@ export const Navbar = () => {
 			<nav
 				className={cn(
 					'fixed top-0 left-0 right-0 z-50 transition-all duration-700 font-inter',
-					scrolled 
-						? 'bg-white/70 backdrop-blur-xl border-b border-gray-200/20' 
+					scrolled
+						? 'bg-white/70 backdrop-blur-xl border-b border-gray-200/20'
 						: 'bg-white/40 backdrop-blur-md'
 				)}
 			>
@@ -75,8 +75,9 @@ export const Navbar = () => {
 									appearance={{
 										elements: {
 											avatarBox: 'w-7 h-7',
-											userButtonTrigger: 'opacity-70 hover:opacity-100 transition-opacity duration-300'
-										}
+											userButtonTrigger:
+												'opacity-70 hover:opacity-100 transition-opacity duration-300',
+										},
 									}}
 								/>
 							) : (
@@ -84,7 +85,6 @@ export const Navbar = () => {
 							)}
 						</div>
 						<div className="hidden lg:block w-7 h-7" /> {/* Spacer for desktop */}
-
 						{/* Desktop Navigation - Premium Center */}
 						<div className="absolute inset-0 hidden lg:flex items-center justify-center pointer-events-none">
 							<nav className="pointer-events-auto flex items-center gap-14">
@@ -94,8 +94,8 @@ export const Navbar = () => {
 										href={item.path}
 										className={cn(
 											'relative text-[13px] font-medium tracking-[0.02em] transition-all duration-300',
-											pathname === item.path 
-												? 'text-gray-900' 
+											pathname === item.path
+												? 'text-gray-900'
 												: 'text-gray-700/70 hover:text-gray-900',
 											'after:absolute after:bottom-[-8px] after:left-0 after:right-0 after:h-[1px]',
 											'after:bg-gray-900',
@@ -110,32 +110,31 @@ export const Navbar = () => {
 								))}
 							</nav>
 						</div>
-
 						{/* Right Section - Hamburger on mobile, Auth on desktop */}
 						<div className="flex items-center">
 							{/* Mobile - Hamburger Menu */}
 							<button
 								onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}
 								className={cn(
-									"lg:hidden relative w-7 h-7 flex items-center justify-center",
-									"transition-all duration-300"
+									'lg:hidden relative w-7 h-7 flex items-center justify-center',
+									'transition-all duration-300'
 								)}
 								aria-label="Toggle menu"
 							>
 								<span
 									className={cn(
-										"absolute block h-[1.5px] w-[18px] bg-gray-700 transition-all duration-300",
-										isMobileMenuOpen 
-											? "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45" 
-											: "top-[11px] left-1/2 -translate-x-1/2"
+										'absolute block h-[1.5px] w-[18px] bg-gray-700 transition-all duration-300',
+										isMobileMenuOpen
+											? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45'
+											: 'top-[11px] left-1/2 -translate-x-1/2'
 									)}
 								/>
 								<span
 									className={cn(
-										"absolute block h-[1.5px] w-[18px] bg-gray-700 transition-all duration-300",
-										isMobileMenuOpen 
-											? "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-45" 
-											: "bottom-[10px] left-1/2 -translate-x-1/2"
+										'absolute block h-[1.5px] w-[18px] bg-gray-700 transition-all duration-300',
+										isMobileMenuOpen
+											? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-45'
+											: 'bottom-[10px] left-1/2 -translate-x-1/2'
 									)}
 								/>
 							</button>
@@ -148,8 +147,9 @@ export const Navbar = () => {
 										appearance={{
 											elements: {
 												avatarBox: 'w-7 h-7 ring-1 ring-black/10',
-												userButtonTrigger: 'opacity-80 hover:opacity-100 transition-opacity duration-500'
-											}
+												userButtonTrigger:
+													'opacity-80 hover:opacity-100 transition-opacity duration-500',
+											},
 										}}
 									/>
 								) : (
@@ -206,14 +206,14 @@ export const Navbar = () => {
 								appearance={{
 									elements: {
 										avatarBox: 'w-6 h-6',
-										userButtonTrigger: 'opacity-60'
-									}
+										userButtonTrigger: 'opacity-60',
+									},
 								}}
 							/>
 						) : (
 							<div className="w-6 h-6" />
 						)}
-						
+
 						<button
 							onClick={() => setMobileMenuOpen(false)}
 							className="relative w-8 h-8 flex items-center justify-center"
@@ -224,8 +224,6 @@ export const Navbar = () => {
 						</button>
 					</div>
 
-
-
 					{/* Mobile Navigation Links */}
 					<div className="px-5 pt-8">
 						<nav>
@@ -234,12 +232,10 @@ export const Navbar = () => {
 									<li key={item.path}>
 										<Link
 											href={item.path}
-																				className={cn(
+											className={cn(
 												'block py-4 text-[28px] font-normal text-gray-800',
 												'transition-colors duration-200',
-												pathname === item.path 
-													? 'text-gray-900' 
-													: 'hover:text-gray-900'
+												pathname === item.path ? 'text-gray-900' : 'hover:text-gray-900'
 											)}
 											style={{ fontFamily: "'Times New Roman', Times, serif" }}
 											onClick={() => setMobileMenuOpen(false)}
@@ -257,7 +253,7 @@ export const Navbar = () => {
 						<div className="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-200/20">
 							<div className="flex space-x-6">
 								<SignInButton mode="modal">
-									<button 
+									<button
 										className="flex-1 py-3 text-center text-[16px] font-normal text-gray-600 hover:text-gray-900 transition-colors duration-200"
 										style={{ fontFamily: "'Times New Roman', Times, serif" }}
 									>
@@ -265,7 +261,7 @@ export const Navbar = () => {
 									</button>
 								</SignInButton>
 								<SignUpButton mode="modal">
-									<button 
+									<button
 										className="flex-1 py-3 text-center text-[16px] font-normal text-gray-600 hover:text-gray-900 transition-colors duration-200"
 										style={{ fontFamily: "'Times New Roman', Times, serif" }}
 									>

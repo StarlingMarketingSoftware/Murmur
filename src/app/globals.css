@@ -71,36 +71,36 @@
 :root {
 	--radius: 0.625rem;
 	--foreground: rgb(48, 50, 64); /* oklch(0.25 0.03 270) */
-	--background: rgb(250, 250, 251); /* oklch(0.98 0.005 270) */;
+	--background: rgb(250, 250, 251); /* oklch(0.98 0.005 270) */
 	--card: rgb(255, 255, 255); /* oklch(1 0 0) */
 	--card-foreground: rgb(37, 37, 37); /* oklch(0.145 0 0) */
 	--popover: rgb(255, 255, 255); /* oklch(1 0 0) */
-	--popover-foreground: rgb(37, 37, 37); /* oklch(0.145 0 0) */;
+	--popover-foreground: rgb(37, 37, 37); /* oklch(0.145 0 0) */
 	--primary: rgb(93, 192, 104); /* oklch(0.6795 0.1263 147.14) */
-	--primary-foreground: rgb(255, 255, 255); /* oklch(1 0 147.14) */;
+	--primary-foreground: rgb(255, 255, 255); /* oklch(1 0 147.14) */
 	--secondary: rgb(134, 134, 229); /* oklch(0.6231 0.188 259.81) */
-	--secondary-foreground: rgb(255, 255, 255); /* oklch(1 0 0) */;
+	--secondary-foreground: rgb(255, 255, 255); /* oklch(1 0 0) */
 	--secondary-light: rgb(178, 187, 243); /* oklch(0.7906 0.1089 252.45) */
-	--secondary-light-foreground: rgb(0, 0, 0); /* oklch(0 0 0) */;
+	--secondary-light-foreground: rgb(0, 0, 0); /* oklch(0 0 0) */
 	--light: rgb(246, 246, 246); /* oklch(0.9642 0 0) */
-	--light-foreground: rgb(117, 117, 119); /* oklch(55.553% 0.00006 271.152) */;
+	--light-foreground: rgb(117, 117, 119); /* oklch(55.553% 0.00006 271.152) */
 	--medium: rgb(226, 226, 226); /* oklch(0.8853 0 0) */
-	--muted: rgb(82, 82, 82); /* oklch(0.3211 0 0) */;
+	--muted: rgb(82, 82, 82); /* oklch(0.3211 0 0) */
 	--accent: rgb(235, 235, 233); /* oklch(0.923 0.003 48.717) */
-	--accent-foreground: rgb(52, 52, 52); /* oklch(0.205 0 0) */;
+	--accent-foreground: rgb(52, 52, 52); /* oklch(0.205 0 0) */
 	--destructive: rgb(223, 62, 62); /* oklch(59.157% 0.24065 26.32) */
 	--warning: rgb(228, 177, 0); /* oklch(0.77 0.16 70) */
 	--success: rgb(60, 136, 60); /* oklch(0.4953 0.1037 140.3) */
-	--navy: rgb(95, 83, 182); /* oklch(0.4865 0.17 266.18) */;
+	--navy: rgb(95, 83, 182); /* oklch(0.4865 0.17 266.18) */
 
 	--border: rgb(213, 213, 213); /* oklch(83.591% 0.0001 271.152) */
 	--input: rgb(235, 235, 235); /* oklch(0.922 0 0) */
-	--ring: rgb(180, 180, 180); /* oklch(0.708 0 0) */;
+	--ring: rgb(180, 180, 180); /* oklch(0.708 0 0) */
 	--chart-1: rgb(33, 33, 32); /* oklch(12.953% 0.00351 69.753) */
 	--chart-2: rgb(0, 163, 191); /* oklch(0.6 0.118 184.704) */
 	--chart-3: rgb(65, 85, 125); /* oklch(0.398 0.07 227.392) */
 	--chart-4: rgb(255, 179, 0); /* oklch(0.828 0.189 84.429) */
-	--chart-5: rgb(255, 158, 0); /* oklch(0.769 0.188 70.08) */;
+	--chart-5: rgb(255, 158, 0); /* oklch(0.769 0.188 70.08) */
 	--sidebar: rgb(251, 251, 251); /* oklch(0.985 0 0) */
 	--sidebar-foreground: rgb(37, 37, 37); /* oklch(0.145 0 0) */
 	--sidebar-primary: rgb(52, 52, 52); /* oklch(0.205 0 0) */
@@ -110,7 +110,7 @@
 	--sidebar-border: rgb(235, 235, 235); /* oklch(0.922 0 0) */
 	--sidebar-ring: rgb(180, 180, 180); /* oklch(0.708 0 0) */
 	--background: rgb(255, 255, 255); /* oklch(1 0 0) */
-	--foreground: rgb(37, 37, 38); /* oklch(0.147 0.004 49.25) */;
+	--foreground: rgb(37, 37, 38); /* oklch(0.147 0.004 49.25) */
 }
 
 .dark {
@@ -128,15 +128,15 @@
 	--muted-foreground: rgb(180, 180, 180); /* oklch(0.708 0 0) */
 	--accent: rgb(69, 69, 69); /* oklch(0.269 0 0) */
 	--accent-foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
-	--destructive: rgb(239, 68, 68); /* oklch(0.704 0.191 22.216) */;
+	--destructive: rgb(239, 68, 68); /* oklch(0.704 0.191 22.216) */
 	--border: rgba(255, 255, 255, 0.1); /* oklch(1 0 0 / 10%) */
 	--input: rgba(255, 255, 255, 0.15); /* oklch(1 0 0 / 15%) */
-	--ring: rgb(142, 142, 142); /* oklch(0.556 0 0) */;
+	--ring: rgb(142, 142, 142); /* oklch(0.556 0 0) */
 	--chart-1: rgb(94, 83, 243); /* oklch(0.488 0.243 264.376) */
 	--chart-2: rgb(71, 207, 115); /* oklch(0.696 0.17 162.48) */
 	--chart-3: rgb(255, 158, 0); /* oklch(0.769 0.188 70.08) */
 	--chart-4: rgb(225, 78, 202); /* oklch(0.627 0.265 303.9) */
-	--chart-5: rgb(245, 83, 83); /* oklch(0.645 0.246 16.439) */;
+	--chart-5: rgb(245, 83, 83); /* oklch(0.645 0.246 16.439) */
 	--sidebar: rgb(52, 52, 52); /* oklch(0.205 0 0) */
 	--sidebar-foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
 	--sidebar-primary: rgb(94, 83, 243); /* oklch(0.488 0.243 264.376) */
@@ -144,7 +144,7 @@
 	--sidebar-accent: rgb(69, 69, 69); /* oklch(0.269 0 0) */
 	--sidebar-accent-foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
 	--sidebar-border: rgba(255, 255, 255, 0.1); /* oklch(1 0 0 / 10%) */
-	--sidebar-ring: rgb(142, 142, 142); /* oklch(0.556 0 0) */;
+	--sidebar-ring: rgb(142, 142, 142); /* oklch(0.556 0 0) */
 }
 
 @-webkit-keyframes scroll {
@@ -153,7 +153,9 @@
 		transform: translate(0);
 	}
 	100% {
-		-webkit-transform: translateX(calc(-50% - 2.75rem)); /* Safari supports calc in transforms */
+		-webkit-transform: translateX(
+			calc(-50% - 2.75rem)
+		); /* Safari supports calc in transforms */
 		transform: translate(calc(-50% - 2.75rem));
 	}
 }
@@ -212,7 +214,8 @@
 }
 
 @-webkit-keyframes pulse-once {
-	0%, 100% {
+	0%,
+	100% {
 		opacity: 1;
 		-webkit-transform: scale(1);
 		transform: scale(1);
@@ -225,7 +228,8 @@
 }
 
 @keyframes pulse-once {
-	0%, 100% {
+	0%,
+	100% {
 		opacity: 1;
 		transform: scale(1);
 	}
@@ -248,7 +252,7 @@
 		height: 0;
 		position: relative;
 	}
-	
+
 	.aspect-video > * {
 		position: absolute;
 		top: 0;
@@ -256,7 +260,7 @@
 		width: 100%;
 		height: 100%;
 	}
-	
+
 	/* Fix for gap property in older Safari */
 	.gap-8 {
 		margin: -1rem;
@@ -278,22 +282,35 @@
 
 /* Console loader animations */
 @-webkit-keyframes blink {
-	0%, 49% { opacity: 1; }
-	50%, 100% { opacity: 0; }
+	0%,
+	49% {
+		opacity: 1;
+	}
+	50%,
+	100% {
+		opacity: 0;
+	}
 }
 
 @keyframes blink {
-	0%, 49% { opacity: 1; }
-	50%, 100% { opacity: 0; }
+	0%,
+	49% {
+		opacity: 1;
+	}
+	50%,
+	100% {
+		opacity: 0;
+	}
 }
 
 @-webkit-keyframes thinking-pulse {
-	0%, 100% { 
+	0%,
+	100% {
 		opacity: 0.2;
 		-webkit-transform: scale(0.7);
 		transform: scale(0.7);
 	}
-	50% { 
+	50% {
 		opacity: 0.8;
 		-webkit-transform: scale(1.1);
 		transform: scale(1.1);
@@ -301,37 +318,41 @@
 }
 
 @keyframes thinking-pulse {
-	0%, 100% { 
+	0%,
+	100% {
 		opacity: 0.2;
 		transform: scale(0.7);
 	}
-	50% { 
+	50% {
 		opacity: 0.8;
 		transform: scale(1.1);
 	}
 }
 
 @-webkit-keyframes gentle-fade {
-	0%, 100% { 
+	0%,
+	100% {
 		opacity: 0.15;
 	}
-	50% { 
+	50% {
 		opacity: 0.7;
 	}
 }
 
 @keyframes gentle-fade {
-	0%, 100% { 
+	0%,
+	100% {
 		opacity: 0.15;
 	}
-	50% { 
+	50% {
 		opacity: 0.7;
 	}
 }
 
 /* Minimal dot loader - Steve Jobs perfection */
 @-webkit-keyframes artistic-flow {
-	0%, 100% {
+	0%,
+	100% {
 		opacity: 0.3;
 		-webkit-transform: scale(1);
 		transform: scale(1);
@@ -344,7 +365,8 @@
 }
 
 @keyframes artistic-flow {
-	0%, 100% {
+	0%,
+	100% {
 		opacity: 0.3;
 		transform: scale(1);
 	}
@@ -356,7 +378,9 @@
 
 /* Alternative - for backwards compatibility */
 @-webkit-keyframes elegant-pulse {
-	0%, 60%, 100% {
+	0%,
+	60%,
+	100% {
 		opacity: 0.6;
 		-webkit-transform: scale(1) translateY(0);
 		transform: scale(1) translateY(0);
@@ -369,7 +393,9 @@
 }
 
 @keyframes elegant-pulse {
-	0%, 60%, 100% {
+	0%,
+	60%,
+	100% {
 		opacity: 0.6;
 		transform: scale(1) translateY(0);
 	}
@@ -403,7 +429,7 @@
 	animation: dialog-fade-in 0.4s ease-out;
 }
 
-.dialog-smooth-fade[data-state="closed"] {
+.dialog-smooth-fade[data-state='closed'] {
 	animation: dialog-fade-out 0.3s ease-in;
 }
 
@@ -491,11 +517,11 @@
 	-webkit-backdrop-filter: blur(10px);
 }
 
-.dialog-overlay-apple[data-state="open"] {
+.dialog-overlay-apple[data-state='open'] {
 	animation: apple-overlay-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-.dialog-overlay-apple[data-state="closed"] {
+.dialog-overlay-apple[data-state='closed'] {
 	animation: apple-overlay-out 0.35s cubic-bezier(0.55, 0, 1, 0.45) forwards;
 }
 
@@ -544,7 +570,6 @@
 		@apply text-lg font-bold;
 	}
 }
-
 
 mux-player {
 	--seek-backward-button: none;
@@ -609,7 +634,8 @@ mux-player {
 }
 
 @-webkit-keyframes subtle-glow {
-	0%, 100% {
+	0%,
+	100% {
 		opacity: 0.4;
 		-webkit-filter: blur(80px);
 		filter: blur(80px);
@@ -622,7 +648,8 @@ mux-player {
 }
 
 @keyframes subtle-glow {
-	0%, 100% {
+	0%,
+	100% {
 		opacity: 0.4;
 		filter: blur(80px);
 	}
@@ -640,11 +667,7 @@ mux-player {
 	width: 100% !important;
 	min-width: 100% !important;
 	max-width: 100% !important;
-	background: linear-gradient(
-		135deg,
-		rgba(0, 0, 0, 0.08),
-		rgba(0, 0, 0, 0.04)
-	);
+	background: linear-gradient(135deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.04));
 	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 	box-shadow: none;
 	transform: none !important;
@@ -664,11 +687,7 @@ mux-player {
 	bottom: 1px;
 	left: 1px;
 	border-radius: calc(0.75rem - 1px); /* Safari supports calc for border-radius */
-	background: linear-gradient(
-		135deg,
-		rgba(255, 255, 255, 0.8),
-		rgba(255, 255, 255, 0.4)
-	);
+	background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.4));
 	pointer-events: none;
 	z-index: 1;
 	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
@@ -770,11 +789,7 @@ mux-player {
 /* Focus state - subtle glow effect */
 /* Safari fallback: :has() is not supported in Safari < 15.4 */
 .search-wave-container:focus-within {
-	background: linear-gradient(
-		135deg,
-		rgba(0, 0, 0, 0.09),
-		rgba(0, 0, 0, 0.05)
-	);
+	background: linear-gradient(135deg, rgba(0, 0, 0, 0.09), rgba(0, 0, 0, 0.05));
 	box-shadow: none;
 	transition: all 0.3s ease;
 }
@@ -782,22 +797,14 @@ mux-player {
 /* Modern browsers with :has() support */
 @supports selector(:has(*)) {
 	.search-wave-container:has(.search-wave-input:focus) {
-		background: linear-gradient(
-			135deg,
-			rgba(0, 0, 0, 0.09),
-			rgba(0, 0, 0, 0.05)
-		);
+		background: linear-gradient(135deg, rgba(0, 0, 0, 0.09), rgba(0, 0, 0, 0.05));
 		box-shadow: none;
 		transition: all 0.3s ease;
 	}
 }
 
 .search-wave-container:focus-within::before {
-	background: linear-gradient(
-		135deg,
-		rgba(255, 255, 255, 0.6),
-		rgba(243, 244, 246, 0.3)
-	);
+	background: linear-gradient(135deg, rgba(255, 255, 255, 0.6), rgba(243, 244, 246, 0.3));
 }
 
 /* Modern browsers with :has() support */
@@ -943,7 +950,8 @@ mux-player {
 }
 
 @-webkit-keyframes focusBreath {
-	0%, 100% {
+	0%,
+	100% {
 		opacity: 0.15;
 	}
 	50% {
@@ -952,7 +960,8 @@ mux-player {
 }
 
 @keyframes focusBreath {
-	0%, 100% {
+	0%,
+	100% {
 		opacity: 0.15;
 	}
 	50% {
@@ -979,7 +988,8 @@ mux-player {
 
 /* Loading state animations - minimalist Apple style */
 @-webkit-keyframes loading-breathe {
-	0%, 100% {
+	0%,
+	100% {
 		opacity: 0.3;
 	}
 	50% {
@@ -988,7 +998,8 @@ mux-player {
 }
 
 @keyframes loading-breathe {
-	0%, 100% {
+	0%,
+	100% {
 		opacity: 0.3;
 	}
 	50% {
@@ -1029,21 +1040,12 @@ mux-player {
 /* Loading state - elegant and minimal */
 .search-wave-loading {
 	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
-	background: linear-gradient(
-		135deg,
-		rgba(0, 0, 0, 0.06),
-		rgba(0, 0, 0, 0.04)
-	);
+	background: linear-gradient(135deg, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.04));
 	animation: loading-breathe 4s ease-in-out infinite;
 }
 
 .search-wave-loading .search-wave-overlay {
-	background: linear-gradient(
-		90deg,
-		transparent,
-		rgba(0, 0, 0, 0.03),
-		transparent
-	);
+	background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.03), transparent);
 	background-size: 200% 100%;
 	animation: gradient-shift 3s ease-in-out infinite !important;
 	opacity: 1 !important;
@@ -1073,11 +1075,7 @@ mux-player {
 	right: 0;
 	bottom: 0;
 	left: 0;
-	background: radial-gradient(
-		ellipse at center,
-		rgba(0, 0, 0, 0.02) 0%,
-		transparent 70%
-	);
+	background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.02) 0%, transparent 70%);
 	animation: loading-breathe 2s ease-in-out infinite;
 	opacity: 1;
 }
@@ -1097,11 +1095,7 @@ mux-player {
 }
 
 .dark .search-wave-container::before {
-	background: linear-gradient(
-		135deg,
-		rgba(31, 41, 55, 0.9),
-		rgba(17, 24, 39, 0.7)
-	);
+	background: linear-gradient(135deg, rgba(31, 41, 55, 0.9), rgba(17, 24, 39, 0.7));
 }
 
 .dark .search-wave-input {
@@ -1206,21 +1200,13 @@ mux-player {
 }
 
 .dark .search-wave-container:focus-within::before {
-	background: linear-gradient(
-		135deg,
-		rgba(31, 41, 55, 0.8),
-		rgba(55, 65, 81, 0.3)
-	);
+	background: linear-gradient(135deg, rgba(31, 41, 55, 0.8), rgba(55, 65, 81, 0.3));
 }
 
 /* Modern browsers with :has() support */
 @supports selector(:has(*)) {
 	.dark .search-wave-container:has(.search-wave-input:focus)::before {
-		background: linear-gradient(
-			135deg,
-			rgba(31, 41, 55, 0.8),
-			rgba(55, 65, 81, 0.3)
-		);
+		background: linear-gradient(135deg, rgba(31, 41, 55, 0.8), rgba(55, 65, 81, 0.3));
 	}
 }
 
@@ -1230,7 +1216,7 @@ mux-player {
 /* Generate button - #5DAB68 */
 .gradient-button-green {
 	background: rgba(93, 171, 104, 0.49) !important;
-	border: 1px solid #5DAB68 !important;
+	border: 1px solid #5dab68 !important;
 	color: black !important;
 	-webkit-transition: all 0.3s ease;
 	-moz-transition: all 0.3s ease;
@@ -1250,7 +1236,7 @@ mux-player {
 }
 .gradient-button-green:hover {
 	background: rgba(93, 171, 104, 0.65) !important; /* Slightly more opaque on hover */
-	border-color: #5DAB68 !important;
+	border-color: #5dab68 !important;
 }
 
 /* Dark mode green button */
@@ -1267,7 +1253,7 @@ mux-player {
 /* Import button - #E2E2E2 */
 .gradient-button-blue {
 	background: rgba(226, 226, 226, 0.49) !important;
-	border: 1px solid #B6B6B6 !important;
+	border: 1px solid #b6b6b6 !important;
 	color: #333 !important;
 	-webkit-transition: background 0.2s ease;
 	-moz-transition: background 0.2s ease;
@@ -1299,12 +1285,12 @@ mux-player {
 /* Dark mode blue button */
 .dark .gradient-button-blue {
 	background: rgba(226, 226, 226, 0.49) !important;
-	border: 1px solid #B6B6B6 !important;
+	border: 1px solid #b6b6b6 !important;
 }
 
 .dark .gradient-button-blue:hover {
 	background: rgba(226, 226, 226, 0.65) !important;
-	border: 1px solid #B6B6B6 !important;
+	border: 1px solid #b6b6b6 !important;
 }
 
 /* Dark mode overlay - more visible */
@@ -1363,7 +1349,9 @@ mux-player {
 
 /* Modern browsers with :has() support */
 @supports selector(:has(*)) {
-	.dark .search-wave-container:has(.search-wave-input:focus) .search-wave-overlay::before {
+	.dark
+		.search-wave-container:has(.search-wave-input:focus)
+		.search-wave-overlay::before {
 		opacity: 0;
 	}
 }
@@ -1374,7 +1362,8 @@ mux-player {
 
 /* Premium text gradient animations - Apple/PointOne inspired */
 @-webkit-keyframes premium-gradient-move {
-	0%, 100% {
+	0%,
+	100% {
 		background-position: 0% 50%;
 	}
 	50% {
@@ -1383,7 +1372,8 @@ mux-player {
 }
 
 @-webkit-keyframes premium-gradient-move {
-	0%, 100% {
+	0%,
+	100% {
 		background-position: 0% 50%;
 	}
 	50% {
@@ -1392,7 +1382,8 @@ mux-player {
 }
 
 @keyframes premium-gradient-move {
-	0%, 100% {
+	0%,
+	100% {
 		background-position: 0% 50%;
 	}
 	50% {
@@ -1432,10 +1423,9 @@ mux-player {
 	}
 }
 
-
-
 @-webkit-keyframes premium-float {
-	0%, 100% {
+	0%,
+	100% {
 		-webkit-transform: translateY(0px);
 		transform: translateY(0px);
 	}
@@ -1446,7 +1436,8 @@ mux-player {
 }
 
 @keyframes premium-float {
-	0%, 100% {
+	0%,
+	100% {
 		transform: translateY(0px);
 	}
 	50% {
@@ -1598,7 +1589,6 @@ mux-player {
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
 	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-
 }
 
 /* Dark mode NYC high society gradient outline - Layer 1 */
@@ -1664,12 +1654,7 @@ mux-player {
 }
 
 .dark .search-wave-loading .search-wave-overlay {
-	background: linear-gradient(
-		90deg,
-		transparent,
-		rgba(255, 255, 255, 0.04),
-		transparent
-	);
+	background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
 	background-size: 200% 100%;
 	animation: gradient-shift 3s ease-in-out infinite !important;
 	opacity: 1 !important;
@@ -1776,10 +1761,6 @@ mux-player {
 
 /* Removed - handled by search-input-group-active now */
 
-
-
-
-
 @-webkit-keyframes inputGlowPulse {
 	0% {
 		box-shadow: none;
@@ -1882,7 +1863,7 @@ mux-player {
 /* Fallback for Safari versions that don't support :has() */
 @supports not (selector(:has(*))) {
 	.campaigns-table-wrapper nav,
-	.campaigns-table-wrapper [role="navigation"] {
+	.campaigns-table-wrapper [role='navigation'] {
 		display: none !important;
 	}
 }
@@ -1953,8 +1934,8 @@ mux-player {
 }
 
 /* Override any generic selectors for the specific columns */
-.campaigns-table-container [role="columnheader"]:not(:nth-child(4)),
-.campaigns-table-container [role="cell"]:not(:nth-child(4)) {
+.campaigns-table-container [role='columnheader']:not(:nth-child(4)),
+.campaigns-table-container [role='cell']:not(:nth-child(4)) {
 	width: calc((100% - 60px) / 3) !important;
 	width: -webkit-calc((100% - 60px) / 3) !important;
 	min-width: 0 !important;
@@ -2002,18 +1983,18 @@ mux-player {
 }
 
 /* Custom toggle switch styles */
-.exclude-contacts-box input[type="checkbox"]:checked + div {
-	background-color: #E5E5E5 !important;
+.exclude-contacts-box input[type='checkbox']:checked + div {
+	background-color: #e5e5e5 !important;
 }
 
-.exclude-contacts-box input[type="checkbox"]:checked + div::after {
+.exclude-contacts-box input[type='checkbox']:checked + div::after {
 	transform: translateX(10px);
 	-webkit-transform: translateX(10px);
 }
 
 /* Safari-specific fixes for toggle */
 @supports (-webkit-appearance: none) {
-	.exclude-contacts-box input[type="checkbox"] + div::after {
+	.exclude-contacts-box input[type='checkbox'] + div::after {
 		-webkit-transition: all 0.2s ease;
 		transition: all 0.2s ease;
 	}
@@ -2056,7 +2037,7 @@ mux-player {
 	opacity: 0;
 }
 
-.search-active .search-result-item:nth-child(n+4) {
+.search-active .search-result-item:nth-child(n + 4) {
 	animation: gentleFadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 	animation-delay: 1.2s;
 	opacity: 0;
@@ -2121,23 +2102,13 @@ mux-player {
 	padding: 0;
 }
 
-
-
-
-
-
-
 /* Search button with elastic entrance - no width change on parent */
 .search-button-active {
 	height: 48px;
 	padding: 0 1.75rem;
 	font-size: 0.9375rem;
 	font-weight: 500;
-	background: linear-gradient(
-		135deg,
-		rgba(93, 171, 104, 0.9),
-		rgba(93, 171, 104, 1)
-	);
+	background: linear-gradient(135deg, rgba(93, 171, 104, 0.9), rgba(93, 171, 104, 1));
 	border: 1px solid rgba(93, 171, 104, 0.3);
 	color: white;
 	border-radius: 0.75rem;
@@ -2151,11 +2122,7 @@ mux-player {
 }
 
 .search-button-active:hover {
-	background: linear-gradient(
-		135deg,
-		rgba(93, 171, 104, 1),
-		rgba(73, 151, 84, 1)
-	);
+	background: linear-gradient(135deg, rgba(93, 171, 104, 1), rgba(73, 151, 84, 1));
 	transform: translate3d(0, -2px, 0);
 	box-shadow: none;
 	transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -2208,20 +2175,12 @@ mux-player {
 
 /* Dark mode search button */
 .dark .search-button-active {
-	background: linear-gradient(
-		135deg,
-		rgba(93, 171, 104, 0.8),
-		rgba(93, 171, 104, 0.9)
-	);
+	background: linear-gradient(135deg, rgba(93, 171, 104, 0.8), rgba(93, 171, 104, 0.9));
 	border: 1px solid rgba(93, 171, 104, 0.5);
 }
 
 .dark .search-button-active:hover {
-	background: linear-gradient(
-		135deg,
-		rgba(93, 171, 104, 0.9),
-		rgba(73, 151, 84, 0.95)
-	);
+	background: linear-gradient(135deg, rgba(93, 171, 104, 0.9), rgba(73, 151, 84, 0.95));
 	transform: translateY(-1px);
 	box-shadow: none;
 }
@@ -2420,7 +2379,7 @@ mux-player {
 /* Quotation marks styling */
 .search-query-quote-left,
 .search-query-quote-right {
-	color: #B8BCC3;
+	color: #b8bcc3;
 	opacity: 1;
 	display: inline;
 	font-family: 'Times New Roman', 'Times', serif;
@@ -2465,12 +2424,12 @@ mux-player {
 }
 
 .dark .search-query-display-text {
-	color: #FFFFFF;
+	color: #ffffff;
 }
 
 .dark .search-query-quote-left,
 .dark .search-query-quote-right {
-	color: #9CA3AF;
+	color: #9ca3af;
 	opacity: 1;
 }
 
@@ -2494,13 +2453,13 @@ mux-player {
 		font-size: 1.5rem;
 		padding: 0 1rem;
 	}
-	
+
 	.search-back-button {
 		left: 1rem;
 		padding: 0.4rem 0.6rem;
 		font-size: 0.85rem;
 	}
-	
+
 	.search-back-icon {
 		width: 16px;
 		height: 16px;
@@ -2511,11 +2470,11 @@ mux-player {
 	.search-query-display-text {
 		font-size: 1.25rem;
 	}
-	
+
 	.search-back-button .search-back-text {
 		display: none;
 	}
-	
+
 	.search-back-button {
 		padding: 0.5rem;
 	}
@@ -2577,8 +2536,6 @@ mux-player {
 	white-space: nowrap;
 }
 
-
-
 /* Dark mode search context label */
 .dark .search-context-label {
 	color: rgba(209, 213, 219, 0.8);
@@ -2625,7 +2582,8 @@ mux-player {
 }
 
 @-webkit-keyframes searchOverlayPulse {
-	0%, 100% {
+	0%,
+	100% {
 		opacity: 0.2;
 	}
 	50% {
@@ -2634,7 +2592,8 @@ mux-player {
 }
 
 @keyframes searchOverlayPulse {
-	0%, 100% {
+	0%,
+	100% {
 		opacity: 0.2;
 	}
 	50% {
@@ -2744,23 +2703,39 @@ mux-player {
 
 /* Table header fade effects */
 @-webkit-keyframes fadeIn {
-	from { opacity: 0.2; }
-	to { opacity: 1; }
+	from {
+		opacity: 0.2;
+	}
+	to {
+		opacity: 1;
+	}
 }
 
 @keyframes fadeIn {
-	from { opacity: 0.2; }
-	to { opacity: 1; }
+	from {
+		opacity: 0.2;
+	}
+	to {
+		opacity: 1;
+	}
 }
 
 @-webkit-keyframes fadeOut {
-	from { opacity: 1; }
-	to { opacity: 0.2; }
+	from {
+		opacity: 1;
+	}
+	to {
+		opacity: 0.2;
+	}
 }
 
 @keyframes fadeOut {
-	from { opacity: 1; }
-	to { opacity: 0.2; }
+	from {
+		opacity: 1;
+	}
+	to {
+		opacity: 0.2;
+	}
 }
 
 .name-header-fade-in {
@@ -2814,7 +2789,8 @@ mux-player {
 }
 
 @-webkit-keyframes appleFadeGlow {
-	0%, 100% {
+	0%,
+	100% {
 		opacity: 1;
 	}
 	50% {
@@ -2823,7 +2799,8 @@ mux-player {
 }
 
 @keyframes appleFadeGlow {
-	0%, 100% {
+	0%,
+	100% {
 		opacity: 1;
 	}
 	50% {
@@ -2951,7 +2928,7 @@ mux-player {
 		flex-direction: column;
 		gap: 1rem;
 	}
-	
+
 	.search-form-active .flex.flex-col.md\\:flex-row > div {
 		width: 100%;
 	}

@@ -15,7 +15,7 @@ export function DotLoader({ className, size = 'xl', color = 'primary' }: DotLoad
 	// Calculate base size
 	const getBaseSize = (): number => {
 		if (typeof size === 'number') return size;
-		
+
 		switch (size) {
 			case 'small':
 				return 3;
@@ -28,19 +28,19 @@ export function DotLoader({ className, size = 'xl', color = 'primary' }: DotLoad
 				return 6;
 		}
 	};
-	
+
 	const baseSize = getBaseSize();
-	
+
 	// Progressive sizing using golden ratio
 	const dotSizes = [
 		baseSize * INVERSE_GOLDEN * INVERSE_GOLDEN, // Smallest
-		baseSize * INVERSE_GOLDEN,                   // Medium
-		baseSize,                                     // Largest
+		baseSize * INVERSE_GOLDEN, // Medium
+		baseSize, // Largest
 	];
-	
+
 	// Spacing between dots (golden ratio)
 	const spacing = baseSize * GOLDEN_RATIO;
-	
+
 	// Color selection - always subtle
 	const getColorClass = () => {
 		switch (color) {
@@ -53,11 +53,11 @@ export function DotLoader({ className, size = 'xl', color = 'primary' }: DotLoad
 				return 'bg-black';
 		}
 	};
-	
+
 	const colorClass = getColorClass();
-	
+
 	return (
-		<div 
+		<div
 			className={twMerge('inline-flex items-center justify-center', className)}
 			style={{ gap: `${spacing}px` }}
 			role="status"
@@ -79,7 +79,9 @@ export function DotLoader({ className, size = 'xl', color = 'primary' }: DotLoad
 			))}
 			<style jsx>{`
 				@keyframes dot-wave {
-					0%, 60%, 100% {
+					0%,
+					60%,
+					100% {
 						transform: translateY(0) scale(1);
 						opacity: 0.3;
 					}
@@ -101,7 +103,7 @@ export function DotLoader({ className, size = 'xl', color = 'primary' }: DotLoad
 export function DotMorph({ className, size = 'xl', color = 'primary' }: DotLoaderProps) {
 	const getBaseSize = (): number => {
 		if (typeof size === 'number') return size;
-		
+
 		switch (size) {
 			case 'small':
 				return 3;
@@ -114,18 +116,18 @@ export function DotMorph({ className, size = 'xl', color = 'primary' }: DotLoade
 				return 6;
 		}
 	};
-	
+
 	const baseSize = getBaseSize();
-	
+
 	// Fibonacci sequence for sizes
 	const dotSizes = [
-		baseSize * 0.5,  // Small (3)
-		baseSize * 0.8,  // Medium (5) 
-		baseSize,        // Large (8)
+		baseSize * 0.5, // Small (3)
+		baseSize * 0.8, // Medium (5)
+		baseSize, // Large (8)
 	];
-	
+
 	const spacing = baseSize * 1.2;
-	
+
 	const getColorClass = () => {
 		switch (color) {
 			case 'background':
@@ -137,11 +139,11 @@ export function DotMorph({ className, size = 'xl', color = 'primary' }: DotLoade
 				return 'bg-gray-900';
 		}
 	};
-	
+
 	const colorClass = getColorClass();
-	
+
 	return (
-		<div 
+		<div
 			className={twMerge('inline-flex items-center justify-center', className)}
 			style={{ gap: `${spacing}px` }}
 			role="status"
@@ -161,7 +163,9 @@ export function DotMorph({ className, size = 'xl', color = 'primary' }: DotLoade
 			))}
 			<style jsx>{`
 				@-webkit-keyframes dot-morph {
-					0%, 80%, 100% {
+					0%,
+					80%,
+					100% {
 						-webkit-transform: scale(1);
 						transform: scale(1);
 						opacity: 0.25;
@@ -173,7 +177,9 @@ export function DotMorph({ className, size = 'xl', color = 'primary' }: DotLoade
 					}
 				}
 				@keyframes dot-morph {
-					0%, 80%, 100% {
+					0%,
+					80%,
+					100% {
 						transform: scale(1);
 						opacity: 0.25;
 					}
@@ -191,7 +197,7 @@ export function DotMorph({ className, size = 'xl', color = 'primary' }: DotLoade
 export function DotPulse({ className, size = 'xl', color = 'primary' }: DotLoaderProps) {
 	const getBaseSize = (): number => {
 		if (typeof size === 'number') return size;
-		
+
 		switch (size) {
 			case 'small':
 				return 4;
@@ -204,19 +210,19 @@ export function DotPulse({ className, size = 'xl', color = 'primary' }: DotLoade
 				return 8;
 		}
 	};
-	
+
 	const baseSize = getBaseSize();
-	
+
 	// Elegant progression: each dot is φ times larger
 	const dotSizes = [
-		Math.round(baseSize * 0.5),     // Smallest
-		Math.round(baseSize * 0.75),    // Medium
-		baseSize,                        // Largest
+		Math.round(baseSize * 0.5), // Smallest
+		Math.round(baseSize * 0.75), // Medium
+		baseSize, // Largest
 	];
-	
+
 	// Tighter spacing for cohesion
 	const spacing = baseSize * 0.8;
-	
+
 	// More refined color palette
 	const getColor = () => {
 		switch (color) {
@@ -229,11 +235,11 @@ export function DotPulse({ className, size = 'xl', color = 'primary' }: DotLoade
 				return '#111827'; // gray-900
 		}
 	};
-	
+
 	const dotColor = getColor();
-	
+
 	return (
-		<div 
+		<div
 			className={twMerge('inline-flex items-center justify-center', className)}
 			style={{ gap: `${spacing}px` }}
 			role="status"
@@ -255,7 +261,9 @@ export function DotPulse({ className, size = 'xl', color = 'primary' }: DotLoade
 			))}
 			<style jsx>{`
 				@keyframes dot-pulse {
-					0%, 80%, 100% {
+					0%,
+					80%,
+					100% {
 						opacity: 0.15;
 						transform: scale(1);
 					}
