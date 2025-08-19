@@ -13,7 +13,7 @@ import {
 	useGetContacts,
 	useGetUsedContactIds,
 } from '@/hooks/queryHooks/useContacts';
-import { ColumnDef, Table } from '@tanstack/react-table';
+import { CellContext, ColumnDef, Table } from '@tanstack/react-table';
 import { ContactWithName } from '@/types/contact';
 import { useCreateApolloContacts } from '@/hooks/queryHooks/useApollo';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
@@ -66,10 +66,11 @@ export const useDashboard = () => {
 	/* HOOKS */
 	// useMe will return undefined values for unauthenticated users
 	const { isFreeTrial, user } = useMe() || { isFreeTrial: false, user: null };
-	
+
 	// User can search if they have an active subscription OR are on a free trial
-	const canSearch = user?.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE || 
-	                  user?.stripeSubscriptionStatus === StripeSubscriptionStatus.TRIALING;
+	const canSearch =
+		user?.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE ||
+		user?.stripeSubscriptionStatus === StripeSubscriptionStatus.TRIALING;
 	const [selectedContactListRows, setSelectedContactListRows] = useState<
 		UserContactList[]
 	>([]);
@@ -89,16 +90,14 @@ export const useDashboard = () => {
 		isPending: isPendingContacts,
 		isLoading: isLoadingContacts,
 		error,
-		refetch: refetchContacts,  // eslint-disable-line @typescript-eslint/no-unused-vars
+		refetch: refetchContacts, // eslint-disable-line @typescript-eslint/no-unused-vars
 		isRefetching: isRefetchingContacts,
 		isError,
 	} = useGetContacts({
 		filters: {
 			query: activeSearchQuery,
 			verificationStatus:
-				process.env.NODE_ENV === 'production'
-					? EmailVerificationStatus.valid
-					: undefined,
+				process.env.NODE_ENV === 'production' ? EmailVerificationStatus.valid : undefined,
 			useVectorSearch: true,
 			limit,
 			excludeUsedContacts: activeExcludeUsedContacts,
@@ -143,10 +142,12 @@ export const useDashboard = () => {
 				filters: {
 					excludeUsedContacts: activeExcludeUsedContacts,
 					limit,
-				}
+				},
 			});
 			if (error instanceof Error && error.message.includes('timeout')) {
-				toast.error('Search timed out after 25 seconds. Please try a more specific search query.');
+				toast.error(
+					'Search timed out after 25 seconds. Please try a more specific search query.'
+				);
 			} else if (error instanceof Error) {
 				toast.error(`Search failed: ${error.message}`);
 			} else {
@@ -179,7 +180,7 @@ export const useDashboard = () => {
 			toast.error('Please enter a search query');
 			return;
 		}
-		
+
 		// Update search parameters
 		setActiveSearchQuery(data.searchText);
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? false);
@@ -196,7 +197,7 @@ export const useDashboard = () => {
 
 	const handleSelectAll = () => {
 		if (!contacts || !tableInstance) return;
-		
+
 		if (isAllSelected) {
 			// Unselect all
 			tableInstance.toggleAllRowsSelected(false);
@@ -282,7 +283,7 @@ export const useDashboard = () => {
 		const lastName = contact.lastName || '';
 		return `${firstName} ${lastName}`.trim();
 	}, []);
-	
+
 	// Helper to check if a contact has a name
 	const contactHasName = useCallback((contact: ContactWithName): boolean => {
 		const firstName = contact.firstName || '';
@@ -293,43 +294,45 @@ export const useDashboard = () => {
 	// Since pagination is disabled, check if majority of contacts have names
 	const visibleRowsHaveNames = useMemo(() => {
 		if (!contacts || contacts.length === 0) return false;
-		
+
 		// Check what percentage of contacts have names
-		const contactsWithNames = contacts.filter(contact => contactHasName(contact));
+		const contactsWithNames = contacts.filter((contact) => contactHasName(contact));
 		const ratio = contactsWithNames.length / contacts.length;
 		const threshold = 0.7; // 70% threshold for header to be fully visible
-		
+
 		console.log('🎨 Name column fade effect:', {
 			totalContacts: contacts.length,
 			contactsWithNames: contactsWithNames.length,
 			percentage: (ratio * 100).toFixed(1) + '%',
 			headerStatus: ratio > threshold ? '✅ VISIBLE' : '🌫️ FADED',
-			threshold: (threshold * 100) + '%'
+			threshold: threshold * 100 + '%',
 		});
-		
+
 		return ratio > threshold; // Header is visible if more than 70% have names
 	}, [contacts, contactHasName]);
 
 	// Dynamically build columns based on whether names exist in contacts
 	const columns = useMemo(() => {
 		// Check if any contact has a firstName or lastName
-		const hasNames = contacts && contacts.length > 0 && 
-			contacts.some(contact => contactHasName(contact));
-		
+		const hasNames =
+			contacts &&
+			contacts.length > 0 &&
+			contacts.some((contact) => contactHasName(contact));
+
 		const allColumns: ColumnDef<ContactWithName>[] = [
 			{
 				accessorKey: 'company',
 				size: 150,
 				header: () => <span className="font-bold">Company</span>,
 				cell: ({ row }) => {
-											return (
-							<TableCellTooltip 
-								text={row.getValue('company')} 
-								maxLength={MAX_CELL_LENGTH} 
-								positioning="below-right"
-								onHover={handleCellHover}
-							/>
-						);
+					return (
+						<TableCellTooltip
+							text={row.getValue('company')}
+							maxLength={MAX_CELL_LENGTH}
+							positioning="below-right"
+							onHover={handleCellHover}
+						/>
+					);
 				},
 			},
 			{
@@ -339,7 +342,6 @@ export const useDashboard = () => {
 				cell: ({ row }) => {
 					const isUsed = usedContactIdsSet.has(row.original.id);
 					const email = (row.getValue('email') as string) || '';
-					const [local, domain] = email.includes('@') ? email.split('@') : [email, ''];
 					const rowIndex = row.index;
 					const showFull = rowIndex < 3; // First three rows show full email
 					if (showFull) {
@@ -357,9 +359,9 @@ export const useDashboard = () => {
 										</TooltipContent>
 									</Tooltip>
 								) : (
-									<TableCellTooltip 
-										text={email} 
-										maxLength={MAX_CELL_LENGTH} 
+									<TableCellTooltip
+										text={email}
+										maxLength={MAX_CELL_LENGTH}
 										positioning="below-right"
 										onHover={handleCellHover}
 									/>
@@ -370,82 +372,88 @@ export const useDashboard = () => {
 					// Obfuscate the entire email address with a smooth fading blur
 					return (
 						<div className="text-left whitespace-nowrap overflow-visible relative">
-							<span className="email-obfuscated-local inline-block">
-								{email}
-							</span>
+							<span className="email-obfuscated-local inline-block">{email}</span>
 						</div>
 					);
 				},
 			},
 			// Name column - conditionally included (always show if ANY contact has names)
-			...(hasNames ? [{
-				accessorKey: 'firstName' as const,  // Use firstName as key but display computed name
-				id: 'name',  // Custom id for the column
-				size: 150,
-				header: () => {
-					return (
-						<span 
-							className={`font-bold transition-all duration-700 ease-in-out ${
-								visibleRowsHaveNames 
-									? 'text-black dark:text-white' 
-									: 'text-gray-300 dark:text-gray-600'
-							}`}
-							style={{ 
-								opacity: visibleRowsHaveNames ? 1 : 0.25,
-								transform: visibleRowsHaveNames ? 'scale(1) translateY(0)' : 'scale(0.9) translateY(2px)',
-								filter: visibleRowsHaveNames ? 'blur(0px)' : 'blur(0.5px)'
-							}}
-							title={visibleRowsHaveNames 
-								? 'Most contacts have names' 
-								: 'Most contacts lack names - column faded'}
-						>
-							Name
-						</span>
-					);
-				},
-				cell: ({ row }: any) => {
-					const contact = row.original as ContactWithName;
-					const hasName = contactHasName(contact);
-					const nameValue = hasName ? computeName(contact) : '';
-					return (
-						<div 
-							className={`truncate transition-all duration-500 ease-in-out hover:scale-105 ${
-								hasName 
-									? 'text-black dark:text-white' 
-									: 'text-gray-300 dark:text-gray-700'
-							}`}
-							style={{
-								opacity: hasName ? 1 : 0.2,
-								transform: hasName ? 'scale(1)' : 'scale(0.85)',
-							}}
-						>
-							{hasName ? (
-								<TableCellTooltip 
-									text={nameValue} 
-									maxLength={MAX_CELL_LENGTH} 
-									positioning="below-right"
-									onHover={handleCellHover}
-								/>
-							) : (
-								<span className="select-none">—</span>
-							)}
-						</div>
-					);
-				},
-			}] : []),
+			...(hasNames
+				? [
+						{
+							accessorKey: 'firstName' as const, // Use firstName as key but display computed name
+							id: 'name', // Custom id for the column
+							size: 150,
+							header: () => {
+								return (
+									<span
+										className={`font-bold transition-all duration-700 ease-in-out ${
+											visibleRowsHaveNames
+												? 'text-black dark:text-white'
+												: 'text-gray-300 dark:text-gray-600'
+										}`}
+										style={{
+											opacity: visibleRowsHaveNames ? 1 : 0.25,
+											transform: visibleRowsHaveNames
+												? 'scale(1) translateY(0)'
+												: 'scale(0.9) translateY(2px)',
+											filter: visibleRowsHaveNames ? 'blur(0px)' : 'blur(0.5px)',
+										}}
+										title={
+											visibleRowsHaveNames
+												? 'Most contacts have names'
+												: 'Most contacts lack names - column faded'
+										}
+									>
+										Name
+									</span>
+								);
+							},
+							cell: ({ row }: CellContext<ContactWithName, unknown>) => {
+								const contact = row.original as ContactWithName;
+								const hasName = contactHasName(contact);
+								const nameValue = hasName ? computeName(contact) : '';
+								return (
+									<div
+										className={`truncate transition-all duration-500 ease-in-out hover:scale-105 ${
+											hasName
+												? 'text-black dark:text-white'
+												: 'text-gray-300 dark:text-gray-700'
+										}`}
+										style={{
+											opacity: hasName ? 1 : 0.2,
+											transform: hasName ? 'scale(1)' : 'scale(0.85)',
+										}}
+									>
+										{hasName ? (
+											<TableCellTooltip
+												text={nameValue}
+												maxLength={MAX_CELL_LENGTH}
+												positioning="below-right"
+												onHover={handleCellHover}
+											/>
+										) : (
+											<span className="select-none">—</span>
+										)}
+									</div>
+								);
+							},
+						},
+				  ]
+				: []),
 			{
 				accessorKey: 'city',
 				size: 150,
 				header: () => <span className="font-bold">City</span>,
 				cell: ({ row }) => {
-											return (
-							<TableCellTooltip 
-								text={row.getValue('city')} 
-								maxLength={MAX_CELL_LENGTH} 
-								positioning="below-right"
-								onHover={handleCellHover}
-							/>
-						);
+					return (
+						<TableCellTooltip
+							text={row.getValue('city')}
+							maxLength={MAX_CELL_LENGTH}
+							positioning="below-right"
+							onHover={handleCellHover}
+						/>
+					);
 				},
 			},
 			{
@@ -453,14 +461,14 @@ export const useDashboard = () => {
 				size: 150,
 				header: () => <span className="font-bold">State</span>,
 				cell: ({ row }) => {
-											return (
-							<TableCellTooltip 
-								text={row.getValue('state')} 
-								maxLength={MAX_CELL_LENGTH} 
-								positioning="below-right"
-								onHover={handleCellHover}
-							/>
-						);
+					return (
+						<TableCellTooltip
+							text={row.getValue('state')}
+							maxLength={MAX_CELL_LENGTH}
+							positioning="below-right"
+							onHover={handleCellHover}
+						/>
+					);
 				},
 			},
 			{
@@ -469,19 +477,26 @@ export const useDashboard = () => {
 				header: () => <span className="font-bold">Description</span>,
 				cell: ({ row }) => {
 					return (
-						<TableCellTooltip 
-							text={row.getValue('title')} 
-							maxLength={MAX_CELL_LENGTH} 
+						<TableCellTooltip
+							text={row.getValue('title')}
+							maxLength={MAX_CELL_LENGTH}
 							positioning="below-left"
 							onHover={handleCellHover}
 						/>
 					);
 				},
-			}
+			},
 		];
 
 		return allColumns;
-	}, [contacts, usedContactIdsSet, visibleRowsHaveNames, contactHasName, computeName, MAX_CELL_LENGTH]);
+	}, [
+		contacts,
+		usedContactIdsSet,
+		visibleRowsHaveNames,
+		contactHasName,
+		computeName,
+		MAX_CELL_LENGTH,
+	]);
 
 	return {
 		form,

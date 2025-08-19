@@ -430,8 +430,9 @@ export const searchSimilarContacts = async (
 	});
 
 	// Post-process results with optional location boosts and institutional penalties
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const processResultsWithLocationBoost = (hits: any[]): any[] => {
+	const processResultsWithLocationBoost = (
+		hits: estypes.SearchHit[]
+	): estypes.SearchHit[] => {
 		const skipBoosts = locationStrategy === 'strict' || boosts.exact === 0;
 
 		const penalties = new Set((options?.penaltyCities || []).map((c) => c.toLowerCase()));
