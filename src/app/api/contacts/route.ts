@@ -354,12 +354,11 @@ export async function GET(req: NextRequest) {
 				: requestedLimit;
 			// Protect the vector path with a timeout and fallback to substring search
 			const vectorSearchWithTimeout = async () => {
-				const timeoutMs = 14000; // keep the UI snappy
+				const timeoutMs = 14000;
 				return await Promise.race([
 					searchSimilarContacts(
 						queryJson,
 						effectiveVectorLimit,
-						0.1,
 						effectiveLocationStrategy,
 						{
 							penaltyCities,
