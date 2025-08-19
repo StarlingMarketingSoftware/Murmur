@@ -26,7 +26,7 @@ export const CampaignName: FC<CampaignNameProps> = (props) => {
 										<FormItem className="">
 											<FormControl>
 												<Input
-													className="!text-[63px] !h-fit mt-[17px] mb-8 font-primary text-center !w-fit !min-w-0"
+													className="!text-[36px] !h-fit mt-4 mb-6 font-primary text-center !w-fit !min-w-0"
 													variant="light"
 													rounded={false}
 													{...field}
@@ -38,7 +38,7 @@ export const CampaignName: FC<CampaignNameProps> = (props) => {
 							</div>
 						) : (
 							<>
-								<Typography className="!text-[63px] text-center h-fit w-fit mt-[20px] mb-8">
+								<Typography className="!text-[36px] text-center h-fit w-fit mt-5 mb-6">
 									{campaign.name}
 								</Typography>
 							</>
@@ -47,7 +47,7 @@ export const CampaignName: FC<CampaignNameProps> = (props) => {
 							type="submit"
 							className={cn(
 								'absolute translate-x-full -right-3 ',
-								isEdit ? 'bottom-0' : 'bottom-5'
+								isEdit ? 'bottom-0' : 'bottom-2'
 							)}
 							isLoading={isPendingEditCampaign}
 							variant="action-link"

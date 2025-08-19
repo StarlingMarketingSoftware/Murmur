@@ -46,7 +46,7 @@ const Murmur = () => {
 			)}
 			<div className={`hidden lg:block transition-opacity duration-200 ${shouldHideContent ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}>
 				<CampaignName campaign={campaign} />
-				<Card className="mt-38 border-border !border-2">
+				<Card className="mt-20 border-border !border-2">
 					<CardContent>
 						<div className="flex gap-24">
 							<div className="">

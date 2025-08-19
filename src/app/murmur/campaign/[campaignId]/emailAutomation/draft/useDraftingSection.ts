@@ -140,7 +140,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			isAiSubject: true,
 			subject: '',
 			fullAiPrompt: '',
-			hybridPrompt: '',
+			hybridPrompt: 'Generate a professional email based on the template below.',
 			hybridAvailableBlocks: [
 				HybridBlock.introduction,
 				HybridBlock.research,
@@ -242,7 +242,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			(values.fullAiPrompt === '' && draftingMode === 'ai') ||
 			(values.handwrittenPrompt === '' && draftingMode === 'handwritten') ||
 			(values.handwrittenPrompt === '<p></p>' && draftingMode === 'handwritten') ||
-			(values.hybridPrompt === '' && draftingMode === 'hybrid') ||
 			generationProgress > -1 ||
 			contacts?.length === 0 ||
 			isPendingGeneration
@@ -1011,7 +1010,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				isAiSubject: campaign.isAiSubject ?? true,
 				subject: campaign.subject ?? '',
 				fullAiPrompt: campaign.fullAiPrompt ?? '',
-				hybridPrompt: campaign.hybridPrompt ?? '',
+				hybridPrompt: campaign.hybridPrompt ?? 'Generate a professional email based on the template below.',
 				hybridAvailableBlocks: campaign.hybridAvailableBlocks ?? [HybridBlock.text],
 				hybridBlockPrompts: (campaign.hybridBlockPrompts as HybridBlockPrompt[]) ?? [
 					{ id: 'introduction', type: 'introduction', value: '' },

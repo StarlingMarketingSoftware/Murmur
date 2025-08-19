@@ -3070,3 +3070,8 @@ tr:hover .email-obfuscated-local {
 	opacity: 0.75;
 	transform: scale(1);
 }
+
+/* Hide footer on murmur pages (dashboard and campaign) */
+body.murmur-page footer {
+	display: none !important;
+}

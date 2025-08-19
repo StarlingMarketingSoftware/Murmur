@@ -236,7 +236,7 @@ export default function HomePage() {
 					header=""
 					title="FAQs"
 					description="Everything you need to know about Murmur!"
-					showMoreLink=""
+					showMoreLink="/contact"
 				/>
 				<div className="h-24" />
 			</div>

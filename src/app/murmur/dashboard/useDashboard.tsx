@@ -221,9 +221,7 @@ export const useDashboard = () => {
 
 		await batchUpdateContacts({ updates });
 
-		const defaultName = `${capitalize(
-			activeSearchQuery
-		)} - ${new Date().toLocaleDateString()}`;
+		const defaultName = capitalize(activeSearchQuery);
 		if (currentTab === 'search') {
 			const newUserContactList = await createContactList({
 				name: defaultName,
@@ -244,7 +242,7 @@ export const useDashboard = () => {
 				return;
 			}
 			const campaign = await createCampaign({
-				name: `New Campaign - ${selectedContactListRows[0].name}`,
+				name: selectedContactListRows[0].name,
 				userContactLists: selectedContactListRows.map((row) => row.id),
 			});
 			if (campaign) {

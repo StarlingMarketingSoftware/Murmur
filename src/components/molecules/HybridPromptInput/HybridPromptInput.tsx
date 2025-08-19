@@ -143,23 +143,10 @@ export const HybridPromptInput = () => {
 
 	return (
 		<div>
-			<FormField
-				control={form.control}
-				name="hybridPrompt"
-				render={({ field }) => (
-					<FormItem>
-						<FormLabel>{'AI Prompt'}</FormLabel>
-						<FormControl>
-							<Textarea className="h-[150px]" placeholder={'Hybrid '} {...field} />
-						</FormControl>
-						<FormMessage />
-					</FormItem>
-				)}
-			/>
 			<FormLabel>Email Template</FormLabel>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
 				<Droppable id="droppable">
-					<div className="min-h-[500px] mt-3 border-2 border-foreground rounded-xl p-3 bg-gray-50 flex flex-col gap-3 items-start transition w-full mb-4">
+					<div className="min-h-[650px] mt-3 border-2 border-foreground rounded-xl p-3 bg-gray-50 flex flex-col gap-3 items-start transition w-full mb-4">
 						{fields.length === 0 && (
 							<Typography font="secondary" className=" text-gray-400 italic">
 								Add blocks here to build your prompt...

@@ -159,6 +159,7 @@ const Contact = () => {
 					title="Help"
 					description="Get your questions answered!"
 					faqs={FAQS}
+					theme="light"
 				/>
 			</div>
 		</>

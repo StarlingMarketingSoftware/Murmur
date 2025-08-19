@@ -6,6 +6,7 @@ import { UserButton } from '@clerk/nextjs';
 import { urls } from '@/constants/urls';
 import { useMe } from '@/hooks/useMe';
 import { ArrowLeft } from 'lucide-react';
+import { useEffect } from 'react';
 
 export default function MurmurLayout({
 	children,
@@ -17,6 +18,14 @@ export default function MurmurLayout({
 
 	// Show Admin link only for admin users
 	const showAdminLink = user?.role === 'admin';
+
+	// Hide footer for murmur pages
+	useEffect(() => {
+		document.body.classList.add('murmur-page');
+		return () => {
+			document.body.classList.remove('murmur-page');
+		};
+	}, []);
 
 	return (
 		<>
