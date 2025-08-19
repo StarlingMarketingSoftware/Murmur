@@ -61,8 +61,8 @@ export const Navbar = () => {
 				className={cn(
 					'fixed top-0 left-0 right-0 z-50 transition-all duration-700 font-inter',
 					scrolled 
-						? 'bg-white/30 backdrop-blur-3xl backdrop-saturate-200 border-b border-white/10' 
-						: 'bg-white/10 backdrop-blur-2xl backdrop-saturate-150'
+						? 'bg-white/70 backdrop-blur-xl border-b border-gray-200/20' 
+						: 'bg-white/40 backdrop-blur-md'
 				)}
 			>
 				<div className="w-full">
@@ -193,7 +193,7 @@ export const Navbar = () => {
 				<div
 					className={cn(
 						'absolute top-0 left-0 right-0 h-screen',
-						'bg-white backdrop-blur-3xl',
+						'bg-white/90 backdrop-blur-3xl',
 						'transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]',
 						isMobileMenuOpen ? 'translate-y-0' : '-translate-y-full'
 					)}

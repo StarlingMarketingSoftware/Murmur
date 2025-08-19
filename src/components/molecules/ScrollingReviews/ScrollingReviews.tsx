@@ -1,13 +1,6 @@
 import { useRef } from 'react';
 import { ReviewCard } from '../ReviewCard/ReviewCard';
 import { Review } from '@/types';
-import {
-	Carousel,
-	CarouselContent,
-	CarouselItem,
-	CarouselNext,
-	CarouselPrevious,
-} from '@/components/ui/carousel';
 
 const REVIEWS: Review[] = [
 	{
@@ -46,47 +39,64 @@ export const ScrollingReviews = () => {
 	const scrollerRef = useRef<HTMLDivElement>(null);
 	const scrollerInnerRef = useRef<HTMLDivElement>(null);
 
+	const handleMouseEnter = () => {
+		if (scrollerInnerRef.current) {
+			// Check if Web Animations API is supported
+			if ('getAnimations' in scrollerInnerRef.current) {
+				// Slow down the animation by adjusting playback rate
+				const animations = scrollerInnerRef.current.getAnimations();
+				animations.forEach(animation => {
+					if ('playbackRate' in animation) {
+						(animation as Animation).playbackRate = 0.3; // Slow to 30% speed
+					}
+				});
+			}
+		}
+	};
+
+	const handleMouseLeave = () => {
+		if (scrollerInnerRef.current) {
+			// Check if Web Animations API is supported
+			if ('getAnimations' in scrollerInnerRef.current) {
+				// Return to normal speed
+				const animations = scrollerInnerRef.current.getAnimations();
+				animations.forEach(animation => {
+					if ('playbackRate' in animation) {
+						(animation as Animation).playbackRate = 1; // Normal speed
+					}
+				});
+			}
+		}
+	};
+
 	return (
-		<>
-			<Carousel className="sm:hidden block w-7/10 mx-auto">
-				<CarouselContent>
-					{REVIEWS.map((review, index) => (
-						<CarouselItem key={index} className="w-full mx-auto">
-							<div key={index} className="flex justify-center">
-								<ReviewCard review={review} />
-							</div>
-						</CarouselItem>
-					))}
-				</CarouselContent>
-				<CarouselPrevious />
-				<CarouselNext />
-			</Carousel>
+		<div
+			ref={scrollerRef}
+			className="w-full pt-8 sm:pt-17 pb-6 sm:pb-11 overflow-hidden"
+			onMouseEnter={handleMouseEnter}
+			onMouseLeave={handleMouseLeave}
+			style={{
+				maskImage:
+					'linear-gradient(to right, transparent, white 20%, white 80%, transparent 100%)',
+				WebkitMaskImage:
+					'linear-gradient(to right, transparent, white 20%, white 80%, transparent 100%)',
+			}}
+		>
 			<div
-				ref={scrollerRef}
-				className="w-full pt-17 pb-11 overflow-hidden sm:block hidden"
-				style={{
-					maskImage:
-						'linear-gradient(to right, transparent, white 20%, white 80%, transparent 100%)',
-					WebkitMaskImage:
-						'linear-gradient(to right, transparent, white 20%, white 80%, transparent 100%)',
-				}}
+				ref={scrollerInnerRef}
+				className="animate-scroll w-fit flex gap-8 sm:gap-22 py-2"
 			>
-				<div
-					ref={scrollerInnerRef}
-					className="animate-scroll hover:animate-none w-fit flex gap-22 py-2"
-				>
-					{REVIEWS.map((review, index) => (
-						<div key={index}>
-							<ReviewCard review={review} />
-						</div>
-					))}
-					{REVIEWS.map((review, index) => (
-						<div className="" key={`${index}-dup`}>
-							<ReviewCard review={review} />
-						</div>
-					))}
-				</div>
+				{REVIEWS.map((review, index) => (
+					<div key={index}>
+						<ReviewCard review={review} />
+					</div>
+				))}
+				{REVIEWS.map((review, index) => (
+					<div className="" key={`${index}-dup`}>
+						<ReviewCard review={review} />
+					</div>
+				))}
 			</div>
-		</>
+		</div>
 	);
 };
