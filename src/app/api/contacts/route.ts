@@ -16,6 +16,7 @@ import { applyHardcodedLocationOverrides } from '@/app/api/_utils/searchPreproce
 import { Contact, EmailVerificationStatus, Prisma } from '@prisma/client';
 import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vectorDb';
 import { OPEN_AI_MODEL_OPTIONS } from '@/constants';
+import { StripeSubscriptionStatus } from '@/types';
 
 const VECTOR_SEARCH_LIMIT_DEFAULT = 50;
 
@@ -84,8 +85,8 @@ export async function GET(req: NextRequest) {
 		// Allow both active subscriptions and free trials
 		if (
 			!user ||
-			(user.stripeSubscriptionStatus !== 'active' &&
-				user.stripeSubscriptionStatus !== 'trialing')
+			(user.stripeSubscriptionStatus !== StripeSubscriptionStatus.ACTIVE &&
+				user.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING)
 		) {
 			return apiBadRequest(
 				'An active subscription or free trial is required to search for contacts'

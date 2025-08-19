@@ -90,7 +90,6 @@ export const useDashboard = () => {
 		isPending: isPendingContacts,
 		isLoading: isLoadingContacts,
 		error,
-		refetch: refetchContacts, // eslint-disable-line @typescript-eslint/no-unused-vars
 		isRefetching: isRefetchingContacts,
 		isError,
 	} = useGetContacts({
