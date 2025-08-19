@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter, Zen_Antique } from 'next/font/google';
-import { Footer } from '@/components/molecules/Footer/Footer';
+import { ConditionalFooter } from '@/components/molecules/Footer/ConditionalFooter';
 import { Toaster } from '@/components/ui/toast';
 import './globals.css';
 import SubLayout from './sublayout';
@@ -66,7 +66,7 @@ export default function RootLayout({
 					<ThemeProvider attribute="class" defaultTheme="light">
 						<SubLayout>
 							<main className="flex-1">{children}</main>
-							<Footer />
+							<ConditionalFooter />
 							<Toaster />
 						</SubLayout>
 					</ThemeProvider>
