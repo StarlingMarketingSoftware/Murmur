@@ -26,11 +26,12 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 		isGenerationDisabled,
 		draftingMode,
 		hasTestMessage,
+		showSettings,
 	} = useDraftingRightPanel(props);
 
 	return (
 		<div className="flex flex-col gap-4 mt-6 p-5">
-			{draftingMode === 'ai' && (
+			{showSettings && (
 				<BlockTabs
 					activeValue={activeTab}
 					onValueChange={setActiveTab}

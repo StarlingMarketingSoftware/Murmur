@@ -54,7 +54,8 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 		transition,
 	};
 
-	const isTextBlock = block.value === HybridBlock.text;
+	const isTextBlock = block.value === HybridBlock.text || block.value === 'text';
+	const isFullAutomatedBlock = block.value === HybridBlock.full_automated || block.value === 'full_automated';
 
 	return (
 		<div
@@ -73,7 +74,7 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 				<div className="flex-grow">
 					{isDragging && <div className="absolute inset-0 rounded-md bg-gray-100 z-10" />}
 					<div className="absolute right-3 top-3">
-						{!isTextBlock && (
+						{!isTextBlock && !isFullAutomatedBlock && (
 							<Button
 								type="button"
 								className="mr-1"
@@ -107,10 +108,11 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 							</>
 						)}
 					</div>
-					{isTextBlock ? (
+					{isTextBlock || isFullAutomatedBlock ? (
 						<Textarea
 							placeholder={block.placeholder}
 							onClick={(e) => e.stopPropagation()}
+							className={isFullAutomatedBlock ? 'h-[400px]' : ''}
 							{...form.register(`hybridBlockPrompts.${fieldIndex}.value`)}
 						/>
 					) : (
@@ -179,23 +181,29 @@ export const HybridPromptInput = () => {
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent className="w-56" align="start">
-						<DropdownMenuLabel>
-							{watchedAvailableBlocks.length <= 1
-								? 'All AI blocks have been used'
-								: 'Select a Block'}
-						</DropdownMenuLabel>
+						<DropdownMenuLabel>Select a Block</DropdownMenuLabel>
 						<DropdownMenuGroup>
-							{watchedAvailableBlocks.map((block: HybridBlock) => {
-								if (block === HybridBlock.text) return null;
+							{BLOCKS.filter(block => 
+								block.value !== HybridBlock.text && 
+								block.value !== HybridBlock.full_automated
+							).map((block) => {
+								const isUsed = !watchedAvailableBlocks.includes(block.value);
 								return (
 									<DropdownMenuItem
-										onClick={() => handleAddBlock(getBlock(block))}
-										key={block}
+										onClick={() => handleAddBlock(block)}
+										key={block.value}
+										disabled={isUsed}
 									>
-										{getBlock(block).label}
+										{block.label} {isUsed && '(Used)'}
 									</DropdownMenuItem>
 								);
 							})}
+							<DropdownMenuItem
+								onClick={() => handleAddBlock(BLOCKS.find(b => b.value === HybridBlock.full_automated)!)}
+								key={HybridBlock.full_automated}
+							>
+								Full Automated
+							</DropdownMenuItem>
 						</DropdownMenuGroup>
 					</DropdownMenuContent>
 				</DropdownMenu>

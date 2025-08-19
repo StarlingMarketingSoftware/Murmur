@@ -238,10 +238,19 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const isGenerationDisabled = useCallback(() => {
 		const values = form.getValues();
+		const hasFullAutomatedBlock = values.hybridBlockPrompts?.some(
+			block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
+		);
+		const fullAutomatedBlock = values.hybridBlockPrompts?.find(
+			block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
+		);
+		const isFullAutomatedEmpty = hasFullAutomatedBlock && (!fullAutomatedBlock?.value || fullAutomatedBlock.value === '');
+		
 		return (
 			(values.fullAiPrompt === '' && draftingMode === 'ai') ||
 			(values.handwrittenPrompt === '' && draftingMode === 'handwritten') ||
 			(values.handwrittenPrompt === '<p></p>' && draftingMode === 'handwritten') ||
+			(isFullAutomatedEmpty && draftingMode === 'hybrid') ||
 			generationProgress > -1 ||
 			contacts?.length === 0 ||
 			isPendingGeneration
@@ -619,6 +628,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 
 		const values = getValues();
+		console.log('[Test Generation] All form values:', values);
 
 		setIsTest(true);
 
@@ -639,10 +649,34 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 				let parsedRes: DraftEmailResponse;
 
-				if (values.draftingMode === DraftingMode.ai) {
+								// Check if we have a Full Automated block in hybrid mode
+				const hasFullAutomatedBlock = values.hybridBlockPrompts?.some(
+					block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
+				);
+				const fullAutomatedBlock = values.hybridBlockPrompts?.find(
+					block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
+				);
+
+				console.log('[Test Generation] Mode:', values.draftingMode);
+				console.log('[Test Generation] Has Full Automated Block:', hasFullAutomatedBlock);
+				console.log('[Test Generation] Full Automated Block Value:', fullAutomatedBlock?.value);
+				console.log('[Test Generation] Hybrid Blocks:', values.hybridBlockPrompts);
+
+				if (values.draftingMode === DraftingMode.ai || 
+					(values.draftingMode === DraftingMode.hybrid && hasFullAutomatedBlock)) {
+					const fullAiPrompt = values.draftingMode === DraftingMode.ai 
+						? values.fullAiPrompt 
+						: fullAutomatedBlock?.value || '';
+					
+					console.log('[Test Generation] Using Full AI mode with prompt:', fullAiPrompt);
+					
+					if (!fullAiPrompt || fullAiPrompt.trim() === '') {
+						throw new Error('AI prompt cannot be empty');
+					}
+					
 					parsedRes = await draftFullAiEmail(
 						contacts[0],
-						values.fullAiPrompt,
+						fullAiPrompt,
 						values.draftingTone,
 						values.paragraphs
 					);
@@ -660,7 +694,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					await saveTestEmail({
 						id: campaign.id,
 						data: {
-							...form.getValues(),
 							testSubject: parsedRes.subject,
 							testMessage: convertAiResponseToRichTextEmail(
 								parsedRes.message,
@@ -689,6 +722,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			} catch (e) {
 				if (e instanceof Error) {
 					console.error('Error generating test email:', e.message);
+					console.error('Full error:', e);
+					toast.error(`Error: ${e.message}`);
+				} else {
+					console.error('Unknown error generating test email:', e);
+					toast.error('An unknown error occurred');
 				}
 
 				attempts++;
@@ -730,10 +768,27 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 					let parsedDraft;
 
-					if (values.draftingMode === DraftingMode.ai) {
+					// Check if we have a Full Automated block in hybrid mode
+					const hasFullAutomatedBlock = values.hybridBlockPrompts?.some(
+						block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
+					);
+					const fullAutomatedBlock = values.hybridBlockPrompts?.find(
+						block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
+					);
+
+					if (values.draftingMode === DraftingMode.ai || 
+						(values.draftingMode === DraftingMode.hybrid && hasFullAutomatedBlock)) {
+						const fullAiPrompt = values.draftingMode === DraftingMode.ai 
+							? values.fullAiPrompt 
+							: fullAutomatedBlock?.value || '';
+						
+						if (!fullAiPrompt || fullAiPrompt.trim() === '') {
+							throw new Error('AI prompt cannot be empty');
+						}
+						
 						parsedDraft = await draftFullAiEmail(
 							recipient,
-							values.fullAiPrompt,
+							fullAiPrompt,
 							values.draftingTone,
 							values.paragraphs,
 							controller.signal
@@ -930,9 +985,37 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		async (values: DraftingFormValues) => {
 			try {
 				setAutosaveStatus('saving');
+				
+				// Transform hybridBlockPrompts to handle full_automated blocks
+				// TODO: Remove this workaround once the server-side Prisma client is updated
+				// to include the full_automated enum value
+				const transformedValues = {
+					...values,
+					hybridBlockPrompts: values.hybridBlockPrompts?.map(block => {
+						// If the block is full_automated, store the prompt in fullAiPrompt
+						if (block.type === 'full_automated' || (block.type as any) === 'full_automated') {
+							// Store the full automated prompt in fullAiPrompt
+							return {
+								...block,
+								type: HybridBlock.text, // Convert to text type for now
+								value: block.value,
+							};
+						}
+						return block;
+					}),
+				};
+				
+				// If we have a full automated block, also save its content to fullAiPrompt
+				const fullAutomatedBlock = values.hybridBlockPrompts?.find(
+					block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
+				);
+				if (fullAutomatedBlock) {
+					transformedValues.fullAiPrompt = fullAutomatedBlock.value;
+				}
+				
 				await saveCampaign({
 					id: campaign.id,
-					data: values,
+					data: transformedValues,
 				});
 				setAutosaveStatus('saved');
 				setLastSavedAt(new Date());
@@ -967,10 +1050,39 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		if (Object.keys(formState.errors).length > 0) {
 			return;
 		}
+		
+		const values = form.getValues();
+		
+		// Transform hybridBlockPrompts to handle full_automated blocks
+		// TODO: Remove this workaround once the server-side Prisma client is updated
+		// to include the full_automated enum value
+		const transformedValues = {
+			...values,
+			hybridBlockPrompts: values.hybridBlockPrompts?.map(block => {
+				// If the block is full_automated, store the prompt in fullAiPrompt
+				if (block.type === 'full_automated' || block.type === HybridBlock.full_automated) {
+					// Store the full automated prompt in fullAiPrompt
+					return {
+						...block,
+						type: HybridBlock.text, // Convert to text type for now
+						value: block.value,
+					};
+				}
+				return block;
+			}),
+		};
+		
+		// If we have a full automated block, also save its content to fullAiPrompt
+		const fullAutomatedBlock = values.hybridBlockPrompts?.find(
+			block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
+		);
+		if (fullAutomatedBlock) {
+			transformedValues.fullAiPrompt = fullAutomatedBlock.value;
+		}
 
 		saveCampaign({
 			id: campaign.id,
-			data: form.getValues(),
+			data: transformedValues,
 		});
 	};
 

@@ -8,7 +8,6 @@ import { CampaignName } from '@/components/organisms/CampaignName/CampaignName';
 import { Typography } from '@/components/ui/typography';
 import { twMerge } from 'tailwind-merge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { DraftingSection } from './emailAutomation/draft/DraftingSection';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
@@ -38,14 +37,14 @@ const Murmur = () => {
 	// ensures a premium, smooth transition with no scale effects.
 	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
 	return (
-		<AppLayout>
+		<AppLayout paddingTop="none">
 			<NoMobilePage />
 			{shouldHideContent && (
 				<div className="fixed inset-0 bg-white z-40" />
 			)}
 			<div className={`hidden lg:block transition-opacity duration-200 ${shouldHideContent ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}>
 				<CampaignName campaign={campaign} />
-				<div className="flex gap-24 justify-center mt-8">
+				<div className="flex gap-24 justify-center mt-4">
 					<div className="flex flex-col">
 						<Typography variant="h3" className="text-lg font-semibold font-secondary mb-2">To:</Typography>
 						{campaign?.userContactLists?.map((contactList) => (
@@ -99,11 +98,9 @@ const Murmur = () => {
 					</div>
 				</div>
 
-				<Typography variant="h2" className="mt-10">
-					Drafting
-				</Typography>
-				<Separator className="!w-1/2" />
-				<DraftingSection campaign={campaign} />
+				<div className="mt-6">
+					<DraftingSection campaign={campaign} />
+				</div>
 				<PrepareSendingSection campaign={campaign} />
 				<SentEmailsTable campaign={campaign} />
 				<Link href={urls.murmur.dashboard.index}>

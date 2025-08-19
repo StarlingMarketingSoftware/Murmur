@@ -16,13 +16,15 @@ export interface DraftingRightPanelProps {
 	isTest: boolean;
 	draftingMode: DraftingMode;
 	isGenerationDisabled: () => boolean;
+	hasFullAutomatedBlock?: boolean;
 }
 
 export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
-	const { campaign, handleTestPrompt, isTest, draftingMode, isGenerationDisabled } =
+	const { campaign, handleTestPrompt, isTest, draftingMode, isGenerationDisabled, hasFullAutomatedBlock } =
 		props;
 	const form = useFormContext<z.infer<typeof draftingFormSchema>>();
-	const areSettingsDisabled = draftingMode !== 'ai';
+	const areSettingsDisabled = draftingMode !== 'ai' && !hasFullAutomatedBlock;
+	const showSettings = draftingMode === 'ai' || hasFullAutomatedBlock;
 
 	const [activeTab, setActiveTab] = useState<ActiveTab>('settings');
 
@@ -69,10 +71,10 @@ export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
 	);
 
 	useEffect(() => {
-		if (draftingMode !== 'ai') {
+		if (!showSettings) {
 			setActiveTab('test');
 		}
-	}, [draftingMode]);
+	}, [showSettings]);
 
 	const hasTestMessage = campaign.testMessage || campaign.testSubject;
 
@@ -90,5 +92,6 @@ export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
 		isGenerationDisabled,
 		draftingMode,
 		hasTestMessage,
+		showSettings,
 	};
 };

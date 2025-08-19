@@ -36,6 +36,7 @@ import { HandwrittenPromptInput } from '@/components/molecules/HandwrittenPrompt
 import { Typography } from '@/components/ui/typography';
 import { Font } from '@/types';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
+import { HybridBlock } from '@prisma/client';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
@@ -327,6 +328,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 								handleTestPrompt={handleGenerateTestDrafts}
 								isTest={isTest}
 								draftingMode={draftingMode}
+								hasFullAutomatedBlock={form.watch('hybridBlockPrompts')?.some(block => block.type === HybridBlock.full_automated) || false}
 							/>
 						</div>
 					</div>
