@@ -17,11 +17,11 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
-import ConsoleLoader from '@/components/ui/console-loader';
+import ConsoleLoader from '@/components/atoms/ConsoleLoader/ConsoleLoader';
 import { Card, CardContent } from '@/components/ui/card';
 import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
-import { useClerk, SignInButton } from '@clerk/nextjs';
+import { useClerk } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { MobileAppComingSoon } from '@/components/molecules/MobileAppComingSoon/MobileAppComingSoon';
 
