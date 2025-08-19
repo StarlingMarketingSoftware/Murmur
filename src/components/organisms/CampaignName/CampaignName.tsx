@@ -38,7 +38,7 @@ export const CampaignName: FC<CampaignNameProps> = (props) => {
 							</div>
 						) : (
 							<>
-								<Typography className="!text-[36px] text-center h-fit w-fit mt-5 mb-6">
+								<Typography className="!text-[36px] text-center h-fit w-fit mt-0 mb-6">
 									{campaign.name}
 								</Typography>
 							</>

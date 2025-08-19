@@ -5,7 +5,6 @@ import Spinner from '@/components/ui/spinner';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import { IdentityDialog } from '@/components/organisms/_dialogs/IdentityDialog/IdentityDialog';
 import { CampaignName } from '@/components/organisms/CampaignName/CampaignName';
-import { Card, CardContent } from '@/components/ui/card';
 import { Typography } from '@/components/ui/typography';
 import { twMerge } from 'tailwind-merge';
 import { Button } from '@/components/ui/button';
@@ -46,76 +45,61 @@ const Murmur = () => {
 			)}
 			<div className={`hidden lg:block transition-opacity duration-200 ${shouldHideContent ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}>
 				<CampaignName campaign={campaign} />
-				<Card className="mt-20 border-border !border-2">
-					<CardContent>
-						<div className="flex gap-24">
-							<div className="">
-								<div className="flex gap-8 mb-6 items-center">
-									<Typography variant="h2" className="">
-										User Settings
-									</Typography>
-									<IdentityDialog
-										triggerButton={<Button variant="action-link">Change</Button>}
-										campaign={campaign}
-										title="User Settings"
-										open={isIdentityDialogOpen}
-										onOpenChange={setIsIdentityDialogOpen}
-									/>
-								</div>
-								<Typography className="font-bold !text-[15px]">
-									{campaign?.identity?.name}
-								</Typography>
-								<Typography className="font-bold font-secondary !text-[13px]">
-									{campaign?.identity?.email}
-								</Typography>
-								<Typography
-									className={twMerge(
-										'font-secondary !text-[13px]',
-										!campaign?.identity?.website && '!text-muted italic'
-									)}
-								>
-									{campaign?.identity?.website || 'No website'}
-								</Typography>
-							</div>
-
-							<div className="flex flex-col">
-								<div className="flex gap-8 mb-6 items-center">
-									<Typography variant="h2">Lists Selected</Typography>
-									<ManageCampaignContactListDialog
-										campaign={campaign}
-										open={isContactListDialogOpen}
-										onOpenChange={setIsContactListDialogOpen}
-									/>
-								</div>
-								{campaign?.userContactLists?.map((contactList) => (
-									<Typography key={contactList.id} className="font-bold !text-[15px]">
-										{contactList?.name}
-									</Typography>
-								))}
-								{campaign?.userContactLists.length === 0 && (
-									<Alert variant="warning" className="max-w-72">
-										<AlertCircle className="h-4 w-4" />
-										<AlertTitle>No Recipients</AlertTitle>
-										<AlertDescription>
-											You have not selected any recipients for this campaign.
-										</AlertDescription>
-									</Alert>
-								)}
-							</div>
+				<div className="flex gap-24 justify-center mt-8">
+					<div className="flex flex-col">
+						<Typography variant="h3" className="text-lg font-semibold font-secondary mb-2">To:</Typography>
+						{campaign?.userContactLists?.map((contactList) => (
+							<Typography key={contactList.id} className="font-bold !text-[15px]">
+								{contactList?.name}
+							</Typography>
+						))}
+						{campaign?.userContactLists.length === 0 && (
+							<Alert variant="warning" className="max-w-72">
+								<AlertCircle className="h-4 w-4" />
+								<AlertTitle>No Recipients</AlertTitle>
+								<AlertDescription>
+									You have not selected any recipients for this campaign.
+								</AlertDescription>
+							</Alert>
+						)}
+						<div className="mt-1">
+							<ManageCampaignContactListDialog
+								campaign={campaign}
+								open={isContactListDialogOpen}
+								onOpenChange={setIsContactListDialogOpen}
+							/>
 						</div>
-					</CardContent>
-				</Card>
+					</div>
 
-				<Typography
-					variant="p"
-					font="secondary"
-					className="mt-13 text-[19px] text-center"
-					color="light"
-				>
-					What do you want to say?
-				</Typography>
+					<div className="">
+						<Typography variant="h3" className="text-lg font-semibold font-secondary mb-2">
+							From:
+						</Typography>
+						<Typography className="font-bold !text-[15px]">
+							{campaign?.identity?.name}
+						</Typography>
+						<Typography className="font-bold font-secondary !text-[13px]">
+							{campaign?.identity?.email}
+						</Typography>
+						<Typography
+							className={twMerge(
+								'font-secondary !text-[13px]',
+								!campaign?.identity?.website && '!text-muted italic'
+							)}
+						>
+							{campaign?.identity?.website || 'No website'}
+						</Typography>
+						<IdentityDialog
+							triggerButton={<Button variant="action-link" className="mt-1">Change</Button>}
+							campaign={campaign}
+							title="User Settings"
+							open={isIdentityDialogOpen}
+							onOpenChange={setIsIdentityDialogOpen}
+						/>
+					</div>
+				</div>
 
-				<Typography variant="h2" className="mt-13">
+				<Typography variant="h2" className="mt-10">
 					Drafting
 				</Typography>
 				<Separator className="!w-1/2" />
