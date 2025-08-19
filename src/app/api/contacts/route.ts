@@ -511,7 +511,6 @@ export async function GET(req: NextRequest) {
 					esMatches = positivesOnly.slice(0, finalLimit) as unknown as typeof esMatches;
 				}
 			}
-
 			const vectorSearchContactIds = esMatches
 				.map((match) => Number(match.metadata.contactId ?? match.id))
 				.filter((n) => Number.isFinite(n));

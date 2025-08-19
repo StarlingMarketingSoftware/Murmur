@@ -45,10 +45,12 @@ export const UpgradeSubscriptionDrawer: FC<UpgradeSubscriptionDrawerProps> = (pr
 		>
 			{!hideTriggerButton && (
 				<DrawerTrigger asChild>
-					<Button 
-						variant={buttonVariant ? buttonVariant : 'primary'} 
+					<Button
+						variant={buttonVariant ? buttonVariant : 'primary'}
 						className={twMerge(
-							`gradient-button ${triggerButtonText === 'Import' ? 'gradient-button-blue' : ''}`,
+							`gradient-button ${
+								triggerButtonText === 'Import' ? 'gradient-button-blue' : ''
+							}`,
 							props.className
 						)}
 					>
