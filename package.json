@@ -4,10 +4,10 @@
 	"private": true,
 	"scripts": {
 		"dev": "next dev --port 3000",
-		"build": "node --max-old-space-size=4096 node_modules/.bin/next build",
+		"build": "set NODE_OPTIONS=--max-old-space-size=8192 && next build",
 		"start": "next start",
 		"lint": "next lint",
-		"vercel-build": "cross-env NODE_OPTIONS=--max-old-space-size=8192 prisma generate && prisma migrate deploy && next build",
+		"vercel-build": "prisma generate && prisma migrate deploy && next build",
 		"postinstall": "prisma generate",
 		"import-production-contacts": "tsx --tsconfig tsconfig.json scripts/import-production-contacts.ts",
 		"check-elasticsearch": "tsx --tsconfig tsconfig.json scripts/check-elasticsearch.tsx",

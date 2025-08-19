@@ -305,7 +305,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			throw new Error('Campaign identity is required');
 		}
 
-		// ROBUSTNESS FIX: Dynamically create the system prompt with real data.
 		const populatedSystemPrompt = PERPLEXITY_FULL_AI_PROMPT.replace(
 			'{recipient_first_name}',
 			recipient.firstName || ''
@@ -328,7 +327,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		console.log(
 			`[Full AI] Starting generation for contact: ${recipient.id} (${recipient.email})`
 		);
-		console.log('[Full AI] Populated System Prompt:', populatedSystemPrompt.substring(0, 300));
+		console.log(
+			'[Full AI] Populated System Prompt:',
+			populatedSystemPrompt.substring(0, 300)
+		);
 		console.log('[Full AI] User Prompt:', userPrompt.substring(0, 300));
 
 		let perplexityResponse: string;
@@ -344,11 +346,18 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			if (error instanceof Error && error.message.includes('cancelled')) {
 				throw error;
 			}
-			throw new Error(`Failed to generate email content: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			throw new Error(
+				`Failed to generate email content: ${
+					error instanceof Error ? error.message : 'Unknown error'
+				}`
+			);
 		}
 
 		console.log('[Full AI] Perplexity response length:', perplexityResponse.length);
-		console.log('[Full AI] Perplexity response preview:', perplexityResponse.substring(0, 200));
+		console.log(
+			'[Full AI] Perplexity response preview:',
+			perplexityResponse.substring(0, 200)
+		);
 
 		let mistralResponse1: string;
 		try {
@@ -372,41 +381,48 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 
 		console.log('[Full AI] Mistral raw response:', mistralResponse1.substring(0, 500));
-		
+
 		let mistralResponse1Parsed: DraftEmailResponse;
 		try {
 			// Robust JSON parsing: handle markdown blocks, extra text, etc.
 			let cleanedResponse = mistralResponse1;
-			
+
 			// Remove markdown code blocks if present
-			cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
-			
+			cleanedResponse = cleanedResponse
+				.replace(/^```(?:json)?\s*/i, '')
+				.replace(/\s*```$/i, '');
+
 			// Try to extract JSON object from the response
 			const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
 			if (jsonMatch) {
 				cleanedResponse = jsonMatch[0];
 			}
-			
+
 			// Remove any trailing commas before closing braces/brackets (common LLM mistake)
 			cleanedResponse = cleanedResponse.replace(/,(\s*[}\]])/g, '$1');
-			
-			console.log('[Full AI] Attempting to parse cleaned JSON:', cleanedResponse.substring(0, 200));
+
+			console.log(
+				'[Full AI] Attempting to parse cleaned JSON:',
+				cleanedResponse.substring(0, 200)
+			);
 			mistralResponse1Parsed = JSON.parse(cleanedResponse);
-			
+
 			// Validate the parsed object has required fields
 			if (!mistralResponse1Parsed.message || !mistralResponse1Parsed.subject) {
 				throw new Error('Parsed JSON missing required fields (message or subject)');
 			}
-			
+
 			console.log('[Full AI] Successfully parsed Mistral response');
 		} catch (e) {
 			console.error('[Full AI] Mistral JSON parse failed:', e);
 			console.error('[Full AI] Failed response was:', mistralResponse1);
-			
+
 			// Better fallback: try to extract subject and message as plain text
 			const subjectMatch = mistralResponse1.match(/subject[:\s]+["']?([^"'\n]+)["']?/i);
-			const messageMatch = mistralResponse1.match(/message[:\s]+["']?([\s\S]+?)["']?(?:\}|$)/i);
-			
+			const messageMatch = mistralResponse1.match(
+				/message[:\s]+["']?([\s\S]+?)["']?(?:\}|$)/i
+			);
+
 			if (subjectMatch && messageMatch) {
 				mistralResponse1Parsed = {
 					subject: subjectMatch[1].trim(),
@@ -431,7 +447,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 		if (paragraphs > 0) {
 			try {
-				console.log(`[Full AI] Applying paragraph formatting for ${paragraphs} paragraphs`);
+				console.log(
+					`[Full AI] Applying paragraph formatting for ${paragraphs} paragraphs`
+				);
 				mistralResponse2 = await callMistralAgent({
 					prompt: getMistralParagraphPrompt(paragraphs),
 					content: mistralResponse1Parsed.message,
@@ -444,7 +462,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				mistralResponse2 = mistralResponse1Parsed.message;
 			}
 		} else {
-			console.log('[Full AI] No paragraph formatting requested, returning parsed response');
+			console.log(
+				'[Full AI] No paragraph formatting requested, returning parsed response'
+			);
 			return mistralResponse1Parsed;
 		}
 
@@ -509,31 +529,35 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		try {
 			// Apply same robust JSON parsing as Full AI mode
 			let cleanedResponse = mistralResponse;
-			
+
 			// Remove markdown code blocks if present
-			cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
-			
+			cleanedResponse = cleanedResponse
+				.replace(/^```(?:json)?\s*/i, '')
+				.replace(/\s*```$/i, '');
+
 			// Try to extract JSON object from the response
 			const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
 			if (jsonMatch) {
 				cleanedResponse = jsonMatch[0];
 			}
-			
+
 			// Remove any trailing commas before closing braces/brackets
 			cleanedResponse = cleanedResponse.replace(/,(\s*[}\]])/g, '$1');
-			
+
 			mistralResponseParsed = JSON.parse(cleanedResponse);
-			
+
 			if (!mistralResponseParsed.message || !mistralResponseParsed.subject) {
 				throw new Error('Parsed JSON missing required fields');
 			}
 		} catch (e) {
 			console.error('[Hybrid] Mistral JSON parse failed:', e);
-			
+
 			// Fallback: try to extract from plain text
 			const subjectMatch = mistralResponse.match(/subject[:\s]+["']?([^"'\n]+)["']?/i);
-			const messageMatch = mistralResponse.match(/message[:\s]+["']?([\s\S]+?)["']?(?:\}|$)/i);
-			
+			const messageMatch = mistralResponse.match(
+				/message[:\s]+["']?([\s\S]+?)["']?(?:\}|$)/i
+			);
+
 			if (subjectMatch && messageMatch) {
 				mistralResponseParsed = {
 					subject: subjectMatch[1].trim(),

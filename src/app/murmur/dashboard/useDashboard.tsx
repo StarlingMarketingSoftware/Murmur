@@ -13,7 +13,7 @@ import {
 	useGetContacts,
 	useGetUsedContactIds,
 } from '@/hooks/queryHooks/useContacts';
-import { ColumnDef, Table } from '@tanstack/react-table';
+import { CellContext, ColumnDef, Table } from '@tanstack/react-table';
 import { ContactWithName } from '@/types/contact';
 import { useCreateApolloContacts } from '@/hooks/queryHooks/useApollo';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
@@ -90,7 +90,6 @@ export const useDashboard = () => {
 		isPending: isPendingContacts,
 		isLoading: isLoadingContacts,
 		error,
-		refetch: refetchContacts, // eslint-disable-line @typescript-eslint/no-unused-vars
 		isRefetching: isRefetchingContacts,
 		isError,
 	} = useGetContacts({
@@ -342,7 +341,6 @@ export const useDashboard = () => {
 				cell: ({ row }) => {
 					const isUsed = usedContactIdsSet.has(row.original.id);
 					const email = (row.getValue('email') as string) || '';
-					const [local, domain] = email.includes('@') ? email.split('@') : [email, ''];
 					const rowIndex = row.index;
 					const showFull = rowIndex < 3; // First three rows show full email
 					if (showFull) {
@@ -410,7 +408,7 @@ export const useDashboard = () => {
 									</span>
 								);
 							},
-							cell: ({ row }: any) => {
+							cell: ({ row }: CellContext<ContactWithName, unknown>) => {
 								const contact = row.original as ContactWithName;
 								const hasName = contactHasName(contact);
 								const nameValue = hasName ? computeName(contact) : '';

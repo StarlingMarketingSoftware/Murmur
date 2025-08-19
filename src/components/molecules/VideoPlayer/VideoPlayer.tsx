@@ -35,9 +35,9 @@ export function VideoPlayer({
 					player.currentTime = 0;
 				}
 			};
-			
+
 			player.addEventListener('loadedmetadata', handleLoadedMetadata);
-			
+
 			return () => {
 				player.removeEventListener('loadedmetadata', handleLoadedMetadata);
 			};
@@ -45,12 +45,7 @@ export function VideoPlayer({
 	}, [playbackId]);
 
 	return (
-		<div
-			className={cn(
-				'w-fit h-fit aspect-video max-h-fit overflow-hidden',
-				className
-			)}
-		>
+		<div className={cn('w-fit h-fit aspect-video max-h-fit overflow-hidden', className)}>
 			<MuxPlayer
 				ref={playerRef}
 				accentColor="var(--color-primary)"
@@ -64,12 +59,10 @@ export function VideoPlayer({
 				// Disable autoplay to prevent sync issues
 				autoPlay={false}
 				// Force specific playback rates to prevent drift
-				defaultPlaybackRate={1}
 				playbackRates={[1]}
 				// Disable features that might cause sync issues
 				nohotkeys
 				// Use native controls for better sync handling
-				controls
 			/>
 		</div>
 	);

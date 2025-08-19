@@ -16,6 +16,7 @@ import { applyHardcodedLocationOverrides } from '@/app/api/_utils/searchPreproce
 import { Contact, EmailVerificationStatus, Prisma } from '@prisma/client';
 import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vectorDb';
 import { OPEN_AI_MODEL_OPTIONS } from '@/constants';
+import { StripeSubscriptionStatus } from '@/types';
 
 const VECTOR_SEARCH_LIMIT_DEFAULT = 50;
 
@@ -84,8 +85,8 @@ export async function GET(req: NextRequest) {
 		// Allow both active subscriptions and free trials
 		if (
 			!user ||
-			(user.stripeSubscriptionStatus !== 'active' &&
-				user.stripeSubscriptionStatus !== 'trialing')
+			(user.stripeSubscriptionStatus !== StripeSubscriptionStatus.ACTIVE &&
+				user.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING)
 		) {
 			return apiBadRequest(
 				'An active subscription or free trial is required to search for contacts'
@@ -354,12 +355,11 @@ export async function GET(req: NextRequest) {
 				: requestedLimit;
 			// Protect the vector path with a timeout and fallback to substring search
 			const vectorSearchWithTimeout = async () => {
-				const timeoutMs = 14000; // keep the UI snappy
+				const timeoutMs = 14000;
 				return await Promise.race([
 					searchSimilarContacts(
 						queryJson,
 						effectiveVectorLimit,
-						0.1,
 						effectiveLocationStrategy,
 						{
 							penaltyCities,
@@ -511,18 +511,6 @@ export async function GET(req: NextRequest) {
 					esMatches = positivesOnly.slice(0, finalLimit) as unknown as typeof esMatches;
 				}
 			}
-			// 8.1 seemed like a good limit to keep noise out of music venues...but restrictive for
-
-			// Create a map of contactId to relevance score for efficient lookup
-			// const relevanceMap = new Map<number, number>();
-			// vectorSearchResults.matches.forEach((match, index) => {
-			// 	const contactId = Number((match.metadata as { contactId: number }).contactId);
-			// 	// Use the actual score from vector search, or fall back to rank-based scoring
-			// 	const relevanceScore =
-			// 		match.score || 1 - index / vectorSearchResults.matches.length;
-			// 	relevanceMap.set(contactId, relevanceScore);
-			// });
-
 			const vectorSearchContactIds = esMatches
 				.map((match) => Number(match.metadata.contactId ?? match.id))
 				.filter((n) => Number.isFinite(n));
@@ -768,38 +756,6 @@ export async function GET(req: NextRequest) {
 
 				return apiResponse(fallbackContacts.slice(0, limit));
 			}
-
-			// if (contacts.length < 100) {
-			// 	const fallbackContacts = await substringSearch();
-			// 	const existingContactIds = new Set(contacts.map((contact) => contact.id));
-			// 	const uniqueFallbackContacts = fallbackContacts.filter(
-			// 		(contact) => !existingContactIds.has(contact.id)
-			// 	);
-
-			// 	contacts = [...contacts, ...uniqueFallbackContacts];
-			// }
-
-			// balanced sorting combining relevance and userContactListCount
-			// const maxUserContactListCount = Math.max(
-			// 	...contacts.map((c) => c.userContactListCount),
-			// 	1
-			// );
-
-			// contacts.sort((a, b) => {
-			// 	const aRelevance = relevanceMap.get(a.id) || 0;
-			// 	const bRelevance = relevanceMap.get(b.id) || 0;
-
-			// 	// Normalize userContactListCount (invert so lower count = higher score)
-			// 	const aCountScore = 1 - a.userContactListCount / maxUserContactListCount;
-			// 	const bCountScore = 1 - b.userContactListCount / maxUserContactListCount;
-
-			// 	// Weighted combination (70% relevance, 30% userContactListCount)
-			// 	const aCompositeScore = 0.4 * aRelevance + 0.6 * aCountScore;
-			// 	const bCompositeScore = 0.4 * bRelevance + 0.6 * bCountScore;
-
-			// 	// Sort by composite score (descending - higher score first)
-			// 	return bCompositeScore - aCompositeScore;
-			// });
 
 			return apiResponse(contacts.slice(0, limit));
 		} else {
