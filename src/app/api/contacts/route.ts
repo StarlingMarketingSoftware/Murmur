@@ -757,38 +757,6 @@ export async function GET(req: NextRequest) {
 				return apiResponse(fallbackContacts.slice(0, limit));
 			}
 
-			// if (contacts.length < 100) {
-			// 	const fallbackContacts = await substringSearch();
-			// 	const existingContactIds = new Set(contacts.map((contact) => contact.id));
-			// 	const uniqueFallbackContacts = fallbackContacts.filter(
-			// 		(contact) => !existingContactIds.has(contact.id)
-			// 	);
-
-			// 	contacts = [...contacts, ...uniqueFallbackContacts];
-			// }
-
-			// balanced sorting combining relevance and userContactListCount
-			// const maxUserContactListCount = Math.max(
-			// 	...contacts.map((c) => c.userContactListCount),
-			// 	1
-			// );
-
-			// contacts.sort((a, b) => {
-			// 	const aRelevance = relevanceMap.get(a.id) || 0;
-			// 	const bRelevance = relevanceMap.get(b.id) || 0;
-
-			// 	// Normalize userContactListCount (invert so lower count = higher score)
-			// 	const aCountScore = 1 - a.userContactListCount / maxUserContactListCount;
-			// 	const bCountScore = 1 - b.userContactListCount / maxUserContactListCount;
-
-			// 	// Weighted combination (70% relevance, 30% userContactListCount)
-			// 	const aCompositeScore = 0.4 * aRelevance + 0.6 * aCountScore;
-			// 	const bCompositeScore = 0.4 * bRelevance + 0.6 * bCountScore;
-
-			// 	// Sort by composite score (descending - higher score first)
-			// 	return bCompositeScore - aCompositeScore;
-			// });
-
 			return apiResponse(contacts.slice(0, limit));
 		} else {
 			// Use regular search if vector search is not enabled

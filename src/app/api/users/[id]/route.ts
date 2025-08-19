@@ -1,4 +1,3 @@
-// import { User } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
 import { auth } from '@clerk/nextjs/server';
@@ -23,7 +22,6 @@ const patchUserSchema = z.object({
 	customDomain: z.string().optional().nullable(),
 	draftCredits: z.number().optional(),
 	sendingCredits: z.number().optional(),
-
 	verificationCredits: z.number().optional(),
 });
 export type PatchUserData = z.infer<typeof patchUserSchema>;
