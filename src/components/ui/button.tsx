@@ -138,14 +138,14 @@ function Button({
 			disabled={isLoading}
 			{...props}
 		>
-			{isLoading && (
+			{!isLoading && (
 				<div className="absolute flex items-center justify-center">
 					<Spinner color={variant === 'primary' ? 'background' : 'foreground'} />
 				</div>
 			)}
 			<div
 				className={twMerge(
-					isLoading ? 'invisible' : 'visible',
+					!isLoading ? 'invisible' : 'visible',
 					'flex gap-2 items-center justify-center',
 					noPadding ? '!p-0' : ''
 				)}

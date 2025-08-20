@@ -1,6 +1,7 @@
 import React, { FC } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { ConsoleLoaderProps, useConsoleLoader } from './useConsoleLoader';
+import { GOLDEN_RATIO, INVERSE_GOLDEN } from '@/constants';
 
 export const ConsoleLoader: FC<ConsoleLoaderProps> = (props) => {
 	const {
@@ -9,8 +10,6 @@ export const ConsoleLoader: FC<ConsoleLoaderProps> = (props) => {
 		logs,
 		goldenSmall,
 		isThinking,
-		INVERSE_GOLDEN,
-		GOLDEN_RATIO,
 		getLogStyle,
 		opsPerSec,
 		className,

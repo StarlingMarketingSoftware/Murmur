@@ -1,3 +1,4 @@
+import { GOLDEN_RATIO, INVERSE_GOLDEN } from '@/constants';
 import { useEffect, useRef, useState } from 'react';
 
 export interface ConsoleLoaderProps {
@@ -200,8 +201,6 @@ export const useConsoleLoader = (props: ConsoleLoaderProps) => {
 
 	/* CONSTANTS */
 
-	const GOLDEN_RATIO = 1.618;
-	const INVERSE_GOLDEN = 0.618;
 	const baseUnit = 16;
 	const goldenLarge = Math.round(baseUnit * GOLDEN_RATIO); // 26px
 	const goldenSmall = Math.round(baseUnit * INVERSE_GOLDEN); // 10px
@@ -337,8 +336,6 @@ export const useConsoleLoader = (props: ConsoleLoaderProps) => {
 		logs,
 		goldenSmall,
 		isThinking,
-		INVERSE_GOLDEN,
-		GOLDEN_RATIO,
 		getLogStyle,
 		opsPerSec,
 		className,

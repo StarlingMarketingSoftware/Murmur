@@ -19,3 +19,6 @@ export const RESTRICTED_FEATURE_MESSAGES = {
 export const BASE_URL =
 	process.env.NEXT_PUBLIC_SITE_URL ??
 	(typeof window !== 'undefined' ? window.location.origin : '');
+
+export const GOLDEN_RATIO = 1.618;
+export const INVERSE_GOLDEN = 0.618;
