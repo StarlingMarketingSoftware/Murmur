@@ -1125,12 +1125,6 @@ mux-player {
 	}
 }
 
-/* Removed excessive background gradients for cleaner appearance */
-
-/* Removed dark mode excessive background gradients for cleaner appearance */
-
-/* Premium text gradient animations - Apple/PointOne inspired */
-
 @keyframes premium-gradient-move {
 	0%,
 	100% {

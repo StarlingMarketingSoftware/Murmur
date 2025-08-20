@@ -298,7 +298,7 @@ const Dashboard = () => {
 								<Card className="w-full max-w-full mx-auto">
 									<CardContent className="py-8">
 										<div className="text-center">
-											<Typography variant="h3" className="text-red-600 mb-2">
+											<Typography variant="h3" className="text-destructive mb-2">
 												Search Failed
 											</Typography>
 											<Typography className="text-gray-600 mb-4">

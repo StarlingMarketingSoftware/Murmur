@@ -291,7 +291,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 
 	const columns: ColumnDef<ContactInput>[] = publicColumns;
 
-	const { isAdmin, triggerText, buttonVariant } = props;
+	const { isAdmin, triggerText, buttonVariant, className } = props;
 
 	if (isAdmin) {
 		columns.push(...adminColumns);
@@ -436,6 +436,6 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		triggerText,
 		buttonVariant,
 		isAdmin,
-		className: props.className,
+		className,
 	};
 };
