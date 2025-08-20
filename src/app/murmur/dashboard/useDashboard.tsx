@@ -6,7 +6,6 @@ import { z } from 'zod';
 import { EmailVerificationStatus, UserContactList } from '@prisma/client';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
-import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import {
 	useBatchUpdateContacts,
@@ -23,6 +22,7 @@ import { capitalize } from '@/utils/string';
 import { TableCellTooltip } from '@/components/molecules/TableCellTooltip/TableCellTooltip';
 import { useMe } from '@/hooks/useMe';
 import { StripeSubscriptionStatus } from '@/types';
+import { usePageTransition } from '@/contexts/PageTransitionContext';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -54,7 +54,7 @@ export const useDashboard = () => {
 		},
 	];
 
-	const router = useRouter();
+	const { startTransition } = usePageTransition();
 	const form = useForm<FormData>({
 		resolver: zodResolver(formSchema),
 		defaultValues: {
@@ -230,7 +230,7 @@ export const useDashboard = () => {
 			});
 
 			if (campaign) {
-				router.push(urls.murmur.campaign.detail(campaign.id));
+				startTransition(`${urls.murmur.campaign.detail(campaign.id)}?silent=1`);
 			}
 		} else if (currentTab === 'list') {
 			if (selectedContactListRows.length === 0) {
@@ -242,7 +242,7 @@ export const useDashboard = () => {
 				userContactLists: selectedContactListRows.map((row) => row.id),
 			});
 			if (campaign) {
-				router.push(urls.murmur.campaign.detail(campaign.id));
+				startTransition(`${urls.murmur.campaign.detail(campaign.id)}?silent=1`);
 			}
 		}
 	};
