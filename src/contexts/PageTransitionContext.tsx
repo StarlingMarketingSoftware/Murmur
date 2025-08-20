@@ -79,17 +79,27 @@ const PageTransition = ({
 	const verticalLineRef = useRef<HTMLDivElement>(null);
 	const shimmerRef = useRef<HTMLDivElement>(null);
 
-	useEffect(() => {
+		useEffect(() => {
 		if (!isActive) return;
 
-		if (!containerRef.current || !whiteOverlayRef.current || 
+		if (!containerRef.current || !whiteOverlayRef.current ||
 			!lineOneRef.current || !lineTwoRef.current || !lineThreeRef.current ||
 			!verticalLineRef.current || !shimmerRef.current) {
 			return;
 		}
 
+		// Store current scroll position
+		const scrollPosition = window.scrollY;
+		
+		// Disable scrolling when transition is active
+		document.body.style.overflow = 'hidden';
+		document.body.style.position = 'fixed';
+		document.body.style.width = '100%';
+		document.body.style.top = `-${scrollPosition}px`;
+		document.body.style.touchAction = 'none'; // Prevent touch scrolling on mobile
+
 		// Initial state
-		gsap.set(containerRef.current, { 
+		gsap.set(containerRef.current, {
 			display: 'block',
 			opacity: 0,
 		});
@@ -213,6 +223,17 @@ const PageTransition = ({
 
 		return () => {
 			tl.kill();
+			
+			// Re-enable scrolling when transition completes
+			const scrollY = document.body.style.top;
+			document.body.style.overflow = '';
+			document.body.style.position = '';
+			document.body.style.width = '';
+			document.body.style.top = '';
+			document.body.style.touchAction = ''; // Re-enable touch scrolling
+			if (scrollY) {
+				window.scrollTo(0, parseInt(scrollY || '0') * -1);
+			}
 		};
 	}, [isActive, onComplete]);
 
@@ -228,9 +249,10 @@ const PageTransition = ({
 				width: '100vw',
 				height: '100vh',
 				zIndex: 99999,
-				pointerEvents: 'none',
+				pointerEvents: 'all', // Changed to 'all' to block all interactions
 				overflow: 'hidden',
 				backgroundColor: '#FFFFFF',
+				touchAction: 'none', // Prevent any touch gestures
 			}}
 		>
 			{/* Pure white overlay */}
