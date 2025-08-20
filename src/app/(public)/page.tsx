@@ -41,8 +41,6 @@ const FAQS: FAQ[] = [
 export default function HomePage() {
 	const { addTextSlide, addFadeIn } = useScrollAnimations();
 	const heroRef = useRef<HTMLDivElement>(null);
-	const heroTextRef = useRef<HTMLHeadingElement>(null);
-	const heroSubTextRef = useRef<HTMLParagraphElement>(null);
 	
 	useEffect(() => {
 		// Simple hero fade in
@@ -59,84 +57,7 @@ export default function HomePage() {
 			);
 		}
 		
-		// Letter-by-letter animation for hero text
-		if (heroTextRef.current) {
-			// Split text into words, then letters within words
-			const text = heroTextRef.current.innerText;
-			const words = text.split(' ');
-			
-			// Create word containers with letter spans inside
-			const wordSpans = words.map((word) => {
-				const letterSpans = word.split('').map((letter) => {
-					if (letter === '.') {
-						return `<span class="inline-block opacity-0" style="filter: blur(12px); transform: translateY(20px); font-weight: 400;">${letter}</span>`;
-					}
-					return `<span class="inline-block opacity-0" style="filter: blur(10px); transform: translateY(15px); font-weight: 400;">${letter}</span>`;
-				});
-				
-				// Wrap letters in a word container that won't break
-				return `<span class="inline-block whitespace-nowrap">${letterSpans.join('')}</span>`;
-			});
-			
-			// Join words with spaces
-			heroTextRef.current.innerHTML = wordSpans.join(' ');
-			
-			// Animate each letter
-			const letterElements = heroTextRef.current.querySelectorAll('span span');
-			gsap.to(letterElements, {
-				opacity: 1,
-				filter: 'blur(0px)',
-				y: 0,
-				duration: 1.2,
-				stagger: {
-					each: 0.04, // Time between each letter
-					from: "start",
-					ease: "power2.inOut"
-				},
-				ease: 'power4.out',
-				delay: 0.3, // Start quickly after page loads
-			});
-		}
-		
-		// Letter-by-letter animation for subtitle - ultra premium
-		if (heroSubTextRef.current) {
-			// Split text into words, then letters within words
-			const text = heroSubTextRef.current.innerText;
-			const words = text.split(' ');
-			
-			// Create word containers with letter spans inside
-			const wordSpans = words.map((word) => {
-				const letterSpans = word.split('').map((letter) => {
-					// Special handling for '+' symbol
-					if (letter === '+') {
-						return `<span class="inline-block opacity-0" style="filter: blur(2px); transform: translateX(-10px); font-weight: 300;">${letter}</span>`;
-					}
-					return `<span class="inline-block opacity-0" style="filter: blur(2px); transform: translateX(-10px); font-weight: 300;">${letter}</span>`;
-				});
-				
-				// Wrap letters in a word container that won't break
-				return `<span class="inline-block whitespace-nowrap">${letterSpans.join('')}</span>`;
-			});
-			
-			// Join words with spaces
-			heroSubTextRef.current.innerHTML = wordSpans.join(' ');
-			
-			// Animate each letter
-			const letterElements = heroSubTextRef.current.querySelectorAll('span span');
-			gsap.to(letterElements, {
-				opacity: 1,
-				filter: 'blur(0px)',
-				x: 0,
-				duration: 1.8, // Slower, more deliberate
-				stagger: {
-					each: 0.02, // Very smooth cascade
-					from: "start", // Left to right
-					ease: "power4.inOut" // Ultra smooth easing
-				},
-				ease: 'power4.out', // Luxury easing
-				delay: 2, // Start after main text completes
-			});
-		}
+		// No animations for hero text and subtitle - they appear immediately
 	}, []);
 	
 	return (
@@ -162,7 +83,6 @@ export default function HomePage() {
 								className="text-center !text-[24px] sm:!text-[28px] md:!text-[34px] leading-[1] mt-8 sm:mt-12 md:mt-16 lg:mt-[72px] whitespace-normal sm:whitespace-nowrap font-tertiary"
 								style={{ fontWeight: 400 }}
 								data-hero-element
-								ref={heroTextRef}
 							>
 								Get Contacts. Get Work. Email Anyone.
 							</h2>
@@ -170,7 +90,6 @@ export default function HomePage() {
 								<p 
 									className="text-center text-black font-inter !text-[14px] sm:!text-[22px] md:!text-[26px] whitespace-nowrap"
 									style={{ fontWeight: 300 }}
-									ref={heroSubTextRef}
 								>
 									The Ultimate Database + Email Tool for Musicians
 								</p>
