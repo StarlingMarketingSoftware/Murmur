@@ -15,7 +15,7 @@ import { FC, ReactNode } from 'react';
 import { Input } from '@/components/ui/input';
 import { Typography } from '@/components/ui/typography';
 import { PlusIcon, EditIcon, X, SquareCheckIcon } from 'lucide-react';
-import Spinner from '@/components/ui/spinner';
+import Spinner from '@/components/atoms/Spinner/Spinner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import EditContactListDialog from '../EditContactListDialog/EditContactListDialog';

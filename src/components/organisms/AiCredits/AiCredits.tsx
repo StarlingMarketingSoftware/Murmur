@@ -1,7 +1,7 @@
 'use client';
 import { useMe } from '@/hooks/useMe';
 import { CreditCardIcon } from 'lucide-react';
-import Spinner from '../../ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import {
 	Tooltip,
 	TooltipContent,

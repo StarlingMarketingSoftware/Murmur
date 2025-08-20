@@ -17,11 +17,11 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
-import ConsoleLoader from '@/components/ui/console-loader';
+import ConsoleLoader from '@/components/atoms/ConsoleLoader/ConsoleLoader';
 import { Card, CardContent } from '@/components/ui/card';
 import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
-import { useClerk, SignInButton } from '@clerk/nextjs';
+import { useClerk } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { MobileAppComingSoon } from '@/components/molecules/MobileAppComingSoon/MobileAppComingSoon';
 
@@ -53,7 +53,6 @@ const Dashboard = () => {
 		hoveredText,
 	} = useDashboard();
 
-	// Show mobile app coming soon page on mobile devices
 	// Return null during initial load to prevent hydration mismatch
 	if (isMobile === null) {
 		return null;
@@ -149,7 +148,6 @@ const Dashboard = () => {
 														/>
 														<div className="search-wave-overlay" />
 													</div>
-													{/* Buttons hidden during active search */}
 												</div>
 											</FormControl>
 											<FormMessage />
@@ -298,7 +296,7 @@ const Dashboard = () => {
 								<Card className="w-full max-w-full mx-auto">
 									<CardContent className="py-8">
 										<div className="text-center">
-											<Typography variant="h3" className="text-red-600 mb-2">
+											<Typography variant="h3" className="text-destructive mb-2">
 												Search Failed
 											</Typography>
 											<Typography className="text-gray-600 mb-4">

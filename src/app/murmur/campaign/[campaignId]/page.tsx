@@ -1,7 +1,7 @@
 'use client';
 
 import { useCampaignDetail } from './useCampaignDetail';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import { IdentityDialog } from '@/components/organisms/_dialogs/IdentityDialog/IdentityDialog';
 import { CampaignName } from '@/components/organisms/CampaignName/CampaignName';
@@ -39,14 +39,14 @@ const Murmur = () => {
 	return (
 		<AppLayout paddingTop="none">
 			<NoMobilePage />
-			{shouldHideContent && (
-				<div className="fixed inset-0 bg-white z-40" />
-			)}
-			<div 
-				className={`hidden lg:block transition-opacity duration-200 ${shouldHideContent ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}
+			{shouldHideContent && <div className="fixed inset-0 bg-white z-40" />}
+			<div
+				className={`hidden lg:block transition-opacity duration-200 ${
+					shouldHideContent ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'
+				}`}
 				style={{
 					WebkitTransition: 'opacity 0.2s',
-					transition: 'opacity 0.2s'
+					transition: 'opacity 0.2s',
 				}}
 			>
 				<div className="flex justify-center">
@@ -54,7 +54,12 @@ const Murmur = () => {
 				</div>
 				<div className="w-[1165px] mx-auto flex items-start gap-[47px] mt-4">
 					<div className="w-[559px] flex flex-col">
-						<Typography variant="h3" className="text-lg font-semibold font-secondary mb-2">To:</Typography>
+						<Typography
+							variant="h3"
+							className="text-lg font-semibold font-secondary mb-2"
+						>
+							To:
+						</Typography>
 						{campaign?.userContactLists?.map((contactList) => (
 							<Typography key={contactList.id} className="font-bold !text-[15px]">
 								{contactList?.name}
@@ -79,7 +84,10 @@ const Murmur = () => {
 					</div>
 
 					<div className="w-[559px]">
-						<Typography variant="h3" className="text-lg font-semibold font-secondary mb-2">
+						<Typography
+							variant="h3"
+							className="text-lg font-semibold font-secondary mb-2"
+						>
 							From:
 						</Typography>
 						<Typography className="font-bold !text-[15px]">
@@ -97,7 +105,11 @@ const Murmur = () => {
 							{campaign?.identity?.website || 'No website'}
 						</Typography>
 						<IdentityDialog
-							triggerButton={<Button variant="action-link" className="mt-1">Change</Button>}
+							triggerButton={
+								<Button variant="action-link" className="mt-1">
+									Change
+								</Button>
+							}
 							campaign={campaign}
 							title="User Settings"
 							open={isIdentityDialogOpen}

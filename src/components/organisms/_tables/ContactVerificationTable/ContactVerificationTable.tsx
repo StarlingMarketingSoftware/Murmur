@@ -1,6 +1,6 @@
 'use client';
 
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import { Button } from '@/components/ui/button';
 import { useContactVerificationTable } from './useContactVerificationTable';

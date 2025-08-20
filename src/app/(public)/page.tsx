@@ -1,16 +1,13 @@
- 'use client';
- import LogoIcon from '@/components/atoms/_svg/LogoIcon';
+'use client';
+import LogoIcon from '@/components/atoms/_svg/LogoIcon';
 import { Button } from '@/components/ui/button';
 import { Typography } from '@/components/ui/typography';
 import { urls } from '@/constants/urls';
-import { SignUpButton, useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { PromotionLogos } from '@/components/molecules/PromotionLogos/PromotionLogos';
 import { FAQ } from '@/types';
-// import Image from 'next/image';
 import { ProductList } from '@/components/organisms/ProductList/ProductList';
 import { FaqSection } from '@/components/molecules/FaqSection/FaqSection';
-import { GradientBanner } from '@/components/molecules/GradientBanner/GradientBanner';
 import { VideoPlayer } from '@/components/molecules/VideoPlayer/VideoPlayer';
 import { ComparisonTable } from '@/components/molecules/ComparisonTable/ComparisonTable';
 import { ScrollingReviews } from '@/components/molecules/ScrollingReviews/ScrollingReviews';
@@ -37,8 +34,6 @@ const FAQS: FAQ[] = [
 ];
 
 export default function HomePage() {
-	const { isSignedIn } = useClerk();
-
 	return (
 		<main className="overflow-hidden">
 			<div className="relative w-screen bg-white py-12 sm:py-16 md:py-20 lg:py-24">
@@ -50,10 +45,16 @@ export default function HomePage() {
 							<div className="inline-block">
 								<LogoIcon width="106px" height="84px" />
 							</div>
-							<Typography variant="h1" className="text-center mt-2 !text-[60px] sm:!text-[70px] md:!text-[80px] leading-[0.8]">
+							<Typography
+								variant="h1"
+								className="text-center mt-2 !text-[60px] sm:!text-[70px] md:!text-[80px] leading-[0.8]"
+							>
 								Murmur
 							</Typography>
-							<Typography variant="h2" className="text-center !text-[24px] sm:!text-[28px] md:!text-[34px] leading-[1] mt-8 sm:mt-12 md:mt-16 lg:mt-[72px] whitespace-normal sm:whitespace-nowrap" style={{ fontFamily: 'var(--font-zen-antique)' }}>
+							<Typography
+								variant="h2"
+								className="text-center !text-[24px] sm:!text-[28px] md:!text-[34px] leading-[1] mt-8 sm:mt-12 md:mt-16 lg:mt-[72px] whitespace-normal sm:whitespace-nowrap font-tertiary"
+							>
 								Get Contacts. Get Work. Email Anyone.
 							</Typography>
 							<div className="w-full max-w-[764px] mx-auto mt-2 flex items-center justify-center px-4">
@@ -63,19 +64,26 @@ export default function HomePage() {
 							</div>
 						</div>
 					</div>
-					
+
 					<div className="mt-8 sm:mt-10 md:mt-12 flex flex-col items-center">
 						<LeadSender />
-						<Link href={urls.murmur.dashboard.index} className="mt-0 mx-auto w-full max-w-[490px] px-4">
+						<Link
+							href={urls.murmur.dashboard.index}
+							className="mt-0 mx-auto w-full max-w-[490px] px-4"
+						>
 							<Button
 								variant="primary"
 								size="lg"
 								font="secondary"
 								noPadding
 								className="!w-full !h-[42px] !min-h-0 !py-0 !px-0 !font-normal"
-								style={{ backgroundColor: '#289137', borderRadius: '7px', fontWeight: 400 }}
+								style={{
+									backgroundColor: '#289137',
+									borderRadius: '7px',
+									fontWeight: 400,
+								}}
 							>
-								<span className="!font-normal">Launch</span>
+								Launch
 							</Button>
 						</Link>
 						<Typography variant="p" className="text-center mt-4 tracking-[0.08em]">
@@ -86,11 +94,14 @@ export default function HomePage() {
 				<div className="h-16 sm:h-20 md:h-24"></div>
 			</div>
 			{/* Explanation */}
-			<div className="w-full bg-[#EBEBEB] pt-16 pb-4">
+			<div className="w-full bg-gray-200 pt-16 pb-4">
 				{/* Video Section */}
 				<div className="pt-0 pb-6 px-4">
 					<div className="mx-auto max-w-[943px] flex items-center justify-center flex-col">
-						<Typography variant="h2" className="text-center sm:text-left text-[30px] sm:text-[42px] w-full mb-8" style={{ fontFamily: 'var(--font-zen-antique)' }}>
+						<Typography
+							variant="h2"
+							className="text-center sm:text-left text-[30px] sm:text-[42px] w-full mb-8 font-tertiary"
+						>
 							Not Another Email Tool.
 						</Typography>
 						<div className="relative max-w-[943px] w-full h-full aspect-video">
@@ -103,15 +114,17 @@ export default function HomePage() {
 								}}
 							/>
 						</div>
-						<Typography className="mt-8 mx-auto max-w-[943px]" variant="promoP" style={{ textAlign: 'justify' }}>
+						<Typography
+							className="mt-8 mx-auto max-w-[943px] !text-justify"
+							variant="promoP"
+						>
 							{`Murmur serves an entirely different purpose. While other email marketing tools like Mailchimp are great for keeping up an email newsletter, Murmur is designed specifically for musicians and managers in the music industry. We've trained our system on industry knowledge to help you succeed`}
 						</Typography>
 						<div className="flex justify-center mt-24">
 							<Link href={urls.contact.index}>
-								<Button 
+								<Button
 									size="lg"
-									className="bg-[#000000] text-white hover:bg-[#000000]/90 px-12"
-									style={{ fontFamily: 'var(--font-zen-antique)', borderRadius: '5.59px' }}
+									className="bg-black text-background hover:bg-[#000000]/90 px-12 font-tertiary rounded-[5.59px]"
 								>
 									Book a demo
 								</Button>
@@ -120,12 +133,13 @@ export default function HomePage() {
 					</div>
 				</div>
 			</div>
-			{/* Removed promo banner */}
 
-			{/* Moved: Send without Limits + second video + description */}
 			<div className="w-full bg-[#1C1C1C] pt-14 sm:pt-28 pb-2 sm:pb-4 px-4">
 				<div className="mx-auto max-w-[943px] flex items-center justify-center flex-col">
-					<Typography variant="h2" className="text-center sm:text-left w-full text-white text-[30px] sm:text-[42px]" style={{ fontFamily: 'var(--font-zen-antique)' }}>
+					<Typography
+						variant="h2"
+						className="text-center sm:text-left w-full text-background text-[30px] sm:text-[42px] font-tertiary"
+					>
 						Send without Limits.<br></br> Dream without Boundaries.
 					</Typography>
 					<div className="relative max-w-[943px] w-full h-full aspect-video mt-8 sm:mt-12">
@@ -142,7 +156,7 @@ export default function HomePage() {
 				</div>
 				<Typography
 					variant="promoP"
-					className="w-full max-w-[943px] mx-auto !mt-16 sm:!mt-32 text-white"
+					className="w-full max-w-[943px] mx-auto !mt-16 sm:!mt-32 text-background"
 					style={{ textAlign: 'justify' }}
 				>
 					{`Our software gathers data on each contact every time you draft an email with
@@ -157,8 +171,7 @@ export default function HomePage() {
 				<ComparisonTable />
 			</div>
 
-
-			<div className="w-full bg-white">
+			<div className="w-full bg-background">
 				<div className="max-w-[1608px] mx-auto pt-18 sm:pt-24">
 					<Typography variant="h3" className="text-center text-[27px] font-inter">
 						Trusted by countless professionals
@@ -183,7 +196,10 @@ export default function HomePage() {
 
 			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-25 px-4">
 				<div className="mx-auto max-w-[943px]">
-					<Typography variant="h2" className="text-center sm:text-left text-[30px] sm:text-[42px]" style={{ fontFamily: 'var(--font-zen-antique)' }}>
+					<Typography
+						variant="h2"
+						className="text-center sm:text-left text-[30px] sm:text-[42px] font-tertiary"
+					>
 						Murmur helps you draft.<br></br> No ChatGPT. We built our own.
 					</Typography>
 				</div>
@@ -198,11 +214,13 @@ export default function HomePage() {
 					thousands of successful emails. We've made technology that lets you build a
 					campaign that cuts through the noise. We know what it takes to succeed.`}
 				</Typography>
-
 			</div>
 
 			<div className="mt-24">
-				<Typography variant="h2" className="text-center mx-auto py-8 text-[30px] sm:text-[42px]" style={{ fontFamily: 'var(--font-zen-antique)' }}>
+				<Typography
+					variant="h2"
+					className="text-center mx-auto py-8 text-[30px] sm:text-[42px] font-tertiary"
+				>
 					{`Find the plan that's right for`} <span className="italic">you</span>
 				</Typography>
 			</div>
@@ -219,10 +237,9 @@ export default function HomePage() {
 				<ProductList billingCycle="year" />
 				<div className="mt-16 flex justify-center">
 					<Link href={urls.pricing.index}>
-						<Button 
+						<Button
 							size="lg"
-							className="bg-[#000000] text-white hover:bg-[#000000]/90 px-12"
-							style={{ fontFamily: 'var(--font-zen-antique)', borderRadius: '5.59px' }}
+							className="bg-[#000000] text-white hover:bg-[#000000]/90 px-12 font-tertiary rounded-[5.59px]"
 						>
 							Learn More
 						</Button>

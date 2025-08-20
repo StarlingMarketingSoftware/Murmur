@@ -10,8 +10,6 @@ import { getSubscriptionTierWithPriceId } from '@/utils';
 import { addMonths, isAfter } from 'date-fns';
 import { NextRequest } from 'next/server';
 
-export const maxDuration = 30;
-
 export async function GET(req: NextRequest) {
 	const cronSecret = process.env.CRON_SECRET;
 	if (!cronSecret) {
@@ -20,13 +18,7 @@ export async function GET(req: NextRequest) {
 		return apiServerError(errorMessage);
 	}
 
-	// Allow either Authorization header or `?secret=` query param (Vercel Cron does not support custom headers)
-	const url = new URL(req.url);
-	const querySecret = url.searchParams.get('secret');
-	const authHeader = req.headers.get('Authorization');
-	const isAuthorized =
-		authHeader === `Bearer ${cronSecret}` || (querySecret && querySecret === cronSecret);
-	if (!isAuthorized) {
+	if (req.headers.get('Authorization') !== `Bearer ${cronSecret}`) {
 		console.error('CRON JOB: Unauthorized');
 		return apiUnauthorized();
 	}

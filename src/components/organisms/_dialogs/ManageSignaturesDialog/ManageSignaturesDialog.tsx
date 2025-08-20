@@ -23,7 +23,7 @@ import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Signature } from '@prisma/client';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { twMerge } from 'tailwind-merge';
 import { Input } from '@/components/ui/input';
 import { SaveIcon, TrashIcon } from 'lucide-react';

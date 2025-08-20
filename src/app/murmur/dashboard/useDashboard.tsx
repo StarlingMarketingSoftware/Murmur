@@ -130,9 +130,7 @@ export const useDashboard = () => {
 		}
 	}, [hasSearched, activeSearchQuery, activeExcludeUsedContacts, limit]);
 
-	// Handle errors
 	useEffect(() => {
-		// Only show error if we've actually searched (not on initial load)
 		if (isError && error && hasSearched && activeSearchQuery) {
 			console.error('Contact search error details:', {
 				error,
@@ -198,10 +196,8 @@ export const useDashboard = () => {
 		if (!contacts || !tableInstance) return;
 
 		if (isAllSelected) {
-			// Unselect all
 			tableInstance.toggleAllRowsSelected(false);
 		} else {
-			// Select all rows
 			tableInstance.toggleAllRowsSelected(true);
 		}
 	};
@@ -297,14 +293,6 @@ export const useDashboard = () => {
 		const ratio = contactsWithNames.length / contacts.length;
 		const threshold = 0.7; // 70% threshold for header to be fully visible
 
-		console.log('🎨 Name column fade effect:', {
-			totalContacts: contacts.length,
-			contactsWithNames: contactsWithNames.length,
-			percentage: (ratio * 100).toFixed(1) + '%',
-			headerStatus: ratio > threshold ? '✅ VISIBLE' : '🌫️ FADED',
-			threshold: threshold * 100 + '%',
-		});
-
 		return ratio > threshold; // Header is visible if more than 70% have names
 	}, [contacts, contactHasName]);
 
@@ -340,7 +328,7 @@ export const useDashboard = () => {
 					const isUsed = usedContactIdsSet.has(row.original.id);
 					const email = (row.getValue('email') as string) || '';
 					const rowIndex = row.index;
-					const showFull = rowIndex < 3; // First three rows show full email
+					const showFull = rowIndex < 3;
 					if (showFull) {
 						return (
 							<div className="flex truncate">
@@ -352,7 +340,7 @@ export const useDashboard = () => {
 											</div>
 										</TooltipTrigger>
 										<TooltipContent side="right">
-											<div className="font-normal">{email}</div>
+											<div>{email}</div>
 										</TooltipContent>
 									</Tooltip>
 								) : (

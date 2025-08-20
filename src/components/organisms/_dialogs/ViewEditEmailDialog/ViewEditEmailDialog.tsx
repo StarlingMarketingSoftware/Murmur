@@ -14,7 +14,7 @@ import {
 	useViewEditEmailDialog,
 	ViewEditEmailDialogProps,
 } from './useViewEditEmailDialog';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import {
 	Form,
 	FormControl,

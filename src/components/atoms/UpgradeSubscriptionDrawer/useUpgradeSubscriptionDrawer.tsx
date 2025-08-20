@@ -25,6 +25,7 @@ export const useUpgradeSubscriptionDrawer = (props: UpgradeSubscriptionDrawerPro
 		setIsOpen,
 		hideTriggerButton,
 		buttonVariant,
+		className,
 	} = props;
 	const { user, subscriptionTier, isFreeTrial } = useMe();
 	const router = useRouter();
@@ -80,5 +81,6 @@ export const useUpgradeSubscriptionDrawer = (props: UpgradeSubscriptionDrawerPro
 		isUpdateSubscriptionTriggered,
 		hideTriggerButton,
 		buttonVariant,
+		className,
 	};
 };

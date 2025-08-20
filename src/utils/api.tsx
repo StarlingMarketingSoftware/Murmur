@@ -1,7 +1,6 @@
 type FetchMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
-// Default timeout in milliseconds
-const DEFAULT_TIMEOUT = 30000; // 30 seconds
+const DEFAULT_TIMEOUT = 30000;
 
 export const _fetch = async <TBody = unknown,>(
 	url: string,
@@ -11,11 +10,9 @@ export const _fetch = async <TBody = unknown,>(
 ): Promise<Response> => {
 	const timeout = options?.timeout ?? DEFAULT_TIMEOUT;
 
-	// Create an AbortController for timeout
 	const controller = new AbortController();
 	const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-	// Use provided signal or timeout signal
 	const signal = options?.signal ?? controller.signal;
 
 	try {

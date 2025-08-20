@@ -45,7 +45,7 @@ For Stripe subscription functionality, set up a webhook:
    - Events: Select `checkout.session.completed`, `customer.subscription.updated`, and `customer.subscription.deleted`.
    - Create a signing secret and copy it
 3. Add the signing secret to your `.env` file as `STRIPE_WEBHOOK_SECRET`
-4. For testing locally, use Stripe CLI, instead of ngrok.
+4. For testing locally, install and use the Stripe CLI (https://docs.stripe.com/stripe-cli?install-method=homebrew), instead of ngrok.
 
    - https://docs.stripe.com/webhooks
    - Run the following command:

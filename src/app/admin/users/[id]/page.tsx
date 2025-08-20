@@ -1,6 +1,6 @@
 'use client';
 import { FC } from 'react';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { useManageUserDetail } from './useManageUserDetail';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

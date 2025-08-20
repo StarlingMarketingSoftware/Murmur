@@ -4,7 +4,7 @@ import { Progress } from '@/components/ui/progress';
 import { Typography } from '@/components/ui/typography';
 import { BanIcon, CheckCircle2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 
 const ProgressIndicator: FC<ProgressIndicatorProps> = (props) => {
 	const {
