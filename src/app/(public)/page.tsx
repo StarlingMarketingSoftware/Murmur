@@ -366,7 +366,7 @@ export default function HomePage() {
 			</div>
 
 			<div className="w-full bg-[#2B2B2B]">
-				<div ref={(el) => addFadeIn(el)}>
+				<div ref={(el) => addFadeIn(el)} data-faq-section>
 					<FaqSection
 						faqs={FAQS}
 						header=""

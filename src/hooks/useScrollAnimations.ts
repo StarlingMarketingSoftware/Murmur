@@ -75,6 +75,11 @@ export const useScrollAnimations = () => {
 					willChange: 'opacity', // Safari optimization
 				});
 
+				// Check if this is a bottom section that shouldn't fade out when scrolled past
+				const isBottomSection = element.querySelector('[data-faq-section]') || 
+									   element.closest('[data-faq-section]') ||
+									   element.classList.contains('faq-section');
+				
 				const trigger = ScrollTrigger.create({
 					trigger: element,
 					start: 'top 90%', // Similar to PointOne's trigger point
@@ -93,13 +98,16 @@ export const useScrollAnimations = () => {
 					},
 					onLeave: () => {
 						// Scrolling down - element leaves viewport from top
-						gsap.to(element, {
-							opacity: 0,
-							duration: 0.3, // Quick fade out
-							ease: 'power2.in',
-							overwrite: 'auto',
-							force3D: false, // Safari fix
-						});
+						// Don't fade out bottom sections like FAQ
+						if (!isBottomSection) {
+							gsap.to(element, {
+								opacity: 0,
+								duration: 0.3, // Quick fade out
+								ease: 'power2.in',
+								overwrite: 'auto',
+								force3D: false, // Safari fix
+							});
+						}
 					},
 					onEnterBack: () => {
 						// Scrolling up - element re-enters viewport from top
