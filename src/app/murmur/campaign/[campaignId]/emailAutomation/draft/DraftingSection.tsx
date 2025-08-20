@@ -11,30 +11,15 @@ import {
 	Form,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import {
-	Select,
-	SelectContent,
-	SelectGroup,
-	SelectItem,
-	SelectLabel,
-	SelectTrigger,
-	SelectValue,
-} from '@/components/ui/select';
-import { FONT_OPTIONS } from '@/constants';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { ManageSignaturesDialog } from '@/components/organisms/_dialogs/ManageSignaturesDialog/ManageSignaturesDialog';
 import { ConfirmDialog } from '@/components/organisms/_dialogs/ConfirmDialog/ConfirmDialog';
 import ProgressIndicator from '@/components/molecules/ProgressIndicator/ProgressIndicator';
-import { Signature } from '@prisma/client';
-import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 import { Typography } from '@/components/ui/typography';
-import { Font } from '@/types';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
-import { HybridBlock } from '@prisma/client';
 import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {

@@ -9,16 +9,12 @@ interface TableCellTooltipProps {
 
 export const TableCellTooltip: FC<TableCellTooltipProps> = ({
 	text,
-	maxLength = 40,
-	positioning = 'below-right', // Kept for backwards compatibility
 	onHover,
 }) => {
 	const textRef = useRef<HTMLDivElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
-	const overlayRef = useRef<HTMLDivElement>(null);
 	const [isOverflowing, setIsOverflowing] = useState(false);
 	const [isHovering, setIsHovering] = useState(false);
-	const [overlayPosition, setOverlayPosition] = useState({ top: 0, left: 0 });
 
 	useEffect(() => {
 		const checkOverflow = () => {
@@ -63,20 +59,11 @@ export const TableCellTooltip: FC<TableCellTooltipProps> = ({
 		const updatePosition = () => {
 			const container = containerRef.current!;
 
-			// Find the table element
-			const tableElement = container.closest('table');
-			if (!tableElement) return;
+					// Find the table element
+		const tableElement = container.closest('table');
+		if (!tableElement) return;
 
-			// Get the table's position
-			const tableRect = tableElement.getBoundingClientRect();
-
-			// STATIC POSITION: Right above the table, left-aligned for better readability
-			// Text appears in a neat position above the table
-			const tooltipTop = tableRect.top - 35; // 35px above the table top
-			const tooltipLeft = tableRect.left; // Align with left edge of table
-
-			// Apply the position
-			setOverlayPosition({ top: tooltipTop, left: Math.max(10, tooltipLeft) });
+		// Position is now handled statically
 		};
 
 		// Update position immediately

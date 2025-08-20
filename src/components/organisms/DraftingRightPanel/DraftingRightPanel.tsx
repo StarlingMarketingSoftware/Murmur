@@ -1,6 +1,5 @@
 import { FC } from 'react';
 import { DraftingRightPanelProps, useDraftingRightPanel } from './useDraftingRightPanel';
-import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
 import { StepSlider } from '@/components/atoms/StepSlider/StepSlider';
@@ -15,7 +14,6 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 	const {
 		activeTab,
 		setActiveTab,
-		modeOptions,
 		toneOptions,
 		draftEmail,
 		handleTestPrompt,
@@ -23,7 +21,6 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 		areSettingsDisabled,
 		form,
 		isGenerationDisabled,
-		draftingMode,
 		hasTestMessage,
 		showSettings,
 		insertPlaceholder,

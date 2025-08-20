@@ -18,7 +18,7 @@ import { ContactWithName } from '@/types/contact';
 import { useCreateApolloContacts } from '@/hooks/queryHooks/useApollo';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { toast } from 'sonner';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
 import { capitalize } from '@/utils/string';
 import { TableCellTooltip } from '@/components/molecules/TableCellTooltip/TableCellTooltip';
 import { useMe } from '@/hooks/useMe';
