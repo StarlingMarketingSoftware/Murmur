@@ -5,9 +5,7 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 // See https://clerk.com/docs/references/nextjs/auth-middleware for more information about configuring your middleware
 
 const isProtectedRoute = createRouteMatcher([
-	// Protect all API routes except webhooks and the cron endpoint
-	'/api/((?!webhooks|stripe/cron).*)$',
-	// Protect all murmur routes except the dashboard
+	'/api/((?!webhooks).*)$',
 	'/murmur/((?!dashboard).*)$',
 	'/admin/(.*)',
 ]);

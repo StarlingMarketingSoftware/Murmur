@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
 		ignoreBuildErrors: process.env.VERCEL ? true : false, // ignore build errors in production
 	},
 	eslint: {
-		ignoreDuringBuilds: true, // ignore build errors in production
+		ignoreDuringBuilds: process.env.VERCEL ? true : false, // ignore build errors in production
 	},
 	productionBrowserSourceMaps: false,
 };

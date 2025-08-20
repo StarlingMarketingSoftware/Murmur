@@ -49,9 +49,8 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 
 				{/* Main content with fade animation */}
 				<div
-					className="flex flex-col h-full w-full bg-white"
+					className="flex flex-col h-full w-full bg-white font-primary"
 					style={{
-						fontFamily: "'Times New Roman', Times, serif",
 						WebkitAnimation: 'dialog-smooth-in 0.3s ease-out forwards',
 						animation: 'dialog-smooth-in 0.3s ease-out forwards',
 					}}
@@ -61,8 +60,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 						{/* Back button - always visible, goes to dashboard */}
 						<button
 							onClick={() => router.push(urls.murmur.dashboard.index)}
-							className="absolute left-8 top-1/2 -translate-y-1/2 inline-flex items-center gap-2 px-3 py-1.5 bg-transparent border-0 rounded-lg text-gray-600/60 text-sm font-normal cursor-pointer transition-all duration-200 hover:bg-gray-100/50 hover:text-gray-900 active:scale-95"
-							style={{ fontFamily: "'Times New Roman', Times, serif" }}
+							className="absolute left-8 top-1/2 -translate-y-1/2 inline-flex items-center gap-2 px-3 py-1.5 bg-transparent border-0 rounded-lg text-gray-600/60 text-sm font-normal cursor-pointer transition-all duration-200 hover:bg-gray-100/50 hover:text-gray-900 active:scale-95 font-primary"
 							aria-label="Back to dashboard"
 						>
 							<svg

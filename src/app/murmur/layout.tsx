@@ -8,15 +8,10 @@ import { useMe } from '@/hooks/useMe';
 import { ArrowLeft } from 'lucide-react';
 import { useEffect } from 'react';
 
-export default function MurmurLayout({
-	children,
-}: {
-	children: React.ReactNode;
-}) {
+export default function MurmurLayout({ children }: { children: React.ReactNode }) {
 	const pathname = usePathname();
 	const { user } = useMe();
 
-	// Show Admin link only for admin users
 	const showAdminLink = user?.role === 'admin';
 
 	// Hide footer for murmur pages
@@ -35,21 +30,20 @@ export default function MurmurLayout({
 						{/* Back to Home button */}
 						<Link
 							href={urls.home.index}
-							className="flex items-center gap-2 text-[13px] font-normal transition-all duration-200 font-secondary tracking-[0.02em] text-gray-600 opacity-60 hover:opacity-100 hover:text-black"
+							className="flex items-center gap-2 text-[13px] transition-all duration-200 font-secondary tracking-[0.02em] text-gray-600 opacity-60 hover:opacity-100 hover:text-black"
 						>
 							<ArrowLeft className="w-4 h-4" />
 							<span className="hidden sm:inline">Back to Home</span>
 							<span className="sm:hidden">Home</span>
 						</Link>
-						
-						{/* Admin link - only show if user is admin */}
+
 						{showAdminLink && (
 							<Link
 								href={urls.admin.index}
 								className={cn(
-									'text-[13px] font-normal transition-all duration-200 font-secondary tracking-[0.02em]',
-									pathname === urls.admin.index 
-										? 'text-black opacity-100' 
+									'text-[13px] transition-all duration-200 font-secondary tracking-[0.02em]',
+									pathname === urls.admin.index
+										? 'text-black opacity-100'
 										: 'text-gray-600 opacity-60 hover:opacity-100 hover:text-black'
 								)}
 							>
@@ -57,13 +51,13 @@ export default function MurmurLayout({
 							</Link>
 						)}
 					</div>
-					<UserButton 
-						afterSignOutUrl="/" 
+					<UserButton
 						appearance={{
 							elements: {
-								avatarBox: "w-7 h-7",
-								userButtonTrigger: "opacity-60 hover:opacity-100 transition-opacity duration-200"
-							}
+								avatarBox: 'w-7 h-7',
+								userButtonTrigger:
+									'opacity-60 hover:opacity-100 transition-opacity duration-200',
+							},
 						}}
 					/>
 				</div>
