@@ -21,7 +21,15 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table';
-import { Dispatch, SetStateAction, useEffect, useState, useMemo, useCallback } from 'react';
+import {
+	Dispatch,
+	SetStateAction,
+	useEffect,
+	useState,
+	useMemo,
+	useCallback,
+	ReactNode,
+} from 'react';
 import { twMerge } from 'tailwind-merge';
 import CustomPagination from '@/components/molecules/CustomPagination/CustomPagination';
 import { Input } from '@/components/ui/input';
@@ -49,7 +57,7 @@ interface DataTableProps<TData, TValue> {
 	displayRowsPerPage?: boolean;
 	constrainHeight?: boolean;
 	hidePagination?: boolean;
-	headerAction?: React.ReactNode;
+	headerAction?: ReactNode;
 }
 
 interface TableSortingButtonProps<TData> {
@@ -212,12 +220,6 @@ export function CustomTable<TData, TValue>({
 		}
 	}, [pagination.pageIndex, pagination.pageSize, data]);
 
-	const tableContainerStyle = {
-		width: '100%',
-		maxWidth: '100%',
-		height: constrainHeight ? '429px' : undefined,
-	};
-
 	return (
 		<div className="w-full [&_::-webkit-scrollbar]:h-[4px] [&_::-webkit-scrollbar]:md:h-[7px] [&_::-webkit-scrollbar-thumb]:bg-gray-300 [&_::-webkit-scrollbar-thumb]:rounded-full [&_::-webkit-scrollbar]:w-[4px] [&_::-webkit-scrollbar]:md:w-[7px]">
 			<div className="flex items-center justify-between py-4 gap-4 w-full">
@@ -265,9 +267,9 @@ export function CustomTable<TData, TValue>({
 			</div>
 			<div
 				className={twMerge(
-					'border-2 border-black relative overflow-y-auto overflow-x-auto custom-scrollbar w-full',
+					'border-2 border-black relative overflow-y-auto overflow-x-auto custom-scrollbar w-[1185px] max-w-full',
+					constrainHeight && 'h-[429px]'
 				)}
-				style={tableContainerStyle}
 			>
 				<Table className="relative w-full min-w-full table-fixed" variant={variant}>
 					<TableHeader variant={variant} sticky>
@@ -275,13 +277,13 @@ export function CustomTable<TData, TValue>({
 							<TableRow className="sticky top-0" key={headerGroup.id} variant={variant}>
 								{headerGroup.headers.map((header) => {
 									const totalColumns = headerGroup.headers.length;
-									const columnWidth = `${100 / totalColumns}%`; // Evenly distribute width
+									const columnWidth = `${100 / totalColumns}%`;
 									return (
-										<TableHead 
-											key={header.id} 
+										<TableHead
+											key={header.id}
 											variant={variant}
-											style={{ width: columnWidth, minWidth: '120px' }}
-											className="whitespace-nowrap"
+											style={{ width: columnWidth }}
+											className="whitespace-nowrap min-w-[120px]"
 										>
 											{header.isPlaceholder
 												? null
@@ -313,13 +315,13 @@ export function CustomTable<TData, TValue>({
 								>
 									{row.getVisibleCells().map((cell) => {
 										const totalColumns = row.getVisibleCells().length;
-										const columnWidth = `${100 / totalColumns}%`; // Evenly distribute width
+										const columnWidth = `${100 / totalColumns}%`;
 										return (
-											<TableCell 
-												key={cell.id} 
+											<TableCell
+												key={cell.id}
 												variant={variant}
-												style={{ width: columnWidth, minWidth: '120px' }}
-												className="whitespace-nowrap"
+												style={{ width: columnWidth }}
+												className="whitespace-nowrap min-w-[120px]"
 											>
 												{flexRender(cell.column.columnDef.cell, cell.getContext())}
 											</TableCell>
@@ -341,7 +343,9 @@ export function CustomTable<TData, TValue>({
 					</TableBody>
 				</Table>
 			</div>
-			{!hidePagination && <CustomPagination<TData> currentPage={pagination.pageIndex} table={table} />}
+			{!hidePagination && (
+				<CustomPagination<TData> currentPage={pagination.pageIndex} table={table} />
+			)}
 		</div>
 	);
 }

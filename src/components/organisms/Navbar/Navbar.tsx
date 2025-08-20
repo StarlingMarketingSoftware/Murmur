@@ -228,7 +228,7 @@ export const Navbar = () => {
 										<Link
 											href={item.path}
 											className={cn(
-												'block py-4 text-[28px] font-normal text-gray-800 font-primary',
+												'block py-4 text-[28px] text-gray-800 font-primary',
 												'transition-colors duration-200',
 												pathname === item.path ? 'text-gray-900' : 'hover:text-gray-900'
 											)}
@@ -247,12 +247,12 @@ export const Navbar = () => {
 						<div className="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-200/20">
 							<div className="flex space-x-6">
 								<SignInButton mode="modal">
-									<button className="flex-1 py-3 text-center text-[16px] font-normal text-gray-600 hover:text-gray-900 transition-colors duration-200 font-primary">
+									<button className="flex-1 py-3 text-center text-[16px] text-gray-600 hover:text-gray-900 transition-colors duration-200 font-primary">
 										Sign in
 									</button>
 								</SignInButton>
 								<SignUpButton mode="modal">
-									<button className="flex-1 py-3 text-center text-[16px] font-normal text-gray-600 hover:text-gray-900 transition-colors duration-200 font-primary">
+									<button className="flex-1 py-3 text-center text-[16px] text-gray-600 hover:text-gray-900 transition-colors duration-200 font-primary">
 										Sign up
 									</button>
 								</SignUpButton>

@@ -66,6 +66,7 @@
 
 	--font-primary: var(--font-times);
 	--font-secondary: var(--font-inter);
+	--font-tertiary: var(--font-zen-antique);
 }
 
 :root {
@@ -1199,8 +1200,6 @@ mux-player {
 	}
 }
 
-/* Removed text-flow animation for cleaner appearance */
-
 @keyframes premium-shimmer {
 	0% {
 		transform: translateX(-50%);
@@ -1231,12 +1230,6 @@ mux-player {
 	z-index: 1;
 	overflow: hidden;
 }
-
-/* Removed hero section gradient overlay */
-
-/* Removed page-wide shimmer for cleaner look */
-
-/* Removed ambient flow animation for cleaner appearance */
 
 /* Logo container - subtle float only */
 .premium-logo-container {
@@ -1324,8 +1317,6 @@ mux-player {
 	opacity: 0.9;
 }
 
-/* Removed subtitle sweep animation for cleaner text */
-
 /* Accent word - "start" */
 .premium-accent {
 	position: relative;
@@ -1350,8 +1341,6 @@ mux-player {
 	color: rgb(229, 231, 235);
 	transition: all 1.5s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
-
-/* Removed dark mode hero section gradient overlays */
 
 .dark .premium-gradient-text {
 	background: linear-gradient(
@@ -1534,8 +1523,6 @@ mux-player {
 	margin-right: auto;
 	transition: inherit;
 }
-
-/* Removed - handled by search-input-group-active now */
 
 @keyframes inputGlowPulse {
 	0% {

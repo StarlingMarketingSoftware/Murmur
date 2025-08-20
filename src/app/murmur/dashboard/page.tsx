@@ -53,7 +53,6 @@ const Dashboard = () => {
 		hoveredText,
 	} = useDashboard();
 
-	// Show mobile app coming soon page on mobile devices
 	// Return null during initial load to prevent hydration mismatch
 	if (isMobile === null) {
 		return null;
@@ -149,7 +148,6 @@ const Dashboard = () => {
 														/>
 														<div className="search-wave-overlay" />
 													</div>
-													{/* Buttons hidden during active search */}
 												</div>
 											</FormControl>
 											<FormMessage />

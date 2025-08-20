@@ -15,17 +15,13 @@ export const MobileAppComingSoon: React.FC = () => {
 	};
 
 	return (
-		<div 
-			className="fixed inset-0 flex flex-col items-center justify-center px-6 text-center"
+		<div
+			className="fixed inset-0 flex flex-col items-center justify-center px-6 text-center bg-gray-100 min-h-dvh"
 			style={{
-				backgroundColor: '#E2E2E2',
-				minHeight: '100dvh', /* Dynamic viewport height for better mobile support */
-				// @ts-ignore - WebKit specific properties
 				WebkitOverflowScrolling: 'touch',
 				WebkitTapHighlightColor: 'transparent',
 			}}
 		>
-			{/* Back Button */}
 			<Button
 				onClick={handleGoBack}
 				variant="ghost"
@@ -37,19 +33,16 @@ export const MobileAppComingSoon: React.FC = () => {
 			</Button>
 
 			<div className="max-w-sm w-full">
-				{/* Logo */}
 				<div className="mb-8 flex justify-center">
 					<div className="w-24 h-20">
 						<LogoIcon />
 					</div>
 				</div>
 
-				{/* Coming Soon Message */}
-				<Typography 
-					variant="h2" 
-					className="text-gray-700 !text-2xl font-bold"
-				>
-					Mobile App<br />Coming Soon
+				<Typography variant="h2" className="text-gray-700 !text-2xl font-bold">
+					Mobile App
+					<br />
+					Coming Soon
 				</Typography>
 			</div>
 		</div>
