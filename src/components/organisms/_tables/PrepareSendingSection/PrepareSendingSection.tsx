@@ -7,7 +7,7 @@ import {
 } from './usePrepareSendingSection';
 import { ConfirmSendDialog } from '../../_dialogs/ConfirmSendDialog/ConfirmSendDialog';
 import ProgressIndicator from '@/components/molecules/ProgressIndicator/ProgressIndicator';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 
 export const PrepareSendingSection: FC<PrepareSendingSectionProps> = (props) => {

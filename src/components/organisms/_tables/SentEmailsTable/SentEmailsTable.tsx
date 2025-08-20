@@ -3,7 +3,7 @@ import { SentEmailsTableProps, useSentEmailsTable } from './useSentEmailsTable';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import CustomTable from '../../../molecules/CustomTable/CustomTable';
 import ViewEditEmailDialog from '@/components/organisms/_dialogs/ViewEditEmailDialog/ViewEditEmailDialog';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 
 export const SentEmailsTable: FC<SentEmailsTableProps> = (props) => {
 	const {

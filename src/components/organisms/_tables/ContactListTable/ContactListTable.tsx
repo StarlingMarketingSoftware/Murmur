@@ -8,10 +8,10 @@ import {
 } from '@/components/ui/card';
 import CustomTable from '../../../molecules/CustomTable/CustomTable';
 import { ContactListTableProps, useContactListTable } from './useContactListTable';
-import Spinner from '@/components/ui/spinner';
 import { ConfirmDialog } from '../../_dialogs/ConfirmDialog/ConfirmDialog';
 import { Typography } from '@/components/ui/typography';
 import EditContactListDialog from '../../_dialogs/EditContactListDialog/EditContactListDialog';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 
 const ContactListTable: FC<ContactListTableProps> = (props) => {
 	const {

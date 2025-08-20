@@ -6,7 +6,7 @@ import {
 	CardTitle,
 } from '@/components/ui/card';
 import { FC } from 'react';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { RecipientsTableProps, useRecipientsTable } from './useRecipientsTable';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 

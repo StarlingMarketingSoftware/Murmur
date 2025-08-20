@@ -1,7 +1,7 @@
 'use client';
 
 import { useCampaignDetail } from './useCampaignDetail';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import { IdentityDialog } from '@/components/organisms/_dialogs/IdentityDialog/IdentityDialog';
 import { CampaignName } from '@/components/organisms/CampaignName/CampaignName';
@@ -41,10 +41,12 @@ const Murmur = () => {
 	return (
 		<AppLayout>
 			<NoMobilePage />
-			{shouldHideContent && (
-				<div className="fixed inset-0 bg-white z-40" />
-			)}
-			<div className={`hidden lg:block transition-opacity duration-200 ${shouldHideContent ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}>
+			{shouldHideContent && <div className="fixed inset-0 bg-white z-40" />}
+			<div
+				className={`hidden lg:block transition-opacity duration-200 ${
+					shouldHideContent ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'
+				}`}
+			>
 				<CampaignName campaign={campaign} />
 				<Card className="mt-38 border-border !border-2">
 					<CardContent>

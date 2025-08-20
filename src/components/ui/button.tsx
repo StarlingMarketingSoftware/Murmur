@@ -3,8 +3,8 @@ import { Slot as SlotPrimitive } from 'radix-ui';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/utils/index';
-import Spinner from './spinner';
 import { twMerge } from 'tailwind-merge';
+import { Spinner } from '../atoms/Spinner/Spinner';
 
 export type ButtonVariants = VariantProps<typeof buttonVariants>;
 
@@ -138,14 +138,14 @@ function Button({
 			disabled={isLoading}
 			{...props}
 		>
-			{!isLoading && (
+			{isLoading && (
 				<div className="absolute flex items-center justify-center">
 					<Spinner color={variant === 'primary' ? 'background' : 'foreground'} />
 				</div>
 			)}
 			<div
 				className={twMerge(
-					!isLoading ? 'invisible' : 'visible',
+					isLoading ? 'invisible' : 'visible',
 					'flex gap-2 items-center justify-center',
 					noPadding ? '!p-0' : ''
 				)}
