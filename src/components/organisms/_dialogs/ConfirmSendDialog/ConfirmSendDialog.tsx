@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { FC } from 'react';
 import { ConfirmSendDialogProps, useConfirmSendDialog } from './useConfirmSendDialog';
-import { CheckIcon, SendIcon } from 'lucide-react';
+import { SendIcon } from 'lucide-react';
 import { Typography } from '@/components/ui/typography';
 
 export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
@@ -19,7 +19,6 @@ export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
 		<Dialog open={isOpen} onOpenChange={setIsOpen} modal>
 			<DialogTrigger asChild>
 				<Button className="w-full sm:w-fit" disabled={draftEmailCount <= 0}>
-					<CheckIcon />
 					Proceed to Sending Confirmation
 				</Button>
 			</DialogTrigger>

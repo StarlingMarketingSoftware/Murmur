@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { TrashIcon } from 'lucide-react';
+import { X } from 'lucide-react';
 import { FC } from 'react';
 
 interface TableDeleteRowButtonProps {
@@ -27,7 +27,7 @@ export const TableDeleteRowButton: FC<TableDeleteRowButtonProps> = (props) => {
 				onClick(e);
 			}}
 		>
-			<TrashIcon className="text-destructive" />
+			<X className="text-destructive" />
 		</Button>
 	);
 };

@@ -63,18 +63,24 @@ export const useEmailsTable = (props: EmailsTableProps) => {
 			},
 			cell: ({ row }) => {
 				const message: string = row.getValue('message');
-				return <div className="text-left">{ellipsesText(message, 55)}</div>;
+				return <div className="text-left pr-2">{ellipsesText(message, 45)}</div>;
 			},
 		},
 		{
 			id: 'action',
+			header: () => null,
+			size: 50,
+			minSize: 50,
+			maxSize: 50,
 			cell: ({ row }) => (
-				<TableDeleteRowButton
-					disabled={isPendingDeleteEmail}
-					onClick={() => {
-						handleDeleteEmail(row.original.id);
-					}}
-				/>
+				<div className="flex justify-center">
+					<TableDeleteRowButton
+						disabled={isPendingDeleteEmail}
+						onClick={() => {
+							handleDeleteEmail(row.original.id);
+						}}
+					/>
+				</div>
 			),
 		},
 	];

@@ -35,6 +35,8 @@ export const SentEmailsTable: FC<SentEmailsTableProps> = (props) => {
 						singleSelection
 						noDataMessage={'Emails will appear here as they are sent.'}
 						handleRowClick={handleRowClick}
+						hidePagination={true}
+						searchable={false}
 					/>
 				)}
 				<ViewEditEmailDialog

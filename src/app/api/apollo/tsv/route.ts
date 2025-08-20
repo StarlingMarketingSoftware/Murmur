@@ -5,6 +5,7 @@ import { z } from 'zod';
 import Papa from 'papaparse';
 import fs from 'fs/promises';
 import path from 'path';
+import { put } from '@vercel/blob';
 import { apiBadRequest, apiResponse, apiUnauthorized } from '@/app/api/_utils';
 import { enrichApolloContacts, transformApolloContact } from '@/app/api/_utils';
 
@@ -123,10 +124,10 @@ export async function POST(req: NextRequest): Promise<Response> {
 		i++;
 	}
 
-	await exportContactsToTSV(completeContacts, fileName, 0);
+	const finalUrl = await exportContactsToTSV(completeContacts, fileName, 0);
 	return apiResponse({
 		contacts: completeContacts,
-		tsvUrl: `/exports/${fileName}.tsv`,
+		tsvUrl: finalUrl,
 	});
 }
 
@@ -134,7 +135,7 @@ const exportContactsToTSV = async (
 	contacts: ContactPartialWithRequiredEmail[],
 	fileName: string,
 	currentPage: number
-): Promise<void> => {
+): Promise<string> => {
 	const tsvData = contacts.map((contact: ContactPartialWithRequiredEmail) => ({
 		firstname: contact.firstName || '',
 		lastname: contact.lastName || '',
@@ -162,9 +163,22 @@ const exportContactsToTSV = async (
 	// Generate unique filename with timestamp
 	const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 	const filename = `${timestamp}_${fileName}_${currentPage}.tsv`;
-	const filepath = path.join(process.cwd(), 'public', 'exports', filename);
 
-	await fs.mkdir(path.join(process.cwd(), 'public', 'exports'), { recursive: true });
+	// Try Vercel Blob first
+	try {
+		const { url } = await put(filename, tsvContent, {
+			access: 'public',
+			contentType: 'text/tab-separated-values; charset=utf-8',
+		});
+		return url;
+	} catch (err) {
+		console.error('Failed to upload to Vercel Blob, falling back to local filesystem', err);
+	}
+
+	// Fallback: write to local filesystem (works locally; not on Vercel)
+	const exportsDir = path.join(process.cwd(), 'public', 'exports');
+	await fs.mkdir(exportsDir, { recursive: true });
+	const filepath = path.join(exportsDir, filename);
 	await fs.writeFile(filepath, tsvContent, 'utf-8');
-	return;
+	return `/exports/${filename}`;
 };

@@ -260,6 +260,7 @@ enum HybridBlock {
   research
   action
   text
+  full_automated
 }
 
 enum ContactVerificationRequestStatus {
