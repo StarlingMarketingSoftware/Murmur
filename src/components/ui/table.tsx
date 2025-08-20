@@ -156,7 +156,7 @@ function TableRow({
 }
 
 const tableHeadVariants = cva(
-	'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] bg-background border-b-2 border-black',
+	'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap overflow-hidden text-ellipsis [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] bg-background border-b-2 border-black',
 	{
 		variants: {
 			variant: {
@@ -185,7 +185,7 @@ function TableHead({
 }
 
 const tableCellVariants = cva(
-	'p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+	'p-2 align-middle whitespace-nowrap overflow-hidden text-ellipsis [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
 	{
 		variants: {
 			variant: {

@@ -97,6 +97,8 @@ export function TableSortingButton<TData>({
 interface CustomTableProps<TData, TValue> extends DataTableProps<TData, TValue> {
 	variant?: 'primary' | 'secondary';
 	tableRef?: (table: TableType<TData>) => void;
+	useAutoLayout?: boolean;
+	allowColumnOverflow?: boolean;
 }
 
 export function CustomTable<TData, TValue>({
@@ -116,6 +118,8 @@ export function CustomTable<TData, TValue>({
 	constrainHeight = false,
 	hidePagination = false,
 	headerAction,
+	useAutoLayout = false,
+	allowColumnOverflow = false,
 }: CustomTableProps<TData, TValue>) {
 	const [pagination, setPagination] = useState({
 		pageIndex: 0,
@@ -271,7 +275,14 @@ export function CustomTable<TData, TValue>({
 					constrainHeight && 'h-[429px]'
 				)}
 			>
-				<Table className="relative w-full min-w-full table-fixed" variant={variant}>
+				<Table
+					className={twMerge(
+						'relative min-w-full',
+						allowColumnOverflow ? 'w-max' : 'w-full',
+						useAutoLayout ? 'table-auto' : 'table-fixed'
+					)}
+					variant={variant}
+				>
 					<TableHeader variant={variant} sticky>
 						{table.getHeaderGroups().map((headerGroup) => (
 							<TableRow className="sticky top-0" key={headerGroup.id} variant={variant}>
@@ -282,7 +293,7 @@ export function CustomTable<TData, TValue>({
 										<TableHead
 											key={header.id}
 											variant={variant}
-											style={{ width: columnWidth }}
+											style={useAutoLayout ? undefined : { width: columnWidth }}
 											className="whitespace-nowrap min-w-[120px]"
 										>
 											{header.isPlaceholder
@@ -320,7 +331,7 @@ export function CustomTable<TData, TValue>({
 											<TableCell
 												key={cell.id}
 												variant={variant}
-												style={{ width: columnWidth }}
+												style={useAutoLayout ? undefined : { width: columnWidth }}
 												className="whitespace-nowrap min-w-[120px]"
 											>
 												{flexRender(cell.column.columnDef.cell, cell.getContext())}
