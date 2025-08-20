@@ -12,6 +12,7 @@ import { VideoPlayer } from '@/components/molecules/VideoPlayer/VideoPlayer';
 import { ComparisonTable } from '@/components/molecules/ComparisonTable/ComparisonTable';
 import { ScrollingReviews } from '@/components/molecules/ScrollingReviews/ScrollingReviews';
 import { LeadSender } from '@/components/organisms/LeadSender/LeadSender';
+import { LaunchButton } from '@/components/atoms/LaunchButton/LaunchButton';
 
 const FAQS: FAQ[] = [
 	{
@@ -42,12 +43,13 @@ export default function HomePage() {
 					{/* Exact dashboard structure */}
 					<div className="flex justify-center w-full px-4">
 						<div className="text-center w-full max-w-[900px]">
-							<div className="inline-block">
+							<div className="inline-block" data-transition-element="logo-start">
 								<LogoIcon width="106px" height="84px" />
 							</div>
 							<Typography
 								variant="h1"
 								className="text-center mt-2 !text-[60px] sm:!text-[70px] md:!text-[80px] leading-[0.8]"
+								data-transition-element="title-start"
 							>
 								Murmur
 							</Typography>
@@ -67,25 +69,9 @@ export default function HomePage() {
 
 					<div className="mt-8 sm:mt-10 md:mt-12 flex flex-col items-center">
 						<LeadSender />
-						<Link
-							href={urls.murmur.dashboard.index}
-							className="mt-0 mx-auto w-full max-w-[490px] px-4"
-						>
-							<Button
-								variant="primary"
-								size="lg"
-								font="secondary"
-								noPadding
-								className="!w-full !h-[42px] !min-h-0 !py-0 !px-0 !font-normal"
-								style={{
-									backgroundColor: '#289137',
-									borderRadius: '7px',
-									fontWeight: 400,
-								}}
-							>
-								Launch
-							</Button>
-						</Link>
+						<div className="mt-0 mx-auto w-full max-w-[490px] px-4">
+							<LaunchButton />
+						</div>
 						<Typography variant="p" className="text-center mt-4 tracking-[0.08em]">
 							Full access for 7 days. Start today.
 						</Typography>

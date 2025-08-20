@@ -59,6 +59,7 @@
 		"embla-carousel-react": "^8.6.0",
 		"form-data": "^4.0.2",
 		"google-api-javascript-client": "^0.1.0",
+		"gsap": "^3.13.0",
 		"input-otp": "^1.4.2",
 		"langchain": "^0.3.29",
 		"lodash": "^4.17.21",
