@@ -30,11 +30,11 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 						{/* Back to Home button */}
 						<Link
 							href={urls.home.index}
-							className="flex items-center gap-2 text-[13px] transition-all duration-200 font-secondary tracking-[0.02em] text-gray-600 opacity-60 hover:opacity-100 hover:text-black"
+							className="flex items-center gap-2 text-[13px] transition-all duration-200 font-secondary tracking-[0.02em] text-gray-600 opacity-60 hover:opacity-100 hover:text-black safari-nav-fix"
 						>
-							<ArrowLeft className="w-4 h-4" />
-							<span className="hidden sm:inline">Back to Home</span>
-							<span className="sm:hidden">Home</span>
+							<ArrowLeft className="w-4 h-4 flex-shrink-0" />
+							<span className="nav-text-full">Back to Home</span>
+							<span className="nav-text-short">Home</span>
 						</Link>
 
 						{showAdminLink && (

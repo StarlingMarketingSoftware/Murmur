@@ -2564,6 +2564,82 @@ mux-player {
 	}
 }
 
+/* Safari-specific navigation fixes for mobile landscape */
+.safari-nav-fix {
+	white-space: nowrap;
+	overflow: hidden;
+	position: relative;
+}
+
+/* Default: show full text on desktop */
+.nav-text-full {
+	display: inline;
+}
+
+.nav-text-short {
+	display: none;
+}
+
+/* Mobile: show short text */
+@media (max-width: 640px) {
+	.nav-text-full {
+		display: none;
+	}
+	
+	.nav-text-short {
+		display: inline;
+	}
+}
+
+/* Safari-specific fix for landscape mode */
+@supports (-webkit-touch-callout: none) {
+	/* iOS Safari landscape mode fix */
+	@media (orientation: landscape) and (max-height: 500px) {
+		nav {
+			position: relative;
+			z-index: 10;
+			background-color: white;
+			contain: layout;
+		}
+		
+		.safari-nav-fix {
+			display: flex !important;
+			align-items: center !important;
+			white-space: nowrap !important;
+			overflow: hidden !important;
+			text-overflow: ellipsis !important;
+			max-width: 150px;
+		}
+		
+		.nav-text-full,
+		.nav-text-short {
+			position: relative;
+			z-index: 1;
+		}
+		
+		/* Ensure text doesn't overflow in landscape */
+		nav .flex {
+			flex-wrap: nowrap !important;
+		}
+		
+		/* Fix potential text bleed issues */
+		nav span {
+			-webkit-backface-visibility: hidden;
+			backface-visibility: hidden;
+			transform: translateZ(0);
+		}
+	}
+	
+	/* Additional fix for regular mobile Safari */
+	@media (max-width: 768px) {
+		.safari-nav-fix span {
+			-webkit-font-smoothing: antialiased;
+			-moz-osx-font-smoothing: grayscale;
+			text-rendering: optimizeLegibility;
+		}
+	}
+}
+
 /* Safari-specific mobile app coming soon page styles */
 @supports (-webkit-touch-callout: none) {
 	/* iOS Safari specific styles */
