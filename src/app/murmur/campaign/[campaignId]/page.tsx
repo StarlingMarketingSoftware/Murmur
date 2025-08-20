@@ -43,9 +43,11 @@ const Murmur = () => {
 				<div className="fixed inset-0 bg-white z-40" />
 			)}
 			<div className={`hidden lg:block transition-opacity duration-200 ${shouldHideContent ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}>
-				<CampaignName campaign={campaign} />
-				<div className="flex gap-24 justify-center mt-4">
-					<div className="flex flex-col">
+				<div className="flex justify-center">
+					<CampaignName campaign={campaign} />
+				</div>
+				<div className="w-[1165px] mx-auto flex items-start gap-[47px] mt-4">
+					<div className="w-[559px] flex flex-col">
 						<Typography variant="h3" className="text-lg font-semibold font-secondary mb-2">To:</Typography>
 						{campaign?.userContactLists?.map((contactList) => (
 							<Typography key={contactList.id} className="font-bold !text-[15px]">
@@ -70,7 +72,7 @@ const Murmur = () => {
 						</div>
 					</div>
 
-					<div className="">
+					<div className="w-[559px]">
 						<Typography variant="h3" className="text-lg font-semibold font-secondary mb-2">
 							From:
 						</Typography>

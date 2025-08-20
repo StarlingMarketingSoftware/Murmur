@@ -26,7 +26,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
-import { GripVerticalIcon, PlusIcon, Trash2 } from 'lucide-react';
+import { GripVerticalIcon, Trash2 } from 'lucide-react';
 import { HelpTooltip } from '@/components/atoms/HelpTooltip/HelpTooltip';
 import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 import { HybridBlock, Signature } from '@prisma/client';
@@ -203,98 +203,6 @@ export const HybridPromptInput = ({ trackFocusedField, signatures, selectedSigna
 								/>
 							))}
 						</SortableContext>
-
-						<div className="flex flex-col sm:flex-row gap-2 mt-auto">
-							<FormField
-								control={form.control}
-								name="font"
-								render={({ field }) => (
-									<FormItem className="w-[268.11px] mb-2">
-										<FormControl>
-											<Select
-												onValueChange={field.onChange}
-												value={field.value as Font}
-											>
-												<SelectTrigger className="w-full h-[34.99px]">
-													<SelectValue />
-												</SelectTrigger>
-												<SelectContent>
-													<SelectGroup>
-														<SelectLabel>Font</SelectLabel>
-														{FONT_OPTIONS.map((font) => (
-															<SelectItem key={font} value={font}>
-																<span style={{ fontFamily: font }}>{font}</span>
-															</SelectItem>
-														))}
-													</SelectGroup>
-												</SelectContent>
-											</Select>
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-
-							<FormField
-								control={form.control}
-								name="signatureId"
-								render={({ field }) => (
-									<FormItem className="w-[268.11px] mb-2">
-										<FormControl>
-											<Select
-												onValueChange={(value) => {
-													if (value === 'manage-signatures') {
-														setIsOpenSignaturesDialog?.(true);
-														return;
-													}
-													field.onChange(Number(value));
-												}}
-												defaultValue={field.value ? field.value.toString() : ''}
-												value={field.value ? field.value.toString() : ''}
-											>
-												<SelectTrigger className="w-full h-[34.99px]">
-													<SelectValue placeholder="Select signature" />
-												</SelectTrigger>
-												<SelectContent>
-													<SelectGroup>
-														<SelectLabel>Signature</SelectLabel>
-														{signatures && signatures.length > 0 ? (
-															signatures.map((signature: Signature) => (
-																<SelectItem
-																	key={signature.id}
-																	value={signature.id.toString()}
-																>
-																	{signature.name}
-																</SelectItem>
-															))
-														) : (
-															<SelectItem value="no-signatures" disabled>
-																No signatures available
-															</SelectItem>
-														)}
-														<Separator className="my-1" />{' '}
-													</SelectGroup>
-													<SelectGroup>
-														<SelectItem value="manage-signatures">
-															Manage Signatures
-														</SelectItem>
-													</SelectGroup>
-												</SelectContent>
-											</Select>
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-						</div>
-						{selectedSignature && (
-							<RichTextEditor
-								hideMenuBar
-								className="border-none min-h-[69.01px] overflow-x-hidden bg-[#E3E3E3]/40 p-3"
-								isEdit={false}
-								value={selectedSignature.content || ''}
-							/>
-						)}
 					</div>
 				</Droppable>
 			</DndContext>
@@ -302,9 +210,8 @@ export const HybridPromptInput = ({ trackFocusedField, signatures, selectedSigna
 			<div className="flex gap-2 mb-3 justify-center">
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
-						<Button className="!w-[275.23px] !h-[40px] !text-black !border-2" type="button" variant="secondary-light">
-							<PlusIcon />
-							AI Block
+						<Button className="!w-[275px] !h-[51px] !text-black !border-2 !py-0 !leading-none flex items-center justify-center !font-bold" type="button" variant="secondary-light">
+							Add Automated Text
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent className="w-56" align="start">
@@ -337,13 +244,110 @@ export const HybridPromptInput = ({ trackFocusedField, signatures, selectedSigna
 
 				<Button
 					onClick={() => handleAddBlock(getBlock(HybridBlock.text))}
-					className="!w-[275.23px] !h-[40px] !text-black !border-2"
+					className="!w-[275px] !h-[51px] !text-black !border-2 !py-0 !leading-none flex items-center justify-center !font-bold"
 					type="button"
 					variant="primary-light"
 				>
-					<PlusIcon />
-					Text block
+					Add Text
 				</Button>
+			</div>
+
+			<div className="flex flex-col mt-4">
+				<div className="flex gap-2 mb-2">
+					<FormField
+						control={form.control}
+						name="font"
+						render={({ field }) => (
+							<FormItem className="w-[275px]">
+								<FormControl>
+									<Select
+										onValueChange={field.onChange}
+										value={field.value as Font}
+									>
+										<SelectTrigger className="w-full h-[34.99px]">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectGroup>
+												<SelectLabel>Font</SelectLabel>
+												{FONT_OPTIONS.map((font) => (
+													<SelectItem key={font} value={font}>
+														<span style={{ fontFamily: font }}>{font}</span>
+													</SelectItem>
+												))}
+											</SelectGroup>
+										</SelectContent>
+									</Select>
+								</FormControl>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+
+					<FormField
+						control={form.control}
+						name="signatureId"
+						render={({ field }) => (
+							<FormItem className="w-[275px]">
+								<FormControl>
+									<Select
+										onValueChange={(value) => {
+											if (value === 'manage-signatures') {
+												setIsOpenSignaturesDialog?.(true);
+												return;
+											}
+											field.onChange(Number(value));
+										}}
+										defaultValue={field.value ? field.value.toString() : ''}
+										value={field.value ? field.value.toString() : ''}
+									>
+										<SelectTrigger className="w-full h-[34.99px]">
+											<SelectValue placeholder="Select signature" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectGroup>
+												<SelectLabel>Signature</SelectLabel>
+												{signatures && signatures.length > 0 ? (
+													signatures.map((signature: Signature) => (
+														<SelectItem
+															key={signature.id}
+															value={signature.id.toString()}
+														>
+															{signature.name}
+														</SelectItem>
+													))
+												) : (
+													<SelectItem value="no-signatures" disabled>
+														No signatures available
+													</SelectItem>
+												)}
+												<Separator className="my-1" />{' '}
+											</SelectGroup>
+											<SelectGroup>
+												<SelectItem value="manage-signatures">
+													Manage Signatures
+												</SelectItem>
+											</SelectGroup>
+										</SelectContent>
+									</Select>
+								</FormControl>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+				</div>
+				{selectedSignature && (
+					<div className="flex justify-center">
+						<div className="w-[559px] overflow-hidden bg-[#E3E3E3]/40 rounded">
+							<RichTextEditor
+								hideMenuBar
+								className="border-none !min-h-fit !py-2 !px-3"
+								isEdit={false}
+								value={selectedSignature.content || ''}
+							/>
+						</div>
+					</div>
+				)}
 			</div>
 		</div>
 	);

@@ -217,7 +217,7 @@ export const useHybridPromptInput = () => {
 
 			if (newIndex !== correctPosition) {
 				toast.error(
-					'AI Blocks must be in order: Introduction → Research Contact → Call to Action. Custom Text blocks can be placed anywhere.'
+					'Automated Blocks must be in order: Introduction → Research Contact → Call to Action. Custom Text blocks can be placed anywhere.'
 				);
 			}
 

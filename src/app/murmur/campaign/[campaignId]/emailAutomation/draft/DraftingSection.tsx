@@ -132,13 +132,13 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 												}
 												className="data-[state=checked]:bg-primary -translate-y-[2px]"
 											/>
-											<FormLabel className="">AI Subject</FormLabel>
+											<FormLabel className="">Automated Subject</FormLabel>
 										</div>
 										<FormControl>
 											<Input
 												className="w-full h-[44px]"
 												placeholder={
-													isAiSubject ? 'AI-generated subject...' : 'Enter subject...'
+													isAiSubject ? 'Automated subject...' : 'Enter subject...'
 												}
 												disabled={isAiSubject}
 												{...field}
@@ -183,6 +183,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									hasFullAutomatedBlock={hasFullAutomatedBlock}
 									insertPlaceholder={insertPlaceholder}
 									activeTab={activeTab}
+									setActiveTab={setActiveTab}
 								/>
 							</div>
 						</div>
@@ -213,7 +214,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										Are you sure you want to generate emails for all selected
 										recipients?
 										<br /> <br />
-										This action will have AI create a custom email for each recipient
+										This action will automatically create a custom email for each recipient
 										based on the prompt you provided and will count towards your
 										monthly usage limits.
 									</Typography>

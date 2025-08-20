@@ -3,7 +3,6 @@ import { DraftingRightPanelProps, useDraftingRightPanel } from './useDraftingRig
 import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
-import { FlaskConicalIcon } from 'lucide-react';
 import { StepSlider } from '@/components/atoms/StepSlider/StepSlider';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,13 +33,9 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 		<div className="flex flex-col">
 			<div className="w-[559px] h-[530px] border border-black rounded-lg overflow-y-auto">
 				{activeTab === 'settings' && showSettings && (
-					<div className="p-6">
-						<Typography variant="h3" bold className="text-[28px] text-center mt-5">
-							AI Prompt Settings
-						</Typography>
-
-						<div className="mx-auto w-fit mt-16">
-							<Typography variant="h3" bold className="text-[26px]">
+					<div className="p-4">
+						<div className="mx-auto w-fit mt-2">
+							<Typography variant="h3" bold className="text-[22px]">
 								Tone
 							</Typography>
 							<FormField
@@ -60,12 +55,12 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 								)}
 							/>
 						</div>
-						<div className="max-w-56 mx-auto mt-8">
-							<Typography variant="h3" bold className="text-[26px] mt-8">
+						<div className="max-w-56 mx-auto mt-4">
+							<Typography variant="h3" bold className="text-[22px]">
 								Paragraphs
 							</Typography>
-							<Typography className="!text-[12px] mt-2" color="light">
-								Select the number of paragraphs you want the AI to generate in your email
+							<Typography className="!text-[10px] mt-0.5" color="light">
+								Select the number of paragraphs you want to generate automatically in your email
 							</Typography>
 							<FormField
 								control={form.control}
@@ -75,7 +70,7 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 										<FormControl>
 											<StepSlider
 												disabled={areSettingsDisabled}
-												className="mt-6"
+												className="mt-3"
 												value={[field.value]}
 												onValueChange={(value) => field.onChange(value[0])}
 												max={5}
@@ -116,38 +111,18 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 								className="!h-full grow overflow-y-auto"
 								isEdit={false}
 								hideMenuBar
-								placeholder="Hello, this is a message for a test email. This is where your AI generated message will go once you test your prompt. Best regards."
+								placeholder="Hello, this is a message for a test email. This is where your automated message will go once you test your prompt. Best regards."
 								value={draftEmail.message}
 								disabled={isTest}
 							/>
 						</div>
-						<div
-							className={twMerge(
-								hasTestMessage && 'flex justify-center mt-8',
-								!hasTestMessage &&
-									'absolute top-1/2 left-1/2 -translate-x-1/2 z-20 -translate-y-1/2'
-							)}
-						>
-							<Button
-								isLoading={isTest}
-								type="button"
-								bold
-								variant="primary-light"
-								disabled={isGenerationDisabled()}
-								onClick={() => {
-									handleTestPrompt();
-									setActiveTab('test');
-								}}
-							>
-								<FlaskConicalIcon /> Test Your Prompt
-							</Button>
-						</div>
+
 					</div>
 				)}
 
 				{activeTab === 'placeholders' && (
-					<div className="p-6">
-						<div className="grid grid-cols-2 gap-3">
+					<div className="p-4">
+						<div className="grid grid-cols-2 gap-2">
 							{[
 								{ placeholder: '{{firstName}}', label: 'First Name' },
 								{ placeholder: '{{lastName}}', label: 'Last Name' },
@@ -164,7 +139,7 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 							].map(({ placeholder, label }) => (
 								<div
 									key={placeholder}
-									className="flex flex-col gap-1 p-3 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
+									className="flex flex-col gap-0.5 p-2 border rounded-md cursor-pointer hover:bg-accent transition-colors"
 									onMouseDown={(e) => {
 										e.preventDefault(); // Prevent blur
 										if (insertPlaceholder) {
@@ -172,8 +147,8 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 										}
 									}}
 								>
-									<code className="text-sm font-mono text-primary">{placeholder}</code>
-									<Typography className="text-xs text-muted">{label}</Typography>
+									<code className="text-xs font-mono text-primary">{placeholder}</code>
+									<Typography className="text-[10px] text-muted">{label}</Typography>
 								</div>
 							))}
 						</div>
@@ -191,8 +166,9 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 						handleTestPrompt();
 						setActiveTab('test');
 					}}
+					className="!w-[558px] !h-[51px] !rounded-[8px] !bg-[#5DAB68]/20 !border !border-[#5DAB68] hover:!bg-[#5DAB68]/30"
 				>
-					<FlaskConicalIcon /> Test Your Prompt
+					Test Your Prompt
 				</Button>
 			</div>
 		</div>

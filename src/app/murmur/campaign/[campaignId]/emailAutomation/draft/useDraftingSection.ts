@@ -711,7 +711,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					console.log('[Test Generation] Using Full AI mode with prompt:', fullAiPrompt);
 					
 					if (!fullAiPrompt || fullAiPrompt.trim() === '') {
-						throw new Error('AI prompt cannot be empty');
+						throw new Error('Automated prompt cannot be empty');
 					}
 					
 					parsedRes = await draftFullAiEmail(
@@ -841,7 +841,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 							: fullAutomatedBlock?.value || '';
 						
 						if (!fullAiPrompt || fullAiPrompt.trim() === '') {
-							throw new Error('AI prompt cannot be empty');
+							throw new Error('Automated prompt cannot be empty');
 						}
 						
 						parsedDraft = await draftFullAiEmail(

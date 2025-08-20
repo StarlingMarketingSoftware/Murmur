@@ -19,10 +19,11 @@ export interface DraftingRightPanelProps {
 	hasFullAutomatedBlock?: boolean;
 	insertPlaceholder?: (placeholder: string) => void;
 	activeTab: ActiveTab;
+	setActiveTab?: (tab: ActiveTab) => void;
 }
 
 export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
-	const { campaign, handleTestPrompt, isTest, draftingMode, isGenerationDisabled, hasFullAutomatedBlock, insertPlaceholder, activeTab } =
+	const { campaign, handleTestPrompt, isTest, draftingMode, isGenerationDisabled, hasFullAutomatedBlock, insertPlaceholder, activeTab, setActiveTab } =
 		props;
 	const form = useFormContext<z.infer<typeof draftingFormSchema>>();
 	const areSettingsDisabled = !hasFullAutomatedBlock;
@@ -76,7 +77,7 @@ export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
 	return {
 		campaign,
 		activeTab,
-		setActiveTab: () => {}, // No-op since state is managed in parent
+		setActiveTab: setActiveTab || (() => {}), // Use prop if provided, otherwise no-op
 		modeOptions,
 		toneOptions,
 		draftEmail,
