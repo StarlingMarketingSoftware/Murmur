@@ -2,7 +2,6 @@ import {
 	FormControl,
 	FormField,
 	FormItem,
-	FormLabel,
 	FormMessage,
 } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
@@ -70,8 +69,8 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove, trackFocusedField }:
 		WebkitTransition: transition,
 	};
 
-	const isTextBlock = block.value === HybridBlock.text || (block.value as any) === 'text';
-	const isFullAutomatedBlock = block.value === HybridBlock.full_automated || (block.value as any) === 'full_automated';
+	const isTextBlock = block.value === HybridBlock.text;
+	const isFullAutomatedBlock = block.value === HybridBlock.full_automated;
 
 	return (
 		<div

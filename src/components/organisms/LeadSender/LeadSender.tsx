@@ -8,7 +8,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { useLeadSender } from './useLeadSender';
 import { Button } from '@/components/ui/button';
-import { Typography } from '@/components/ui/typography';
 
 export const LeadSender = () => {
 	const { form, onSubmit, isPending } = useLeadSender();

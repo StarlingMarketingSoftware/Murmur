@@ -26,7 +26,7 @@ import {
 	MistralToneAgentType,
 	TestDraftEmail,
 } from '@/types';
-import { ContactWithName } from '@/types/contact';
+
 import {
 	convertAiResponseToRichTextEmail,
 	generateEmailTemplateFromBlocks,
@@ -38,7 +38,6 @@ import {
 	Contact,
 	DraftingMode,
 	DraftingTone,
-	Email,
 	EmailStatus,
 	HybridBlock,
 	Identity,
@@ -55,10 +54,7 @@ export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
 }
 
-type GeneratedEmail = Pick<
-	Email,
-	'subject' | 'message' | 'campaignId' | 'status' | 'contactId'
->;
+
 
 type BatchGenerationResult = {
 	contactId: number;

@@ -42,7 +42,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const name: string = row.getValue('firstName');
 				if (!name) return <NoDataCell />;
-				return <div className="text-left">{row.getValue('firstName')}</div>;
+				return <TSVTableTooltip text={name} />;
 			},
 		},
 		{
@@ -53,7 +53,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const name: string = row.getValue('lastName');
 				if (!name) return <NoDataCell />;
-				return <div className="text-left">{row.getValue('lastName')}</div>;
+				return <TSVTableTooltip text={name} />;
 			},
 		},
 		{
@@ -62,7 +62,9 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 				return <TableSortingButton column={column} label="Email" />;
 			},
 			cell: ({ row }) => {
-				return <div className="text-left">{row.getValue('email')}</div>;
+				const email: string = row.getValue('email');
+				if (!email) return <NoDataCell />;
+				return <TSVTableTooltip text={email} />;
 			},
 		},
 		{
@@ -117,7 +119,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const city: string = row.getValue('city');
 				if (!city) return <NoDataCell />;
-				return <div className="text-left">{city}</div>;
+				return <TSVTableTooltip text={city} />;
 			},
 		},
 		{
@@ -128,7 +130,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const state: string = row.getValue('state');
 				if (!state) return <NoDataCell />;
-				return <div className="text-left">{state}</div>;
+				return <TSVTableTooltip text={state} />;
 			},
 		},
 		{
@@ -139,7 +141,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const country: string = row.getValue('country');
 				if (!country) return <NoDataCell />;
-				return <div className="text-left">{country}</div>;
+				return <TSVTableTooltip text={country} />;
 			},
 		},
 		{
@@ -150,7 +152,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			cell: ({ row }) => {
 				const phone: string = row.getValue('phone');
 				if (!phone) return <NoDataCell />;
-				return <div className="text-left">{phone}</div>;
+				return <TSVTableTooltip text={phone} />;
 			},
 		},
 		{

@@ -1,7 +1,6 @@
 import prisma from '@/lib/prisma';
-import { auth } from '@clerk/nextjs/server';
-import { apiResponse, apiUnauthorized, handleApiError } from '@/app/api/_utils';
-import { EmailVerificationStatus, UserRole } from '@prisma/client';
+import { apiResponse, handleApiError } from '@/app/api/_utils';
+import { EmailVerificationStatus } from '@prisma/client';
 import * as XLSX from 'xlsx';
 
 interface ExcelContactRow {

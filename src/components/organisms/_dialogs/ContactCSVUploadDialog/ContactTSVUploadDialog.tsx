@@ -78,6 +78,8 @@ export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) =
 					data={tsvData}
 					noDataMessage="Upload a TSV file to load data."
 					constrainHeight
+					useAutoLayout
+					allowColumnOverflow
 				/>
 				<DialogFooter className="justify-center items-center">
 					<Button onClick={handleClear} type="button" variant="light">
