@@ -42,7 +42,13 @@ const Murmur = () => {
 			{shouldHideContent && (
 				<div className="fixed inset-0 bg-white z-40" />
 			)}
-			<div className={`hidden lg:block transition-opacity duration-200 ${shouldHideContent ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}>
+			<div 
+				className={`hidden lg:block transition-opacity duration-200 ${shouldHideContent ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}
+				style={{
+					WebkitTransition: 'opacity 0.2s',
+					transition: 'opacity 0.2s'
+				}}
+			>
 				<div className="flex justify-center">
 					<CampaignName campaign={campaign} />
 				</div>

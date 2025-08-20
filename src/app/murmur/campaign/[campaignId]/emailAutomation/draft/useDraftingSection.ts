@@ -248,7 +248,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				return block.value && block.value.trim() !== '';
 			}
 			// AI blocks (introduction, research, action) can be empty
-			if (block.type !== HybridBlock.text && block.type !== 'text') {
+			if (block.type !== HybridBlock.text && (block.type as any) !== 'text') {
 				return true;
 			}
 			// Text blocks must have content
@@ -1129,7 +1129,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			...values,
 			hybridBlockPrompts: values.hybridBlockPrompts?.map(block => {
 				// If the block is full_automated, store the prompt in fullAiPrompt
-				if (block.type === 'full_automated' || block.type === HybridBlock.full_automated) {
+				if (block.type === 'full_automated' || (block.type as any) === HybridBlock.full_automated) {
 					// Store the full automated prompt in fullAiPrompt
 					return {
 						...block,
@@ -1261,11 +1261,15 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		// Update the form value
 		form.setValue(name as any, newValue, { shouldDirty: true });
 		
-		// Set focus back to the element and position cursor after the placeholder
-		setTimeout(() => {
+		// Use requestAnimationFrame for better Safari compatibility
+		requestAnimationFrame(() => {
 			element.focus();
-			element.setSelectionRange(start + placeholder.length, start + placeholder.length);
-		}, 0);
+			// Safari needs a slight delay for setSelectionRange to work properly
+			const newPosition = start + placeholder.length;
+			setTimeout(() => {
+				element.setSelectionRange(newPosition, newPosition);
+			}, 10);
+		});
 	}, [form]);
 
 	// Watch for Full Automated block changes

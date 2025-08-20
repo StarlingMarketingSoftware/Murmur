@@ -87,11 +87,15 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 				{activeTab === 'test' && (
 					<div className="grid gap-4 p-6 relative">
 						<div
-							className={twMerge(
-								!hasTestMessage
-									? 'absolute w-full h-full top-0 left-0 backdrop-blur-xs z-10'
-									: 'hidden'
-							)}
+												className={twMerge(
+						!hasTestMessage
+							? 'absolute w-full h-full top-0 left-0 backdrop-blur-sm z-10'
+							: 'hidden'
+					)}
+					style={{
+						WebkitBackdropFilter: 'blur(4px)',
+						backdropFilter: 'blur(4px)'
+					}}
 						/>
 
 						<div className="grid gap-2">
@@ -139,13 +143,19 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 							].map(({ placeholder, label }) => (
 								<div
 									key={placeholder}
-									className="flex flex-col gap-0.5 p-2 border rounded-md cursor-pointer hover:bg-accent transition-colors"
-									onMouseDown={(e) => {
-										e.preventDefault(); // Prevent blur
+									className="flex flex-col gap-0.5 p-2 border rounded-md cursor-pointer hover:bg-accent transition-colors select-none"
+									onClick={(e) => {
+										e.stopPropagation();
 										if (insertPlaceholder) {
-											insertPlaceholder(placeholder);
+											// Use requestAnimationFrame for Safari compatibility
+											requestAnimationFrame(() => {
+												insertPlaceholder(placeholder);
+											});
 										}
 									}}
+									tabIndex={0}
+									role="button"
+									aria-label={`Insert ${label} placeholder`}
 								>
 									<code className="text-xs font-mono text-primary">{placeholder}</code>
 									<Typography className="text-[10px] text-muted">{label}</Typography>

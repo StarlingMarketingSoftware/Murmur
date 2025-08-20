@@ -2,8 +2,6 @@ import prisma from '@/lib/prisma';
 import { auth } from '@clerk/nextjs/server';
 import { apiResponse, apiUnauthorized, handleApiError } from '@/app/api/_utils';
 import { EmailVerificationStatus, UserRole } from '@prisma/client';
-import fs from 'fs';
-import path from 'path';
 import * as XLSX from 'xlsx';
 
 interface ExcelContactRow {
@@ -32,7 +30,7 @@ interface ExcelContactRow {
 	emailvalidationstatus?: string;
 }
 
-export const GET = async function GET() {
+export const GET = async function GET(request: Request) {
 	try {
 		// const { userId } = await auth();
 		// if (!userId) {
@@ -47,14 +45,16 @@ export const GET = async function GET() {
 		// 	return apiUnauthorized();
 		// }
 
-		// Path to the Excel file
-		const excelPath = path.join(
-			process.cwd(),
-			'public',
-			'contactLists',
-			'2025-07-31ProductionContacts.xlsx'
+		// Load from public assets via HTTP so it works on Vercel
+		const fileUrl = new URL(
+			`/contactLists/2025-07-31ProductionContacts.xlsx`,
+			request.url
 		);
-		const fileBuffer = fs.readFileSync(excelPath);
+		const resp = await fetch(fileUrl);
+		if (!resp.ok) {
+			throw new Error(`Failed to fetch Excel from ${fileUrl.toString()}`);
+		}
+		const fileBuffer = Buffer.from(await resp.arrayBuffer());
 
 		// Parse the Excel file
 		const workbook = XLSX.read(fileBuffer, { type: 'buffer' });

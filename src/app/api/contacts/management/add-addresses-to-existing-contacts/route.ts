@@ -1,11 +1,9 @@
 import prisma from '@/lib/prisma';
 import { auth } from '@clerk/nextjs/server';
 import { apiResponse, apiUnauthorized, handleApiError } from '@/app/api/_utils';
-import fs from 'fs';
-import path from 'path';
 import Papa from 'papaparse';
 
-export const GET = async function GET() {
+export const GET = async function GET(request: Request) {
 	try {
 		const { userId } = await auth();
 		if (!userId) {
@@ -19,14 +17,16 @@ export const GET = async function GET() {
 			return apiUnauthorized('Only admins can access this route');
 		}
 
-		// Read the TSV file
-		const tsvPath = path.join(
-			process.cwd(),
-			'public',
-			'contactLists',
-			'musicVenuesEmailAndAddressOnly.tsv'
+		// Read the TSV file via HTTP so it works on Vercel
+		const fileUrl = new URL(
+			`/contactLists/musicVenuesEmailAndAddressOnly.tsv`,
+			request.url
 		);
-		const tsvContent = fs.readFileSync(tsvPath, 'utf8');
+		const resp = await fetch(fileUrl);
+		if (!resp.ok) {
+			throw new Error(`Failed to fetch TSV from ${fileUrl.toString()}`);
+		}
+		const tsvContent = await resp.text();
 
 		// Parse the TSV file
 		const parsed = Papa.parse(tsvContent, {

@@ -65,28 +65,30 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove, trackFocusedField }:
 
 	const style = {
 		transform: CSS.Transform.toString(transform),
+		WebkitTransform: CSS.Transform.toString(transform),
 		transition,
+		WebkitTransition: transition,
 	};
 
-	const isTextBlock = block.value === HybridBlock.text || block.value === 'text';
-	const isFullAutomatedBlock = block.value === HybridBlock.full_automated || block.value === 'full_automated';
+	const isTextBlock = block.value === HybridBlock.text || (block.value as any) === 'text';
+	const isFullAutomatedBlock = block.value === HybridBlock.full_automated || (block.value as any) === 'full_automated';
 
 	return (
 		<div
 			ref={setNodeRef}
 			style={style}
-			className={twMerge(
-				'w-full relative border-2 border-gray-300 rounded-md bg-gray-100 p-4 pl-1',
-				isTextBlock ? 'border-primary' : 'border-secondary',
-				isDragging ? 'opacity-50 z-50 translate-z-0' : ''
-			)}
+			className={				twMerge(
+					'w-full relative border-2 border-gray-300 rounded-md bg-gray-100 p-4 pl-1',
+					isTextBlock ? 'border-primary' : 'border-secondary',
+					isDragging ? 'opacity-50 z-50 transform-gpu' : ''
+				)}
 		>
 			<div className="flex items-center gap-2">
 				<div {...attributes} {...listeners} className="cursor-grab h-fit w-fit">
 					<GripVerticalIcon className="text-muted" />
 				</div>
 				<div className="flex-grow">
-					{isDragging && <div className="absolute inset-0 rounded-md bg-gray-100 z-10" />}
+					{isDragging && <div className="absolute inset-0 rounded-md bg-gray-100 z-10 pointer-events-none" />}
 					<div className="absolute right-3 top-3">
 						{!isTextBlock && !isFullAutomatedBlock && (
 							<Button
@@ -131,8 +133,7 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove, trackFocusedField }:
 								className={isFullAutomatedBlock ? 'h-[400px]' : ''}
 								{...fieldProps}
 								onFocus={(e) => {
-									fieldProps.onFocus?.(e);
-									trackFocusedField?.(`hybridBlockPrompts.${fieldIndex}.value`, e.target);
+									trackFocusedField?.(`hybridBlockPrompts.${fieldIndex}.value`, e.target as HTMLTextAreaElement);
 								}}
 							/>
 						);
@@ -146,8 +147,7 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove, trackFocusedField }:
 										onClick={(e) => e.stopPropagation()}
 										{...fieldProps}
 										onFocus={(e) => {
-											fieldProps.onFocus?.(e);
-											trackFocusedField?.(`hybridBlockPrompts.${fieldIndex}.value`, e.target);
+											trackFocusedField?.(`hybridBlockPrompts.${fieldIndex}.value`, e.target as HTMLInputElement);
 										}}
 									/>
 								);
@@ -182,7 +182,7 @@ export const HybridPromptInput = ({ trackFocusedField, signatures, selectedSigna
 		<div>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
 				<Droppable id="droppable">
-					<div className="w-[559px] min-h-[530px] border-[3px] border-black rounded-md p-3 bg-gray-50 flex flex-col gap-3 items-start transition mb-4 overflow-y-auto overflow-x-hidden">
+					<div className="w-[559px] min-h-[530px] border-[3px] border-black rounded-md p-3 bg-gray-50 flex flex-col gap-3 items-start transition mb-4 overflow-y-auto overflow-x-hidden transform-gpu">
 						{fields.length === 0 && (
 							<Typography font="secondary" className=" text-gray-400 italic">
 								Add blocks here to build your prompt...
