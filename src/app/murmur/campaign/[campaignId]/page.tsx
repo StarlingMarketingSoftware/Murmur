@@ -98,16 +98,22 @@ const Murmur = () => {
 					</div>
 				</div>
 
-				<div className="mt-6">
+				<div className="mt-6 flex justify-center">
 					<DraftingSection campaign={campaign} />
 				</div>
-				<PrepareSendingSection campaign={campaign} />
-				<SentEmailsTable campaign={campaign} />
-				<Link href={urls.murmur.dashboard.index}>
-					<Button className="w-full font-bold mt-8" size="lg" variant="light">
-						Back to Dashboard
-					</Button>
-				</Link>
+				<div className="flex justify-center">
+					<PrepareSendingSection campaign={campaign} />
+				</div>
+				<div className="flex justify-center">
+					<SentEmailsTable campaign={campaign} />
+				</div>
+				<div className="flex justify-center mt-8">
+					<Link href={urls.murmur.dashboard.index}>
+						<Button className="font-bold px-8" size="lg" variant="light">
+							Back to Dashboard
+						</Button>
+					</Link>
+				</div>
 			</div>
 		</AppLayout>
 	);

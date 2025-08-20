@@ -27,20 +27,14 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 		draftingMode,
 		hasTestMessage,
 		showSettings,
+		insertPlaceholder,
 	} = useDraftingRightPanel(props);
 
 	return (
-		<div className="flex flex-col gap-4 mt-6 p-5">
-			{showSettings && (
-				<BlockTabs
-					activeValue={activeTab}
-					onValueChange={setActiveTab}
-					options={modeOptions}
-				/>
-			)}
-			<div>
-				{activeTab === 'settings' && (
-					<>
+		<div className="flex flex-col">
+			<div className="w-[559px] h-[530px] border border-black rounded-lg overflow-y-auto">
+				{activeTab === 'settings' && showSettings && (
+					<div className="p-6">
 						<Typography variant="h3" bold className="text-[28px] text-center mt-5">
 							AI Prompt Settings
 						</Typography>
@@ -93,10 +87,10 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 								)}
 							/>
 						</div>
-					</>
+					</div>
 				)}
 				{activeTab === 'test' && (
-					<div className="grid gap-4 py-4 relative p-4">
+					<div className="grid gap-4 p-6 relative">
 						<div
 							className={twMerge(
 								!hasTestMessage
@@ -151,23 +145,55 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 					</div>
 				)}
 
-				{activeTab === 'settings' && (
-					<div className="flex justify-center mt-8">
-						<Button
-							isLoading={isTest}
-							type="button"
-							bold
-							variant="primary-light"
-							disabled={isGenerationDisabled()}
-							onClick={() => {
-								handleTestPrompt();
-								setActiveTab('test');
-							}}
-						>
-							<FlaskConicalIcon /> Test Your Prompt
-						</Button>
+				{activeTab === 'placeholders' && (
+					<div className="p-6">
+						<div className="grid grid-cols-2 gap-3">
+							{[
+								{ placeholder: '{{firstName}}', label: 'First Name' },
+								{ placeholder: '{{lastName}}', label: 'Last Name' },
+								{ placeholder: '{{company}}', label: 'Company' },
+								{ placeholder: '{{email}}', label: 'Email' },
+								{ placeholder: '{{phone}}', label: 'Phone' },
+								{ placeholder: '{{address}}', label: 'Address' },
+								{ placeholder: '{{city}}', label: 'City' },
+								{ placeholder: '{{state}}', label: 'State' },
+								{ placeholder: '{{country}}', label: 'Country' },
+								{ placeholder: '{{website}}', label: 'Website' },
+								{ placeholder: '{{senderName}}', label: 'Your Name' },
+								{ placeholder: '{{senderWebsite}}', label: 'Your Website' },
+							].map(({ placeholder, label }) => (
+								<div
+									key={placeholder}
+									className="flex flex-col gap-1 p-3 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
+									onMouseDown={(e) => {
+										e.preventDefault(); // Prevent blur
+										if (insertPlaceholder) {
+											insertPlaceholder(placeholder);
+										}
+									}}
+								>
+									<code className="text-sm font-mono text-primary">{placeholder}</code>
+									<Typography className="text-xs text-muted">{label}</Typography>
+								</div>
+							))}
+						</div>
 					</div>
 				)}
+			</div>
+			<div className="flex justify-center mt-4">
+				<Button
+					isLoading={isTest}
+					type="button"
+					bold
+					variant="primary-light"
+					disabled={isGenerationDisabled()}
+					onClick={() => {
+						handleTestPrompt();
+						setActiveTab('test');
+					}}
+				>
+					<FlaskConicalIcon /> Test Your Prompt
+				</Button>
 			</div>
 		</div>
 	);

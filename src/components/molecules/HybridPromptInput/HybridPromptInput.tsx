@@ -29,19 +29,33 @@ import { Button } from '@/components/ui/button';
 import { GripVerticalIcon, PlusIcon, Trash2 } from 'lucide-react';
 import { HelpTooltip } from '@/components/atoms/HelpTooltip/HelpTooltip';
 import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
-import { HybridBlock } from '@prisma/client';
+import { HybridBlock, Signature } from '@prisma/client';
 import { BLOCKS, useHybridPromptInput } from './useHybridPromptInput';
 import { twMerge } from 'tailwind-merge';
 import { useState } from 'react';
+import {
+	Select,
+	SelectContent,
+	SelectGroup,
+	SelectItem,
+	SelectLabel,
+	SelectTrigger,
+	SelectValue,
+} from '@/components/ui/select';
+import { Font } from '@/types';
+import { FONT_OPTIONS } from '@/constants';
+import { Separator } from '@/components/ui/separator';
+import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 
 interface SortableAIBlockProps {
 	block: (typeof BLOCKS)[number];
 	id: string;
 	fieldIndex: number;
 	onRemove: (id: string) => void;
+	trackFocusedField?: (fieldName: string, element: HTMLTextAreaElement | HTMLInputElement | null) => void;
 }
 
-const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockProps) => {
+const SortableAIBlock = ({ block, id, fieldIndex, onRemove, trackFocusedField }: SortableAIBlockProps) => {
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
 		useSortable({ id });
 	const form = useFormContext<DraftingFormValues>();
@@ -108,22 +122,36 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 							</>
 						)}
 					</div>
-					{isTextBlock || isFullAutomatedBlock ? (
-						<Textarea
-							placeholder={block.placeholder}
-							onClick={(e) => e.stopPropagation()}
-							className={isFullAutomatedBlock ? 'h-[400px]' : ''}
-							{...form.register(`hybridBlockPrompts.${fieldIndex}.value`)}
-						/>
-					) : (
+					{isTextBlock || isFullAutomatedBlock ? (() => {
+						const fieldProps = form.register(`hybridBlockPrompts.${fieldIndex}.value`);
+						return (
+							<Textarea
+								placeholder={block.placeholder}
+								onClick={(e) => e.stopPropagation()}
+								className={isFullAutomatedBlock ? 'h-[400px]' : ''}
+								{...fieldProps}
+								onFocus={(e) => {
+									fieldProps.onFocus?.(e);
+									trackFocusedField?.(`hybridBlockPrompts.${fieldIndex}.value`, e.target);
+								}}
+							/>
+						);
+					})() : (
 						<>
-							{isEdit && (
-								<Input
-									placeholder={block.placeholder}
-									onClick={(e) => e.stopPropagation()}
-									{...form.register(`hybridBlockPrompts.${fieldIndex}.value`)}
-								/>
-							)}
+							{isEdit && (() => {
+								const fieldProps = form.register(`hybridBlockPrompts.${fieldIndex}.value`);
+								return (
+									<Input
+										placeholder={block.placeholder}
+										onClick={(e) => e.stopPropagation()}
+										{...fieldProps}
+										onFocus={(e) => {
+											fieldProps.onFocus?.(e);
+											trackFocusedField?.(`hybridBlockPrompts.${fieldIndex}.value`, e.target);
+										}}
+									/>
+								);
+							})()}
 						</>
 					)}
 				</div>
@@ -132,7 +160,14 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove }: SortableAIBlockPro
 	);
 };
 
-export const HybridPromptInput = () => {
+interface HybridPromptInputProps {
+	trackFocusedField?: (fieldName: string, element: HTMLTextAreaElement | HTMLInputElement | null) => void;
+	signatures?: Signature[];
+	selectedSignature?: Signature | null;
+	setIsOpenSignaturesDialog?: (open: boolean) => void;
+}
+
+export const HybridPromptInput = ({ trackFocusedField, signatures, selectedSignature, setIsOpenSignaturesDialog }: HybridPromptInputProps) => {
 	const {
 		form,
 		fields,
@@ -145,10 +180,9 @@ export const HybridPromptInput = () => {
 
 	return (
 		<div>
-			<FormLabel>Email Template</FormLabel>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
 				<Droppable id="droppable">
-					<div className="min-h-[650px] mt-3 border-2 border-foreground rounded-xl p-3 bg-gray-50 flex flex-col gap-3 items-start transition w-full mb-4">
+					<div className="w-[559px] min-h-[530px] border-[3px] border-black rounded-md p-3 bg-gray-50 flex flex-col gap-3 items-start transition mb-4 overflow-y-auto overflow-x-hidden">
 						{fields.length === 0 && (
 							<Typography font="secondary" className=" text-gray-400 italic">
 								Add blocks here to build your prompt...
@@ -165,17 +199,110 @@ export const HybridPromptInput = () => {
 									fieldIndex={index}
 									block={getBlock(field.type)}
 									onRemove={handleRemoveBlock}
+									trackFocusedField={trackFocusedField}
 								/>
 							))}
 						</SortableContext>
+
+						<div className="flex flex-col sm:flex-row gap-2 mt-auto">
+							<FormField
+								control={form.control}
+								name="font"
+								render={({ field }) => (
+									<FormItem className="w-[268.11px] mb-2">
+										<FormControl>
+											<Select
+												onValueChange={field.onChange}
+												value={field.value as Font}
+											>
+												<SelectTrigger className="w-full h-[34.99px]">
+													<SelectValue />
+												</SelectTrigger>
+												<SelectContent>
+													<SelectGroup>
+														<SelectLabel>Font</SelectLabel>
+														{FONT_OPTIONS.map((font) => (
+															<SelectItem key={font} value={font}>
+																<span style={{ fontFamily: font }}>{font}</span>
+															</SelectItem>
+														))}
+													</SelectGroup>
+												</SelectContent>
+											</Select>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+
+							<FormField
+								control={form.control}
+								name="signatureId"
+								render={({ field }) => (
+									<FormItem className="w-[268.11px] mb-2">
+										<FormControl>
+											<Select
+												onValueChange={(value) => {
+													if (value === 'manage-signatures') {
+														setIsOpenSignaturesDialog?.(true);
+														return;
+													}
+													field.onChange(Number(value));
+												}}
+												defaultValue={field.value ? field.value.toString() : ''}
+												value={field.value ? field.value.toString() : ''}
+											>
+												<SelectTrigger className="w-full h-[34.99px]">
+													<SelectValue placeholder="Select signature" />
+												</SelectTrigger>
+												<SelectContent>
+													<SelectGroup>
+														<SelectLabel>Signature</SelectLabel>
+														{signatures && signatures.length > 0 ? (
+															signatures.map((signature: Signature) => (
+																<SelectItem
+																	key={signature.id}
+																	value={signature.id.toString()}
+																>
+																	{signature.name}
+																</SelectItem>
+															))
+														) : (
+															<SelectItem value="no-signatures" disabled>
+																No signatures available
+															</SelectItem>
+														)}
+														<Separator className="my-1" />{' '}
+													</SelectGroup>
+													<SelectGroup>
+														<SelectItem value="manage-signatures">
+															Manage Signatures
+														</SelectItem>
+													</SelectGroup>
+												</SelectContent>
+											</Select>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+						</div>
+						{selectedSignature && (
+							<RichTextEditor
+								hideMenuBar
+								className="border-none min-h-[69.01px] overflow-x-hidden bg-[#E3E3E3]/40 p-3"
+								isEdit={false}
+								value={selectedSignature.content || ''}
+							/>
+						)}
 					</div>
 				</Droppable>
 			</DndContext>
 
-			<div className="flex gap-2 mb-3">
+			<div className="flex gap-2 mb-3 justify-center">
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
-						<Button className="w-1/2" type="button" variant="secondary-light">
+						<Button className="!w-[275.23px] !h-[40px] !text-black !border-2" type="button" variant="secondary-light">
 							<PlusIcon />
 							AI Block
 						</Button>
@@ -183,8 +310,8 @@ export const HybridPromptInput = () => {
 					<DropdownMenuContent className="w-56" align="start">
 						<DropdownMenuLabel>Select a Block</DropdownMenuLabel>
 						<DropdownMenuGroup>
-							{BLOCKS.filter(block => 
-								block.value !== HybridBlock.text && 
+							{BLOCKS.filter(block =>
+								block.value !== HybridBlock.text &&
 								block.value !== HybridBlock.full_automated
 							).map((block) => {
 								const isUsed = !watchedAvailableBlocks.includes(block.value);
@@ -210,7 +337,7 @@ export const HybridPromptInput = () => {
 
 				<Button
 					onClick={() => handleAddBlock(getBlock(HybridBlock.text))}
-					className="w-1/2"
+					className="!w-[275.23px] !h-[40px] !text-black !border-2"
 					type="button"
 					variant="primary-light"
 				>
