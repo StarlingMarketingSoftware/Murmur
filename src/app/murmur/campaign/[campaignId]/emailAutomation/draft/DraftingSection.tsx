@@ -11,30 +11,15 @@ import {
 	Form,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import {
-	Select,
-	SelectContent,
-	SelectGroup,
-	SelectItem,
-	SelectLabel,
-	SelectTrigger,
-	SelectValue,
-} from '@/components/ui/select';
-import { FONT_OPTIONS } from '@/constants';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { ManageSignaturesDialog } from '@/components/organisms/_dialogs/ManageSignaturesDialog/ManageSignaturesDialog';
 import { ConfirmDialog } from '@/components/organisms/_dialogs/ConfirmDialog/ConfirmDialog';
 import ProgressIndicator from '@/components/molecules/ProgressIndicator/ProgressIndicator';
-import { Signature } from '@prisma/client';
-import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 import { Typography } from '@/components/ui/typography';
-import { Font } from '@/types';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
-import { HybridBlock } from '@prisma/client';
 import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
@@ -142,7 +127,9 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 												}
 												disabled={isAiSubject}
 												{...field}
-												onFocus={(e) => !isAiSubject && trackFocusedField('subject', e.target)}
+												onFocus={(e) =>
+													!isAiSubject && trackFocusedField('subject', e.target)
+												}
 											/>
 										</FormControl>
 										<FormMessage />
@@ -155,7 +142,9 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 							<div className="w-[559px]">
 								<BlockTabs
 									activeValue={activeTab}
-									onValueChange={(value) => setActiveTab(value as 'settings' | 'test' | 'placeholders')}
+									onValueChange={(value) =>
+										setActiveTab(value as 'settings' | 'test' | 'placeholders')
+									}
 									options={[
 										{ label: 'Settings', value: 'settings' },
 										{ label: 'Test', value: 'test' },
@@ -204,21 +193,20 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									</Button>
 								</div>
 							</div>
-								<ConfirmDialog
-									title="Confirm Batch Generation of Emails"
-									confirmAction={handleGenerateDrafts}
-									open={isConfirmDialogOpen}
-									onOpenChange={setIsConfirmDialogOpen}
-								>
-									<Typography>
-										Are you sure you want to generate emails for all selected
-										recipients?
-										<br /> <br />
-										This action will automatically create a custom email for each recipient
-										based on the prompt you provided and will count towards your
-										monthly usage limits.
-									</Typography>
-								</ConfirmDialog>
+							<ConfirmDialog
+								title="Confirm Batch Generation of Emails"
+								confirmAction={handleGenerateDrafts}
+								open={isConfirmDialogOpen}
+								onOpenChange={setIsConfirmDialogOpen}
+							>
+								<Typography>
+									Are you sure you want to generate emails for all selected recipients?
+									<br /> <br />
+									This action will automatically create a custom email for each recipient
+									based on the prompt you provided and will count towards your monthly
+									usage limits.
+								</Typography>
+							</ConfirmDialog>
 							<ProgressIndicator
 								progress={generationProgress}
 								setProgress={setGenerationProgress}
