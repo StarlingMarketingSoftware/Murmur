@@ -168,6 +168,8 @@ export const MobileAppComingSoon: React.FC = () => {
 				WebkitTapHighlightColor: 'transparent',
 				backgroundColor: '#FFFFFF',
 				touchAction: 'none',
+				WebkitTransform: 'translateZ(0)', // Safari GPU acceleration
+				WebkitBackfaceVisibility: 'hidden', // Safari flicker fix
 			}}
 		>
 			{/* Animated lines overlay */}

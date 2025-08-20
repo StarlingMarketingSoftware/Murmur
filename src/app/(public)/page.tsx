@@ -39,7 +39,7 @@ const FAQS: FAQ[] = [
 ];
 
 export default function HomePage() {
-	const { addContainerFade, addTextSlide, addFadeIn, addLuxuryFade, addScaleIn, addSlideInLeft, addSlideInRight, addParallax } = useScrollAnimations();
+	const { addTextSlide, addFadeIn } = useScrollAnimations();
 	const heroRef = useRef<HTMLDivElement>(null);
 	const heroTextRef = useRef<HTMLHeadingElement>(null);
 	const heroSubTextRef = useRef<HTMLParagraphElement>(null);
@@ -66,8 +66,8 @@ export default function HomePage() {
 			const words = text.split(' ');
 			
 			// Create word containers with letter spans inside
-			const wordSpans = words.map((word, wordIndex) => {
-				const letterSpans = word.split('').map((letter, letterIndex) => {
+			const wordSpans = words.map((word) => {
+				const letterSpans = word.split('').map((letter) => {
 					if (letter === '.') {
 						return `<span class="inline-block opacity-0" style="filter: blur(12px); transform: translateY(20px); font-weight: 400;">${letter}</span>`;
 					}
@@ -105,8 +105,8 @@ export default function HomePage() {
 			const words = text.split(' ');
 			
 			// Create word containers with letter spans inside
-			const wordSpans = words.map((word, wordIndex) => {
-				const letterSpans = word.split('').map((letter, letterIndex) => {
+			const wordSpans = words.map((word) => {
+				const letterSpans = word.split('').map((letter) => {
 					// Special handling for '+' symbol
 					if (letter === '+') {
 						return `<span class="inline-block opacity-0" style="filter: blur(2px); transform: translateX(-10px); font-weight: 300;">${letter}</span>`;

@@ -253,6 +253,8 @@ const PageTransition = ({
 				overflow: 'hidden',
 				backgroundColor: '#FFFFFF',
 				touchAction: 'none', // Prevent any touch gestures
+				WebkitTransform: 'translateZ(0)', // Safari GPU acceleration
+				WebkitBackfaceVisibility: 'hidden', // Safari flicker fix
 			}}
 		>
 			{/* Pure white overlay */}

@@ -3,6 +3,8 @@
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
+  /* Safari scroll fix */
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Premium text rendering */
@@ -10,6 +12,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  /* Safari fixes */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 
 /* Subtle shadow for depth */
@@ -36,4 +41,19 @@ body {
 /* Remove CTA animation */
 .luxury-cta {
   /* No animation */
+}
+
+/* Safari opacity animation fixes */
+[ref*="addFadeIn"],
+[ref*="addTextSlide"],
+[ref*="addContainerFade"] {
+  -webkit-transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  -webkit-perspective: 1000px;
+}
+
+/* Prevent Safari flicker on animated elements */
+* {
+  -webkit-font-smoothing: subpixel-antialiased;
+  -webkit-transform-style: preserve-3d;
 }

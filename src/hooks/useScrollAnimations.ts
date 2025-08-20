@@ -7,13 +7,18 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 // Register ScrollTrigger plugin
 if (typeof window !== 'undefined') {
 	gsap.registerPlugin(ScrollTrigger);
-}
-
-interface ScrollAnimationOptions {
-	delay?: number;
-	duration?: number;
-	y?: number;
-	stagger?: number;
+	
+	// Safari-specific optimizations
+	// Check navigator exists (for SSR)
+	if (typeof navigator !== 'undefined') {
+		const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+		if (isSafari) {
+			// Reduce lag smoothing for Safari
+			gsap.ticker.lagSmoothing(0);
+			// Force refresh rate for smoother animations
+			gsap.ticker.fps(60);
+		}
+	}
 }
 
 export const useScrollAnimations = () => {
@@ -40,16 +45,21 @@ export const useScrollAnimations = () => {
 				
 				if (isProductList) {
 					// For product list, just do a one-time fade in
-					gsap.set(element, { opacity: 0 });
+					gsap.set(element, { 
+						opacity: 0,
+						willChange: 'opacity', // Safari optimization
+					});
 					
 					const trigger = ScrollTrigger.create({
 						trigger: element,
 						start: 'top 90%',
+						anticipatePin: 0, // Safari fix
 						onEnter: () => {
 							gsap.to(element, {
 								opacity: 1,
 								duration: 0.6,
 								ease: 'power2.out',
+								force3D: false, // Safari fix
 							});
 						},
 						once: true, // Only animate once for interactive elements
@@ -62,6 +72,7 @@ export const useScrollAnimations = () => {
 				// Set initial state for regular elements
 				gsap.set(element, {
 					opacity: 0,
+					willChange: 'opacity', // Safari optimization
 				});
 
 				const trigger = ScrollTrigger.create({
@@ -69,6 +80,7 @@ export const useScrollAnimations = () => {
 					start: 'top 90%', // Similar to PointOne's trigger point
 					end: 'bottom 10%', // Keep elements visible in viewport
 					scrub: false, // Don't tie to scroll position directly
+					anticipatePin: 0, // Safari fix for ScrollTrigger
 					onEnter: () => {
 						// Scrolling down - element enters viewport from bottom
 						gsap.to(element, {
@@ -76,6 +88,7 @@ export const useScrollAnimations = () => {
 							duration: 0.6, // Quick but smooth like PointOne
 							ease: 'power2.out', // Smooth deceleration
 							overwrite: 'auto', // Auto manage animations
+							force3D: false, // Safari fix - prevent layer creation issues
 						});
 					},
 					onLeave: () => {
@@ -85,6 +98,7 @@ export const useScrollAnimations = () => {
 							duration: 0.3, // Quick fade out
 							ease: 'power2.in',
 							overwrite: 'auto',
+							force3D: false, // Safari fix
 						});
 					},
 					onEnterBack: () => {
@@ -94,6 +108,7 @@ export const useScrollAnimations = () => {
 							duration: 0.6, // Consistent with enter
 							ease: 'power2.out',
 							overwrite: 'auto',
+							force3D: false, // Safari fix
 						});
 					},
 					onLeaveBack: () => {
@@ -103,6 +118,7 @@ export const useScrollAnimations = () => {
 							duration: 0.3, // Quick fade out
 							ease: 'power2.in',
 							overwrite: 'auto',
+							force3D: false, // Safari fix
 						});
 					},
 				});

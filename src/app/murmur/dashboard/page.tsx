@@ -1,7 +1,5 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { useDashboard } from './useDashboard';
 
