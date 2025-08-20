@@ -130,9 +130,7 @@ export const useDashboard = () => {
 		}
 	}, [hasSearched, activeSearchQuery, activeExcludeUsedContacts, limit]);
 
-	// Handle errors
 	useEffect(() => {
-		// Only show error if we've actually searched (not on initial load)
 		if (isError && error && hasSearched && activeSearchQuery) {
 			console.error('Contact search error details:', {
 				error,

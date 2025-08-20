@@ -219,12 +219,12 @@
 	}
 
 	/* Fix for drag and drop in Safari */
-	[draggable="true"] {
+	[draggable='true'] {
 		-webkit-user-drag: element;
 		cursor: grab;
 	}
 
-	[draggable="true"]:active {
+	[draggable='true']:active {
 		cursor: grabbing;
 	}
 
@@ -275,7 +275,9 @@
 	}
 
 	/* Fix for z-index issues in Safari */
-	.z-10, .z-40, .z-50 {
+	.z-10,
+	.z-40,
+	.z-50 {
 		-webkit-transform: translateZ(0);
 		transform: translateZ(0);
 	}
@@ -1337,15 +1339,11 @@ mux-player {
 	background-clip: initial !important;
 }
 
-/* Hover effects removed for Murmur text - no interaction effects */
-
 .premium-subtitle-gradient:hover {
 	opacity: 1;
 	color: rgb(75, 85, 99);
 	transition: all 1.5s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
-
-/* Dark mode hover effects removed for Murmur text */
 
 .dark .premium-subtitle-gradient:hover {
 	opacity: 1;
