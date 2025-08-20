@@ -4,7 +4,6 @@ import { apiResponse, apiUnauthorized } from '@/app/api/_utils';
 import { initializeVectorDb, upsertContactToVectorDb } from '../../_utils/vectorDb';
 import { EmailVerificationStatus, UserRole } from '@prisma/client';
 
-// Add timeout wrapper
 const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
 	return Promise.race([
 		promise,
@@ -21,7 +20,6 @@ export async function GET() {
 			return apiUnauthorized();
 		}
 
-		// Check if the user is an admin
 		const user = await prisma.user.findUnique({
 			where: {
 				clerkId: userId,
@@ -31,10 +29,8 @@ export async function GET() {
 			return apiUnauthorized();
 		}
 
-		// Add timeout to initialization
 		await withTimeout(initializeVectorDb(), 30000); // 30 second timeout
 
-		// Add timeout to database query
 		const contacts = await withTimeout(
 			prisma.contact.findMany({
 				where: {

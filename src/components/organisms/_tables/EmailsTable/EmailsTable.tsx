@@ -36,6 +36,8 @@ const EmailsTable: FC<EmailsTableProps> = (props) => {
 				constrainHeight
 				displayRowsPerPage={false}
 				rowsPerPage={200}
+				hidePagination={true}
+				searchable={false}
 			/>
 			<ViewEditEmailDialog
 				email={selectedDraft}

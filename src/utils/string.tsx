@@ -1,6 +1,10 @@
 import { HybridBlockPrompt } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 import { HybridBlock } from '@prisma/client';
 
+export const normalizeTextCaseAndWhitespace = (text: string): string => {
+	return text.trim().toLowerCase();
+};
+
 /**
  * Truncates text to a specified length and adds ellipses
  * Tries to break at word boundaries when possible for better readability
@@ -152,7 +156,7 @@ export const stringifyJsonSubset = <T,>(
 export const generateEmailTemplateFromBlocks = (blocks: HybridBlockPrompt[]): string => {
 	const template: string[] = [];
 	for (const block of blocks) {
-		if (block.type === 'text') {
+		if (block.type === 'text' || block.type === HybridBlock.text) {
 			template.push(`${block.value}`);
 		} else {
 			template.push(`{{${block.type}}}`);
@@ -167,10 +171,17 @@ export const generateEmailTemplateFromBlocks = (blocks: HybridBlockPrompt[]): st
  * @returns The set of prompts
  */
 export const generatePromptsFromBlocks = (blocks: HybridBlockPrompt[]): string => {
+	const defaultPrompts: Record<string, string> = {
+		introduction: 'Write a professional and personalized introduction that establishes rapport with the recipient.',
+		research: 'Include relevant research about the recipient or their company that shows genuine interest and understanding.',
+		action: 'Create a clear and compelling call to action that encourages the recipient to take the next step.'
+	};
+
 	const prompts: string[] = [];
 	for (const block of blocks) {
-		if (block.type !== HybridBlock.text) {
-			prompts.push(`Prompt for {{${block.type}}}: ${block.value}`);
+		if (block.type !== HybridBlock.text && block.type !== 'text') {
+			const prompt = block.value?.trim() || defaultPrompts[block.type] || `Generate content for ${block.type}`;
+			prompts.push(`Prompt for {{${block.type}}}: ${prompt}`);
 		}
 	}
 	return prompts.join('\n\n');

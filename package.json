@@ -4,14 +4,17 @@
 	"private": true,
 	"scripts": {
 		"dev": "next dev --port 3000",
-		"build": "node --max-old-space-size=4096 node_modules/.bin/next build",
+		"build": "cross-env NODE_OPTIONS=--max-old-space-size=8192 next build",
 		"start": "next start",
 		"lint": "next lint",
-		"vercel-build": "cross-env NODE_OPTIONS=--max-old-space-size=8192 prisma generate && prisma migrate deploy && next build",
+		"vercel-build": "prisma generate && prisma migrate deploy && next build",
 		"postinstall": "prisma generate",
 		"import-production-contacts": "tsx --tsconfig tsconfig.json scripts/import-production-contacts.ts",
 		"check-elasticsearch": "tsx --tsconfig tsconfig.json scripts/check-elasticsearch.tsx",
 		"reindex-from-production": "tsx --tsconfig tsconfig.json scripts/reindex-from-production.ts"
+	},
+	"engines": {
+		"node": ">=18.18.0"
 	},
 	"prisma": {
 		"seed": "tsx --tsconfig tsconfig.json prisma/seed.ts"
@@ -47,6 +50,7 @@
 		"@types/gapi": "^0.0.47",
 		"@types/papaparse": "^5.3.16",
 		"@types/string-similarity": "^4.0.2",
+		"@vercel/blob": "^1.1.1",
 		"@xenova/transformers": "^2.17.2",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
@@ -96,11 +100,11 @@
 		"@types/nodemailer": "^6.4.17",
 		"@types/react": "^19",
 		"@types/react-dom": "^19",
+		"cross-env": "^7.0.3",
 		"dotenv": "^17.2.1",
 		"eslint": "^9",
 		"eslint-config-next": "15.2.2",
 		"prisma": "^6.11.1",
-		"cross-env": "^7.0.3",
 		"tailwindcss": "^4.1.11",
 		"ts-node": "^10.9.2",
 		"tsx": "^4.19.3",
