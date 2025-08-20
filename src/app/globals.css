@@ -2554,13 +2554,25 @@ mux-player {
 /* Maintain consistent spacing ratio on zoom */
 @media (min-width: 1920px) {
 	.campaigns-table-wrapper {
+		margin-top: -webkit-calc(16rem + 2vw) !important; /* Safari prefix */
 		margin-top: calc(16rem + 2vw) !important;
 	}
 }
 
 @media (min-width: 2560px) {
 	.campaigns-table-wrapper {
+		margin-top: -webkit-calc(18rem + 2vw) !important; /* Safari prefix */
 		margin-top: calc(18rem + 2vw) !important;
+	}
+}
+
+/* Safari-specific fix for campaigns table */
+@supports (-webkit-appearance: none) {
+	.campaigns-table-wrapper {
+		-webkit-transform: translateZ(0); /* Hardware acceleration */
+		transform: translateZ(0);
+		-webkit-backface-visibility: hidden;
+		backface-visibility: hidden;
 	}
 }
 
@@ -2569,6 +2581,8 @@ mux-player {
 	white-space: nowrap;
 	overflow: hidden;
 	position: relative;
+	-webkit-text-size-adjust: 100%; /* Prevent text size changes in Safari */
+	text-size-adjust: 100%;
 }
 
 /* Default: show full text on desktop */
