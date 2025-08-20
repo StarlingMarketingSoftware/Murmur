@@ -258,7 +258,7 @@ export default function HomePage() {
 							/>
 						</div>
 					</div>
-					<div ref={(el) => addTextSlide(el)}>
+					<div ref={(el) => addTextSlide(el)} data-persistent-content>
 						<Typography
 							variant="promoP"
 							className="w-full max-w-[943px] mx-auto !mt-16 sm:!mt-32 text-background px-4"
@@ -306,7 +306,7 @@ export default function HomePage() {
 
 			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-25 px-4">
 				<div className="mx-auto max-w-[943px]">
-					<div ref={(el) => addTextSlide(el)}>
+					<div ref={(el) => addTextSlide(el)} data-persistent-content>
 						<Typography
 							variant="h2"
 							className="text-center sm:text-left text-[30px] sm:text-[42px] font-tertiary"
@@ -315,7 +315,7 @@ export default function HomePage() {
 						</Typography>
 					</div>
 				</div>
-				<div ref={(el) => addTextSlide(el)}>
+				<div ref={(el) => addTextSlide(el)} data-persistent-content>
 					<Typography
 						variant="promoP"
 						className="w-full max-w-[943px] mx-auto !mt-10"
