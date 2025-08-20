@@ -75,10 +75,13 @@ export const useScrollAnimations = () => {
 					willChange: 'opacity', // Safari optimization
 				});
 
-				// Check if this is a bottom section that shouldn't fade out when scrolled past
-				const isBottomSection = element.querySelector('[data-faq-section]') || 
-									   element.closest('[data-faq-section]') ||
-									   element.classList.contains('faq-section');
+				// Check if this is a persistent section that shouldn't fade out when scrolled past
+				const isPersistentSection = element.querySelector('[data-faq-section]') || 
+										   element.closest('[data-faq-section]') ||
+										   element.classList.contains('faq-section') ||
+										   element.querySelector('[data-persistent-content]') ||
+										   element.closest('[data-persistent-content]') ||
+										   element.hasAttribute('data-persistent-content');
 				
 				const trigger = ScrollTrigger.create({
 					trigger: element,
@@ -98,8 +101,8 @@ export const useScrollAnimations = () => {
 					},
 					onLeave: () => {
 						// Scrolling down - element leaves viewport from top
-						// Don't fade out bottom sections like FAQ
-						if (!isBottomSection) {
+						// Don't fade out persistent sections
+						if (!isPersistentSection) {
 							gsap.to(element, {
 								opacity: 0,
 								duration: 0.3, // Quick fade out
