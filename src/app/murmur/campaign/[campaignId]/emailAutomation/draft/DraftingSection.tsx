@@ -21,6 +21,7 @@ import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/Hybr
 import { Typography } from '@/components/ui/typography';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
+import { DraftingMode } from '@prisma/client';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
@@ -51,13 +52,13 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		activeTab,
 		setActiveTab,
 		hasFullAutomatedBlock,
+		draftingModeBasedOnBlocks,
 	} = useDraftingSection(props);
 
 	const {
 		formState: { isDirty },
 	} = form;
 
-	// Helper function to get autosave status display
 	const getAutosaveStatusDisplay = (): ReactNode => {
 		switch (autosaveStatus) {
 			case 'saving':
@@ -112,6 +113,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 											<Separator orientation="vertical" className="!h-5" />
 											<Switch
 												checked={isAiSubject}
+												disabled={draftingModeBasedOnBlocks === DraftingMode.handwritten}
 												onCheckedChange={(val: boolean) =>
 													form.setValue('isAiSubject', val)
 												}
@@ -146,9 +148,17 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										setActiveTab(value as 'settings' | 'test' | 'placeholders')
 									}
 									options={[
-										{ label: 'Settings', value: 'settings' },
+										{
+											label: 'Settings',
+											value: 'settings',
+											disabled: draftingModeBasedOnBlocks !== DraftingMode.ai,
+										},
 										{ label: 'Test', value: 'test' },
-										{ label: 'Placeholders', value: 'placeholders' },
+										{
+											label: 'Placeholders',
+											value: 'placeholders',
+											disabled: draftingModeBasedOnBlocks === DraftingMode.ai,
+										},
 									]}
 								/>
 							</div>
@@ -168,7 +178,6 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									campaign={campaign}
 									handleTestPrompt={handleGenerateTestDrafts}
 									isTest={isTest}
-									draftingMode={'hybrid'}
 									hasFullAutomatedBlock={hasFullAutomatedBlock}
 									insertPlaceholder={insertPlaceholder}
 									activeTab={activeTab}

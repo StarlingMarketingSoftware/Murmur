@@ -54,6 +54,14 @@ export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
 }
 
+type GeneratedEmail = {
+	subject: string;
+	message: string;
+	contactId: number;
+	status: EmailStatus;
+	campaignId: number;
+};
+
 type BatchGenerationResult = {
 	contactId: number;
 	success: boolean;
@@ -75,7 +83,6 @@ export type HybridBlockPrompts = {
 };
 
 export const draftingFormSchema = z.object({
-	draftingMode: z.nativeEnum(DraftingMode).default(DraftingMode.hybrid),
 	isAiSubject: z.boolean().default(true),
 	subject: z.string().default(''),
 	fullAiPrompt: z.string().default(''),
@@ -133,7 +140,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const form = useForm<DraftingFormValues>({
 		resolver: zodResolver(draftingFormSchema),
 		defaultValues: {
-			draftingMode: DraftingMode.hybrid,
 			isAiSubject: true,
 			subject: '',
 			fullAiPrompt: '',
@@ -164,7 +170,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	});
 
 	const isAiSubject = form.watch('isAiSubject');
-	const draftingMode = form.watch('draftingMode');
 	const { getValues } = form;
 
 	// API
@@ -285,7 +290,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			contacts?.length === 0 ||
 			isPendingGeneration
 		);
-	}, [form, draftingMode, generationProgress, contacts?.length, isPendingGeneration]);
+	}, [form, generationProgress, contacts?.length, isPendingGeneration]);
 
 	// FUNCTIONS
 
@@ -642,14 +647,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			}
 		}
 
-		// Get isAiSubject from form values
 		const formValues = form.getValues();
-		const shouldUseAiSubject = formValues.isAiSubject ?? true;
 
 		return {
-			subject: shouldUseAiSubject
-				? mistralResponseParsed.subject
-				: formValues.subject || '',
+			subject: isAiSubject ? mistralResponseParsed.subject : formValues.subject || '',
 			message: finalMessage,
 		};
 	};
@@ -721,7 +722,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					(block) => block.type === 'full_automated'
 				);
 
-				console.log('[Test Generation] Mode:', values.draftingMode);
+				console.log('[Test Generation] Mode:', draftingModeBasedOnBlocks);
 				console.log('[Test Generation] Has Full Automated Block:', hasFullAutomatedBlock);
 				console.log(
 					'[Test Generation] Full Automated Block Value:',
@@ -729,12 +730,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				);
 				console.log('[Test Generation] Hybrid Blocks:', values.hybridBlockPrompts);
 
-				if (
-					values.draftingMode === DraftingMode.ai ||
-					(values.draftingMode === DraftingMode.hybrid && hasFullAutomatedBlock)
-				) {
+				if (draftingModeBasedOnBlocks === DraftingMode.ai) {
 					const fullAiPrompt =
-						values.draftingMode === DraftingMode.ai
+						draftingModeBasedOnBlocks === DraftingMode.ai
 							? values.fullAiPrompt
 							: fullAutomatedBlock?.value || '';
 
@@ -750,7 +748,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 						values.draftingTone,
 						values.paragraphs
 					);
-				} else if (values.draftingMode === DraftingMode.hybrid) {
+				} else if (draftingModeBasedOnBlocks === DraftingMode.hybrid) {
 					// For regular hybrid blocks
 					if (!values.hybridBlockPrompts || values.hybridBlockPrompts.length === 0) {
 						throw new Error('No blocks added. Please add at least one block.');
@@ -859,20 +857,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 					let parsedDraft;
 
-					// Check if we have a Full Automated block in hybrid mode
-					const hasFullAutomatedBlock = values.hybridBlockPrompts?.some(
-						(block) => block.type === 'full_automated'
-					);
 					const fullAutomatedBlock = values.hybridBlockPrompts?.find(
 						(block) => block.type === 'full_automated'
 					);
 
-					if (
-						values.draftingMode === DraftingMode.ai ||
-						(values.draftingMode === DraftingMode.hybrid && hasFullAutomatedBlock)
-					) {
+					if (draftingModeBasedOnBlocks === DraftingMode.ai) {
 						const fullAiPrompt =
-							values.draftingMode === DraftingMode.ai
+							draftingModeBasedOnBlocks === DraftingMode.ai
 								? values.fullAiPrompt
 								: fullAutomatedBlock?.value || '';
 
@@ -887,7 +878,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 							values.paragraphs,
 							controller.signal
 						);
-					} else if (values.draftingMode === DraftingMode.hybrid) {
+					} else if (draftingModeBasedOnBlocks === DraftingMode.hybrid) {
 						// Filter out any full_automated blocks for hybrid processing
 						const hybridBlocks =
 							values.hybridBlockPrompts?.filter(
@@ -1148,7 +1139,55 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	};
 
+	// Insert placeholder at cursor position
+	const insertPlaceholder = useCallback(
+		(placeholder: string) => {
+			const { name, element } = lastFocusedFieldRef.current;
+			console.log(
+				'[Insert Placeholder] Current focused field:',
+				name,
+				'Element:',
+				element
+			);
+
+			if (!element || !name) {
+				console.log('[Insert Placeholder] No focused field found');
+				return;
+			}
+
+			const start = element.selectionStart || 0;
+			const end = element.selectionEnd || 0;
+			const currentValue = element.value;
+
+			const newValue =
+				currentValue.substring(0, start) + placeholder + currentValue.substring(end);
+			console.log('[Insert Placeholder] Inserting', placeholder, 'at position', start);
+
+			// Update the form value
+			form.setValue(name as keyof DraftingFormValues, newValue, { shouldDirty: true });
+
+			// Use requestAnimationFrame for better Safari compatibility
+			requestAnimationFrame(() => {
+				element.focus();
+				// Safari needs a slight delay for setSelectionRange to work properly
+				const newPosition = start + placeholder.length;
+				setTimeout(() => {
+					element.setSelectionRange(newPosition, newPosition);
+				}, 10);
+			});
+		},
+		[form]
+	);
+
 	// EFFECTS
+
+	useEffect(() => {
+		if (draftingModeBasedOnBlocks === DraftingMode.handwritten) {
+			form.setValue('isAiSubject', false);
+		} else {
+			form.setValue('isAiSubject', true);
+		}
+	}, [draftingModeBasedOnBlocks, form]);
 
 	useEffect(() => {
 		const currentSignature = signatures?.find(
@@ -1164,7 +1203,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	useEffect(() => {
 		if (campaign && form && signatures?.length > 0 && isFirstLoad) {
 			form.reset({
-				draftingMode: DraftingMode.hybrid,
 				isAiSubject: campaign.isAiSubject ?? true,
 				subject: campaign.subject ?? '',
 				fullAiPrompt: campaign.fullAiPrompt ?? '',
@@ -1220,53 +1258,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		};
 	}, [debouncedAutosave]);
 
-	// Track focused field
 	const trackFocusedField = useCallback(
 		(fieldName: string, element: HTMLTextAreaElement | HTMLInputElement | null) => {
-			console.log('[Track Focus] Field:', fieldName, 'Element:', element);
 			lastFocusedFieldRef.current = { name: fieldName, element };
 		},
 		[]
-	);
-
-	// Insert placeholder at cursor position
-	const insertPlaceholder = useCallback(
-		(placeholder: string) => {
-			const { name, element } = lastFocusedFieldRef.current;
-			console.log(
-				'[Insert Placeholder] Current focused field:',
-				name,
-				'Element:',
-				element
-			);
-
-			if (!element || !name) {
-				console.log('[Insert Placeholder] No focused field found');
-				return;
-			}
-
-			const start = element.selectionStart || 0;
-			const end = element.selectionEnd || 0;
-			const currentValue = element.value;
-
-			const newValue =
-				currentValue.substring(0, start) + placeholder + currentValue.substring(end);
-			console.log('[Insert Placeholder] Inserting', placeholder, 'at position', start);
-
-			// Update the form value
-			form.setValue(name as keyof DraftingFormValues, newValue, { shouldDirty: true });
-
-			// Use requestAnimationFrame for better Safari compatibility
-			requestAnimationFrame(() => {
-				element.focus();
-				// Safari needs a slight delay for setSelectionRange to work properly
-				const newPosition = start + placeholder.length;
-				setTimeout(() => {
-					element.setSelectionRange(newPosition, newPosition);
-				}, 10);
-			});
-		},
-		[form]
 	);
 
 	// Watch for Full Automated block changes
@@ -1304,7 +1300,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		isOpenSignaturesDialog,
 		setIsOpenSignaturesDialog,
 		selectedSignature,
-		draftingMode,
 		handleGenerateTestDrafts,
 		handleGenerateDrafts,
 		hybridFields,
@@ -1322,5 +1317,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		activeTab,
 		setActiveTab,
 		hasFullAutomatedBlock,
+		draftingModeBasedOnBlocks,
 	};
 };

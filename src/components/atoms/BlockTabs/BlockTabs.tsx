@@ -4,6 +4,7 @@ import { twMerge } from 'tailwind-merge';
 export interface TabOption<T = string> {
 	value: T;
 	label: string;
+	disabled?: boolean;
 }
 
 interface TabsCustomProps<T = string> {
@@ -32,6 +33,7 @@ export function BlockTabs<T = string>({
 					key={String(option.value)}
 					className={twMerge(
 						'h-8 transition border-2',
+						option.disabled && 'opacity-50 pointer-events-none',
 						activeValue === option.value
 							? twMerge(
 									'border-primary bg-gradient-to-br from-background to-primary/20',
@@ -46,7 +48,7 @@ export function BlockTabs<T = string>({
 					style={{
 						width: `${100 / options.length}%`,
 					}}
-					onClick={() => onValueChange(option.value)}
+					onClick={() => !option.disabled && onValueChange(option.value)}
 				>
 					<Typography font="secondary" className="ml-2 !text-[20px]">
 						{option.label}

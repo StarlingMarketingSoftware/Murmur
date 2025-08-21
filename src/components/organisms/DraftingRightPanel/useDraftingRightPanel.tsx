@@ -1,6 +1,6 @@
 import { draftingFormSchema } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 import { CampaignWithRelations, OptionWithLabel, TestDraftEmail } from '@/types';
-import { DraftingMode, DraftingTone } from '@prisma/client';
+import { DraftingTone } from '@prisma/client';
 import { useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { z } from 'zod';
@@ -14,7 +14,6 @@ export interface DraftingRightPanelProps {
 	campaign: CampaignWithRelations;
 	handleTestPrompt: () => Promise<void>;
 	isTest: boolean;
-	draftingMode: DraftingMode;
 	isGenerationDisabled: () => boolean;
 	hasFullAutomatedBlock?: boolean;
 	insertPlaceholder?: (placeholder: string) => void;
@@ -23,8 +22,16 @@ export interface DraftingRightPanelProps {
 }
 
 export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
-	const { campaign, handleTestPrompt, isTest, draftingMode, isGenerationDisabled, hasFullAutomatedBlock, insertPlaceholder, activeTab, setActiveTab } =
-		props;
+	const {
+		campaign,
+		handleTestPrompt,
+		isTest,
+		isGenerationDisabled,
+		hasFullAutomatedBlock,
+		insertPlaceholder,
+		activeTab,
+		setActiveTab,
+	} = props;
 	const form = useFormContext<z.infer<typeof draftingFormSchema>>();
 	const areSettingsDisabled = !hasFullAutomatedBlock;
 	const showSettings = hasFullAutomatedBlock; // Only show settings when Full Automated block is present
@@ -86,7 +93,6 @@ export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
 		form,
 		areSettingsDisabled,
 		isGenerationDisabled,
-		draftingMode,
 		hasTestMessage,
 		showSettings,
 		insertPlaceholder,
