@@ -3,7 +3,7 @@
 	"outputDirectory": ".next",
 	"crons": [
 		{
-			"path": "/api/stripe/cron?secret=\u003cCRON_SECRET\u003e",
+			"path": "/api/webhooks/stripe/cron",
 			"schedule": "0 0 * * *"
 		}
 	],

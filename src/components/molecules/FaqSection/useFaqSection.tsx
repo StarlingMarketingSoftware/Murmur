@@ -6,10 +6,11 @@ export interface FaqSectionProps {
 	title: string;
 	description: string;
 	showMoreLink?: string;
+	theme?: 'light' | 'dark';
 }
 
 export const useFaqSection = (props: FaqSectionProps) => {
-	const { faqs, header, title, description, showMoreLink } = props;
+	const { faqs, header, title, description, showMoreLink, theme = 'dark' } = props;
 
 	return {
 		faqs,
@@ -17,5 +18,6 @@ export const useFaqSection = (props: FaqSectionProps) => {
 		title,
 		description,
 		showMoreLink,
+		theme,
 	};
 };

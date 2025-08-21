@@ -1,9 +1,6 @@
 import prisma from '@/lib/prisma';
-import { auth } from '@clerk/nextjs/server';
-import { apiResponse, apiUnauthorized, handleApiError } from '@/app/api/_utils';
-import { EmailVerificationStatus, UserRole } from '@prisma/client';
-import fs from 'fs';
-import path from 'path';
+import { apiResponse, handleApiError } from '@/app/api/_utils';
+import { EmailVerificationStatus } from '@prisma/client';
 import * as XLSX from 'xlsx';
 
 interface ExcelContactRow {
@@ -32,29 +29,31 @@ interface ExcelContactRow {
 	emailvalidationstatus?: string;
 }
 
-export const POST = async function POST() {
+export const GET = async function GET(request: Request) {
 	try {
-		const { userId } = await auth();
-		if (!userId) {
-			return apiUnauthorized();
-		}
+		// const { userId } = await auth();
+		// if (!userId) {
+		// 	return apiUnauthorized();
+		// }
 
-		const user = await prisma.user.findUnique({
-			where: { clerkId: userId },
-		});
+		// const user = await prisma.user.findUnique({
+		// 	where: { clerkId: userId },
+		// });
 
-		if (user?.role !== UserRole.admin) {
-			return apiUnauthorized();
-		}
+		// if (user?.role !== UserRole.admin) {
+		// 	return apiUnauthorized();
+		// }
 
-		// Path to the Excel file
-		const excelPath = path.join(
-			process.cwd(),
-			'public',
-			'contactLists',
-			'V1 Database pt. 4_valid.xlsx'
+		// Load from public assets via HTTP so it works on Vercel
+		const fileUrl = new URL(
+			`/contactLists/2025-07-31ProductionContacts.xlsx`,
+			request.url
 		);
-		const fileBuffer = fs.readFileSync(excelPath);
+		const resp = await fetch(fileUrl);
+		if (!resp.ok) {
+			throw new Error(`Failed to fetch Excel from ${fileUrl.toString()}`);
+		}
+		const fileBuffer = Buffer.from(await resp.arrayBuffer());
 
 		// Parse the Excel file
 		const workbook = XLSX.read(fileBuffer, { type: 'buffer' });

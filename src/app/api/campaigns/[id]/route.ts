@@ -10,7 +10,7 @@ import {
 	handleApiError,
 	connectOrDisconnectId,
 } from '@/app/api/_utils';
-import { DraftingMode, DraftingTone, HybridBlock, Status } from '@prisma/client';
+import { DraftingTone, HybridBlock, Status } from '@prisma/client';
 import { ApiRouteParams } from '@/types';
 import { NextRequest } from 'next/server';
 
@@ -18,7 +18,6 @@ import { z } from 'zod';
 
 const patchCampaignSchema = z.object({
 	name: z.string().optional(),
-	draftingMode: z.nativeEnum(DraftingMode).optional(),
 	draftingTone: z.nativeEnum(DraftingTone).optional(),
 	paragraphs: z.number().min(0).max(5).optional(),
 	isAiSubject: z.boolean().optional(),
@@ -107,29 +106,33 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 			hybridBlockPrompts,
 			...updateData
 		} = validatedData.data;
-		
+
 		// Verify that the identity belongs to the current user
 		if (identityId) {
 			const identity = await prisma.identity.findUnique({
 				where: { id: identityId },
 			});
-			
+
 			if (!identity) {
 				return apiBadRequest('Identity not found');
 			}
-			
+
 			if (identity.userId !== userId) {
 				return apiUnauthorized('You do not have permission to use this identity');
 			}
 		}
 
+		const fullAiBlock = hybridBlockPrompts?.find(
+			(block) => block.type === 'full_automated'
+		);
+
 		const updatePayload = {
 			...updateData,
-			// Handle null values for array fields - convert null to undefined to omit the field
 			...(hybridAvailableBlocks !== null && { hybridAvailableBlocks }),
 			...(hybridBlockPrompts !== null && { hybridBlockPrompts }),
 			signature: connectOrDisconnectId(signatureId),
 			identity: connectOrDisconnectId(identityId),
+			...(fullAiBlock && { fullAiPrompt: fullAiBlock.value }),
 			...(contactOperation && {
 				contacts: {
 					[contactOperation.action]: contactOperation.contactIds.map((id: number) => {
@@ -146,7 +149,7 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 				},
 			}),
 		};
-		
+
 		const updatedCampaign = await prisma.campaign.update({
 			where: {
 				id: Number(id),

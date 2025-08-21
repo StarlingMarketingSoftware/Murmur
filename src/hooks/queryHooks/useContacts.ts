@@ -30,9 +30,9 @@ export const useGetContacts = (options: ContactQueryOptions) => {
 		queryKey: [...QUERY_KEYS.list(), options.filters],
 		queryFn: async ({ signal }) => {
 			const url = appendQueryParamsToUrl(urls.api.contacts.index, options.filters);
-			const response = await _fetch(url, undefined, undefined, { 
+			const response = await _fetch(url, undefined, undefined, {
 				signal,
-				timeout: 25000 // 25 second timeout for contact searches
+				timeout: 25000,
 			});
 
 			if (!response.ok) {

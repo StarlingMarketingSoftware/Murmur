@@ -38,7 +38,8 @@ Do not include a subject line or signature - just the body text.
 Do not keep to too strict a formula, we want this to feel human.
 
 Rules:
-- NEVER confuse the recipient's name with the sender's name. The recipient's information is clearly provided. If this happens, it will ruin the email.
+- NEVER confuse the recipient's name with the sender's name. The recipient's information is clearly provided-
+- If there is no name for the recipient, just use a greeting with no name, like "Hi,"
 0. No passive sentences, only active sentences
 1.Don't include "hope you're doing well"
 2. keep it very succinct
@@ -163,19 +164,23 @@ export const getMistralHybridPrompt = (
 ): string => {
 	return `
 
-I will provide an email that was generated from a template that includes pre-written text that must remain in its original form, as well as placeholders that may include {{introduction}} {{research}} and {{call-to-action}}. When you revise the email, only revise the sections generated from the placeholders. DO NOT change sections that were pre-written text. Each placeholder may have specific instructions attached to them. Please make sure to follow the instructions for each placeholder.
+I will provide an email that was generated from a template that includes pre-written text that is specified in {{text}} blocks as well as AI placeholders that may include {{introduction}} {{research}} and {{call-to-action}}. When you revise the email, only revise the sections generated from the placeholders. DO NOT change the content specified in the {{text}} blocks. Each placeholder may have specific instructions attached to them. Each text block will have exact text associated with it.Please make sure to follow the instructions for each placeholder, and keep the exact text for each text block.
+
+!IMPORTANT! When you've composed the email do another check to make sure that the exact text in the {{text}} blocks is not changed from the given template. If any of the {{text}} blocks are changed, please revert that section to the original text in the template.
 
 	Perform the following tasks to the email:
-	1. If there is a greeting at the beginning of the email like "Hello!" "Hi ~~" or "こんにちは", keep it as it is. DO NOT remove the new line character after the greeting if there is one. Also do not remove any special characters if they are there. Simply put, DO NOT change it.
-	2. Generate a subject line for the email.
-	3. Remove all text in brackets [] and recompose the email to make sense.
-	4. Don't make up any websites and double check that the email is cogent.
-	5. Don't pretend to be anyone or add any additional information that isn't factual.
-	6. Don't include a signature.
-	7. Make it more human.
+	1. !IMPORTANT! Do not add any placeholders that are not specified in the template. For example, if the template does not include section for {{research}}, do not add content related to researching the contact. Do not add any content that is not specified in the template.
+	2. If there is a greeting at the beginning of the email like "Hello!" "Hi ~~" or "こんにちは", keep it as it is. DO NOT remove the new line character after the greeting if there is one. Also do not remove any special characters if they are there. Simply put, DO NOT change it.
+	3. Generate a subject line for the email.
+	4. Remove all text in brackets [] and recompose the email to make sense.
+	5. Don't make up any websites and double check that the email is cogent.
+	6. Don't pretend to be anyone or add any additional information that isn't factual.
+	7. Don't include a signature.
+	8. Make it more human.
 	8. Use more bursts and less uniform.
 	10. Don't say "here's the revised version" -- just provide the subject and message in JSON format.
 	11. If the email greeting includes a person's name, keep it there. DO NOT remove it.
+	12. Do not modify the order of the template. If the template has {{introduction}}, {{text0}}, then {{call-to-action}}, do not put {{text0}} after {{call-to-action}} or any reordering of that sort.
 
 	Formatting Instructions:
 1. !IMPORTANT! Ensure that there is a line break character "\n" between each paragraph.

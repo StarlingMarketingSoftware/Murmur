@@ -38,10 +38,18 @@ const CustomX = () => {
 	);
 };
 
-const CustomTd = ({ children, isLast = false }: { children: ReactNode; isLast?: boolean }) => {
+const CustomTd = ({
+	children,
+	isLast = false,
+}: {
+	children: ReactNode;
+	isLast?: boolean;
+}) => {
 	return (
 		<td
-			className={`py-1 sm:py-2 md:py-3 lg:py-4 px-1 sm:px-2 ${!isLast ? 'border-r border-r-white' : ''} text-center text-white ${TABLE_CELL_WIDTH}`}
+			className={`py-1 sm:py-2 md:py-3 lg:py-4 px-1 sm:px-2 ${
+				!isLast ? 'border-r border-r-white' : ''
+			} text-center text-white ${TABLE_CELL_WIDTH}`}
 		>
 			{children}
 		</td>
@@ -50,9 +58,7 @@ const CustomTd = ({ children, isLast = false }: { children: ReactNode; isLast?: 
 
 const CustomTh = ({ children }: { children?: ReactNode }) => {
 	return (
-		<th
-			className={`p-1 sm:p-2 md:p-3 lg:p-4 text-white ${TABLE_CELL_WIDTH}`}
-		>
+		<th className={`p-1 sm:p-2 md:p-3 lg:p-4 text-white ${TABLE_CELL_WIDTH}`}>
 			{children}
 		</th>
 	);
@@ -77,20 +83,22 @@ export const ComparisonTable = () => {
 							</CustomTh>
 						</tr>
 					</thead>
-				<tbody>
-					{features.map((feature, index) => (
-						<tr key={index}>
-							<td
-								className={`pt-2 md:pt-3 lg:pt-4 pr-1 sm:pr-4 md:pr-6 lg:pr-8 text-[9px] sm:text-[14px] md:text-[17px] lg:text-[20px] xl:text-[24px] border-r border-r-white break-words text-left font-inter font-light xl:text-nowrap text-white ${TABLE_CELL_WIDTH}`}
-							>
-								{feature.label}
-							</td>
-							<CustomTd>{feature.murmur ? <CustomCheck /> : <CustomX />}</CustomTd>
-							<CustomTd>{feature.chatgpt ? <CustomCheck /> : <CustomX />}</CustomTd>
-							<CustomTd isLast>{feature.mailchimp ? <CustomCheck /> : <CustomX />}</CustomTd>
-						</tr>
-					))}
-				</tbody>
+					<tbody>
+						{features.map((feature, index) => (
+							<tr key={index}>
+								<td
+									className={`pt-2 md:pt-3 lg:pt-4 pr-1 sm:pr-4 md:pr-6 lg:pr-8 text-[9px] sm:text-[14px] md:text-[17px] lg:text-[20px] xl:text-[24px] border-r border-r-white break-words text-left font-inter font-light xl:text-nowrap text-white ${TABLE_CELL_WIDTH}`}
+								>
+									{feature.label}
+								</td>
+								<CustomTd>{feature.murmur ? <CustomCheck /> : <CustomX />}</CustomTd>
+								<CustomTd>{feature.chatgpt ? <CustomCheck /> : <CustomX />}</CustomTd>
+								<CustomTd isLast>
+									{feature.mailchimp ? <CustomCheck /> : <CustomX />}
+								</CustomTd>
+							</tr>
+						))}
+					</tbody>
 				</table>
 			</div>
 		</div>

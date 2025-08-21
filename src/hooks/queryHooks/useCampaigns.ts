@@ -5,7 +5,6 @@ import { CampaignWithRelations, CustomMutationOptions } from '@/types';
 import { urls } from '@/constants/urls';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { USE_TEST_DATA, generateTestCampaigns } from '@/constants/testData';
 
 const QUERY_KEYS = {
 	all: ['campaigns'] as const,
@@ -22,14 +21,6 @@ export const useGetCampaigns = () => {
 	return useQuery({
 		queryKey: QUERY_KEYS.list(),
 		queryFn: async () => {
-			// Use test data if enabled
-			if (USE_TEST_DATA.campaigns) {
-				// Simulate network delay for more realistic behavior
-				await new Promise(resolve => setTimeout(resolve, 500));
-				return generateTestCampaigns();
-			}
-			
-			// Otherwise use real API
 			const response = await _fetch(urls.api.campaigns.index);
 			if (!response.ok) {
 				throw new Error('Failed to fetch campaigns');
@@ -43,29 +34,6 @@ export const useGetCampaign = (id: string) => {
 	return useQuery<CampaignWithRelations>({
 		queryKey: QUERY_KEYS.detail(id),
 		queryFn: async () => {
-			// Use test data if enabled
-			if (USE_TEST_DATA.campaigns) {
-				// Simulate network delay
-				await new Promise(resolve => setTimeout(resolve, 300));
-				const testCampaigns = generateTestCampaigns();
-				const campaign = testCampaigns.find(c => c.id === parseInt(id));
-				if (!campaign) {
-					throw new Error('Campaign not found');
-				}
-				// Return campaign with relations (empty for test data)
-				return {
-					...campaign,
-					emails: [],
-					contacts: [],
-					contactLists: [],
-					userContactLists: [],
-					signature: null,
-					identity: null,
-					user: null
-				} as CampaignWithRelations;
-			}
-			
-			// Otherwise use real API
 			const response = await _fetch(urls.api.campaigns.detail(id));
 			if (!response.ok) {
 				throw new Error('Failed to fetch campaign');

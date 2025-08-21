@@ -29,7 +29,7 @@ export const fetchMistral = async (
 		console.error('[Mistral] Available agent IDs:', Object.keys(MISTRAL_AGENT_IDS));
 		throw new Error(`Mistral agent ID not configured for type: ${agentType}`);
 	}
-	
+
 	if (!apiKey) {
 		throw new Error('Mistral API key is not set');
 	}
@@ -44,7 +44,7 @@ export const fetchMistral = async (
 		agentId,
 		promptLength: prompt.length,
 		contentLength: content.length,
-		messagePreview: userMessage.substring(0, 200)
+		messagePreview: userMessage.substring(0, 200),
 	});
 
 	let response;
@@ -65,12 +65,12 @@ export const fetchMistral = async (
 		}
 		throw new Error('Mistral API call failed');
 	}
-	
+
 	if (!response || !response.choices || !response.choices[0]) {
 		console.error('[Mistral] Invalid response structure:', response);
 		throw new Error('Invalid response from Mistral Agent');
 	}
-	
+
 	const message = response.choices[0].message?.content?.toString();
 	if (!message) {
 		console.error('[Mistral] No message content in response:', response.choices[0]);
@@ -78,6 +78,6 @@ export const fetchMistral = async (
 	}
 
 	console.log('[Mistral] Response received, length:', message.length);
-	console.log('[Mistral] Response preview:', message.substring(0, 200));
+	console.log('[Mistral] Response preview:', message);
 	return message;
 };

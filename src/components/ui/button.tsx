@@ -3,8 +3,8 @@ import { Slot as SlotPrimitive } from 'radix-ui';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/utils/index';
-import Spinner from './spinner';
 import { twMerge } from 'tailwind-merge';
+import { Spinner } from '../atoms/Spinner/Spinner';
 
 export type ButtonVariants = VariantProps<typeof buttonVariants>;
 

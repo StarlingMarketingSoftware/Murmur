@@ -1,4 +1,3 @@
-import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import EmailsTable from '../EmailsTable/EmailsTable';
 import { FC } from 'react';
 import {
@@ -7,7 +6,7 @@ import {
 } from './usePrepareSendingSection';
 import { ConfirmSendDialog } from '../../_dialogs/ConfirmSendDialog/ConfirmSendDialog';
 import ProgressIndicator from '@/components/molecules/ProgressIndicator/ProgressIndicator';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 
 export const PrepareSendingSection: FC<PrepareSendingSectionProps> = (props) => {
@@ -31,17 +30,14 @@ export const PrepareSendingSection: FC<PrepareSendingSectionProps> = (props) => 
 	}
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>Drafted Emails</CardTitle>
-			</CardHeader>
-			<CardContent>
-				<EmailsTable
-					emails={draftEmails}
-					isPending={isPendingEmails}
-					noDataMessage="No draft emails were found."
-					isEditable
-				/>
+		<div className="w-full">
+			<EmailsTable
+				emails={draftEmails}
+				isPending={isPendingEmails}
+				noDataMessage="No draft emails were found."
+				isEditable
+			/>
+			<div className="flex justify-center mt-6">
 				{isSendingDisabled ? (
 					<UpgradeSubscriptionDrawer
 						triggerButtonText="Proceed to Sending Confirmation"
@@ -58,14 +54,14 @@ export const PrepareSendingSection: FC<PrepareSendingSectionProps> = (props) => 
 						draftEmails={draftEmails}
 					/>
 				)}
-				<ProgressIndicator
-					progress={sendingProgress}
-					total={draftEmails.length}
-					setProgress={setSendingProgress}
-					pendingMessage="Sending {{progress}} emails..."
-					completeMessage="Finished sending {{progress}} emails."
-				/>
-			</CardContent>
-		</Card>
+			</div>
+			<ProgressIndicator
+				progress={sendingProgress}
+				total={draftEmails.length}
+				setProgress={setSendingProgress}
+				pendingMessage="Sending {{progress}} emails..."
+				completeMessage="Finished sending {{progress}} emails."
+			/>
+		</div>
 	);
 };

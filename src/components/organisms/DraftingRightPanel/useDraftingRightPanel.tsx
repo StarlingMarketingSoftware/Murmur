@@ -1,11 +1,11 @@
 import { draftingFormSchema } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 import { CampaignWithRelations, OptionWithLabel, TestDraftEmail } from '@/types';
-import { DraftingMode, DraftingTone } from '@prisma/client';
-import { useEffect, useMemo, useState } from 'react';
+import { DraftingTone } from '@prisma/client';
+import { useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { z } from 'zod';
 
-type ActiveTab = 'settings' | 'test';
+type ActiveTab = 'settings' | 'test' | 'placeholders';
 
 export interface ToneOption extends OptionWithLabel<DraftingTone> {
 	description: string;
@@ -14,21 +14,32 @@ export interface DraftingRightPanelProps {
 	campaign: CampaignWithRelations;
 	handleTestPrompt: () => Promise<void>;
 	isTest: boolean;
-	draftingMode: DraftingMode;
 	isGenerationDisabled: () => boolean;
+	hasFullAutomatedBlock?: boolean;
+	insertPlaceholder?: (placeholder: string) => void;
+	activeTab: ActiveTab;
+	setActiveTab?: (tab: ActiveTab) => void;
 }
 
 export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
-	const { campaign, handleTestPrompt, isTest, draftingMode, isGenerationDisabled } =
-		props;
+	const {
+		campaign,
+		handleTestPrompt,
+		isTest,
+		isGenerationDisabled,
+		hasFullAutomatedBlock,
+		insertPlaceholder,
+		activeTab,
+		setActiveTab,
+	} = props;
 	const form = useFormContext<z.infer<typeof draftingFormSchema>>();
-	const areSettingsDisabled = draftingMode !== 'ai';
-
-	const [activeTab, setActiveTab] = useState<ActiveTab>('settings');
+	const areSettingsDisabled = !hasFullAutomatedBlock;
+	const showSettings = hasFullAutomatedBlock; // Only show settings when Full Automated block is present
 
 	const modeOptions: OptionWithLabel<ActiveTab>[] = [
 		{ value: 'settings', label: 'Settings' },
 		{ value: 'test', label: 'Test' },
+		{ value: 'placeholders', label: 'Placeholders' },
 	];
 
 	const toneOptions: ToneOption[] = [
@@ -68,18 +79,12 @@ export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
 		[campaign.testSubject, campaign.testMessage]
 	);
 
-	useEffect(() => {
-		if (draftingMode !== 'ai') {
-			setActiveTab('test');
-		}
-	}, [draftingMode]);
-
 	const hasTestMessage = campaign.testMessage || campaign.testSubject;
 
 	return {
 		campaign,
 		activeTab,
-		setActiveTab,
+		setActiveTab: setActiveTab || (() => {}), // Use prop if provided, otherwise no-op
 		modeOptions,
 		toneOptions,
 		draftEmail,
@@ -88,7 +93,8 @@ export const useDraftingRightPanel = (props: DraftingRightPanelProps) => {
 		form,
 		areSettingsDisabled,
 		isGenerationDisabled,
-		draftingMode,
 		hasTestMessage,
+		showSettings,
+		insertPlaceholder,
 	};
 };

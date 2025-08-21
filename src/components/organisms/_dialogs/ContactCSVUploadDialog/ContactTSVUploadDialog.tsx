@@ -34,12 +34,17 @@ export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) =
 		triggerText,
 		buttonVariant,
 		isAdmin,
+		className,
 	} = useContactTSVUploadDialog(props);
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
-				<Button variant={buttonVariant || 'primary-light'} className={twMerge("gradient-button gradient-button-blue", props.className)} bold>
+				<Button
+					variant={buttonVariant || 'primary-light'}
+					className={twMerge('gradient-button gradient-button-blue', className)}
+					bold
+				>
 					{triggerText}
 				</Button>
 			</DialogTrigger>
@@ -73,6 +78,8 @@ export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) =
 					data={tsvData}
 					noDataMessage="Upload a TSV file to load data."
 					constrainHeight
+					useAutoLayout
+					allowColumnOverflow
 				/>
 				<DialogFooter className="justify-center items-center">
 					<Button onClick={handleClear} type="button" variant="light">

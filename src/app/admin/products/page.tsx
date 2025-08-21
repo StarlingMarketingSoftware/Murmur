@@ -3,7 +3,7 @@
 import { ProductCard } from '@/components/organisms/ProductCard/ProductCard';
 import { useStripeProducts } from '@/hooks/queryHooks/useStripeProducts';
 import { useMe } from '@/hooks/useMe';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { UserRole } from '@prisma/client';
 
 export default function Products() {

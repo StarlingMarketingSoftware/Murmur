@@ -30,10 +30,10 @@ export const EllipsesWithTooltip = ({
 			<TooltipTrigger asChild>
 				<span className={`cursor-default ${className}`}>{truncatedText}</span>
 			</TooltipTrigger>
-			<TooltipContent 
-				side={tooltipPlacement} 
+			<TooltipContent
+				side={tooltipPlacement}
 				sideOffset={5}
-				className="font-normal text-[13px] leading-relaxed"
+				className=" text-[13px] leading-relaxed"
 			>
 				{text}
 			</TooltipContent>
