@@ -300,12 +300,19 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		let combinedTextBlocks = values.hybridBlockPrompts
 			?.filter((block) => block.type === 'text')
 			.map((block) => block.value.replace(/\n/g, '\n'))
-			.join('\n\n');
+			.join('\n');
 
 		HANDWRITTEN_PLACEHOLDER_OPTIONS.forEach(({ value }) => {
 			const placeholder = `{{${value}}}`;
 			let contactValue = '';
-			contactValue = contact[value as keyof Contact]?.toString() || '';
+
+			if (placeholder === '{{senderName}}') {
+				contactValue = campaign.identity?.name || '';
+			} else if (placeholder === '{{senderWebsite}}') {
+				contactValue = campaign.identity?.website || '';
+			} else {
+				contactValue = contact[value as keyof Contact]?.toString() || '';
+			}
 
 			combinedTextBlocks = combinedTextBlocks.replace(
 				new RegExp(placeholder, 'g'),
@@ -492,6 +499,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		hybridBlocks: HybridBlockPrompt[],
 		signal?: AbortSignal
 	): Promise<DraftEmailResponse> => {
+		console.log('DRAFTING HYBRID EMAIL');
 		const stringifiedRecipient = stringifyJsonSubset<Contact>(recipient, [
 			'firstName',
 			'lastName',
@@ -655,27 +663,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 				let parsedRes: DraftEmailResponse;
 
-				// Check if we have a Full Automated block in hybrid mode
-				const hasFullAutomatedBlock = values.hybridBlockPrompts?.some(
-					(block) => block.type === 'full_automated'
-				);
 				const fullAutomatedBlock = values.hybridBlockPrompts?.find(
 					(block) => block.type === 'full_automated'
 				);
 
 				console.log('[Test Generation] Mode:', draftingMode);
-				console.log('[Test Generation] Has Full Automated Block:', hasFullAutomatedBlock);
-				console.log(
-					'[Test Generation] Full Automated Block Value:',
-					fullAutomatedBlock?.value
-				);
-				console.log('[Test Generation] Hybrid Blocks:', values.hybridBlockPrompts);
 
 				if (draftingMode === DraftingMode.ai) {
-					const fullAiPrompt =
-						draftingMode === DraftingMode.ai
-							? values.fullAiPrompt
-							: fullAutomatedBlock?.value || '';
+					const fullAiPrompt = fullAutomatedBlock?.value || '';
 
 					console.log('[Test Generation] Using Full AI mode with prompt:', fullAiPrompt);
 
@@ -779,7 +774,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	) => {
 		const values = getValues();
 
-		console.log('🚀 ~ generateBatchPromises ~ draftingMode:', draftingMode);
 		return batchToProcess.map(async (recipient: Contact) => {
 			const MAX_RETRIES = 5;
 			let lastError: Error | null = null;
@@ -803,10 +797,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					);
 
 					if (draftingMode === DraftingMode.ai) {
-						const fullAiPrompt =
-							draftingMode === DraftingMode.ai
-								? values.fullAiPrompt
-								: fullAutomatedBlock?.value || '';
+						const fullAiPrompt = fullAutomatedBlock?.value || '';
 
 						if (!fullAiPrompt || fullAiPrompt.trim() === '') {
 							throw new Error('Automated prompt cannot be empty');

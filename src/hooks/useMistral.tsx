@@ -45,7 +45,10 @@ export const useMistral = (options: CustomMutationOptions = {}) => {
 			}
 			const res = await response.json();
 			console.log('[Mistral] Response type:', typeof res);
-			console.log('[Mistral] Response preview:', typeof res === 'string' ? res.substring(0, 200) : JSON.stringify(res).substring(0, 200));
+			console.log(
+				'[Mistral] Response preview:',
+				typeof res === 'string' ? res : JSON.stringify(res)
+			);
 
 			return removeMarkdownCodeBlocks(res);
 		},
