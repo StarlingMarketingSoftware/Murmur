@@ -57,7 +57,8 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 								Paragraphs
 							</Typography>
 							<Typography className="!text-[10px] mt-0.5" color="light">
-								Select the number of paragraphs you want to generate automatically in your email
+								Select the number of paragraphs you want to generate automatically in your
+								email
 							</Typography>
 							<FormField
 								control={form.control}
@@ -84,15 +85,15 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 				{activeTab === 'test' && (
 					<div className="grid gap-4 p-6 relative">
 						<div
-												className={twMerge(
-						!hasTestMessage
-							? 'absolute w-full h-full top-0 left-0 backdrop-blur-sm z-10'
-							: 'hidden'
-					)}
-					style={{
-						WebkitBackdropFilter: 'blur(4px)',
-						backdropFilter: 'blur(4px)'
-					}}
+							className={twMerge(
+								!hasTestMessage
+									? 'absolute w-full h-full top-0 left-0 backdrop-blur-sm z-10'
+									: 'hidden'
+							)}
+							style={{
+								WebkitBackdropFilter: 'blur(4px)',
+								backdropFilter: 'blur(4px)',
+							}}
 						/>
 
 						<div className="grid gap-2">
@@ -117,7 +118,6 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 								disabled={isTest}
 							/>
 						</div>
-
 					</div>
 				)}
 

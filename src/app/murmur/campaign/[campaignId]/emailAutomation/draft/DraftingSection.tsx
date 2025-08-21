@@ -21,43 +21,44 @@ import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/Hybr
 import { Typography } from '@/components/ui/typography';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
+import { DraftingMode } from '@prisma/client';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
-		campaign,
-		form,
-		setIsConfirmDialogOpen,
-		cancelGeneration,
-		generationProgress,
-		setGenerationProgress,
-		contacts,
-		isConfirmDialogOpen,
-		isPendingGeneration,
-		isAiSubject,
-		isTest,
-		signatures,
-		isOpenSignaturesDialog,
-		setIsOpenSignaturesDialog,
-		selectedSignature,
-		handleGenerateTestDrafts,
-		handleGenerateDrafts,
-		autosaveStatus,
-		isJustSaved,
-		isGenerationDisabled,
-		isOpenUpgradeSubscriptionDrawer,
-		setIsOpenUpgradeSubscriptionDrawer,
-		trackFocusedField,
-		insertPlaceholder,
 		activeTab,
-		setActiveTab,
+		autosaveStatus,
+		campaign,
+		cancelGeneration,
+		contacts,
+		draftingMode,
+		form,
+		generationProgress,
+		handleGenerateDrafts,
+		handleGenerateTestDrafts,
 		hasFullAutomatedBlock,
+		insertPlaceholder,
+		isAiSubject,
+		isConfirmDialogOpen,
+		isGenerationDisabled,
+		isJustSaved,
+		isOpenSignaturesDialog,
+		isOpenUpgradeSubscriptionDrawer,
+		isPendingGeneration,
+		isTest,
+		selectedSignature,
+		setActiveTab,
+		setGenerationProgress,
+		setIsConfirmDialogOpen,
+		setIsOpenSignaturesDialog,
+		setIsOpenUpgradeSubscriptionDrawer,
+		signatures,
+		trackFocusedField,
 	} = useDraftingSection(props);
 
 	const {
 		formState: { isDirty },
 	} = form;
 
-	// Helper function to get autosave status display
 	const getAutosaveStatusDisplay = (): ReactNode => {
 		switch (autosaveStatus) {
 			case 'saving':
@@ -112,6 +113,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 											<Separator orientation="vertical" className="!h-5" />
 											<Switch
 												checked={isAiSubject}
+												disabled={draftingMode === DraftingMode.handwritten}
 												onCheckedChange={(val: boolean) =>
 													form.setValue('isAiSubject', val)
 												}
@@ -127,7 +129,9 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 												}
 												disabled={isAiSubject}
 												{...field}
-												onFocus={(e) => !isAiSubject && trackFocusedField('subject', e.target)}
+												onFocus={(e) =>
+													!isAiSubject && trackFocusedField('subject', e.target)
+												}
 											/>
 										</FormControl>
 										<FormMessage />
@@ -140,11 +144,21 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 							<div className="w-[559px]">
 								<BlockTabs
 									activeValue={activeTab}
-									onValueChange={(value) => setActiveTab(value as 'settings' | 'test' | 'placeholders')}
+									onValueChange={(value) =>
+										setActiveTab(value as 'settings' | 'test' | 'placeholders')
+									}
 									options={[
-										{ label: 'Settings', value: 'settings' },
+										{
+											label: 'Settings',
+											value: 'settings',
+											disabled: draftingMode !== DraftingMode.ai,
+										},
 										{ label: 'Test', value: 'test' },
-										{ label: 'Placeholders', value: 'placeholders' },
+										{
+											label: 'Placeholders',
+											value: 'placeholders',
+											disabled: draftingMode === DraftingMode.ai,
+										},
 									]}
 								/>
 							</div>
@@ -164,7 +178,6 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									campaign={campaign}
 									handleTestPrompt={handleGenerateTestDrafts}
 									isTest={isTest}
-									draftingMode={'hybrid'}
 									hasFullAutomatedBlock={hasFullAutomatedBlock}
 									insertPlaceholder={insertPlaceholder}
 									activeTab={activeTab}
@@ -189,21 +202,20 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									</Button>
 								</div>
 							</div>
-								<ConfirmDialog
-									title="Confirm Batch Generation of Emails"
-									confirmAction={handleGenerateDrafts}
-									open={isConfirmDialogOpen}
-									onOpenChange={setIsConfirmDialogOpen}
-								>
-									<Typography>
-										Are you sure you want to generate emails for all selected
-										recipients?
-										<br /> <br />
-										This action will automatically create a custom email for each recipient
-										based on the prompt you provided and will count towards your
-										monthly usage limits.
-									</Typography>
-								</ConfirmDialog>
+							<ConfirmDialog
+								title="Confirm Batch Generation of Emails"
+								confirmAction={handleGenerateDrafts}
+								open={isConfirmDialogOpen}
+								onOpenChange={setIsConfirmDialogOpen}
+							>
+								<Typography>
+									Are you sure you want to generate emails for all selected recipients?
+									<br /> <br />
+									This action will automatically create a custom email for each recipient
+									based on the prompt you provided and will count towards your monthly
+									usage limits.
+								</Typography>
+							</ConfirmDialog>
 							<ProgressIndicator
 								progress={generationProgress}
 								setProgress={setGenerationProgress}

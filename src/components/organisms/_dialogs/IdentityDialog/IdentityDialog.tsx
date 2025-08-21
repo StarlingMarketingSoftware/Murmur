@@ -4,7 +4,12 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
 import { IdentityDialogProps, useIdentityDialog } from './useIdentityDialog';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import {
+	Dialog,
+	DialogContent,
+	DialogTitle,
+	DialogTrigger,
+} from '@/components/ui/dialog';
 import { CreateIdentityPanel } from './CreateIdentityPanel/CreateIdentityPanel';
 import { twMerge } from 'tailwind-merge';
 import { Button } from '@/components/ui/button';
@@ -44,6 +49,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 				className="!fixed !inset-0 !translate-x-0 !translate-y-0 !top-0 !left-0 !max-w-none !max-h-none !h-full !w-full !rounded-none !border-0 !p-0 overflow-hidden data-[state=open]:!animate-none data-[state=closed]:!animate-none"
 				hideCloseButton={true}
 			>
+				<DialogTitle />
 				{/* Immediate white background to prevent flash */}
 				<div className="absolute inset-0 bg-white" style={{ zIndex: -1 }} />
 

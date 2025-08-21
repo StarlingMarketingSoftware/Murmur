@@ -57,7 +57,7 @@ export const usePerplexity = () => {
 
 			try {
 				const jsonString: string = data.choices[0].message.content;
-				console.log('[Perplexity] Response preview:', jsonString.substring(0, 200));
+				console.log('[Perplexity] Response preview:', jsonString);
 				return jsonString;
 			} catch (e) {
 				console.error('[Perplexity] Failed to extract content from response:', e, data);

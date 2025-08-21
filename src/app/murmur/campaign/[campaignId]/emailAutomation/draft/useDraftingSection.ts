@@ -1,5 +1,3 @@
-// TODO: Remove handwritten mode imports after full migration
-// import { HANDWRITTEN_PLACEHOLDER_OPTIONS } from '@/components/molecules/HandwrittenPromptInput/HandwrittenPromptInput';
 import {
 	DEFAULT_FONT,
 	FONT_OPTIONS,
@@ -45,16 +43,24 @@ import {
 } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { debounce } from 'lodash';
+import { HANDWRITTEN_PLACEHOLDER_OPTIONS } from '@/components/molecules/HandwrittenPromptInput/HandwrittenPromptInput';
+import { ContactWithName } from '@/types/contact';
 
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
 }
 
-
+type GeneratedEmail = {
+	subject: string;
+	message: string;
+	contactId: number;
+	status: EmailStatus;
+	campaignId: number;
+};
 
 type BatchGenerationResult = {
 	contactId: number;
@@ -62,8 +68,6 @@ type BatchGenerationResult = {
 	error?: string;
 	retries: number;
 };
-
-
 
 const FONT_VALUES: [Font, ...Font[]] = FONT_OPTIONS as [Font, ...Font[]];
 
@@ -79,7 +83,6 @@ export type HybridBlockPrompts = {
 };
 
 export const draftingFormSchema = z.object({
-	draftingMode: z.nativeEnum(DraftingMode).default(DraftingMode.hybrid),
 	isAiSubject: z.boolean().default(true),
 	subject: z.string().default(''),
 	fullAiPrompt: z.string().default(''),
@@ -121,18 +124,21 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [autosaveStatus, setAutosaveStatus] = useState<
 		'idle' | 'saving' | 'saved' | 'error'
 	>('idle');
-	const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
-	const [activeTab, setActiveTab] = useState<'settings' | 'test' | 'placeholders'>('settings');
+	const [activeTab, setActiveTab] = useState<'settings' | 'test' | 'placeholders'>(
+		'settings'
+	);
 
 	const isGenerationCancelledRef = useRef(false);
-	const lastFocusedFieldRef = useRef<{ name: string; element: HTMLTextAreaElement | HTMLInputElement | null }>({ name: '', element: null });
+	const lastFocusedFieldRef = useRef<{
+		name: string;
+		element: HTMLTextAreaElement | HTMLInputElement | null;
+	}>({ name: '', element: null });
 
-	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
+	const { data: signatures } = useGetSignatures();
 
 	const form = useForm<DraftingFormValues>({
 		resolver: zodResolver(draftingFormSchema),
 		defaultValues: {
-			draftingMode: DraftingMode.hybrid,
 			isAiSubject: true,
 			subject: '',
 			fullAiPrompt: '',
@@ -152,19 +158,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		},
 		mode: 'onChange',
 	});
-	const {
-		fields: hybridFields,
-		append: hybridAppend,
-		remove: hybridRemove,
-		move: hybridMove,
-	} = useFieldArray({
-		control: form.control,
-		name: 'hybridBlockPrompts',
-	});
 
 	const isAiSubject = form.watch('isAiSubject');
-	const draftingMode = form.watch('draftingMode');
-	const { getValues, formState } = form;
+	const { getValues } = form;
 
 	// API
 
@@ -187,9 +183,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 
-	const { isPending: isPendingSaveCampaign, mutateAsync: saveCampaign } = useEditCampaign(
-		{ suppressToasts: true }
-	);
+	const { mutateAsync: saveCampaign } = useEditCampaign({ suppressToasts: true });
 
 	const { mutateAsync: saveTestEmail } = useEditCampaign({
 		suppressToasts: true,
@@ -205,6 +199,28 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const selectedSignature: Signature = signatures?.find(
 		(sig: Signature) => sig.id === signatureId
 	);
+
+	const getDraftingModeBasedOnBlocks = useCallback(() => {
+		const hasFullAutomatedBlock = form
+			.getValues('hybridBlockPrompts')
+			?.some((block) => block.type === 'full_automated');
+
+		if (hasFullAutomatedBlock) {
+			return DraftingMode.ai;
+		}
+
+		const isOnlyTextBlocks = form
+			.getValues('hybridBlockPrompts')
+			?.every((block) => block.type === 'text');
+
+		if (isOnlyTextBlocks) {
+			return DraftingMode.handwritten;
+		}
+
+		return DraftingMode.hybrid;
+	}, [form]);
+
+	const draftingMode = getDraftingModeBasedOnBlocks();
 
 	const isPendingGeneration =
 		isPendingCallPerplexity || isPendingCallMistralAgent || isPendingCreateEmail;
@@ -229,28 +245,29 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const isGenerationDisabled = useCallback(() => {
 		const values = form.getValues();
 		const hasFullAutomatedBlock = values.hybridBlockPrompts?.some(
-			block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
+			(block) => block.type === 'full_automated'
 		);
 		const fullAutomatedBlock = values.hybridBlockPrompts?.find(
-			block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
+			(block) => block.type === 'full_automated'
 		);
-		const isFullAutomatedEmpty = hasFullAutomatedBlock && (!fullAutomatedBlock?.value || fullAutomatedBlock.value === '');
-		const hasNoBlocks = !values.hybridBlockPrompts || values.hybridBlockPrompts.length === 0;
-		
-		// Check if we have any AI blocks (introduction, research, action) or non-empty text blocks
-		const hasAIBlocks = values.hybridBlockPrompts?.some(block => {
-			// Full automated blocks must have content
-			if (block.type === 'full_automated' || (block.type as any) === 'full_automated') {
+
+		const isFullAutomatedEmpty =
+			hasFullAutomatedBlock &&
+			(!fullAutomatedBlock?.value || fullAutomatedBlock.value === '');
+
+		const hasNoBlocks =
+			!values.hybridBlockPrompts || values.hybridBlockPrompts.length === 0;
+
+		const hasAIBlocks = values.hybridBlockPrompts?.some((block) => {
+			if (block.type === 'full_automated') {
 				return block.value && block.value.trim() !== '';
 			}
-			// AI blocks (introduction, research, action) can be empty
-			if (block.type !== HybridBlock.text && (block.type as any) !== 'text') {
+			if (block.type !== HybridBlock.text) {
 				return true;
 			}
-			// Text blocks must have content
 			return block.value && block.value.trim() !== '';
 		});
-		
+
 		return (
 			isFullAutomatedEmpty ||
 			hasNoBlocks ||
@@ -259,12 +276,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			contacts?.length === 0 ||
 			isPendingGeneration
 		);
-	}, [form, draftingMode, generationProgress, contacts?.length, isPendingGeneration]);
+	}, [form, generationProgress, contacts?.length, isPendingGeneration]);
 
 	// FUNCTIONS
-	
-	// TODO: Remove handwritten mode functions after full migration
-	/*
+
 	const batchGenerateHandWrittenDrafts = () => {
 		const generatedEmails: GeneratedEmail[] = [];
 
@@ -282,34 +297,43 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const generateHandwrittenDraft = (contact: ContactWithName): GeneratedEmail => {
 		const values = getValues();
-		let processedMessage = values.handwrittenPrompt || '';
+		let combinedTextBlocks = values.hybridBlockPrompts
+			?.filter((block) => block.type === 'text')
+			.map((block) => block.value)
+			.join('\n');
 
 		HANDWRITTEN_PLACEHOLDER_OPTIONS.forEach(({ value }) => {
 			const placeholder = `{{${value}}}`;
 			let contactValue = '';
-			contactValue = contact[value as keyof Contact]?.toString() || '';
 
-			processedMessage = processedMessage.replace(
+			if (placeholder === '{{senderName}}') {
+				contactValue = campaign.identity?.name || '';
+			} else if (placeholder === '{{senderWebsite}}') {
+				contactValue = campaign.identity?.website || '';
+			} else {
+				contactValue = contact[value as keyof Contact]?.toString() || '';
+			}
+
+			combinedTextBlocks = combinedTextBlocks.replace(
 				new RegExp(placeholder, 'g'),
 				contactValue
 			);
 		});
 
-		if (selectedSignature?.content) {
-			processedMessage += `<p></p>${selectedSignature.content}`;
-		}
-
 		return {
 			subject: values.subject || '',
-			message: processedMessage,
+			message: convertAiResponseToRichTextEmail(
+				combinedTextBlocks,
+				values.font,
+				selectedSignature
+			),
 			campaignId: campaign.id,
-			status: 'draft' as EmailStatus,
+			status: EmailStatus.draft,
 			contactId: contact.id,
 		};
 	};
-	*/
 
-	const draftFullAiEmail = async (
+	const draftAiEmail = async (
 		recipient: Contact,
 		prompt: string,
 		toneAgentType: MistralToneAgentType,
@@ -326,11 +350,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			recipient.firstName || ''
 		).replace('{company}', recipient.company || '');
 
-		const userPrompt = `Sender: ${stringifyJsonSubset<Identity>(campaign.identity, [
-			'name',
-			'website',
-		])}\n\nRecipient Additional Info: ${stringifyJsonSubset<Contact>(recipient, [
+		const userPrompt = `Sender information\n: ${stringifyJsonSubset<Identity>(
+			campaign.identity,
+			['name', 'website']
+		)}\n\nRecipient information: ${stringifyJsonSubset<Contact>(recipient, [
 			'lastName',
+			'firstName',
+			'email',
+			'company',
 			'address',
 			'city',
 			'state',
@@ -338,16 +365,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			'website',
 			'phone',
 		])}\n\nUser Goal: ${prompt}`;
+		console.log('🚀 ~ draftAiEmail ~ userPrompt:', userPrompt);
 
 		// Debug logging for Full AI path
 		console.log(
 			`[Full AI] Starting generation for contact: ${recipient.id} (${recipient.email})`
 		);
-		console.log(
-			'[Full AI] Populated System Prompt:',
-			populatedSystemPrompt.substring(0, 300)
-		);
-		console.log('[Full AI] User Prompt:', userPrompt.substring(0, 300));
+		console.log('[Full AI] Populated System Prompt:', populatedSystemPrompt);
+		console.log('[Full AI] User Prompt:', userPrompt);
 
 		let perplexityResponse: string;
 		try {
@@ -369,34 +394,16 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			);
 		}
 
-		console.log('[Full AI] Perplexity response length:', perplexityResponse.length);
-		console.log(
-			'[Full AI] Perplexity response preview:',
-			perplexityResponse.substring(0, 200)
-		);
+		console.log('[Full AI] Perplexity response preview:', perplexityResponse);
 
-		let mistralResponse1: string;
-		try {
-			mistralResponse1 = await callMistralAgent({
-				prompt: getMistralTonePrompt(toneAgentType),
-				content: perplexityResponse,
-				agentType: toneAgentType,
-				signal: signal,
-			});
-		} catch (error) {
-			console.error('[Full AI] Mistral tone agent call failed:', error);
-			if (error instanceof Error && error.message.includes('cancelled')) {
-				throw error;
-			}
-			// If Mistral fails, try to create a basic response with the Perplexity content
-			console.log('[Full AI] Falling back to Perplexity response due to Mistral error');
-			return {
-				subject: `Email for ${recipient.firstName || recipient.email}`,
-				message: perplexityResponse,
-			};
-		}
+		const mistralResponse1 = await callMistralAgent({
+			prompt: getMistralTonePrompt(toneAgentType),
+			content: perplexityResponse,
+			agentType: toneAgentType,
+			signal: signal,
+		});
 
-		console.log('[Full AI] Mistral raw response:', mistralResponse1.substring(0, 500));
+		console.log('[Full AI] Mistral raw response:', mistralResponse1);
 
 		let mistralResponse1Parsed: DraftEmailResponse;
 		try {
@@ -494,8 +501,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		recipient: Contact,
 		hybridPrompt: string,
 		hybridBlocks: HybridBlockPrompt[],
-		signal?: AbortSignal,
-		paragraphs?: number
+		signal?: AbortSignal
 	): Promise<DraftEmailResponse> => {
 		const stringifiedRecipient = stringifyJsonSubset<Contact>(recipient, [
 			'firstName',
@@ -517,14 +523,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			'name',
 			'website',
 		]);
-		console.log('[Hybrid Email] Processing blocks:', hybridBlocks);
 		const stringifiedHybridBlocks = generateEmailTemplateFromBlocks(hybridBlocks);
-		console.log('[Hybrid Email] Template:', stringifiedHybridBlocks);
 
 		const perplexityPrompt = `**RECIPIENT**\n${stringifiedRecipient}\n\n**SENDER**\n${stringifiedSender}\n\n**PROMPT**\n${hybridPrompt}\n\n**EMAIL TEMPLATE**\n${stringifiedHybridBlocks}\n\n**PROMPTS**\n${generatePromptsFromBlocks(
 			hybridBlocks
 		)}`;
-		console.log('[Hybrid Email] Full prompt:', perplexityPrompt);
 
 		const perplexityResponse: string = await callPerplexity({
 			model: 'sonar',
@@ -584,11 +587,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					message: messageMatch[1].trim(),
 				};
 			} else {
-				// Use perplexity response as fallback
-				mistralResponseParsed = {
-					subject: `Email for ${recipient.company || recipient.firstName || 'recipient'}`,
-					message: perplexityResponse,
-				};
+				throw new Error('Mistral response failed to be parsed');
 			}
 		}
 
@@ -596,31 +595,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			throw new Error('No message or subject generated by Mistral Agent');
 		}
 
-		// Apply paragraph formatting if requested
-		let finalMessage = mistralResponseParsed.message;
-		if (paragraphs && paragraphs > 0) {
-			try {
-				console.log(`[Hybrid Email] Applying paragraph formatting for ${paragraphs} paragraphs`);
-				finalMessage = await callMistralAgent({
-					prompt: getMistralParagraphPrompt(paragraphs),
-					content: mistralResponseParsed.message,
-					agentType: `paragraph${paragraphs}` as MistralParagraphAgentType,
-					signal: signal,
-				});
-				console.log('[Hybrid Email] Paragraph formatting applied successfully');
-			} catch (e) {
-				console.error('[Hybrid Email] Paragraph formatting failed:', e);
-				finalMessage = mistralResponseParsed.message;
-			}
-		}
-
-		// Get isAiSubject from form values
-		const formValues = form.getValues();
-		const shouldUseAiSubject = formValues.isAiSubject ?? true;
-		
 		return {
-			subject: shouldUseAiSubject ? mistralResponseParsed.subject : formValues.subject || '',
-			message: finalMessage,
+			subject: isAiSubject ? mistralResponseParsed.subject : form.getValues('subject'),
+			message: mistralResponseParsed.message,
 		};
 	};
 
@@ -633,7 +610,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	};
 
-	/*
 	const generateHandWrittenDraftTest = async () => {
 		setIsTest(true);
 		if (!contacts || contacts.length === 0) {
@@ -651,7 +627,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		});
 		setIsTest(false);
 	};
-	*/
 
 	const generateAiDraftTest = async () => {
 		const draftCredits = user?.draftCredits;
@@ -685,60 +660,52 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 				let parsedRes: DraftEmailResponse;
 
-								// Check if we have a Full Automated block in hybrid mode
-				const hasFullAutomatedBlock = values.hybridBlockPrompts?.some(
-					block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
-				);
 				const fullAutomatedBlock = values.hybridBlockPrompts?.find(
-					block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
+					(block) => block.type === 'full_automated'
 				);
 
-				console.log('[Test Generation] Mode:', values.draftingMode);
-				console.log('[Test Generation] Has Full Automated Block:', hasFullAutomatedBlock);
-				console.log('[Test Generation] Full Automated Block Value:', fullAutomatedBlock?.value);
-				console.log('[Test Generation] Hybrid Blocks:', values.hybridBlockPrompts);
+				console.log('[Test Generation] Mode:', draftingMode);
 
-				if (values.draftingMode === DraftingMode.ai || 
-					(values.draftingMode === DraftingMode.hybrid && hasFullAutomatedBlock)) {
-					const fullAiPrompt = values.draftingMode === DraftingMode.ai 
-						? values.fullAiPrompt 
-						: fullAutomatedBlock?.value || '';
-					
+				if (draftingMode === DraftingMode.ai) {
+					const fullAiPrompt = fullAutomatedBlock?.value || '';
+
 					console.log('[Test Generation] Using Full AI mode with prompt:', fullAiPrompt);
-					
+
 					if (!fullAiPrompt || fullAiPrompt.trim() === '') {
 						throw new Error('Automated prompt cannot be empty');
 					}
-					
-					parsedRes = await draftFullAiEmail(
+
+					parsedRes = await draftAiEmail(
 						contacts[0],
 						fullAiPrompt,
 						values.draftingTone,
 						values.paragraphs
 					);
-				} else if (values.draftingMode === DraftingMode.hybrid) {
+				} else if (draftingMode === DraftingMode.hybrid) {
 					// For regular hybrid blocks
 					if (!values.hybridBlockPrompts || values.hybridBlockPrompts.length === 0) {
 						throw new Error('No blocks added. Please add at least one block.');
 					}
-					
+
 					// Filter out any full_automated blocks for hybrid processing
 					const hybridBlocks = values.hybridBlockPrompts.filter(
-						block => block.type !== 'full_automated' && (block.type as any) !== 'full_automated'
+						(block) => block.type !== 'full_automated'
 					);
-					
+
 					if (hybridBlocks.length === 0) {
-						throw new Error('No hybrid blocks found. Please add Introduction, Research, Action, or Text blocks.');
+						throw new Error(
+							'No hybrid blocks found. Please add Introduction, Research, Action, or Text blocks.'
+						);
 					}
-					
+
 					console.log('[Test Generation] Using Hybrid mode with blocks:', hybridBlocks);
-					
+
 					parsedRes = await draftHybridEmail(
 						contacts[0],
-						values.hybridPrompt || 'Generate a professional email based on the template below.',
+						values.hybridPrompt ||
+							'Generate a professional email based on the template below.',
 						hybridBlocks,
-						undefined,
-						values.paragraphs
+						undefined
 					);
 				} else {
 					throw new Error('Invalid drafting mode');
@@ -822,47 +789,41 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 					let parsedDraft;
 
-					// Check if we have a Full Automated block in hybrid mode
-					const hasFullAutomatedBlock = values.hybridBlockPrompts?.some(
-						block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
-					);
 					const fullAutomatedBlock = values.hybridBlockPrompts?.find(
-						block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
+						(block) => block.type === 'full_automated'
 					);
 
-					if (values.draftingMode === DraftingMode.ai || 
-						(values.draftingMode === DraftingMode.hybrid && hasFullAutomatedBlock)) {
-						const fullAiPrompt = values.draftingMode === DraftingMode.ai 
-							? values.fullAiPrompt 
-							: fullAutomatedBlock?.value || '';
-						
+					if (draftingMode === DraftingMode.ai) {
+						const fullAiPrompt = fullAutomatedBlock?.value || '';
+
 						if (!fullAiPrompt || fullAiPrompt.trim() === '') {
 							throw new Error('Automated prompt cannot be empty');
 						}
-						
-						parsedDraft = await draftFullAiEmail(
+
+						parsedDraft = await draftAiEmail(
 							recipient,
 							fullAiPrompt,
 							values.draftingTone,
 							values.paragraphs,
 							controller.signal
 						);
-					} else if (values.draftingMode === DraftingMode.hybrid) {
+					} else if (draftingMode === DraftingMode.hybrid) {
 						// Filter out any full_automated blocks for hybrid processing
-						const hybridBlocks = values.hybridBlockPrompts?.filter(
-							block => block.type !== 'full_automated' && (block.type as any) !== 'full_automated'
-						) || [];
-						
+						const hybridBlocks =
+							values.hybridBlockPrompts?.filter(
+								(block) => block.type !== 'full_automated'
+							) || [];
+
 						if (hybridBlocks.length === 0) {
 							throw new Error('No hybrid blocks found for email generation.');
 						}
-						
+
 						parsedDraft = await draftHybridEmail(
 							recipient,
-							values.hybridPrompt || 'Generate a professional email based on the template below.',
+							values.hybridPrompt ||
+								'Generate a professional email based on the template below.',
 							hybridBlocks,
-							controller.signal,
-							values.paragraphs
+							controller.signal
 						);
 					}
 
@@ -1046,44 +1007,18 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	};
 
-	const performAutosave = useCallback(
+	// HANDLERS
+
+	const handleAutoSave = useCallback(
 		async (values: DraftingFormValues) => {
 			try {
 				setAutosaveStatus('saving');
-				
-				// Transform hybridBlockPrompts to handle full_automated blocks
-				// TODO: Remove this workaround once the server-side Prisma client is updated
-				// to include the full_automated enum value
-				const transformedValues = {
-					...values,
-					hybridBlockPrompts: values.hybridBlockPrompts?.map(block => {
-						// If the block is full_automated, store the prompt in fullAiPrompt
-						if (block.type === 'full_automated' || (block.type as any) === 'full_automated') {
-							// Store the full automated prompt in fullAiPrompt
-							return {
-								...block,
-								type: HybridBlock.text, // Convert to text type for now
-								value: block.value,
-							};
-						}
-						return block;
-					}),
-				};
-				
-				// If we have a full automated block, also save its content to fullAiPrompt
-				const fullAutomatedBlock = values.hybridBlockPrompts?.find(
-					block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
-				);
-				if (fullAutomatedBlock) {
-					transformedValues.fullAiPrompt = fullAutomatedBlock.value;
-				}
-				
+
 				await saveCampaign({
 					id: campaign.id,
-					data: transformedValues,
+					data: values,
 				});
 				setAutosaveStatus('saved');
-				setLastSavedAt(new Date());
 				setIsJustSaved(true);
 
 				setTimeout(() => {
@@ -1104,62 +1039,67 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const debouncedAutosave = useMemo(
 		() =>
 			debounce((values: DraftingFormValues) => {
-				performAutosave(values);
+				handleAutoSave(values);
 			}, 1500),
-		[performAutosave]
+		[handleAutoSave]
 	);
 
-	// HANDLERS
-
-	const handleSavePrompt = () => {
-		if (Object.keys(formState.errors).length > 0) {
-			return;
-		}
-		
-		const values = form.getValues();
-		
-		// Transform hybridBlockPrompts to handle full_automated blocks
-		// TODO: Remove this workaround once the server-side Prisma client is updated
-		// to include the full_automated enum value
-		const transformedValues = {
-			...values,
-			hybridBlockPrompts: values.hybridBlockPrompts?.map(block => {
-				// If the block is full_automated, store the prompt in fullAiPrompt
-				if (block.type === 'full_automated' || (block.type as any) === HybridBlock.full_automated) {
-					// Store the full automated prompt in fullAiPrompt
-					return {
-						...block,
-						type: HybridBlock.text, // Convert to text type for now
-						value: block.value,
-					};
-				}
-				return block;
-			}),
-		};
-		
-		// If we have a full automated block, also save its content to fullAiPrompt
-		const fullAutomatedBlock = values.hybridBlockPrompts?.find(
-			block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
-		);
-		if (fullAutomatedBlock) {
-			transformedValues.fullAiPrompt = fullAutomatedBlock.value;
-		}
-
-		saveCampaign({
-			id: campaign.id,
-			data: transformedValues,
-		});
-	};
-
 	const handleGenerateTestDrafts = async () => {
-		generateAiDraftTest();
+		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
+			generateAiDraftTest();
+		} else if (draftingMode === DraftingMode.handwritten) {
+			generateHandWrittenDraftTest();
+		}
 	};
 
 	const handleGenerateDrafts = async () => {
-		batchGenerateFullAiDrafts();
+		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
+			batchGenerateFullAiDrafts();
+		} else if (draftingMode === DraftingMode.handwritten) {
+			batchGenerateHandWrittenDrafts();
+		}
 	};
 
+	const insertPlaceholder = useCallback(
+		(placeholder: string) => {
+			const { name, element } = lastFocusedFieldRef.current;
+
+			if (!element || !name) {
+				console.log('[Insert Placeholder] No focused field found');
+				return;
+			}
+
+			const start = element.selectionStart || 0;
+			const end = element.selectionEnd || 0;
+			const currentValue = element.value;
+
+			const newValue =
+				currentValue.substring(0, start) + placeholder + currentValue.substring(end);
+			console.log('[Insert Placeholder] Inserting', placeholder, 'at position', start);
+
+			form.setValue(name as keyof DraftingFormValues, newValue, { shouldDirty: true });
+
+			// Use requestAnimationFrame for better Safari compatibility, needs slight delay for setSelectionRange to work properly
+			requestAnimationFrame(() => {
+				element.focus();
+				const newPosition = start + placeholder.length;
+				setTimeout(() => {
+					element.setSelectionRange(newPosition, newPosition);
+				}, 10);
+			});
+		},
+		[form]
+	);
+
 	// EFFECTS
+
+	useEffect(() => {
+		if (draftingMode === DraftingMode.handwritten) {
+			form.setValue('isAiSubject', false);
+		} else {
+			form.setValue('isAiSubject', true);
+		}
+	}, [draftingMode, form]);
 
 	useEffect(() => {
 		const currentSignature = signatures?.find(
@@ -1175,11 +1115,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	useEffect(() => {
 		if (campaign && form && signatures?.length > 0 && isFirstLoad) {
 			form.reset({
-				draftingMode: DraftingMode.hybrid,
 				isAiSubject: campaign.isAiSubject ?? true,
 				subject: campaign.subject ?? '',
 				fullAiPrompt: campaign.fullAiPrompt ?? '',
-				hybridPrompt: campaign.hybridPrompt ?? 'Generate a professional email based on the template below.',
+				hybridPrompt:
+					campaign.hybridPrompt ??
+					'Generate a professional email based on the template below.',
 				hybridAvailableBlocks: campaign.hybridAvailableBlocks ?? [HybridBlock.text],
 				hybridBlockPrompts: (campaign.hybridBlockPrompts as HybridBlockPrompt[]) ?? [
 					{ id: 'introduction', type: 'introduction', value: '' },
@@ -1205,8 +1146,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		/* eslint-disable-next-line react-hooks/exhaustive-deps */
 	}, []);
 
-
-
 	useEffect(() => {
 		if (isFirstLoad) return;
 
@@ -1231,47 +1170,17 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		};
 	}, [debouncedAutosave]);
 
-	// Track focused field
-	const trackFocusedField = useCallback((fieldName: string, element: HTMLTextAreaElement | HTMLInputElement | null) => {
-		console.log('[Track Focus] Field:', fieldName, 'Element:', element);
-		lastFocusedFieldRef.current = { name: fieldName, element };
-	}, []);
-
-	// Insert placeholder at cursor position
-	const insertPlaceholder = useCallback((placeholder: string) => {
-		const { name, element } = lastFocusedFieldRef.current;
-		console.log('[Insert Placeholder] Current focused field:', name, 'Element:', element);
-		
-		if (!element || !name) {
-			console.log('[Insert Placeholder] No focused field found');
-			return;
-		}
-
-		const start = element.selectionStart || 0;
-		const end = element.selectionEnd || 0;
-		const currentValue = element.value;
-		
-		const newValue = currentValue.substring(0, start) + placeholder + currentValue.substring(end);
-		console.log('[Insert Placeholder] Inserting', placeholder, 'at position', start);
-		
-		// Update the form value
-		form.setValue(name as any, newValue, { shouldDirty: true });
-		
-		// Use requestAnimationFrame for better Safari compatibility
-		requestAnimationFrame(() => {
-			element.focus();
-			// Safari needs a slight delay for setSelectionRange to work properly
-			const newPosition = start + placeholder.length;
-			setTimeout(() => {
-				element.setSelectionRange(newPosition, newPosition);
-			}, 10);
-		});
-	}, [form]);
+	const trackFocusedField = useCallback(
+		(fieldName: string, element: HTMLTextAreaElement | HTMLInputElement | null) => {
+			lastFocusedFieldRef.current = { name: fieldName, element };
+		},
+		[]
+	);
 
 	// Watch for Full Automated block changes
 	const watchedHybridBlockPrompts = form.watch('hybridBlockPrompts');
 	const hasFullAutomatedBlock = watchedHybridBlockPrompts?.some(
-		block => block.type === 'full_automated' || (block.type as any) === 'full_automated'
+		(block) => block.type === 'full_automated'
 	);
 
 	useEffect(() => {
@@ -1286,41 +1195,33 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	}, [hasFullAutomatedBlock, activeTab]);
 
 	return {
-		campaign,
-		form,
-		setIsConfirmDialogOpen,
-		cancelGeneration,
-		generationProgress,
-		setGenerationProgress,
-		contacts,
-		isConfirmDialogOpen,
-		isPendingGeneration,
-		isAiSubject,
-		isPendingSaveCampaign,
-		handleSavePrompt,
-		isTest,
-		signatures,
-		isPendingSignatures,
-		isOpenSignaturesDialog,
-		setIsOpenSignaturesDialog,
-		selectedSignature,
-		draftingMode,
-		handleGenerateTestDrafts,
-		handleGenerateDrafts,
-		hybridFields,
-		hybridAppend,
-		hybridRemove,
-		hybridMove,
-		autosaveStatus,
-		lastSavedAt,
-		isJustSaved,
-		isGenerationDisabled,
-		isOpenUpgradeSubscriptionDrawer,
-		setIsOpenUpgradeSubscriptionDrawer,
-		trackFocusedField,
-		insertPlaceholder,
 		activeTab,
-		setActiveTab,
+		autosaveStatus,
+		campaign,
+		cancelGeneration,
+		contacts,
+		draftingMode,
+		form,
+		generationProgress,
+		handleGenerateDrafts,
+		handleGenerateTestDrafts,
 		hasFullAutomatedBlock,
+		insertPlaceholder,
+		isAiSubject,
+		isConfirmDialogOpen,
+		isGenerationDisabled,
+		isJustSaved,
+		isOpenSignaturesDialog,
+		isOpenUpgradeSubscriptionDrawer,
+		isPendingGeneration,
+		isTest,
+		selectedSignature,
+		setActiveTab,
+		setGenerationProgress,
+		setIsConfirmDialogOpen,
+		setIsOpenSignaturesDialog,
+		setIsOpenUpgradeSubscriptionDrawer,
+		signatures,
+		trackFocusedField,
 	};
 };

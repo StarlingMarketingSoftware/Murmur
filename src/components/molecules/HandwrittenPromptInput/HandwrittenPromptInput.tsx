@@ -9,13 +9,18 @@ import { useFormContext } from 'react-hook-form';
 import RichTextEditor from '../RichTextEditor/RichTextEditor';
 
 export const HANDWRITTEN_PLACEHOLDER_OPTIONS = [
-	{ value: 'name', label: 'Name' },
-	{ value: 'company', label: 'Company' },
 	{ value: 'firstName', label: 'First Name' },
 	{ value: 'lastName', label: 'Last Name' },
+	{ value: 'company', label: 'Company' },
+	{ value: 'email', label: 'Email' },
+	{ value: 'phone', label: 'Phone' },
+	{ value: 'address', label: 'Address' },
+	{ value: 'city', label: 'City' },
 	{ value: 'state', label: 'State' },
 	{ value: 'country', label: 'Country' },
-	{ value: 'city', label: 'City' },
+	{ value: 'website', label: 'Website' },
+	{ value: 'senderName', label: 'Sender Name' },
+	{ value: 'senderWebsite', label: 'Sender Website' },
 ];
 
 export const HandwrittenPromptInput = () => {

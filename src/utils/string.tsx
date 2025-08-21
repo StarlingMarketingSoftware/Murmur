@@ -155,9 +155,11 @@ export const stringifyJsonSubset = <T,>(
  */
 export const generateEmailTemplateFromBlocks = (blocks: HybridBlockPrompt[]): string => {
 	const template: string[] = [];
+	let textBlockCount = 0;
 	for (const block of blocks) {
-		if (block.type === 'text' || block.type === HybridBlock.text) {
-			template.push(`${block.value}`);
+		if (block.type === HybridBlock.text) {
+			template.push(`{{${block.type + textBlockCount}}}`);
+			textBlockCount++;
 		} else {
 			template.push(`{{${block.type}}}`);
 		}
@@ -172,17 +174,22 @@ export const generateEmailTemplateFromBlocks = (blocks: HybridBlockPrompt[]): st
  */
 export const generatePromptsFromBlocks = (blocks: HybridBlockPrompt[]): string => {
 	const defaultPrompts: Record<string, string> = {
-		introduction: 'Write a professional and personalized introduction that establishes rapport with the recipient.',
-		research: 'Include relevant research about the recipient or their company that shows genuine interest and understanding.',
-		action: 'Create a clear and compelling call to action that encourages the recipient to take the next step.'
+		introduction:
+			'Write a professional and personalized introduction that establishes rapport with the recipient.',
+		research:
+			'Include relevant research about the recipient or their company that shows genuine interest and understanding.',
+		action:
+			'Create a clear and compelling call to action that encourages the recipient to take the next step.',
 	};
 
 	const prompts: string[] = [];
 	for (const block of blocks) {
-		if (block.type !== HybridBlock.text && block.type !== 'text') {
-			const prompt = block.value?.trim() || defaultPrompts[block.type] || `Generate content for ${block.type}`;
-			prompts.push(`Prompt for {{${block.type}}}: ${prompt}`);
-		}
+		const prompt =
+			block.value?.trim() ||
+			defaultPrompts[block.type] ||
+			`Generate content for ${block.type}`;
+		const labelText = block.type === 'text' ? 'Exact text' : 'Prompt for';
+		prompts.push(`${labelText} {{${block.type}}}: ${prompt}`);
 	}
 	return prompts.join('\n\n');
 };
