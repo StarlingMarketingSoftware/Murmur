@@ -31,7 +31,7 @@ import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/emailAuto
 import { HybridBlock, DraftingTone } from '@prisma/client';
 import { BLOCKS, useHybridPromptInput } from './useHybridPromptInput';
 import { twMerge } from 'tailwind-merge';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 
 interface SortableAIBlockProps {
@@ -182,9 +182,10 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove, trackFocusedField }:
 
 interface HybridPromptInputProps {
 	trackFocusedField?: (fieldName: string, element: HTMLTextAreaElement | HTMLInputElement | null) => void;
+	testMessage?: string | null;
 }
 
-export const HybridPromptInput = ({ trackFocusedField }: HybridPromptInputProps) => {
+export const HybridPromptInput = ({ trackFocusedField, testMessage }: HybridPromptInputProps) => {
 	const {
 		form,
 		fields,
@@ -195,11 +196,52 @@ export const HybridPromptInput = ({ trackFocusedField }: HybridPromptInputProps)
 		handleAddBlock,
 	} = useHybridPromptInput();
 
+	const [showTestPreview, setShowTestPreview] = useState(false);
+
+	// Show test preview when testMessage changes
+	useEffect(() => {
+		if (testMessage) {
+			setShowTestPreview(true);
+		}
+	}, [testMessage]);
+
 	return (
 		<div>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
 				<Droppable id="droppable">
-					<div className="w-[892px] min-h-[530px] border-[3px] border-black rounded-md bg-gray-50 transition mb-4 flex flex-col">
+					<div className="w-[892px] min-h-[530px] border-[3px] border-black rounded-md bg-gray-50 transition mb-4 flex flex-col relative">
+						{/* Test Preview Overlay */}
+						{showTestPreview && testMessage && (
+							<div className="absolute inset-0 bg-white z-50 rounded-md overflow-hidden border-2 border-gray-300">
+								<div className="relative h-full flex flex-col">
+									{/* Header with X Button */}
+									<div className="flex justify-between items-center p-4 border-b border-gray-200">
+										<h3 className="text-lg font-semibold text-gray-800" style={{ fontFamily: 'Inter' }}>Test Email Preview</h3>
+										<button
+											type="button"
+											onClick={() => setShowTestPreview(false)}
+											className="p-1 hover:bg-gray-100 rounded transition-colors"
+										>
+											<X className="h-5 w-5" style={{ color: '#A20000' }} />
+										</button>
+									</div>
+									
+									{/* Test Email Content */}
+									<div className="flex-1 p-6 overflow-y-auto bg-gray-50">
+										<div 
+											dangerouslySetInnerHTML={{ __html: testMessage }}
+											className="max-w-none"
+											style={{ 
+												fontFamily: form.watch('font') || 'Arial',
+												lineHeight: '1.6',
+												fontSize: '14px'
+											}}
+										/>
+									</div>
+								</div>
+							</div>
+						)}
+						
 						{/* Content area */}
 						<div className="flex-1 p-3 flex flex-col gap-3 items-start">
 							{fields.length === 0 && (
@@ -291,7 +333,10 @@ export const HybridPromptInput = ({ trackFocusedField }: HybridPromptInputProps)
 												<Textarea
 													placeholder="Enter your signature..."
 													className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-[25px] mt-1 p-0 resize-none overflow-hidden"
-													style={{ height: 'auto' }}
+													style={{ 
+														height: 'auto',
+														fontFamily: form.watch('font') || 'Arial'
+													}}
 													onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
 														const target = e.currentTarget;
 														target.style.height = 'auto';

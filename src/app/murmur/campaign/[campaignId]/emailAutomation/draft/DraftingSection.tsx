@@ -142,9 +142,34 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 							<div className="flex-shrink-0">
 								<HybridPromptInput
 									trackFocusedField={trackFocusedField}
+									testMessage={campaign?.testMessage}
 								/>
 							</div>
 							{/* Right panel removed from UI but functionality preserved in routing */}
+						</div>
+						<div className="flex justify-end mt-2 mb-2">
+							<button
+								type="button"
+								onClick={handleGenerateTestDrafts}
+								disabled={isGenerationDisabled()}
+								style={{ 
+									width: '94px', 
+									height: '39px',
+									backgroundColor: 'rgba(93, 171, 104, 0.08)',
+									border: '2px solid #5DAB68',
+									color: '#000',
+									fontFamily: 'Times New Roman',
+									fontWeight: 'bold',
+									borderRadius: '6px',
+									cursor: isGenerationDisabled() ? 'not-allowed' : 'pointer',
+									opacity: isGenerationDisabled() ? 0.5 : 1,
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center'
+								}}
+							>
+								{(isPendingGeneration && isTest) ? 'Testing...' : 'Test'}
+							</button>
 						</div>
 						<div>
 							<div className="flex flex-col gap-4 mt-4">

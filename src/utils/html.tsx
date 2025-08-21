@@ -42,24 +42,40 @@ export const formatHTMLForEmailClients = (html: string): string => {
 
 export const addSignatureToHtml = (html: string, signature: string | null): string => {
 	const signatureContent = signature || '';
-	return `${html}<p></p><div>${signatureContent}</div>`;
+	// Convert line breaks in signature to <br> tags for proper HTML rendering
+	const formattedSignature = signatureContent.replace(/\n/g, '<br>');
+	// Add proper spacing between body and signature with styled div
+	return `${html}<br><br><div style="margin-top: 1em;">${formattedSignature}</div>`;
 };
 
 export const replaceLineBreaksWithRichTextTags = (text: string, font: string): string => {
 	const fontStyle = `style="font-family: ${font}"`;
-	const res = `<p><span ${fontStyle}>${text}</span></p>`;
-	return res.replace(/\n/g, `</span></p><p><span ${fontStyle}>`);
+	// Split by double newlines to create paragraphs
+	const paragraphs = text.split(/\n\n+/);
+	// Process each paragraph, converting single newlines to <br> within paragraphs
+	const htmlParagraphs = paragraphs
+		.filter(paragraph => paragraph.trim() !== '') // Remove empty paragraphs
+		.map((paragraph, index, array) => {
+			// Replace single newlines with <br> tags within each paragraph
+			const withLineBreaks = paragraph.replace(/\n/g, '<br>');
+			// Add margin-bottom to all paragraphs except the last one
+			const marginStyle = index < array.length - 1 ? 'margin-bottom: 1em;' : '';
+			return `<p style="${marginStyle}"><span ${fontStyle}>${withLineBreaks}</span></p>`;
+		});
+	return htmlParagraphs.join('');
 };
 
-// take all instances of single \n and replace them with \n\n (does not do anything to instances of two consecutive new lines \n\n)
+// Convert AI response text to rich HTML email with proper paragraph and line break handling
 export const convertAiResponseToRichTextEmail = (
 	html: string,
 	font: string,
 	signature: string | null
 ): string => {
-	const cleanedNewLines = html.replace(/(?<!\n)\n(?!\n)/g, '\n\n');
-	const htmlWithFont = replaceLineBreaksWithRichTextTags(cleanedNewLines, font);
-	return addSignatureToHtml(htmlWithFont, signature);
+	// Process the text to create proper HTML with paragraphs and line breaks
+	const htmlWithFont = replaceLineBreaksWithRichTextTags(html, font);
+	// Apply font styling to signature as well
+	const styledSignature = signature ? `<span style="font-family: ${font}">${signature}</span>` : null;
+	return addSignatureToHtml(htmlWithFont, styledSignature);
 };
 
 export const extractJsonFromPseudoHTML = (
