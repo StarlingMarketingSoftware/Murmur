@@ -299,7 +299,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const values = getValues();
 		let combinedTextBlocks = values.hybridBlockPrompts
 			?.filter((block) => block.type === 'text')
-			.map((block) => block.value.replace(/\n/g, '\n'))
+			.map((block) => block.value)
 			.join('\n');
 
 		HANDWRITTEN_PLACEHOLDER_OPTIONS.forEach(({ value }) => {
@@ -503,7 +503,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		hybridBlocks: HybridBlockPrompt[],
 		signal?: AbortSignal
 	): Promise<DraftEmailResponse> => {
-		console.log('DRAFTING HYBRID EMAIL');
 		const stringifiedRecipient = stringifyJsonSubset<Contact>(recipient, [
 			'firstName',
 			'lastName',
@@ -537,12 +536,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			signal: signal,
 		});
 
-		console.log(
-			getMistralHybridPrompt(
-				stringifiedHybridBlocks,
-				generatePromptsFromBlocks(hybridBlocks)
-			)
-		);
 		const mistralResponse = await callMistralAgent({
 			prompt: getMistralHybridPrompt(
 				stringifiedHybridBlocks,
@@ -1067,7 +1060,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	};
 
-	// Insert placeholder at cursor position
 	const insertPlaceholder = useCallback(
 		(placeholder: string) => {
 			const { name, element } = lastFocusedFieldRef.current;

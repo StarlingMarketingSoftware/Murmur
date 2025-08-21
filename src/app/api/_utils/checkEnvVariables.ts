@@ -40,7 +40,6 @@ export function checkRequiredEnvVariables() {
 		return false;
 	}
 
-	// console.log('✅ All required environment variables are configured');
 	return true;
 }
 

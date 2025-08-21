@@ -294,7 +294,6 @@ export const useHybridPromptInput = () => {
 
 		const blockToBeRemoved = fields[blockIndex];
 
-		// Handle Full Automated block removal specially
 		if (blockToBeRemoved.type === HybridBlock.full_automated) {
 			remove(blockIndex);
 			return;
