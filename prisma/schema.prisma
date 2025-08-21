@@ -150,6 +150,7 @@ model Campaign {
   signatureId           Int?
   font                  String            @default("Arial")
   identityId            Int?
+  draftingMode          DraftingMode      @default(hybrid)
   draftingTone          DraftingTone      @default(normal)
   handwrittenPrompt     String?
   hybridPrompt          String?
