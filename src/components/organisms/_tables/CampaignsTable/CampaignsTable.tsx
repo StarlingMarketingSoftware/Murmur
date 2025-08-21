@@ -1,11 +1,6 @@
 import { FC } from 'react';
-import {
-	Card,
-	CardHeader,
-	CardContent,
-	CardTitle,
-} from '@/components/ui/card';
-import Spinner from '@/components/ui/spinner';
+import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import CustomTable from '../../../molecules/CustomTable/CustomTable';
 import { useCampaignsTable } from './useCampaignsTable';
 import { ConfirmDialog } from '../../_dialogs/ConfirmDialog/ConfirmDialog';

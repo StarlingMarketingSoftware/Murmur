@@ -6,7 +6,6 @@ import { z } from 'zod';
 import { EmailVerificationStatus, UserContactList } from '@prisma/client';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
-import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import {
 	useBatchUpdateContacts,
@@ -18,11 +17,12 @@ import { ContactWithName } from '@/types/contact';
 import { useCreateApolloContacts } from '@/hooks/queryHooks/useApollo';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { toast } from 'sonner';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
 import { capitalize } from '@/utils/string';
 import { TableCellTooltip } from '@/components/molecules/TableCellTooltip/TableCellTooltip';
 import { useMe } from '@/hooks/useMe';
 import { StripeSubscriptionStatus } from '@/types';
+import { usePageTransition } from '@/contexts/PageTransitionContext';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -54,7 +54,7 @@ export const useDashboard = () => {
 		},
 	];
 
-	const router = useRouter();
+	const { startTransition } = usePageTransition();
 	const form = useForm<FormData>({
 		resolver: zodResolver(formSchema),
 		defaultValues: {
@@ -130,9 +130,7 @@ export const useDashboard = () => {
 		}
 	}, [hasSearched, activeSearchQuery, activeExcludeUsedContacts, limit]);
 
-	// Handle errors
 	useEffect(() => {
-		// Only show error if we've actually searched (not on initial load)
 		if (isError && error && hasSearched && activeSearchQuery) {
 			console.error('Contact search error details:', {
 				error,
@@ -198,10 +196,8 @@ export const useDashboard = () => {
 		if (!contacts || !tableInstance) return;
 
 		if (isAllSelected) {
-			// Unselect all
 			tableInstance.toggleAllRowsSelected(false);
 		} else {
-			// Select all rows
 			tableInstance.toggleAllRowsSelected(true);
 		}
 	};
@@ -234,7 +230,7 @@ export const useDashboard = () => {
 			});
 
 			if (campaign) {
-				router.push(urls.murmur.campaign.detail(campaign.id));
+				startTransition(`${urls.murmur.campaign.detail(campaign.id)}?silent=1`);
 			}
 		} else if (currentTab === 'list') {
 			if (selectedContactListRows.length === 0) {
@@ -246,7 +242,7 @@ export const useDashboard = () => {
 				userContactLists: selectedContactListRows.map((row) => row.id),
 			});
 			if (campaign) {
-				router.push(urls.murmur.campaign.detail(campaign.id));
+				startTransition(`${urls.murmur.campaign.detail(campaign.id)}?silent=1`);
 			}
 		}
 	};
@@ -297,14 +293,6 @@ export const useDashboard = () => {
 		const ratio = contactsWithNames.length / contacts.length;
 		const threshold = 0.7; // 70% threshold for header to be fully visible
 
-		console.log('🎨 Name column fade effect:', {
-			totalContacts: contacts.length,
-			contactsWithNames: contactsWithNames.length,
-			percentage: (ratio * 100).toFixed(1) + '%',
-			headerStatus: ratio > threshold ? '✅ VISIBLE' : '🌫️ FADED',
-			threshold: threshold * 100 + '%',
-		});
-
 		return ratio > threshold; // Header is visible if more than 70% have names
 	}, [contacts, contactHasName]);
 
@@ -337,36 +325,8 @@ export const useDashboard = () => {
 				size: 150,
 				header: () => <span className="font-bold">Email</span>,
 				cell: ({ row }) => {
-					const isUsed = usedContactIdsSet.has(row.original.id);
 					const email = (row.getValue('email') as string) || '';
-					const rowIndex = row.index;
-					const showFull = rowIndex < 3; // First three rows show full email
-					if (showFull) {
-						return (
-							<div className="flex truncate">
-								{isUsed ? (
-									<Tooltip>
-										<TooltipTrigger>
-											<div className="text-left bg-secondary/20 px-2 rounded-md truncate">
-												{email}
-											</div>
-										</TooltipTrigger>
-										<TooltipContent side="right">
-											<div className="font-normal">{email}</div>
-										</TooltipContent>
-									</Tooltip>
-								) : (
-									<TableCellTooltip
-										text={email}
-										maxLength={MAX_CELL_LENGTH}
-										positioning="below-right"
-										onHover={handleCellHover}
-									/>
-								)}
-							</div>
-						);
-					}
-					// Obfuscate the entire email address with a smooth fading blur
+					// Always blur all emails
 					return (
 						<div className="text-left whitespace-nowrap overflow-visible relative">
 							<span className="email-obfuscated-local inline-block">{email}</span>

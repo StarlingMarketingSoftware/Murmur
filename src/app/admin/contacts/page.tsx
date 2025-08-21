@@ -2,7 +2,7 @@
 
 import { useManageContacts } from './useManageContacts';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import CreateContactListDialog from '@/components/organisms/_dialogs/CreateContactListDialog/CreateContactListDialog';
 import ContactVerificationTable from '@/components/organisms/_tables/ContactVerificationTable/ContactVerificationTable';

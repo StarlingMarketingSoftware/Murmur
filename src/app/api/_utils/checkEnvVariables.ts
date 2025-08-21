@@ -4,7 +4,7 @@ const requiredEnvVars = {
 	// Core AI Services
 	PERPLEXITY_API_KEY: 'Perplexity API key (required for email content generation)',
 	MISTRAL_API_KEY: 'Mistral API key (required for tone adjustment)',
-	
+
 	// Mistral Agent IDs
 	MISTRAL_AGENT_ID: 'Mistral agent for normal tone',
 	MISTRAL_TONE_EXPLANATORY_AGENT_ID: 'Mistral agent for explanatory tone',
@@ -21,23 +21,25 @@ const requiredEnvVars = {
 
 export function checkRequiredEnvVariables() {
 	const missingVars: string[] = [];
-	
-	console.log('🔍 Checking environment variables for email generation...');
-	
+
 	for (const [varName, description] of Object.entries(requiredEnvVars)) {
 		if (!process.env[varName]) {
 			missingVars.push(`  ❌ ${varName}: ${description}`);
 		}
 	}
-	
+
 	if (missingVars.length > 0) {
-		console.warn('⚠️  WARNING: Missing environment variables for Full AI email generation:');
+		console.warn(
+			'⚠️  WARNING: Missing environment variables for Full AI email generation:'
+		);
 		console.warn(missingVars.join('\n'));
 		console.warn('\n📚 See ENV_SETUP_GUIDE.md for setup instructions');
-		console.warn('🔧 Full AI email generation will not work properly without these variables\n');
+		console.warn(
+			'🔧 Full AI email generation will not work properly without these variables\n'
+		);
 		return false;
 	}
-	
+
 	console.log('✅ All required environment variables are configured');
 	return true;
 }

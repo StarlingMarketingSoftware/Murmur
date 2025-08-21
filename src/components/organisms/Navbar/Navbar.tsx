@@ -1,13 +1,11 @@
 'use client';
 import { useAuth, UserButton, SignUpButton, SignInButton } from '@clerk/nextjs';
 import { urls } from '@/constants/urls';
-// import { Menu, X, ChevronRight } from 'lucide-react';
 import { useMe } from '@/hooks/useMe';
 import Link from 'next/link';
 import { cn } from '@/utils';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-// import LogoIcon from '@/components/atoms/_svg/LogoIcon';
 
 export const Navbar = () => {
 	const { user } = useMe();
@@ -71,7 +69,6 @@ export const Navbar = () => {
 						<div className="lg:hidden flex items-center">
 							{isSignedIn ? (
 								<UserButton
-									afterSignOutUrl="/"
 									appearance={{
 										elements: {
 											avatarBox: 'w-7 h-7',
@@ -85,7 +82,7 @@ export const Navbar = () => {
 							)}
 						</div>
 						<div className="hidden lg:block w-7 h-7" /> {/* Spacer for desktop */}
-						{/* Desktop Navigation - Premium Center */}
+						{/* Desktop Navigation */}
 						<div className="absolute inset-0 hidden lg:flex items-center justify-center pointer-events-none">
 							<nav className="pointer-events-auto flex items-center gap-14">
 								{navItems.map((item) => (
@@ -143,7 +140,6 @@ export const Navbar = () => {
 							<div className="hidden lg:flex items-center">
 								{isSignedIn ? (
 									<UserButton
-										afterSignOutUrl="/"
 										appearance={{
 											elements: {
 												avatarBox: 'w-7 h-7 ring-1 ring-black/10',
@@ -173,7 +169,7 @@ export const Navbar = () => {
 				</div>
 			</nav>
 
-			{/* Mobile Menu Overlay - Glass Art */}
+			{/* Mobile Menu Overlay */}
 			<div
 				className={cn(
 					'fixed inset-0 z-40 lg:hidden',
@@ -189,7 +185,7 @@ export const Navbar = () => {
 					onClick={() => setMobileMenuOpen(false)}
 				/>
 
-				{/* Menu Panel - Apple Glass effect */}
+				{/* Menu Panel */}
 				<div
 					className={cn(
 						'absolute top-0 left-0 right-0 h-screen',
@@ -202,7 +198,6 @@ export const Navbar = () => {
 					<div className="flex items-center justify-between h-12 px-5 pt-2">
 						{isSignedIn ? (
 							<UserButton
-								afterSignOutUrl="/"
 								appearance={{
 									elements: {
 										avatarBox: 'w-6 h-6',
@@ -233,11 +228,10 @@ export const Navbar = () => {
 										<Link
 											href={item.path}
 											className={cn(
-												'block py-4 text-[28px] font-normal text-gray-800',
+												'block py-4 text-[28px] text-gray-800 font-primary',
 												'transition-colors duration-200',
 												pathname === item.path ? 'text-gray-900' : 'hover:text-gray-900'
 											)}
-											style={{ fontFamily: "'Times New Roman', Times, serif" }}
 											onClick={() => setMobileMenuOpen(false)}
 										>
 											{item.label}
@@ -253,18 +247,12 @@ export const Navbar = () => {
 						<div className="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-200/20">
 							<div className="flex space-x-6">
 								<SignInButton mode="modal">
-									<button
-										className="flex-1 py-3 text-center text-[16px] font-normal text-gray-600 hover:text-gray-900 transition-colors duration-200"
-										style={{ fontFamily: "'Times New Roman', Times, serif" }}
-									>
+									<button className="flex-1 py-3 text-center text-[16px] text-gray-600 hover:text-gray-900 transition-colors duration-200 font-primary">
 										Sign in
 									</button>
 								</SignInButton>
 								<SignUpButton mode="modal">
-									<button
-										className="flex-1 py-3 text-center text-[16px] font-normal text-gray-600 hover:text-gray-900 transition-colors duration-200"
-										style={{ fontFamily: "'Times New Roman', Times, serif" }}
-									>
+									<button className="flex-1 py-3 text-center text-[16px] text-gray-600 hover:text-gray-900 transition-colors duration-200 font-primary">
 										Sign up
 									</button>
 								</SignUpButton>

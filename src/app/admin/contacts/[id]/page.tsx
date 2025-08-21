@@ -1,6 +1,6 @@
 'use client';
 import { FC } from 'react';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import { useManageContactListDetail } from './useManageContactListDetail';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

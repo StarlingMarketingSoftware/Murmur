@@ -1,7 +1,7 @@
 import { FC } from 'react';
 import CustomTable from '../../../molecules/CustomTable/CustomTable';
 import { EmailsTableProps, useEmailsTable } from './useEmailsTable';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import ViewEditEmailDialog from '@/components/organisms/_dialogs/ViewEditEmailDialog/ViewEditEmailDialog';
 
 const EmailsTable: FC<EmailsTableProps> = (props) => {

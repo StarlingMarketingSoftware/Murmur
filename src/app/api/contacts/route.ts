@@ -61,16 +61,10 @@ export type ContactFilterData = z.infer<typeof contactFilterSchema>;
 
 export type PostContactData = z.infer<typeof createContactSchema>;
 
-// Set maximum duration for Vercel serverless function
 export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
 	try {
-		// Debug logging for environment variables
-		console.log(
-			'--- DEBUG: API Key from env (OPEN_AI_API_KEY):',
-			process.env.OPEN_AI_API_KEY ? 'Exists' : 'MISSING!'
-		);
 		const { userId } = await auth();
 		if (!userId) {
 			return apiUnauthorized();

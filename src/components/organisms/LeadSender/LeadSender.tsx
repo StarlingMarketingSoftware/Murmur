@@ -8,7 +8,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { useLeadSender } from './useLeadSender';
 import { Button } from '@/components/ui/button';
-import { Typography } from '@/components/ui/typography';
 
 export const LeadSender = () => {
 	const { form, onSubmit, isPending } = useLeadSender();
@@ -40,8 +39,7 @@ export const LeadSender = () => {
 						type="submit"
 						variant="ghost"
 						isLoading={isPending}
-						className="!absolute !right-[2px] !top-[2px] !h-[38px] !opacity-100 !w-[100px] sm:!w-[150px] px-3 sm:px-6 hover:bg-gray-100 !border-l !border-l-black !border-r-0 !border-t-0 !border-b-0 text-foreground !text-[14px] sm:!text-[18px]"
-						style={{ backgroundColor: '#FFFFFF', borderRadius: '7px' }}
+						className="!absolute !right-[2px] !top-[2px] !h-[38px] !opacity-100 !w-[100px] sm:!w-[150px] px-3 sm:px-6 hover:bg-gray-100 !border-l !border-l-black !border-r-0 !border-t-0 !border-b-0 text-foreground !text-[14px] sm:!text-[18px] bg-background rounded-[7px]"
 					>
 						Try for Free
 					</Button>

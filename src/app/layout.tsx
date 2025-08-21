@@ -7,6 +7,7 @@ import SubLayout from './sublayout';
 import localFont from 'next/font/local';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import StoreProvider from './StoreProvider';
+import { PageTransitionProvider } from '@/contexts/PageTransitionContext';
 
 const inter = Inter({
 	variable: '--font-inter',
@@ -64,11 +65,13 @@ export default function RootLayout({
 			>
 				<body className={`antialiased min-h-screen flex flex-col`}>
 					<ThemeProvider attribute="class" defaultTheme="light">
-						<SubLayout>
-							<main className="flex-1">{children}</main>
-							<Footer />
-							<Toaster />
-						</SubLayout>
+						<PageTransitionProvider>
+							<SubLayout>
+								<main className="flex-1">{children}</main>
+								<Footer />
+								<Toaster />
+							</SubLayout>
+						</PageTransitionProvider>
 					</ThemeProvider>
 				</body>
 			</html>

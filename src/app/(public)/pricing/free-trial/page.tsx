@@ -2,7 +2,7 @@
 
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { Typography } from '@/components/ui/typography';
 import { useFreeTrial } from './useFreeTrial';
 import { SignUpButton } from '@clerk/nextjs';

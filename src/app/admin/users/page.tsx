@@ -2,7 +2,7 @@
 
 import { useManageUsers } from './useManageUsers';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 
 const ManageUsersPage = () => {

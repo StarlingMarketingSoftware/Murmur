@@ -1,7 +1,7 @@
 import { FC } from 'react';
 import { ProductListProps, useProductList } from './useProductList';
 import { ProductCard } from '../ProductCard/ProductCard';
-import Spinner from '@/components/ui/spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 
 export const ProductList: FC<ProductListProps> = (props) => {
 	const { sortedProducts, user, isPendingProducts, billingCycle } = useProductList(props);

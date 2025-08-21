@@ -36,6 +36,7 @@ export const UpgradeSubscriptionDrawer: FC<UpgradeSubscriptionDrawerProps> = (pr
 		isUpdateSubscriptionTriggered,
 		hideTriggerButton,
 		buttonVariant,
+		className,
 	} = useUpgradeSubscriptionDrawer(props);
 
 	return (
@@ -51,7 +52,7 @@ export const UpgradeSubscriptionDrawer: FC<UpgradeSubscriptionDrawerProps> = (pr
 							`gradient-button ${
 								triggerButtonText === 'Import' ? 'gradient-button-blue' : ''
 							}`,
-							props.className
+							className
 						)}
 					>
 						{triggerButtonText}
