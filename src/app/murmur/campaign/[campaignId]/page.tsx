@@ -62,15 +62,16 @@ const Murmur = () => {
 							>
 								To:
 							</Typography>
-							<input
-								type="text"
-								className="outline-none bg-transparent text-[15px] cursor-pointer flex-1 text-gray-600"
-								style={{ fontFamily: 'Inter', fontWeight: 'normal' }}
-								placeholder="Enter recipients..."
-								value={campaign?.userContactLists?.map(list => list.name).join(', ') || ''}
+							<Typography className="ml-2 !text-[15px] text-gray-600" style={{ fontFamily: 'Inter', fontWeight: 'normal' }}>
+								{campaign?.userContactLists?.map(list => list.name).join(', ') || 'No recipients selected'}
+							</Typography>
+							<Button 
+								variant="action-link" 
+								className="ml-2"
 								onClick={() => setIsContactListDialogOpen(true)}
-								readOnly
-							/>
+							>
+								Change
+							</Button>
 						</div>
 
 						<div className="flex items-center">
@@ -81,20 +82,16 @@ const Murmur = () => {
 							>
 								From:
 							</Typography>
-							<Typography className="!text-[15px] text-gray-600" style={{ fontFamily: 'Inter', fontWeight: 'normal' }}>
+							<Typography className="ml-2 !text-[15px] text-gray-600" style={{ fontFamily: 'Inter', fontWeight: 'normal' }}>
 								{campaign?.identity?.name}
 							</Typography>
-							<IdentityDialog
-								triggerButton={
-									<Button variant="action-link" className="ml-2">
-										Change
-									</Button>
-								}
-								campaign={campaign}
-								title="User Settings"
-								open={isIdentityDialogOpen}
-								onOpenChange={setIsIdentityDialogOpen}
-							/>
+							<Button 
+								variant="action-link" 
+								className="ml-2"
+								onClick={() => setIsIdentityDialogOpen(true)}
+							>
+								Change
+							</Button>
 						</div>
 					</div>
 				</div>
@@ -103,6 +100,13 @@ const Murmur = () => {
 					campaign={campaign}
 					open={isContactListDialogOpen}
 					onOpenChange={setIsContactListDialogOpen}
+				/>
+
+				<IdentityDialog
+					campaign={campaign}
+					title="User Settings"
+					open={isIdentityDialogOpen}
+					onOpenChange={setIsIdentityDialogOpen}
 				/>
 
 				<div className="mt-6 flex justify-center">

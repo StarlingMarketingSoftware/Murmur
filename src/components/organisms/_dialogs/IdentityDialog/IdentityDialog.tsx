@@ -75,7 +75,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 				onOpenChange(open);
 			}}
 		>
-			<DialogTrigger asChild>{triggerButton}</DialogTrigger>
+			{triggerButton && <DialogTrigger asChild>{triggerButton}</DialogTrigger>}
 			<DialogContent
 				disableEscapeKeyDown
 				disableOutsideClick
