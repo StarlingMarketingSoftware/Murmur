@@ -24,7 +24,6 @@ import { DraftingMode } from '@prisma/client';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
-		activeTab,
 		autosaveStatus,
 		campaign,
 		cancelGeneration,
@@ -34,8 +33,6 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		generationProgress,
 		handleGenerateDrafts,
 		handleGenerateTestDrafts,
-		hasFullAutomatedBlock,
-		insertPlaceholder,
 		isAiSubject,
 		isConfirmDialogOpen,
 		isGenerationDisabled,
@@ -43,7 +40,6 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		isOpenUpgradeSubscriptionDrawer,
 		isPendingGeneration,
 		isTest,
-		setActiveTab,
 		setGenerationProgress,
 		setIsConfirmDialogOpen,
 		setIsOpenUpgradeSubscriptionDrawer,
@@ -164,8 +160,12 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									cursor: isGenerationDisabled() ? 'not-allowed' : 'pointer',
 									opacity: isGenerationDisabled() ? 0.5 : 1,
 									display: 'flex',
+									WebkitBoxAlign: 'center',
 									alignItems: 'center',
-									justifyContent: 'center'
+									WebkitBoxPack: 'center',
+									justifyContent: 'center',
+									WebkitAppearance: 'none',
+									appearance: 'none'
 								}}
 							>
 								{(isPendingGeneration && isTest) ? 'Testing...' : 'Test'}

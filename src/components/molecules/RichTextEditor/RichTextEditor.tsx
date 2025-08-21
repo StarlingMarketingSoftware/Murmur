@@ -194,6 +194,11 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 					],
 					className
 				),
+				style: `
+					-webkit-user-select: text;
+					user-select: text;
+					-webkit-appearance: none;
+				`
 			},
 		},
 		onUpdate: ({ editor }) => {

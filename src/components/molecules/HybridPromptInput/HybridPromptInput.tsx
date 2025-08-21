@@ -131,7 +131,11 @@ const SortableAIBlock = ({ block, id, fieldIndex, onRemove, trackFocusedField }:
 														? 'bg-black text-white shadow-sm'
 														: 'bg-gray-200 text-gray-600 hover:bg-gray-300'
 												)}
-												style={{ fontFamily: 'Inter' }}
+												style={{ 
+													fontFamily: 'Inter',
+													WebkitAppearance: 'none',
+													WebkitTapHighlightColor: 'transparent'
+												}}
 											>
 												{tone.label}
 											</button>
@@ -217,13 +221,14 @@ export const HybridPromptInput = ({ trackFocusedField, testMessage }: HybridProm
 									{/* Header with X Button */}
 									<div className="flex justify-between items-center p-4 border-b border-gray-200">
 										<h3 className="text-lg font-semibold text-gray-800" style={{ fontFamily: 'Inter' }}>Test Email Preview</h3>
-										<button
-											type="button"
-											onClick={() => setShowTestPreview(false)}
-											className="p-1 hover:bg-gray-100 rounded transition-colors"
-										>
-											<X className="h-5 w-5" style={{ color: '#A20000' }} />
-										</button>
+																			<button
+										type="button"
+										onClick={() => setShowTestPreview(false)}
+										className="p-1 hover:bg-gray-100 rounded transition-colors"
+										style={{ WebkitAppearance: 'none' }}
+									>
+										<X className="h-5 w-5" style={{ color: '#A20000' }} />
+									</button>
 									</div>
 									
 									{/* Test Email Content */}

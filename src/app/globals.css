@@ -196,6 +196,34 @@
 
 /* Safari-specific fixes */
 @supports (-webkit-appearance: none) {
+	/* Fix for RichTextEditor paragraph spacing in Safari */
+	.ProseMirror p {
+		margin-bottom: 1rem;
+		-webkit-margin-after: 1rem;
+	}
+	
+	.ProseMirror p:last-of-type,
+	.ProseMirror p:last-child {
+		margin-bottom: 0;
+		-webkit-margin-after: 0;
+	}
+	
+	.ProseMirror .br-spacing {
+		display: block;
+		height: 1rem;
+		content: '';
+	}
+	
+	.ProseMirror div[style*="margin-top"] {
+		-webkit-margin-before: 1.5rem;
+	}
+	
+	/* Fix for button appearance in Safari */
+	button {
+		-webkit-appearance: none;
+		appearance: none;
+	}
+	
 	/* Fix for aspect-ratio in Safari < 15 */
 	.aspect-video {
 		padding-bottom: 56.25%; /* 16:9 aspect ratio fallback */
