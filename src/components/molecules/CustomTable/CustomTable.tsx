@@ -226,7 +226,7 @@ export function CustomTable<TData, TValue>({
 
 	return (
 		<div className="w-full [&_::-webkit-scrollbar]:h-[4px] [&_::-webkit-scrollbar]:md:h-[7px] [&_::-webkit-scrollbar-thumb]:bg-gray-300 [&_::-webkit-scrollbar-thumb]:rounded-full [&_::-webkit-scrollbar]:w-[4px] [&_::-webkit-scrollbar]:md:w-[7px]">
-			<div className="flex items-center justify-between py-4 gap-4 w-full">
+			<div className="flex items-center justify-between py-4 gap-4 w-[1185px] max-w-full mx-auto">
 				<div className="flex items-center gap-4 flex-wrap">
 					{searchable && (
 						<Input
@@ -271,7 +271,7 @@ export function CustomTable<TData, TValue>({
 			</div>
 			<div
 				className={twMerge(
-					'border-2 border-black relative overflow-y-auto overflow-x-auto custom-scrollbar w-[1185px] max-w-full',
+					'border-2 border-black relative overflow-y-auto overflow-x-auto custom-scrollbar w-[1185px] max-w-full mx-auto',
 					constrainHeight && 'h-[429px]'
 				)}
 			>
@@ -355,7 +355,9 @@ export function CustomTable<TData, TValue>({
 				</Table>
 			</div>
 			{!hidePagination && (
-				<CustomPagination<TData> currentPage={pagination.pageIndex} table={table} />
+				<div className="w-[1185px] max-w-full mx-auto">
+					<CustomPagination<TData> currentPage={pagination.pageIndex} table={table} />
+				</div>
 			)}
 		</div>
 	);

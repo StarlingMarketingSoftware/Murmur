@@ -35,7 +35,7 @@ export const BLOCKS = [
 		value: HybridBlock.full_automated,
 		help: 'Let AI generate the entire email based on your prompt. This will override all other blocks.',
 		placeholder:
-			'Write your prompt for the AI here. For example:\n"Draft an email to schedule a meeting with the marketing team to discuss our Q2 strategy."\nBased on this prompt, the AI will generate a custom email for each recipient.',
+			'Prompt Murmur here. Tell it what you want to say in an email and it will compose a batch of emails based on your instructions.',
 	},
 	{
 		label: 'Custom Text',

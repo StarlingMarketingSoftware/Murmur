@@ -5,7 +5,6 @@ import {
 	DialogDescription,
 	DialogHeader,
 	DialogTitle,
-	DialogTrigger,
 } from '@/components/ui/dialog';
 import {
 	ManageCampaignContactListDialogProps,
@@ -75,9 +74,6 @@ export const ManageCampaignContactListDialog: FC<ManageCampaignContactListDialog
 	return (
 		<>
 			<Dialog open={open} onOpenChange={onOpenChange}>
-				<DialogTrigger asChild>
-					<Button variant="action-link">Change</Button>
-				</DialogTrigger>
 				<DialogContent className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px]">
 					<DialogHeader>
 						<DialogTitle>Manage Contact Lists</DialogTitle>

@@ -1,6 +1,6 @@
 import { FC, ReactNode } from 'react';
 import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
-import { DraftingRightPanel } from '@/components/organisms/DraftingRightPanel/DraftingRightPanel';
+// DraftingRightPanel removed from UI but functionality preserved in routing
 import { Button } from '@/components/ui/button';
 import {
 	FormField,
@@ -14,18 +14,16 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { ManageSignaturesDialog } from '@/components/organisms/_dialogs/ManageSignaturesDialog/ManageSignaturesDialog';
 import { ConfirmDialog } from '@/components/organisms/_dialogs/ConfirmDialog/ConfirmDialog';
 import ProgressIndicator from '@/components/molecules/ProgressIndicator/ProgressIndicator';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 import { Typography } from '@/components/ui/typography';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
-import { BlockTabs } from '@/components/atoms/BlockTabs/BlockTabs';
+// BlockTabs removed from UI but functionality preserved
 import { DraftingMode } from '@prisma/client';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
-		activeTab,
 		autosaveStatus,
 		campaign,
 		cancelGeneration,
@@ -35,23 +33,16 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		generationProgress,
 		handleGenerateDrafts,
 		handleGenerateTestDrafts,
-		hasFullAutomatedBlock,
-		insertPlaceholder,
 		isAiSubject,
 		isConfirmDialogOpen,
 		isGenerationDisabled,
 		isJustSaved,
-		isOpenSignaturesDialog,
 		isOpenUpgradeSubscriptionDrawer,
 		isPendingGeneration,
 		isTest,
-		selectedSignature,
-		setActiveTab,
 		setGenerationProgress,
 		setIsConfirmDialogOpen,
-		setIsOpenSignaturesDialog,
 		setIsOpenUpgradeSubscriptionDrawer,
-		signatures,
 		trackFocusedField,
 	} = useDraftingSection(props);
 
@@ -98,7 +89,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		<div className="mb-30 flex flex-col items-center">
 			<Form {...form}>
 				<form className="flex flex-col items-center">
-					<div className="w-[1165px]">
+					<div className="w-[892px]">
 						<div className="mb-4">
 							<FormField
 								control={form.control}
@@ -107,7 +98,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									required: isAiSubject,
 								}}
 								render={({ field }) => (
-									<FormItem className="w-[469px]">
+									<FormItem className="w-[892px]">
 										<div className="flex items-center gap-2">
 											<FormLabel>Subject</FormLabel>
 											<Separator orientation="vertical" className="!h-5" />
@@ -139,51 +130,46 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 								)}
 							/>
 						</div>
-						<div className="flex justify-between items-center mb-3">
+						<div className="mb-3">
 							<FormLabel>Email Template</FormLabel>
-							<div className="w-[559px]">
-								<BlockTabs
-									activeValue={activeTab}
-									onValueChange={(value) =>
-										setActiveTab(value as 'settings' | 'test' | 'placeholders')
-									}
-									options={[
-										{
-											label: 'Settings',
-											value: 'settings',
-											disabled: draftingMode !== DraftingMode.ai,
-										},
-										{ label: 'Test', value: 'test' },
-										{
-											label: 'Placeholders',
-											value: 'placeholders',
-											disabled: draftingMode === DraftingMode.ai,
-										},
-									]}
-								/>
-							</div>
+							{/* BlockTabs removed from UI but activeTab state preserved for routing */}
 						</div>
 						<div className="flex gap-[47px] items-start">
 							<div className="flex-shrink-0">
 								<HybridPromptInput
 									trackFocusedField={trackFocusedField}
-									signatures={signatures}
-									selectedSignature={selectedSignature}
-									setIsOpenSignaturesDialog={setIsOpenSignaturesDialog}
+									testMessage={campaign?.testMessage}
 								/>
 							</div>
-							<div className="flex-shrink-0">
-								<DraftingRightPanel
-									isGenerationDisabled={isGenerationDisabled}
-									campaign={campaign}
-									handleTestPrompt={handleGenerateTestDrafts}
-									isTest={isTest}
-									hasFullAutomatedBlock={hasFullAutomatedBlock}
-									insertPlaceholder={insertPlaceholder}
-									activeTab={activeTab}
-									setActiveTab={setActiveTab}
-								/>
-							</div>
+							{/* Right panel removed from UI but functionality preserved in routing */}
+						</div>
+						<div className="flex justify-end mt-2 mb-2">
+							<button
+								type="button"
+								onClick={handleGenerateTestDrafts}
+								disabled={isGenerationDisabled()}
+								style={{ 
+									width: '94px', 
+									height: '39px',
+									backgroundColor: 'rgba(93, 171, 104, 0.08)',
+									border: '2px solid #5DAB68',
+									color: '#000',
+									fontFamily: 'Times New Roman',
+									fontWeight: 'bold',
+									borderRadius: '6px',
+									cursor: isGenerationDisabled() ? 'not-allowed' : 'pointer',
+									opacity: isGenerationDisabled() ? 0.5 : 1,
+									display: 'flex',
+									WebkitBoxAlign: 'center',
+									alignItems: 'center',
+									WebkitBoxPack: 'center',
+									justifyContent: 'center',
+									WebkitAppearance: 'none',
+									appearance: 'none'
+								}}
+							>
+								{(isPendingGeneration && isTest) ? 'Testing...' : 'Test'}
+							</button>
 						</div>
 						<div>
 							<div className="flex flex-col gap-4 mt-4">
@@ -196,7 +182,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										isLoading={isPendingGeneration && !isTest}
 										disabled={isGenerationDisabled()}
 										bold
-										className="!w-[1165px] !h-[39px]"
+										className="!w-[892px] !h-[39px]"
 									>
 										Generate Drafts
 									</Button>
@@ -229,11 +215,6 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 				</form>
 			</Form>
 
-			<ManageSignaturesDialog
-				campaign={campaign}
-				open={isOpenSignaturesDialog}
-				onOpenChange={setIsOpenSignaturesDialog}
-			/>
 			<UpgradeSubscriptionDrawer
 				message="You have run out of drafting credits! Please upgrade your plan."
 				triggerButtonText="Upgrade"

@@ -41,6 +41,16 @@ export const PageTransitionProvider: React.FC<PageTransitionProviderProps> = ({ 
 
 	const onTransitionComplete = useCallback(() => {
 		if (transitionTo) {
+			// Ensure body styles are reset before navigation
+			document.body.style.overflow = '';
+			document.body.style.overflowX = '';
+			document.body.style.overflowY = '';
+			document.body.style.position = '';
+			document.body.style.width = '';
+			document.body.style.top = '';
+			document.body.style.touchAction = '';
+			document.documentElement.style.overflow = '';
+			
 			// Navigate to the new page
 			router.push(transitionTo);
 			// Clean up transition state after navigation and fade out

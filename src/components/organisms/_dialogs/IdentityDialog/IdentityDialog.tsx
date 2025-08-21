@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,7 @@ import { urls } from '@/constants/urls';
 
 export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 	const router = useRouter();
+	const [isContentReady, setIsContentReady] = useState(false);
 	const {
 		title,
 		open,
@@ -35,6 +36,38 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 		isPendingIdentities,
 	} = useIdentityDialog(props);
 
+	// Ensure dialog content renders after page transition completes
+	useEffect(() => {
+		if (open) {
+			// Reset body styles and wait for next frame
+			const resetBodyStyles = () => {
+				// Ensure body is not in fixed position
+				if (document.body.style.position === 'fixed' || document.body.style.position === 'absolute') {
+					document.body.style.position = '';
+					document.body.style.overflow = '';
+					document.body.style.overflowX = '';
+					document.body.style.overflowY = '';
+					document.body.style.width = '';
+					document.body.style.top = '';
+					document.body.style.touchAction = '';
+					document.documentElement.style.overflow = '';
+				}
+				// Wait for layout to stabilize with double RAF for browser paint
+				requestAnimationFrame(() => {
+					requestAnimationFrame(() => {
+						setIsContentReady(true);
+					});
+				});
+			};
+			
+			// Small delay to ensure transition cleanup is complete
+			const timer = setTimeout(resetBodyStyles, 100);
+			return () => clearTimeout(timer);
+		} else {
+			setIsContentReady(false);
+		}
+	}, [open]);
+
 	return (
 		<Dialog
 			open={open}
@@ -42,7 +75,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 				onOpenChange(open);
 			}}
 		>
-			<DialogTrigger asChild>{triggerButton}</DialogTrigger>
+			{triggerButton && <DialogTrigger asChild>{triggerButton}</DialogTrigger>}
 			<DialogContent
 				disableEscapeKeyDown
 				disableOutsideClick
@@ -57,36 +90,39 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 				<div
 					className="flex flex-col h-full w-full bg-white font-primary"
 					style={{
-						WebkitAnimation: 'dialog-smooth-in 0.3s ease-out forwards',
-						animation: 'dialog-smooth-in 0.3s ease-out forwards',
+						WebkitAnimation: isContentReady ? 'dialog-smooth-in 0.3s ease-out forwards' : 'none',
+						animation: isContentReady ? 'dialog-smooth-in 0.3s ease-out forwards' : 'none',
+						opacity: isContentReady ? 1 : 0,
 					}}
 				>
 					{/* Full screen header with back button */}
 					<div className="relative bg-white px-8 py-6">
 						{/* Back button - always visible, goes to dashboard */}
-						<button
-							onClick={() => router.push(urls.murmur.dashboard.index)}
-							className="absolute left-8 top-1/2 -translate-y-1/2 inline-flex items-center gap-2 px-3 py-1.5 bg-transparent border-0 rounded-lg text-gray-600/60 text-sm font-normal cursor-pointer transition-all duration-200 hover:bg-gray-100/50 hover:text-gray-900 active:scale-95 font-primary"
-							aria-label="Back to dashboard"
-						>
-							<svg
-								width="20"
-								height="20"
-								viewBox="0 0 20 20"
-								fill="none"
-								xmlns="http://www.w3.org/2000/svg"
-								className="w-[18px] h-[18px]"
+						{isContentReady && (
+							<button
+								onClick={() => router.push(urls.murmur.dashboard.index)}
+								className="absolute left-8 top-1/2 -translate-y-1/2 inline-flex items-center gap-2 px-3 py-1.5 bg-transparent border-0 rounded-lg text-gray-600/60 text-sm font-normal cursor-pointer transition-all duration-200 hover:bg-gray-100/50 hover:text-gray-900 active:scale-95 font-primary"
+								aria-label="Back to dashboard"
 							>
-								<path
-									d="M12 16L6 10L12 4"
-									stroke="currentColor"
-									strokeWidth="1.5"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-								/>
-							</svg>
-							<span>Back</span>
-						</button>
+								<svg
+									width="20"
+									height="20"
+									viewBox="0 0 20 20"
+									fill="none"
+									xmlns="http://www.w3.org/2000/svg"
+									className="w-[18px] h-[18px]"
+								>
+									<path
+										d="M12 16L6 10L12 4"
+										stroke="currentColor"
+										strokeWidth="1.5"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									/>
+								</svg>
+								<span>Back</span>
+							</button>
+						)}
 
 						<div className="text-center">
 							<h2 className="text-2xl font-semibold text-gray-900">{title}</h2>
