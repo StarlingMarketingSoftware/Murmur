@@ -30,7 +30,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		campaign,
 		cancelGeneration,
 		contacts,
-		draftingModeBasedOnBlocks,
+		draftingMode,
 		form,
 		generationProgress,
 		handleGenerateDrafts,
@@ -113,7 +113,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 											<Separator orientation="vertical" className="!h-5" />
 											<Switch
 												checked={isAiSubject}
-												disabled={draftingModeBasedOnBlocks === DraftingMode.handwritten}
+												disabled={draftingMode === DraftingMode.handwritten}
 												onCheckedChange={(val: boolean) =>
 													form.setValue('isAiSubject', val)
 												}
@@ -151,13 +151,13 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										{
 											label: 'Settings',
 											value: 'settings',
-											disabled: draftingModeBasedOnBlocks !== DraftingMode.ai,
+											disabled: draftingMode !== DraftingMode.ai,
 										},
 										{ label: 'Test', value: 'test' },
 										{
 											label: 'Placeholders',
 											value: 'placeholders',
-											disabled: draftingModeBasedOnBlocks === DraftingMode.ai,
+											disabled: draftingMode === DraftingMode.ai,
 										},
 									]}
 								/>

@@ -220,7 +220,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		return DraftingMode.hybrid;
 	}, [form]);
 
-	const draftingModeBasedOnBlocks = getDraftingModeBasedOnBlocks();
+	const draftingMode = getDraftingModeBasedOnBlocks();
 
 	const isPendingGeneration =
 		isPendingCallPerplexity || isPendingCallMistralAgent || isPendingCreateEmail;
@@ -250,23 +250,21 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const fullAutomatedBlock = values.hybridBlockPrompts?.find(
 			(block) => block.type === 'full_automated'
 		);
+
 		const isFullAutomatedEmpty =
 			hasFullAutomatedBlock &&
 			(!fullAutomatedBlock?.value || fullAutomatedBlock.value === '');
+
 		const hasNoBlocks =
 			!values.hybridBlockPrompts || values.hybridBlockPrompts.length === 0;
 
-		// Check if we have any AI blocks (introduction, research, action) or non-empty text blocks
 		const hasAIBlocks = values.hybridBlockPrompts?.some((block) => {
-			// Full automated blocks must have content
 			if (block.type === 'full_automated') {
 				return block.value && block.value.trim() !== '';
 			}
-			// AI blocks (introduction, research, action) can be empty
 			if (block.type !== HybridBlock.text) {
 				return true;
 			}
-			// Text blocks must have content
 			return block.value && block.value.trim() !== '';
 		});
 
@@ -328,7 +326,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		};
 	};
 
-	const draftFullAiEmail = async (
+	const draftAiEmail = async (
 		recipient: Contact,
 		prompt: string,
 		toneAgentType: MistralToneAgentType,
@@ -362,11 +360,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		console.log(
 			`[Full AI] Starting generation for contact: ${recipient.id} (${recipient.email})`
 		);
-		console.log(
-			'[Full AI] Populated System Prompt:',
-			populatedSystemPrompt.substring(0, 300)
-		);
-		console.log('[Full AI] User Prompt:', userPrompt.substring(0, 300));
+		console.log('[Full AI] Populated System Prompt:', populatedSystemPrompt);
+		console.log('[Full AI] User Prompt:', userPrompt);
 
 		let perplexityResponse: string;
 		try {
@@ -388,34 +383,16 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			);
 		}
 
-		console.log('[Full AI] Perplexity response length:', perplexityResponse.length);
-		console.log(
-			'[Full AI] Perplexity response preview:',
-			perplexityResponse.substring(0, 200)
-		);
+		console.log('[Full AI] Perplexity response preview:', perplexityResponse);
 
-		let mistralResponse1: string;
-		try {
-			mistralResponse1 = await callMistralAgent({
-				prompt: getMistralTonePrompt(toneAgentType),
-				content: perplexityResponse,
-				agentType: toneAgentType,
-				signal: signal,
-			});
-		} catch (error) {
-			console.error('[Full AI] Mistral tone agent call failed:', error);
-			if (error instanceof Error && error.message.includes('cancelled')) {
-				throw error;
-			}
-			// If Mistral fails, try to create a basic response with the Perplexity content
-			console.log('[Full AI] Falling back to Perplexity response due to Mistral error');
-			return {
-				subject: `Email for ${recipient.firstName || recipient.email}`,
-				message: perplexityResponse,
-			};
-		}
+		const mistralResponse1 = await callMistralAgent({
+			prompt: getMistralTonePrompt(toneAgentType),
+			content: perplexityResponse,
+			agentType: toneAgentType,
+			signal: signal,
+		});
 
-		console.log('[Full AI] Mistral raw response:', mistralResponse1.substring(0, 500));
+		console.log('[Full AI] Mistral raw response:', mistralResponse1);
 
 		let mistralResponse1Parsed: DraftEmailResponse;
 		try {
@@ -513,8 +490,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		recipient: Contact,
 		hybridPrompt: string,
 		hybridBlocks: HybridBlockPrompt[],
-		signal?: AbortSignal,
-		paragraphs?: number
+		signal?: AbortSignal
 	): Promise<DraftEmailResponse> => {
 		const stringifiedRecipient = stringifyJsonSubset<Contact>(recipient, [
 			'firstName',
@@ -536,14 +512,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			'name',
 			'website',
 		]);
-		console.log('[Hybrid Email] Processing blocks:', hybridBlocks);
 		const stringifiedHybridBlocks = generateEmailTemplateFromBlocks(hybridBlocks);
-		console.log('[Hybrid Email] Template:', stringifiedHybridBlocks);
 
 		const perplexityPrompt = `**RECIPIENT**\n${stringifiedRecipient}\n\n**SENDER**\n${stringifiedSender}\n\n**PROMPT**\n${hybridPrompt}\n\n**EMAIL TEMPLATE**\n${stringifiedHybridBlocks}\n\n**PROMPTS**\n${generatePromptsFromBlocks(
 			hybridBlocks
 		)}`;
-		console.log('[Hybrid Email] Full prompt:', perplexityPrompt);
 
 		const perplexityResponse: string = await callPerplexity({
 			model: 'sonar',
@@ -552,6 +525,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			signal: signal,
 		});
 
+		console.log(
+			getMistralHybridPrompt(
+				stringifiedHybridBlocks,
+				generatePromptsFromBlocks(hybridBlocks)
+			)
+		);
 		const mistralResponse = await callMistralAgent({
 			prompt: getMistralHybridPrompt(
 				stringifiedHybridBlocks,
@@ -603,11 +582,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					message: messageMatch[1].trim(),
 				};
 			} else {
-				// Use perplexity response as fallback
-				mistralResponseParsed = {
-					subject: `Email for ${recipient.company || recipient.firstName || 'recipient'}`,
-					message: perplexityResponse,
-				};
+				throw new Error('Mistral response failed to be parsed');
 			}
 		}
 
@@ -615,31 +590,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			throw new Error('No message or subject generated by Mistral Agent');
 		}
 
-		// Apply paragraph formatting if requested
-		let finalMessage = mistralResponseParsed.message;
-		if (paragraphs && paragraphs > 0) {
-			try {
-				console.log(
-					`[Hybrid Email] Applying paragraph formatting for ${paragraphs} paragraphs`
-				);
-				finalMessage = await callMistralAgent({
-					prompt: getMistralParagraphPrompt(paragraphs),
-					content: mistralResponseParsed.message,
-					agentType: `paragraph${paragraphs}` as MistralParagraphAgentType,
-					signal: signal,
-				});
-				console.log('[Hybrid Email] Paragraph formatting applied successfully');
-			} catch (e) {
-				console.error('[Hybrid Email] Paragraph formatting failed:', e);
-				finalMessage = mistralResponseParsed.message;
-			}
-		}
-
-		const formValues = form.getValues();
-
 		return {
-			subject: isAiSubject ? mistralResponseParsed.subject : formValues.subject || '',
-			message: finalMessage,
+			subject: isAiSubject ? mistralResponseParsed.subject : form.getValues('subject'),
+			message: mistralResponseParsed.message,
 		};
 	};
 
@@ -710,7 +663,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					(block) => block.type === 'full_automated'
 				);
 
-				console.log('[Test Generation] Mode:', draftingModeBasedOnBlocks);
+				console.log('[Test Generation] Mode:', draftingMode);
 				console.log('[Test Generation] Has Full Automated Block:', hasFullAutomatedBlock);
 				console.log(
 					'[Test Generation] Full Automated Block Value:',
@@ -718,9 +671,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				);
 				console.log('[Test Generation] Hybrid Blocks:', values.hybridBlockPrompts);
 
-				if (draftingModeBasedOnBlocks === DraftingMode.ai) {
+				if (draftingMode === DraftingMode.ai) {
 					const fullAiPrompt =
-						draftingModeBasedOnBlocks === DraftingMode.ai
+						draftingMode === DraftingMode.ai
 							? values.fullAiPrompt
 							: fullAutomatedBlock?.value || '';
 
@@ -730,13 +683,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 						throw new Error('Automated prompt cannot be empty');
 					}
 
-					parsedRes = await draftFullAiEmail(
+					parsedRes = await draftAiEmail(
 						contacts[0],
 						fullAiPrompt,
 						values.draftingTone,
 						values.paragraphs
 					);
-				} else if (draftingModeBasedOnBlocks === DraftingMode.hybrid) {
+				} else if (draftingMode === DraftingMode.hybrid) {
 					// For regular hybrid blocks
 					if (!values.hybridBlockPrompts || values.hybridBlockPrompts.length === 0) {
 						throw new Error('No blocks added. Please add at least one block.');
@@ -760,8 +713,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 						values.hybridPrompt ||
 							'Generate a professional email based on the template below.',
 						hybridBlocks,
-						undefined,
-						values.paragraphs
+						undefined
 					);
 				} else {
 					throw new Error('Invalid drafting mode');
@@ -827,6 +779,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	) => {
 		const values = getValues();
 
+		console.log('🚀 ~ generateBatchPromises ~ draftingMode:', draftingMode);
 		return batchToProcess.map(async (recipient: Contact) => {
 			const MAX_RETRIES = 5;
 			let lastError: Error | null = null;
@@ -849,9 +802,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 						(block) => block.type === 'full_automated'
 					);
 
-					if (draftingModeBasedOnBlocks === DraftingMode.ai) {
+					if (draftingMode === DraftingMode.ai) {
 						const fullAiPrompt =
-							draftingModeBasedOnBlocks === DraftingMode.ai
+							draftingMode === DraftingMode.ai
 								? values.fullAiPrompt
 								: fullAutomatedBlock?.value || '';
 
@@ -859,14 +812,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 							throw new Error('Automated prompt cannot be empty');
 						}
 
-						parsedDraft = await draftFullAiEmail(
+						parsedDraft = await draftAiEmail(
 							recipient,
 							fullAiPrompt,
 							values.draftingTone,
 							values.paragraphs,
 							controller.signal
 						);
-					} else if (draftingModeBasedOnBlocks === DraftingMode.hybrid) {
+					} else if (draftingMode === DraftingMode.hybrid) {
 						// Filter out any full_automated blocks for hybrid processing
 						const hybridBlocks =
 							values.hybridBlockPrompts?.filter(
@@ -882,8 +835,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 							values.hybridPrompt ||
 								'Generate a professional email based on the template below.',
 							hybridBlocks,
-							controller.signal,
-							values.paragraphs
+							controller.signal
 						);
 					}
 
@@ -1105,23 +1057,17 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	);
 
 	const handleGenerateTestDrafts = async () => {
-		if (
-			draftingModeBasedOnBlocks === DraftingMode.ai ||
-			draftingModeBasedOnBlocks === DraftingMode.hybrid
-		) {
+		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
 			generateAiDraftTest();
-		} else if (draftingModeBasedOnBlocks === DraftingMode.handwritten) {
+		} else if (draftingMode === DraftingMode.handwritten) {
 			generateHandWrittenDraftTest();
 		}
 	};
 
 	const handleGenerateDrafts = async () => {
-		if (
-			draftingModeBasedOnBlocks === DraftingMode.ai ||
-			draftingModeBasedOnBlocks === DraftingMode.hybrid
-		) {
+		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
 			batchGenerateFullAiDrafts();
-		} else if (draftingModeBasedOnBlocks === DraftingMode.handwritten) {
+		} else if (draftingMode === DraftingMode.handwritten) {
 			batchGenerateHandWrittenDrafts();
 		}
 	};
@@ -1161,12 +1107,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	// EFFECTS
 
 	useEffect(() => {
-		if (draftingModeBasedOnBlocks === DraftingMode.handwritten) {
+		if (draftingMode === DraftingMode.handwritten) {
 			form.setValue('isAiSubject', false);
 		} else {
 			form.setValue('isAiSubject', true);
 		}
-	}, [draftingModeBasedOnBlocks, form]);
+	}, [draftingMode, form]);
 
 	useEffect(() => {
 		const currentSignature = signatures?.find(
@@ -1267,7 +1213,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		campaign,
 		cancelGeneration,
 		contacts,
-		draftingModeBasedOnBlocks,
+		draftingMode,
 		form,
 		generationProgress,
 		handleGenerateDrafts,

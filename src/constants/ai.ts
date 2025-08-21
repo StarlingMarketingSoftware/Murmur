@@ -165,7 +165,10 @@ export const getMistralHybridPrompt = (
 
 I will provide an email that was generated from a template that includes pre-written text that must remain in its original form, as well as placeholders that may include {{introduction}} {{research}} and {{call-to-action}}. When you revise the email, only revise the sections generated from the placeholders. DO NOT change sections that were pre-written text. Each placeholder may have specific instructions attached to them. Please make sure to follow the instructions for each placeholder.
 
+!IMPORTANT! When you've composed the email do another check to make sure that the pre-written text is not changed. If any of the pre-written text is changed, please revert that section to the original text. If any of the text in the template outside of the {{}} is changed, it will constitute a failure of your task.
+
 	Perform the following tasks to the email:
+	0. Do not touch of the pre-written text outside of the {{}}.
 	1. If there is a greeting at the beginning of the email like "Hello!" "Hi ~~" or "こんにちは", keep it as it is. DO NOT remove the new line character after the greeting if there is one. Also do not remove any special characters if they are there. Simply put, DO NOT change it.
 	2. Generate a subject line for the email.
 	3. Remove all text in brackets [] and recompose the email to make sense.
@@ -176,6 +179,7 @@ I will provide an email that was generated from a template that includes pre-wri
 	8. Use more bursts and less uniform.
 	10. Don't say "here's the revised version" -- just provide the subject and message in JSON format.
 	11. If the email greeting includes a person's name, keep it there. DO NOT remove it.
+	12. If the email contains any text that 
 
 	Formatting Instructions:
 1. !IMPORTANT! Ensure that there is a line break character "\n" between each paragraph.
