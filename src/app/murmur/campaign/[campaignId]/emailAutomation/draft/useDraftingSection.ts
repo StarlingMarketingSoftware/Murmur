@@ -350,11 +350,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			recipient.firstName || ''
 		).replace('{company}', recipient.company || '');
 
-		const userPrompt = `Sender: ${stringifyJsonSubset<Identity>(campaign.identity, [
-			'name',
-			'website',
-		])}\n\nRecipient Additional Info: ${stringifyJsonSubset<Contact>(recipient, [
+		const userPrompt = `Sender information\n: ${stringifyJsonSubset<Identity>(
+			campaign.identity,
+			['name', 'website']
+		)}\n\nRecipient information: ${stringifyJsonSubset<Contact>(recipient, [
 			'lastName',
+			'firstName',
+			'email',
+			'company',
 			'address',
 			'city',
 			'state',
@@ -362,6 +365,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			'website',
 			'phone',
 		])}\n\nUser Goal: ${prompt}`;
+		console.log('🚀 ~ draftAiEmail ~ userPrompt:', userPrompt);
 
 		// Debug logging for Full AI path
 		console.log(

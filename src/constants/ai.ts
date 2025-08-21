@@ -38,7 +38,8 @@ Do not include a subject line or signature - just the body text.
 Do not keep to too strict a formula, we want this to feel human.
 
 Rules:
-- NEVER confuse the recipient's name with the sender's name. The recipient's information is clearly provided. If this happens, it will ruin the email.
+- NEVER confuse the recipient's name with the sender's name. The recipient's information is clearly provided-
+- If there is no name for the recipient, just use a greeting with no name, like "Hi,"
 0. No passive sentences, only active sentences
 1.Don't include "hope you're doing well"
 2. keep it very succinct
