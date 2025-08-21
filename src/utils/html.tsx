@@ -1,4 +1,4 @@
-import { Signature } from '@prisma/client';
+
 
 export const replacePTagsInSignature = (html: string): string => {
 	// First capture group is everything before the signature div
@@ -40,8 +40,8 @@ export const formatHTMLForEmailClients = (html: string): string => {
 		.replace(/<\/p>/g, '</p>');
 };
 
-export const addSignatureToHtml = (html: string, signature: Signature | null): string => {
-	const signatureContent = signature ? signature.content : '';
+export const addSignatureToHtml = (html: string, signature: string | null): string => {
+	const signatureContent = signature || '';
 	return `${html}<p></p><div>${signatureContent}</div>`;
 };
 
@@ -55,7 +55,7 @@ export const replaceLineBreaksWithRichTextTags = (text: string, font: string): s
 export const convertAiResponseToRichTextEmail = (
 	html: string,
 	font: string,
-	signature: Signature | null
+	signature: string | null
 ): string => {
 	const cleanedNewLines = html.replace(/(?<!\n)\n(?!\n)/g, '\n\n');
 	const htmlWithFont = replaceLineBreaksWithRichTextTags(cleanedNewLines, font);

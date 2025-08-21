@@ -98,6 +98,7 @@ export const draftingFormSchema = z.object({
 	handwrittenPrompt: z.string().default(''),
 	font: z.enum(FONT_VALUES),
 	signatureId: z.number().optional(),
+	signature: z.string().optional(),
 	draftingTone: z.nativeEnum(DraftingTone).default(DraftingTone.normal),
 	paragraphs: z.number().min(0).max(5).default(3),
 });
@@ -113,7 +114,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const queryClient = useQueryClient();
 
 	const [isFirstLoad, setIsFirstLoad] = useState(true);
-	const [isOpenSignaturesDialog, setIsOpenSignaturesDialog] = useState(false);
 	const [isOpenUpgradeSubscriptionDrawer, setIsOpenUpgradeSubscriptionDrawer] =
 		useState(false);
 	const [generationProgress, setGenerationProgress] = useState(-1);
@@ -144,15 +144,19 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			fullAiPrompt: '',
 			hybridPrompt: 'Generate a professional email based on the template below.',
 			hybridAvailableBlocks: [
+				HybridBlock.full_automated,
 				HybridBlock.introduction,
 				HybridBlock.research,
 				HybridBlock.action,
 				HybridBlock.text,
 			],
-			hybridBlockPrompts: [],
+			hybridBlockPrompts: [
+				{ id: 'full_automated', type: HybridBlock.full_automated, value: '' }
+			],
 			handwrittenPrompt: '',
 			font: (campaign.font as Font) ?? DEFAULT_FONT,
 			signatureId: campaign.signatureId ?? signatures?.[0]?.id,
+			signature: `Thank you,\n${campaign.identity?.name || ''}`,
 			draftingTone: DraftingTone.normal,
 			paragraphs: 0,
 		},
@@ -195,10 +199,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	// VARIABLES
 
 	const draftCredits = user?.draftCredits;
-	const signatureId = form.watch('signatureId');
-	const selectedSignature: Signature = signatures?.find(
-		(sig: Signature) => sig.id === signatureId
-	);
+	const signatureText = form.watch('signature') || `Thank you,\n${campaign.identity?.name || ''}`;
 
 	const getDraftingModeBasedOnBlocks = useCallback(() => {
 		const hasFullAutomatedBlock = form
@@ -325,7 +326,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			message: convertAiResponseToRichTextEmail(
 				combinedTextBlocks,
 				values.font,
-				selectedSignature
+				signatureText || null
 			),
 			campaignId: campaign.id,
 			status: EmailStatus.draft,
@@ -719,7 +720,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 							testMessage: convertAiResponseToRichTextEmail(
 								parsedRes.message,
 								values.font,
-								signatures?.find((sig: Signature) => sig.id === values.signatureId)
+								signatureText || null
 							),
 						},
 					});
@@ -837,7 +838,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 							message: convertAiResponseToRichTextEmail(
 								parsedDraft.message,
 								values.font,
-								selectedSignature
+								signatureText || null
 							),
 							campaignId: campaign.id,
 							status: 'draft' as EmailStatus,
@@ -1114,6 +1115,23 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	useEffect(() => {
 		if (campaign && form && signatures?.length > 0 && isFirstLoad) {
+			// Check if campaign has the old default blocks (introduction, research, action)
+			const campaignBlocks = campaign.hybridBlockPrompts as HybridBlockPrompt[];
+			const hasOldDefaults = campaignBlocks && 
+				campaignBlocks.length === 3 &&
+				campaignBlocks.some(b => b.type === 'introduction' && b.value === '') &&
+				campaignBlocks.some(b => b.type === 'research' && b.value === '') &&
+				campaignBlocks.some(b => b.type === 'action' && b.value === '');
+			
+			// If it has the old empty defaults, replace with new full_automated default
+			const hybridBlockPromptsToUse = hasOldDefaults 
+				? [{ id: 'full_automated', type: HybridBlock.full_automated, value: '' }]
+				: (campaignBlocks ?? [{ id: 'full_automated', type: HybridBlock.full_automated, value: '' }]);
+			
+			const hybridAvailableBlocksToUse = hasOldDefaults 
+				? [HybridBlock.full_automated, HybridBlock.introduction, HybridBlock.research, HybridBlock.action, HybridBlock.text]
+				: (campaign.hybridAvailableBlocks ?? [HybridBlock.full_automated, HybridBlock.introduction, HybridBlock.research, HybridBlock.action, HybridBlock.text]);
+			
 			form.reset({
 				isAiSubject: campaign.isAiSubject ?? true,
 				subject: campaign.subject ?? '',
@@ -1121,21 +1139,39 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				hybridPrompt:
 					campaign.hybridPrompt ??
 					'Generate a professional email based on the template below.',
-				hybridAvailableBlocks: campaign.hybridAvailableBlocks ?? [HybridBlock.text],
-				hybridBlockPrompts: (campaign.hybridBlockPrompts as HybridBlockPrompt[]) ?? [
-					{ id: 'introduction', type: 'introduction', value: '' },
-					{ id: 'research', type: 'research', value: '' },
-					{ id: 'action', type: 'action', value: '' },
-				],
+				hybridAvailableBlocks: hybridAvailableBlocksToUse,
+				hybridBlockPrompts: hybridBlockPromptsToUse,
 				handwrittenPrompt: campaign.handwrittenPrompt ?? '',
 				font: (campaign.font as Font) ?? DEFAULT_FONT,
 				signatureId: campaign.signatureId ?? signatures?.[0]?.id,
+				signature: `Thank you,\n${campaign.identity?.name || ''}`,
 				draftingTone: campaign.draftingTone ?? DraftingTone.normal,
 				paragraphs: campaign.paragraphs ?? 0,
 			});
+			
+			// If we migrated from old defaults, save the new blocks to the campaign
+			if (hasOldDefaults) {
+				saveCampaign({
+					id: campaign.id,
+					data: {
+						hybridBlockPrompts: hybridBlockPromptsToUse,
+						hybridAvailableBlocks: hybridAvailableBlocksToUse,
+					},
+				});
+			}
+			
 			setIsFirstLoad(false);
 		}
 	}, [campaign, form, signatures, isFirstLoad, saveCampaign]);
+
+	// Update signature when identity changes
+	useEffect(() => {
+		const currentSignature = form.getValues('signature');
+		// Only update if signature is empty or is the default template
+		if (!currentSignature || currentSignature === 'Thank you,' || currentSignature.startsWith('Thank you,\n')) {
+			form.setValue('signature', `Thank you,\n${campaign.identity?.name || ''}`);
+		}
+	}, [campaign.identity?.name, form]);
 
 	useEffect(() => {
 		return () => {
@@ -1211,17 +1247,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		isConfirmDialogOpen,
 		isGenerationDisabled,
 		isJustSaved,
-		isOpenSignaturesDialog,
 		isOpenUpgradeSubscriptionDrawer,
 		isPendingGeneration,
 		isTest,
-		selectedSignature,
 		setActiveTab,
 		setGenerationProgress,
 		setIsConfirmDialogOpen,
-		setIsOpenSignaturesDialog,
 		setIsOpenUpgradeSubscriptionDrawer,
-		signatures,
 		trackFocusedField,
 	};
 };

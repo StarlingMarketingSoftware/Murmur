@@ -52,71 +52,58 @@ const Murmur = () => {
 				<div className="flex justify-center">
 					<CampaignName campaign={campaign} />
 				</div>
-				<div className="w-[1165px] mx-auto flex items-start gap-[47px] mt-4">
-					<div className="w-[559px] flex flex-col">
-						<Typography
-							variant="h3"
-							className="text-lg font-semibold font-secondary mb-2"
-						>
-							To:
-						</Typography>
-						{campaign?.userContactLists?.map((contactList) => (
-							<Typography key={contactList.id} className="font-bold !text-[15px]">
-								{contactList?.name}
+				<div className="flex justify-center mt-4">
+					<div className="flex flex-col gap-4 w-[400px]">
+						<div className="flex items-center">
+							<Typography
+								variant="h3"
+								className="text-lg font-semibold w-[60px] text-gray-600"
+								style={{ fontFamily: 'Inter' }}
+							>
+								To:
 							</Typography>
-						))}
-						{campaign?.userContactLists.length === 0 && (
-							<Alert variant="warning" className="max-w-72">
-								<AlertCircle className="h-4 w-4" />
-								<AlertTitle>No Recipients</AlertTitle>
-								<AlertDescription>
-									You have not selected any recipients for this campaign.
-								</AlertDescription>
-							</Alert>
-						)}
-						<div className="mt-1">
-							<ManageCampaignContactListDialog
+							<input
+								type="text"
+								className="outline-none bg-transparent text-[15px] cursor-pointer flex-1 text-gray-600"
+								style={{ fontFamily: 'Inter', fontWeight: 'normal' }}
+								placeholder="Enter recipients..."
+								value={campaign?.userContactLists?.map(list => list.name).join(', ') || ''}
+								onClick={() => setIsContactListDialogOpen(true)}
+								readOnly
+							/>
+						</div>
+
+						<div className="flex items-center">
+							<Typography
+								variant="h3"
+								className="text-lg font-semibold w-[60px] text-gray-600"
+								style={{ fontFamily: 'Inter' }}
+							>
+								From:
+							</Typography>
+							<Typography className="!text-[15px] text-gray-600" style={{ fontFamily: 'Inter', fontWeight: 'normal' }}>
+								{campaign?.identity?.name}
+							</Typography>
+							<IdentityDialog
+								triggerButton={
+									<Button variant="action-link" className="ml-2">
+										Change
+									</Button>
+								}
 								campaign={campaign}
-								open={isContactListDialogOpen}
-								onOpenChange={setIsContactListDialogOpen}
+								title="User Settings"
+								open={isIdentityDialogOpen}
+								onOpenChange={setIsIdentityDialogOpen}
 							/>
 						</div>
 					</div>
-
-					<div className="w-[559px]">
-						<Typography
-							variant="h3"
-							className="text-lg font-semibold font-secondary mb-2"
-						>
-							From:
-						</Typography>
-						<Typography className="font-bold !text-[15px]">
-							{campaign?.identity?.name}
-						</Typography>
-						<Typography className="font-bold font-secondary !text-[13px]">
-							{campaign?.identity?.email}
-						</Typography>
-						<Typography
-							className={twMerge(
-								'font-secondary !text-[13px]',
-								!campaign?.identity?.website && '!text-muted italic'
-							)}
-						>
-							{campaign?.identity?.website || 'No website'}
-						</Typography>
-						<IdentityDialog
-							triggerButton={
-								<Button variant="action-link" className="mt-1">
-									Change
-								</Button>
-							}
-							campaign={campaign}
-							title="User Settings"
-							open={isIdentityDialogOpen}
-							onOpenChange={setIsIdentityDialogOpen}
-						/>
-					</div>
 				</div>
+				
+				<ManageCampaignContactListDialog
+					campaign={campaign}
+					open={isContactListDialogOpen}
+					onOpenChange={setIsContactListDialogOpen}
+				/>
 
 				<div className="mt-6 flex justify-center">
 					<DraftingSection campaign={campaign} />
