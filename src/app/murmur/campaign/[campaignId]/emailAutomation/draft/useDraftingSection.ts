@@ -43,7 +43,7 @@ import {
 } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { debounce } from 'lodash';
@@ -124,7 +124,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [autosaveStatus, setAutosaveStatus] = useState<
 		'idle' | 'saving' | 'saved' | 'error'
 	>('idle');
-	const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 	const [activeTab, setActiveTab] = useState<'settings' | 'test' | 'placeholders'>(
 		'settings'
 	);
@@ -135,7 +134,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		element: HTMLTextAreaElement | HTMLInputElement | null;
 	}>({ name: '', element: null });
 
-	const { data: signatures, isPending: isPendingSignatures } = useGetSignatures();
+	const { data: signatures } = useGetSignatures();
 
 	const form = useForm<DraftingFormValues>({
 		resolver: zodResolver(draftingFormSchema),
@@ -158,15 +157,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			paragraphs: 0,
 		},
 		mode: 'onChange',
-	});
-	const {
-		fields: hybridFields,
-		append: hybridAppend,
-		remove: hybridRemove,
-		move: hybridMove,
-	} = useFieldArray({
-		control: form.control,
-		name: 'hybridBlockPrompts',
 	});
 
 	const isAiSubject = form.watch('isAiSubject');
@@ -193,9 +183,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 
-	const { isPending: isPendingSaveCampaign, mutateAsync: saveCampaign } = useEditCampaign(
-		{ suppressToasts: true }
-	);
+	const { mutateAsync: saveCampaign } = useEditCampaign({ suppressToasts: true });
 
 	const { mutateAsync: saveTestEmail } = useEditCampaign({
 		suppressToasts: true,
@@ -1091,7 +1079,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					data: values,
 				});
 				setAutosaveStatus('saved');
-				setLastSavedAt(new Date());
 				setIsJustSaved(true);
 
 				setTimeout(() => {
@@ -1143,12 +1130,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const insertPlaceholder = useCallback(
 		(placeholder: string) => {
 			const { name, element } = lastFocusedFieldRef.current;
-			console.log(
-				'[Insert Placeholder] Current focused field:',
-				name,
-				'Element:',
-				element
-			);
 
 			if (!element || !name) {
 				console.log('[Insert Placeholder] No focused field found');
@@ -1163,13 +1144,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				currentValue.substring(0, start) + placeholder + currentValue.substring(end);
 			console.log('[Insert Placeholder] Inserting', placeholder, 'at position', start);
 
-			// Update the form value
 			form.setValue(name as keyof DraftingFormValues, newValue, { shouldDirty: true });
 
-			// Use requestAnimationFrame for better Safari compatibility
+			// Use requestAnimationFrame for better Safari compatibility, needs slight delay for setSelectionRange to work properly
 			requestAnimationFrame(() => {
 				element.focus();
-				// Safari needs a slight delay for setSelectionRange to work properly
 				const newPosition = start + placeholder.length;
 				setTimeout(() => {
 					element.setSelectionRange(newPosition, newPosition);
@@ -1283,40 +1262,33 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	}, [hasFullAutomatedBlock, activeTab]);
 
 	return {
-		campaign,
-		form,
-		setIsConfirmDialogOpen,
-		cancelGeneration,
-		generationProgress,
-		setGenerationProgress,
-		contacts,
-		isConfirmDialogOpen,
-		isPendingGeneration,
-		isAiSubject,
-		isPendingSaveCampaign,
-		isTest,
-		signatures,
-		isPendingSignatures,
-		isOpenSignaturesDialog,
-		setIsOpenSignaturesDialog,
-		selectedSignature,
-		handleGenerateTestDrafts,
-		handleGenerateDrafts,
-		hybridFields,
-		hybridAppend,
-		hybridRemove,
-		hybridMove,
-		autosaveStatus,
-		lastSavedAt,
-		isJustSaved,
-		isGenerationDisabled,
-		isOpenUpgradeSubscriptionDrawer,
-		setIsOpenUpgradeSubscriptionDrawer,
-		trackFocusedField,
-		insertPlaceholder,
 		activeTab,
-		setActiveTab,
-		hasFullAutomatedBlock,
+		autosaveStatus,
+		campaign,
+		cancelGeneration,
+		contacts,
 		draftingModeBasedOnBlocks,
+		form,
+		generationProgress,
+		handleGenerateDrafts,
+		handleGenerateTestDrafts,
+		hasFullAutomatedBlock,
+		insertPlaceholder,
+		isAiSubject,
+		isConfirmDialogOpen,
+		isGenerationDisabled,
+		isJustSaved,
+		isOpenSignaturesDialog,
+		isOpenUpgradeSubscriptionDrawer,
+		isPendingGeneration,
+		isTest,
+		selectedSignature,
+		setActiveTab,
+		setGenerationProgress,
+		setIsConfirmDialogOpen,
+		setIsOpenSignaturesDialog,
+		setIsOpenUpgradeSubscriptionDrawer,
+		signatures,
+		trackFocusedField,
 	};
 };

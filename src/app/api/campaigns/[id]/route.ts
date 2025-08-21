@@ -122,13 +122,17 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 			}
 		}
 
+		const fullAiBlock = hybridBlockPrompts?.find(
+			(block) => block.type === 'full_automated'
+		);
+
 		const updatePayload = {
 			...updateData,
-			// Handle null values for array fields - convert null to undefined to omit the field
 			...(hybridAvailableBlocks !== null && { hybridAvailableBlocks }),
 			...(hybridBlockPrompts !== null && { hybridBlockPrompts }),
 			signature: connectOrDisconnectId(signatureId),
 			identity: connectOrDisconnectId(identityId),
+			...(fullAiBlock && { fullAiPrompt: fullAiBlock.value }),
 			...(contactOperation && {
 				contacts: {
 					[contactOperation.action]: contactOperation.contactIds.map((id: number) => {

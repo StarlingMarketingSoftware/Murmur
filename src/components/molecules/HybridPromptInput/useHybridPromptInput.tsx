@@ -34,7 +34,8 @@ export const BLOCKS = [
 		label: 'Full Automated',
 		value: HybridBlock.full_automated,
 		help: 'Let AI generate the entire email based on your prompt. This will override all other blocks.',
-		placeholder: 'Write your prompt for the AI here. For example:\n"Draft an email to schedule a meeting with the marketing team to discuss our Q2 strategy."\nBased on this prompt, the AI will generate a custom email for each recipient.',
+		placeholder:
+			'Write your prompt for the AI here. For example:\n"Draft an email to schedule a meeting with the marketing team to discuss our Q2 strategy."\nBased on this prompt, the AI will generate a custom email for each recipient.',
 	},
 	{
 		label: 'Custom Text',
@@ -66,6 +67,7 @@ export const useHybridPromptInput = () => {
 			[HybridBlock.introduction]: 0,
 			[HybridBlock.research]: 1,
 			[HybridBlock.action]: 2,
+			[HybridBlock.full_automated]: 3,
 		};
 
 		const aiBlockNumberSequence: number[] = [];
@@ -112,22 +114,30 @@ export const useHybridPromptInput = () => {
 
 	const handleAddBlock = (block: (typeof BLOCKS)[number]) => {
 		// Handle Full Automated block specially
-		if (block.value === HybridBlock.full_automated || block.value === 'full_automated') {
+		if (block.value === HybridBlock.full_automated) {
 			// Check if there are any existing blocks
 			if (fields.length > 0) {
 				toast.error('Full Automated mode requires clearing all existing blocks first.');
 				return;
 			}
-			
+
 			// Add the full automated block without switching modes
-			append({ id: block.value, type: block.value, value: '' });
+			append({
+				id: block.value,
+				type: block.value,
+				value: form.getValues('fullAiPrompt') ?? '',
+			});
 			return;
 		}
 
 		// Check if Full Automated block exists
-		const hasFullAutomatedBlock = fields.some((field) => field.type === HybridBlock.full_automated || field.type === 'full_automated');
+		const hasFullAutomatedBlock = fields.some(
+			(field) => field.type === HybridBlock.full_automated
+		);
 		if (hasFullAutomatedBlock) {
-			toast.error('You need to remove the Full Automated block to use individual blocks.');
+			toast.error(
+				'You need to remove the Full Automated block to use individual blocks.'
+			);
 			return;
 		}
 
@@ -285,7 +295,7 @@ export const useHybridPromptInput = () => {
 		const blockToBeRemoved = fields[blockIndex];
 
 		// Handle Full Automated block removal specially
-		if (blockToBeRemoved.type === HybridBlock.full_automated || blockToBeRemoved.type === 'full_automated') {
+		if (blockToBeRemoved.type === HybridBlock.full_automated) {
 			remove(blockIndex);
 			return;
 		}
