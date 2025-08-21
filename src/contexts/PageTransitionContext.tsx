@@ -79,8 +79,11 @@ const PageTransition = ({
 	const verticalLineRef = useRef<HTMLDivElement>(null);
 	const shimmerRef = useRef<HTMLDivElement>(null);
 
-		useEffect(() => {
+	useEffect(() => {
 		if (!isActive) return;
+
+		// Check if gsap is available (for SSR compatibility)
+		if (typeof window === 'undefined' || !gsap) return;
 
 		if (!containerRef.current || !whiteOverlayRef.current ||
 			!lineOneRef.current || !lineTwoRef.current || !lineThreeRef.current ||
