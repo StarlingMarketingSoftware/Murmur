@@ -29,12 +29,21 @@ interface RichTextEditorProps {
 const Div = Node.create({
 	name: 'div',
 	group: 'block',
-	content: 'block+',
+	content: 'inline*',
 	parseHTML() {
-		return [{ tag: 'div' }];
+		return [
+			{
+				tag: 'div',
+				getAttrs: (element) => {
+					// Preserve any inline styles
+					const el = element as HTMLElement;
+					return el.style.cssText ? { style: el.style.cssText } : {};
+				},
+			},
+		];
 	},
 	renderHTML({ HTMLAttributes }) {
-		return ['div', HTMLAttributes, 0];
+		return ['div', { ...HTMLAttributes, class: 'mt-6' }, 0];
 	},
 });
 
@@ -96,6 +105,17 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 	const editor = useEditor({
 		extensions: [
 			StarterKit.configure({
+				paragraph: {
+					HTMLAttributes: {
+						class: 'mb-4',
+					},
+				},
+				hardBreak: {
+					keepMarks: false,
+					HTMLAttributes: {
+						class: 'br-spacing',
+					},
+				},
 				bulletList: {
 					HTMLAttributes: {
 						class: 'list-disc pl-6',
@@ -164,6 +184,9 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 					'px-3 py-2 text-sm ',
 					'placeholder:text-muted-foreground',
 					'disabled:cursor-not-allowed disabled:opacity-50',
+					'[&_p]:mb-4 [&_p:last-of-type]:mb-0', // Add margin between paragraphs
+					'[&_.br-spacing]:block [&_.br-spacing]:h-4', // Make br tags create visible space
+					'[&_div]:mt-6', // Add spacing before signature div
 					disabled && [
 						'cursor-not-allowed bg-light !text-light-foreground',
 						'text-muted-foreground pointer-events-none',
