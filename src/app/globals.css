@@ -2752,3 +2752,27 @@ tr:hover .email-obfuscated-local {
 body.murmur-page footer {
 	display: none !important;
 }
+
+/* Ensure campaigns block never overlaps the search bar on extreme zoom */
+/* When zoomed out, the search bar's margin-top grows due to vh units, 
+   so we need to ensure the campaigns table is positioned far enough below */
+@media (min-height: 800px) {
+	.dashboard-container:not(.search-active) .campaigns-table-wrapper {
+		/* Add minimal extra margin that scales with viewport height to prevent overlap */
+		margin-top: calc(8rem + 2vh) !important;
+	}
+}
+
+@media (min-height: 1200px) {
+	.dashboard-container:not(.search-active) .campaigns-table-wrapper {
+		/* Slightly more margin for extreme zoom levels */
+		margin-top: calc(8rem + 3vh) !important;
+	}
+}
+
+/* Also ensure the hero wrapper can contain the growing search bar */
+.dashboard-container:not(.search-active) .hero-wrapper {
+	/* Allow hero to grow with viewport height to contain search bar */
+	min-height: calc(320px + max(0px, 10vh - 80px));
+	height: auto;
+}
