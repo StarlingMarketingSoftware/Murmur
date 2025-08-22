@@ -66,7 +66,7 @@ const CustomTh = ({ children }: { children?: ReactNode }) => {
 
 export const ComparisonTable = () => {
 	return (
-		<div className="mx-auto w-full max-w-[943px] py-6 md:py-8 lg:py-12 px-4 text-white font-inter">
+		<div className="mx-auto w-full max-w-[943px] py-6 md:py-8 lg:py-12 px-4 text-white font-secondary">
 			<div className="w-full">
 				<table className="border-collapse w-full border-0 border-none">
 					<thead>
@@ -87,7 +87,7 @@ export const ComparisonTable = () => {
 						{features.map((feature, index) => (
 							<tr key={index}>
 								<td
-									className={`pt-2 md:pt-3 lg:pt-4 pr-1 sm:pr-4 md:pr-6 lg:pr-8 text-[9px] sm:text-[14px] md:text-[17px] lg:text-[20px] xl:text-[24px] border-r border-r-white break-words text-left font-inter font-light xl:text-nowrap text-white ${TABLE_CELL_WIDTH}`}
+									className={`pt-2 md:pt-3 lg:pt-4 pr-1 sm:pr-4 md:pr-6 lg:pr-8 text-[9px] sm:text-[14px] md:text-[17px] lg:text-[20px] xl:text-[24px] border-r border-r-white break-words text-left font-secondary font-light xl:text-nowrap text-white ${TABLE_CELL_WIDTH}`}
 								>
 									{feature.label}
 								</td>

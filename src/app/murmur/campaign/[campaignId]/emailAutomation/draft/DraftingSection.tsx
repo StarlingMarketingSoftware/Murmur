@@ -1,6 +1,5 @@
 import { FC, ReactNode } from 'react';
 import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
-// DraftingRightPanel removed from UI but functionality preserved in routing
 import { Button } from '@/components/ui/button';
 import {
 	FormField,
@@ -19,8 +18,8 @@ import ProgressIndicator from '@/components/molecules/ProgressIndicator/Progress
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 import { Typography } from '@/components/ui/typography';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
-// BlockTabs removed from UI but functionality preserved
 import { DraftingMode } from '@prisma/client';
+import { cn } from '@/utils';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
@@ -132,7 +131,6 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 						</div>
 						<div className="mb-3">
 							<FormLabel>Email Template</FormLabel>
-							{/* BlockTabs removed from UI but activeTab state preserved for routing */}
 						</div>
 						<div className="flex gap-[47px] items-start">
 							<div className="flex-shrink-0">
@@ -141,35 +139,23 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									testMessage={campaign?.testMessage}
 								/>
 							</div>
-							{/* Right panel removed from UI but functionality preserved in routing */}
 						</div>
 						<div className="flex justify-end mt-2 mb-2">
-							<button
+							<Button
 								type="button"
 								onClick={handleGenerateTestDrafts}
 								disabled={isGenerationDisabled()}
-								style={{ 
-									width: '94px', 
-									height: '39px',
-									backgroundColor: 'rgba(93, 171, 104, 0.08)',
-									border: '2px solid #5DAB68',
-									color: '#000',
-									fontFamily: 'Times New Roman',
-									fontWeight: 'bold',
-									borderRadius: '6px',
-									cursor: isGenerationDisabled() ? 'not-allowed' : 'pointer',
-									opacity: isGenerationDisabled() ? 0.5 : 1,
-									display: 'flex',
-									WebkitBoxAlign: 'center',
-									alignItems: 'center',
-									WebkitBoxPack: 'center',
-									justifyContent: 'center',
+								className={cn(
+									'w-[94px] h-[39px] bg-[rgba(93,171,104,0.08)] border-2 border-[#5DAB68] text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary',
+									isGenerationDisabled() ? 'opacity-50 cursor-not-allowed' : 'opacity-100'
+								)}
+								style={{
 									WebkitAppearance: 'none',
-									appearance: 'none'
+									appearance: 'none',
 								}}
 							>
-								{(isPendingGeneration && isTest) ? 'Testing...' : 'Test'}
-							</button>
+								{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+							</Button>
 						</div>
 						<div>
 							<div className="flex flex-col gap-4 mt-4">

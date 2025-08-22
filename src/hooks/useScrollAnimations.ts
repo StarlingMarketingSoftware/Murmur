@@ -19,25 +19,26 @@ export const useScrollAnimations = () => {
 		// Small delay to ensure DOM is ready
 		const timer = setTimeout(() => {
 			// Clean up any existing triggers
-			triggersRef.current.forEach(trigger => trigger.kill());
+			triggersRef.current.forEach((trigger) => trigger.kill());
 			triggersRef.current = [];
 
 			// Continuous opacity fade in/out - triggers every time you scroll
 			fadeInRef.current.forEach((element) => {
 				if (!element) return;
-				
+
 				// Check if this element should have continuous animations
 				// Skip ProductList specifically to avoid hover issues
-				const isProductList = element.querySelector('[data-product-list]') || 
-									  element.closest('[data-product-list]');
-				
+				const isProductList =
+					element.querySelector('[data-product-list]') ||
+					element.closest('[data-product-list]');
+
 				if (isProductList) {
 					// For product list, just do a one-time fade in
-					gsap.set(element, { 
+					gsap.set(element, {
 						opacity: 0,
 						willChange: 'opacity', // Safari optimization
 					});
-					
+
 					const trigger = ScrollTrigger.create({
 						trigger: element,
 						start: 'top 90%',
@@ -52,11 +53,11 @@ export const useScrollAnimations = () => {
 						},
 						once: true, // Only animate once for interactive elements
 					});
-					
+
 					triggersRef.current.push(trigger);
 					return;
 				}
-				
+
 				// Set initial state for regular elements
 				gsap.set(element, {
 					opacity: 0,
@@ -64,16 +65,17 @@ export const useScrollAnimations = () => {
 				});
 
 				// Check if this is a persistent section that shouldn't fade out when scrolled past
-				const isPersistentSection = element.querySelector('[data-faq-section]') || 
-										   element.closest('[data-faq-section]') ||
-										   element.classList.contains('faq-section') ||
-										   element.querySelector('[data-persistent-content]') ||
-										   element.closest('[data-persistent-content]') ||
-										   element.hasAttribute('data-persistent-content');
-				
+				const isPersistentSection =
+					element.querySelector('[data-faq-section]') ||
+					element.closest('[data-faq-section]') ||
+					element.classList.contains('faq-section') ||
+					element.querySelector('[data-persistent-content]') ||
+					element.closest('[data-persistent-content]') ||
+					element.hasAttribute('data-persistent-content');
+
 				const trigger = ScrollTrigger.create({
 					trigger: element,
-					start: 'top 90%', // Similar to PointOne's trigger point
+					start: 'top 90%',
 					end: 'bottom 10%', // Keep elements visible in viewport
 					scrub: false, // Don't tie to scroll position directly
 					anticipatePin: 0, // Safari fix for ScrollTrigger
@@ -81,7 +83,7 @@ export const useScrollAnimations = () => {
 						// Scrolling down - element enters viewport from bottom
 						gsap.to(element, {
 							opacity: 1,
-							duration: 0.6, // Quick but smooth like PointOne
+							duration: 0.6,
 							ease: 'power2.out', // Smooth deceleration
 							overwrite: 'auto', // Auto manage animations
 							force3D: false, // Safari fix - prevent layer creation issues
@@ -121,7 +123,7 @@ export const useScrollAnimations = () => {
 						});
 					},
 				});
-				
+
 				triggersRef.current.push(trigger);
 			});
 
@@ -132,7 +134,7 @@ export const useScrollAnimations = () => {
 		return () => {
 			clearTimeout(timer);
 			// Clean up all triggers
-			triggersRef.current.forEach(trigger => trigger.kill());
+			triggersRef.current.forEach((trigger) => trigger.kill());
 			triggersRef.current = [];
 			fadeInRef.current = [];
 		};
@@ -156,7 +158,7 @@ export const useScrollAnimations = () => {
 	return {
 		// Primary method
 		addFadeIn,
-		
+
 		// All other methods map to fade in for consistency
 		addContainerFade,
 		addTextSlide,

@@ -326,7 +326,6 @@ export const useDashboard = () => {
 				header: () => <span className="font-bold">Email</span>,
 				cell: ({ row }) => {
 					const email = (row.getValue('email') as string) || '';
-					// Always blur all emails
 					return (
 						<div className="text-left whitespace-nowrap overflow-visible relative">
 							<span className="email-obfuscated-local inline-block">{email}</span>

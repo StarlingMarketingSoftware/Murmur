@@ -16,6 +16,7 @@ import { ManageCampaignContactListDialog } from '@/components/organisms/_dialogs
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { NoMobilePage } from '@/components/atoms/NoMobilePage/NoMobilePage';
+import { cn } from '@/utils';
 
 const Murmur = () => {
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
@@ -36,11 +37,12 @@ const Murmur = () => {
 	return (
 		<AppLayout paddingTop="none">
 			<NoMobilePage />
-			{shouldHideContent && <div className="fixed inset-0 bg-white z-40" />}
+			{shouldHideContent && <div className="fixed inset-0 bg-background z-40" />}
 			<div
-				className={`hidden lg:block transition-opacity duration-200 ${
+				className={cn(
+					'hidden lg:block transition-opacity duration-200',
 					shouldHideContent ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'
-				}`}
+				)}
 				style={{
 					WebkitTransition: 'opacity 0.2s',
 					transition: 'opacity 0.2s',
@@ -54,16 +56,16 @@ const Murmur = () => {
 						<div className="flex items-center">
 							<Typography
 								variant="h3"
-								className="text-lg font-semibold w-[60px] text-gray-600"
-								style={{ fontFamily: 'Inter' }}
+								className="text-lg font-semibold w-[60px] text-gray-600 font-secondary"
 							>
 								To:
 							</Typography>
-							<Typography className="ml-2 !text-[15px] text-gray-600" style={{ fontFamily: 'Inter', fontWeight: 'normal' }}>
-								{campaign?.userContactLists?.map(list => list.name).join(', ') || 'No recipients selected'}
+							<Typography className="ml-2 !text-[15px] text-gray-600 font-secondary">
+								{campaign?.userContactLists?.map((list) => list.name).join(', ') ||
+									'No recipients selected'}
 							</Typography>
-							<Button 
-								variant="action-link" 
+							<Button
+								variant="action-link"
 								className="ml-2"
 								onClick={() => setIsContactListDialogOpen(true)}
 							>
@@ -74,16 +76,15 @@ const Murmur = () => {
 						<div className="flex items-center">
 							<Typography
 								variant="h3"
-								className="text-lg font-semibold w-[60px] text-gray-600"
-								style={{ fontFamily: 'Inter' }}
+								className="text-lg font-semibold w-[60px] text-gray-600 font-secondary"
 							>
 								From:
 							</Typography>
-							<Typography className="ml-2 !text-[15px] text-gray-600" style={{ fontFamily: 'Inter', fontWeight: 'normal' }}>
+							<Typography className="ml-2 !text-[15px] text-gray-600 font-secondary">
 								{campaign?.identity?.name}
 							</Typography>
-							<Button 
-								variant="action-link" 
+							<Button
+								variant="action-link"
 								className="ml-2"
 								onClick={() => setIsIdentityDialogOpen(true)}
 							>
@@ -92,7 +93,7 @@ const Murmur = () => {
 						</div>
 					</div>
 				</div>
-				
+
 				<ManageCampaignContactListDialog
 					campaign={campaign}
 					open={isContactListDialogOpen}

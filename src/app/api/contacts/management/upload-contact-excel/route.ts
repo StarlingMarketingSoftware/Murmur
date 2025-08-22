@@ -1,7 +1,8 @@
 import prisma from '@/lib/prisma';
-import { apiResponse, handleApiError } from '@/app/api/_utils';
-import { EmailVerificationStatus } from '@prisma/client';
+import { apiResponse, apiUnauthorized, handleApiError } from '@/app/api/_utils';
+import { EmailVerificationStatus, UserRole } from '@prisma/client';
 import * as XLSX from 'xlsx';
+import { auth } from '@clerk/nextjs/server';
 
 interface ExcelContactRow {
 	firstname?: string;
@@ -31,18 +32,18 @@ interface ExcelContactRow {
 
 export const GET = async function GET(request: Request) {
 	try {
-		// const { userId } = await auth();
-		// if (!userId) {
-		// 	return apiUnauthorized();
-		// }
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
 
-		// const user = await prisma.user.findUnique({
-		// 	where: { clerkId: userId },
-		// });
+		const user = await prisma.user.findUnique({
+			where: { clerkId: userId },
+		});
 
-		// if (user?.role !== UserRole.admin) {
-		// 	return apiUnauthorized();
-		// }
+		if (user?.role !== UserRole.admin) {
+			return apiUnauthorized();
+		}
 
 		// Load from public assets via HTTP so it works on Vercel
 		const fileUrl = new URL(

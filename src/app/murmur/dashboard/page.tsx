@@ -56,8 +56,6 @@ const Dashboard = () => {
 		hoveredText,
 	} = useDashboard();
 
-
-
 	// Return null during initial load to prevent hydration mismatch
 	if (isMobile === null) {
 		return null;
@@ -104,8 +102,12 @@ const Dashboard = () => {
 							</Typography>
 						</div>
 					</div>
-					
-					<div className={`search-bar-wrapper mt-[27px] w-full max-w-[1132px] mx-auto px-4 ${hasSearched ? 'search-bar-active' : ''}`}>
+
+					<div
+						className={`search-bar-wrapper mt-[27px] w-full max-w-[1132px] mx-auto px-4 ${
+							hasSearched ? 'search-bar-active' : ''
+						}`}
+					>
 						<div className="search-bar-inner">
 							{hasSearched && activeSearchQuery && (
 								<div className="search-context-label">
@@ -119,9 +121,14 @@ const Dashboard = () => {
 										if (!isSignedIn) {
 											if (hasProblematicBrowser) {
 												// For Edge/Safari, navigate to sign-in page
-												console.log('[Dashboard] Edge/Safari detected, navigating to sign-in page');
+												console.log(
+													'[Dashboard] Edge/Safari detected, navigating to sign-in page'
+												);
 												if (typeof window !== 'undefined') {
-													sessionStorage.setItem('redirectAfterSignIn', window.location.pathname);
+													sessionStorage.setItem(
+														'redirectAfterSignIn',
+														window.location.pathname
+													);
 												}
 												window.location.href = urls.signIn.index;
 											} else {
@@ -174,20 +181,7 @@ const Dashboard = () => {
 									{!hasSearched && (
 										<div className="flex flex-row gap-4 items-center justify-between w-full flex-wrap">
 											<div className="flex flex-row gap-4 items-center h-[39px] justify-start flex-shrink-0">
-												<div
-													className="exclude-contacts-box flex items-center"
-													style={{
-														backgroundColor: '#EFEFEF',
-														width: '227px',
-														height: '32px',
-														borderRadius: '8px',
-														display: 'flex',
-														alignItems: 'center',
-														paddingLeft: '16px',
-														paddingRight: '16px',
-														margin: 'auto 0',
-													}}
-												>
+												<div className="exclude-contacts-box bg-[#EFEFEF] w-[227px] h-[32px] rounded-[8px] flex items-center px-4 my-auto">
 													<FormField
 														control={form.control}
 														name="excludeUsedContacts"
@@ -209,17 +203,7 @@ const Dashboard = () => {
 																			checked={field.value}
 																			onChange={(e) => field.onChange(e.target.checked)}
 																		/>
-																		<div
-																			className="peer-checked:after:translate-x-[10px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[#050505] after:rounded-full after:h-[12px] after:w-[12px] after:transition-all"
-																			style={{
-																				width: '26px',
-																				height: '16px',
-																				backgroundColor: '#E5E5E5',
-																				borderRadius: '9999px',
-																				position: 'relative',
-																				transition: 'background-color 0.2s',
-																			}}
-																		></div>
+																		<div className="peer-checked:after:translate-x-[2px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[#050505] after:rounded-full after:h-[12px] after:w-[12px] after:transition-all w-[26px] h-4 bg-[#E5E5E5] rounded-full relative transition-colors duration-200" />
 																	</label>
 																</FormControl>
 															</FormItem>
@@ -271,7 +255,7 @@ const Dashboard = () => {
 					</div>
 				</div>
 
-				{/* Elegant search query display with back button */}
+				{/* Search query display with back button */}
 				{hasSearched && activeSearchQuery && (
 					<div className="search-query-display mt-20">
 						<div className="search-query-display-inner">
@@ -416,10 +400,11 @@ const Dashboard = () => {
 
 				{!hasSearched && (
 					<div className="campaigns-table-wrapper mt-32 sm:mt-36 md:mt-40 lg:mt-44 xl:mt-48 2xl:mt-56 relative">
-						<div 
+						<div
 							className="absolute top-0 left-0 right-0 h-8 z-10 pointer-events-none"
 							style={{
-								background: 'linear-gradient(to bottom, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 100%)'
+								background:
+									'linear-gradient(to bottom, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 100%)',
 							}}
 						/>
 						<CampaignsTable />

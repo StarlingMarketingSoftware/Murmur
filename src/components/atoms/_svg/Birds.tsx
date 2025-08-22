@@ -1,6 +1,5 @@
-import { CommonIconProps, defaultPathClassName } from '@/utils';
+import { cn, CommonIconProps, defaultPathClassName } from '@/utils';
 import { FC } from 'react';
-import { twMerge } from 'tailwind-merge';
 export const Birds: FC<CommonIconProps> = (props) => {
 	const {
 		width = '100%',
@@ -19,7 +18,7 @@ export const Birds: FC<CommonIconProps> = (props) => {
 		>
 			<path
 				d="M1623.12,416.06l-12.14-21.27-1.22,6.96-2.73-3.58s-2.07,22.12,3.95,25.69c0,0-2.73,3.86-7.62,4.89,0,0,1.6,9.79,8.66,9.69,0,0,1.79-7.06,4.71-7.81l6.4,8.38s6.72,6.76,10.46,7.12l7.41.71,1.51-1.9-14.68-23.06,3.11-6.78-7.81.94Z"
-				className={twMerge(pathClassName, 'fill-none stroke-[#000000]')}
+				className={cn(pathClassName, 'fill-none stroke-[#000000]')}
 			/>
 			<path
 				d="M1568.06,410.64l3.58,18.68,8.09-1.13-3.58,7.34,9.51,14.21-3.55.42.71,2.12s-15.11-2.05-17.58-11.86c0,0-4.19,3.8-5.02,6.33-.1.31-.15.61-.14.87.14,2.4-6.21-3.53-5.58-8.05l7.69-5.22s-4.87-12.56,2.75-21.6l1.48,4.59s-1.55-3.11,1.62-6.71Z"

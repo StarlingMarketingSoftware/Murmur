@@ -9,8 +9,8 @@ import React, {
 	useEffect,
 } from 'react';
 import { useRouter } from 'next/navigation';
+import { gsap } from 'gsap';
 
-// Determine if we should run the premium transition animation
 const shouldUseChromeAnimation = (): boolean => {
 	if (typeof navigator === 'undefined') return false;
 	const ua = navigator.userAgent || '';
@@ -21,12 +21,24 @@ const shouldUseChromeAnimation = (): boolean => {
 	const isFirefox = ua.includes('Firefox');
 	const isDuckDuckGo = ua.includes('DuckDuckGo');
 	const isIOS = /iPad|iPhone|iPod/.test(ua) || ua.includes('CriOS'); // Treat iOS Chrome as non-Chrome engine
-	const isBrave = (navigator as unknown as { brave?: boolean }).brave !== undefined || ua.includes('Brave');
-	const isSafari = /Safari/.test(ua) && /Apple Computer/.test(vendor) && !/Chrome/.test(ua);
+	const isBrave =
+		(navigator as unknown as { brave?: boolean }).brave !== undefined ||
+		ua.includes('Brave');
+	const isSafari =
+		/Safari/.test(ua) && /Apple Computer/.test(vendor) && !/Chrome/.test(ua);
 	const isChromeDesktop = /Chrome/.test(ua) && /Google Inc/.test(vendor);
-	
-	const result = isChromeDesktop && !isEdge && !isOpera && !isSamsung && !isFirefox && !isDuckDuckGo && !isIOS && !isBrave && !isSafari;
-	
+
+	const result =
+		isChromeDesktop &&
+		!isEdge &&
+		!isOpera &&
+		!isSamsung &&
+		!isFirefox &&
+		!isDuckDuckGo &&
+		!isIOS &&
+		!isBrave &&
+		!isSafari;
+
 	// Debug logging
 	if (typeof window !== 'undefined') {
 		console.log('[PageTransition] Browser detection:', {
@@ -36,10 +48,10 @@ const shouldUseChromeAnimation = (): boolean => {
 			isSafari,
 			isIOS,
 			isChrome: isChromeDesktop,
-			canAnimate: result
+			canAnimate: result,
 		});
 	}
-	
+
 	return result;
 };
 
@@ -61,7 +73,9 @@ interface PageTransitionContextType {
 	startTransition: (to: string) => void;
 }
 
-const PageTransitionContext = createContext<PageTransitionContextType | undefined>(undefined);
+const PageTransitionContext = createContext<PageTransitionContextType | undefined>(
+	undefined
+);
 
 export const usePageTransition = () => {
 	const context = useContext(PageTransitionContext);
@@ -75,22 +89,25 @@ interface PageTransitionProviderProps {
 	children: ReactNode;
 }
 
-export const PageTransitionProvider: React.FC<PageTransitionProviderProps> = ({ children }) => {
+export const PageTransitionProvider: React.FC<PageTransitionProviderProps> = ({
+	children,
+}) => {
 	const [isTransitioning, setIsTransitioning] = useState(false);
 	const [transitionTo, setTransitionTo] = useState<string | null>(null);
 	const router = useRouter();
-	
+
 	// Check browser support synchronously to avoid timing issues
-	const isChromeBrowser = typeof window !== 'undefined' ? shouldUseChromeAnimation() : false;
+	const isChromeBrowser =
+		typeof window !== 'undefined' ? shouldUseChromeAnimation() : false;
 
 	const startTransition = useCallback(
 		(to: string) => {
 			try {
 				console.log('[PageTransition] startTransition called:', { to, isChromeBrowser });
-				
+
 				// Double-check browser support at call time
 				const canAnimate = isChromeBrowser && shouldUseChromeAnimation();
-				
+
 				if (canAnimate) {
 					console.log('[PageTransition] Starting animation transition');
 					setIsTransitioning(true);
@@ -99,11 +116,11 @@ export const PageTransitionProvider: React.FC<PageTransitionProviderProps> = ({ 
 					console.log('[PageTransition] Skipping animation, direct navigation');
 					// Non-Chrome: skip animation and navigate immediately
 					resetScrollLocks();
-					
+
 					// Ensure we don't accidentally trigger any transitions
 					setIsTransitioning(false);
 					setTransitionTo(null);
-					
+
 					// Use immediate navigation with multiple fallbacks
 					if (typeof window !== 'undefined') {
 						// Method 1: Direct assignment
@@ -115,7 +132,7 @@ export const PageTransitionProvider: React.FC<PageTransitionProviderProps> = ({ 
 						} catch (e) {
 							console.error('[PageTransition] URL construction failed:', e);
 						}
-						
+
 						// Method 2: Replace current page
 						try {
 							window.location.replace(to);
@@ -123,7 +140,7 @@ export const PageTransitionProvider: React.FC<PageTransitionProviderProps> = ({ 
 						} catch (e) {
 							console.error('[PageTransition] Replace failed:', e);
 						}
-						
+
 						// Method 3: Assign directly
 						try {
 							window.location.assign(to);
@@ -132,7 +149,7 @@ export const PageTransitionProvider: React.FC<PageTransitionProviderProps> = ({ 
 							console.error('[PageTransition] Assign failed:', e);
 						}
 					}
-					
+
 					// Final fallback: Next.js router
 					router.push(to);
 				}
@@ -144,7 +161,7 @@ export const PageTransitionProvider: React.FC<PageTransitionProviderProps> = ({ 
 				}
 			}
 		},
-		[isChromeBrowser, router],
+		[isChromeBrowser, router]
 	);
 
 	const onTransitionComplete = useCallback(() => {
@@ -158,7 +175,7 @@ export const PageTransitionProvider: React.FC<PageTransitionProviderProps> = ({ 
 			document.body.style.top = '';
 			document.body.style.touchAction = '';
 			document.documentElement.style.overflow = '';
-			
+
 			// Navigate to the new page
 			router.push(transitionTo);
 			// Clean up transition state after navigation and fade out
@@ -178,9 +195,6 @@ export const PageTransitionProvider: React.FC<PageTransitionProviderProps> = ({ 
 		</PageTransitionContext.Provider>
 	);
 };
-
-// Premium transition - yacht purchase elegance
-import { gsap } from 'gsap';
 
 const PageTransition = ({
 	isActive,
@@ -202,7 +216,9 @@ const PageTransition = ({
 	useEffect(() => {
 		// Final safeguard: never run animations on non-Chrome
 		if (!isChrome) {
-			console.log('[PageTransition] Component mounted on non-Chrome, immediately completing');
+			console.log(
+				'[PageTransition] Component mounted on non-Chrome, immediately completing'
+			);
 			resetScrollLocks();
 			if (isActive) {
 				onComplete();
@@ -215,15 +231,21 @@ const PageTransition = ({
 		// Check if gsap is available (for SSR compatibility)
 		if (typeof window === 'undefined' || !gsap) return;
 
-		if (!containerRef.current || !whiteOverlayRef.current ||
-			!lineOneRef.current || !lineTwoRef.current || !lineThreeRef.current ||
-			!verticalLineRef.current || !shimmerRef.current) {
+		if (
+			!containerRef.current ||
+			!whiteOverlayRef.current ||
+			!lineOneRef.current ||
+			!lineTwoRef.current ||
+			!lineThreeRef.current ||
+			!verticalLineRef.current ||
+			!shimmerRef.current
+		) {
 			return;
 		}
 
 		// Store current scroll position
 		const scrollPosition = window.scrollY;
-		
+
 		// Disable scrolling when transition is active
 		document.body.style.overflow = 'hidden';
 		document.body.style.overflowX = 'hidden';
@@ -268,10 +290,10 @@ const PageTransition = ({
 			x: '-100%',
 		});
 
-		const tl = gsap.timeline({ 
-			defaults: { 
-				ease: 'power2.inOut' // Smoother, more luxurious easing
-			}
+		const tl = gsap.timeline({
+			defaults: {
+				ease: 'power2.inOut',
+			},
 		});
 
 		tl
@@ -281,75 +303,120 @@ const PageTransition = ({
 				duration: 0.2,
 				ease: 'power2.out',
 			})
-			// First horizontal line slides in from left - Elegant
-			.to(lineOneRef.current, {
-				x: '0%',
-				opacity: 0.85,
-				duration: 0.7,
-				ease: 'power3.out',
-			}, '-=0.1')
-			// Second horizontal line slides in from right - Elegant
-			.to(lineTwoRef.current, {
-				x: '0%',
-				opacity: 0.75,
-				duration: 0.8,
-				ease: 'power3.out',
-			}, '-=0.6')
-			// Center line expands - Luxurious
-			.to(lineThreeRef.current, {
-				width: '100%',
-				opacity: 0.9,
-				duration: 0.9,
-				ease: 'power2.inOut',
-			}, '-=0.7')
-			// Vertical line descends - Graceful
-			.to(verticalLineRef.current, {
-				y: '0%',
-				opacity: 0.7,
-				duration: 1.0,
-				ease: 'power2.out',
-			}, '-=0.8')
-			// White overlay builds elegantly
-			.to(whiteOverlayRef.current, {
-				opacity: 0.7,
-				duration: 0.6,
-				ease: 'power2.inOut',
-			}, '-=0.5')
-			// Subtle premium shimmer
-			.to(shimmerRef.current, {
-				x: '150%',
-				duration: 1.2,
-				ease: 'power1.inOut',
-			}, '-=0.9')
-			// Brief pause for elegance
-			.to({}, {
-				duration: 0.2,
-			})
-			// Exit animation - lines fade out elegantly
-			.to([lineOneRef.current, lineTwoRef.current, lineThreeRef.current, verticalLineRef.current], {
-				opacity: 0,
-				duration: 0.5,
-				stagger: 0.08,
-				ease: 'power2.in',
-			})
-			// Final white fade - smooth luxury
-			.to(whiteOverlayRef.current, {
-				opacity: 1,
-				duration: 0.5,
-				ease: 'power2.in',
-			}, '-=0.4')
+			// First horizontal line slides in from left
+			.to(
+				lineOneRef.current,
+				{
+					x: '0%',
+					opacity: 0.85,
+					duration: 0.7,
+					ease: 'power3.out',
+				},
+				'-=0.1'
+			)
+			// Second horizontal line slides in from right
+			.to(
+				lineTwoRef.current,
+				{
+					x: '0%',
+					opacity: 0.75,
+					duration: 0.8,
+					ease: 'power3.out',
+				},
+				'-=0.6'
+			)
+			// Center line expands
+			.to(
+				lineThreeRef.current,
+				{
+					width: '100%',
+					opacity: 0.9,
+					duration: 0.9,
+					ease: 'power2.inOut',
+				},
+				'-=0.7'
+			)
+			// Vertical line descends
+			.to(
+				verticalLineRef.current,
+				{
+					y: '0%',
+					opacity: 0.7,
+					duration: 1.0,
+					ease: 'power2.out',
+				},
+				'-=0.8'
+			)
+			// White overlay builds
+			.to(
+				whiteOverlayRef.current,
+				{
+					opacity: 0.7,
+					duration: 0.6,
+					ease: 'power2.inOut',
+				},
+				'-=0.5'
+			)
+			// Subtle shimmer
+			.to(
+				shimmerRef.current,
+				{
+					x: '150%',
+					duration: 1.2,
+					ease: 'power1.inOut',
+				},
+				'-=0.9'
+			)
+			// Brief pause
+			.to(
+				{},
+				{
+					duration: 0.2,
+				}
+			)
+			// Exit animation - lines fade out
+			.to(
+				[
+					lineOneRef.current,
+					lineTwoRef.current,
+					lineThreeRef.current,
+					verticalLineRef.current,
+				],
+				{
+					opacity: 0,
+					duration: 0.5,
+					stagger: 0.08,
+					ease: 'power2.in',
+				}
+			)
+			// Final white fade
+			.to(
+				whiteOverlayRef.current,
+				{
+					opacity: 1,
+					duration: 0.5,
+					ease: 'power2.in',
+				},
+				'-=0.4'
+			)
 			// Hold white screen briefly
-			.to({}, {
-				duration: 0.15,
-			})
+			.to(
+				{},
+				{
+					duration: 0.15,
+				}
+			)
 			// Navigate when fully white
 			.call(() => {
 				onComplete();
 			})
 			// Keep white overlay a bit longer to cover page load
-			.to({}, {
-				duration: 0.3,
-			})
+			.to(
+				{},
+				{
+					duration: 0.3,
+				}
+			)
 			// Final container fade
 			.to(containerRef.current, {
 				opacity: 0,
@@ -359,7 +426,7 @@ const PageTransition = ({
 
 		return () => {
 			tl.kill();
-			
+
 			// Re-enable scrolling when transition completes
 			const scrollY = document.body.style.top;
 			document.body.style.overflow = '';
@@ -411,7 +478,7 @@ const PageTransition = ({
 					opacity: 0,
 				}}
 			/>
-			
+
 			{/* First horizontal line - slides from left */}
 			<div
 				ref={lineOneRef}
@@ -422,11 +489,12 @@ const PageTransition = ({
 					width: '100%',
 					height: '4px',
 					zIndex: 2,
-					background: 'linear-gradient(90deg, transparent 0%, #C0C0C0 20%, #C0C0C0 80%, transparent 100%)',
+					background:
+						'linear-gradient(90deg, transparent 0%, #C0C0C0 20%, #C0C0C0 80%, transparent 100%)',
 					opacity: 0,
 				}}
 			/>
-			
+
 			{/* Second horizontal line - slides from right */}
 			<div
 				ref={lineTwoRef}
@@ -437,11 +505,12 @@ const PageTransition = ({
 					width: '100%',
 					height: '3px',
 					zIndex: 2,
-					background: 'linear-gradient(90deg, transparent 0%, #D3D3D3 15%, #D3D3D3 85%, transparent 100%)',
+					background:
+						'linear-gradient(90deg, transparent 0%, #D3D3D3 15%, #D3D3D3 85%, transparent 100%)',
 					opacity: 0,
 				}}
 			/>
-			
+
 			{/* Center expanding line */}
 			<div
 				ref={lineThreeRef}
@@ -453,11 +522,12 @@ const PageTransition = ({
 					height: '6px',
 					transform: 'translate(-50%, -50%)',
 					zIndex: 3,
-					background: 'linear-gradient(90deg, transparent 0%, #B8B8B8 35%, #B8B8B8 65%, transparent 100%)',
+					background:
+						'linear-gradient(90deg, transparent 0%, #B8B8B8 35%, #B8B8B8 65%, transparent 100%)',
 					opacity: 0,
 				}}
 			/>
-			
+
 			{/* Vertical line - descends from top */}
 			<div
 				ref={verticalLineRef}
@@ -468,11 +538,11 @@ const PageTransition = ({
 					width: '3px',
 					height: '100%',
 					zIndex: 2,
-					background: 'linear-gradient(180deg, transparent 0%, #CCCCCC 25%, #CCCCCC 75%, transparent 100%)',
+					background:
+						'linear-gradient(180deg, transparent 0%, #CCCCCC 25%, #CCCCCC 75%, transparent 100%)',
 					opacity: 0,
 				}}
 			/>
-			
 
 			{/* Premium subtle shimmer */}
 			<div
