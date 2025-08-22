@@ -1,13 +1,13 @@
 import { FC } from 'react';
 import { GradientBannerProps } from './useGradientBanner';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/utils';
 
 export const GradientBanner: FC<GradientBannerProps> = (props) => {
 	const { className, children, gloss } = props;
 
 	return (
 		<div
-			className={twMerge(
+			className={cn(
 				'relative w-full bg-gradient-to-r from-transparent via-gray-100 to-transparent overflow-hidden py-12 px-4',
 				className
 			)}

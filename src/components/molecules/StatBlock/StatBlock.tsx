@@ -1,6 +1,6 @@
 import { Typography } from '@/components/ui/typography';
 import { FC } from 'react';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/utils';
 
 interface StatBlockProps {
 	size?: 'sm' | 'md' | 'lg';
@@ -52,11 +52,11 @@ export const StatBlock: FC<StatBlockProps> = ({
 	}
 
 	return (
-		<div className={twMerge('text-center flex flex-col', className)}>
-			<Typography variant="h2" className={twMerge(['p-0', cnStat])}>
+		<div className={cn('text-center flex flex-col', className)}>
+			<Typography variant="h2" className={cn(['p-0', cnStat])}>
 				{stat}
 			</Typography>
-			<Typography variant="p" className={twMerge(['!mt-0 font-bold', cnDescription])}>
+			<Typography variant="p" className={cn(['!mt-0 font-bold', cnDescription])}>
 				{description}
 			</Typography>
 		</div>

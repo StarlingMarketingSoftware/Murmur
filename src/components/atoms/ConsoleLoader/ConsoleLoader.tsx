@@ -1,7 +1,7 @@
 import React, { FC } from 'react';
-import { twMerge } from 'tailwind-merge';
 import { ConsoleLoaderProps, useConsoleLoader } from './useConsoleLoader';
 import { GOLDEN_RATIO, INVERSE_GOLDEN } from '@/constants';
+import { cn } from '@/utils';
 
 export const ConsoleLoader: FC<ConsoleLoaderProps> = (props) => {
 	const {
@@ -16,7 +16,7 @@ export const ConsoleLoader: FC<ConsoleLoaderProps> = (props) => {
 	} = useConsoleLoader(props);
 
 	return (
-		<div className={twMerge('relative', className)}>
+		<div className={cn('relative', className)}>
 			{/* Main container with golden ratio padding */}
 			<div
 				style={{
@@ -48,7 +48,7 @@ export const ConsoleLoader: FC<ConsoleLoaderProps> = (props) => {
 									: '›'}
 							</span>
 							<span
-								className={twMerge(
+								className={cn(
 									log.type === 'detail'
 										? 'tracking-[0.015em] text-[12px]'
 										: 'tracking-[0.005em] text-[13px]'

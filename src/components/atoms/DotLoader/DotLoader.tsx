@@ -1,13 +1,13 @@
 import React, { FC } from 'react';
-import { twMerge } from 'tailwind-merge';
 import { DotLoaderProps, useDotLoader, useDotMorph, useDotPulse } from './useDotLoader';
+import { cn } from '@/utils';
 
 export const DotLoader: FC<DotLoaderProps> = (props) => {
 	const { spacing, dotSizes, colorClass, baseSize, className } = useDotLoader(props);
 
 	return (
 		<div
-			className={twMerge('inline-flex items-center justify-center', className)}
+			className={cn('inline-flex items-center justify-center', className)}
 			style={{ gap: `${spacing}px` }}
 			role="status"
 			aria-label="Loading"
@@ -15,7 +15,7 @@ export const DotLoader: FC<DotLoaderProps> = (props) => {
 			{dotSizes.map((dotSize, index) => (
 				<div
 					key={index}
-					className={twMerge(colorClass, 'rounded-full shadow-sm')}
+					className={cn(colorClass, 'rounded-full shadow-sm')}
 					style={{
 						width: `${dotSize}px`,
 						height: `${dotSize}px`,
@@ -51,7 +51,7 @@ export const DotMorph: FC<DotLoaderProps> = (props) => {
 
 	return (
 		<div
-			className={twMerge('inline-flex items-center justify-center', className)}
+			className={cn('inline-flex items-center justify-center', className)}
 			style={{ gap: `${spacing}px` }}
 			role="status"
 			aria-label="Loading"
@@ -59,7 +59,7 @@ export const DotMorph: FC<DotLoaderProps> = (props) => {
 			{dotSizes.map((dotSize, index) => (
 				<div
 					key={index}
-					className={twMerge(colorClass, 'rounded-full')}
+					className={cn(colorClass, 'rounded-full')}
 					style={{
 						width: `${dotSize}px`,
 						height: `${dotSize}px`,
@@ -105,10 +105,7 @@ export const DotPulse: FC<DotLoaderProps> = (props) => {
 
 	return (
 		<div
-			className={twMerge(
-				'inline-flex items-center justify-center rounded-full',
-				className
-			)}
+			className={cn('inline-flex items-center justify-center rounded-full', className)}
 			style={{ gap: `${spacing}px` }}
 			role="status"
 			aria-label="Loading"

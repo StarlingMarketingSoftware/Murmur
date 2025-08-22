@@ -16,7 +16,7 @@ import { DownloadIcon, UploadIcon } from 'lucide-react';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import { FC } from 'react';
 import { DialogDescription } from '@radix-ui/react-dialog';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/utils';
 
 export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) => {
 	const {
@@ -42,13 +42,13 @@ export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) =
 			<DialogTrigger asChild>
 				<Button
 					variant={buttonVariant || 'primary-light'}
-					className={twMerge('gradient-button gradient-button-blue', className)}
+					className={cn('gradient-button gradient-button-blue', className)}
 					bold
 				>
 					{triggerText}
 				</Button>
 			</DialogTrigger>
-			<DialogContent className={twMerge(isAdmin && '!max-w-98/100 !max-h-98/100')}>
+			<DialogContent className={cn(isAdmin && '!max-w-98/100 !max-h-98/100')}>
 				<DialogHeader>
 					<DialogTitle>Add Contacts by TSV Upload</DialogTitle>
 				</DialogHeader>

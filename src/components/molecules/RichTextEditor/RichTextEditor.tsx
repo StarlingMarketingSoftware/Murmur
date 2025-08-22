@@ -9,7 +9,7 @@ import Underline from '@tiptap/extension-underline';
 import FontFamily from '@tiptap/extension-font-family';
 import Placeholder from '@tiptap/extension-placeholder';
 import { FC, useEffect } from 'react';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/utils';
 import { Node } from '@tiptap/core';
 import TextStyle from '@tiptap/extension-text-style';
 import { DEFAULT_FONT } from '@/constants/ui';
@@ -179,7 +179,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 		content: value ? cleanHtml(value) : '',
 		editorProps: {
 			attributes: {
-				class: twMerge(
+				class: cn(
 					'min-h-[200px] w-full rounded-md border border-gray-300 bg-gray-50',
 					'px-3 py-2 text-sm ',
 					'placeholder:text-muted-foreground',
@@ -198,7 +198,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 					-webkit-user-select: text;
 					user-select: text;
 					-webkit-appearance: none;
-				`
+				`,
 			},
 		},
 		onUpdate: ({ editor }) => {

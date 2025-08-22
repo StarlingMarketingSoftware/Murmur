@@ -1,6 +1,6 @@
 import { FC } from 'react';
 import { Typography } from '@/components/ui/typography';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/utils';
 
 export interface BlockSelectOption {
 	value: string;
@@ -25,7 +25,7 @@ export const BlockSelect: FC<BlockSelectProps> = ({
 }) => {
 	return (
 		<div
-			className={twMerge(
+			className={cn(
 				'grid grid-cols-2 gap-3 mt-2 w-fit transition',
 				disabled && 'opacity-50 pointer-events-none',
 				className
@@ -34,7 +34,7 @@ export const BlockSelect: FC<BlockSelectProps> = ({
 			{options.map((tone: BlockSelectOption) => (
 				<div
 					key={tone.value}
-					className={twMerge(
+					className={cn(
 						'w-[194px] h-[78px] border-2 p-1 col-span-1 transition transition-300',
 						tone.value === value
 							? 'bg-gradient-to-br from-background to-primary/30 pointer-events-none border-primary'
