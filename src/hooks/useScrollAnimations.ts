@@ -4,20 +4,16 @@ import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
-// Register ScrollTrigger plugin
-if (typeof window !== 'undefined') {
-	gsap.registerPlugin(ScrollTrigger);
+// Register ScrollTrigger plugin only for Chrome
+if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
+	const isChrome = /Chrome/.test(navigator.userAgent) && 
+	                 /Google Inc/.test(navigator.vendor) && 
+	                 !/Edg/.test(navigator.userAgent);
 	
-	// Safari-specific optimizations
-	// Check navigator exists (for SSR)
-	if (typeof navigator !== 'undefined') {
-		const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-		if (isSafari) {
-			// Reduce lag smoothing for Safari
-			gsap.ticker.lagSmoothing(0);
-			// Force refresh rate for smoother animations
-			gsap.ticker.fps(60);
-		}
+	if (isChrome) {
+		gsap.registerPlugin(ScrollTrigger);
+	} else {
+		console.log('[useScrollAnimations] Non-Chrome browser detected, not registering ScrollTrigger');
 	}
 }
 
@@ -27,6 +23,27 @@ export const useScrollAnimations = () => {
 
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
+		
+		// Check if browser is Chrome before running scroll animations
+		const isChrome = /Chrome/.test(navigator.userAgent) && 
+		                 /Google Inc/.test(navigator.vendor) && 
+		                 !/Edg/.test(navigator.userAgent);
+		
+		if (!isChrome) {
+			const browserInfo = {
+				isSafari: /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent),
+				isEdge: navigator.userAgent.includes('Edg'),
+				userAgent: navigator.userAgent
+			};
+			console.log('[useScrollAnimations] Non-Chrome browser detected, disabling all scroll animations', browserInfo);
+			// Make all elements visible immediately
+			fadeInRef.current.forEach((element) => {
+				if (element) {
+					element.style.opacity = '1';
+				}
+			});
+			return;
+		}
 
 		// Small delay to ensure DOM is ready
 		const timer = setTimeout(() => {
@@ -153,6 +170,16 @@ export const useScrollAnimations = () => {
 	const addFadeIn = (element: HTMLElement | null) => {
 		if (element && !fadeInRef.current.includes(element)) {
 			fadeInRef.current.push(element);
+			
+			// For non-Chrome browsers, make element visible immediately
+			const isChrome = typeof window !== 'undefined' &&
+			                 /Chrome/.test(navigator.userAgent) && 
+			                 /Google Inc/.test(navigator.vendor) && 
+			                 !/Edg/.test(navigator.userAgent);
+			
+			if (!isChrome && element) {
+				element.style.opacity = '1';
+			}
 		}
 	};
 

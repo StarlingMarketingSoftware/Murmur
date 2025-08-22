@@ -13,6 +13,7 @@ import { ComparisonTable } from '@/components/molecules/ComparisonTable/Comparis
 import { ScrollingReviews } from '@/components/molecules/ScrollingReviews/ScrollingReviews';
 import { LeadSender } from '@/components/organisms/LeadSender/LeadSender';
 import { LaunchButton } from '@/components/atoms/LaunchButton/LaunchButton';
+// import { LaunchButtonDirect as LaunchButton } from '@/components/atoms/LaunchButton/LaunchButtonDirect';
 import { useScrollAnimations } from '@/hooks/useScrollAnimations';
 import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
@@ -43,6 +44,25 @@ export default function HomePage() {
 	const heroRef = useRef<HTMLDivElement>(null);
 	
 	useEffect(() => {
+		// Check if browser is Chrome before running GSAP animations
+		const isChrome = /Chrome/.test(navigator.userAgent) && 
+		                 /Google Inc/.test(navigator.vendor) && 
+		                 !/Edg/.test(navigator.userAgent);
+		
+		if (!isChrome) {
+			const browserInfo = {
+				isSafari: /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent),
+				isEdge: navigator.userAgent.includes('Edg'),
+				vendor: navigator.vendor,
+				userAgent: navigator.userAgent
+			};
+			console.log('[HomePage] Non-Chrome browser detected, skipping GSAP animations', browserInfo);
+			if (heroRef.current) {
+				heroRef.current.style.opacity = '1';
+			}
+			return;
+		}
+		
 		// Simple hero fade in
 		if (heroRef.current) {
 			gsap.fromTo(heroRef.current, 
