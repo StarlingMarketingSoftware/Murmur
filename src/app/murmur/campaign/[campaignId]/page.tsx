@@ -37,7 +37,7 @@ const Murmur = () => {
 	return (
 		<AppLayout paddingTop="none">
 			<NoMobilePage />
-			{shouldHideContent && <div className="fixed inset-0 bg-white z-40" />}
+			{shouldHideContent && <div className="fixed inset-0 bg-background z-40" />}
 			<div
 				className={cn(
 					'hidden lg:block transition-opacity duration-200',
@@ -56,15 +56,11 @@ const Murmur = () => {
 						<div className="flex items-center">
 							<Typography
 								variant="h3"
-								className="text-lg font-semibold w-[60px] text-gray-600"
-								style={{ fontFamily: 'Inter' }}
+								className="text-lg font-semibold w-[60px] text-gray-600 font-inter"
 							>
 								To:
 							</Typography>
-							<Typography
-								className="ml-2 !text-[15px] text-gray-600"
-								style={{ fontFamily: 'Inter', fontWeight: 'normal' }}
-							>
+							<Typography className="ml-2 !text-[15px] text-gray-600 font-inter">
 								{campaign?.userContactLists?.map((list) => list.name).join(', ') ||
 									'No recipients selected'}
 							</Typography>
@@ -80,15 +76,11 @@ const Murmur = () => {
 						<div className="flex items-center">
 							<Typography
 								variant="h3"
-								className="text-lg font-semibold w-[60px] text-gray-600"
-								style={{ fontFamily: 'Inter' }}
+								className="text-lg font-semibold w-[60px] text-gray-600 font-inter"
 							>
 								From:
 							</Typography>
-							<Typography
-								className="ml-2 !text-[15px] text-gray-600"
-								style={{ fontFamily: 'Inter', fontWeight: 'normal' }}
-							>
+							<Typography className="ml-2 !text-[15px] text-gray-600 font-inter">
 								{campaign?.identity?.name}
 							</Typography>
 							<Button

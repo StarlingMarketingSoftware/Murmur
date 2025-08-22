@@ -13,7 +13,6 @@ import { ComparisonTable } from '@/components/molecules/ComparisonTable/Comparis
 import { ScrollingReviews } from '@/components/molecules/ScrollingReviews/ScrollingReviews';
 import { LeadSender } from '@/components/organisms/LeadSender/LeadSender';
 import { LaunchButton } from '@/components/atoms/LaunchButton/LaunchButton';
-// import { LaunchButtonDirect as LaunchButton } from '@/components/atoms/LaunchButton/LaunchButtonDirect';
 import { useScrollAnimations } from '@/hooks/useScrollAnimations';
 import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
@@ -82,8 +81,6 @@ export default function HomePage() {
 				}
 			);
 		}
-
-		// No animations for hero text and subtitle - they appear immediately
 	}, []);
 
 	return (

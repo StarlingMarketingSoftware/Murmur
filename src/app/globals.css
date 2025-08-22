@@ -39,6 +39,7 @@
 	--color-input: var(--input);
 	--color-border: var(--border);
 	--color-destructive: var(--destructive);
+	--color-destructive-dark: var(--destructive-dark);
 	--color-warning: var(--warning);
 	--color-success: var(--success);
 	--color-dark: var(--dark);
@@ -66,7 +67,8 @@
 
 	--font-primary: var(--font-times);
 	--font-secondary: var(--font-inter);
-	--font-tertiary: var(--font-zen-antique);
+	--font-zen: var(--font-zen-antique);
+	--font-inter: var(--font-inter);
 }
 
 :root {
@@ -90,6 +92,7 @@
 	--accent: rgb(235, 235, 233); /* oklch(0.923 0.003 48.717) */
 	--accent-foreground: rgb(52, 52, 52); /* oklch(0.205 0 0) */
 	--destructive: rgb(223, 62, 62); /* oklch(59.157% 0.24065 26.32) */
+	--destructive-dark: rgb(162, 0, 0);
 	--warning: rgb(228, 177, 0); /* oklch(0.77 0.16 70) */
 	--success: rgb(60, 136, 60); /* oklch(0.4953 0.1037 140.3) */
 	--navy: rgb(95, 83, 182); /* oklch(0.4865 0.17 266.18) */
@@ -130,6 +133,7 @@
 	--accent: rgb(69, 69, 69); /* oklch(0.269 0 0) */
 	--accent-foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
 	--destructive: rgb(239, 68, 68); /* oklch(0.704 0.191 22.216) */
+	--destructive-dark: rgb(162, 0, 0);
 	--border: rgba(255, 255, 255, 0.1); /* oklch(1 0 0 / 10%) */
 	--input: rgba(255, 255, 255, 0.15); /* oklch(1 0 0 / 15%) */
 	--ring: rgb(142, 142, 142); /* oklch(0.556 0 0) */
@@ -201,29 +205,29 @@
 		margin-bottom: 1rem;
 		-webkit-margin-after: 1rem;
 	}
-	
+
 	.ProseMirror p:last-of-type,
 	.ProseMirror p:last-child {
 		margin-bottom: 0;
 		-webkit-margin-after: 0;
 	}
-	
+
 	.ProseMirror .br-spacing {
 		display: block;
 		height: 1rem;
 		content: '';
 	}
-	
-	.ProseMirror div[style*="margin-top"] {
+
+	.ProseMirror div[style*='margin-top'] {
 		-webkit-margin-before: 1.5rem;
 	}
-	
+
 	/* Fix for button appearance in Safari */
 	button {
 		-webkit-appearance: none;
 		appearance: none;
 	}
-	
+
 	/* Fix for aspect-ratio in Safari < 15 */
 	.aspect-video {
 		padding-bottom: 56.25%; /* 16:9 aspect ratio fallback */
@@ -2627,7 +2631,7 @@ mux-player {
 	.nav-text-full {
 		display: none;
 	}
-	
+
 	.nav-text-short {
 		display: inline;
 	}
@@ -2643,7 +2647,7 @@ mux-player {
 			background-color: white;
 			contain: layout;
 		}
-		
+
 		.safari-nav-fix {
 			display: flex !important;
 			align-items: center !important;
@@ -2652,18 +2656,18 @@ mux-player {
 			text-overflow: ellipsis !important;
 			max-width: 150px;
 		}
-		
+
 		.nav-text-full,
 		.nav-text-short {
 			position: relative;
 			z-index: 1;
 		}
-		
+
 		/* Ensure text doesn't overflow in landscape */
 		nav .flex {
 			flex-wrap: nowrap !important;
 		}
-		
+
 		/* Fix potential text bleed issues */
 		nav span {
 			-webkit-backface-visibility: hidden;
@@ -2671,7 +2675,7 @@ mux-player {
 			transform: translateZ(0);
 		}
 	}
-	
+
 	/* Additional fix for regular mobile Safari */
 	@media (max-width: 768px) {
 		.safari-nav-fix span {

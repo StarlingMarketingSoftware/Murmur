@@ -8,9 +8,9 @@ import { isProblematicBrowser } from '@/utils/browserDetection';
 export const LaunchButton = () => {
 	const { startTransition } = usePageTransition();
 	const { isSignedIn, openSignIn } = useClerk();
-	
+
 	const hasProblematicBrowser = isProblematicBrowser();
-	
+
 	const handleLaunch = () => {
 		if (!isSignedIn) {
 			// For Edge/Safari, navigate directly to sign-in page instead of opening modal
@@ -31,19 +31,14 @@ export const LaunchButton = () => {
 			startTransition(urls.murmur.dashboard.index);
 		}
 	};
-	
+
 	return (
 		<Button
 			variant="primary"
 			size="lg"
 			font="secondary"
 			noPadding
-			className="!w-full !h-[42px] !min-h-0 !py-0 !px-0 !font-normal"
-			style={{
-				backgroundColor: '#289137',
-				borderRadius: '7px',
-				fontWeight: 400,
-			}}
+			className="!w-full !h-[42px] !min-h-0 !py-0 !px-0 rounded-[7px] bg-[#289137]"
 			onClick={handleLaunch}
 		>
 			Launch

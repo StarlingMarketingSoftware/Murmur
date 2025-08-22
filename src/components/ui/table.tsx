@@ -31,20 +31,17 @@ function Table({
 	);
 }
 
-const tableHeaderVariants = cva(
-	'[&_tr]:border-b-2 [&_tr]:border-black',
-	{
-		variants: {
-			variant: {
-				primary: 'text-[15px] font-primary',
-				secondary: 'text-[15px] font-secondary bg-primary',
-			},
+const tableHeaderVariants = cva('[&_tr]:border-b-2 [&_tr]:border-black', {
+	variants: {
+		variant: {
+			primary: 'text-[15px] font-primary',
+			secondary: 'text-[15px] font-secondary bg-primary',
 		},
-		defaultVariants: {
-			variant: 'primary',
-		},
-	}
-);
+	},
+	defaultVariants: {
+		variant: 'primary',
+	},
+});
 
 interface TableHeaderProps extends React.ComponentProps<'thead'> {
 	variant?: 'primary' | 'secondary';
@@ -131,7 +128,8 @@ const tableRowVariants = cva(
 	{
 		variants: {
 			variant: {
-				primary: 'text-[15px] odd:bg-gray-50 even:bg-white border-black data-[state=selected]:!bg-primary/30 data-[state=selected]:shadow-inner data-[state=selected]:font-medium data-[state=selected]:scale-[1.005]',
+				primary:
+					'text-[15px] odd:bg-gray-50 even:bg-background border-black data-[state=selected]:!bg-primary/30 data-[state=selected]:shadow-inner data-[state=selected]:font-medium data-[state=selected]:scale-[1.005]',
 				secondary: 'text-[15px] font-secondary bg-background border-gray-200',
 			},
 		},

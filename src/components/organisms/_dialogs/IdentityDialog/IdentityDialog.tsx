@@ -62,11 +62,11 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 			>
 				<DialogTitle />
 				{/* Immediate white background to prevent flash */}
-				<div className="absolute inset-0 bg-white" style={{ zIndex: -1 }} />
+				<div className="absolute inset-0 bg-background" style={{ zIndex: -1 }} />
 
 				{/* Main content with fade animation */}
 				<div
-					className="flex flex-col h-screen w-full bg-white font-primary"
+					className="flex flex-col h-screen w-full bg-background font-primary"
 					style={{
 						WebkitAnimation: isContentReady
 							? 'dialog-smooth-in 0.3s ease-out forwards'
@@ -78,7 +78,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 					}}
 				>
 					{/* Full screen header with back button - fixed position */}
-					<div className="relative bg-white px-8 py-6 flex-shrink-0">
+					<div className="relative bg-background px-8 py-6 flex-shrink-0">
 						{/* Back button - always visible, goes to dashboard */}
 						{isContentReady && (
 							<button
@@ -148,7 +148,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 													<h3 className="text-lg font-semibold text-gray-900 mb-3">
 														Create New Profile
 													</h3>
-													<div className="bg-white p-4 rounded-lg">
+													<div className="bg-background p-4 rounded-lg">
 														<CreateIdentityPanel
 															setShowCreatePanel={setShowCreatePanel}
 															isEdit={isEdit}
@@ -179,7 +179,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 																			{identities.map((identity) => (
 																				<div
 																					key={identity.id}
-																					className="bg-white p-5 rounded-lg hover:bg-gray-50 transition-all"
+																					className="bg-background p-5 rounded-lg hover:bg-gray-50 transition-all"
 																				>
 																					<div className="flex items-start gap-4">
 																						<RadioGroupItem
@@ -239,8 +239,8 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 						</div>
 					</div>
 
-					{/* Footer with actions - fixed position */}
-					<div className="bg-white px-8 py-4 flex-shrink-0 border-t border-gray-200">
+					{/* Footer */}
+					<div className="bg-background px-8 py-4 flex-shrink-0 border-t border-gray-200">
 						<div className="max-w-6xl mx-auto flex justify-center">
 							<Button
 								isLoading={isPendingAssignIdentity}
