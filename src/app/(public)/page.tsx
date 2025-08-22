@@ -109,23 +109,22 @@ export default function HomePage() {
 							>
 								Murmur
 							</Typography>
-							<h2
-								className="text-center !text-[24px] sm:!text-[28px] md:!text-[34px] leading-[1] mt-8 sm:mt-12 md:mt-16 lg:mt-[72px] whitespace-normal sm:whitespace-nowrap font-tertiary"
-								style={{ fontWeight: 400 }}
+							<Typography
+								className="text-center !text-[24px] sm:!text-[28px] md:!text-[34px] leading-[1] mt-8 sm:mt-12 md:mt-16 lg:mt-[72px] whitespace-normal sm:whitespace-nowrap font-tertiary font-normal"
 								data-hero-element
 							>
 								Get Contacts. Get Work. Email Anyone.
-							</h2>
+							</Typography>
 							<div
 								className="w-full max-w-[764px] mx-auto mt-2 flex items-center justify-center px-4"
 								data-hero-element
 							>
-								<p
-									className="text-center text-black font-inter !text-[14px] sm:!text-[22px] md:!text-[26px] whitespace-nowrap"
-									style={{ fontWeight: 300 }}
+								<Typography
+									variant="p"
+									className="text-center text-black font-inter !text-[14px] sm:!text-[22px] md:!text-[26px] whitespace-nowrap font-[300]"
 								>
 									The Ultimate Database + Email Tool for Musicians
-								</p>
+								</Typography>
 							</div>
 						</div>
 					</div>
