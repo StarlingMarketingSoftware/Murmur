@@ -7,7 +7,7 @@ import {
 	DialogTitle,
 } from '@/components/ui/dialog';
 import { FC } from 'react';
-import Spinner from '@/components/atoms/Spinner/Spinner';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import {
 	ManageContactListDialogProps,
 	useManageContactListDialog,

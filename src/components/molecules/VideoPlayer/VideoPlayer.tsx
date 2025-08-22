@@ -13,6 +13,21 @@ interface VideoPlayerProps {
 	playbackId: string;
 }
 
+// Minimal shape we rely on from the mux-player element
+interface MuxPlayerLike extends HTMLElement {
+	currentTime: number;
+	addEventListener: (
+		type: string,
+		listener: EventListenerOrEventListenerObject,
+		options?: boolean | AddEventListenerOptions
+	) => void;
+	removeEventListener: (
+		type: string,
+		listener: EventListenerOrEventListenerObject,
+		options?: boolean | EventListenerOptions
+	) => void;
+}
+
 export function VideoPlayer({
 	className,
 	thumbnailTime = 1.5,
@@ -22,12 +37,12 @@ export function VideoPlayer({
 	},
 	playbackId,
 }: VideoPlayerProps) {
-	const playerRef = useRef<any>(null);
+	const playerRef = useRef<MuxPlayerLike | null>(null);
 
 	useEffect(() => {
 		// Force reload on mount to ensure proper initialization
-		if (playerRef.current) {
-			const player = playerRef.current;
+		const player = playerRef.current;
+		if (player) {
 			// Add event listener for loadedmetadata to ensure proper sync
 			const handleLoadedMetadata = () => {
 				// Reset playback to ensure sync
@@ -47,7 +62,9 @@ export function VideoPlayer({
 	return (
 		<div className={cn('w-fit h-fit aspect-video max-h-fit overflow-hidden', className)}>
 			<MuxPlayer
-				ref={playerRef}
+				ref={(el) => {
+					playerRef.current = (el as unknown as MuxPlayerLike) || null;
+				}}
 				accentColor="var(--color-primary)"
 				playbackId={playbackId}
 				thumbnailTime={thumbnailTime}
