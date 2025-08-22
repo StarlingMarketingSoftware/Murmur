@@ -151,7 +151,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				HybridBlock.text,
 			],
 			hybridBlockPrompts: [
-				{ id: 'full_automated', type: HybridBlock.full_automated, value: '' }
+				{ id: 'full_automated', type: HybridBlock.full_automated, value: '' },
 			],
 			handwrittenPrompt: '',
 			font: (campaign.font as Font) ?? DEFAULT_FONT,
@@ -199,7 +199,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	// VARIABLES
 
 	const draftCredits = user?.draftCredits;
-	const signatureText = form.watch('signature') || `Thank you,\n${campaign.identity?.name || ''}`;
+	const signatureText =
+		form.watch('signature') || `Thank you,\n${campaign.identity?.name || ''}`;
 
 	const getDraftingModeBasedOnBlocks = useCallback(() => {
 		const hasFullAutomatedBlock = form
@@ -366,7 +367,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			'website',
 			'phone',
 		])}\n\nUser Goal: ${prompt}`;
-		console.log('🚀 ~ draftAiEmail ~ userPrompt:', userPrompt);
 
 		// Debug logging for Full AI path
 		console.log(
@@ -1117,21 +1117,36 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		if (campaign && form && signatures?.length > 0 && isFirstLoad) {
 			// Check if campaign has the old default blocks (introduction, research, action)
 			const campaignBlocks = campaign.hybridBlockPrompts as HybridBlockPrompt[];
-			const hasOldDefaults = campaignBlocks && 
+			const hasOldDefaults =
+				campaignBlocks &&
 				campaignBlocks.length === 3 &&
-				campaignBlocks.some(b => b.type === 'introduction' && b.value === '') &&
-				campaignBlocks.some(b => b.type === 'research' && b.value === '') &&
-				campaignBlocks.some(b => b.type === 'action' && b.value === '');
-			
+				campaignBlocks.some((b) => b.type === 'introduction' && b.value === '') &&
+				campaignBlocks.some((b) => b.type === 'research' && b.value === '') &&
+				campaignBlocks.some((b) => b.type === 'action' && b.value === '');
+
 			// If it has the old empty defaults, replace with new full_automated default
-			const hybridBlockPromptsToUse = hasOldDefaults 
+			const hybridBlockPromptsToUse = hasOldDefaults
 				? [{ id: 'full_automated', type: HybridBlock.full_automated, value: '' }]
-				: (campaignBlocks ?? [{ id: 'full_automated', type: HybridBlock.full_automated, value: '' }]);
-			
-			const hybridAvailableBlocksToUse = hasOldDefaults 
-				? [HybridBlock.full_automated, HybridBlock.introduction, HybridBlock.research, HybridBlock.action, HybridBlock.text]
-				: (campaign.hybridAvailableBlocks ?? [HybridBlock.full_automated, HybridBlock.introduction, HybridBlock.research, HybridBlock.action, HybridBlock.text]);
-			
+				: campaignBlocks ?? [
+						{ id: 'full_automated', type: HybridBlock.full_automated, value: '' },
+				  ];
+
+			const hybridAvailableBlocksToUse = hasOldDefaults
+				? [
+						HybridBlock.full_automated,
+						HybridBlock.introduction,
+						HybridBlock.research,
+						HybridBlock.action,
+						HybridBlock.text,
+				  ]
+				: campaign.hybridAvailableBlocks ?? [
+						HybridBlock.full_automated,
+						HybridBlock.introduction,
+						HybridBlock.research,
+						HybridBlock.action,
+						HybridBlock.text,
+				  ];
+
 			form.reset({
 				isAiSubject: campaign.isAiSubject ?? true,
 				subject: campaign.subject ?? '',
@@ -1148,7 +1163,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				draftingTone: campaign.draftingTone ?? DraftingTone.normal,
 				paragraphs: campaign.paragraphs ?? 0,
 			});
-			
+
 			// If we migrated from old defaults, save the new blocks to the campaign
 			if (hasOldDefaults) {
 				saveCampaign({
@@ -1159,7 +1174,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					},
 				});
 			}
-			
+
 			setIsFirstLoad(false);
 		}
 	}, [campaign, form, signatures, isFirstLoad, saveCampaign]);
@@ -1168,7 +1183,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	useEffect(() => {
 		const currentSignature = form.getValues('signature');
 		// Only update if signature is empty or is the default template
-		if (!currentSignature || currentSignature === 'Thank you,' || currentSignature.startsWith('Thank you,\n')) {
+		if (
+			!currentSignature ||
+			currentSignature === 'Thank you,' ||
+			currentSignature.startsWith('Thank you,\n')
+		) {
 			form.setValue('signature', `Thank you,\n${campaign.identity?.name || ''}`);
 		}
 	}, [campaign.identity?.name, form]);
