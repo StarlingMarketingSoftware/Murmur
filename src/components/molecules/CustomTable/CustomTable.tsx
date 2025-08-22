@@ -30,7 +30,6 @@ import {
 	useCallback,
 	ReactNode,
 } from 'react';
-import { twMerge } from 'tailwind-merge';
 import CustomPagination from '@/components/molecules/CustomPagination/CustomPagination';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -270,13 +269,13 @@ export function CustomTable<TData, TValue>({
 				{isSelectable && headerAction ? headerAction : null}
 			</div>
 			<div
-				className={twMerge(
+				className={cn(
 					'border-2 border-black relative overflow-y-auto overflow-x-auto custom-scrollbar w-[1185px] max-w-full mx-auto',
 					constrainHeight && 'h-[429px]'
 				)}
 			>
 				<Table
-					className={twMerge(
+					className={cn(
 						'relative min-w-full',
 						allowColumnOverflow ? 'w-max' : 'w-full',
 						useAutoLayout ? 'table-auto' : 'table-fixed'
@@ -310,7 +309,7 @@ export function CustomTable<TData, TValue>({
 							table.getRowModel().rows.map((row) => (
 								<TableRow
 									variant={variant}
-									className={twMerge(
+									className={cn(
 										(handleRowClick || (setSelectedRows && isSelectable)) &&
 											'cursor-pointer'
 									)}

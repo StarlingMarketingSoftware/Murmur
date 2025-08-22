@@ -1,6 +1,6 @@
 import { useFormContext, useFieldArray } from 'react-hook-form';
 import { DragEndEvent } from '@dnd-kit/core';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 import { HybridBlock } from '@prisma/client';
@@ -45,16 +45,66 @@ export const BLOCKS = [
 	},
 ];
 
-export const useHybridPromptInput = () => {
+export interface HybridPromptInputProps {
+	trackFocusedField?: (
+		fieldName: string,
+		element: HTMLTextAreaElement | HTMLInputElement | null
+	) => void;
+	testMessage?: string | null;
+}
+
+export const useHybridPromptInput = (props: HybridPromptInputProps) => {
+	const { testMessage, trackFocusedField } = props;
+
+	/* HOOKS */
+
 	const form = useFormContext<DraftingFormValues>();
 	const [textBlockCount, setTextBlockCount] = useState(0);
+	const [showTestPreview, setShowTestPreview] = useState(false);
 
 	const { fields, append, remove, move, insert } = useFieldArray({
 		control: form.control,
 		name: 'hybridBlockPrompts',
 	});
 
+	/* VARIABLES */
+
 	const watchedAvailableBlocks = form.watch('hybridAvailableBlocks');
+
+	const BLOCK_ITEMS = [
+		{
+			value: HybridBlock.full_automated,
+			label: 'Full Automated',
+			disabled: false,
+			showUsed: false,
+		},
+		{
+			value: HybridBlock.introduction,
+			label: 'Introduction',
+			disabled: !watchedAvailableBlocks.includes(HybridBlock.introduction),
+			showUsed: true,
+		},
+		{
+			value: HybridBlock.research,
+			label: 'Research Contact',
+			disabled: !watchedAvailableBlocks.includes(HybridBlock.research),
+			showUsed: true,
+		},
+		{
+			value: HybridBlock.action,
+			label: 'Call to Action',
+			disabled: !watchedAvailableBlocks.includes(HybridBlock.action),
+			showUsed: true,
+		},
+		{
+			value: HybridBlock.text,
+			label: 'Text',
+			disabled: false,
+			showUsed: false,
+		},
+	];
+
+	/* FUNCTIONS */
 
 	const findCorrectPosition = (newBlock: string, contents: { type: HybridBlock }[]) => {
 		if (newBlock === HybridBlock.text) return contents.length;
@@ -355,6 +405,14 @@ export const useHybridPromptInput = () => {
 		return block;
 	};
 
+	/* EFFECTS */
+
+	useEffect(() => {
+		if (testMessage) {
+			setShowTestPreview(true);
+		}
+	}, [testMessage]);
+
 	return {
 		handleDragEnd,
 		handleRemoveBlock,
@@ -364,5 +422,10 @@ export const useHybridPromptInput = () => {
 		form,
 		fields,
 		watchedAvailableBlocks,
+		BLOCK_ITEMS,
+		showTestPreview,
+		setShowTestPreview,
+		trackFocusedField,
+		testMessage,
 	};
 };

@@ -1,6 +1,5 @@
-import { CommonIconProps, defaultPathClassName } from '@/utils';
+import { cn, CommonIconProps, defaultPathClassName } from '@/utils';
 import { FC } from 'react';
-import { twMerge } from 'tailwind-merge';
 
 const SquareCheck: FC<CommonIconProps> = (props) => {
 	const {
@@ -21,7 +20,7 @@ const SquareCheck: FC<CommonIconProps> = (props) => {
 		>
 			<path
 				d="M8.49,43.69l35.56,35.2L115.16,8.49"
-				className={twMerge(pathClassName, 'fill-none stroke-[21px]')}
+				className={cn(pathClassName, 'fill-none stroke-[21px]')}
 			/>
 		</svg>
 	);

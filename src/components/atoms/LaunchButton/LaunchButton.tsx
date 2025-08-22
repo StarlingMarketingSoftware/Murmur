@@ -22,7 +22,7 @@ export const LaunchButton = () => {
 			size="lg"
 			font="secondary"
 			noPadding
-			className="!w-full !h-[42px] !min-h-0 !py-0 !px-0 !font-normal !bg-[#289137] !rounded-[7px]"
+			className="!w-full !h-[42px] !min-h-0 !py-0 !px-0 rounded-[7px] bg-[#289137]"
 			onClick={handleLaunch}
 		>
 			Launch

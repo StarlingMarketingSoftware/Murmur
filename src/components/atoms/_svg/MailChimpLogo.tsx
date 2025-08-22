@@ -1,6 +1,6 @@
-import { CommonIconProps, defaultPathClassName } from '@/utils';
+import { cn, CommonIconProps, defaultPathClassName } from '@/utils';
 import { FC } from 'react';
-import { twMerge } from 'tailwind-merge';
+
 export const MailchimpLogo: FC<CommonIconProps> = (props) => {
 	const {
 		width = '100%',
@@ -65,7 +65,7 @@ export const MailchimpLogo: FC<CommonIconProps> = (props) => {
 				d="M343.08,52.27c4.29-.15,11.44,1.82,12.25,6.79,1.16,7.05-9.43,9.25-14.64,8.34-13.3-2.33-10.38-14.68,2.39-15.12Z"
 			/>
 			<path
-				className={twMerge(pathClassName, 'fill-white')}
+				className={cn(pathClassName, 'fill-white')}
 				d="M84.61,31.63c.19,1.7-1.4,3.13-1.75,4.88-.45,2.25,1.51.14,2.57-.42,5.42-2.86,11.06-5.03,17.25-5.46l-2.98,3.97c4.51.47,11.68,1.33,15.48,3.92.42.29.91.37.76,1.06-18.45-4.35-37.9.14-53.39,10.61-.26-.27,1.35-2.16,1.65-2.5"
 			/>
 			<path

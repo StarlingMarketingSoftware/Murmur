@@ -1,7 +1,7 @@
 'use client';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { Typography } from '@/components/ui/typography';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/utils';
 import { Stripe } from 'stripe';
 import { FC } from 'react';
 import { ProductCardProps, useProductCard } from './useProductCard';
@@ -24,7 +24,7 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 	return (
 		<Card
 			onClick={isLink ? handleClick : undefined}
-			className={twMerge(
+			className={cn(
 				'w-[300px] sm:w-[315px] h-[737px] bg-gradient-to-b from-white to-gray-100 hover:-translate-y-1 transition-all duration-300 border-black !border-3 pt-3 px-6',
 				isLink && 'cursor-pointer',
 				isHighlighted && 'border-navy from-secondary/7 to-gray-100',

@@ -1,6 +1,6 @@
-import { CommonIconProps, defaultPathClassName } from '@/utils';
+import { cn, CommonIconProps, defaultPathClassName } from '@/utils';
 import { FC } from 'react';
-import { twMerge } from 'tailwind-merge';
+
 export const ChatGPTLogo: FC<CommonIconProps> = (props) => {
 	const {
 		width = '100%',
@@ -21,37 +21,37 @@ export const ChatGPTLogo: FC<CommonIconProps> = (props) => {
 				y="75.98"
 				width="67"
 				height="67"
-				className={twMerge(pathClassName, 'fill-transparent')}
+				className={cn(pathClassName, 'fill-transparent')}
 			/>
 			<g>
 				<path d="M147.05,158.12c-6.7,27.11-36.78,41.88-62.5,30.25-7.19-3.25-13.17-8.69-17.93-14.87-22.14,6.1-45.73-5.58-53.96-26.94-4.59-11.9-3.86-23.83.78-35.57C-13.99,84.68,3.26,37.13,40.95,34.21c3.58-14.4,14.34-26.35,28.27-31.42,19.34-7.05,40.12-.34,52.18,16.03,37.06-9.73,68.58,27.39,53.19,62.49,6.94,7.08,11.99,16.51,13.25,26.44,3.16,24.85-15.72,48.59-40.78,50.37ZM68.5,100.61l.8-49.18c.04-2.72,1.66-4.54,3.94-5.77l37.35-21.73C92.36,1.34,55.51,12.06,51.5,40.5v50.53s17.01,9.58,17.01,9.58ZM77,57.11v19.22l42.88-23.69c1.55-.81,3.22-1.29,4.98-.9l39.37,22.55c.84.17.46-.14.62-.54,10.29-25.89-17.03-52.7-42.8-42.81l-45.05,26.18ZM39.77,45.98C11.73,50.5,1.62,86.24,23.53,104.51l44.46,25.59,1.29-.15,15.8-9.3-42.86-25.92c-.82-.44-2.45-3.34-2.45-4.02v-44.72ZM148.23,146.34c28.21-4.42,38.21-40.65,16-58.69l-44.83-25.42-16.48,9.44,43.03,26.16c.79.34,2.29,3.2,2.29,3.78v44.72ZM93.86,76.82l-16.46,9.43c-.42.31-.37.75-.42,1.2-.22,1.85-.26,17.66.22,18.44l16.66,9.62,16.74-9.42c.42-.31.37-.75.42-1.2.22-1.85.26-17.65-.22-18.44l-16.94-9.63ZM136.43,101.08l-16.93-9.37c-.42,11.93-.13,23.87-.39,35.83-.03,1.48-.37,3.29-.43,4.82-.18,4.76,1.49,10.94-3.09,13.92l-37.99,21.91c-.64.87,4.67,5.22,5.52,5.84,20.62,15.13,49.33,2.98,53.38-21.82l-.06-51.12ZM111,115.99l-45.15,24.66-2.72-.07-39.34-22.56c-.6.01-1.53,3.61-1.7,4.36-5.94,26.1,19.17,48.12,44.14,38.88l44.77-26.05v-19.22Z" />
 				<path
 					d="M68.5,100.61l-17.01-9.58v-50.53C55.51,12.06,92.36,1.34,110.59,23.93l-37.35,21.73c-2.28,1.23-3.9,3.05-3.94,5.77l-.8,49.18Z"
-					className={twMerge(pathClassName, 'fill-transparent')}
+					className={cn(pathClassName, 'fill-transparent')}
 				/>
 				<path
 					d="M111,115.99v19.22l-44.77,26.05c-24.97,9.23-50.09-12.79-44.14-38.88.17-.75,1.1-4.35,1.7-4.36l39.34,22.56,2.72.07,45.15-24.66Z"
-					className={twMerge(pathClassName, 'fill-transparent')}
+					className={cn(pathClassName, 'fill-transparent')}
 				/>
 				<path
 					d="M136.43,101.08l.06,51.12c-4.04,24.8-32.75,36.96-53.38,21.82-.84-.62-6.16-4.97-5.52-5.84l37.99-21.91c4.58-2.97,2.91-9.16,3.09-13.92.06-1.53.4-3.34.43-4.82.26-11.95-.03-23.89.39-35.83l16.93,9.37Z"
-					className={twMerge(pathClassName, 'fill-transparent')}
+					className={cn(pathClassName, 'fill-transparent')}
 				/>
 				<path
 					d="M77,57.11l45.05-26.18c25.78-9.89,53.09,16.92,42.8,42.81-.16.4.23.71-.62.54l-39.37-22.55c-1.76-.39-3.43.1-4.98.9l-42.88,23.69v-19.22Z"
-					className={twMerge(pathClassName, 'fill-transparent')}
+					className={cn(pathClassName, 'fill-transparent')}
 				/>
 				<path
 					d="M39.77,45.98v44.72c0,.68,1.63,3.58,2.45,4.02l42.86,25.92-15.8,9.3-1.29.15-44.46-25.59C1.62,86.24,11.73,50.5,39.77,45.98Z"
-					className={twMerge(pathClassName, 'fill-transparent')}
+					className={cn(pathClassName, 'fill-transparent')}
 				/>
 				<path
 					d="M148.23,146.34v-44.72c0-.58-1.5-3.45-2.29-3.78l-43.03-26.16,16.48-9.44,44.83,25.42c22.21,18.04,12.22,54.27-16,58.69Z"
-					className={twMerge(pathClassName, 'fill-transparent')}
+					className={cn(pathClassName, 'fill-transparent')}
 				/>
 				<path
 					d="M93.86,76.82l16.94,9.63c.48.79.44,16.59.22,18.44-.05.45,0,.89-.42,1.2l-16.74,9.42-16.66-9.62c-.48-.79-.44-16.59-.22-18.44.05-.45,0-.89.42-1.2l16.46-9.43Z"
-					className={twMerge(pathClassName, 'fill-transparent')}
+					className={cn(pathClassName, 'fill-transparent')}
 				/>
 			</g>
 			<g>
@@ -64,11 +64,11 @@ export const ChatGPTLogo: FC<CommonIconProps> = (props) => {
 				<path d="M441.68,58.1v16.8h14.86v11.63h-14.86v31.33c0,.33,1.09,3.96,1.36,4.45,1.25,2.25,3.75,2.44,6.08,2.37s5.26-1.84,6.77-.36v10.66c-9.68,3.15-21.78,3.2-26.16-7.76-.36-.9-1.62-4.88-1.62-5.48v-35.21h-9.04v-11.63h9.04v-13.57l13.57-3.23Z" />
 				<path
 					d="M555.37,92.34v-28.42c7.99-.91,20.65-1.19,23.75,8.22,2.16,6.56.35,14.8-6.16,18.09-1.08.55-5.38,2.11-6.29,2.11h-11.3Z"
-					className={twMerge(pathClassName, 'fill-transparent')}
+					className={cn(pathClassName, 'fill-transparent')}
 				/>
 				<path
 					d="M399.7,106.55c.03,4.91.62,9.26-2.31,13.53-5.67,8.28-20.25,7.43-18.32-4.76,1.27-8,14.22-9.13,20.63-8.76Z"
-					className={twMerge(pathClassName, 'fill-transparent')}
+					className={cn(pathClassName, 'fill-transparent')}
 				/>
 			</g>
 		</svg>

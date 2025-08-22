@@ -41,13 +41,11 @@ export const ScrollingReviews = () => {
 
 	const handleMouseEnter = () => {
 		if (scrollerInnerRef.current) {
-			// Check if Web Animations API is supported
 			if ('getAnimations' in scrollerInnerRef.current) {
-				// Slow down the animation by adjusting playback rate
 				const animations = scrollerInnerRef.current.getAnimations();
-				animations.forEach(animation => {
+				animations.forEach((animation) => {
 					if ('playbackRate' in animation) {
-						(animation as Animation).playbackRate = 0.3; // Slow to 30% speed
+						(animation as Animation).playbackRate = 0.3;
 					}
 				});
 			}
@@ -56,13 +54,11 @@ export const ScrollingReviews = () => {
 
 	const handleMouseLeave = () => {
 		if (scrollerInnerRef.current) {
-			// Check if Web Animations API is supported
 			if ('getAnimations' in scrollerInnerRef.current) {
-				// Return to normal speed
 				const animations = scrollerInnerRef.current.getAnimations();
-				animations.forEach(animation => {
+				animations.forEach((animation) => {
 					if ('playbackRate' in animation) {
-						(animation as Animation).playbackRate = 1; // Normal speed
+						(animation as Animation).playbackRate = 1;
 					}
 				});
 			}

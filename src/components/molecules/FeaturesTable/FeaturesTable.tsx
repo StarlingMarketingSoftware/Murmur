@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/table';
 import { CheckIcon } from 'lucide-react';
 import { Typography } from '@/components/ui/typography';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/utils';
 
 type Feature = {
 	contactFeatures: {
@@ -228,7 +228,7 @@ interface SectionHeaderProps {
 	title: string;
 }
 const SectionHeader: FC<SectionHeaderProps> = ({ title }) => {
-	const cn = 'bg-gray-200 border-y-0 border-x-1 border-gray-200';
+	const cnHead = 'bg-gray-200 border-y-0 border-x-1 border-gray-200';
 	return (
 		<TableRow className="border-x-2 border-gray-200 border-y-0">
 			<TableHead className="bg-gray-200 font-semibold text-foreground !pl-5 border-y-0 border-x-1 border-gray-200">
@@ -236,9 +236,9 @@ const SectionHeader: FC<SectionHeaderProps> = ({ title }) => {
 					{title}
 				</Typography>
 			</TableHead>
-			<TableHead className={cn} />
-			<TableHead className={twMerge(cn, 'hidden md:table-cell')} />
-			<TableHead className={twMerge(cn, ' hidden md:table-cell')} />
+			<TableHead className={cnHead} />
+			<TableHead className={cn(cnHead, 'hidden md:table-cell')} />
+			<TableHead className={cn(cnHead, ' hidden md:table-cell')} />
 		</TableRow>
 	);
 };
@@ -356,7 +356,7 @@ export const FeaturesTable: FC = () => {
 							</TableHead>
 							<TableHead className="">
 								<Typography
-									className={twMerge(
+									className={cn(
 										tableHeadingStyles,
 										'border-b-solid border-b-2 border-secondary'
 									)}
@@ -374,7 +374,7 @@ export const FeaturesTable: FC = () => {
 					</TableHeader>
 					<TableHeader>
 						<TableRow
-							className={twMerge(
+							className={cn(
 								'border-solid border-x-2 border-gray-200 pointer-events-none bg-gray-50'
 							)}
 						>

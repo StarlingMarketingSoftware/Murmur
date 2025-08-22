@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { FormField, FormItem, FormControl } from '@/components/ui/form';
 import { BlockSelect } from '@/components/atoms/BlockSelect/BlockSelect';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/utils';
 
 export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 	const {
@@ -85,7 +85,7 @@ export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 				{activeTab === 'test' && (
 					<div className="grid gap-4 p-6 relative">
 						<div
-							className={twMerge(
+							className={cn(
 								!hasTestMessage
 									? 'absolute w-full h-full top-0 left-0 backdrop-blur-sm z-10'
 									: 'hidden'

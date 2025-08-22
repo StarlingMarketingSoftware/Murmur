@@ -1,9 +1,7 @@
 import * as React from 'react';
 import { Slot as SlotPrimitive } from 'radix-ui';
 import { cva, type VariantProps } from 'class-variance-authority';
-
-import { cn } from '@/utils/index';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/utils';
 import { Spinner } from '../atoms/Spinner/Spinner';
 
 export type ButtonVariants = VariantProps<typeof buttonVariants>;
@@ -144,7 +142,7 @@ function Button({
 				</div>
 			)}
 			<div
-				className={twMerge(
+				className={cn(
 					isLoading ? 'invisible' : 'visible',
 					'flex gap-2 items-center justify-center',
 					noPadding ? '!p-0' : ''

@@ -9,7 +9,7 @@ import {
 	Pagination,
 } from '../../ui/pagination';
 import { Table } from '@tanstack/react-table';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/utils';
 
 interface CustomPaginationProps<TData> {
 	table: Table<TData>;
@@ -97,7 +97,7 @@ const CustomPagination = <TData,>({
 			} else {
 				return (
 					<PaginationItem
-						className={twMerge(
+						className={cn(
 							page === currentPage + 1 &&
 								'bg-background border-primary border-1 text-foreground pointer-events-none',
 							'rounded-md'
@@ -118,7 +118,7 @@ const CustomPagination = <TData,>({
 		<Pagination className="my-4">
 			<PaginationContent>
 				<PaginationItem
-					className={twMerge(currentPage === 0 && 'pointer-events-none opacity-25')}
+					className={cn(currentPage === 0 && 'pointer-events-none opacity-25')}
 					onClick={() => table.previousPage()}
 				>
 					<PaginationPrevious />
@@ -126,7 +126,7 @@ const CustomPagination = <TData,>({
 				<div className="hidden sm:flex">{generatePaginationItems(false)}</div>
 				<div className="flex sm:hidden">{generatePaginationItems(true)}</div>
 				<PaginationItem
-					className={twMerge(
+					className={cn(
 						(currentPage + 1 === numPages || table.getRowModel().rows.length === 0) &&
 							'pointer-events-none opacity-25'
 					)}

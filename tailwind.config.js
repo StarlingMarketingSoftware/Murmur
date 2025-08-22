@@ -19,10 +19,6 @@ module.exports = {
 				'10xl': '10rem', // 160px
 				xs: '0.65rem', // 10.4px - smaller than default xs
 			},
-			fontFamily: {
-				primary: ['var(--font-times)'],
-				secondary: ['var(--font-inter)'],
-			},
 
 			colors: {
 				'ui-01': {
