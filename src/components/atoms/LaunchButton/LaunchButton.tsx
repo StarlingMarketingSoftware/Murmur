@@ -3,13 +3,11 @@ import { Button } from '@/components/ui/button';
 import { urls } from '@/constants/urls';
 import { usePageTransition } from '@/contexts/PageTransitionContext';
 import { useClerk } from '@clerk/nextjs';
-import { useRouter } from 'next/navigation';
 import { isProblematicBrowser } from '@/utils/browserDetection';
 
 export const LaunchButton = () => {
 	const { startTransition } = usePageTransition();
 	const { isSignedIn, openSignIn } = useClerk();
-	const router = useRouter();
 	
 	const hasProblematicBrowser = isProblematicBrowser();
 	

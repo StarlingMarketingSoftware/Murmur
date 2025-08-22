@@ -21,7 +21,7 @@ const shouldUseChromeAnimation = (): boolean => {
 	const isFirefox = ua.includes('Firefox');
 	const isDuckDuckGo = ua.includes('DuckDuckGo');
 	const isIOS = /iPad|iPhone|iPod/.test(ua) || ua.includes('CriOS'); // Treat iOS Chrome as non-Chrome engine
-	const isBrave = (navigator as any).brave !== undefined || ua.includes('Brave');
+	const isBrave = (navigator as unknown as { brave?: boolean }).brave !== undefined || ua.includes('Brave');
 	const isSafari = /Safari/.test(ua) && /Apple Computer/.test(vendor) && !/Chrome/.test(ua);
 	const isChromeDesktop = /Chrome/.test(ua) && /Google Inc/.test(vendor);
 	
