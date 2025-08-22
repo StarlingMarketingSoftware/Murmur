@@ -10,6 +10,52 @@ import React, {
 } from 'react';
 import { useRouter } from 'next/navigation';
 
+// Determine if we should run the premium transition animation
+const shouldUseChromeAnimation = (): boolean => {
+	if (typeof navigator === 'undefined') return false;
+	const ua = navigator.userAgent || '';
+	const vendor = navigator.vendor || '';
+	const isEdge = ua.includes('Edg');
+	const isOpera = ua.includes('OPR') || ua.includes('Opera');
+	const isSamsung = ua.includes('SamsungBrowser');
+	const isFirefox = ua.includes('Firefox');
+	const isDuckDuckGo = ua.includes('DuckDuckGo');
+	const isIOS = /iPad|iPhone|iPod/.test(ua) || ua.includes('CriOS'); // Treat iOS Chrome as non-Chrome engine
+	const isBrave = (navigator as any).brave !== undefined || ua.includes('Brave');
+	const isSafari = /Safari/.test(ua) && /Apple Computer/.test(vendor) && !/Chrome/.test(ua);
+	const isChromeDesktop = /Chrome/.test(ua) && /Google Inc/.test(vendor);
+	
+	const result = isChromeDesktop && !isEdge && !isOpera && !isSamsung && !isFirefox && !isDuckDuckGo && !isIOS && !isBrave && !isSafari;
+	
+	// Debug logging
+	if (typeof window !== 'undefined') {
+		console.log('[PageTransition] Browser detection:', {
+			userAgent: ua,
+			vendor: vendor,
+			isEdge,
+			isSafari,
+			isIOS,
+			isChrome: isChromeDesktop,
+			canAnimate: result
+		});
+	}
+	
+	return result;
+};
+
+// Ensure any scroll locking styles are removed
+const resetScrollLocks = () => {
+	if (typeof document === 'undefined') return;
+	document.body.style.overflow = '';
+	document.body.style.overflowX = '';
+	document.body.style.overflowY = '';
+	document.body.style.position = '';
+	document.body.style.width = '';
+	document.body.style.top = '';
+	document.body.style.touchAction = '';
+	document.documentElement.style.overflow = '';
+};
+
 interface PageTransitionContextType {
 	isTransitioning: boolean;
 	startTransition: (to: string) => void;
@@ -33,11 +79,73 @@ export const PageTransitionProvider: React.FC<PageTransitionProviderProps> = ({ 
 	const [isTransitioning, setIsTransitioning] = useState(false);
 	const [transitionTo, setTransitionTo] = useState<string | null>(null);
 	const router = useRouter();
+	
+	// Check browser support synchronously to avoid timing issues
+	const isChromeBrowser = typeof window !== 'undefined' ? shouldUseChromeAnimation() : false;
 
-	const startTransition = useCallback((to: string) => {
-		setIsTransitioning(true);
-		setTransitionTo(to);
-	}, []);
+	const startTransition = useCallback(
+		(to: string) => {
+			try {
+				console.log('[PageTransition] startTransition called:', { to, isChromeBrowser });
+				
+				// Double-check browser support at call time
+				const canAnimate = isChromeBrowser && shouldUseChromeAnimation();
+				
+				if (canAnimate) {
+					console.log('[PageTransition] Starting animation transition');
+					setIsTransitioning(true);
+					setTransitionTo(to);
+				} else {
+					console.log('[PageTransition] Skipping animation, direct navigation');
+					// Non-Chrome: skip animation and navigate immediately
+					resetScrollLocks();
+					
+					// Ensure we don't accidentally trigger any transitions
+					setIsTransitioning(false);
+					setTransitionTo(null);
+					
+					// Use immediate navigation with multiple fallbacks
+					if (typeof window !== 'undefined') {
+						// Method 1: Direct assignment
+						try {
+							const fullUrl = new URL(to, window.location.origin).toString();
+							console.log('[PageTransition] Navigating to:', fullUrl);
+							window.location.href = fullUrl;
+							return;
+						} catch (e) {
+							console.error('[PageTransition] URL construction failed:', e);
+						}
+						
+						// Method 2: Replace current page
+						try {
+							window.location.replace(to);
+							return;
+						} catch (e) {
+							console.error('[PageTransition] Replace failed:', e);
+						}
+						
+						// Method 3: Assign directly
+						try {
+							window.location.assign(to);
+							return;
+						} catch (e) {
+							console.error('[PageTransition] Assign failed:', e);
+						}
+					}
+					
+					// Final fallback: Next.js router
+					router.push(to);
+				}
+			} catch (error) {
+				console.error('[PageTransition] Critical error in startTransition:', error);
+				// Emergency fallback - just navigate
+				if (typeof window !== 'undefined') {
+					window.location.href = to;
+				}
+			}
+		},
+		[isChromeBrowser, router],
+	);
 
 	const onTransitionComplete = useCallback(() => {
 		if (transitionTo) {
@@ -64,7 +172,7 @@ export const PageTransitionProvider: React.FC<PageTransitionProviderProps> = ({ 
 	return (
 		<PageTransitionContext.Provider value={{ isTransitioning, startTransition }}>
 			{children}
-			{isTransitioning && (
+			{isTransitioning && isChromeBrowser && (
 				<PageTransition isActive={isTransitioning} onComplete={onTransitionComplete} />
 			)}
 		</PageTransitionContext.Provider>
@@ -89,7 +197,19 @@ const PageTransition = ({
 	const verticalLineRef = useRef<HTMLDivElement>(null);
 	const shimmerRef = useRef<HTMLDivElement>(null);
 
+	const isChrome = shouldUseChromeAnimation();
+
 	useEffect(() => {
+		// Final safeguard: never run animations on non-Chrome
+		if (!isChrome) {
+			console.log('[PageTransition] Component mounted on non-Chrome, immediately completing');
+			resetScrollLocks();
+			if (isActive) {
+				onComplete();
+			}
+			return;
+		}
+
 		if (!isActive) return;
 
 		// Check if gsap is available (for SSR compatibility)
@@ -254,9 +374,10 @@ const PageTransition = ({
 				window.scrollTo(0, parseInt(scrollY || '0') * -1);
 			}
 		};
-	}, [isActive, onComplete]);
+	}, [isActive, onComplete, isChrome]);
 
-	if (!isActive) return null;
+	// Never render overlay on non-Chrome browsers
+	if (!isActive || !isChrome) return null;
 
 	return (
 		<div

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safari Browser Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .result {
+            background: #f0f0f0;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .safari { background-color: #d4edda; }
+        .non-safari { background-color: #f8d7da; }
+        .test-button {
+            background-color: #289137;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 7px;
+            cursor: pointer;
+            margin: 10px 0;
+            display: block;
+            font-size: 16px;
+        }
+        pre {
+            background: #333;
+            color: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .working { background-color: #d4edda; color: #155724; }
+        .not-working { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>Safari Browser Test</h1>
+    
+    <div id="browserInfo" class="result">
+        <p>Detecting browser...</p>
+    </div>
+    
+    <h2>Test Navigation Methods:</h2>
+    
+    <button class="test-button" onclick="testSignIn()">Test Sign-In Navigation</button>
+    <button class="test-button" onclick="testDashboard()">Test Dashboard Navigation</button>
+    
+    <h2>Test Results:</h2>
+    <div id="results"></div>
+    
+    <script>
+        function detectBrowser() {
+            const ua = navigator.userAgent || '';
+            const vendor = navigator.vendor || '';
+            
+            // Same detection logic as in the app
+            const isEdge = ua.includes('Edg');
+            const isSafari = /Safari/.test(ua) && /Apple Computer/.test(vendor) && !/Chrome/.test(ua);
+            const isIOS = /iPad|iPhone|iPod/.test(ua) || ua.includes('CriOS');
+            const isChrome = /Chrome/.test(ua) && /Google Inc/.test(vendor);
+            
+            const isProblematicBrowser = isEdge || isSafari || isIOS;
+            
+            const info = document.getElementById('browserInfo');
+            info.className = 'result ' + (isSafari || isIOS ? 'safari' : 'non-safari');
+            
+            let browserName = 'Unknown';
+            if (isSafari) browserName = 'Safari (Desktop)';
+            else if (isIOS) browserName = 'Safari (iOS)';
+            else if (isEdge) browserName = 'Edge';
+            else if (isChrome) browserName = 'Chrome';
+            
+            info.innerHTML = `
+                <h2>Browser Detection Results</h2>
+                <p><strong>Browser:</strong> ${browserName}</p>
+                <p><strong>Should bypass animations:</strong> ${isProblematicBrowser ? 'YES' : 'NO'}</p>
+                <p><strong>Should use direct navigation for sign-in:</strong> ${isProblematicBrowser ? 'YES' : 'NO'}</p>
+                
+                <h3>Detection Details:</h3>
+                <ul>
+                    <li>User Agent: ${ua}</li>
+                    <li>Vendor: ${vendor}</li>
+                    <li>Is Safari Desktop: ${isSafari}</li>
+                    <li>Is iOS/iPad: ${isIOS}</li>
+                    <li>Is Edge: ${isEdge}</li>
+                    <li>Is Chrome: ${isChrome}</li>
+                </ul>
+                
+                <h3>Expected Behavior in This Browser:</h3>
+                <ul>
+                    ${isProblematicBrowser ? `
+                        <li>✅ No transition animations will play</li>
+                        <li>✅ Launch button will navigate directly (no animation)</li>
+                        <li>✅ Sign-in will open in a new page (not modal)</li>
+                        <li>✅ No GSAP animations on landing page</li>
+                    ` : `
+                        <li>🎬 Transition animations will play</li>
+                        <li>🎬 Launch button will show animation</li>
+                        <li>🎬 Sign-in will open as modal</li>
+                        <li>🎬 GSAP animations active</li>
+                    `}
+                </ul>
+            `;
+        }
+        
+        function addResult(message, success) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = 'status ' + (success ? 'working' : 'not-working');
+            div.textContent = message;
+            results.appendChild(div);
+        }
+        
+        function testSignIn() {
+            try {
+                // Save redirect like the app does
+                sessionStorage.setItem('redirectAfterSignIn', '/murmur/dashboard');
+                addResult('✓ Saved redirect URL to sessionStorage', true);
+                
+                // Test navigation
+                setTimeout(() => {
+                    window.location.href = '/sign-in';
+                }, 500);
+                
+                addResult('✓ Sign-in navigation initiated', true);
+            } catch (error) {
+                addResult('✗ Error: ' + error.message, false);
+            }
+        }
+        
+        function testDashboard() {
+            try {
+                window.location.href = '/murmur/dashboard';
+                addResult('✓ Dashboard navigation initiated', true);
+            } catch (error) {
+                addResult('✗ Error: ' + error.message, false);
+            }
+        }
+        
+        // Run detection on load
+        detectBrowser();
+    </script>
+</body>
+</html>

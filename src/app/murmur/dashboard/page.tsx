@@ -2,6 +2,8 @@
 
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { useDashboard } from './useDashboard';
+import { urls } from '@/constants/urls';
+import { isProblematicBrowser } from '@/utils/browserDetection';
 
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import LogoIcon from '@/components/atoms/_svg/LogoIcon';
@@ -28,6 +30,7 @@ import { MobileAppComingSoon } from '@/components/molecules/MobileAppComingSoon/
 const Dashboard = () => {
 	const { isSignedIn, openSignIn } = useClerk();
 	const isMobile = useIsMobile();
+	const hasProblematicBrowser = isProblematicBrowser();
 	const {
 		form,
 		onSubmit,
@@ -114,7 +117,16 @@ const Dashboard = () => {
 									onSubmit={(e) => {
 										e.preventDefault();
 										if (!isSignedIn) {
-											openSignIn();
+											if (hasProblematicBrowser) {
+												// For Edge/Safari, navigate to sign-in page
+												console.log('[Dashboard] Edge/Safari detected, navigating to sign-in page');
+												if (typeof window !== 'undefined') {
+													sessionStorage.setItem('redirectAfterSignIn', window.location.pathname);
+												}
+												window.location.href = urls.signIn.index;
+											} else {
+												openSignIn();
+											}
 										} else {
 											form.handleSubmit(onSubmit)(e);
 										}
