@@ -1,4 +1,4 @@
-import { FC, useEffect, useState, useRef } from 'react';
+import { FC, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -19,7 +19,6 @@ import { urls } from '@/constants/urls';
 export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 	const router = useRouter();
 	const [isContentReady, setIsContentReady] = useState(false);
-	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const {
 		title,
 		open,
@@ -40,69 +39,13 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 	// Ensure dialog content renders after page transition completes
 	useEffect(() => {
 		if (open) {
-			// Reset body styles and wait for next frame
-			const resetBodyStyles = () => {
-				// Ensure body is not in fixed position
-				if (document.body.style.position === 'fixed' || document.body.style.position === 'absolute') {
-					document.body.style.position = '';
-					document.body.style.overflow = '';
-					document.body.style.overflowX = '';
-					document.body.style.overflowY = '';
-					document.body.style.width = '';
-					document.body.style.top = '';
-					document.body.style.touchAction = '';
-					document.documentElement.style.overflow = '';
-				}
-				
-				// Reset scroll position to top when dialog opens
-				window.scrollTo(0, 0);
-				document.body.scrollTop = 0;
-				document.documentElement.scrollTop = 0;
-				
-				// Also reset any scrollable containers within the dialog
-				const dialogContent = document.querySelector('[data-slot="dialog-content"]');
-				if (dialogContent) {
-					(dialogContent as HTMLElement).scrollTop = 0;
-				}
-				
-				// Reset our custom scroll container
-				if (scrollContainerRef.current) {
-					scrollContainerRef.current.scrollTop = 0;
-				}
-				
-				// Wait for layout to stabilize with double RAF for browser paint
-				requestAnimationFrame(() => {
-					requestAnimationFrame(() => {
-						setIsContentReady(true);
-					});
-				});
-			};
-			
-			// Small delay to ensure transition cleanup is complete
-			const timer = setTimeout(resetBodyStyles, 100);
-			return () => clearTimeout(timer);
+			setIsContentReady(true);
 		} else {
 			setIsContentReady(false);
 		}
-	}, [open, scrollContainerRef]);
-
-	// Lock background scroll while dialog is open
-	useEffect(() => {
-		if (!open) return;
-		const prev = document.body.style.overflow;
-		document.body.style.overflow = 'hidden';
-		return () => {
-			document.body.style.overflow = prev;
-		};
 	}, [open]);
 
-	// After identities load/change, ensure we are scrolled to the top
-	useEffect(() => {
-		if (!open) return;
-		const dialogContent = document.querySelector('[data-slot="dialog-content"]') as HTMLElement | null;
-		if (dialogContent) dialogContent.scrollTop = 0;
-		if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
-	}, [open, identities?.length]);
+
 
 	return (
 		<Dialog
@@ -116,7 +59,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 				disableEscapeKeyDown
 				disableOutsideClick
 				onOpenAutoFocus={(e) => e.preventDefault()}
-				className="!fixed !inset-0 !translate-x-0 !translate-y-0 !top-0 !left-0 !max-w-none !max-h-none !h-full !w-full !rounded-none !border-0 !p-0 overflow-hidden data-[state=open]:!animate-none data-[state=closed]:!animate-none"
+				className="!fixed !inset-0 !translate-x-0 !translate-y-0 !top-0 !left-0 !max-w-none !max-h-screen !h-screen !w-full !rounded-none !border-0 !p-0 !overflow-hidden data-[state=open]:!animate-none data-[state=closed]:!animate-none"
 				hideCloseButton={true}
 			>
 				<DialogTitle />
@@ -125,7 +68,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 
 				{/* Main content with fade animation */}
 				<div
-					className="flex flex-col h-full w-full bg-white font-primary overflow-hidden"
+					className="flex flex-col h-screen w-full bg-white font-primary"
 					style={{
 						WebkitAnimation: isContentReady ? 'dialog-smooth-in 0.3s ease-out forwards' : 'none',
 						animation: isContentReady ? 'dialog-smooth-in 0.3s ease-out forwards' : 'none',
@@ -172,8 +115,8 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 					</div>
 
 					{/* Main content area - scrollable */}
-					<div ref={scrollContainerRef} className="flex-1 overflow-y-auto bg-gray-50/30">
-						<div className="min-h-full flex justify-start py-6">
+					<div className="flex-1 min-h-0 overflow-y-auto bg-gray-50/30">
+						<div className="flex justify-start py-6">
 							<div className="w-full max-w-6xl px-8 mx-auto">
 							{isPendingIdentities ? (
 								<div className="h-full flex items-center justify-center">
@@ -295,7 +238,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 					</div>
 
 					{/* Footer with actions - fixed position */}
-					<div className="bg-white px-8 pt-3 pb-2 flex-shrink-0 border-t border-gray-200 z-10">
+					<div className="bg-white px-8 py-4 flex-shrink-0 border-t border-gray-200">
 						<div className="max-w-6xl mx-auto flex justify-center">
 							<Button
 								isLoading={isPendingAssignIdentity}
