@@ -2,58 +2,53 @@
 
 /* Smooth scrolling */
 html {
-  scroll-behavior: smooth;
-  /* Safari scroll fix */
-  -webkit-overflow-scrolling: touch;
+	scroll-behavior: smooth;
+	/* Safari scroll fix */
+	-webkit-overflow-scrolling: touch;
 }
 
 /* Premium text rendering */
 body {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  /* Safari fixes */
-  -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+	/* Safari fixes */
+	-webkit-tap-highlight-color: transparent;
+	-webkit-touch-callout: none;
 }
 
 /* Subtle shadow for depth */
 .luxury-shadow {
-  box-shadow: 
-    0 2px 4px rgba(0, 0, 0, 0.02),
-    0 4px 8px rgba(0, 0, 0, 0.02),
-    0 8px 16px rgba(0, 0, 0, 0.02);
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02), 0 4px 8px rgba(0, 0, 0, 0.02),
+		0 8px 16px rgba(0, 0, 0, 0.02);
 }
 
 /* Premium hover states */
 .luxury-hover {
-  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+	transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .luxury-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 
-    0 4px 8px rgba(0, 0, 0, 0.04),
-    0 8px 16px rgba(0, 0, 0, 0.04),
-    0 16px 32px rgba(0, 0, 0, 0.04);
+	transform: translateY(-2px);
+	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.04), 0 8px 16px rgba(0, 0, 0, 0.04),
+		0 16px 32px rgba(0, 0, 0, 0.04);
 }
 
 /* Remove CTA animation */
 .luxury-cta {
-  /* No animation */
+	/* No animation */
 }
 
 /* Safari opacity animation fixes */
-[ref*="addFadeIn"],
-[ref*="addTextSlide"],
-[ref*="addContainerFade"] {
-  -webkit-transform: translateZ(0);
-  -webkit-backface-visibility: hidden;
-  -webkit-perspective: 1000px;
+[ref*='addFadeIn'],
+[ref*='addTextSlide'],
+[ref*='addContainerFade'] {
+	-webkit-transform: translateZ(0);
+	-webkit-backface-visibility: hidden;
+	-webkit-perspective: 1000px;
 }
 
 /* Prevent Safari flicker on animated elements */
 * {
-  -webkit-font-smoothing: subpixel-antialiased;
-  -webkit-transform-style: preserve-3d;
+	-webkit-font-smoothing: subpixel-antialiased;
 }
