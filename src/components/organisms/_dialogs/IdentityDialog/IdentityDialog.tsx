@@ -15,6 +15,7 @@ import { cn } from '@/utils';
 import { Button } from '@/components/ui/button';
 
 import { urls } from '@/constants/urls';
+import { Typography } from '@/components/ui/typography';
 
 export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 	const router = useRouter();
@@ -129,9 +130,12 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 										{/* Show create form centered when no profiles exist */}
 										{!identities || identities.length === 0 ? (
 											<div className="w-full max-w-md">
-												<h3 className="text-xl font-semibold text-gray-900 mb-6 text-center">
+												<Typography
+													variant="h3"
+													className="text-xl font-semibold text-gray-900 mb-6 text-center"
+												>
 													Create Your First Profile
-												</h3>
+												</Typography>
 												<CreateIdentityPanel
 													setShowCreatePanel={setShowCreatePanel}
 													isEdit={isEdit}
@@ -145,9 +149,12 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 											<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
 												{/* Create New Profile Section */}
 												<div>
-													<h3 className="text-lg font-semibold text-gray-900 mb-3">
+													<Typography
+														variant="h3"
+														className="text-lg font-semibold text-gray-900 mb-3"
+													>
 														Create New Profile
-													</h3>
+													</Typography>
 													<div className="bg-background p-4 rounded-lg">
 														<CreateIdentityPanel
 															setShowCreatePanel={setShowCreatePanel}
@@ -161,9 +168,12 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 
 												{/* Existing Profiles Section */}
 												<div>
-													<h3 className="text-xl font-semibold text-gray-900 mb-4">
+													<Typography
+														variant="h3"
+														className="text-xl font-semibold text-gray-900 mb-4"
+													>
 														Select Existing Profile
-													</h3>
+													</Typography>
 													<Form {...form}>
 														<FormField
 															control={form.control}
