@@ -20,12 +20,14 @@ import { Typography } from '@/components/ui/typography';
 export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 	const router = useRouter();
 	const [isContentReady, setIsContentReady] = useState(false);
+	const [expandedProfileId, setExpandedProfileId] = useState<number | null>(null);
 	const {
 		title,
 		open,
 		onOpenChange,
 		triggerButton,
 		setShowCreatePanel,
+		showCreatePanel,
 		identities,
 		form,
 		isEdit,
@@ -147,25 +149,6 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 										) : (
 											/* Show grid layout when profiles exist */
 											<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
-												{/* Create New Profile Section */}
-												<div>
-													<Typography
-														variant="h3"
-														className="text-lg font-semibold text-gray-900 mb-3"
-													>
-														Create New Profile
-													</Typography>
-													<div className="bg-background p-4 rounded-lg">
-														<CreateIdentityPanel
-															setShowCreatePanel={setShowCreatePanel}
-															isEdit={isEdit}
-															selectedIdentity={isEdit ? selectedIdentity : undefined}
-															showCreatePanel={true}
-															setValue={setValue}
-														/>
-													</div>
-												</div>
-
 												{/* Existing Profiles Section */}
 												<div>
 													<Typography
@@ -189,23 +172,63 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 																			{identities.map((identity) => (
 																				<div
 																					key={identity.id}
-																					className="bg-background p-5 rounded-lg hover:bg-gray-50 transition-all"
+																					className="bg-background rounded-lg hover:bg-gray-50 transition-all cursor-pointer"
+																					onClick={() =>
+																						setExpandedProfileId(
+																							expandedProfileId === identity.id
+																								? null
+																								: identity.id
+																						)
+																					}
 																				>
-																					<div className="flex items-start gap-4">
+																					<div className="flex items-center gap-4 px-0 py-4">
 																						<RadioGroupItem
 																							value={identity.id.toString()}
 																							id={`identity-${identity.id}`}
-																							className="mt-1"
+																							className="mt-0"
+																							onClick={(e) => e.stopPropagation()}
 																						/>
 																						<div className="flex-1">
 																							<Label
-																								className="block text-lg font-semibold text-gray-900 mb-1 cursor-pointer"
+																								className="block text-lg font-semibold text-gray-900 cursor-pointer"
 																								htmlFor={`identity-${identity.id}`}
 																							>
 																								{identity.name}
 																							</Label>
+																						</div>
+																						<svg
+																							width="20"
+																							height="20"
+																							viewBox="0 0 20 20"
+																							fill="none"
+																							xmlns="http://www.w3.org/2000/svg"
+																							className={cn(
+																								'transform transition-transform duration-200',
+																								expandedProfileId === identity.id
+																									? 'rotate-180'
+																									: ''
+																							)}
+																						>
+																							<path
+																								d="M5 7.5L10 12.5L15 7.5"
+																								stroke="currentColor"
+																								strokeWidth="1.5"
+																								strokeLinecap="round"
+																								strokeLinejoin="round"
+																							/>
+																						</svg>
+																					</div>
+																					<div
+																						className={cn(
+																							'overflow-hidden transition-all duration-200',
+																							expandedProfileId === identity.id
+																								? 'max-h-[200px] border-t border-gray-100'
+																								: 'max-h-0'
+																						)}
+																					>
+																						<div className="px-0 py-3">
 																							<Label
-																								className="block text-sm font-medium text-gray-600 mb-1 cursor-pointer"
+																								className="block text-sm font-medium text-gray-600 mb-1"
 																								htmlFor={`identity-${identity.id}`}
 																							>
 																								{identity.email}
@@ -222,9 +245,9 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 																							<button
 																								type="button"
 																								className="text-sm text-blue-600 hover:text-blue-700 underline"
-																								onClick={() => {
+																								onClick={(e) => {
+																									e.stopPropagation();
 																									setIsEdit(true);
-																									// In edit mode, we'll replace the create form with edit form
 																									setShowCreatePanel(true);
 																								}}
 																							>
@@ -240,6 +263,62 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 															)}
 														/>
 													</Form>
+												</div>
+
+												{/* Create New Profile Section */}
+												<div>
+													<div
+														className="bg-background rounded-lg hover:bg-gray-50 transition-all cursor-pointer"
+														onClick={() => setShowCreatePanel((prev) => !prev)}
+													>
+														<div className="flex items-center gap-4 p-4">
+															<div className="flex items-center gap-2">
+																<Typography
+																	variant="h3"
+																	className="text-lg font-semibold text-gray-900"
+																>
+																	Create New Profile
+																</Typography>
+																<svg
+																	width="16"
+																	height="16"
+																	viewBox="0 0 16 16"
+																	fill="none"
+																	xmlns="http://www.w3.org/2000/svg"
+																	className={cn(
+																		'transform transition-transform duration-200',
+																		showCreatePanel ? 'rotate-45' : ''
+																	)}
+																>
+																	<path
+																		d="M8 2V14M2 8H14"
+																		stroke="currentColor"
+																		strokeWidth="2"
+																		strokeLinecap="round"
+																		strokeLinejoin="round"
+																	/>
+																</svg>
+															</div>
+														</div>
+														<div
+															className={cn(
+																'overflow-hidden transition-all duration-200',
+																showCreatePanel
+																	? 'max-h-[500px] border-t border-gray-100'
+																	: 'max-h-0'
+															)}
+														>
+															<div className="p-4 pt-3">
+																<CreateIdentityPanel
+																	setShowCreatePanel={setShowCreatePanel}
+																	isEdit={isEdit}
+																	selectedIdentity={isEdit ? selectedIdentity : undefined}
+																	showCreatePanel={true}
+																	setValue={setValue}
+																/>
+															</div>
+														</div>
+													</div>
 												</div>
 											</div>
 										)}
