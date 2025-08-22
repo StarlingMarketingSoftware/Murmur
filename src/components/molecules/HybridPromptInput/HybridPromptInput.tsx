@@ -137,7 +137,7 @@ const SortableAIBlock = ({
 													form.setValue('draftingTone', tone.value);
 												}}
 												className={cn(
-													'w-[53px] h-[15px] rounded-[8px] text-[10px] font-medium transition-all flex items-center justify-center font-inter',
+													'w-[53px] h-[15px] rounded-[8px] text-[10px] font-medium transition-all flex items-center justify-center font-secondary',
 													form.watch('draftingTone') === tone.value
 														? 'bg-black text-white shadow-sm'
 														: 'bg-gray-200 text-gray-600 hover:bg-gray-300'
@@ -252,7 +252,7 @@ export const HybridPromptInput = ({
 								<div className="relative h-full flex flex-col">
 									{/* Header with X Button */}
 									<div className="flex justify-between items-center p-4 border-b border-gray-200">
-										<h3 className="text-lg font-semibold text-gray-800 font-inter">
+										<h3 className="text-lg font-semibold text-gray-800 font-secondary">
 											Test Email Preview
 										</h3>
 										<button
@@ -390,7 +390,7 @@ export const HybridPromptInput = ({
 								render={({ field }) => (
 									<FormItem>
 										<div className="w-[868px] mx-auto min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2">
-											<FormLabel className="text-base font-semibold font-inter">
+											<FormLabel className="text-base font-semibold font-secondary">
 												Signature
 											</FormLabel>
 											<FormControl>

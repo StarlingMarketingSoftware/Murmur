@@ -121,7 +121,7 @@ export default function HomePage() {
 							>
 								<Typography
 									variant="p"
-									className="text-center text-black font-inter !text-[14px] sm:!text-[22px] md:!text-[26px] whitespace-nowrap font-[300]"
+									className="text-center text-black font-secondary !text-[14px] sm:!text-[22px] md:!text-[26px] whitespace-nowrap font-[300]"
 								>
 									The Ultimate Database + Email Tool for Musicians
 								</Typography>
@@ -237,7 +237,7 @@ export default function HomePage() {
 			<div className="w-full bg-background">
 				<div className="max-w-[1608px] mx-auto pt-18 sm:pt-24">
 					<div ref={(el) => addTextSlide(el)}>
-						<Typography variant="h3" className="text-center text-[27px] font-inter">
+						<Typography variant="h3" className="text-center text-[27px] font-secondary">
 							Trusted by countless professionals
 						</Typography>
 					</div>

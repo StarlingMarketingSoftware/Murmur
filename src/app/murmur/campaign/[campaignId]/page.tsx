@@ -56,11 +56,11 @@ const Murmur = () => {
 						<div className="flex items-center">
 							<Typography
 								variant="h3"
-								className="text-lg font-semibold w-[60px] text-gray-600 font-inter"
+								className="text-lg font-semibold w-[60px] text-gray-600 font-secondary"
 							>
 								To:
 							</Typography>
-							<Typography className="ml-2 !text-[15px] text-gray-600 font-inter">
+							<Typography className="ml-2 !text-[15px] text-gray-600 font-secondary">
 								{campaign?.userContactLists?.map((list) => list.name).join(', ') ||
 									'No recipients selected'}
 							</Typography>
@@ -76,11 +76,11 @@ const Murmur = () => {
 						<div className="flex items-center">
 							<Typography
 								variant="h3"
-								className="text-lg font-semibold w-[60px] text-gray-600 font-inter"
+								className="text-lg font-semibold w-[60px] text-gray-600 font-secondary"
 							>
 								From:
 							</Typography>
-							<Typography className="ml-2 !text-[15px] text-gray-600 font-inter">
+							<Typography className="ml-2 !text-[15px] text-gray-600 font-secondary">
 								{campaign?.identity?.name}
 							</Typography>
 							<Button

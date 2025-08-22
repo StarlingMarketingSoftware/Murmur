@@ -57,7 +57,7 @@ export const Navbar = () => {
 			{/* Main Navigation Bar - Artistic Glass */}
 			<nav
 				className={cn(
-					'fixed top-0 left-0 right-0 z-50 transition-all duration-700 font-inter',
+					'fixed top-0 left-0 right-0 z-50 transition-all duration-700 font-secondary',
 					scrolled
 						? 'bg-background/70 backdrop-blur-xl border-b border-gray-200/20'
 						: 'bg-background/40 backdrop-blur-md'
