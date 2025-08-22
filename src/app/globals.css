@@ -68,6 +68,20 @@
 	--font-primary: var(--font-times);
 	--font-secondary: var(--font-inter);
 	--font-zen: var(--font-zen-antique);
+	--font-tertiary: var(--font-zen-antique);
+}
+
+/* Font family utility classes */
+.font-primary {
+	font-family: var(--font-times), 'Times New Roman', serif;
+}
+
+.font-secondary {
+	font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+.font-tertiary {
+	font-family: var(--font-zen-antique), serif;
 }
 
 :root {
