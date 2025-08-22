@@ -29,9 +29,13 @@ import { Button } from '@/components/ui/button';
 import { X, Plus } from 'lucide-react';
 import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 import { HybridBlock, DraftingTone } from '@prisma/client';
-import { BLOCKS, useHybridPromptInput } from './useHybridPromptInput';
+import {
+	BLOCKS,
+	HybridPromptInputProps,
+	useHybridPromptInput,
+} from './useHybridPromptInput';
 import { cn } from '@/utils';
-import React, { useState, useEffect } from 'react';
+import React, { useState, FC } from 'react';
 
 interface SortableAIBlockProps {
 	block: (typeof BLOCKS)[number];
@@ -210,36 +214,20 @@ const SortableAIBlock = ({
 	);
 };
 
-interface HybridPromptInputProps {
-	trackFocusedField?: (
-		fieldName: string,
-		element: HTMLTextAreaElement | HTMLInputElement | null
-	) => void;
-	testMessage?: string | null;
-}
-
-export const HybridPromptInput = ({
-	trackFocusedField,
-	testMessage,
-}: HybridPromptInputProps) => {
+export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const {
 		form,
 		fields,
-		watchedAvailableBlocks,
 		handleDragEnd,
 		handleRemoveBlock,
 		getBlock,
 		handleAddBlock,
-	} = useHybridPromptInput();
-
-	const [showTestPreview, setShowTestPreview] = useState(false);
-
-	// Show test preview when testMessage changes
-	useEffect(() => {
-		if (testMessage) {
-			setShowTestPreview(true);
-		}
-	}, [testMessage]);
+		showTestPreview,
+		setShowTestPreview,
+		BLOCK_ITEMS,
+		trackFocusedField,
+		testMessage,
+	} = useHybridPromptInput(props);
 
 	return (
 		<div>
@@ -320,62 +308,22 @@ export const HybridPromptInput = ({
 									<DropdownMenuContent className="w-56" align="center">
 										<DropdownMenuLabel>Add Block</DropdownMenuLabel>
 										<DropdownMenuGroup>
-											<DropdownMenuItem
-												onClick={() =>
-													handleAddBlock(
-														BLOCKS.find((b) => b.value === HybridBlock.full_automated)!
-													)
-												}
-												key={HybridBlock.full_automated}
-											>
-												Full Automated
-											</DropdownMenuItem>
-											<DropdownMenuItem
-												onClick={() =>
-													handleAddBlock(
-														BLOCKS.find((b) => b.value === HybridBlock.introduction)!
-													)
-												}
-												key={HybridBlock.introduction}
-												disabled={
-													!watchedAvailableBlocks.includes(HybridBlock.introduction)
-												}
-											>
-												Introduction{' '}
-												{!watchedAvailableBlocks.includes(HybridBlock.introduction) &&
-													'(Used)'}
-											</DropdownMenuItem>
-											<DropdownMenuItem
-												onClick={() =>
-													handleAddBlock(
-														BLOCKS.find((b) => b.value === HybridBlock.research)!
-													)
-												}
-												key={HybridBlock.research}
-												disabled={!watchedAvailableBlocks.includes(HybridBlock.research)}
-											>
-												Research Contact{' '}
-												{!watchedAvailableBlocks.includes(HybridBlock.research) &&
-													'(Used)'}
-											</DropdownMenuItem>
-											<DropdownMenuItem
-												onClick={() =>
-													handleAddBlock(
-														BLOCKS.find((b) => b.value === HybridBlock.action)!
-													)
-												}
-												key={HybridBlock.action}
-												disabled={!watchedAvailableBlocks.includes(HybridBlock.action)}
-											>
-												Call to Action{' '}
-												{!watchedAvailableBlocks.includes(HybridBlock.action) && '(Used)'}
-											</DropdownMenuItem>
-											<DropdownMenuItem
-												onClick={() => handleAddBlock(getBlock(HybridBlock.text))}
-												key={HybridBlock.text}
-											>
-												Text
-											</DropdownMenuItem>
+											{BLOCK_ITEMS.map((item) => (
+												<DropdownMenuItem
+													key={item.value}
+													onClick={() => {
+														if (item.value === HybridBlock.text) {
+															handleAddBlock(getBlock(HybridBlock.text));
+														} else {
+															handleAddBlock(BLOCKS.find((b) => b.value === item.value)!);
+														}
+													}}
+													disabled={item.disabled}
+												>
+													{item.label}
+													{item.showUsed && item.disabled && ` (Used)`}
+												</DropdownMenuItem>
+											))}
 										</DropdownMenuGroup>
 									</DropdownMenuContent>
 								</DropdownMenu>
