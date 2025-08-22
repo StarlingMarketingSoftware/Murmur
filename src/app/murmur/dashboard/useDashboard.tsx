@@ -18,7 +18,7 @@ import { useCreateApolloContacts } from '@/hooks/queryHooks/useApollo';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { toast } from 'sonner';
 
-import { capitalize } from '@/utils/string';
+import { capitalize, getStateAbbreviation } from '@/utils/string';
 import { TableCellTooltip } from '@/components/molecules/TableCellTooltip/TableCellTooltip';
 import { useMe } from '@/hooks/useMe';
 import { StripeSubscriptionStatus } from '@/types';
@@ -417,9 +417,11 @@ export const useDashboard = () => {
 				size: 150,
 				header: () => <span className="font-bold">State</span>,
 				cell: ({ row }) => {
+					const fullStateName = row.getValue('state') as string;
+					const stateAbbr = getStateAbbreviation(fullStateName);
 					return (
 						<TableCellTooltip
-							text={row.getValue('state')}
+							text={stateAbbr}
 							maxLength={MAX_CELL_LENGTH}
 							positioning="below-right"
 							onHover={handleCellHover}
