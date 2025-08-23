@@ -267,11 +267,11 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 
 												{/* Create New Profile Section */}
 												<div>
-													<div
-														className="bg-background rounded-lg hover:bg-gray-50 transition-all cursor-pointer"
-														onClick={() => setShowCreatePanel((prev) => !prev)}
-													>
-														<div className="flex items-center gap-4 p-4">
+													<div className="bg-background rounded-lg transition-all">
+														<div
+															className="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-pointer"
+															onClick={() => setShowCreatePanel((prev) => !prev)}
+														>
 															<div className="flex items-center gap-2">
 																<Typography
 																	variant="h3"
@@ -307,6 +307,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 																	? 'max-h-[500px] border-t border-gray-100'
 																	: 'max-h-0'
 															)}
+															onClick={(e) => e.stopPropagation()}
 														>
 															<div className="p-4 pt-3">
 																<CreateIdentityPanel
