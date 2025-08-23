@@ -74,6 +74,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 									<InfoTooltip message="This is the address where you will receive your responses." />
 								</div>
 								<FormControl>
+									n
 									<div className="flex gap-2 items-center">
 										<div className="flex-1 relative">
 											<Input {...field} disabled={isCodeVerified} />

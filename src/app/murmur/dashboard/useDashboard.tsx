@@ -12,7 +12,7 @@ import {
 	useGetContacts,
 	useGetUsedContactIds,
 } from '@/hooks/queryHooks/useContacts';
-import { CellContext, ColumnDef, Table } from '@tanstack/react-table';
+import { ColumnDef, Table } from '@tanstack/react-table';
 import { ContactWithName } from '@/types/contact';
 import { useCreateApolloContacts } from '@/hooks/queryHooks/useApollo';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
@@ -259,9 +259,9 @@ export const useDashboard = () => {
 		setTableInstance(table);
 	};
 
-	const handleCellHover = (text: string | null) => {
+	const handleCellHover = useCallback((text: string | null) => {
 		setHoveredText(text || '');
-	};
+	}, []);
 
 	/* EFFECTS */
 	useEffect(() => {
@@ -285,16 +285,16 @@ export const useDashboard = () => {
 	}, []);
 
 	// Since pagination is disabled, check if majority of contacts have names
-	const visibleRowsHaveNames = useMemo(() => {
-		if (!contacts || contacts.length === 0) return false;
+	// const visibleRowsHaveNames = useMemo(() => {
+	// 	if (!contacts || contacts.length === 0) return false;
 
-		// Check what percentage of contacts have names
-		const contactsWithNames = contacts.filter((contact) => contactHasName(contact));
-		const ratio = contactsWithNames.length / contacts.length;
-		const threshold = 0.7; // 70% threshold for header to be fully visible
+	// 	// Check what percentage of contacts have names
+	// 	const contactsWithNames = contacts.filter((contact) => contactHasName(contact));
+	// 	const ratio = contactsWithNames.length / contacts.length;
+	// 	const threshold = 0.7; // 70% threshold for header to be fully visible
 
-		return ratio > threshold; // Header is visible if more than 70% have names
-	}, [contacts, contactHasName]);
+	// 	return ratio > threshold; // Header is visible if more than 70% have names
+	// }, [contacts, contactHasName]);
 
 	// Build columns for the table
 	const columns = useMemo(() => {
