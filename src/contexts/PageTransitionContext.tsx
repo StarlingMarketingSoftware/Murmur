@@ -178,11 +178,12 @@ export const PageTransitionProvider: React.FC<PageTransitionProviderProps> = ({
 
 			// Navigate to the new page
 			router.push(transitionTo);
-			// Clean up transition state after navigation and fade out
+			// Keep the overlay visible longer to prevent flash
+			// Only clean up after navigation has likely completed
 			setTimeout(() => {
 				setIsTransitioning(false);
 				setTransitionTo(null);
-			}, 500); // Keep overlay visible longer to cover page load
+			}, 1000); // Longer delay to ensure page has loaded
 		}
 	}, [router, transitionTo]);
 
@@ -300,7 +301,7 @@ const PageTransition = ({
 			// Fade in container
 			.to(containerRef.current, {
 				opacity: 1,
-				duration: 0.2,
+				duration: 0.1,
 				ease: 'power2.out',
 			})
 			// First horizontal line slides in from left
@@ -309,120 +310,69 @@ const PageTransition = ({
 				{
 					x: '0%',
 					opacity: 0.85,
-					duration: 0.7,
+					duration: 0.5,
 					ease: 'power3.out',
 				},
-				'-=0.1'
+				'-=0.05'
 			)
-			// Second horizontal line slides in from right
+			// Second horizontal line slides in from right (heavy overlap)
 			.to(
 				lineTwoRef.current,
 				{
 					x: '0%',
 					opacity: 0.75,
-					duration: 0.8,
+					duration: 0.55,
 					ease: 'power3.out',
 				},
-				'-=0.6'
+				'-=0.48'
 			)
-			// Center line expands
+			// Center line expands (heavy overlap)
 			.to(
 				lineThreeRef.current,
 				{
 					width: '100%',
 					opacity: 0.9,
-					duration: 0.9,
+					duration: 0.6,
 					ease: 'power2.inOut',
 				},
-				'-=0.7'
+				'-=0.53'
 			)
-			// Vertical line descends
+			// Vertical line descends (heavy overlap)
 			.to(
 				verticalLineRef.current,
 				{
 					y: '0%',
 					opacity: 0.7,
-					duration: 1.0,
+					duration: 0.6,
 					ease: 'power2.out',
 				},
-				'-=0.8'
+				'-=0.58'
 			)
-			// White overlay builds
-			.to(
-				whiteOverlayRef.current,
-				{
-					opacity: 0.7,
-					duration: 0.6,
-					ease: 'power2.inOut',
-				},
-				'-=0.5'
-			)
-			// Subtle shimmer
+			// Subtle shimmer (runs during lines)
 			.to(
 				shimmerRef.current,
 				{
 					x: '150%',
-					duration: 1.2,
+					duration: 0.7,
 					ease: 'power1.inOut',
 				},
-				'-=0.9'
+				'-=0.6'
 			)
-			// Brief pause
-			.to(
-				{},
-				{
-					duration: 0.2,
-				}
-			)
-			// Exit animation - lines fade out
-			.to(
-				[
-					lineOneRef.current,
-					lineTwoRef.current,
-					lineThreeRef.current,
-					verticalLineRef.current,
-				],
-				{
-					opacity: 0,
-					duration: 0.5,
-					stagger: 0.08,
-					ease: 'power2.in',
-				}
-			)
-			// Final white fade
+			// Quick white fade (no line fade-out, just go to white)
 			.to(
 				whiteOverlayRef.current,
 				{
 					opacity: 1,
-					duration: 0.5,
+					duration: 0.25,
 					ease: 'power2.in',
 				},
-				'-=0.4'
+				'-=0.1'
 			)
-			// Hold white screen briefly
-			.to(
-				{},
-				{
-					duration: 0.15,
-				}
-			)
-			// Navigate when fully white
+			// Navigate immediately when fully white
 			.call(() => {
 				onComplete();
-			})
-			// Keep white overlay a bit longer to cover page load
-			.to(
-				{},
-				{
-					duration: 0.3,
-				}
-			)
-			// Final container fade
-			.to(containerRef.current, {
-				opacity: 0,
-				duration: 0.2,
-				ease: 'power2.out',
 			});
+		// Don't fade out - let the white screen stay until navigation completes
 
 		return () => {
 			tl.kill();
