@@ -74,16 +74,15 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 									<InfoTooltip message="This is the address where you will receive your responses." />
 								</div>
 								<FormControl>
-									n
-									<div className="flex gap-2 items-center">
-										<div className="flex-1 relative">
+									<div className="grid grid-cols-5 gap-2 items-center">
+										<div className="col-span-4 relative">
 											<Input {...field} disabled={isCodeVerified} />
 											{isCodeVerified && (
 												<CheckCircleIcon className="absolute top-1/4 right-4 stroke-primary" />
 											)}
 										</div>
 										<Button
-											className="whitespace-nowrap"
+											className="col-span-1 min-w-0 w-full"
 											variant={isCodeVerified ? 'light' : 'primary-light'}
 											type="button"
 											onClick={(e) => {

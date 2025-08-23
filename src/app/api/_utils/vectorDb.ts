@@ -408,9 +408,7 @@ export const searchSimilarContacts = async (
 		fields: [
 			'contactId',
 			'email',
-			'firstName.keyword',
 			'firstName',
-			'lastName.keyword',
 			'lastName',
 			'company',
 			'title',
@@ -515,18 +513,15 @@ export const searchSimilarContacts = async (
 
 	const processedHits = processResultsWithLocationBoost(results.hits.hits);
 
-	// Debug log to see what's coming from Elasticsearch
-	console.log('First hit fields:', JSON.stringify(results.hits.hits[0]?.fields, null, 2));
-
 	return {
 		matches: processedHits.map((hit) => ({
 			id: hit._id,
 			score: hit._score || 0,
 			metadata: {
-				contactId: hit.fields?.contactId?.[0],
-				email: hit.fields?.email?.[0],
-				firstName: hit.fields?.firstName?.[0] || null,
-				lastName: hit.fields?.lastName?.[0] || null,
+				contactId: hit.fields?.contactId[0],
+				email: hit.fields?.email[0],
+				firstName: hit.fields?.firstName?.[0],
+				lastName: hit.fields?.lastName?.[0],
 				company: hit.fields?.company?.[0],
 				title: hit.fields?.title?.[0],
 				headline: hit.fields?.headline?.[0],
@@ -584,9 +579,7 @@ export const searchContactsByLocation = async (
 		fields: [
 			'contactId',
 			'email',
-			'firstName.keyword',
 			'firstName',
-			'lastName.keyword',
 			'lastName',
 			'company',
 			'title',

@@ -82,14 +82,10 @@ const SortableAIBlock = ({
 				isDragging ? 'opacity-50 z-50 transform-gpu' : ''
 			)}
 		>
-			{/* Drag handle - only on the left side to avoid interfering with buttons */}
 			<div
 				{...attributes}
 				{...listeners}
-				className={cn(
-					'absolute top-0 left-0 h-12 cursor-move z-[1]',
-					isFullAutomatedBlock ? 'w-24' : 'w-full' // Limit width for Full Automated block
-				)}
+				className="absolute top-0 left-0 right-0 h-12 cursor-move z-[5]"
 			/>
 			<div className="flex items-center p-4">
 				<div className="flex-grow">
@@ -129,7 +125,7 @@ const SortableAIBlock = ({
 									{block.label}
 								</Typography>
 								{isFullAutomatedBlock && (
-									<div className="flex gap-1 relative z-[100] pointer-events-auto">
+									<div className="flex gap-1">
 										{[
 											{ value: DraftingTone.normal, label: 'Normal' },
 											{ value: DraftingTone.explanatory, label: 'Explain' },
@@ -142,14 +138,10 @@ const SortableAIBlock = ({
 												type="button"
 												onClick={(e) => {
 													e.stopPropagation();
-													e.preventDefault();
 													form.setValue('draftingTone', tone.value);
 												}}
-												onMouseDown={(e) => {
-													e.stopPropagation();
-												}}
 												className={cn(
-													'w-[53px] h-[15px] rounded-[8px] text-[10px] font-medium transition-all flex items-center justify-center font-secondary cursor-pointer',
+													'w-[53px] h-[15px] rounded-[8px] text-[10px] font-medium transition-all flex items-center justify-center font-secondary',
 													form.watch('draftingTone') === tone.value
 														? 'bg-black text-white shadow-sm'
 														: 'bg-gray-200 text-gray-600 hover:bg-gray-300'
@@ -157,8 +149,6 @@ const SortableAIBlock = ({
 												style={{
 													WebkitAppearance: 'none',
 													WebkitTapHighlightColor: 'transparent',
-													pointerEvents: 'auto',
-													cursor: 'pointer',
 												}}
 											>
 												{tone.label}
