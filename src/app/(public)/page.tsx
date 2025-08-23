@@ -13,6 +13,7 @@ import { ComparisonTable } from '@/components/molecules/ComparisonTable/Comparis
 import { ScrollingReviews } from '@/components/molecules/ScrollingReviews/ScrollingReviews';
 import { LeadSender } from '@/components/organisms/LeadSender/LeadSender';
 import { LaunchButton } from '@/components/atoms/LaunchButton/LaunchButton';
+// import { LaunchButtonDirect as LaunchButton } from '@/components/atoms/LaunchButton/LaunchButtonDirect';
 import { useScrollAnimations } from '@/hooks/useScrollAnimations';
 import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
@@ -81,12 +82,14 @@ export default function HomePage() {
 				}
 			);
 		}
+
+		// No animations for hero text and subtitle - they appear immediately
 	}, []);
 
 	return (
 		<main className="overflow-hidden">
 			<div
-				className="relative w-screen bg-background py-12 sm:py-16 md:py-20 lg:py-24"
+				className="relative w-screen bg-white py-12 sm:py-16 md:py-20 lg:py-24"
 				ref={heroRef}
 			>
 				{/* Content layer */}
@@ -109,22 +112,23 @@ export default function HomePage() {
 							>
 								Murmur
 							</Typography>
-							<Typography
-								className="text-center !text-[24px] sm:!text-[28px] md:!text-[34px] leading-[1] mt-8 sm:mt-12 md:mt-16 lg:mt-[72px] whitespace-normal sm:whitespace-nowrap font-tertiary font-normal"
+							<h2
+								className="text-center !text-[24px] sm:!text-[28px] md:!text-[34px] leading-[1] mt-8 sm:mt-12 md:mt-16 lg:mt-[72px] whitespace-normal sm:whitespace-nowrap !font-zen"
+								style={{ fontWeight: 400 }}
 								data-hero-element
 							>
 								Get Contacts. Get Work. Email Anyone.
-							</Typography>
+							</h2>
 							<div
 								className="w-full max-w-[764px] mx-auto mt-2 flex items-center justify-center px-4"
 								data-hero-element
 							>
-								<Typography
-									variant="p"
-									className="text-center text-black font-secondary !text-[14px] sm:!text-[22px] md:!text-[26px] whitespace-nowrap font-[300]"
+								<p
+									className="text-center text-black font-inter !text-[14px] sm:!text-[22px] md:!text-[26px] whitespace-nowrap"
+									style={{ fontWeight: 300 }}
 								>
 									The Ultimate Database + Email Tool for Musicians
-								</Typography>
+								</p>
 							</div>
 						</div>
 					</div>
@@ -152,7 +156,7 @@ export default function HomePage() {
 						<div ref={(el) => addTextSlide(el)}>
 							<Typography
 								variant="h2"
-								className="text-center sm:text-left text-[30px] sm:text-[42px] w-full mb-8 font-tertiary"
+								className="text-center sm:text-left text-[30px] sm:text-[42px] w-full mb-8 !font-zen"
 							>
 								Not Another Email Tool.
 							</Typography>
@@ -195,7 +199,7 @@ export default function HomePage() {
 						<div ref={(el) => addTextSlide(el)}>
 							<Typography
 								variant="h2"
-								className="text-center sm:text-left w-full text-background text-[30px] sm:text-[42px] font-tertiary"
+								className="text-center sm:text-left w-full text-background text-[30px] sm:text-[42px] !font-zen"
 							>
 								Send without Limits.<br></br> Dream without Boundaries.
 							</Typography>
@@ -237,7 +241,7 @@ export default function HomePage() {
 			<div className="w-full bg-background">
 				<div className="max-w-[1608px] mx-auto pt-18 sm:pt-24">
 					<div ref={(el) => addTextSlide(el)}>
-						<Typography variant="h3" className="text-center text-[27px] font-secondary">
+						<Typography variant="h3" className="text-center text-[27px] font-inter">
 							Trusted by countless professionals
 						</Typography>
 					</div>
@@ -269,7 +273,7 @@ export default function HomePage() {
 					<div ref={(el) => addTextSlide(el)} data-persistent-content>
 						<Typography
 							variant="h2"
-							className="text-center sm:text-left text-[30px] sm:text-[42px] font-tertiary"
+							className="text-center sm:text-left text-[30px] sm:text-[42px] !font-zen"
 						>
 							Murmur helps you draft.<br></br> No ChatGPT. We built our own.
 						</Typography>
@@ -294,7 +298,7 @@ export default function HomePage() {
 				<div ref={(el) => addTextSlide(el)}>
 					<Typography
 						variant="h2"
-						className="text-center mx-auto py-8 text-[30px] sm:text-[42px] font-tertiary"
+						className="text-center mx-auto py-8 text-[30px] sm:text-[42px] !font-zen"
 					>
 						{`Find the plan that's right for`} <span className="italic">you</span>
 					</Typography>
@@ -317,7 +321,7 @@ export default function HomePage() {
 					<Link href={urls.pricing.index}>
 						<Button
 							size="lg"
-							className="bg-[#000000] text-background hover:bg-[#000000]/90 px-12 font-tertiary rounded-[5.59px] luxury-hover luxury-shadow"
+							className="bg-[#000000] text-white hover:bg-[#000000]/90 px-12 font-tertiary rounded-[5.59px] luxury-hover luxury-shadow"
 						>
 							Learn More
 						</Button>
@@ -332,7 +336,7 @@ export default function HomePage() {
 						header=""
 						title="FAQs"
 						description="Everything you need to know about Murmur!"
-						showMoreLink={urls.contact.index}
+						showMoreLink="/contact"
 					/>
 				</div>
 				<div className="h-24" />
