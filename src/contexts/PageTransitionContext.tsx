@@ -121,44 +121,13 @@ export const PageTransitionProvider: React.FC<PageTransitionProviderProps> = ({
 					setIsTransitioning(false);
 					setTransitionTo(null);
 
-					// Use immediate navigation with multiple fallbacks
-					if (typeof window !== 'undefined') {
-						// Method 1: Direct assignment
-						try {
-							const fullUrl = new URL(to, window.location.origin).toString();
-							console.log('[PageTransition] Navigating to:', fullUrl);
-							window.location.href = fullUrl;
-							return;
-						} catch (e) {
-							console.error('[PageTransition] URL construction failed:', e);
-						}
-
-						// Method 2: Replace current page
-						try {
-							window.location.replace(to);
-							return;
-						} catch (e) {
-							console.error('[PageTransition] Replace failed:', e);
-						}
-
-						// Method 3: Assign directly
-						try {
-							window.location.assign(to);
-							return;
-						} catch (e) {
-							console.error('[PageTransition] Assign failed:', e);
-						}
-					}
-
-					// Final fallback: Next.js router
+					// Use Next.js router for navigation to ensure proper routing
 					router.push(to);
 				}
 			} catch (error) {
 				console.error('[PageTransition] Critical error in startTransition:', error);
-				// Emergency fallback - just navigate
-				if (typeof window !== 'undefined') {
-					window.location.href = to;
-				}
+				// Emergency fallback - use Next.js router
+				router.push(to);
 			}
 		},
 		[isChromeBrowser, router]
@@ -178,12 +147,11 @@ export const PageTransitionProvider: React.FC<PageTransitionProviderProps> = ({
 
 			// Navigate to the new page
 			router.push(transitionTo);
-			// Keep the overlay visible longer to prevent flash
-			// Only clean up after navigation has likely completed
+			// Clean up transition state after navigation and fade out
 			setTimeout(() => {
 				setIsTransitioning(false);
 				setTransitionTo(null);
-			}, 1000); // Longer delay to ensure page has loaded
+			}, 200); // Reduced delay to match faster animation
 		}
 	}, [router, transitionTo]);
 
@@ -310,69 +278,114 @@ const PageTransition = ({
 				{
 					x: '0%',
 					opacity: 0.85,
-					duration: 0.5,
+					duration: 0.3,
 					ease: 'power3.out',
 				},
 				'-=0.05'
 			)
-			// Second horizontal line slides in from right (heavy overlap)
+			// Second horizontal line slides in from right
 			.to(
 				lineTwoRef.current,
 				{
 					x: '0%',
 					opacity: 0.75,
-					duration: 0.55,
+					duration: 0.35,
 					ease: 'power3.out',
 				},
-				'-=0.48'
+				'-=0.25'
 			)
-			// Center line expands (heavy overlap)
+			// Center line expands
 			.to(
 				lineThreeRef.current,
 				{
 					width: '100%',
 					opacity: 0.9,
-					duration: 0.6,
+					duration: 0.4,
 					ease: 'power2.inOut',
 				},
-				'-=0.53'
+				'-=0.3'
 			)
-			// Vertical line descends (heavy overlap)
+			// Vertical line descends
 			.to(
 				verticalLineRef.current,
 				{
 					y: '0%',
 					opacity: 0.7,
-					duration: 0.6,
+					duration: 0.4,
 					ease: 'power2.out',
 				},
-				'-=0.58'
+				'-=0.35'
 			)
-			// Subtle shimmer (runs during lines)
+			// White overlay builds
+			.to(
+				whiteOverlayRef.current,
+				{
+					opacity: 0.7,
+					duration: 0.25,
+					ease: 'power2.inOut',
+				},
+				'-=0.2'
+			)
+			// Subtle shimmer
 			.to(
 				shimmerRef.current,
 				{
 					x: '150%',
-					duration: 0.7,
+					duration: 0.5,
 					ease: 'power1.inOut',
 				},
-				'-=0.6'
+				'-=0.4'
 			)
-			// Quick white fade (no line fade-out, just go to white)
+			// Brief pause (removed - no pause needed)
+			// Exit animation - lines fade out
+			.to(
+				[
+					lineOneRef.current,
+					lineTwoRef.current,
+					lineThreeRef.current,
+					verticalLineRef.current,
+				],
+				{
+					opacity: 0,
+					duration: 0.2,
+					stagger: 0.03,
+					ease: 'power2.in',
+				}
+			)
+			// Final white fade
 			.to(
 				whiteOverlayRef.current,
 				{
 					opacity: 1,
-					duration: 0.25,
+					duration: 0.2,
 					ease: 'power2.in',
 				},
-				'-=0.1'
+				'-=0.15'
 			)
-			// Navigate immediately when fully white
+			// Hold white screen briefly (reduced)
+			.to(
+				{},
+				{
+					duration: 0.05,
+				}
+			)
+			// Navigate when fully white
 			.call(() => {
 				onComplete();
+			})
+			// Keep white overlay a bit longer to cover page load (reduced)
+			.to(
+				{},
+				{
+					duration: 0.1,
+				}
+			)
+			// Final container fade
+			.to(containerRef.current, {
+				opacity: 0,
+				duration: 0.1,
+				ease: 'power2.out',
 			});
-		// Don't fade out - let the white screen stay until navigation completes
 
 		return () => {
 			tl.kill();
