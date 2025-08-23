@@ -68,6 +68,20 @@
 	--font-primary: var(--font-times);
 	--font-secondary: var(--font-inter);
 	--font-zen: var(--font-zen-antique);
+	--font-tertiary: var(--font-zen-antique);
+}
+
+/* Font family utility classes */
+.font-primary {
+	font-family: var(--font-times), 'Times New Roman', serif;
+}
+
+.font-secondary {
+	font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+.font-tertiary {
+	font-family: var(--font-zen-antique), serif;
 }
 
 :root {
@@ -1766,15 +1780,8 @@ mux-player {
 	align-items: center;
 }
 
-/* Custom toggle switch styles */
-.exclude-contacts-box input[type='checkbox']:checked + div {
-	background-color: #e5e5e5 !important;
-}
-
-.exclude-contacts-box input[type='checkbox']:checked + div::after {
-	transform: translateX(10px);
-	-webkit-transform: translateX(10px);
-}
+/* Custom toggle switch styles - REMOVED OLD CONFLICTING STYLES */
+/* Old styles that forced gray background have been removed */
 
 /* Safari-specific fixes for toggle */
 @supports (-webkit-appearance: none) {
@@ -2806,4 +2813,37 @@ body.murmur-page footer {
 	/* Allow hero to grow with viewport height to contain search bar */
 	min-height: calc(320px + max(0px, 10vh - 80px));
 	height: auto;
+}
+
+/* Toggle switch styles - using data attributes for maximum specificity */
+.toggle-switch-track[data-checked='true'] {
+	background-color: rgba(93, 171, 104, 0.49) !important;
+	background: rgba(93, 171, 104, 0.49) !important;
+}
+
+.toggle-switch-track[data-checked='false'] {
+	background-color: #e5e5e5 !important;
+	background: #e5e5e5 !important;
+}
+
+/* Fallback with class names */
+.toggle-switch-track.toggle-on {
+	background-color: rgba(93, 171, 104, 0.49) !important;
+	background: rgba(93, 171, 104, 0.49) !important;
+}
+
+.toggle-switch-track.toggle-off {
+	background-color: #e5e5e5 !important;
+	background: #e5e5e5 !important;
+}
+
+/* Even more specific rules to override any parent background */
+.exclude-contacts-box .toggle-switch-track[data-checked='true'] {
+	background-color: rgba(93, 171, 104, 0.49) !important;
+	background: rgba(93, 171, 104, 0.49) !important;
+}
+
+.exclude-contacts-box .toggle-switch-track[data-checked='false'] {
+	background-color: #e5e5e5 !important;
+	background: #e5e5e5 !important;
 }

@@ -193,3 +193,88 @@ export const generatePromptsFromBlocks = (blocks: HybridBlockPrompt[]): string =
 	}
 	return prompts.join('\n\n');
 };
+
+/**
+ * Converts full state names to their two-letter abbreviations
+ * @param stateName - The full state name (e.g., "California", "New York")
+ * @returns The two-letter state abbreviation (e.g., "CA", "NY") or the original input if not found
+ */
+export const getStateAbbreviation = (stateName: string | null | undefined): string => {
+	if (!stateName) return '';
+
+	// Mapping of full state names to abbreviations
+	const stateAbbreviations: Record<string, string> = {
+		alabama: 'AL',
+		alaska: 'AK',
+		arizona: 'AZ',
+		arkansas: 'AR',
+		california: 'CA',
+		colorado: 'CO',
+		connecticut: 'CT',
+		delaware: 'DE',
+		florida: 'FL',
+		georgia: 'GA',
+		hawaii: 'HI',
+		idaho: 'ID',
+		illinois: 'IL',
+		indiana: 'IN',
+		iowa: 'IA',
+		kansas: 'KS',
+		kentucky: 'KY',
+		louisiana: 'LA',
+		maine: 'ME',
+		maryland: 'MD',
+		massachusetts: 'MA',
+		michigan: 'MI',
+		minnesota: 'MN',
+		mississippi: 'MS',
+		missouri: 'MO',
+		montana: 'MT',
+		nebraska: 'NE',
+		nevada: 'NV',
+		'new hampshire': 'NH',
+		'new jersey': 'NJ',
+		'new mexico': 'NM',
+		'new york': 'NY',
+		'north carolina': 'NC',
+		'north dakota': 'ND',
+		ohio: 'OH',
+		oklahoma: 'OK',
+		oregon: 'OR',
+		pennsylvania: 'PA',
+		'rhode island': 'RI',
+		'south carolina': 'SC',
+		'south dakota': 'SD',
+		tennessee: 'TN',
+		texas: 'TX',
+		utah: 'UT',
+		vermont: 'VT',
+		virginia: 'VA',
+		washington: 'WA',
+		'west virginia': 'WV',
+		wisconsin: 'WI',
+		wyoming: 'WY',
+		// U.S. Territories
+		'american samoa': 'AS',
+		'district of columbia': 'DC',
+		guam: 'GU',
+		'northern mariana islands': 'MP',
+		'puerto rico': 'PR',
+		'u.s. virgin islands': 'VI',
+		'virgin islands': 'VI',
+	};
+
+	// Clean and normalize the input
+	const normalizedState = stateName.trim().toLowerCase();
+
+	// Check if it's already an abbreviation (2 uppercase letters)
+	if (/^[A-Z]{2}$/.test(stateName.trim())) {
+		return stateName.trim();
+	}
+
+	// Look up the abbreviation
+	const abbreviation = stateAbbreviations[normalizedState];
+
+	// Return the abbreviation if found, otherwise return the original input
+	return abbreviation || stateName;
+};
