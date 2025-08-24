@@ -157,6 +157,28 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 								{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
 							</Button>
 						</div>
+
+						{/* New section matching Email Template box style */}
+						<div className="mb-3 mt-6">
+							<FormLabel>New Section</FormLabel>
+						</div>
+						<div className="flex gap-[47px] items-start">
+							<div className="flex-shrink-0">
+								{/* Empty content area - to be filled later */}
+								<div
+									className="bg-white"
+									style={{
+										width: '892px',
+										height: '530px',
+										border: '3px solid #000000',
+										borderRadius: '8px',
+									}}
+								>
+									{/* Content will go here */}
+								</div>
+							</div>
+						</div>
+
 						<div>
 							<div className="flex flex-col gap-4 mt-4">
 								<div className="flex flex-col sm:flex-row gap-4 items-center justify-end">
