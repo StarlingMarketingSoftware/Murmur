@@ -1766,14 +1766,37 @@ mux-player {
 	align-items: center;
 }
 
-/* Custom toggle switch styles */
-.exclude-contacts-box input[type='checkbox']:checked + div {
-	background-color: #e5e5e5 !important;
+/* Toggle switch styles - using data attributes for maximum specificity */
+.toggle-switch-track[data-checked='true'] {
+	background-color: rgba(93, 171, 104, 0.49) !important;
+	background: rgba(93, 171, 104, 0.49) !important;
 }
 
-.exclude-contacts-box input[type='checkbox']:checked + div::after {
-	transform: translateX(10px);
-	-webkit-transform: translateX(10px);
+.toggle-switch-track[data-checked='false'] {
+	background-color: #e5e5e5 !important;
+	background: #e5e5e5 !important;
+}
+
+/* Fallback with class names */
+.toggle-switch-track.toggle-on {
+	background-color: rgba(93, 171, 104, 0.49) !important;
+	background: rgba(93, 171, 104, 0.49) !important;
+}
+
+.toggle-switch-track.toggle-off {
+	background-color: #e5e5e5 !important;
+	background: #e5e5e5 !important;
+}
+
+/* Even more specific rules to override any parent background */
+.exclude-contacts-box .toggle-switch-track[data-checked='true'] {
+	background-color: rgba(93, 171, 104, 0.49) !important;
+	background: rgba(93, 171, 104, 0.49) !important;
+}
+
+.exclude-contacts-box .toggle-switch-track[data-checked='false'] {
+	background-color: #e5e5e5 !important;
+	background: #e5e5e5 !important;
 }
 
 /* Safari-specific fixes for toggle */

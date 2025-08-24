@@ -1,6 +1,6 @@
 import { User, Contact } from '@prisma/client';
 import prisma from '../src/lib/prisma';
-import { parse } from 'csv-parse/sync';
+import { read as readXLSX, utils as xlsxUtils } from 'xlsx';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { getEmbeddingForContact } from './seed-data/contactEmbeddingsHelper';
@@ -146,15 +146,12 @@ const importCSVWithSubcategories = async (
 	relativeFilePath: string,
 	categoryName: string
 ) => {
-	const csvPath = path.join(process.cwd(), 'public', relativeFilePath);
+	const filePath = path.join(process.cwd(), 'public', relativeFilePath);
 
-	const filePath = path.join(csvPath);
-	const fileContent = await fs.readFile(filePath, 'utf-8');
-
-	const records: ContactCSVFormat[] = parse(fileContent, {
-		columns: true,
-		skip_empty_lines: true,
-	});
+	const workbook = readXLSX(filePath);
+	const sheetName = workbook.SheetNames[0];
+	const worksheet = workbook.Sheets[sheetName];
+	const records: ContactCSVFormat[] = xlsxUtils.sheet_to_json(worksheet);
 
 	// create all categories first
 
@@ -170,10 +167,14 @@ const importCSVWithSubcategories = async (
 
 	for (const record of records) {
 		// const recordCategoryName = generateCategoryName(categoryName, record.state);
+		const nameParts = record.name ? record.name.split(' ') : ['', ''];
+		const firstName = nameParts[0] || '';
+		const lastName = nameParts.slice(1).join(' ') || '';
 
 		await prisma.contact.create({
 			data: {
-				lastName: record.name,
+				firstName: firstName,
+				lastName: lastName,
 				email: record.email,
 				company: record.company,
 				website: record.website,
@@ -273,12 +274,19 @@ const seedElasticsearchEmbeddings = async (contacts: Contact[]) => {
 
 async function main() {
 	/* Seed users */
-	await prisma.user.createMany({
-		data: userData,
-	});
+	for (const user of userData) {
+		await prisma.user.upsert({
+			where: { clerkId: user.clerkId },
+			update: user,
+			create: user,
+		});
+	}
 
 	/* Seed contacts */
-	importCSVWithSubcategories('contactLists/musicVenuesDemo4106.csv', 'Music Venues');
+	await importCSVWithSubcategories(
+		'contactLists/2025-07-31ProductionContacts.xlsx',
+		'Production Contacts'
+	);
 
 	/* Seed embeddings */
 	const allContacts = await prisma.contact.findMany();
