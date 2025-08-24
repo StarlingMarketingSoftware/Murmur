@@ -16,7 +16,6 @@ import {
 	DropdownMenuContent,
 	DropdownMenuGroup,
 	DropdownMenuItem,
-	DropdownMenuLabel,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -232,6 +231,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		handleRemoveBlock,
 		getBlock,
 		handleAddBlock,
+		handleAddHybridAutomation,
 		showTestPreview,
 		setShowTestPreview,
 		BLOCK_ITEMS,
@@ -315,25 +315,88 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											<Plus className="h-8 w-8" strokeWidth={3} />
 										</Button>
 									</DropdownMenuTrigger>
-									<DropdownMenuContent className="w-56" align="center">
-										<DropdownMenuLabel>Add Block</DropdownMenuLabel>
-										<DropdownMenuGroup>
-											{BLOCK_ITEMS.map((item) => (
-												<DropdownMenuItem
-													key={item.value}
-													onClick={() => {
-														if (item.value === HybridBlock.text) {
-															handleAddBlock(getBlock(HybridBlock.text));
-														} else {
-															handleAddBlock(BLOCKS.find((b) => b.value === item.value)!);
-														}
-													}}
-													disabled={item.disabled}
-												>
-													{item.label}
-													{item.showUsed && item.disabled && ` (Used)`}
-												</DropdownMenuItem>
-											))}
+									<DropdownMenuContent
+										className="w-[275px] h-[180px] !overflow-hidden flex flex-col justify-between p-0 !border-0"
+										align="center"
+										side="bottom"
+										avoidCollisions={false}
+									>
+										<DropdownMenuGroup className="p-0">
+											{BLOCK_ITEMS.filter((item) => item.position === 'top').map(
+												(item) => (
+													<DropdownMenuItem
+														key={item.value}
+														onClick={() => {
+															if (item.value === 'hybrid_automation') {
+																handleAddHybridAutomation();
+															} else if (item.value === HybridBlock.text) {
+																handleAddBlock(getBlock(HybridBlock.text));
+															} else {
+																handleAddBlock(
+																	BLOCKS.find((b) => b.value === item.value)!
+																);
+															}
+														}}
+														disabled={item.disabled}
+														className="p-0 focus:bg-transparent hover:bg-transparent"
+													>
+														<div
+															className={`w-[275.23px] h-[51px] border-2 rounded-[8px] flex items-center justify-start pl-4 cursor-pointer font-bold ${
+																item.value === HybridBlock.text
+																	? 'bg-[#CEE6D2] border-[#208D33]'
+																	: item.value === 'hybrid_automation'
+																	? 'bg-[#CBE3F7] border-[#51A2E4]'
+																	: item.value === HybridBlock.full_automated
+																	? 'bg-[#CBDAF7] border-[#5165E4]'
+																	: ''
+															}`}
+														>
+															{item.label}
+															{item.showUsed && item.disabled && ` (Used)`}
+														</div>
+													</DropdownMenuItem>
+												)
+											)}
+										</DropdownMenuGroup>
+										<div className="flex items-center justify-start pl-4 font-normal">
+											<span>or</span>
+										</div>
+										<DropdownMenuGroup className="p-0">
+											{BLOCK_ITEMS.filter((item) => item.position === 'bottom').map(
+												(item) => (
+													<DropdownMenuItem
+														key={item.value}
+														onClick={() => {
+															if (item.value === 'hybrid_automation') {
+																handleAddHybridAutomation();
+															} else if (item.value === HybridBlock.text) {
+																handleAddBlock(getBlock(HybridBlock.text));
+															} else {
+																handleAddBlock(
+																	BLOCKS.find((b) => b.value === item.value)!
+																);
+															}
+														}}
+														disabled={item.disabled}
+														className="p-0 focus:bg-transparent hover:bg-transparent"
+													>
+														<div
+															className={`w-[275.23px] h-[51px] border-2 rounded-[8px] flex items-center justify-start pl-4 cursor-pointer font-bold ${
+																item.value === HybridBlock.text
+																	? 'bg-[#CEE6D2] border-[#208D33]'
+																	: item.value === 'hybrid_automation'
+																	? 'bg-[#CBE3F7] border-[#51A2E4]'
+																	: item.value === HybridBlock.full_automated
+																	? 'bg-[#CBDAF7] border-[#5165E4]'
+																	: ''
+															}`}
+														>
+															{item.label}
+															{item.showUsed && item.disabled && ` (Used)`}
+														</div>
+													</DropdownMenuItem>
+												)
+											)}
 										</DropdownMenuGroup>
 									</DropdownMenuContent>
 								</DropdownMenu>
