@@ -530,6 +530,46 @@ export async function GET(req: NextRequest) {
 				},
 			});
 
+			// Enrich missing names from Elasticsearch metadata
+			if (contacts && contacts.length > 0) {
+				const idToEsName = new Map<
+					number,
+					{ firstName: string | null; lastName: string | null }
+				>();
+				for (const m of esMatches as Array<{
+					id: string;
+					metadata: Record<string, unknown>;
+				}>) {
+					const meta = (m?.metadata || {}) as Record<string, unknown>;
+					const idNum = Number(meta.contactId ?? m.id);
+					if (!Number.isFinite(idNum)) continue;
+					const firstName = (meta.firstName as string | null | undefined) ?? null;
+					const lastName = (meta.lastName as string | null | undefined) ?? null;
+					if (
+						(firstName && String(firstName).trim()) ||
+						(lastName && String(lastName).trim())
+					) {
+						idToEsName.set(idNum, {
+							firstName: firstName ? String(firstName) : null,
+							lastName: lastName ? String(lastName) : null,
+						});
+					}
+				}
+
+				contacts = contacts.map((c) => {
+					const hasDbName =
+						(c.firstName && c.firstName.trim()) || (c.lastName && c.lastName.trim());
+					if (hasDbName) return c;
+					const meta = idToEsName.get(c.id);
+					if (!meta) return c;
+					return {
+						...c,
+						firstName: meta.firstName ?? c.firstName,
+						lastName: meta.lastName ?? c.lastName,
+					};
+				});
+			}
+
 			// Defensive strict-location enforcement for vector results
 			if (
 				(forceCityExactCity || (forceCityAny && forceCityAny.length > 0)) &&
@@ -709,28 +749,28 @@ export async function GET(req: NextRequest) {
 							? parsedId
 							: Math.floor(Math.random() * 1_000_000_000),
 						apolloPersonId: null,
-						firstName: md.firstName ?? null,
-						lastName: md.lastName ?? null,
-						email: md.email ?? '',
-						company: md.company ?? null,
-						city: md.city ?? null,
-						state: md.state ?? null,
-						country: md.country ?? null,
-						address: md.address ?? null,
+						firstName: (md.firstName as string) ?? null,
+						lastName: (md.lastName as string) ?? null,
+						email: (md.email as string) ?? '',
+						company: (md.company as string) ?? null,
+						city: (md.city as string) ?? null,
+						state: (md.state as string) ?? null,
+						country: (md.country as string) ?? null,
+						address: (md.address as string) ?? null,
 						phone: null,
-						website: md.website ?? null,
-						title: md.title ?? null,
-						headline: md.headline ?? null,
+						website: (md.website as string) ?? null,
+						title: (md.title as string) ?? null,
+						headline: (md.headline as string) ?? null,
 						linkedInUrl: null,
 						photoUrl: null,
-						metadata: md.metadata ?? null,
+						metadata: (md.metadata as string) ?? null,
 						companyLinkedInUrl: null,
-						companyFoundedYear: md.companyFoundedYear ?? null,
-						companyType: md.companyType ?? null,
+						companyFoundedYear: (md.companyFoundedYear as string) ?? null,
+						companyType: (md.companyType as string) ?? null,
 						companyTechStack: toArray(md.companyTechStack),
 						companyPostalCode: null,
 						companyKeywords: toArray(md.companyKeywords),
-						companyIndustry: md.companyIndustry ?? null,
+						companyIndustry: (md.companyIndustry as string) ?? null,
 						latitude: null,
 						longitude: null,
 						isPrivate: false,

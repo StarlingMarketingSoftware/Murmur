@@ -82,7 +82,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 											)}
 										</div>
 										<Button
-											className="col-span-1 min-w-0 w-full"
+											className="whitespace-nowrap"
 											variant={isCodeVerified ? 'light' : 'primary-light'}
 											type="button"
 											onClick={(e) => {
