@@ -73,34 +73,25 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 
 	const BLOCK_ITEMS = [
 		{
-			value: HybridBlock.full_automated,
-			label: 'Full Automated',
-			disabled: false,
-			showUsed: false,
-		},
-		{
-			value: HybridBlock.introduction,
-			label: 'Introduction',
-			disabled: !watchedAvailableBlocks.includes(HybridBlock.introduction),
-			showUsed: true,
-		},
-		{
-			value: HybridBlock.research,
-			label: 'Research Contact',
-			disabled: !watchedAvailableBlocks.includes(HybridBlock.research),
-			showUsed: true,
-		},
-		{
-			value: HybridBlock.action,
-			label: 'Call to Action',
-			disabled: !watchedAvailableBlocks.includes(HybridBlock.action),
-			showUsed: true,
-		},
-		{
 			value: HybridBlock.text,
 			label: 'Text',
 			disabled: false,
 			showUsed: false,
+			position: 'top',
+		},
+		{
+			value: 'hybrid_automation',
+			label: 'Hybrid Automation',
+			disabled: false,
+			showUsed: false,
+			position: 'top',
+		},
+		{
+			value: HybridBlock.full_automated,
+			label: 'Full Automated',
+			disabled: false,
+			showUsed: false,
+			position: 'bottom',
 		},
 	];
 
@@ -210,6 +201,36 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		form.setValue(
 			'hybridAvailableBlocks',
 			watchedAvailableBlocks.filter((b) => b !== block.value)
+		);
+	};
+
+	const handleAddHybridAutomation = () => {
+		// Check if there are any existing blocks
+		if (fields.length > 0) {
+			toast.error('Hybrid Automation requires clearing all existing blocks first.');
+			return;
+		}
+
+		// Add all three blocks in order
+		const blocksToAdd = [
+			{ id: HybridBlock.introduction, type: HybridBlock.introduction, value: '' },
+			{ id: HybridBlock.research, type: HybridBlock.research, value: '' },
+			{ id: HybridBlock.action, type: HybridBlock.action, value: '' },
+		];
+
+		blocksToAdd.forEach((block) => {
+			append(block);
+		});
+
+		// Remove these blocks from available blocks
+		form.setValue(
+			'hybridAvailableBlocks',
+			watchedAvailableBlocks.filter(
+				(b) =>
+					b !== HybridBlock.introduction &&
+					b !== HybridBlock.research &&
+					b !== HybridBlock.action
+			)
 		);
 	};
 
@@ -417,6 +438,7 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		handleDragEnd,
 		handleRemoveBlock,
 		handleAddBlock,
+		handleAddHybridAutomation,
 		getBlock,
 		ORDERED_BLOCKS,
 		form,
