@@ -19,14 +19,6 @@ module.exports = {
 				'10xl': '10rem', // 160px
 				xs: '0.65rem', // 10.4px - smaller than default xs
 			},
-			fontFamily: {
-				primary: ['var(--font-times)', 'Times New Roman', 'serif'],
-				secondary: ['var(--font-inter)', 'Inter', 'sans-serif'],
-				inter: ['var(--font-inter)', 'Inter', 'sans-serif'],
-				zen: ['var(--font-zen-antique)', 'serif'],
-				tertiary: ['var(--font-zen-antique)', 'serif'],
-			},
-
 			colors: {
 				'ui-01': {
 					DEFAULT: stone[50],

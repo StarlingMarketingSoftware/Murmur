@@ -426,13 +426,7 @@ const Dashboard = () => {
 
 				{!hasSearched && (
 					<div className="campaigns-table-wrapper mt-32 sm:mt-36 md:mt-40 lg:mt-44 xl:mt-48 2xl:mt-56 relative">
-						<div
-							className="absolute top-0 left-0 right-0 h-8 z-10 pointer-events-none"
-							style={{
-								background:
-									'linear-gradient(to bottom, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 100%)',
-							}}
-						/>
+						<div className="absolute top-0 left-0 right-0 h-8 z-10 pointer-events-none bg-gradient-to-b from-white to-transparent" />
 						<CampaignsTable />
 					</div>
 				)}
