@@ -284,18 +284,6 @@ export const useDashboard = () => {
 		return firstName.length > 0 || lastName.length > 0;
 	}, []);
 
-	// Since pagination is disabled, check if majority of contacts have names
-	// const visibleRowsHaveNames = useMemo(() => {
-	// 	if (!contacts || contacts.length === 0) return false;
-
-	// 	// Check what percentage of contacts have names
-	// 	const contactsWithNames = contacts.filter((contact) => contactHasName(contact));
-	// 	const ratio = contactsWithNames.length / contacts.length;
-	// 	const threshold = 0.7; // 70% threshold for header to be fully visible
-
-	// 	return ratio > threshold; // Header is visible if more than 70% have names
-	// }, [contacts, contactHasName]);
-
 	// Build columns for the table
 	const columns = useMemo(() => {
 		const allColumns: ColumnDef<ContactWithName>[] = [
