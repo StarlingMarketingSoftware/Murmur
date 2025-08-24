@@ -130,7 +130,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 							/>
 						</div>
 						<div className="mb-3">
-							<FormLabel>Email Template</FormLabel>
+							<FormLabel className="font-inter font-normal">Email Structure</FormLabel>
 						</div>
 						<div className="flex gap-[47px] items-start">
 							<div className="flex-shrink-0">
@@ -160,13 +160,13 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 
 						{/* New section matching Email Template box style */}
 						<div className="mb-3 mt-6">
-							<FormLabel>New Section</FormLabel>
+							<FormLabel className="font-inter font-normal">Drafting</FormLabel>
 						</div>
 						<div className="flex gap-[47px] items-start">
 							<div className="flex-shrink-0">
 								{/* Empty content area - to be filled later */}
 								<div
-									className="bg-white"
+									className="bg-white relative"
 									style={{
 										width: '892px',
 										height: '530px',
@@ -174,7 +174,94 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										borderRadius: '8px',
 									}}
 								>
-									{/* Content will go here */}
+									{/* Left table - Contacts list */}
+									<div
+										className="absolute bg-white border border-gray-300 overflow-auto"
+										style={{
+											width: '336px',
+											height: '441px',
+											left: '22px',
+											bottom: '16px',
+										}}
+									>
+										{contacts && contacts.length > 0 ? (
+											<table className="w-full" style={{ tableLayout: 'fixed' }}>
+												<thead>
+													<tr className="border-b border-gray-300 bg-gray-50">
+														<th
+															className="text-left text-xs font-semibold p-1"
+															style={{ width: '30%' }}
+														>
+															Name
+														</th>
+														<th
+															className="text-left text-xs font-semibold p-1"
+															style={{ width: '25%' }}
+														>
+															Company
+														</th>
+														<th
+															className="text-left text-xs font-semibold p-1"
+															style={{ width: '25%' }}
+														>
+															Location
+														</th>
+														<th
+															className="text-left text-xs font-semibold p-1"
+															style={{ width: '20%' }}
+														>
+															Role
+														</th>
+													</tr>
+												</thead>
+												<tbody>
+													{contacts.map((contact) => (
+														<tr
+															key={contact.id}
+															className="border-b border-gray-200"
+															style={{ height: '49px' }}
+														>
+															<td className="p-1 text-xs truncate">
+																{contact.name ||
+																	`${contact.firstName || ''} ${
+																		contact.lastName || ''
+																	}`.trim() ||
+																	contact.email}
+															</td>
+															<td className="p-1 text-xs text-gray-600 truncate">
+																{contact.company || '-'}
+															</td>
+															<td className="p-1 text-xs text-gray-500 truncate">
+																{[contact.city, contact.state]
+																	.filter(Boolean)
+																	.join(', ') || '-'}
+															</td>
+															<td className="p-1 text-xs text-gray-400 truncate">
+																{contact.headline || '-'}
+															</td>
+														</tr>
+													))}
+												</tbody>
+											</table>
+										) : (
+											<div className="flex items-center justify-center h-full text-gray-500">
+												No contacts selected
+											</div>
+										)}
+									</div>
+
+									{/* Right table */}
+									<div
+										className="absolute bg-white border border-gray-300"
+										style={{
+											width: '336px',
+											height: '441px',
+											right: '22px',
+											bottom: '16px',
+										}}
+									>
+										{/* Right table content will go here */}
+									</div>
 								</div>
 							</div>
 						</div>
