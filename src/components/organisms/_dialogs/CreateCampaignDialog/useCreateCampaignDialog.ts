@@ -3,8 +3,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { urls } from '@/constants/urls';
 
 const createCampaignSchema = z.object({
 	name: z.string().min(1, { message: 'Campaign name is required.' }),
@@ -12,7 +10,6 @@ const createCampaignSchema = z.object({
 
 export const useCreateCampaignDialog = () => {
 	const [open, setOpen] = useState(false);
-	const router = useRouter();
 
 	const form = useForm<z.infer<typeof createCampaignSchema>>({
 		resolver: zodResolver(createCampaignSchema),
@@ -28,8 +25,6 @@ export const useCreateCampaignDialog = () => {
 		if (res) {
 			form.reset();
 			setOpen(false);
-			// Navigate to the newly created campaign
-			router.push(`${urls.murmur.campaign.detail(res.id)}?silent=1`);
 		}
 	};
 

@@ -63,9 +63,7 @@ export default function RootLayout({
 				className={`${inter.variable} ${timesNewRoman.variable} ${zenAntique.variable}`}
 				suppressHydrationWarning
 			>
-				<body
-					className={`${inter.variable} ${zenAntique.variable} ${timesNewRoman.variable} antialiased min-h-screen flex flex-col`}
-				>
+				<body className={`antialiased min-h-screen flex flex-col`}>
 					<ThemeProvider attribute="class" defaultTheme="light">
 						<PageTransitionProvider>
 							<SubLayout>
