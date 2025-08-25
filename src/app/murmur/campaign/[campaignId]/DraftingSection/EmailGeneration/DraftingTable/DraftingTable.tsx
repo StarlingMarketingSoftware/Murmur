@@ -31,15 +31,17 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	return (
 		<div>
 			<div className="text-sm font-inter font-medium text-black">{title}</div>
-			<div className="flex w-full justify-end">
-				<Button
-					type="button"
-					variant="ghost"
-					className="text-sm font-inter font-medium text-black bg-none border-none cursor-pointer p-0 hover:underline transition-colors"
-					onClick={handleClick}
-				>
-					{areAllSelected ? 'Deselect All' : 'Select All'}
-				</Button>
+			<div className="flex w-full justify-end h-[20px] mb-2">
+				{title !== 'Drafts' && (
+					<Button
+						type="button"
+						variant="ghost"
+						className="text-sm font-inter font-medium text-black bg-none border-none cursor-pointer p-0 hover:underline transition-colors -mt-1"
+						onClick={handleClick}
+					>
+						{areAllSelected ? 'Deselect All' : 'Select All'}
+					</Button>
+				)}
 			</div>
 			{/* Left table - Contacts list */}
 			<div className="bg-background border border-gray-300 overflow-auto custom-scroll w-[336px] h-[441px] overflow-x-hidden overflow-y-auto pr-[10px]">

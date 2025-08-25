@@ -13,18 +13,15 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		isPendingDeleteEmail,
 		handleDraftClick,
 		handleDeleteDraft,
-		selectedDraftIds,
 		contacts,
-		handleDraftSelection,
-		handleSelectAllDrafts,
 	} = useDraftedEmails(props);
 
 	return (
 		<>
 			{/* Right table - Generated Drafts */}
 			<DraftingTable
-				handleClick={handleSelectAllDrafts}
-				areAllSelected={selectedDraftIds.size === draftEmails.length}
+				handleClick={() => {}}
+				areAllSelected={false}
 				hasData={draftEmails.length > 0}
 				noDataMessage="No drafts generated"
 				noDataDescription='Click "Generate Drafts" to create emails for the selected contacts'
@@ -45,17 +42,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							<div
 								key={draft.id}
 								className={cn(
-									'border-b border-gray-200 cursor-pointer transition-colors p-3 relative',
-									selectedDraftIds.has(draft.id)
-										? 'bg-[#D6E8D9] border-2 border-[#5DAB68]'
-										: ''
+									'border-b border-gray-200 cursor-pointer transition-colors p-3 relative'
 								)}
-								onClick={(e) => {
-									// Only handle selection if not clicking on delete button
-									if (!(e.target as HTMLElement).closest('button')) {
-										handleDraftSelection(draft.id);
-									}
-								}}
 								onDoubleClick={() => handleDraftClick(draft)}
 							>
 								{/* Delete button */}

@@ -72,7 +72,10 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 	// Custom send handler without dialog dependencies
 	const handleSend = async () => {
-		const selectedDrafts = draftEmails.filter((d) => selectedDraftIds.has(d.id));
+		const selectedDrafts =
+			selectedDraftIds.size > 0
+				? draftEmails.filter((d) => selectedDraftIds.has(d.id))
+				: draftEmails;
 
 		if (!campaign?.identity?.email || !campaign?.identity?.name) {
 			toast.error('Please create an Identity before sending emails.');
@@ -267,14 +270,11 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 						{/* Right table - push to the end */}
 						<div className="ml-auto">
 							<DraftedEmails
-								selectedDraftIds={selectedDraftIds}
-								setSelectedDraftIds={setSelectedDraftIds}
 								draftEmails={draftEmails}
 								isPendingEmails={isPendingEmails}
 								contacts={contacts}
 								setSelectedDraft={setSelectedDraft}
 								setIsDraftDialogOpen={setIsDraftDialogOpen}
-								handleDraftSelection={handleDraftSelection}
 							/>
 						</div>
 					</div>
@@ -315,7 +315,12 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												>
 													To:
 												</Typography>
-												<Typography className="mt-0.5 !text-[14px] text-[#000000] font-secondary">{`${selectedDraftIds.size} emails selected`}</Typography>
+												<Typography className="mt-0.5 !text-[14px] text-[#000000] font-secondary">{`${
+													selectedDraftIds.size > 0
+														? selectedDraftIds.size
+														: draftEmails.length
+												} emails selected`}</Typography>
+												<Typography className="hidden">{draftEmails.length}</Typography>
 											</div>
 											<div className="flex justify-center">
 												<div className="flex flex-col items-start">
@@ -356,12 +361,12 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 										type="button"
 										className={cn(
 											'w-[891px] !h-[39px] font-bold flex items-center justify-center transition-colors',
-											selectedDraftIds.size === 0 && 'opacity-50 cursor-not-allowed',
+											draftEmails.length === 0 && 'opacity-50 cursor-not-allowed',
 											isWaitingToSend
 												? 'bg-[#5DAB68] border-0 text-white'
 												: 'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]'
 										)}
-										disabled={selectedDraftIds.size === 0}
+										disabled={draftEmails.length === 0}
 										onClick={async () => {
 											if (!isWaitingToSend) {
 												setIsWaitingToSend(true);

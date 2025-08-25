@@ -265,25 +265,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			return block.value && block.value.trim() !== '';
 		});
 
-		const result =
+		return (
 			isFullAutomatedEmpty ||
 			hasNoBlocks ||
 			!hasAIBlocks ||
 			generationProgress > -1 ||
 			contacts?.length === 0 ||
-			isPendingGeneration;
-
-		console.log('isGenerationDisabled debug:', {
-			isFullAutomatedEmpty,
-			hasNoBlocks,
-			hasAIBlocks,
-			generationProgress,
-			contactsLength: contacts?.length,
-			isPendingGeneration,
-			result,
-		});
-
-		return result;
+			isPendingGeneration
+		);
 	}, [form, generationProgress, contacts?.length, isPendingGeneration]);
 
 	// FUNCTIONS
@@ -313,7 +302,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		});
 
 		toast.success('All handwritten drafts generated successfully!');
-		setGenerationProgress(-1);
 	};
 
 	const generateHandwrittenDraft = (contact: ContactWithName): GeneratedEmail => {
@@ -1024,13 +1012,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				} else {
 					toast.error('Email generation failed. Please try again.');
 				}
-				setGenerationProgress(-1);
 			} else if (stoppedDueToCredits && successfulEmails > 0) {
 				// Show partial success message when stopped due to credits
 				toast.warning(
 					`Generated ${successfulEmails} emails before running out of credits. Please upgrade your plan to continue.`
 				);
-				setGenerationProgress(-1);
 			}
 		} catch (error) {
 			if (error instanceof Error && error.message === 'Request cancelled.') {
@@ -1039,7 +1025,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				console.error('Unexpected error during batch processing:', error);
 				toast.error('An error occurred during email generation.');
 			}
-			setGenerationProgress(-1);
 		} finally {
 			setAbortController(null);
 		}

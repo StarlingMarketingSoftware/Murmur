@@ -5,13 +5,10 @@ import { Dispatch, SetStateAction } from 'react';
 
 export interface DraftedEmailsProps {
 	contacts: ContactWithName[];
-	selectedDraftIds: Set<number>;
 	setSelectedDraft: Dispatch<SetStateAction<EmailWithRelations | null>>;
 	setIsDraftDialogOpen: Dispatch<SetStateAction<boolean>>;
-	handleDraftSelection: (draftId: number) => void;
 	draftEmails: EmailWithRelations[];
 	isPendingEmails: boolean;
-	setSelectedDraftIds: Dispatch<SetStateAction<Set<number>>>;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {
@@ -20,9 +17,6 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		isPendingEmails,
 		setSelectedDraft,
 		setIsDraftDialogOpen,
-		handleDraftSelection,
-		selectedDraftIds,
-		setSelectedDraftIds,
 		contacts,
 	} = props;
 
@@ -31,16 +25,6 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 	const handleDraftClick = (draft: EmailWithRelations) => {
 		setSelectedDraft(draft);
 		setIsDraftDialogOpen(true);
-	};
-
-	const handleSelectAllDrafts = () => {
-		if (selectedDraftIds.size === draftEmails?.length && draftEmails?.length > 0) {
-			// Deselect all if all are selected
-			setSelectedDraftIds(new Set());
-		} else {
-			// Select all
-			setSelectedDraftIds(new Set(draftEmails?.map((d) => d.id) || []));
-		}
 	};
 
 	const handleDeleteDraft = async (e: React.MouseEvent, draftId: number) => {
@@ -56,9 +40,6 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		deleteEmail,
 		handleDraftClick,
 		handleDeleteDraft,
-		handleDraftSelection,
-		handleSelectAllDrafts,
-		selectedDraftIds,
 		contacts,
 	};
 };
