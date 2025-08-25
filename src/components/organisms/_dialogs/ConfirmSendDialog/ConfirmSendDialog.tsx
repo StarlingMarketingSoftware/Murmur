@@ -13,14 +13,18 @@ import { SendIcon } from 'lucide-react';
 import { Typography } from '@/components/ui/typography';
 
 export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
-	const { handleSend, draftEmailCount, isOpen, setIsOpen, user, campaign } =
+	const { handleSend, draftEmailCount, isOpen, setIsOpen, user, campaign, disabled } =
 		useConfirmSendDialog(props);
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen} modal>
 			<DialogTrigger asChild>
 				<Button
-					className="w-[891px] h-[39px] bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black font-bold hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)] flex items-center justify-center"
-					disabled={draftEmailCount <= 0}
+					className={`w-[891px] h-[39px] bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black font-bold flex items-center justify-center ${
+						disabled || draftEmailCount <= 0
+							? 'opacity-50 cursor-not-allowed hover:bg-[rgba(93,171,104,0.47)] hover:border-[#5DAB68]'
+							: 'hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]'
+					}`}
+					disabled={disabled || draftEmailCount <= 0}
 				>
 					Send
 				</Button>

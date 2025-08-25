@@ -208,6 +208,9 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	// State for selected contacts for drafting
 	const [selectedContactIds, setSelectedContactIds] = useState<Set<number>>(new Set());
 
+	// State for selected drafts for sending
+	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
+
 	// Delete email hook
 	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
 
@@ -215,6 +218,14 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const { user, isFreeTrial } = useMe();
 	const [sendingProgress, setSendingProgress] = useState(-1);
 	const isSendingDisabled = isFreeTrial || user?.sendingCredits === 0;
+
+	// Clear selected drafts after sending is complete
+	useEffect(() => {
+		if (sendingProgress === selectedDraftIds.size && selectedDraftIds.size > 0) {
+			// Clear selection after successful sending
+			setSelectedDraftIds(new Set());
+		}
+	}, [sendingProgress, selectedDraftIds.size]);
 
 	// Handle draft click to view/edit
 	const handleDraftClick = (draft: EmailType) => {
@@ -240,6 +251,19 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 				newSet.delete(contactId);
 			} else {
 				newSet.add(contactId);
+			}
+			return newSet;
+		});
+	};
+
+	// Handle draft selection for sending
+	const handleDraftSelection = (draftId: number) => {
+		setSelectedDraftIds((prev) => {
+			const newSet = new Set(prev);
+			if (newSet.has(draftId)) {
+				newSet.delete(draftId);
+			} else {
+				newSet.add(draftId);
 			}
 			return newSet;
 		});
@@ -385,6 +409,40 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									>
 										Contacts
 									</div>
+
+									{/* Select All button */}
+									<button
+										type="button"
+										className="absolute hover:underline transition-colors"
+										onClick={() => {
+											if (
+												selectedContactIds.size === contacts?.length &&
+												contacts?.length > 0
+											) {
+												// Deselect all if all are selected
+												setSelectedContactIds(new Set());
+											} else {
+												// Select all
+												setSelectedContactIds(new Set(contacts?.map((c) => c.id) || []));
+											}
+										}}
+										style={{
+											left: '280px', // Positioned near right edge of left table
+											top: '35px',
+											fontSize: '14px',
+											fontFamily: 'Inter',
+											fontWeight: '500',
+											color: '#000000',
+											background: 'none',
+											border: 'none',
+											cursor: 'pointer',
+											padding: '0',
+										}}
+									>
+										{selectedContactIds.size === contacts?.length && contacts?.length > 0
+											? 'Deselect All'
+											: 'Select All'}
+									</button>
 
 									{/* Left table - Contacts list */}
 									<div
@@ -707,6 +765,41 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										Drafts
 									</div>
 
+									{/* Select All button for drafts */}
+									<button
+										type="button"
+										className="absolute hover:underline transition-colors"
+										onClick={() => {
+											if (
+												selectedDraftIds.size === draftEmails?.length &&
+												draftEmails?.length > 0
+											) {
+												// Deselect all if all are selected
+												setSelectedDraftIds(new Set());
+											} else {
+												// Select all
+												setSelectedDraftIds(new Set(draftEmails?.map((d) => d.id) || []));
+											}
+										}}
+										style={{
+											left: '790px', // Positioned near right edge of right table
+											top: '35px',
+											fontSize: '14px',
+											fontFamily: 'Inter',
+											fontWeight: '500',
+											color: '#000000',
+											background: 'none',
+											border: 'none',
+											cursor: 'pointer',
+											padding: '0',
+										}}
+									>
+										{selectedDraftIds.size === draftEmails?.length &&
+										draftEmails?.length > 0
+											? 'Deselect All'
+											: 'Select All'}
+									</button>
+
 									{/* Right table - Generated Drafts */}
 									<div
 										className="absolute bg-white border border-gray-300 overflow-auto custom-scroll"
@@ -740,11 +833,24 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 													return (
 														<div
 															key={draft.id}
-															className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
-															onClick={() => handleDraftClick(draft)}
+															className="border-b border-gray-200 cursor-pointer transition-colors"
+															onClick={(e) => {
+																// Only handle selection if not clicking on delete button
+																if (!(e.target as HTMLElement).closest('button')) {
+																	handleDraftSelection(draft.id);
+																}
+															}}
+															onDoubleClick={() => handleDraftClick(draft)}
 															style={{
 																padding: '12px',
 																position: 'relative',
+																backgroundColor: selectedDraftIds.has(draft.id)
+																	? '#D6E8D9'
+																	: 'transparent',
+																border: selectedDraftIds.has(draft.id)
+																	? '2px solid #5DAB68'
+																	: undefined,
+																borderBottom: '1px solid #e5e7eb',
 															}}
 														>
 															{/* Delete button */}
@@ -812,13 +918,17 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										{getAutosaveStatusDisplay()}
 									</div>
 								)}
-								{/* Send button - appears when there are drafts */}
+								{/* Send button - always visible but disabled when no drafts selected */}
 								{draftEmails.length > 0 && (
 									<div className="flex justify-end">
 										{isSendingDisabled ? (
 											<UpgradeSubscriptionDrawer
 												triggerButtonText="Send"
-												className="!w-[891px] !h-[39px] !bg-[rgba(93,171,104,0.47)] !border-2 !border-[#5DAB68] !text-black !font-bold hover:!bg-[rgba(93,171,104,0.6)] hover:!border-[#5DAB68] active:!bg-[rgba(93,171,104,0.7)] !flex !items-center !justify-center"
+												className={`!w-[891px] !h-[39px] !bg-[rgba(93,171,104,0.47)] !border-2 !border-[#5DAB68] !text-black !font-bold !flex !items-center !justify-center ${
+													selectedDraftIds.size === 0
+														? '!opacity-50 !cursor-not-allowed hover:!bg-[rgba(93,171,104,0.47)] hover:!border-[#5DAB68]'
+														: 'hover:!bg-[rgba(93,171,104,0.6)] hover:!border-[#5DAB68] active:!bg-[rgba(93,171,104,0.7)]'
+												}`}
 												message={
 													isFreeTrial
 														? `Your free trial subscription does not include the ability to send emails. To send the emails you've drafted, please upgrade your subscription to the paid version.`
@@ -829,7 +939,10 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 											<ConfirmSendDialog
 												setSendingProgress={setSendingProgress}
 												campaign={campaign}
-												draftEmails={draftEmails}
+												draftEmails={draftEmails.filter((d) =>
+													selectedDraftIds.has(d.id)
+												)}
+												disabled={selectedDraftIds.size === 0}
 											/>
 										)}
 									</div>
@@ -867,7 +980,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 							<ProgressIndicator
 								progress={sendingProgress}
 								setProgress={setSendingProgress}
-								total={draftEmails.length}
+								total={selectedDraftIds.size}
 								pendingMessage="Sending {{progress}} emails..."
 								completeMessage="Finished sending {{progress}} emails."
 							/>
