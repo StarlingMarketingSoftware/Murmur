@@ -3,7 +3,6 @@ import { EmailGenerationProps, useEmailGeneration } from './useEmailGeneration';
 import { Button } from '@/components/ui/button';
 import { FormLabel } from '@/components/ui/form';
 
-import ProgressIndicator from '@/components/molecules/ProgressIndicator/ProgressIndicator';
 import { Typography } from '@/components/ui/typography';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { cn } from '@/utils';
@@ -36,6 +35,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		handleGenerateDrafts,
 		generationProgress,
 		setGenerationProgress,
+		generationTotal,
 		handleDraftSelection,
 		selectedDraft,
 		isDraftDialogOpen,
@@ -54,6 +54,19 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	const {
 		formState: { isDirty },
 	} = form;
+
+	// Debug helper
+	const isDraftDisabled = () => {
+		const genDisabled = isGenerationDisabled();
+		const noSelection = selectedContactIds.size === 0;
+		console.log('Draft button disabled check:', {
+			isGenerationDisabled: genDisabled,
+			selectedContactIds: selectedContactIds.size,
+			noSelection,
+			overall: genDisabled || noSelection,
+		});
+		return genDisabled || noSelection;
+	};
 
 	const getAutosaveStatusDisplay = (): ReactNode => {
 		switch (autosaveStatus) {
@@ -104,6 +117,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 							selectedContactIds={selectedContactIds}
 							setSelectedContactIds={setSelectedContactIds}
 							handleContactSelection={handleContactSelection}
+							generationProgress={generationProgress}
+							generationTotal={generationTotal}
 						/>
 
 						{/* Generate Drafts Button - Absolutely centered */}
@@ -111,10 +126,10 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 							<Button
 								type="button"
 								onClick={handleDraftButtonClick}
-								disabled={isGenerationDisabled() || selectedContactIds.size === 0}
+								disabled={isDraftDisabled()}
 								className={cn(
 									'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black font-inter font-medium rounded-[6px] cursor-pointer transition-all duration-200 hover:bg-[rgba(93,171,104,0.6)] hover:border-[#4a8d56] active:bg-[rgba(93,171,104,0.7)] active:border-[#3d7346] h-[52px] w-[95px] flex items-center justify-center appearance-none text-sm font-inter p-0 m-0 leading-normal box-border text-center',
-									isGenerationDisabled() || selectedContactIds.size === 0
+									isDraftDisabled()
 										? 'opacity-50 cursor-not-allowed hover:bg-[rgba(93,171,104,0.47)] hover:border-[#5DAB68]'
 										: ''
 								)}
@@ -187,22 +202,6 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 						</div>
 					)}
 				</div>
-
-				<ProgressIndicator
-					progress={generationProgress}
-					setProgress={setGenerationProgress}
-					total={selectedContactIds.size}
-					pendingMessage="Generating {{progress}} emails..."
-					completeMessage="Finished generating {{progress}} emails."
-					cancelAction={cancelGeneration}
-				/>
-				<ProgressIndicator
-					progress={sendingProgress}
-					setProgress={setSendingProgress}
-					total={selectedDraftIds.size}
-					pendingMessage="Sending {{progress}} emails..."
-					completeMessage="Finished sending {{progress}} emails."
-				/>
 			</div>
 			<ViewEditEmailDialog
 				email={selectedDraft}

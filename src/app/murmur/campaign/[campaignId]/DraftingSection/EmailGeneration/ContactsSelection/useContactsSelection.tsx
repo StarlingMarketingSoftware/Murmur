@@ -6,11 +6,20 @@ export interface ContactsSelectionProps {
 	selectedContactIds: Set<number>;
 	setSelectedContactIds: Dispatch<SetStateAction<Set<number>>>;
 	handleContactSelection: (contactId: number) => void;
+	generationProgress?: number;
+	cancelGeneration?: () => void;
+	generationTotal?: number;
 }
 
 export const useContactsSelection = (props: ContactsSelectionProps) => {
-	const { contacts, selectedContactIds, setSelectedContactIds, handleContactSelection } =
-		props;
+	const {
+		contacts,
+		selectedContactIds,
+		setSelectedContactIds,
+		handleContactSelection,
+		generationProgress,
+		generationTotal,
+	} = props;
 
 	const handleClick = () => {
 		if (selectedContactIds.size === contacts?.length && contacts?.length > 0) {
@@ -30,5 +39,7 @@ export const useContactsSelection = (props: ContactsSelectionProps) => {
 		handleContactSelection,
 		handleClick,
 		areAllSelected,
+		generationProgress,
+		generationTotal,
 	};
 };

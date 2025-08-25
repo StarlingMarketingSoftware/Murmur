@@ -23,7 +23,7 @@ export interface EmailGenerationProps {
 	isPendingGeneration: boolean;
 	isTest: boolean;
 	form: UseFormReturn<DraftingFormValues>;
-	handleGenerateDrafts: () => Promise<void>;
+	handleGenerateDrafts: (contactIds?: number[]) => Promise<void>;
 	generationProgress: number;
 	setGenerationProgress: Dispatch<SetStateAction<number>>;
 	cancelGeneration: () => void;
@@ -58,6 +58,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 	const [selectedContactIds, setSelectedContactIds] = useState<Set<number>>(new Set());
 	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
 	const [sendingProgress, setSendingProgress] = useState(-1);
+	const [generationTotal, setGenerationTotal] = useState(0);
 
 	const { user, isFreeTrial } = useMe();
 	// User info for send functionality
@@ -90,7 +91,9 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		} else {
 			// Second click - execute draft generation
 			setIsWaitingForConfirm(false);
-			await handleGenerateDrafts();
+			const ids = Array.from(selectedContactIds);
+			setGenerationTotal(ids.length);
+			await handleGenerateDrafts(ids);
 			setSelectedContactIds(new Set());
 		}
 	};
@@ -209,6 +212,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		handleGenerateDrafts,
 		generationProgress,
 		setGenerationProgress,
+		generationTotal,
 		form,
 		cancelGeneration,
 		autosaveStatus,

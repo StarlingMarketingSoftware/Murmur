@@ -11,6 +11,9 @@ interface DraftingTableProps {
 	noDataDescription: string;
 	isPending: boolean;
 	title: string;
+	generationProgress?: number;
+	totalContacts?: number;
+	onCancel?: () => void;
 }
 export const DraftingTable: FC<DraftingTableProps> = ({
 	title,
@@ -21,6 +24,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	noDataMessage,
 	noDataDescription,
 	isPending,
+	generationProgress = -1,
+	totalContacts = 0,
+	onCancel,
 }) => {
 	return (
 		<div>
@@ -54,6 +60,44 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					</>
 				)}
 			</div>
+
+			{/* Progress bar underneath contacts table */}
+			{title === 'Contacts' && (
+				<div className="mt-2 w-[336px] flex items-center gap-3">
+					{/* Progress text - left aligned */}
+					<div className="text-xs font-inter text-gray-600 flex-none">
+						{generationProgress >= 0 && totalContacts > 0
+							? `Drafting ${generationProgress}/${totalContacts}`
+							: 'Ready to draft'}
+					</div>
+
+					{/* Progress bar - fills remaining width */}
+					<div className="flex-1 h-[7px] bg-[rgba(93,171,104,0.49)] border-0 relative">
+						<div
+							className="h-full bg-[#5DAB68] transition-all duration-300 ease-out absolute top-0 left-0"
+							style={{
+								width: `${
+									generationProgress >= 0 && totalContacts > 0
+										? Math.min((generationProgress / totalContacts) * 100, 100)
+										: 0
+								}%`,
+							}}
+						/>
+					</div>
+
+					{/* Cancel button */}
+					{onCancel && generationProgress >= 0 && (
+						<button
+							type="button"
+							onClick={onCancel}
+							className="ml-2 w-[16px] h-[16px] flex items-center justify-center text-white bg-[#DC2626] hover:bg-[#B91C1C] transition-colors cursor-pointer"
+							aria-label="Cancel drafting"
+						>
+							×
+						</button>
+					)}
+				</div>
+			)}
 		</div>
 	);
 };
