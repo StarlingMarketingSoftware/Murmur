@@ -19,7 +19,7 @@ export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
 		<Dialog open={isOpen} onOpenChange={setIsOpen} modal>
 			<DialogTrigger asChild>
 				<Button
-					className="w-[891px] h-[39px] bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]"
+					className="w-[891px] h-[39px] bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black font-bold hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)] flex items-center justify-center"
 					disabled={draftEmailCount <= 0}
 				>
 					Send

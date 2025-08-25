@@ -329,7 +329,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																		{/* Top Left - Name */}
 																		<div
 																			style={{
-																				padding: '4px',
+																				padding: '4px 4px 4px 12px',
 																				display: 'flex',
 																				alignItems: 'center',
 																			}}
@@ -377,7 +377,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																		{/* Bottom Left - Company */}
 																		<div
 																			style={{
-																				padding: '4px',
+																				padding: '4px 4px 4px 12px',
 																				display: 'flex',
 																				alignItems: 'center',
 																			}}
@@ -403,7 +403,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																						.filter(Boolean)
 																						.join(', ')}
 																					className="text-xs text-black"
-																					style={{ width: '100%', paddingLeft: '8px' }}
+																					style={{ width: '100%' }}
 																				/>
 																			) : (
 																				<div style={{ width: '100%' }}></div>
@@ -419,7 +419,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																		<div
 																			style={{
 																				gridRow: '1 / 3',
-																				padding: '4px',
+																				padding: '4px 4px 4px 12px',
 																				display: 'flex',
 																				alignItems: 'center',
 																			}}
@@ -477,10 +477,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																								.filter(Boolean)
 																								.join(', ')}
 																							className="text-xs text-black"
-																							style={{
-																								width: '100%',
-																								paddingLeft: '8px',
-																							}}
+																							style={{ width: '100%' }}
 																						/>
 																					) : (
 																						<div style={{ width: '100%' }}></div>
@@ -503,10 +500,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																							.filter(Boolean)
 																							.join(', ')}
 																						className="text-xs text-black"
-																						style={{
-																							width: '100%',
-																							paddingLeft: '8px',
-																						}}
+																						style={{ width: '100%' }}
 																					/>
 																				) : (
 																					<div style={{ width: '100%' }}></div>
@@ -521,8 +515,13 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 												))}
 											</div>
 										) : (
-											<div className="flex items-center justify-center h-full text-black">
-												No contacts selected
+											<div className="flex flex-col items-center justify-center h-full text-gray-500 px-4">
+												<div className="text-sm font-semibold mb-2">
+													No contacts selected
+												</div>
+												<div className="text-xs text-center">
+													Select contacts to generate personalized emails
+												</div>
 											</div>
 										)}
 									</div>
@@ -541,19 +540,19 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 											onClick={() => setIsConfirmDialogOpen(true)}
 											disabled={isGenerationDisabled()}
 											className={cn(
-												'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black font-inter font-medium rounded-[6px] cursor-pointer transition-all duration-200 hover:bg-[rgba(93,171,104,0.6)] hover:border-[#4a8d56] active:bg-[rgba(93,171,104,0.7)] active:border-[#3d7346] h-[52px] w-[87px]',
+												'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black font-bold rounded-[6px] cursor-pointer transition-all duration-200 hover:bg-[rgba(93,171,104,0.6)] hover:border-[#4a8d56] active:bg-[rgba(93,171,104,0.7)] active:border-[#3d7346] h-[52px] w-[100px] flex items-center justify-center',
 												isGenerationDisabled()
 													? 'opacity-50 cursor-not-allowed hover:bg-[rgba(93,171,104,0.47)] hover:border-[#5DAB68]'
 													: ''
 											)}
 											noPadding
 											style={{
-												width: '87px',
+												width: '100px',
 												height: '52px',
 												WebkitAppearance: 'none',
 												appearance: 'none',
 												fontSize: '14px',
-												fontWeight: '500',
+												fontWeight: 'bold',
 												display: 'flex',
 												alignItems: 'center',
 												justifyContent: 'center',
@@ -567,7 +566,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 											{isPendingGeneration && !isTest ? (
 												<Spinner size="small" />
 											) : (
-												'Draft'
+												<span>Draft &gt;</span>
 											)}
 										</Button>
 									</div>
@@ -683,7 +682,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										{isSendingDisabled ? (
 											<UpgradeSubscriptionDrawer
 												triggerButtonText="Send"
-												className="!w-[891px] !h-[39px] !bg-[rgba(93,171,104,0.47)] !border-2 !border-[#5DAB68] !text-black hover:!bg-[rgba(93,171,104,0.6)] hover:!border-[#5DAB68] active:!bg-[rgba(93,171,104,0.7)]"
+												className="!w-[891px] !h-[39px] !bg-[rgba(93,171,104,0.47)] !border-2 !border-[#5DAB68] !text-black !font-bold hover:!bg-[rgba(93,171,104,0.6)] hover:!border-[#5DAB68] active:!bg-[rgba(93,171,104,0.7)] !flex !items-center !justify-center"
 												message={
 													isFreeTrial
 														? `Your free trial subscription does not include the ability to send emails. To send the emails you've drafted, please upgrade your subscription to the paid version.`
