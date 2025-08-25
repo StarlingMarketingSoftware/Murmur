@@ -273,8 +273,6 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 								draftEmails={draftEmails}
 								isPendingEmails={isPendingEmails}
 								contacts={contacts}
-								setSelectedDraft={setSelectedDraft}
-								setIsDraftDialogOpen={setIsDraftDialogOpen}
 							/>
 						</div>
 					</div>
