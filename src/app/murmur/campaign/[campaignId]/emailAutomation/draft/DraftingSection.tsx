@@ -1,4 +1,4 @@
-import { FC, ReactNode } from 'react';
+import { FC, ReactNode, useRef, useState, useEffect } from 'react';
 import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,9 +31,55 @@ const ScrollableText = ({
 	className?: string;
 	style?: React.CSSProperties;
 }) => {
+	const containerRef = useRef<HTMLDivElement>(null);
+	const textRef = useRef<HTMLSpanElement>(null);
+	const [isOverflowing, setIsOverflowing] = useState(false);
+
+	useEffect(() => {
+		const checkOverflow = () => {
+			if (containerRef.current && textRef.current) {
+				// Check if the text width exceeds the container width
+				const containerWidth = containerRef.current.offsetWidth;
+				const textWidth = textRef.current.scrollWidth;
+				setIsOverflowing(textWidth > containerWidth);
+			}
+		};
+
+		checkOverflow();
+		// Recheck on window resize
+		window.addEventListener('resize', checkOverflow);
+
+		// Also check when text changes
+		const observer = new ResizeObserver(checkOverflow);
+		if (containerRef.current) {
+			observer.observe(containerRef.current);
+		}
+
+		return () => {
+			window.removeEventListener('resize', checkOverflow);
+			observer.disconnect();
+		};
+	}, [text]);
+
 	return (
-		<div className="hover-scroll-container" style={style}>
-			<span className={`hover-scroll-text ${className || ''}`} data-text={text}>
+		<div
+			ref={containerRef}
+			className={
+				isOverflowing ? 'hover-scroll-container' : 'overflow-hidden relative w-full'
+			}
+			style={style}
+		>
+			<span
+				ref={textRef}
+				className={
+					isOverflowing
+						? `hover-scroll-text ${className || ''}`
+						: `inline-block whitespace-nowrap overflow-hidden text-ellipsis max-w-full w-full ${
+								className || ''
+						  }`
+				}
+				data-text={text}
+			>
 				{text}
 			</span>
 		</div>
@@ -204,20 +250,22 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 											bottom: '16px',
 											overflowX: 'hidden',
 											overflowY: 'auto',
+											paddingRight: '10px',
 										}}
 									>
 										{contacts && contacts.length > 0 ? (
-											<div className="w-full">
+											<div style={{ overflow: 'visible', width: '316px' }}>
 												{contacts.map((contact) => (
 													<div
 														key={contact.id}
 														className="border-b border-gray-200"
 														style={{
 															display: 'grid',
-															gridTemplateColumns: '168px 168px',
+															gridTemplateColumns: '158px 158px',
 															gridTemplateRows: '24.5px 24.5px',
-															width: '336px',
+															width: '316px',
 															height: '49px',
+															overflow: 'visible',
 														}}
 													>
 														{(() => {
@@ -253,11 +301,11 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																				padding: '4px',
 																				display: 'flex',
 																				alignItems: 'center',
+																				overflow: 'visible',
 																			}}
 																		>
 																			{contact.headline ? (
 																				<div
-																					className="bg-gray-100"
 																					style={{
 																						height: '20.54px',
 																						borderRadius: '6.64px',
@@ -265,7 +313,9 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																						display: 'flex',
 																						alignItems: 'center',
 																						width: 'fit-content',
-																						maxWidth: '100%',
+																						maxWidth: 'calc(100% - 8px)',
+																						backgroundColor: '#E8EFFF',
+																						border: '0.83px solid #000000',
 																					}}
 																				>
 																					<ScrollableText
@@ -330,7 +380,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																		>
 																			<ScrollableText
 																				text={contact.company || 'Contact'}
-																				className="text-xs text-black"
+																				className="font-bold text-xs text-black"
 																				style={{ width: '100%' }}
 																			/>
 																		</div>
@@ -344,10 +394,10 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																						padding: '4px',
 																						display: 'flex',
 																						alignItems: 'center',
+																						overflow: 'visible',
 																					}}
 																				>
 																					<div
-																						className="bg-gray-100"
 																						style={{
 																							height: '20.54px',
 																							borderRadius: '6.64px',
@@ -356,6 +406,8 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																							alignItems: 'center',
 																							width: 'fit-content',
 																							maxWidth: '100%',
+																							backgroundColor: '#E8EFFF',
+																							border: '0.83px solid #000000',
 																						}}
 																					>
 																						<ScrollableText
