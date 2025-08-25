@@ -11,6 +11,13 @@ export const ORDERED_BLOCKS = [
 	HybridBlock.action,
 ] as const;
 
+export type BlockItem = {
+	value: HybridBlock | 'hybrid_automation';
+	label: string;
+	disabled: boolean;
+	showUsed: boolean;
+	position: 'top' | 'bottom';
+};
 export const BLOCKS = [
 	{
 		label: 'Introduction',
@@ -71,7 +78,7 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 
 	const watchedAvailableBlocks = form.watch('hybridAvailableBlocks');
 
-	const BLOCK_ITEMS = [
+	const BLOCK_ITEMS: BlockItem[] = [
 		{
 			value: HybridBlock.text,
 			label: 'Text',
