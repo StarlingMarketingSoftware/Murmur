@@ -282,7 +282,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	// FUNCTIONS
 
-	const batchGenerateHandWrittenDrafts = () => {
+	const batchGenerateHandWrittenDrafts = async () => {
 		const generatedEmails: GeneratedEmail[] = [];
 
 		if (!contacts || contacts.length === 0) {
@@ -294,7 +294,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			generatedEmails.push(generateHandwrittenDraft(contact));
 		});
 
-		createEmail(generatedEmails);
+		await createEmail(generatedEmails);
+
+		// Invalidate emails query to refresh the drafts list
+		queryClient.invalidateQueries({
+			queryKey: ['emails', { campaignId: campaign.id }],
+		});
+
+		toast.success('All handwritten drafts generated successfully!');
 	};
 
 	const generateHandwrittenDraft = (contact: ContactWithName): GeneratedEmail => {
@@ -736,6 +743,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					queryClient.invalidateQueries({
 						queryKey: ['user'],
 					});
+					queryClient.invalidateQueries({
+						queryKey: ['emails', { campaignId: campaign.id }],
+					});
 					toast.success('Test email generated successfully!');
 					isSuccess = true;
 				} else {
@@ -977,6 +987,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				editUser({
 					clerkId: user.clerkId,
 					data: { draftCredits: newCreditBalance },
+				});
+			}
+
+			// Invalidate emails query to refresh the drafts list
+			if (successfulEmails > 0) {
+				queryClient.invalidateQueries({
+					queryKey: ['emails', { campaignId: campaign.id }],
 				});
 			}
 

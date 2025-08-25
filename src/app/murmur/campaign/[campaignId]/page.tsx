@@ -8,7 +8,6 @@ import { CampaignName } from '@/components/organisms/CampaignName/CampaignName';
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
 import { DraftingSection } from './emailAutomation/draft/DraftingSection';
-import { PrepareSendingSection } from '@/components/organisms/_tables/PrepareSendingSection/PrepareSendingSection';
 import { SentEmailsTable } from '@/components/organisms/_tables/SentEmailsTable/SentEmailsTable';
 import { urls } from '@/constants/urls';
 import Link from 'next/link';
@@ -109,9 +108,6 @@ const Murmur = () => {
 
 				<div className="mt-6 flex justify-center">
 					<DraftingSection campaign={campaign} />
-				</div>
-				<div className="flex justify-center">
-					<PrepareSendingSection campaign={campaign} />
 				</div>
 				<div className="flex justify-center">
 					<SentEmailsTable campaign={campaign} />

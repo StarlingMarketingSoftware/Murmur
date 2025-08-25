@@ -2830,3 +2830,68 @@ body.murmur-page footer {
 	min-height: calc(320px + max(0px, 10vh - 80px));
 	height: auto;
 }
+
+/* Force square scrollbars */
+.custom-scroll::-webkit-scrollbar,
+.custom-scroll::-webkit-scrollbar-thumb,
+.custom-scroll::-webkit-scrollbar-track,
+.custom-scroll::-webkit-scrollbar-corner,
+.custom-scroll::-webkit-scrollbar-button {
+	border-radius: 0 !important;
+	-webkit-border-radius: 0 !important;
+}
+
+.custom-scroll::-webkit-scrollbar {
+	width: 1px !important;
+	height: 1px !important;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb {
+	background: #000 !important;
+}
+
+.custom-scroll {
+	scrollbar-width: thin;
+	scrollbar-color: #000 transparent;
+}
+
+/* Scrolling text on hover */
+@keyframes scrollText {
+	0% {
+		transform: translateX(0);
+	}
+	100% {
+		transform: translateX(calc(-100% - 50px));
+	}
+}
+
+.hover-scroll-container {
+	overflow: hidden;
+	position: relative;
+	width: 100%;
+}
+
+.hover-scroll-text {
+	display: inline-block;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+	width: 100%;
+}
+.hover-scroll-container:hover .hover-scroll-text {
+	animation: scrollText 8s linear infinite;
+	text-overflow: initial;
+	max-width: none;
+	width: auto;
+	padding-right: 50px;
+}
+
+/* Create a seamless loop by duplicating the text */
+.hover-scroll-container:hover .hover-scroll-text::after {
+	content: attr(data-text);
+	position: absolute;
+	left: 100%;
+	padding-left: 50px;
+	white-space: nowrap;
+}
