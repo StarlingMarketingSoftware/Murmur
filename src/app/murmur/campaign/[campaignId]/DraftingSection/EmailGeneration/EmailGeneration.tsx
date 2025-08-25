@@ -124,42 +124,23 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 	return (
 		<>
-			{/* New section matching Email Template box style */}
 			<div className="mb-3 mt-6">
 				<FormLabel className="font-inter font-normal">Drafting</FormLabel>
 			</div>
 			<div className="flex gap-[47px] items-start">
 				<div className="flex-shrink-0">
 					{/* Empty content area - to be filled later */}
-					<div
-						className="bg-white relative"
-						style={{
-							width: '892px',
-							height: '530px',
-							border: '3px solid #000000',
-							borderRadius: '8px',
-							overflowX: 'hidden',
-						}}
-					>
+					<div className="bg-white relative w-[892px] h-[530px] border-[3px] border-black rounded-lg overflow-x-hidden">
 						{/* Left table label */}
-						<div
-							className="absolute"
-							style={{
-								left: '22px',
-								top: '16px',
-								fontSize: '14px',
-								fontFamily: 'Inter',
-								fontWeight: '500',
-								color: '#000000',
-							}}
-						>
+						<div className="absolute left-[22px] top-4 text-sm font-inter font-medium text-black">
 							Contacts
 						</div>
 
 						{/* Select All button */}
-						<button
+						<Button
 							type="button"
-							className="absolute hover:underline transition-colors"
+							variant="ghost"
+							className="absolute left-[280px] top-[35px] text-sm font-inter font-medium text-black bg-none border-none cursor-pointer p-0 hover:underline transition-colors"
 							onClick={() => {
 								if (
 									selectedContactIds.size === contacts?.length &&
@@ -172,59 +153,26 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 									setSelectedContactIds(new Set(contacts?.map((c) => c.id) || []));
 								}
 							}}
-							style={{
-								left: '280px', // Positioned near right edge of left table
-								top: '35px',
-								fontSize: '14px',
-								fontFamily: 'Inter',
-								fontWeight: '500',
-								color: '#000000',
-								background: 'none',
-								border: 'none',
-								cursor: 'pointer',
-								padding: '0',
-							}}
 						>
 							{selectedContactIds.size === contacts?.length && contacts?.length > 0
 								? 'Deselect All'
 								: 'Select All'}
-						</button>
+						</Button>
 
 						{/* Left table - Contacts list */}
-						<div
-							className="absolute bg-white border border-gray-300 overflow-auto custom-scroll"
-							style={{
-								width: '336px',
-								height: '441px',
-								left: '22px',
-								bottom: '16px',
-								overflowX: 'hidden',
-								overflowY: 'auto',
-								paddingRight: '10px',
-							}}
-						>
+						<div className="absolute bg-white border border-gray-300 overflow-auto custom-scroll w-[336px] h-[441px] left-[22px] bottom-4 overflow-x-hidden overflow-y-auto pr-[10px]">
 							{contacts && contacts.length > 0 ? (
-								<div style={{ overflow: 'visible', width: '316px' }}>
+								<div className="overflow-visible w-[316px]">
 									{contacts.map((contact) => (
 										<div
 											key={contact.id}
-											className="border-b border-gray-200 cursor-pointer transition-colors"
+											className={cn(
+												'border-b border-gray-200 cursor-pointer transition-colors grid grid-cols-[158px_158px] grid-rows-[24.5px_24.5px] w-[316px] h-[49px] overflow-visible',
+												selectedContactIds.has(contact.id)
+													? 'bg-[#D6E8D9] border-2 border-[#5DAB68]'
+													: ''
+											)}
 											onClick={() => handleContactSelection(contact.id)}
-											style={{
-												display: 'grid',
-												gridTemplateColumns: '158px 158px',
-												gridTemplateRows: '24.5px 24.5px',
-												width: '316px',
-												height: '49px',
-												overflow: 'visible',
-												backgroundColor: selectedContactIds.has(contact.id)
-													? '#D6E8D9'
-													: 'transparent',
-												border: selectedContactIds.has(contact.id)
-													? '2px solid #5DAB68'
-													: undefined,
-												borderBottom: '1px solid #e5e7eb',
-											}}
 										>
 											{(() => {
 												const fullName =
@@ -237,76 +185,37 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 													return (
 														<>
 															{/* Top Left - Name */}
-															<div
-																style={{
-																	padding: '4px 4px 4px 12px',
-																	display: 'flex',
-																	alignItems: 'center',
-																}}
-															>
+															<div className="p-1 pl-3 flex items-center">
 																<ScrollableText
 																	text={fullName}
-																	className="font-bold text-xs"
-																	style={{ width: '100%' }}
+																	className="font-bold text-xs w-full"
 																/>
 															</div>
 
 															{/* Top Right - Title */}
-															<div
-																style={{
-																	padding: '4px',
-																	display: 'flex',
-																	alignItems: 'center',
-																	overflow: 'visible',
-																}}
-															>
+															<div className="p-1 flex items-center overflow-visible">
 																{contact.headline ? (
-																	<div
-																		style={{
-																			height: '20.54px',
-																			borderRadius: '6.64px',
-																			padding: '0 8px',
-																			display: 'flex',
-																			alignItems: 'center',
-																			width: 'fit-content',
-																			maxWidth: 'calc(100% - 8px)',
-																			backgroundColor: '#E8EFFF',
-																			border: '0.83px solid #000000',
-																		}}
-																	>
+																	<div className="h-[20.54px] rounded-[6.64px] px-2 flex items-center w-fit max-w-[calc(100%-8px)] bg-[#E8EFFF] border-[0.83px] border-black">
 																		<ScrollableText
 																			text={contact.headline}
 																			className="text-xs text-black"
 																		/>
 																	</div>
 																) : (
-																	<div style={{ width: '100%' }}></div>
+																	<div className="w-full"></div>
 																)}
 															</div>
 
 															{/* Bottom Left - Company */}
-															<div
-																style={{
-																	padding: '4px 4px 4px 12px',
-																	display: 'flex',
-																	alignItems: 'center',
-																}}
-															>
+															<div className="p-1 pl-3 flex items-center">
 																<ScrollableText
 																	text={contact.company || ''}
-																	className="text-xs text-black"
-																	style={{ width: '100%' }}
+																	className="text-xs text-black w-full"
 																/>
 															</div>
 
 															{/* Bottom Right - Location */}
-															<div
-																style={{
-																	padding: '4px',
-																	display: 'flex',
-																	alignItems: 'center',
-																}}
-															>
+															<div className="p-1 flex items-center">
 																{contact.city || contact.state ? (
 																	<ScrollableText
 																		text={[
@@ -315,11 +224,10 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 																		]
 																			.filter(Boolean)
 																			.join(', ')}
-																		className="text-xs text-black"
-																		style={{ width: '100%' }}
+																		className="text-xs text-black w-full"
 																	/>
 																) : (
-																	<div style={{ width: '100%' }}></div>
+																	<div className="w-full"></div>
 																)}
 															</div>
 														</>
@@ -329,18 +237,10 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 													return (
 														<>
 															{/* Left column - Company vertically centered */}
-															<div
-																style={{
-																	gridRow: '1 / 3',
-																	padding: '4px 4px 4px 12px',
-																	display: 'flex',
-																	alignItems: 'center',
-																}}
-															>
+															<div className="row-span-2 p-1 pl-3 flex items-center">
 																<ScrollableText
 																	text={contact.company || 'Contact'}
-																	className="font-bold text-xs text-black"
-																	style={{ width: '100%' }}
+																	className="font-bold text-xs text-black w-full"
 																/>
 															</div>
 
@@ -348,28 +248,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 															{contact.headline ? (
 																<>
 																	{/* Top Right - Title */}
-																	<div
-																		className="bg-red-500"
-																		style={{
-																			padding: '4px',
-																			display: 'flex',
-																			alignItems: 'center',
-																			overflow: 'visible',
-																		}}
-																	>
-																		<div
-																			style={{
-																				height: '20.54px',
-																				borderRadius: '6.64px',
-																				padding: '0 8px',
-																				display: 'flex',
-																				alignItems: 'center',
-																				width: 'fit-content',
-																				maxWidth: '100%',
-																				backgroundColor: '#E8EFFF',
-																				border: '0.83px solid #000000',
-																			}}
-																		>
+																	<div className="bg-red-500 p-1 flex items-center overflow-visible">
+																		<div className="h-[20.54px] rounded-[6.64px] px-2 flex items-center w-fit max-w-full bg-[#E8EFFF] border-[0.83px] border-black">
 																			<ScrollableText
 																				text={contact.headline}
 																				className="text-xs text-black"
@@ -378,13 +258,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 																	</div>
 
 																	{/* Bottom Right - Location */}
-																	<div
-																		style={{
-																			padding: '4px',
-																			display: 'flex',
-																			alignItems: 'center',
-																		}}
-																	>
+																	<div className="p-1 flex items-center">
 																		{contact.city || contact.state ? (
 																			<ScrollableText
 																				text={[
@@ -393,24 +267,16 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 																				]
 																					.filter(Boolean)
 																					.join(', ')}
-																				className="text-xs text-black"
-																				style={{ width: '100%' }}
+																				className="text-xs text-black w-full"
 																			/>
 																		) : (
-																			<div style={{ width: '100%' }}></div>
+																			<div className="w-full"></div>
 																		)}
 																	</div>
 																</>
 															) : (
 																// No title - vertically center location
-																<div
-																	style={{
-																		gridRow: '1 / 3',
-																		padding: '4px',
-																		display: 'flex',
-																		alignItems: 'center',
-																	}}
-																>
+																<div className="row-span-2 p-1 flex items-center">
 																	{contact.city || contact.state ? (
 																		<ScrollableText
 																			text={[
@@ -419,11 +285,10 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 																			]
 																				.filter(Boolean)
 																				.join(', ')}
-																			className="text-xs text-black"
-																			style={{ width: '100%' }}
+																			className="text-xs text-black w-full"
 																		/>
 																	) : (
-																		<div style={{ width: '100%' }}></div>
+																		<div className="w-full"></div>
 																	)}
 																</div>
 															)}
@@ -445,42 +310,18 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 						</div>
 
 						{/* Generate Drafts Button - Center between tables */}
-						<div
-							className="absolute flex items-center justify-center"
-							style={{
-								left: '50%',
-								top: '50%',
-								transform: 'translate(-50%, -50%)',
-							}}
-						>
+						<div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
 							<Button
 								type="button"
 								onClick={() => setIsConfirmDialogOpen(true)}
 								disabled={isGenerationDisabled() || selectedContactIds.size === 0}
 								className={cn(
-									'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black font-inter font-medium rounded-[6px] cursor-pointer transition-all duration-200 hover:bg-[rgba(93,171,104,0.6)] hover:border-[#4a8d56] active:bg-[rgba(93,171,104,0.7)] active:border-[#3d7346] h-[52px] w-[95px] flex items-center justify-center',
+									'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black font-inter font-medium rounded-[6px] cursor-pointer transition-all duration-200 hover:bg-[rgba(93,171,104,0.6)] hover:border-[#4a8d56] active:bg-[rgba(93,171,104,0.7)] active:border-[#3d7346] h-[52px] w-[95px] flex items-center justify-center appearance-none text-sm font-inter p-0 m-0 leading-normal box-border text-center',
 									isGenerationDisabled() || selectedContactIds.size === 0
 										? 'opacity-50 cursor-not-allowed hover:bg-[rgba(93,171,104,0.47)] hover:border-[#5DAB68]'
 										: ''
 								)}
 								noPadding
-								style={{
-									width: '95px',
-									height: '52px',
-									WebkitAppearance: 'none',
-									appearance: 'none',
-									fontSize: '14px',
-									fontWeight: '500',
-									fontFamily: 'Inter',
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center',
-									padding: '0',
-									margin: '0',
-									lineHeight: 'normal',
-									boxSizing: 'border-box',
-									textAlign: 'center',
-								}}
 							>
 								{isPendingGeneration && !isTest ? (
 									<Spinner size="small" />
@@ -494,24 +335,14 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 						</div>
 
 						{/* Right table label */}
-						<div
-							className="absolute"
-							style={{
-								left: '534px', // 892px total - 22px margin - 336px width
-								top: '16px',
-								fontSize: '14px',
-								fontFamily: 'Inter',
-								fontWeight: '500',
-								color: '#000000',
-							}}
-						>
+						<div className="absolute left-[534px] top-4 text-sm font-inter font-medium text-black">
 							Drafts
 						</div>
 
 						{/* Select All button for drafts */}
 						<button
 							type="button"
-							className="absolute hover:underline transition-colors"
+							className="absolute left-[790px] top-[35px] text-sm font-inter font-medium text-black bg-none border-none cursor-pointer p-0 hover:underline transition-colors"
 							onClick={() => {
 								if (
 									selectedDraftIds.size === draftEmails?.length &&
@@ -524,18 +355,6 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 									setSelectedDraftIds(new Set(draftEmails?.map((d) => d.id) || []));
 								}
 							}}
-							style={{
-								left: '790px', // Positioned near right edge of right table
-								top: '35px',
-								fontSize: '14px',
-								fontFamily: 'Inter',
-								fontWeight: '500',
-								color: '#000000',
-								background: 'none',
-								border: 'none',
-								cursor: 'pointer',
-								padding: '0',
-							}}
 						>
 							{selectedDraftIds.size === draftEmails?.length && draftEmails?.length > 0
 								? 'Deselect All'
@@ -543,24 +362,13 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 						</button>
 
 						{/* Right table - Generated Drafts */}
-						<div
-							className="absolute bg-white border border-gray-300 overflow-auto custom-scroll"
-							style={{
-								width: '336px',
-								height: '441px',
-								right: '22px',
-								bottom: '16px',
-								overflowX: 'hidden',
-								overflowY: 'auto',
-								paddingRight: '10px',
-							}}
-						>
+						<div className="absolute bg-white border border-gray-300 overflow-auto custom-scroll w-[336px] h-[441px] right-[22px] bottom-4 overflow-x-hidden overflow-y-auto pr-[10px]">
 							{isPendingEmails ? (
 								<div className="flex items-center justify-center h-full">
 									<Spinner size="small" />
 								</div>
 							) : draftEmails.length > 0 ? (
-								<div style={{ overflow: 'visible', width: '316px' }}>
+								<div className="overflow-visible w-[316px]">
 									{draftEmails.map((draft) => {
 										const contact = contacts?.find((c) => c.id === draft.contactId);
 										const contactName = contact
@@ -573,7 +381,12 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 										return (
 											<div
 												key={draft.id}
-												className="border-b border-gray-200 cursor-pointer transition-colors"
+												className={cn(
+													'border-b border-gray-200 cursor-pointer transition-colors p-3 relative',
+													selectedDraftIds.has(draft.id)
+														? 'bg-[#D6E8D9] border-2 border-[#5DAB68]'
+														: ''
+												)}
 												onClick={(e) => {
 													// Only handle selection if not clicking on delete button
 													if (!(e.target as HTMLElement).closest('button')) {
@@ -581,29 +394,19 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 													}
 												}}
 												onDoubleClick={() => handleDraftClick(draft)}
-												style={{
-													padding: '12px',
-													position: 'relative',
-													backgroundColor: selectedDraftIds.has(draft.id)
-														? '#D6E8D9'
-														: 'transparent',
-													border: selectedDraftIds.has(draft.id)
-														? '2px solid #5DAB68'
-														: undefined,
-													borderBottom: '1px solid #e5e7eb',
-												}}
 											>
 												{/* Delete button */}
-												<button
+												<Button
 													type="button"
+													variant="icon"
 													onClick={(e) => handleDeleteDraft(e, draft.id)}
-													className="absolute top-2 right-2 p-1 transition-colors"
-													style={{
-														zIndex: 10,
-													}}
+													className="absolute top-2 right-2 p-1 transition-colors z-10 group"
 												>
-													<X size={16} className="text-gray-500 hover:text-red-500" />
-												</button>
+													<X
+														size={16}
+														className="text-gray-500 group-hover:text-red-500"
+													/>
+												</Button>
 
 												{/* Contact name */}
 												<div className="font-bold text-xs mb-1 pr-8">{contactName}</div>
@@ -651,7 +454,6 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 							{getAutosaveStatusDisplay()}
 						</div>
 					)}
-					{/* Send button - always visible but disabled when no drafts selected */}
 					{draftEmails.length > 0 && (
 						<div className="flex justify-end">
 							{isSendingDisabled ? (
