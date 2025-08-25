@@ -437,14 +437,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								<div className="flex-1 flex flex-col p-3">
 									<div className="flex-1 border-2 border-black rounded-lg bg-background flex flex-col overflow-hidden mb-[13px]">
 										{/* Header with X Button */}
-										<div className="flex justify-between items-center p-4 border-b border-gray-200">
-											<h3 className="text-lg font-semibold text-gray-800 font-secondary">
-												Test Email Preview
+										<div className="relative p-4">
+											<h3 className="text-sm font-medium font-inter text-center">
+												Test Prompt
 											</h3>
 											<button
 												type="button"
 												onClick={() => setShowTestPreview(false)}
-												className="p-1 hover:bg-gray-100 rounded transition-colors"
+												className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded transition-colors"
 												style={{ WebkitAppearance: 'none' }}
 											>
 												<X className="h-5 w-5 text-destructive-dark" />

@@ -95,7 +95,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 			</div>
 			<div className="flex gap-[47px] items-start">
 				<div className="flex-shrink-0">
-					<div className="flex flex-row w-[892px] h-[530px] border-[3px] border-black rounded-lg overflow-x-hidden p-4">
+					<div className="relative flex flex-row w-[892px] h-[530px] border-[3px] border-black rounded-lg overflow-x-hidden p-[17px]">
 						{/* Left table container */}
 						<ContactsSelection
 							contacts={contacts}
@@ -104,8 +104,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 							handleContactSelection={handleContactSelection}
 						/>
 
-						{/* Generate Drafts Button - Center between tables */}
-						<div className="flex items-center justify-center mx-4">
+						{/* Generate Drafts Button - Absolutely centered */}
+						<div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
 							<Button
 								type="button"
 								onClick={() => setIsConfirmDialogOpen(true)}
@@ -129,71 +129,22 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 							</Button>
 						</div>
 
-						<DraftedEmails
-							selectedDraftIds={selectedDraftIds}
-							setSelectedDraftIds={setSelectedDraftIds}
-							draftEmails={draftEmails}
-							isPendingEmails={isPendingEmails}
-							contacts={contacts}
-							setSelectedDraft={setSelectedDraft}
-							setIsDraftDialogOpen={setIsDraftDialogOpen}
-							handleDraftSelection={handleDraftSelection}
-						/>
+						{/* Right table - push to the end */}
+						<div className="ml-auto">
+							<DraftedEmails
+								selectedDraftIds={selectedDraftIds}
+								setSelectedDraftIds={setSelectedDraftIds}
+								draftEmails={draftEmails}
+								isPendingEmails={isPendingEmails}
+								contacts={contacts}
+								setSelectedDraft={setSelectedDraft}
+								setIsDraftDialogOpen={setIsDraftDialogOpen}
+								handleDraftSelection={handleDraftSelection}
+							/>
+						</div>
 					</div>
 				</div>
 			</div>
-
-			<div>
-				<div className="flex flex-col gap-4 mt-4">
-					{getAutosaveStatusDisplay() && (
-						<div className="flex flex-col sm:flex-row gap-4 items-center justify-end">
-							{getAutosaveStatusDisplay()}
-						</div>
-					)}
-				</div>
-				<ConfirmDialog
-					title="Confirm Batch Generation of Emails"
-					confirmAction={async () => {
-						// Note: handleGenerateDrafts should be modified to use selectedContactIds
-						// For now, it will use all contacts as before
-						await handleGenerateDrafts();
-						setSelectedContactIds(new Set());
-					}}
-					open={isConfirmDialogOpen}
-					onOpenChange={setIsConfirmDialogOpen}
-				>
-					<Typography>
-						Are you sure you want to generate emails for {selectedContactIds.size}{' '}
-						selected recipient{selectedContactIds.size !== 1 ? 's' : ''}?
-						<br /> <br />
-						This action will automatically create a custom email for each recipient based
-						on the prompt you provided and will count towards your monthly usage limits.
-					</Typography>
-				</ConfirmDialog>
-				<ProgressIndicator
-					progress={generationProgress}
-					setProgress={setGenerationProgress}
-					total={selectedContactIds.size}
-					pendingMessage="Generating {{progress}} emails..."
-					completeMessage="Finished generating {{progress}} emails."
-					cancelAction={cancelGeneration}
-				/>
-				<ProgressIndicator
-					progress={sendingProgress}
-					setProgress={setSendingProgress}
-					total={selectedDraftIds.size}
-					pendingMessage="Sending {{progress}} emails..."
-					completeMessage="Finished sending {{progress}} emails."
-				/>
-			</div>
-			<ViewEditEmailDialog
-				email={selectedDraft}
-				isOpen={isDraftDialogOpen}
-				setIsOpen={setIsDraftDialogOpen}
-				isEditable={true}
-			/>
-
-			{/* OLD CODE PLACEHOLDER */}
 
 			<div>
 				<div className="flex flex-col gap-4 mt-4">
