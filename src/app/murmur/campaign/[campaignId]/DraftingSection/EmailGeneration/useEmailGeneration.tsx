@@ -1,12 +1,9 @@
-import { useDeleteEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useMe } from '@/hooks/useMe';
 import { CampaignWithRelations, EmailWithRelations } from '@/types/campaign';
 import { ContactWithName } from '@/types/contact';
-import { EmailStatus } from '@prisma/client';
 import {
 	Dispatch,
 	SetStateAction,
-	useRef,
 	useEffect,
 	useState,
 	useMemo,
@@ -16,55 +13,8 @@ import { DraftingFormValues } from '../useDraftingSection';
 import { UseFormReturn } from 'react-hook-form';
 import { debounce } from 'lodash';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
-
-export interface ScrollableTextProps {
-	text: string;
-	className?: string;
-	style?: React.CSSProperties;
-}
-
-export const useScrollableText = (props: ScrollableTextProps) => {
-	const { text, className, style } = props;
-
-	const containerRef = useRef<HTMLDivElement>(null);
-	const textRef = useRef<HTMLSpanElement>(null);
-	const [isOverflowing, setIsOverflowing] = useState(false);
-
-	useEffect(() => {
-		const checkOverflow = () => {
-			if (containerRef.current && textRef.current) {
-				// Check if the text width exceeds the container width
-				const containerWidth = containerRef.current.offsetWidth;
-				const textWidth = textRef.current.scrollWidth;
-				setIsOverflowing(textWidth > containerWidth);
-			}
-		};
-
-		checkOverflow();
-		// Recheck on window resize
-		window.addEventListener('resize', checkOverflow);
-
-		// Also check when text changes
-		const observer = new ResizeObserver(checkOverflow);
-		if (containerRef.current) {
-			observer.observe(containerRef.current);
-		}
-
-		return () => {
-			window.removeEventListener('resize', checkOverflow);
-			observer.disconnect();
-		};
-	}, [text]);
-
-	return {
-		containerRef,
-		textRef,
-		isOverflowing,
-		style,
-		className,
-		text,
-	};
-};
+import { EmailStatus } from '@prisma/client';
+import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 
 export interface EmailGenerationProps {
 	campaign: CampaignWithRelations;
@@ -126,20 +76,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		emails?.filter((email: EmailWithRelations) => email.status === EmailStatus.draft) ||
 		[];
 
-	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
-
 	/* HANDLERS */
-
-	const handleDraftClick = (draft: EmailWithRelations) => {
-		setSelectedDraft(draft);
-		setIsDraftDialogOpen(true);
-	};
-
-	const handleDeleteDraft = async (e: React.MouseEvent, draftId: number) => {
-		e.stopPropagation();
-		e.preventDefault();
-		await deleteEmail(draftId);
-	};
 
 	const handleContactSelection = (contactId: number) => {
 		setSelectedContactIds((prev) => {
@@ -249,13 +186,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		setSendingProgress,
 		selectedDraftIds,
 		setSelectedDraftIds,
-		emails,
-		isPendingEmails,
-		draftEmails,
 		isSendingDisabled,
-		isPendingDeleteEmail,
-		handleDraftClick,
-		handleDeleteDraft,
 		isFreeTrial,
 		handleDraftSelection,
 		handleGenerateDrafts,
@@ -265,5 +196,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		cancelGeneration,
 		autosaveStatus,
 		isJustSaved,
+		draftEmails,
+		isPendingEmails,
 	};
 };

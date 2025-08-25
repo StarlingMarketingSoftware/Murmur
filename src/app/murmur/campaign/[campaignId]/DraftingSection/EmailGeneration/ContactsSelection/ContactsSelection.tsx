@@ -1,0 +1,156 @@
+import { FC } from 'react';
+import { ContactsSelectionProps, useContactsSelection } from './useContactsSelection';
+import { cn, getStateAbbreviation } from '@/utils';
+import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
+import { DraftingTable } from '../DraftingTable/DraftingTable';
+
+export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
+	const {
+		contacts,
+		selectedContactIds,
+		handleContactSelection,
+		handleClick,
+		areAllSelected,
+	} = useContactsSelection(props);
+
+	return (
+		<DraftingTable
+			handleClick={handleClick}
+			areAllSelected={areAllSelected}
+			hasData={contacts.length > 0}
+			noDataMessage="No contacts selected"
+			noDataDescription="Select contacts to generate personalized emails"
+			isPending={false}
+			title="Contacts"
+		>
+			<div className="overflow-visible w-[316px]">
+				{contacts.map((contact) => (
+					<div
+						key={contact.id}
+						className={cn(
+							'border-b border-gray-200 cursor-pointer transition-colors grid grid-cols-[158px_158px] grid-rows-[24.5px_24.5px] w-[316px] h-[49px] overflow-visible',
+							selectedContactIds.has(contact.id)
+								? 'bg-[#D6E8D9] border-2 border-primary'
+								: ''
+						)}
+						onClick={() => handleContactSelection(contact.id)}
+					>
+						{(() => {
+							const fullName =
+								contact.name ||
+								`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+
+							// Left column - Name and Company
+							if (fullName) {
+								// Has name - show name in top, company in bottom
+								return (
+									<>
+										{/* Top Left - Name */}
+										<div className="p-1 pl-3 flex items-center">
+											<ScrollableText
+												text={fullName}
+												className="font-bold text-xs w-full"
+											/>
+										</div>
+
+										{/* Top Right - Title */}
+										<div className="p-1 flex items-center overflow-visible">
+											{contact.headline ? (
+												<div className="h-5 rounded-[6px] px-2 flex items-center w-fit max-w-[calc(100%-8px)] bg-[#E8EFFF] border-1 border-black">
+													<ScrollableText
+														text={contact.headline}
+														className="text-xs text-black"
+													/>
+												</div>
+											) : (
+												<div className="w-full" />
+											)}
+										</div>
+
+										{/* Bottom Left - Company */}
+										<div className="p-1 pl-3 flex items-center">
+											<ScrollableText
+												text={contact.company || ''}
+												className="text-xs text-black w-full"
+											/>
+										</div>
+
+										{/* Bottom Right - Location */}
+										<div className="p-1 flex items-center">
+											{contact.city || contact.state ? (
+												<ScrollableText
+													text={[contact.city, getStateAbbreviation(contact.state)]
+														.filter(Boolean)
+														.join(', ')}
+													className="text-xs text-black w-full"
+												/>
+											) : (
+												<div className="w-full" />
+											)}
+										</div>
+									</>
+								);
+							} else {
+								// No name - vertically center company on left side
+								return (
+									<>
+										{/* Left column - Company vertically centered */}
+										<div className="row-span-2 p-1 pl-3 flex items-center">
+											<ScrollableText
+												text={contact.company || 'Contact'}
+												className="font-bold text-xs text-black w-full"
+											/>
+										</div>
+
+										{/* Right column - Title or Location */}
+										{contact.headline ? (
+											<>
+												{/* Top Right - Title */}
+												<div className="p-1 flex items-center overflow-visible">
+													<div className="h-[20.54px] rounded-[6.64px] px-2 flex items-center w-fit max-w-full bg-[#E8EFFF] border-[0.83px] border-black">
+														<ScrollableText
+															text={contact.headline}
+															className="text-xs text-black"
+														/>
+													</div>
+												</div>
+
+												{/* Bottom Right - Location */}
+												<div className="p-1 flex items-center">
+													{contact.city || contact.state ? (
+														<ScrollableText
+															text={[contact.city, getStateAbbreviation(contact.state)]
+																.filter(Boolean)
+																.join(', ')}
+															className="text-xs text-black w-full"
+														/>
+													) : (
+														<div className="w-full"></div>
+													)}
+												</div>
+											</>
+										) : (
+											// No title - vertically center location
+											<div className="row-span-2 p-1 flex items-center">
+												{contact.city || contact.state ? (
+													<ScrollableText
+														text={[contact.city, getStateAbbreviation(contact.state)]
+															.filter(Boolean)
+															.join(', ')}
+														className="text-xs text-black w-full"
+													/>
+												) : (
+													<div className="w-full"></div>
+												)}
+											</div>
+										)}
+									</>
+								);
+							}
+						})()}
+					</div>
+				))}
+			</div>
+		</DraftingTable>
+	);
+};
