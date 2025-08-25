@@ -281,173 +281,192 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		<div>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
 				<Droppable id="droppable">
-					<div className="w-[892px] min-h-[530px] border-[3px] border-black rounded-md bg-gray-50 transition mb-4 flex flex-col relative">
-						{/* Test Preview Overlay */}
-						{showTestPreview && testMessage && (
-							<div className="absolute inset-0 bg-background z-50 rounded-md overflow-hidden border-2 border-gray-300">
-								<div className="relative h-full flex flex-col">
-									{/* Header with X Button */}
-									<div className="flex justify-between items-center p-4 border-b border-gray-200">
-										<h3 className="text-lg font-semibold text-gray-800 font-secondary">
-											Test Email Preview
-										</h3>
-										<button
-											type="button"
-											onClick={() => setShowTestPreview(false)}
-											className="p-1 hover:bg-gray-100 rounded transition-colors"
-											style={{ WebkitAppearance: 'none' }}
-										>
-											<X className="h-5 w-5 text-destructive-dark" />
-										</button>
-									</div>
+					<div
+						className={`w-[892px] min-h-[530px] border-[3px] border-black rounded-md bg-gray-50 transition mb-4 flex ${
+							showTestPreview && testMessage ? 'flex-row' : 'flex-col'
+						} relative`}
+					>
+						{/* Left side - Content area */}
+						<div
+							className={`${
+								showTestPreview && testMessage ? 'w-1/2' : 'w-full'
+							} flex flex-col`}
+						>
+							<div className="flex-1 flex flex-col">
+								{/* Content area */}
+								<div className="p-3 flex flex-col gap-3 items-start">
+									{fields.length === 0 && (
+										<span className="text-gray-300 font-primary text-[12px]">
+											Add blocks here to build your prompt...
+										</span>
+									)}
+									<SortableContext
+										items={fields.map((f) => f.id)}
+										strategy={verticalListSortingStrategy}
+									>
+										{fields.map((field, index) => (
+											<SortableAIBlock
+												key={field.id}
+												id={field.id}
+												fieldIndex={index}
+												block={getBlock(field.type)}
+												onRemove={handleRemoveBlock}
+												trackFocusedField={trackFocusedField}
+											/>
+										))}
+									</SortableContext>
 
-									{/* Test Email Content */}
-									<div className="flex-1 p-6 overflow-y-auto bg-gray-50">
-										<div
-											dangerouslySetInnerHTML={{ __html: testMessage }}
-											className="max-w-none"
-											style={{
-												fontFamily: form.watch('font') || 'Arial',
-												lineHeight: '1.6',
-												fontSize: '14px',
-											}}
-										/>
+									{/* Add Block Button */}
+									<div className="w-full flex justify-center mt-2">
+										<DropdownMenu>
+											<DropdownMenuTrigger asChild>
+												<Button
+													type="button"
+													variant="ghost"
+													size="icon"
+													className="h-12 w-12 hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+												>
+													<Plus className="h-8 w-8" strokeWidth={3} />
+												</Button>
+											</DropdownMenuTrigger>
+											<DropdownMenuContent
+												className="w-[275.23px] h-[190px] !overflow-hidden !border-0"
+												align="center"
+												side="bottom"
+												avoidCollisions={false}
+											>
+												<div className="relative flex flex-col justify-between h-full">
+													{/* Vertical lines that extend from hybrid block's side borders */}
+													<div className="absolute top-[6px] bottom-[6px] left-0 w-[2px] bg-[#51A2E4] z-0" />
+													<div className="absolute top-[6px] bottom-[6px] right-0 w-[2px] bg-[#51A2E4] z-0" />
+
+													<DropdownMenuGroup className="p-0 relative">
+														{BLOCK_ITEMS.filter((item) => item.position === 'top').map(
+															(item) => (
+																<BlockMenuItem
+																	key={item.value}
+																	item={item}
+																	onClick={() => {
+																		if (item.value === 'hybrid_automation') {
+																			handleAddHybridAutomation();
+																		} else if (item.value === HybridBlock.text) {
+																			handleAddBlock(getBlock(HybridBlock.text));
+																		} else {
+																			handleAddBlock(
+																				BLOCKS.find((b) => b.value === item.value)!
+																			);
+																		}
+																	}}
+																/>
+															)
+														)}
+													</DropdownMenuGroup>
+													<div className="flex items-center justify-start pl-4 font-normal relative z-10">
+														<span>or</span>
+													</div>
+													<DropdownMenuGroup className="p-0 relative">
+														{BLOCK_ITEMS.filter((item) => item.position === 'bottom').map(
+															(item) => (
+																<BlockMenuItem
+																	key={item.value}
+																	item={item}
+																	onClick={() => {
+																		if (item.value === 'hybrid_automation') {
+																			handleAddHybridAutomation();
+																		} else if (item.value === HybridBlock.text) {
+																			handleAddBlock(getBlock(HybridBlock.text));
+																		} else {
+																			handleAddBlock(
+																				BLOCKS.find((b) => b.value === item.value)!
+																			);
+																		}
+																	}}
+																/>
+															)
+														)}
+													</DropdownMenuGroup>
+												</div>
+											</DropdownMenuContent>
+										</DropdownMenu>
+									</div>
+								</div>
+
+								{/*  Signature Block */}
+								<div className="px-3 mt-auto">
+									<FormField
+										control={form.control}
+										name="signature"
+										render={({ field }) => (
+											<FormItem>
+												<div
+													className={`${
+														showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]'
+													} mx-auto min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2 mb-[13px]`}
+												>
+													<FormLabel className="text-base font-semibold font-secondary">
+														Signature
+													</FormLabel>
+													<FormControl>
+														<Textarea
+															placeholder="Enter your signature..."
+															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-[25px] mt-1 p-0 resize-none overflow-hidden"
+															style={{
+																height: 'auto',
+																fontFamily: form.watch('font') || 'Arial',
+															}}
+															onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+																const target = e.currentTarget;
+																target.style.height = 'auto';
+																target.style.height = target.scrollHeight + 'px';
+															}}
+															{...field}
+														/>
+													</FormControl>
+												</div>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+								</div>
+							</div>
+						</div>
+
+						{/* Right side - Test Preview Panel */}
+						{showTestPreview && testMessage && (
+							<div className="w-1/2 flex flex-col">
+								<div className="flex-1 flex flex-col p-3">
+									<div className="flex-1 border-2 border-black rounded-lg bg-background flex flex-col overflow-hidden mb-[13px]">
+										{/* Header with X Button */}
+										<div className="flex justify-between items-center p-4 border-b border-gray-200">
+											<h3 className="text-lg font-semibold text-gray-800 font-secondary">
+												Test Email Preview
+											</h3>
+											<button
+												type="button"
+												onClick={() => setShowTestPreview(false)}
+												className="p-1 hover:bg-gray-100 rounded transition-colors"
+												style={{ WebkitAppearance: 'none' }}
+											>
+												<X className="h-5 w-5 text-destructive-dark" />
+											</button>
+										</div>
+
+										{/* Test Email Content */}
+										<div className="flex-1 p-6 overflow-y-auto bg-gray-50">
+											<div
+												dangerouslySetInnerHTML={{ __html: testMessage }}
+												className="max-w-none"
+												style={{
+													fontFamily: form.watch('font') || 'Arial',
+													lineHeight: '1.6',
+													fontSize: '14px',
+												}}
+											/>
+										</div>
 									</div>
 								</div>
 							</div>
 						)}
-
-						{/* Content area */}
-						<div className="flex-1 p-3 flex flex-col gap-3 items-start">
-							{fields.length === 0 && (
-								<span className="text-gray-300 font-primary text-[12px]">
-									Add blocks here to build your prompt...
-								</span>
-							)}
-							<SortableContext
-								items={fields.map((f) => f.id)}
-								strategy={verticalListSortingStrategy}
-							>
-								{fields.map((field, index) => (
-									<SortableAIBlock
-										key={field.id}
-										id={field.id}
-										fieldIndex={index}
-										block={getBlock(field.type)}
-										onRemove={handleRemoveBlock}
-										trackFocusedField={trackFocusedField}
-									/>
-								))}
-							</SortableContext>
-
-							{/* Add Block Button */}
-							<div className="w-full flex justify-center mt-2">
-								<DropdownMenu>
-									<DropdownMenuTrigger asChild>
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											className="h-12 w-12 hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-										>
-											<Plus className="h-8 w-8" strokeWidth={3} />
-										</Button>
-									</DropdownMenuTrigger>
-									<DropdownMenuContent
-										className="w-[275.23px] h-[190px] !overflow-hidden !border-0"
-										align="center"
-										side="bottom"
-										avoidCollisions={false}
-									>
-										<div className="relative flex flex-col justify-between h-full">
-											{/* Vertical lines that extend from hybrid block's side borders */}
-											<div className="absolute top-[6px] bottom-[6px] left-0 w-[2px] bg-[#51A2E4] z-0" />
-											<div className="absolute top-[6px] bottom-[6px] right-0 w-[2px] bg-[#51A2E4] z-0" />
-
-											<DropdownMenuGroup className="p-0 relative">
-												{BLOCK_ITEMS.filter((item) => item.position === 'top').map(
-													(item) => (
-														<BlockMenuItem
-															key={item.value}
-															item={item}
-															onClick={() => {
-																if (item.value === 'hybrid_automation') {
-																	handleAddHybridAutomation();
-																} else if (item.value === HybridBlock.text) {
-																	handleAddBlock(getBlock(HybridBlock.text));
-																} else {
-																	handleAddBlock(
-																		BLOCKS.find((b) => b.value === item.value)!
-																	);
-																}
-															}}
-														/>
-													)
-												)}
-											</DropdownMenuGroup>
-											<div className="flex items-center justify-start pl-4 font-normal relative z-10">
-												<span>or</span>
-											</div>
-											<DropdownMenuGroup className="p-0 relative">
-												{BLOCK_ITEMS.filter((item) => item.position === 'bottom').map(
-													(item) => (
-														<BlockMenuItem
-															key={item.value}
-															item={item}
-															onClick={() => {
-																if (item.value === 'hybrid_automation') {
-																	handleAddHybridAutomation();
-																} else if (item.value === HybridBlock.text) {
-																	handleAddBlock(getBlock(HybridBlock.text));
-																} else {
-																	handleAddBlock(
-																		BLOCKS.find((b) => b.value === item.value)!
-																	);
-																}
-															}}
-														/>
-													)
-												)}
-											</DropdownMenuGroup>
-										</div>
-									</DropdownMenuContent>
-								</DropdownMenu>
-							</div>
-						</div>
-
-						{/*  Signature Block */}
-						<div className="px-3 pb-[10px]">
-							<FormField
-								control={form.control}
-								name="signature"
-								render={({ field }) => (
-									<FormItem>
-										<div className="w-[868px] mx-auto min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2">
-											<FormLabel className="text-base font-semibold font-secondary">
-												Signature
-											</FormLabel>
-											<FormControl>
-												<Textarea
-													placeholder="Enter your signature..."
-													className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-[25px] mt-1 p-0 resize-none overflow-hidden"
-													style={{
-														height: 'auto',
-														fontFamily: form.watch('font') || 'Arial',
-													}}
-													onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
-														const target = e.currentTarget;
-														target.style.height = 'auto';
-														target.style.height = target.scrollHeight + 'px';
-													}}
-													{...field}
-												/>
-											</FormControl>
-										</div>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-						</div>
 					</div>
 				</Droppable>
 			</DndContext>
