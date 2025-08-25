@@ -21,12 +21,81 @@ import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptio
 import { DraftingMode, EmailStatus } from '@prisma/client';
 import { cn } from '@/utils';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
-import { Trash2, ChevronRight } from 'lucide-react';
+import { ChevronRight, X } from 'lucide-react';
 import ViewEditEmailDialog from '@/components/organisms/_dialogs/ViewEditEmailDialog/ViewEditEmailDialog';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { useDeleteEmail } from '@/hooks/queryHooks/useEmails';
 import { ConfirmSendDialog } from '@/components/organisms/_dialogs/ConfirmSendDialog/ConfirmSendDialog';
 import { useMe } from '@/hooks/useMe';
+
+// Helper function to abbreviate state names
+const abbreviateState = (state: string | null | undefined): string => {
+	if (!state) return '';
+
+	// Common US state abbreviations mapping
+	const stateAbbreviations: { [key: string]: string } = {
+		alabama: 'AL',
+		alaska: 'AK',
+		arizona: 'AZ',
+		arkansas: 'AR',
+		california: 'CA',
+		colorado: 'CO',
+		connecticut: 'CT',
+		delaware: 'DE',
+		florida: 'FL',
+		georgia: 'GA',
+		hawaii: 'HI',
+		idaho: 'ID',
+		illinois: 'IL',
+		indiana: 'IN',
+		iowa: 'IA',
+		kansas: 'KS',
+		kentucky: 'KY',
+		louisiana: 'LA',
+		maine: 'ME',
+		maryland: 'MD',
+		massachusetts: 'MA',
+		michigan: 'MI',
+		minnesota: 'MN',
+		mississippi: 'MS',
+		missouri: 'MO',
+		montana: 'MT',
+		nebraska: 'NE',
+		nevada: 'NV',
+		'new hampshire': 'NH',
+		'new jersey': 'NJ',
+		'new mexico': 'NM',
+		'new york': 'NY',
+		'north carolina': 'NC',
+		'north dakota': 'ND',
+		ohio: 'OH',
+		oklahoma: 'OK',
+		oregon: 'OR',
+		pennsylvania: 'PA',
+		'rhode island': 'RI',
+		'south carolina': 'SC',
+		'south dakota': 'SD',
+		tennessee: 'TN',
+		texas: 'TX',
+		utah: 'UT',
+		vermont: 'VT',
+		virginia: 'VA',
+		washington: 'WA',
+		'west virginia': 'WV',
+		wisconsin: 'WI',
+		wyoming: 'WY',
+		'district of columbia': 'DC',
+		'washington dc': 'DC',
+		'washington d.c.': 'DC',
+	};
+
+	// If it's already a 2-letter abbreviation, return as is
+	if (state.length === 2) return state.toUpperCase();
+
+	// Try to find and return abbreviation
+	const lowerState = state.toLowerCase().trim();
+	return stateAbbreviations[lowerState] || state;
+};
 
 // Helper component for scrolling text
 const ScrollableText = ({
@@ -302,6 +371,21 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										overflowX: 'hidden',
 									}}
 								>
+									{/* Left table label */}
+									<div
+										className="absolute"
+										style={{
+											left: '22px',
+											top: '16px',
+											fontSize: '14px',
+											fontFamily: 'Inter',
+											fontWeight: '500',
+											color: '#000000',
+										}}
+									>
+										Contacts
+									</div>
+
 									{/* Left table - Contacts list */}
 									<div
 										className="absolute bg-white border border-gray-300 overflow-auto custom-scroll"
@@ -423,7 +507,10 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																		>
 																			{contact.city || contact.state ? (
 																				<ScrollableText
-																					text={[contact.city, contact.state]
+																					text={[
+																						contact.city,
+																						abbreviateState(contact.state),
+																					]
 																						.filter(Boolean)
 																						.join(', ')}
 																					className="text-xs text-black"
@@ -497,7 +584,10 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																				>
 																					{contact.city || contact.state ? (
 																						<ScrollableText
-																							text={[contact.city, contact.state]
+																							text={[
+																								contact.city,
+																								abbreviateState(contact.state),
+																							]
 																								.filter(Boolean)
 																								.join(', ')}
 																							className="text-xs text-black"
@@ -520,7 +610,10 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																			>
 																				{contact.city || contact.state ? (
 																					<ScrollableText
-																						text={[contact.city, contact.state]
+																						text={[
+																							contact.city,
+																							abbreviateState(contact.state),
+																						]
 																							.filter(Boolean)
 																							.join(', ')}
 																						className="text-xs text-black"
@@ -599,6 +692,21 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										</Button>
 									</div>
 
+									{/* Right table label */}
+									<div
+										className="absolute"
+										style={{
+											left: '534px', // 892px total - 22px margin - 336px width
+											top: '16px',
+											fontSize: '14px',
+											fontFamily: 'Inter',
+											fontWeight: '500',
+											color: '#000000',
+										}}
+									>
+										Drafts
+									</div>
+
 									{/* Right table - Generated Drafts */}
 									<div
 										className="absolute bg-white border border-gray-300 overflow-auto custom-scroll"
@@ -642,13 +750,13 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 															{/* Delete button */}
 															<button
 																onClick={(e) => handleDeleteDraft(e, draft.id)}
-																className="absolute top-2 right-2 p-1 hover:bg-gray-200 rounded transition-colors"
+																className="absolute top-2 right-2 p-1 transition-colors"
 																style={{
 																	zIndex: 10,
 																}}
 															>
-																<Trash2
-																	size={14}
+																<X
+																	size={16}
 																	className="text-gray-500 hover:text-red-500"
 																/>
 															</button>
