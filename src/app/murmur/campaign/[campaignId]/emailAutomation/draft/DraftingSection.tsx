@@ -683,7 +683,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										{isSendingDisabled ? (
 											<UpgradeSubscriptionDrawer
 												triggerButtonText="Send"
-												className="!w-[891px] !h-[39px]"
+												className="!w-[891px] !h-[39px] !bg-[rgba(93,171,104,0.47)] !border-2 !border-[#5DAB68] !text-black hover:!bg-[rgba(93,171,104,0.6)] hover:!border-[#5DAB68] active:!bg-[rgba(93,171,104,0.7)]"
 												message={
 													isFreeTrial
 														? `Your free trial subscription does not include the ability to send emails. To send the emails you've drafted, please upgrade your subscription to the paid version.`
