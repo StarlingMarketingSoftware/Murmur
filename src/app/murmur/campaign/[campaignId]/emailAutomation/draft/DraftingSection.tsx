@@ -18,84 +18,12 @@ import ProgressIndicator from '@/components/molecules/ProgressIndicator/Progress
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 import { Typography } from '@/components/ui/typography';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
-import { DraftingMode, EmailStatus } from '@prisma/client';
-import { cn } from '@/utils';
-import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { DraftingMode } from '@prisma/client';
+import { cn, getStateAbbreviation } from '@/utils';
 import { ChevronRight, X } from 'lucide-react';
 import ViewEditEmailDialog from '@/components/organisms/_dialogs/ViewEditEmailDialog/ViewEditEmailDialog';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
-import { useDeleteEmail } from '@/hooks/queryHooks/useEmails';
 import { ConfirmSendDialog } from '@/components/organisms/_dialogs/ConfirmSendDialog/ConfirmSendDialog';
-import { useMe } from '@/hooks/useMe';
-
-// Helper function to abbreviate state names
-const abbreviateState = (state: string | null | undefined): string => {
-	if (!state) return '';
-
-	// Common US state abbreviations mapping
-	const stateAbbreviations: { [key: string]: string } = {
-		alabama: 'AL',
-		alaska: 'AK',
-		arizona: 'AZ',
-		arkansas: 'AR',
-		california: 'CA',
-		colorado: 'CO',
-		connecticut: 'CT',
-		delaware: 'DE',
-		florida: 'FL',
-		georgia: 'GA',
-		hawaii: 'HI',
-		idaho: 'ID',
-		illinois: 'IL',
-		indiana: 'IN',
-		iowa: 'IA',
-		kansas: 'KS',
-		kentucky: 'KY',
-		louisiana: 'LA',
-		maine: 'ME',
-		maryland: 'MD',
-		massachusetts: 'MA',
-		michigan: 'MI',
-		minnesota: 'MN',
-		mississippi: 'MS',
-		missouri: 'MO',
-		montana: 'MT',
-		nebraska: 'NE',
-		nevada: 'NV',
-		'new hampshire': 'NH',
-		'new jersey': 'NJ',
-		'new mexico': 'NM',
-		'new york': 'NY',
-		'north carolina': 'NC',
-		'north dakota': 'ND',
-		ohio: 'OH',
-		oklahoma: 'OK',
-		oregon: 'OR',
-		pennsylvania: 'PA',
-		'rhode island': 'RI',
-		'south carolina': 'SC',
-		'south dakota': 'SD',
-		tennessee: 'TN',
-		texas: 'TX',
-		utah: 'UT',
-		vermont: 'VT',
-		virginia: 'VA',
-		washington: 'WA',
-		'west virginia': 'WV',
-		wisconsin: 'WI',
-		wyoming: 'WY',
-		'district of columbia': 'DC',
-		'washington dc': 'DC',
-		'washington d.c.': 'DC',
-	};
-
-	// If it's already a 2-letter abbreviation, return as is
-	if (state.length === 2) return state.toUpperCase();
-
-	// Try to find and return abbreviation
-	const lowerState = state.toLowerCase().trim();
-	return stateAbbreviations[lowerState] || state;
-};
 
 // Helper component for scrolling text
 const ScrollableText = ({
@@ -184,90 +112,29 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		setIsConfirmDialogOpen,
 		setIsOpenUpgradeSubscriptionDrawer,
 		trackFocusedField,
+		selectedDraft,
+		selectedContactIds,
+		selectedDraftIds,
+		sendingProgress,
+		isSendingDisabled,
+		isPendingDeleteEmail,
+		isPendingEmails,
+		draftEmails,
+		setSelectedContactIds,
+		setSelectedDraftIds,
+		isFreeTrial,
+		setSendingProgress,
+		isDraftDialogOpen,
+		setIsDraftDialogOpen,
+		handleDraftClick,
+		handleDeleteDraft,
+		handleContactSelection,
+		handleDraftSelection,
 	} = useDraftingSection(props);
 
 	const {
 		formState: { isDirty },
 	} = form;
-
-	// Fetch draft emails for the campaign
-	const { data: emails, isPending: isPendingEmails } = useGetEmails({
-		filters: {
-			campaignId: campaign.id,
-		},
-	});
-
-	// Filter for draft emails only
-	const draftEmails = emails?.filter((email) => email.status === EmailStatus.draft) || [];
-
-	// State for viewing/editing email
-	type EmailType = typeof draftEmails extends (infer T)[] ? T : never;
-	const [selectedDraft, setSelectedDraft] = useState<EmailType | null>(null);
-	const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
-
-	// State for selected contacts for drafting
-	const [selectedContactIds, setSelectedContactIds] = useState<Set<number>>(new Set());
-
-	// State for selected drafts for sending
-	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
-
-	// Delete email hook
-	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
-
-	// User info for send functionality
-	const { user, isFreeTrial } = useMe();
-	const [sendingProgress, setSendingProgress] = useState(-1);
-	const isSendingDisabled = isFreeTrial || user?.sendingCredits === 0;
-
-	// Clear selected drafts after sending is complete
-	useEffect(() => {
-		if (sendingProgress === selectedDraftIds.size && selectedDraftIds.size > 0) {
-			// Clear selection after successful sending
-			setSelectedDraftIds(new Set());
-		}
-	}, [sendingProgress, selectedDraftIds.size]);
-
-	// Handle draft click to view/edit
-	const handleDraftClick = (draft: EmailType) => {
-		setSelectedDraft(draft);
-		setIsDraftDialogOpen(true);
-	};
-
-	// Handle draft deletion
-	const handleDeleteDraft = async (e: React.MouseEvent, draftId: number) => {
-		e.stopPropagation(); // Prevent opening the draft dialog
-		try {
-			await deleteEmail(draftId);
-		} catch (error) {
-			console.error('Failed to delete draft:', error);
-		}
-	};
-
-	// Handle contact selection for drafting
-	const handleContactSelection = (contactId: number) => {
-		setSelectedContactIds((prev) => {
-			const newSet = new Set(prev);
-			if (newSet.has(contactId)) {
-				newSet.delete(contactId);
-			} else {
-				newSet.add(contactId);
-			}
-			return newSet;
-		});
-	};
-
-	// Handle draft selection for sending
-	const handleDraftSelection = (draftId: number) => {
-		setSelectedDraftIds((prev) => {
-			const newSet = new Set(prev);
-			if (newSet.has(draftId)) {
-				newSet.delete(draftId);
-			} else {
-				newSet.add(draftId);
-			}
-			return newSet;
-		});
-	};
 
 	const getAutosaveStatusDisplay = (): ReactNode => {
 		switch (autosaveStatus) {
@@ -567,7 +434,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																				<ScrollableText
 																					text={[
 																						contact.city,
-																						abbreviateState(contact.state),
+																						getStateAbbreviation(contact.state),
 																					]
 																						.filter(Boolean)
 																						.join(', ')}
@@ -605,6 +472,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																			<>
 																				{/* Top Right - Title */}
 																				<div
+																					className="bg-red-500"
 																					style={{
 																						padding: '4px',
 																						display: 'flex',
@@ -644,7 +512,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																						<ScrollableText
 																							text={[
 																								contact.city,
-																								abbreviateState(contact.state),
+																								getStateAbbreviation(contact.state),
 																							]
 																								.filter(Boolean)
 																								.join(', ')}
@@ -670,7 +538,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																					<ScrollableText
 																						text={[
 																							contact.city,
-																							abbreviateState(contact.state),
+																							getStateAbbreviation(contact.state),
 																						]
 																							.filter(Boolean)
 																							.join(', ')}
@@ -855,6 +723,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 														>
 															{/* Delete button */}
 															<button
+																type="button"
 																onClick={(e) => handleDeleteDraft(e, draft.id)}
 																className="absolute top-2 right-2 p-1 transition-colors"
 																style={{

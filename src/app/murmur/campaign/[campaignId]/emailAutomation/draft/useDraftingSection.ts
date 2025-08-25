@@ -6,7 +6,11 @@ import {
 } from '@/constants';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
-import { useCreateEmail } from '@/hooks/queryHooks/useEmails';
+import {
+	useCreateEmail,
+	useDeleteEmail,
+	useGetEmails,
+} from '@/hooks/queryHooks/useEmails';
 import { useGetSignatures } from '@/hooks/queryHooks/useSignatures';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { useMe } from '@/hooks/useMe';
@@ -36,6 +40,7 @@ import {
 	Contact,
 	DraftingMode,
 	DraftingTone,
+	Email,
 	EmailStatus,
 	HybridBlock,
 	Identity,
@@ -110,7 +115,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	// HOOKS
 
-	const { user } = useMe();
+	const { user, isFreeTrial } = useMe();
 	const queryClient = useQueryClient();
 
 	const [isFirstLoad, setIsFirstLoad] = useState(true);
@@ -127,6 +132,18 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [activeTab, setActiveTab] = useState<'settings' | 'test' | 'placeholders'>(
 		'settings'
 	);
+	// State for viewing/editing email
+	type EmailType = typeof draftEmails extends (infer T)[] ? T : never;
+	const [selectedDraft, setSelectedDraft] = useState<EmailType | null>(null);
+	const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
+
+	// State for selected contacts for drafting
+	const [selectedContactIds, setSelectedContactIds] = useState<Set<number>>(new Set());
+
+	const [sendingProgress, setSendingProgress] = useState(-1);
+
+	// State for selected drafts for sending
+	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
 
 	const isGenerationCancelledRef = useRef(false);
 	const lastFocusedFieldRef = useRef<{
@@ -195,6 +212,22 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { isPending: isPendingCreateEmail, mutateAsync: createEmail } = useCreateEmail({
 		suppressToasts: true,
 	});
+
+	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
+
+	// User info for send functionality
+	const isSendingDisabled = isFreeTrial || user?.sendingCredits === 0;
+
+	// Fetch draft emails for the campaign
+	const { data: emails, isPending: isPendingEmails } = useGetEmails({
+		filters: {
+			campaignId: campaign.id,
+		},
+	});
+
+	// Filter for draft emails only
+	const draftEmails =
+		emails?.filter((email: Email) => email.status === EmailStatus.draft) || [];
 
 	// VARIABLES
 
@@ -1109,6 +1142,49 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		[form]
 	);
 
+	// Handle draft click to view/edit
+	const handleDraftClick = (draft: EmailType) => {
+		setSelectedDraft(draft);
+		setIsDraftDialogOpen(true);
+	};
+
+	// Handle draft deletion
+	const handleDeleteDraft = async (e: React.MouseEvent, draftId: number) => {
+		e.stopPropagation(); // Prevent opening the draft dialog
+		e.preventDefault();
+		try {
+			await deleteEmail(draftId);
+		} catch (error) {
+			console.error('Failed to delete draft:', error);
+		}
+	};
+
+	// Handle contact selection for drafting
+	const handleContactSelection = (contactId: number) => {
+		setSelectedContactIds((prev) => {
+			const newSet = new Set(prev);
+			if (newSet.has(contactId)) {
+				newSet.delete(contactId);
+			} else {
+				newSet.add(contactId);
+			}
+			return newSet;
+		});
+	};
+
+	// Handle draft selection for sending
+	const handleDraftSelection = (draftId: number) => {
+		setSelectedDraftIds((prev) => {
+			const newSet = new Set(prev);
+			if (newSet.has(draftId)) {
+				newSet.delete(draftId);
+			} else {
+				newSet.add(draftId);
+			}
+			return newSet;
+		});
+	};
+
 	// EFFECTS
 
 	useEffect(() => {
@@ -1266,6 +1342,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	}, [hasFullAutomatedBlock, activeTab]);
 
+	// Clear selected drafts after sending is complete
+	useEffect(() => {
+		if (sendingProgress === selectedDraftIds.size && selectedDraftIds.size > 0) {
+			// Clear selection after successful sending
+			setSelectedDraftIds(new Set());
+		}
+	}, [sendingProgress, selectedDraftIds.size]);
+
 	return {
 		activeTab,
 		autosaveStatus,
@@ -1291,5 +1375,23 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		setIsConfirmDialogOpen,
 		setIsOpenUpgradeSubscriptionDrawer,
 		trackFocusedField,
+		selectedDraft,
+		selectedContactIds,
+		selectedDraftIds,
+		sendingProgress,
+		isSendingDisabled,
+		isPendingDeleteEmail,
+		isPendingEmails,
+		draftEmails,
+		setSelectedContactIds,
+		setSelectedDraftIds,
+		isFreeTrial,
+		setSendingProgress,
+		isDraftDialogOpen,
+		setIsDraftDialogOpen,
+		handleDraftClick,
+		handleDeleteDraft,
+		handleContactSelection,
+		handleDraftSelection,
 	};
 };

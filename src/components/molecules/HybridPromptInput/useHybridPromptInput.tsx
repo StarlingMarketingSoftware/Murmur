@@ -212,13 +212,11 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 	};
 
 	const handleAddHybridAutomation = () => {
-		// Check if there are any existing blocks
 		if (fields.length > 0) {
 			toast.error('Hybrid Automation requires clearing all existing blocks first.');
 			return;
 		}
 
-		// Add all three blocks in order
 		const blocksToAdd = [
 			{ id: HybridBlock.introduction, type: HybridBlock.introduction, value: '' },
 			{ id: HybridBlock.research, type: HybridBlock.research, value: '' },
