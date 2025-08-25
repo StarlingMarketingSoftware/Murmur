@@ -97,7 +97,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 			</div>
 			<div className="flex gap-[47px] items-start">
 				<div className="flex-shrink-0">
-					<div className="relative flex flex-row w-[892px] h-[530px] border-[3px] border-black rounded-lg overflow-x-hidden p-[17px]">
+					<div className="relative flex flex-row w-[892px] h-[560px] border-[3px] border-black rounded-lg overflow-x-hidden p-[17px]">
 						{/* Left table container */}
 						<ContactsSelection
 							contacts={contacts}
