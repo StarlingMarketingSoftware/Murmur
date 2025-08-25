@@ -682,8 +682,8 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									<div className="flex justify-end">
 										{isSendingDisabled ? (
 											<UpgradeSubscriptionDrawer
-												triggerButtonText="Proceed to Sending Confirmation"
-												className="!w-[892px] !h-[39px]"
+												triggerButtonText="Send"
+												className="!w-[891px] !h-[39px]"
 												message={
 													isFreeTrial
 														? `Your free trial subscription does not include the ability to send emails. To send the emails you've drafted, please upgrade your subscription to the paid version.`

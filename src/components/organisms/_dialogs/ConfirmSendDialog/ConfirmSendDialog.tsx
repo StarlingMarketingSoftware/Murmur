@@ -18,8 +18,8 @@ export const ConfirmSendDialog: FC<ConfirmSendDialogProps> = (props) => {
 	return (
 		<Dialog open={isOpen} onOpenChange={setIsOpen} modal>
 			<DialogTrigger asChild>
-				<Button className="w-full sm:w-fit" disabled={draftEmailCount <= 0}>
-					Proceed to Sending Confirmation
+				<Button className="w-[891px] h-[39px]" disabled={draftEmailCount <= 0}>
+					Send
 				</Button>
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-[425px]">
