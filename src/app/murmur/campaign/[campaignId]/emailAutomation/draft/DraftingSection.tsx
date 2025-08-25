@@ -18,8 +18,15 @@ import ProgressIndicator from '@/components/molecules/ProgressIndicator/Progress
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 import { Typography } from '@/components/ui/typography';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
-import { DraftingMode } from '@prisma/client';
+import { DraftingMode, EmailStatus } from '@prisma/client';
 import { cn } from '@/utils';
+import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { Trash2 } from 'lucide-react';
+import ViewEditEmailDialog from '@/components/organisms/_dialogs/ViewEditEmailDialog/ViewEditEmailDialog';
+import { Spinner } from '@/components/atoms/Spinner/Spinner';
+import { useDeleteEmail } from '@/hooks/queryHooks/useEmails';
+import { ConfirmSendDialog } from '@/components/organisms/_dialogs/ConfirmSendDialog/ConfirmSendDialog';
+import { useMe } from '@/hooks/useMe';
 
 // Helper component for scrolling text
 const ScrollableText = ({
@@ -113,6 +120,45 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
 		formState: { isDirty },
 	} = form;
+
+	// Fetch draft emails for the campaign
+	const { data: emails, isPending: isPendingEmails } = useGetEmails({
+		filters: {
+			campaignId: campaign.id,
+		},
+	});
+
+	// Filter for draft emails only
+	const draftEmails = emails?.filter((email) => email.status === EmailStatus.draft) || [];
+
+	// State for viewing/editing email
+	type EmailType = typeof draftEmails extends (infer T)[] ? T : never;
+	const [selectedDraft, setSelectedDraft] = useState<EmailType | null>(null);
+	const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
+
+	// Delete email hook
+	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
+
+	// User info for send functionality
+	const { user, isFreeTrial } = useMe();
+	const [sendingProgress, setSendingProgress] = useState(-1);
+	const isSendingDisabled = isFreeTrial || user?.sendingCredits === 0;
+
+	// Handle draft click to view/edit
+	const handleDraftClick = (draft: EmailType) => {
+		setSelectedDraft(draft);
+		setIsDraftDialogOpen(true);
+	};
+
+	// Handle draft deletion
+	const handleDeleteDraft = async (e: React.MouseEvent, draftId: number) => {
+		e.stopPropagation(); // Prevent opening the draft dialog
+		try {
+			await deleteEmail(draftId);
+		} catch (error) {
+			console.error('Failed to delete draft:', error);
+		}
+	};
 
 	const getAutosaveStatusDisplay = (): ReactNode => {
 		switch (autosaveStatus) {
@@ -481,17 +527,99 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										)}
 									</div>
 
-									{/* Right table */}
+									{/* Right table - Generated Drafts */}
 									<div
-										className="absolute bg-white border border-gray-300"
+										className="absolute bg-white border border-gray-300 overflow-auto custom-scroll"
 										style={{
 											width: '336px',
 											height: '441px',
 											right: '22px',
 											bottom: '16px',
+											overflowX: 'hidden',
+											overflowY: 'auto',
+											paddingRight: '10px',
 										}}
 									>
-										{/* Right table content will go here */}
+										{isPendingEmails ? (
+											<div className="flex items-center justify-center h-full">
+												<Spinner size="small" />
+											</div>
+										) : draftEmails.length > 0 ? (
+											<div style={{ overflow: 'visible', width: '316px' }}>
+												{draftEmails.map((draft) => {
+													const contact = contacts?.find((c) => c.id === draft.contactId);
+													const contactName = contact
+														? contact.name ||
+														  `${contact.firstName || ''} ${
+																contact.lastName || ''
+														  }`.trim() ||
+														  contact.company ||
+														  'Contact'
+														: 'Unknown Contact';
+
+													return (
+														<div
+															key={draft.id}
+															className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
+															onClick={() => handleDraftClick(draft)}
+															style={{
+																padding: '12px',
+																position: 'relative',
+															}}
+														>
+															{/* Delete button */}
+															<button
+																onClick={(e) => handleDeleteDraft(e, draft.id)}
+																className="absolute top-2 right-2 p-1 hover:bg-gray-200 rounded transition-colors"
+																style={{
+																	zIndex: 10,
+																}}
+															>
+																<Trash2
+																	size={14}
+																	className="text-gray-500 hover:text-red-500"
+																/>
+															</button>
+
+															{/* Contact name */}
+															<div className="font-bold text-xs mb-1 pr-8">
+																{contactName}
+															</div>
+
+															{/* Email subject */}
+															<div className="text-xs text-gray-600 mb-1 pr-8">
+																<span className="font-semibold">Subject:</span>{' '}
+																{draft.subject || 'No subject'}
+															</div>
+
+															{/* Preview of message */}
+															<div className="text-xs text-gray-500 pr-8">
+																{draft.message
+																	? draft.message
+																			.replace(/<[^>]*>/g, '')
+																			.substring(0, 60) + '...'
+																	: 'No content'}
+															</div>
+														</div>
+													);
+												})}
+											</div>
+										) : (
+											<div className="flex flex-col items-center justify-center h-full text-gray-500 px-4">
+												<div className="text-sm font-semibold mb-2">
+													No drafts generated
+												</div>
+												<div className="text-xs text-center">
+													Click &quot;Generate Drafts&quot; to create emails for the
+													selected contacts
+												</div>
+											</div>
+										)}
+										{isPendingDeleteEmail && (
+											<div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center">
+												<Spinner size="small" />
+											</div>
+										)}
 									</div>
 								</div>
 							</div>
@@ -513,6 +641,28 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										Generate Drafts
 									</Button>
 								</div>
+								{/* Send button - appears when there are drafts */}
+								{draftEmails.length > 0 && (
+									<div className="flex justify-end">
+										{isSendingDisabled ? (
+											<UpgradeSubscriptionDrawer
+												triggerButtonText="Proceed to Sending Confirmation"
+												className="!w-[892px] !h-[39px]"
+												message={
+													isFreeTrial
+														? `Your free trial subscription does not include the ability to send emails. To send the emails you've drafted, please upgrade your subscription to the paid version.`
+														: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
+												}
+											/>
+										) : (
+											<ConfirmSendDialog
+												setSendingProgress={setSendingProgress}
+												campaign={campaign}
+												draftEmails={draftEmails}
+											/>
+										)}
+									</div>
+								)}
 							</div>
 							<ConfirmDialog
 								title="Confirm Batch Generation of Emails"
@@ -536,6 +686,13 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 								completeMessage="Finished generating {{progress}} emails."
 								cancelAction={cancelGeneration}
 							/>
+							<ProgressIndicator
+								progress={sendingProgress}
+								setProgress={setSendingProgress}
+								total={draftEmails.length}
+								pendingMessage="Sending {{progress}} emails..."
+								completeMessage="Finished sending {{progress}} emails."
+							/>
 						</div>
 					</div>
 				</form>
@@ -547,6 +704,13 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 				isOpen={isOpenUpgradeSubscriptionDrawer}
 				setIsOpen={setIsOpenUpgradeSubscriptionDrawer}
 				hideTriggerButton
+			/>
+
+			<ViewEditEmailDialog
+				email={selectedDraft}
+				isOpen={isDraftDialogOpen}
+				setIsOpen={setIsDraftDialogOpen}
+				isEditable={true}
 			/>
 		</div>
 	);
