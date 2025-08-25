@@ -7,7 +7,7 @@ import { IdentityDialog } from '@/components/organisms/_dialogs/IdentityDialog/I
 import { CampaignName } from '@/components/organisms/CampaignName/CampaignName';
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
-import { DraftingSection } from './emailAutomation/draft/DraftingSection';
+import { DraftingSection } from './DraftingSection/DraftingSection';
 import { SentEmailsTable } from '@/components/organisms/_tables/SentEmailsTable/SentEmailsTable';
 import { urls } from '@/constants/urls';
 import Link from 'next/link';

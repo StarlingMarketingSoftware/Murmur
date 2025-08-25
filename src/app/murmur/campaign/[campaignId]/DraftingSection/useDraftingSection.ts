@@ -6,11 +6,7 @@ import {
 } from '@/constants';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
-import {
-	useCreateEmail,
-	useDeleteEmail,
-	useGetEmails,
-} from '@/hooks/queryHooks/useEmails';
+import { useCreateEmail } from '@/hooks/queryHooks/useEmails';
 import { useGetSignatures } from '@/hooks/queryHooks/useSignatures';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { useMe } from '@/hooks/useMe';
@@ -40,18 +36,16 @@ import {
 	Contact,
 	DraftingMode,
 	DraftingTone,
-	Email,
 	EmailStatus,
 	HybridBlock,
 	Identity,
 	Signature,
 } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { debounce } from 'lodash';
 import { HANDWRITTEN_PLACEHOLDER_OPTIONS } from '@/components/molecules/HandwrittenPromptInput/HandwrittenPromptInput';
 import { ContactWithName } from '@/types/contact';
 
@@ -115,35 +109,19 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	// HOOKS
 
-	const { user, isFreeTrial } = useMe();
+	const { user } = useMe();
 	const queryClient = useQueryClient();
 
-	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	const [isOpenUpgradeSubscriptionDrawer, setIsOpenUpgradeSubscriptionDrawer] =
 		useState(false);
 	const [generationProgress, setGenerationProgress] = useState(-1);
-	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 	const [isTest, setIsTest] = useState<boolean>(false);
 	const [abortController, setAbortController] = useState<AbortController | null>(null);
-	const [isJustSaved, setIsJustSaved] = useState(false);
-	const [autosaveStatus, setAutosaveStatus] = useState<
-		'idle' | 'saving' | 'saved' | 'error'
-	>('idle');
+	const [isFirstLoad, setIsFirstLoad] = useState(true);
+
 	const [activeTab, setActiveTab] = useState<'settings' | 'test' | 'placeholders'>(
 		'settings'
 	);
-	// State for viewing/editing email
-	type EmailType = typeof draftEmails extends (infer T)[] ? T : never;
-	const [selectedDraft, setSelectedDraft] = useState<EmailType | null>(null);
-	const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
-
-	// State for selected contacts for drafting
-	const [selectedContactIds, setSelectedContactIds] = useState<Set<number>>(new Set());
-
-	const [sendingProgress, setSendingProgress] = useState(-1);
-
-	// State for selected drafts for sending
-	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
 
 	const isGenerationCancelledRef = useRef(false);
 	const lastFocusedFieldRef = useRef<{
@@ -212,22 +190,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { isPending: isPendingCreateEmail, mutateAsync: createEmail } = useCreateEmail({
 		suppressToasts: true,
 	});
-
-	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
-
-	// User info for send functionality
-	const isSendingDisabled = isFreeTrial || user?.sendingCredits === 0;
-
-	// Fetch draft emails for the campaign
-	const { data: emails, isPending: isPendingEmails } = useGetEmails({
-		filters: {
-			campaignId: campaign.id,
-		},
-	});
-
-	// Filter for draft emails only
-	const draftEmails =
-		emails?.filter((email: Email) => email.status === EmailStatus.draft) || [];
 
 	// VARIABLES
 
@@ -1060,41 +1022,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	// HANDLERS
 
-	const handleAutoSave = useCallback(
-		async (values: DraftingFormValues) => {
-			try {
-				setAutosaveStatus('saving');
-
-				await saveCampaign({
-					id: campaign.id,
-					data: values,
-				});
-				setAutosaveStatus('saved');
-				setIsJustSaved(true);
-
-				setTimeout(() => {
-					setAutosaveStatus('idle');
-				}, 2000);
-			} catch (error) {
-				setAutosaveStatus('error');
-				console.error('Autosave failed:', error);
-
-				setTimeout(() => {
-					setAutosaveStatus('idle');
-				}, 3000);
-			}
-		},
-		[campaign.id, saveCampaign]
-	);
-
-	const debouncedAutosave = useMemo(
-		() =>
-			debounce((values: DraftingFormValues) => {
-				handleAutoSave(values);
-			}, 1500),
-		[handleAutoSave]
-	);
-
 	const handleGenerateTestDrafts = async () => {
 		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
 			generateAiDraftTest();
@@ -1141,49 +1068,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		},
 		[form]
 	);
-
-	// Handle draft click to view/edit
-	const handleDraftClick = (draft: EmailType) => {
-		setSelectedDraft(draft);
-		setIsDraftDialogOpen(true);
-	};
-
-	// Handle draft deletion
-	const handleDeleteDraft = async (e: React.MouseEvent, draftId: number) => {
-		e.stopPropagation(); // Prevent opening the draft dialog
-		e.preventDefault();
-		try {
-			await deleteEmail(draftId);
-		} catch (error) {
-			console.error('Failed to delete draft:', error);
-		}
-	};
-
-	// Handle contact selection for drafting
-	const handleContactSelection = (contactId: number) => {
-		setSelectedContactIds((prev) => {
-			const newSet = new Set(prev);
-			if (newSet.has(contactId)) {
-				newSet.delete(contactId);
-			} else {
-				newSet.add(contactId);
-			}
-			return newSet;
-		});
-	};
-
-	// Handle draft selection for sending
-	const handleDraftSelection = (draftId: number) => {
-		setSelectedDraftIds((prev) => {
-			const newSet = new Set(prev);
-			if (newSet.has(draftId)) {
-				newSet.delete(draftId);
-			} else {
-				newSet.add(draftId);
-			}
-			return newSet;
-		});
-	};
 
 	// EFFECTS
 
@@ -1294,30 +1178,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		/* eslint-disable-next-line react-hooks/exhaustive-deps */
 	}, []);
 
-	useEffect(() => {
-		if (isFirstLoad) return;
-
-		const subscription = form.watch((value, { name }) => {
-			if (name) {
-				const formValues = form.getValues();
-
-				setIsJustSaved(false);
-				if (Object.keys(form.formState.errors).length === 0) {
-					debouncedAutosave(formValues);
-				}
-			}
-		});
-
-		return () => subscription.unsubscribe();
-	}, [form, debouncedAutosave, isFirstLoad]);
-
-	// Cleanup debounced function on unmount
-	useEffect(() => {
-		return () => {
-			debouncedAutosave.cancel();
-		};
-	}, [debouncedAutosave]);
-
 	const trackFocusedField = useCallback(
 		(fieldName: string, element: HTMLTextAreaElement | HTMLInputElement | null) => {
 			lastFocusedFieldRef.current = { name: fieldName, element };
@@ -1342,17 +1202,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	}, [hasFullAutomatedBlock, activeTab]);
 
-	// Clear selected drafts after sending is complete
-	useEffect(() => {
-		if (sendingProgress === selectedDraftIds.size && selectedDraftIds.size > 0) {
-			// Clear selection after successful sending
-			setSelectedDraftIds(new Set());
-		}
-	}, [sendingProgress, selectedDraftIds.size]);
-
 	return {
 		activeTab,
-		autosaveStatus,
 		campaign,
 		cancelGeneration,
 		contacts,
@@ -1364,34 +1215,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		hasFullAutomatedBlock,
 		insertPlaceholder,
 		isAiSubject,
-		isConfirmDialogOpen,
 		isGenerationDisabled,
-		isJustSaved,
 		isOpenUpgradeSubscriptionDrawer,
 		isPendingGeneration,
 		isTest,
 		setActiveTab,
 		setGenerationProgress,
-		setIsConfirmDialogOpen,
 		setIsOpenUpgradeSubscriptionDrawer,
 		trackFocusedField,
-		selectedDraft,
-		selectedContactIds,
-		selectedDraftIds,
-		sendingProgress,
-		isSendingDisabled,
-		isPendingDeleteEmail,
-		isPendingEmails,
-		draftEmails,
-		setSelectedContactIds,
-		setSelectedDraftIds,
-		isFreeTrial,
-		setSendingProgress,
-		isDraftDialogOpen,
-		setIsDraftDialogOpen,
-		handleDraftClick,
-		handleDeleteDraft,
-		handleContactSelection,
-		handleDraftSelection,
+		isFirstLoad,
 	};
 };

@@ -2,7 +2,7 @@ import { useFormContext, useFieldArray } from 'react-hook-form';
 import { DragEndEvent } from '@dnd-kit/core';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
+import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
 import { HybridBlock } from '@prisma/client';
 
 export const ORDERED_BLOCKS = [

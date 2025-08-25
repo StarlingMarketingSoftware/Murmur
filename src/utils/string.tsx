@@ -1,4 +1,4 @@
-import { HybridBlockPrompt } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
+import { HybridBlockPrompt } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
 import { HybridBlock } from '@prisma/client';
 
 export const normalizeTextCaseAndWhitespace = (text: string): string => {
