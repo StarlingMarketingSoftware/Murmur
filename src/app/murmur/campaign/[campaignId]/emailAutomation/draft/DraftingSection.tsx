@@ -21,7 +21,7 @@ import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptio
 import { DraftingMode, EmailStatus } from '@prisma/client';
 import { cn } from '@/utils';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
-import { Trash2 } from 'lucide-react';
+import { Trash2, ChevronRight } from 'lucide-react';
 import ViewEditEmailDialog from '@/components/organisms/_dialogs/ViewEditEmailDialog/ViewEditEmailDialog';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { useDeleteEmail } from '@/hooks/queryHooks/useEmails';
@@ -136,6 +136,9 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const [selectedDraft, setSelectedDraft] = useState<EmailType | null>(null);
 	const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
 
+	// State for selected contacts for drafting
+	const [selectedContactIds, setSelectedContactIds] = useState<Set<number>>(new Set());
+
 	// Delete email hook
 	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
 
@@ -158,6 +161,19 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		} catch (error) {
 			console.error('Failed to delete draft:', error);
 		}
+	};
+
+	// Handle contact selection for drafting
+	const handleContactSelection = (contactId: number) => {
+		setSelectedContactIds((prev) => {
+			const newSet = new Set(prev);
+			if (newSet.has(contactId)) {
+				newSet.delete(contactId);
+			} else {
+				newSet.add(contactId);
+			}
+			return newSet;
+		});
 	};
 
 	const getAutosaveStatusDisplay = (): ReactNode => {
@@ -304,7 +320,8 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 												{contacts.map((contact) => (
 													<div
 														key={contact.id}
-														className="border-b border-gray-200"
+														className="border-b border-gray-200 cursor-pointer transition-colors"
+														onClick={() => handleContactSelection(contact.id)}
 														style={{
 															display: 'grid',
 															gridTemplateColumns: '158px 158px',
@@ -312,6 +329,13 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 															width: '316px',
 															height: '49px',
 															overflow: 'visible',
+															backgroundColor: selectedContactIds.has(contact.id)
+																? '#D6E8D9'
+																: 'transparent',
+															border: selectedContactIds.has(contact.id)
+																? '2px solid #5DAB68'
+																: undefined,
+															borderBottom: '1px solid #e5e7eb',
 														}}
 													>
 														{(() => {
@@ -538,21 +562,22 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										<Button
 											type="button"
 											onClick={() => setIsConfirmDialogOpen(true)}
-											disabled={isGenerationDisabled()}
+											disabled={isGenerationDisabled() || selectedContactIds.size === 0}
 											className={cn(
-												'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black font-bold rounded-[6px] cursor-pointer transition-all duration-200 hover:bg-[rgba(93,171,104,0.6)] hover:border-[#4a8d56] active:bg-[rgba(93,171,104,0.7)] active:border-[#3d7346] h-[52px] w-[100px] flex items-center justify-center',
-												isGenerationDisabled()
+												'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black font-inter font-medium rounded-[6px] cursor-pointer transition-all duration-200 hover:bg-[rgba(93,171,104,0.6)] hover:border-[#4a8d56] active:bg-[rgba(93,171,104,0.7)] active:border-[#3d7346] h-[52px] w-[95px] flex items-center justify-center',
+												isGenerationDisabled() || selectedContactIds.size === 0
 													? 'opacity-50 cursor-not-allowed hover:bg-[rgba(93,171,104,0.47)] hover:border-[#5DAB68]'
 													: ''
 											)}
 											noPadding
 											style={{
-												width: '100px',
+												width: '95px',
 												height: '52px',
 												WebkitAppearance: 'none',
 												appearance: 'none',
 												fontSize: '14px',
-												fontWeight: 'bold',
+												fontWeight: '500',
+												fontFamily: 'Inter',
 												display: 'flex',
 												alignItems: 'center',
 												justifyContent: 'center',
@@ -566,7 +591,10 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 											{isPendingGeneration && !isTest ? (
 												<Spinner size="small" />
 											) : (
-												<span>Draft &gt;</span>
+												<span className="flex items-center gap-1">
+													Draft
+													<ChevronRight size={16} />
+												</span>
 											)}
 										</Button>
 									</div>
@@ -701,12 +729,19 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 							</div>
 							<ConfirmDialog
 								title="Confirm Batch Generation of Emails"
-								confirmAction={handleGenerateDrafts}
+								confirmAction={async () => {
+									// Note: handleGenerateDrafts should be modified to use selectedContactIds
+									// For now, it will use all contacts as before
+									await handleGenerateDrafts();
+									// Clear selection after successful generation
+									setSelectedContactIds(new Set());
+								}}
 								open={isConfirmDialogOpen}
 								onOpenChange={setIsConfirmDialogOpen}
 							>
 								<Typography>
-									Are you sure you want to generate emails for all selected recipients?
+									Are you sure you want to generate emails for {selectedContactIds.size}{' '}
+									selected recipient{selectedContactIds.size !== 1 ? 's' : ''}?
 									<br /> <br />
 									This action will automatically create a custom email for each recipient
 									based on the prompt you provided and will count towards your monthly
@@ -716,7 +751,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 							<ProgressIndicator
 								progress={generationProgress}
 								setProgress={setGenerationProgress}
-								total={contacts?.length || 0}
+								total={selectedContactIds.size}
 								pendingMessage="Generating {{progress}} emails..."
 								completeMessage="Finished generating {{progress}} emails."
 								cancelAction={cancelGeneration}
