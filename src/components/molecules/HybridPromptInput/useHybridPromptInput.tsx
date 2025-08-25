@@ -2,7 +2,7 @@ import { useFormContext, useFieldArray } from 'react-hook-form';
 import { DragEndEvent } from '@dnd-kit/core';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
+import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 import { HybridBlock } from '@prisma/client';
 
 export const ORDERED_BLOCKS = [
@@ -11,13 +11,6 @@ export const ORDERED_BLOCKS = [
 	HybridBlock.action,
 ] as const;
 
-export type BlockItem = {
-	value: HybridBlock | 'hybrid_automation';
-	label: string;
-	disabled: boolean;
-	showUsed: boolean;
-	position: 'top' | 'bottom';
-};
 export const BLOCKS = [
 	{
 		label: 'Introduction',
@@ -78,7 +71,7 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 
 	const watchedAvailableBlocks = form.watch('hybridAvailableBlocks');
 
-	const BLOCK_ITEMS: BlockItem[] = [
+	const BLOCK_ITEMS = [
 		{
 			value: HybridBlock.text,
 			label: 'Text',
@@ -212,11 +205,13 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 	};
 
 	const handleAddHybridAutomation = () => {
+		// Check if there are any existing blocks
 		if (fields.length > 0) {
 			toast.error('Hybrid Automation requires clearing all existing blocks first.');
 			return;
 		}
 
+		// Add all three blocks in order
 		const blocksToAdd = [
 			{ id: HybridBlock.introduction, type: HybridBlock.introduction, value: '' },
 			{ id: HybridBlock.research, type: HybridBlock.research, value: '' },

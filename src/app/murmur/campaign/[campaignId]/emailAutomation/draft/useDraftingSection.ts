@@ -42,10 +42,11 @@ import {
 	Signature,
 } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { debounce } from 'lodash';
 import { HANDWRITTEN_PLACEHOLDER_OPTIONS } from '@/components/molecules/HandwrittenPromptInput/HandwrittenPromptInput';
 import { ContactWithName } from '@/types/contact';
 
@@ -112,13 +113,17 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { user } = useMe();
 	const queryClient = useQueryClient();
 
+	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	const [isOpenUpgradeSubscriptionDrawer, setIsOpenUpgradeSubscriptionDrawer] =
 		useState(false);
 	const [generationProgress, setGenerationProgress] = useState(-1);
+	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 	const [isTest, setIsTest] = useState<boolean>(false);
 	const [abortController, setAbortController] = useState<AbortController | null>(null);
-	const [isFirstLoad, setIsFirstLoad] = useState(true);
-
+	const [isJustSaved, setIsJustSaved] = useState(false);
+	const [autosaveStatus, setAutosaveStatus] = useState<
+		'idle' | 'saving' | 'saved' | 'error'
+	>('idle');
 	const [activeTab, setActiveTab] = useState<'settings' | 'test' | 'placeholders'>(
 		'settings'
 	);
@@ -1022,6 +1027,41 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	// HANDLERS
 
+	const handleAutoSave = useCallback(
+		async (values: DraftingFormValues) => {
+			try {
+				setAutosaveStatus('saving');
+
+				await saveCampaign({
+					id: campaign.id,
+					data: values,
+				});
+				setAutosaveStatus('saved');
+				setIsJustSaved(true);
+
+				setTimeout(() => {
+					setAutosaveStatus('idle');
+				}, 2000);
+			} catch (error) {
+				setAutosaveStatus('error');
+				console.error('Autosave failed:', error);
+
+				setTimeout(() => {
+					setAutosaveStatus('idle');
+				}, 3000);
+			}
+		},
+		[campaign.id, saveCampaign]
+	);
+
+	const debouncedAutosave = useMemo(
+		() =>
+			debounce((values: DraftingFormValues) => {
+				handleAutoSave(values);
+			}, 1500),
+		[handleAutoSave]
+	);
+
 	const handleGenerateTestDrafts = async () => {
 		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
 			generateAiDraftTest();
@@ -1178,6 +1218,30 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		/* eslint-disable-next-line react-hooks/exhaustive-deps */
 	}, []);
 
+	useEffect(() => {
+		if (isFirstLoad) return;
+
+		const subscription = form.watch((value, { name }) => {
+			if (name) {
+				const formValues = form.getValues();
+
+				setIsJustSaved(false);
+				if (Object.keys(form.formState.errors).length === 0) {
+					debouncedAutosave(formValues);
+				}
+			}
+		});
+
+		return () => subscription.unsubscribe();
+	}, [form, debouncedAutosave, isFirstLoad]);
+
+	// Cleanup debounced function on unmount
+	useEffect(() => {
+		return () => {
+			debouncedAutosave.cancel();
+		};
+	}, [debouncedAutosave]);
+
 	const trackFocusedField = useCallback(
 		(fieldName: string, element: HTMLTextAreaElement | HTMLInputElement | null) => {
 			lastFocusedFieldRef.current = { name: fieldName, element };
@@ -1204,6 +1268,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	return {
 		activeTab,
+		autosaveStatus,
 		campaign,
 		cancelGeneration,
 		contacts,
@@ -1215,14 +1280,16 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		hasFullAutomatedBlock,
 		insertPlaceholder,
 		isAiSubject,
+		isConfirmDialogOpen,
 		isGenerationDisabled,
+		isJustSaved,
 		isOpenUpgradeSubscriptionDrawer,
 		isPendingGeneration,
 		isTest,
 		setActiveTab,
 		setGenerationProgress,
+		setIsConfirmDialogOpen,
 		setIsOpenUpgradeSubscriptionDrawer,
 		trackFocusedField,
-		isFirstLoad,
 	};
 };

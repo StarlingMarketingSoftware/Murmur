@@ -1,4 +1,4 @@
-import { HybridBlockPrompt } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
+import { HybridBlockPrompt } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 import { HybridBlock } from '@prisma/client';
 
 export const normalizeTextCaseAndWhitespace = (text: string): string => {
@@ -202,6 +202,7 @@ export const generatePromptsFromBlocks = (blocks: HybridBlockPrompt[]): string =
 export const getStateAbbreviation = (stateName: string | null | undefined): string => {
 	if (!stateName) return '';
 
+	// Mapping of full state names to abbreviations
 	const stateAbbreviations: Record<string, string> = {
 		alabama: 'AL',
 		alaska: 'AK',
@@ -256,8 +257,6 @@ export const getStateAbbreviation = (stateName: string | null | undefined): stri
 		// U.S. Territories
 		'american samoa': 'AS',
 		'district of columbia': 'DC',
-		'washington dc': 'DC',
-		'washington d.c.': 'DC',
 		guam: 'GU',
 		'northern mariana islands': 'MP',
 		'puerto rico': 'PR',

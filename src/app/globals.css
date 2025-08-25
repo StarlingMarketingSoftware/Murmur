@@ -19,8 +19,6 @@
 	--color-secondary-foreground: var(--secondary-foreground);
 	--color-secondary: var(--secondary);
 
-	--color-tertiary: var(--tertiary);
-
 	--color-secondary-light: var(--secondary-light);
 	--color-secondary-light-foreground: var(--secondary-light-foreground);
 
@@ -83,7 +81,6 @@
 	--primary: rgb(93, 192, 104); /* oklch(0.6795 0.1263 147.14) */
 	--primary-foreground: rgb(255, 255, 255); /* oklch(1 0 147.14) */
 	--secondary: rgb(134, 134, 229); /* oklch(0.6231 0.188 259.81) */
-	--tertiary: rgb(81, 162, 228);
 	--secondary-foreground: rgb(255, 255, 255); /* oklch(1 0 0) */
 	--secondary-light: rgb(178, 187, 243); /* oklch(0.7906 0.1089 252.45) */
 	--secondary-light-foreground: rgb(0, 0, 0); /* oklch(0 0 0) */

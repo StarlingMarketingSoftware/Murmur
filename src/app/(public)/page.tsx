@@ -13,6 +13,7 @@ import { ComparisonTable } from '@/components/molecules/ComparisonTable/Comparis
 import { ScrollingReviews } from '@/components/molecules/ScrollingReviews/ScrollingReviews';
 import { LeadSender } from '@/components/organisms/LeadSender/LeadSender';
 import { LaunchButton } from '@/components/atoms/LaunchButton/LaunchButton';
+// import { LaunchButtonDirect as LaunchButton } from '@/components/atoms/LaunchButton/LaunchButtonDirect';
 import { useScrollAnimations } from '@/hooks/useScrollAnimations';
 import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
@@ -88,7 +89,7 @@ export default function HomePage() {
 	return (
 		<main className="overflow-hidden">
 			<div
-				className="relative w-screen bg-background py-12 sm:py-16 md:py-20 lg:py-24"
+				className="relative w-screen bg-white py-12 sm:py-16 md:py-20 lg:py-24"
 				ref={heroRef}
 			>
 				{/* Content layer */}
@@ -112,7 +113,8 @@ export default function HomePage() {
 								Murmur
 							</Typography>
 							<h2
-								className="text-center !text-[24px] sm:!text-[28px] md:!text-[34px] leading-[1] mt-8 sm:mt-12 md:mt-16 lg:mt-[72px] whitespace-normal sm:whitespace-nowrap !font-zen font-normal"
+								className="text-center !text-[24px] sm:!text-[28px] md:!text-[34px] leading-[1] mt-8 sm:mt-12 md:mt-16 lg:mt-[72px] whitespace-normal sm:whitespace-nowrap !font-zen"
+								style={{ fontWeight: 400 }}
 								data-hero-element
 							>
 								Get Contacts. Get Work. Email Anyone.
@@ -121,7 +123,10 @@ export default function HomePage() {
 								className="w-full max-w-[764px] mx-auto mt-2 flex items-center justify-center px-4"
 								data-hero-element
 							>
-								<p className="text-center text-black font-inter !text-[14px] sm:!text-[22px] md:!text-[26px] whitespace-nowrap font-light">
+								<p
+									className="text-center text-black font-inter !text-[14px] sm:!text-[22px] md:!text-[26px] whitespace-nowrap"
+									style={{ fontWeight: 300 }}
+								>
 									The Ultimate Database + Email Tool for Musicians
 								</p>
 							</div>
@@ -263,7 +268,7 @@ export default function HomePage() {
 				</div>
 			</div>
 
-			<div className="w-full bg-gradient-to-b from-gray-200 to-background py-14 sm:py-25 px-4">
+			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-25 px-4">
 				<div className="mx-auto max-w-[943px]">
 					<div ref={(el) => addTextSlide(el)} data-persistent-content>
 						<Typography
@@ -316,7 +321,7 @@ export default function HomePage() {
 					<Link href={urls.pricing.index}>
 						<Button
 							size="lg"
-							className="bg-[#000000] text-background hover:bg-[#000000]/90 px-12 font-tertiary rounded-[5.59px] luxury-hover luxury-shadow"
+							className="bg-[#000000] text-white hover:bg-[#000000]/90 px-12 font-tertiary rounded-[5.59px] luxury-hover luxury-shadow"
 						>
 							Learn More
 						</Button>
@@ -331,7 +336,7 @@ export default function HomePage() {
 						header=""
 						title="FAQs"
 						description="Everything you need to know about Murmur!"
-						showMoreLink={urls.contact.index}
+						showMoreLink="/contact"
 					/>
 				</div>
 				<div className="h-24" />

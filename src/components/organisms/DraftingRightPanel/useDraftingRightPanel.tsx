@@ -1,4 +1,4 @@
-import { draftingFormSchema } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
+import { draftingFormSchema } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
 import { CampaignWithRelations, OptionWithLabel, TestDraftEmail } from '@/types';
 import { DraftingTone } from '@prisma/client';
 import { useMemo } from 'react';
