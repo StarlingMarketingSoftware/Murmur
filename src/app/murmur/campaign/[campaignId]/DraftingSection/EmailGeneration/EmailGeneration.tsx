@@ -2,7 +2,7 @@ import { FC, ReactNode } from 'react';
 import { EmailGenerationProps, useEmailGeneration } from './useEmailGeneration';
 import { Button } from '@/components/ui/button';
 import { FormLabel } from '@/components/ui/form';
-import { ConfirmDialog } from '@/components/organisms/_dialogs/ConfirmDialog/ConfirmDialog';
+
 import ProgressIndicator from '@/components/molecules/ProgressIndicator/ProgressIndicator';
 import { Typography } from '@/components/ui/typography';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
@@ -47,6 +47,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		isJustSaved,
 		draftEmails,
 		isPendingEmails,
+		isWaitingForConfirm,
+		handleDraftButtonClick,
 	} = useEmailGeneration(props);
 
 	const {
@@ -108,7 +110,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 						<div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
 							<Button
 								type="button"
-								onClick={() => setIsConfirmDialogOpen(true)}
+								onClick={handleDraftButtonClick}
 								disabled={isGenerationDisabled() || selectedContactIds.size === 0}
 								className={cn(
 									'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black font-inter font-medium rounded-[6px] cursor-pointer transition-all duration-200 hover:bg-[rgba(93,171,104,0.6)] hover:border-[#4a8d56] active:bg-[rgba(93,171,104,0.7)] active:border-[#3d7346] h-[52px] w-[95px] flex items-center justify-center appearance-none text-sm font-inter p-0 m-0 leading-normal box-border text-center',
@@ -120,6 +122,11 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 							>
 								{isPendingGeneration && !isTest ? (
 									<Spinner size="small" />
+								) : isWaitingForConfirm ? (
+									<span className="flex flex-col items-center leading-tight">
+										<span className="text-xs">Click to</span>
+										<span className="text-sm font-semibold">Confirm</span>
+									</span>
 								) : (
 									<span className="flex items-center gap-1">
 										Draft
@@ -180,25 +187,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 						</div>
 					)}
 				</div>
-				<ConfirmDialog
-					title="Confirm Batch Generation of Emails"
-					confirmAction={async () => {
-						// Note: handleGenerateDrafts should be modified to use selectedContactIds
-						// For now, it will use all contacts as before
-						await handleGenerateDrafts();
-						setSelectedContactIds(new Set());
-					}}
-					open={isConfirmDialogOpen}
-					onOpenChange={setIsConfirmDialogOpen}
-				>
-					<Typography>
-						Are you sure you want to generate emails for {selectedContactIds.size}{' '}
-						selected recipient{selectedContactIds.size !== 1 ? 's' : ''}?
-						<br /> <br />
-						This action will automatically create a custom email for each recipient based
-						on the prompt you provided and will count towards your monthly usage limits.
-					</Typography>
-				</ConfirmDialog>
+
 				<ProgressIndicator
 					progress={generationProgress}
 					setProgress={setGenerationProgress}

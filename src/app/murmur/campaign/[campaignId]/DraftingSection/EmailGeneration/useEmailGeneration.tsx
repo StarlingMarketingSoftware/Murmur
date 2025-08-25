@@ -48,6 +48,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 	/* HOOKS */
 
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+	const [isWaitingForConfirm, setIsWaitingForConfirm] = useState(false);
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
 	const [isJustSaved, setIsJustSaved] = useState(false);
@@ -77,6 +78,22 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		[];
 
 	/* HANDLERS */
+
+	const handleDraftButtonClick = async () => {
+		if (!isWaitingForConfirm) {
+			// First click - show confirm state
+			setIsWaitingForConfirm(true);
+			// Reset after 3 seconds if not confirmed
+			setTimeout(() => {
+				setIsWaitingForConfirm(false);
+			}, 3000);
+		} else {
+			// Second click - execute draft generation
+			setIsWaitingForConfirm(false);
+			await handleGenerateDrafts();
+			setSelectedContactIds(new Set());
+		}
+	};
 
 	const handleContactSelection = (contactId: number) => {
 		setSelectedContactIds((prev) => {
@@ -198,5 +215,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		isJustSaved,
 		draftEmails,
 		isPendingEmails,
+		isWaitingForConfirm,
+		handleDraftButtonClick,
 	};
 };
