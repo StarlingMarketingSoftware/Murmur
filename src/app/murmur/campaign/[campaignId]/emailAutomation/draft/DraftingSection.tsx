@@ -527,6 +527,51 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										)}
 									</div>
 
+									{/* Generate Drafts Button - Center between tables */}
+									<div
+										className="absolute flex items-center justify-center"
+										style={{
+											left: '50%',
+											top: '50%',
+											transform: 'translate(-50%, -50%)',
+										}}
+									>
+										<Button
+											type="button"
+											onClick={() => setIsConfirmDialogOpen(true)}
+											disabled={isGenerationDisabled()}
+											className={cn(
+												'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black font-inter font-medium rounded-[6px] cursor-pointer transition-all duration-200 hover:bg-[rgba(93,171,104,0.6)] hover:border-[#4a8d56] active:bg-[rgba(93,171,104,0.7)] active:border-[#3d7346] h-[52px] w-[87px]',
+												isGenerationDisabled()
+													? 'opacity-50 cursor-not-allowed hover:bg-[rgba(93,171,104,0.47)] hover:border-[#5DAB68]'
+													: ''
+											)}
+											noPadding
+											style={{
+												width: '87px',
+												height: '52px',
+												WebkitAppearance: 'none',
+												appearance: 'none',
+												fontSize: '14px',
+												fontWeight: '500',
+												display: 'flex',
+												alignItems: 'center',
+												justifyContent: 'center',
+												padding: '0',
+												margin: '0',
+												lineHeight: 'normal',
+												boxSizing: 'border-box',
+												textAlign: 'center',
+											}}
+										>
+											{isPendingGeneration && !isTest ? (
+												<Spinner size="small" />
+											) : (
+												'Draft'
+											)}
+										</Button>
+									</div>
+
 									{/* Right table - Generated Drafts */}
 									<div
 										className="absolute bg-white border border-gray-300 overflow-auto custom-scroll"
@@ -627,20 +672,11 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 
 						<div>
 							<div className="flex flex-col gap-4 mt-4">
-								<div className="flex flex-col sm:flex-row gap-4 items-center justify-end">
-									{getAutosaveStatusDisplay()}
-									<Button
-										type="button"
-										variant="primary-light"
-										onClick={() => setIsConfirmDialogOpen(true)}
-										isLoading={isPendingGeneration && !isTest}
-										disabled={isGenerationDisabled()}
-										bold
-										className="!w-[892px] !h-[39px]"
-									>
-										Generate Drafts
-									</Button>
-								</div>
+								{getAutosaveStatusDisplay() && (
+									<div className="flex flex-col sm:flex-row gap-4 items-center justify-end">
+										{getAutosaveStatusDisplay()}
+									</div>
+								)}
 								{/* Send button - appears when there are drafts */}
 								{draftEmails.length > 0 && (
 									<div className="flex justify-end">
