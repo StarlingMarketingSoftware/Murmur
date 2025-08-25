@@ -176,75 +176,235 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 								>
 									{/* Left table - Contacts list */}
 									<div
-										className="absolute bg-white border border-gray-300 overflow-auto"
+										className="absolute bg-white border border-gray-300 overflow-auto custom-scroll"
 										style={{
 											width: '336px',
 											height: '441px',
 											left: '22px',
 											bottom: '16px',
+											scrollbarWidth: 'thin',
+											scrollbarColor: '#000000 transparent',
 										}}
 									>
 										{contacts && contacts.length > 0 ? (
-											<table className="w-full" style={{ tableLayout: 'fixed' }}>
-												<thead>
-													<tr className="border-b border-gray-300 bg-gray-50">
-														<th
-															className="text-left text-xs font-semibold p-1"
-															style={{ width: '30%' }}
-														>
-															Name
-														</th>
-														<th
-															className="text-left text-xs font-semibold p-1"
-															style={{ width: '25%' }}
-														>
-															Company
-														</th>
-														<th
-															className="text-left text-xs font-semibold p-1"
-															style={{ width: '25%' }}
-														>
-															Location
-														</th>
-														<th
-															className="text-left text-xs font-semibold p-1"
-															style={{ width: '20%' }}
-														>
-															Role
-														</th>
-													</tr>
-												</thead>
-												<tbody>
-													{contacts.map((contact) => (
-														<tr
-															key={contact.id}
-															className="border-b border-gray-200"
-															style={{ height: '49px' }}
-														>
-															<td className="p-1 text-xs truncate">
-																{contact.name ||
-																	`${contact.firstName || ''} ${
-																		contact.lastName || ''
-																	}`.trim() ||
-																	contact.email}
-															</td>
-															<td className="p-1 text-xs text-gray-600 truncate">
-																{contact.company || '-'}
-															</td>
-															<td className="p-1 text-xs text-gray-500 truncate">
-																{[contact.city, contact.state]
-																	.filter(Boolean)
-																	.join(', ') || '-'}
-															</td>
-															<td className="p-1 text-xs text-gray-400 truncate">
-																{contact.headline || '-'}
-															</td>
-														</tr>
-													))}
-												</tbody>
-											</table>
+											<div className="w-full">
+												{contacts.map((contact) => (
+													<div
+														key={contact.id}
+														className="border-b border-gray-200"
+														style={{
+															display: 'grid',
+															gridTemplateColumns: '168px 168px',
+															gridTemplateRows: '24.5px 24.5px',
+															width: '336px',
+															height: '49px',
+														}}
+													>
+														{(() => {
+															const fullName =
+																contact.name ||
+																`${contact.firstName || ''} ${
+																	contact.lastName || ''
+																}`.trim();
+
+															// Left column - Name and Company
+															if (fullName) {
+																// Has name - show name in top, company in bottom
+																return (
+																	<>
+																		{/* Top Left - Name */}
+																		<div
+																			style={{
+																				padding: '4px',
+																				display: 'flex',
+																				alignItems: 'center',
+																			}}
+																		>
+																			<div
+																				className="font-bold text-xs truncate"
+																				style={{ width: '100%' }}
+																			>
+																				{fullName}
+																			</div>
+																		</div>
+
+																		{/* Top Right - Title */}
+																		<div
+																			style={{
+																				padding: '4px',
+																				display: 'flex',
+																				alignItems: 'center',
+																			}}
+																		>
+																			{contact.headline ? (
+																				<div
+																					className="bg-gray-100"
+																					style={{
+																						height: '20.54px',
+																						borderRadius: '6.64px',
+																						padding: '0 8px',
+																						display: 'flex',
+																						alignItems: 'center',
+																						width: 'fit-content',
+																						maxWidth: '100%',
+																					}}
+																				>
+																					<div className="text-xs text-black truncate">
+																						{contact.headline}
+																					</div>
+																				</div>
+																			) : (
+																				<div style={{ width: '100%' }}></div>
+																			)}
+																		</div>
+
+																		{/* Bottom Left - Company */}
+																		<div
+																			style={{
+																				padding: '4px',
+																				display: 'flex',
+																				alignItems: 'center',
+																			}}
+																		>
+																			<div
+																				className="text-xs text-black truncate"
+																				style={{ width: '100%' }}
+																			>
+																				{contact.company || ''}
+																			</div>
+																		</div>
+
+																		{/* Bottom Right - Location */}
+																		<div
+																			style={{
+																				padding: '4px',
+																				display: 'flex',
+																				alignItems: 'center',
+																			}}
+																		>
+																			{contact.city || contact.state ? (
+																				<div
+																					className="text-xs text-black truncate"
+																					style={{ width: '100%', paddingLeft: '8px' }}
+																				>
+																					{[contact.city, contact.state]
+																						.filter(Boolean)
+																						.join(', ')}
+																				</div>
+																			) : (
+																				<div style={{ width: '100%' }}></div>
+																			)}
+																		</div>
+																	</>
+																);
+															} else {
+																// No name - vertically center company on left side
+																return (
+																	<>
+																		{/* Left column - Company vertically centered */}
+																		<div
+																			style={{
+																				gridRow: '1 / 3',
+																				padding: '4px',
+																				display: 'flex',
+																				alignItems: 'center',
+																			}}
+																		>
+																			<div
+																				className="text-xs text-black truncate"
+																				style={{ width: '100%' }}
+																			>
+																				{contact.company || 'Contact'}
+																			</div>
+																		</div>
+
+																		{/* Right column - Title or Location */}
+																		{contact.headline ? (
+																			<>
+																				{/* Top Right - Title */}
+																				<div
+																					style={{
+																						padding: '4px',
+																						display: 'flex',
+																						alignItems: 'center',
+																					}}
+																				>
+																					<div
+																						className="bg-gray-100"
+																						style={{
+																							height: '20.54px',
+																							borderRadius: '6.64px',
+																							padding: '0 8px',
+																							display: 'flex',
+																							alignItems: 'center',
+																							width: 'fit-content',
+																							maxWidth: '100%',
+																						}}
+																					>
+																						<div className="text-xs text-black truncate">
+																							{contact.headline}
+																						</div>
+																					</div>
+																				</div>
+
+																				{/* Bottom Right - Location */}
+																				<div
+																					style={{
+																						padding: '4px',
+																						display: 'flex',
+																						alignItems: 'center',
+																					}}
+																				>
+																					{contact.city || contact.state ? (
+																						<div
+																							className="text-xs text-black truncate"
+																							style={{
+																								width: '100%',
+																								paddingLeft: '8px',
+																							}}
+																						>
+																							{[contact.city, contact.state]
+																								.filter(Boolean)
+																								.join(', ')}
+																						</div>
+																					) : (
+																						<div style={{ width: '100%' }}></div>
+																					)}
+																				</div>
+																			</>
+																		) : (
+																			// No title - vertically center location
+																			<div
+																				style={{
+																					gridRow: '1 / 3',
+																					padding: '4px',
+																					display: 'flex',
+																					alignItems: 'center',
+																				}}
+																			>
+																				{contact.city || contact.state ? (
+																					<div
+																						className="text-xs text-black truncate"
+																						style={{ width: '100%', paddingLeft: '8px' }}
+																					>
+																						{[contact.city, contact.state]
+																							.filter(Boolean)
+																							.join(', ')}
+																					</div>
+																				) : (
+																					<div style={{ width: '100%' }}></div>
+																				)}
+																			</div>
+																		)}
+																	</>
+																);
+															}
+														})()}
+													</div>
+												))}
+											</div>
 										) : (
-											<div className="flex items-center justify-center h-full text-gray-500">
+											<div className="flex items-center justify-center h-full text-black">
 												No contacts selected
 											</div>
 										)}

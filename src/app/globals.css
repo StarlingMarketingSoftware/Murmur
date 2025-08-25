@@ -2830,3 +2830,27 @@ body.murmur-page footer {
 	min-height: calc(320px + max(0px, 10vh - 80px));
 	height: auto;
 }
+
+/* Force square scrollbars */
+.custom-scroll::-webkit-scrollbar,
+.custom-scroll::-webkit-scrollbar-thumb,
+.custom-scroll::-webkit-scrollbar-track,
+.custom-scroll::-webkit-scrollbar-corner,
+.custom-scroll::-webkit-scrollbar-button {
+	border-radius: 0 !important;
+	-webkit-border-radius: 0 !important;
+}
+
+.custom-scroll::-webkit-scrollbar {
+	width: 1px !important;
+	height: 1px !important;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb {
+	background: #000 !important;
+}
+
+.custom-scroll {
+	scrollbar-width: thin;
+	scrollbar-color: #000 transparent;
+}
