@@ -21,6 +21,25 @@ import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptio
 import { DraftingMode } from '@prisma/client';
 import { cn } from '@/utils';
 
+// Helper component for scrolling text
+const ScrollableText = ({
+	text,
+	className,
+	style,
+}: {
+	text: string;
+	className?: string;
+	style?: React.CSSProperties;
+}) => {
+	return (
+		<div className="hover-scroll-container" style={style}>
+			<span className={`hover-scroll-text ${className || ''}`} data-text={text}>
+				{text}
+			</span>
+		</div>
+	);
+};
+
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
 		autosaveStatus,
@@ -172,6 +191,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 										height: '530px',
 										border: '3px solid #000000',
 										borderRadius: '8px',
+										overflowX: 'hidden',
 									}}
 								>
 									{/* Left table - Contacts list */}
@@ -182,8 +202,8 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 											height: '441px',
 											left: '22px',
 											bottom: '16px',
-											scrollbarWidth: 'thin',
-											scrollbarColor: '#000000 transparent',
+											overflowX: 'hidden',
+											overflowY: 'auto',
 										}}
 									>
 										{contacts && contacts.length > 0 ? (
@@ -220,12 +240,11 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																				alignItems: 'center',
 																			}}
 																		>
-																			<div
-																				className="font-bold text-xs truncate"
+																			<ScrollableText
+																				text={fullName}
+																				className="font-bold text-xs"
 																				style={{ width: '100%' }}
-																			>
-																				{fullName}
-																			</div>
+																			/>
 																		</div>
 
 																		{/* Top Right - Title */}
@@ -249,9 +268,10 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																						maxWidth: '100%',
 																					}}
 																				>
-																					<div className="text-xs text-black truncate">
-																						{contact.headline}
-																					</div>
+																					<ScrollableText
+																						text={contact.headline}
+																						className="text-xs text-black"
+																					/>
 																				</div>
 																			) : (
 																				<div style={{ width: '100%' }}></div>
@@ -266,12 +286,11 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																				alignItems: 'center',
 																			}}
 																		>
-																			<div
-																				className="text-xs text-black truncate"
+																			<ScrollableText
+																				text={contact.company || ''}
+																				className="text-xs text-black"
 																				style={{ width: '100%' }}
-																			>
-																				{contact.company || ''}
-																			</div>
+																			/>
 																		</div>
 
 																		{/* Bottom Right - Location */}
@@ -283,14 +302,13 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																			}}
 																		>
 																			{contact.city || contact.state ? (
-																				<div
-																					className="text-xs text-black truncate"
-																					style={{ width: '100%', paddingLeft: '8px' }}
-																				>
-																					{[contact.city, contact.state]
+																				<ScrollableText
+																					text={[contact.city, contact.state]
 																						.filter(Boolean)
 																						.join(', ')}
-																				</div>
+																					className="text-xs text-black"
+																					style={{ width: '100%', paddingLeft: '8px' }}
+																				/>
 																			) : (
 																				<div style={{ width: '100%' }}></div>
 																			)}
@@ -310,12 +328,11 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																				alignItems: 'center',
 																			}}
 																		>
-																			<div
-																				className="text-xs text-black truncate"
+																			<ScrollableText
+																				text={contact.company || 'Contact'}
+																				className="text-xs text-black"
 																				style={{ width: '100%' }}
-																			>
-																				{contact.company || 'Contact'}
-																			</div>
+																			/>
 																		</div>
 
 																		{/* Right column - Title or Location */}
@@ -341,9 +358,10 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																							maxWidth: '100%',
 																						}}
 																					>
-																						<div className="text-xs text-black truncate">
-																							{contact.headline}
-																						</div>
+																						<ScrollableText
+																							text={contact.headline}
+																							className="text-xs text-black"
+																						/>
 																					</div>
 																				</div>
 
@@ -356,17 +374,16 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																					}}
 																				>
 																					{contact.city || contact.state ? (
-																						<div
-																							className="text-xs text-black truncate"
+																						<ScrollableText
+																							text={[contact.city, contact.state]
+																								.filter(Boolean)
+																								.join(', ')}
+																							className="text-xs text-black"
 																							style={{
 																								width: '100%',
 																								paddingLeft: '8px',
 																							}}
-																						>
-																							{[contact.city, contact.state]
-																								.filter(Boolean)
-																								.join(', ')}
-																						</div>
+																						/>
 																					) : (
 																						<div style={{ width: '100%' }}></div>
 																					)}
@@ -383,14 +400,16 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 																				}}
 																			>
 																				{contact.city || contact.state ? (
-																					<div
-																						className="text-xs text-black truncate"
-																						style={{ width: '100%', paddingLeft: '8px' }}
-																					>
-																						{[contact.city, contact.state]
+																					<ScrollableText
+																						text={[contact.city, contact.state]
 																							.filter(Boolean)
 																							.join(', ')}
-																					</div>
+																						className="text-xs text-black"
+																						style={{
+																							width: '100%',
+																							paddingLeft: '8px',
+																						}}
+																					/>
 																				) : (
 																					<div style={{ width: '100%' }}></div>
 																				)}
