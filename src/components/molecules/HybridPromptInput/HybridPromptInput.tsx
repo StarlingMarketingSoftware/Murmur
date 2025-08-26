@@ -108,13 +108,18 @@ const SortableAIBlock = ({
 
 	const isTextBlock = block.value === HybridBlock.text;
 	const isFullAutomatedBlock = block.value === HybridBlock.full_automated;
+	const isCompactBlock =
+		block.value === HybridBlock.introduction ||
+		block.value === HybridBlock.research ||
+		block.value === HybridBlock.action;
 
 	return (
 		<div
 			ref={setNodeRef}
 			style={style}
 			className={cn(
-				'w-full relative border-2 border-gray-300 rounded-md bg-background',
+				'relative border-2 border-gray-300 rounded-md bg-background',
+				isCompactBlock ? 'w-[864px] h-[44px]' : 'w-full',
 				isTextBlock ? 'border-primary' : 'border-secondary',
 				isDragging ? 'opacity-50 z-50 transform-gpu' : ''
 			)}
@@ -124,17 +129,23 @@ const SortableAIBlock = ({
 				{...attributes}
 				{...listeners}
 				className={cn(
-					'absolute top-0 left-0 h-12 cursor-move z-[1]',
-					isFullAutomatedBlock ? 'w-24' : 'w-full' // Limit width for Full Automated block
+					'absolute top-0 left-0 cursor-move z-[1]',
+					isCompactBlock ? 'h-[44px] w-8' : 'h-12',
+					isFullAutomatedBlock ? 'w-24' : !isCompactBlock ? 'w-full' : '' // Limit width for Full Automated block and compact blocks
 				)}
 			/>
-			<div className="flex items-center p-4">
-				<div className="flex-grow">
+			<div className={cn('flex items-center', isCompactBlock ? 'p-2 h-full' : 'p-4')}>
+				<div className={cn('flex-grow', isCompactBlock && 'flex items-center')}>
 					{isDragging && (
 						<div className="absolute inset-0 rounded-md bg-background z-10 pointer-events-none" />
 					)}
-					<div className="absolute right-3 top-3 z-30">
-						{!isTextBlock && !isFullAutomatedBlock && (
+					<div
+						className={cn(
+							'absolute z-30',
+							isCompactBlock ? 'right-2 top-1/2 -translate-y-1/2' : 'right-3 top-3'
+						)}
+					>
+						{!isTextBlock && !isFullAutomatedBlock && !isCompactBlock && (
 							<Button
 								type="button"
 								className="mr-1"
@@ -151,6 +162,7 @@ const SortableAIBlock = ({
 							type="button"
 							variant="ghost"
 							size="icon"
+							className={cn(isCompactBlock && 'h-8 w-8')}
 							onClick={(e) => {
 								e.stopPropagation();
 								onRemove(id);
@@ -159,100 +171,159 @@ const SortableAIBlock = ({
 							<X className="h-[13px] w-[13px] text-destructive-dark" />
 						</Button>
 					</div>
-					<div className="mb-2 flex gap-2 min-h-7 items-center relative z-20">
-						{!isTextBlock ? (
-							<>
-								<Typography variant="h4" className="font-inter">
+					{isCompactBlock ? (
+						// Compact blocks: Hybrid stacked on top, compressed to fit 44px
+						<div className="flex items-center w-full h-full">
+							<div className="flex items-center text-gray-300 mr-2 ml-1">
+								<svg
+									width="4"
+									height="10"
+									viewBox="0 0 4 10"
+									fill="none"
+									xmlns="http://www.w3.org/2000/svg"
+								>
+									<circle cx="1" cy="2" r="0.5" fill="currentColor" />
+									<circle cx="3" cy="2" r="0.5" fill="currentColor" />
+									<circle cx="1" cy="5" r="0.5" fill="currentColor" />
+									<circle cx="3" cy="5" r="0.5" fill="currentColor" />
+									<circle cx="1" cy="8" r="0.5" fill="currentColor" />
+									<circle cx="3" cy="8" r="0.5" fill="currentColor" />
+								</svg>
+							</div>
+							<div className="flex flex-col justify-center w-[140px]">
+								<span className="font-inter font-medium text-[17px] leading-[14px]">
+									Hybrid
+								</span>
+								<span className="font-inter font-normal text-xs leading-[14px] mt-1">
 									{block.label}
-								</Typography>
-								{isFullAutomatedBlock && (
-									<div className="flex gap-1 relative z-[100] pointer-events-auto">
-										{[
-											{ value: DraftingTone.normal, label: 'Normal' },
-											{ value: DraftingTone.explanatory, label: 'Explain' },
-											{ value: DraftingTone.formal, label: 'Formal' },
-											{ value: DraftingTone.concise, label: 'Concise' },
-											{ value: DraftingTone.casual, label: 'Casual' },
-										].map((tone) => (
-											<button
-												key={tone.value}
-												type="button"
-												onClick={(e) => {
-													e.stopPropagation();
-													e.preventDefault();
-													form.setValue('draftingTone', tone.value);
-												}}
-												onMouseDown={(e) => {
-													e.stopPropagation();
-												}}
-												className={cn(
-													'w-[53px] h-[15px] rounded-[8px] text-[10px] font-medium transition-all flex items-center justify-center font-secondary cursor-pointer',
-													form.watch('draftingTone') === tone.value
-														? 'bg-black text-white shadow-sm'
-														: 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-												)}
-												style={{
-													WebkitAppearance: 'none',
-													WebkitTapHighlightColor: 'transparent',
-													pointerEvents: 'auto',
-													cursor: 'pointer',
-												}}
-											>
-												{tone.label}
-											</button>
-										))}
-									</div>
-								)}
-							</>
-						) : (
-							<Typography variant="h4" className="font-inter">
-								Manual Text
-							</Typography>
-						)}
-					</div>
-					{isTextBlock || isFullAutomatedBlock ? (
-						(() => {
-							const fieldProps = form.register(`hybridBlockPrompts.${fieldIndex}.value`);
-							return (
-								<Textarea
-									placeholder={block.placeholder}
-									onClick={(e) => e.stopPropagation()}
-									className={cn(
-										'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
-										isFullAutomatedBlock ? 'h-[300px] px-0' : ''
-									)}
-									{...fieldProps}
-									onFocus={(e) => {
-										trackFocusedField?.(
-											`hybridBlockPrompts.${fieldIndex}.value`,
-											e.target as HTMLTextAreaElement
-										);
-									}}
-								/>
-							);
-						})()
+								</span>
+							</div>
+							{(() => {
+								const fieldProps = form.register(
+									`hybridBlockPrompts.${fieldIndex}.value`
+								);
+								return (
+									<input
+										type="text"
+										placeholder={block.placeholder}
+										onClick={(e) => e.stopPropagation()}
+										className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-400 pl-6 pr-12"
+										{...fieldProps}
+										onFocus={(e) => {
+											trackFocusedField?.(
+												`hybridBlockPrompts.${fieldIndex}.value`,
+												e.target as HTMLInputElement
+											);
+										}}
+									/>
+								);
+							})()}
+						</div>
 					) : (
+						// Non-compact blocks: existing layout
 						<>
-							{isEdit &&
+							<span className="font-inter font-medium text-[17px] mb-2 block">
+								Hybrid
+							</span>
+							<div className="mb-2 flex gap-2 min-h-7 items-center relative z-20">
+								{!isTextBlock ? (
+									<>
+										<Typography variant="h4" className="font-inter">
+											{block.label}
+										</Typography>
+										{isFullAutomatedBlock && (
+											<div className="flex gap-1 relative z-[100] pointer-events-auto">
+												{[
+													{ value: DraftingTone.normal, label: 'Normal' },
+													{ value: DraftingTone.explanatory, label: 'Explain' },
+													{ value: DraftingTone.formal, label: 'Formal' },
+													{ value: DraftingTone.concise, label: 'Concise' },
+													{ value: DraftingTone.casual, label: 'Casual' },
+												].map((tone) => (
+													<button
+														key={tone.value}
+														type="button"
+														onClick={(e) => {
+															e.stopPropagation();
+															e.preventDefault();
+															form.setValue('draftingTone', tone.value);
+														}}
+														onMouseDown={(e) => {
+															e.stopPropagation();
+														}}
+														className={cn(
+															'w-[53px] h-[15px] rounded-[8px] text-[10px] font-medium transition-all flex items-center justify-center font-secondary cursor-pointer',
+															form.watch('draftingTone') === tone.value
+																? 'bg-black text-white shadow-sm'
+																: 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+														)}
+														style={{
+															WebkitAppearance: 'none',
+															WebkitTapHighlightColor: 'transparent',
+															pointerEvents: 'auto',
+															cursor: 'pointer',
+														}}
+													>
+														{tone.label}
+													</button>
+												))}
+											</div>
+										)}
+									</>
+								) : (
+									<Typography variant="h4" className="font-inter">
+										Manual Text
+									</Typography>
+								)}
+							</div>
+							{isTextBlock || isFullAutomatedBlock ? (
 								(() => {
 									const fieldProps = form.register(
 										`hybridBlockPrompts.${fieldIndex}.value`
 									);
 									return (
-										<Input
+										<Textarea
 											placeholder={block.placeholder}
 											onClick={(e) => e.stopPropagation()}
-											className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+											className={cn(
+												'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
+												isFullAutomatedBlock ? 'h-[300px] px-0' : ''
+											)}
 											{...fieldProps}
 											onFocus={(e) => {
 												trackFocusedField?.(
 													`hybridBlockPrompts.${fieldIndex}.value`,
-													e.target as HTMLInputElement
+													e.target as HTMLTextAreaElement
 												);
 											}}
 										/>
 									);
-								})()}
+								})()
+							) : (
+								// For other blocks, show input only when in edit mode
+								<>
+									{isEdit &&
+										(() => {
+											const fieldProps = form.register(
+												`hybridBlockPrompts.${fieldIndex}.value`
+											);
+											return (
+												<Input
+													placeholder={block.placeholder}
+													onClick={(e) => e.stopPropagation()}
+													className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+													{...fieldProps}
+													onFocus={(e) => {
+														trackFocusedField?.(
+															`hybridBlockPrompts.${fieldIndex}.value`,
+															e.target as HTMLInputElement
+														);
+													}}
+												/>
+											);
+										})()}
+								</>
+							)}
 						</>
 					)}
 				</div>
