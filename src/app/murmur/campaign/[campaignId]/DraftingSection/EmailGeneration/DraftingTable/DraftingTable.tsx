@@ -32,7 +32,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 		<div>
 			<div className="text-sm font-inter font-medium text-black">{title}</div>
 			<div className="flex w-full justify-end h-[20px] mb-2">
-				{title !== 'Drafts' && (
+				{hasData && (
 					<Button
 						type="button"
 						variant="ghost"

@@ -33,8 +33,22 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
 
 	const handleDraftClick = (draft: EmailWithRelations) => {
+		// Single click - toggle selection only
+		const newSelectedIds = new Set(selectedDraftIds);
+		if (newSelectedIds.has(draft.id)) {
+			newSelectedIds.delete(draft.id);
+		} else {
+			newSelectedIds.add(draft.id);
+		}
+		setSelectedDraftIds(newSelectedIds);
+	};
+
+	const handleDraftDoubleClick = (draft: EmailWithRelations) => {
+		// Double click - open editor
 		setSelectedDraft(draft);
-		setIsDraftDialogOpen(true);
+		setEditedSubject(draft.subject || '');
+		const plainMessage = convertHtmlToPlainText(draft.message);
+		setEditedMessage(plainMessage);
 	};
 
 	const handleSelectAllDrafts = () => {
@@ -55,12 +69,7 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 	const [editedMessage, setEditedMessage] = useState('');
 	const { mutateAsync: updateEmail, isPending: isPendingUpdate } = useEditEmail();
 
-	const handleDraftSelect = (draft: EmailWithRelations) => {
-		setSelectedDraft(draft);
-		setEditedSubject(draft.subject || '');
-		const plainMessage = convertHtmlToPlainText(draft.message);
-		setEditedMessage(plainMessage);
-	};
+	const handleDraftSelect = handleDraftClick;
 
 	const handleSave = async () => {
 		if (!selectedDraft) return;
@@ -99,6 +108,7 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		isPendingDeleteEmail,
 		deleteEmail,
 		handleDraftClick,
+		handleDraftDoubleClick,
 		handleDeleteDraft,
 		handleDraftSelection,
 		handleSelectAllDrafts,
