@@ -23,7 +23,7 @@ export interface EmailGenerationProps {
 	isPendingGeneration: boolean;
 	isTest: boolean;
 	form: UseFormReturn<DraftingFormValues>;
-	handleGenerateDrafts: () => Promise<void>;
+	handleGenerateDrafts: (contactIds?: number[]) => Promise<void>;
 	generationProgress: number;
 	setGenerationProgress: Dispatch<SetStateAction<number>>;
 	cancelGeneration: () => void;
@@ -48,6 +48,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 	/* HOOKS */
 
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+	const [isWaitingForConfirm, setIsWaitingForConfirm] = useState(false);
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
 	const [isJustSaved, setIsJustSaved] = useState(false);
@@ -57,6 +58,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 	const [selectedContactIds, setSelectedContactIds] = useState<Set<number>>(new Set());
 	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
 	const [sendingProgress, setSendingProgress] = useState(-1);
+	const [generationTotal, setGenerationTotal] = useState(0);
 
 	const { user, isFreeTrial } = useMe();
 	// User info for send functionality
@@ -77,6 +79,24 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		[];
 
 	/* HANDLERS */
+
+	const handleDraftButtonClick = async () => {
+		if (!isWaitingForConfirm) {
+			// First click - show confirm state
+			setIsWaitingForConfirm(true);
+			// Reset after 3 seconds if not confirmed
+			setTimeout(() => {
+				setIsWaitingForConfirm(false);
+			}, 3000);
+		} else {
+			// Second click - execute draft generation
+			setIsWaitingForConfirm(false);
+			const ids = Array.from(selectedContactIds);
+			setGenerationTotal(ids.length);
+			await handleGenerateDrafts(ids);
+			setSelectedContactIds(new Set());
+		}
+	};
 
 	const handleContactSelection = (contactId: number) => {
 		setSelectedContactIds((prev) => {
@@ -192,11 +212,14 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		handleGenerateDrafts,
 		generationProgress,
 		setGenerationProgress,
+		generationTotal,
 		form,
 		cancelGeneration,
 		autosaveStatus,
 		isJustSaved,
 		draftEmails,
 		isPendingEmails,
+		isWaitingForConfirm,
+		handleDraftButtonClick,
 	};
 };
