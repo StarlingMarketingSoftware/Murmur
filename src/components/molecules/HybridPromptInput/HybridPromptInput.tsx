@@ -48,6 +48,8 @@ interface SortableAIBlockProps {
 		fieldName: string,
 		element: HTMLTextAreaElement | HTMLInputElement | null
 	) => void;
+	showTestPreview?: boolean;
+	testMessage?: string | null;
 }
 
 interface BlockMenuItemProps {
@@ -93,6 +95,8 @@ const SortableAIBlock = ({
 	fieldIndex,
 	onRemove,
 	trackFocusedField,
+	showTestPreview,
+	testMessage,
 }: SortableAIBlockProps) => {
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
 		useSortable({ id });
@@ -150,9 +154,13 @@ const SortableAIBlock = ({
 					? ''
 					: 'border-2 border-gray-300 bg-background',
 				isTextBlock
-					? 'w-[868px] h-[80px]'
+					? showTestPreview && testMessage
+						? 'w-[416px] h-[80px]'
+						: 'w-[868px] h-[80px]'
 					: isCompactBlock
-					? 'w-[868px] h-[44px]'
+					? showTestPreview && testMessage
+						? 'w-[416px] h-[44px]'
+						: 'w-[868px] h-[44px]'
 					: 'w-full',
 				!isIntroductionBlock &&
 					!isResearchBlock &&
@@ -427,6 +435,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		getBlock,
 		handleAddBlock,
 		handleAddHybridAutomation,
+		handleAddTextBlockAt,
 		showTestPreview,
 		setShowTestPreview,
 		BLOCK_ITEMS,
@@ -456,7 +465,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 						>
 							<div className="flex-1 flex flex-col">
 								{/* Content area */}
-								<div className="p-3 flex flex-col gap-3 items-center flex-1">
+								<div className="p-3 flex flex-col gap-4 items-center flex-1">
 									{fields.length === 0 && (
 										<span className="text-gray-300 font-primary text-[12px]">
 											Add blocks here to build your prompt...
@@ -466,16 +475,67 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										items={fields.map((f) => f.id)}
 										strategy={verticalListSortingStrategy}
 									>
-										{fields.map((field, index) => (
-											<SortableAIBlock
-												key={field.id}
-												id={field.id}
-												fieldIndex={index}
-												block={getBlock(field.type)}
-												onRemove={handleRemoveBlock}
-												trackFocusedField={trackFocusedField}
-											/>
-										))}
+										{fields.map((field, index) => {
+											const isHybridBlock =
+												field.type === HybridBlock.introduction ||
+												field.type === HybridBlock.research ||
+												field.type === HybridBlock.action;
+
+											return (
+												<React.Fragment key={field.id}>
+													<SortableAIBlock
+														id={field.id}
+														fieldIndex={index}
+														block={getBlock(field.type)}
+														onRemove={handleRemoveBlock}
+														trackFocusedField={trackFocusedField}
+														showTestPreview={showTestPreview}
+														testMessage={testMessage}
+													/>
+													{/* Plus button under hybrid blocks */}
+													{isHybridBlock && (
+														<div
+															className={cn(
+																'flex justify-end -mt-1',
+																showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]'
+															)}
+														>
+															<button
+																type="button"
+																onClick={() => handleAddTextBlockAt(index)}
+																className="w-[76px] h-[20px] bg-white hover:bg-[rgba(93,171,104,0.15)] active:bg-[rgba(93,171,104,0.25)] border border-[#5DAB68] rounded-[3.59px] flex items-center justify-center gap-[6px] transition-colors duration-200"
+																title="Add text block"
+																style={{
+																	borderWidth: '1px',
+																	borderColor: '#5DAB68',
+																	borderRadius: '3.59px',
+																}}
+															>
+																<svg
+																	width="8"
+																	height="8"
+																	viewBox="0 0 8 8"
+																	fill="none"
+																	xmlns="http://www.w3.org/2000/svg"
+																	className="flex-shrink-0"
+																>
+																	<path
+																		d="M4 1V7M1 4H7"
+																		stroke="black"
+																		strokeWidth="1.5"
+																		strokeLinecap="square"
+																		strokeLinejoin="miter"
+																	/>
+																</svg>
+																<span className="font-inter text-[10px] text-[#838383] leading-none">
+																	Add text
+																</span>
+															</button>
+														</div>
+													)}
+												</React.Fragment>
+											);
+										})}
 									</SortableContext>
 
 									{/* Add Block Button */}
@@ -554,15 +614,15 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								</div>
 
 								{/*  Signature Block */}
-								<div className="px-3 pb-0 mt-auto">
+								<div className="px-3 pb-0 mt-auto flex justify-center">
 									<FormField
 										control={form.control}
 										name="signature"
 										render={({ field }) => (
-											<FormItem className="w-full">
+											<FormItem>
 												<div
 													className={cn(
-														`mx-auto min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
+														`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
 														showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]'
 													)}
 												>
@@ -599,7 +659,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									onClick={handleGenerateTestDrafts}
 									disabled={isGenerationDisabled?.()}
 									className={cn(
-										'h-[42px] bg-[rgba(93,171,104,0.08)] border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-[rgba(93,171,104,0.15)]',
+										'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-[rgba(93,171,104,0.15)] active:bg-[rgba(93,171,104,0.20)]',
 										showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]',
 										isGenerationDisabled?.()
 											? 'opacity-50 cursor-not-allowed'
