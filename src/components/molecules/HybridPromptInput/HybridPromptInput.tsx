@@ -253,7 +253,7 @@ const SortableAIBlock = ({
 					) : (
 						// Non-compact blocks
 						<>
-							{!isTextBlock && (
+							{!isTextBlock && !isFullAutomatedBlock && (
 								<span className="font-inter font-medium text-[17px] mb-2 block">
 									Hybrid
 								</span>
