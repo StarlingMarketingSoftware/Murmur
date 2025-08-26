@@ -24,6 +24,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		form,
 		handleGenerateTestDrafts,
 		isAiSubject,
+		isDraftingContentReady,
 		isGenerationDisabled,
 		isOpenUpgradeSubscriptionDrawer,
 		isPendingGeneration,
@@ -98,19 +99,27 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 							</div>
 						</div>
 
-						<EmailGeneration
-							campaign={campaign}
-							contacts={contacts || []}
-							isGenerationDisabled={isGenerationDisabled}
-							isPendingGeneration={isPendingGeneration}
-							isTest={isTest}
-							form={form}
-							handleGenerateDrafts={handleGenerateDrafts}
-							generationProgress={generationProgress}
-							setGenerationProgress={setGenerationProgress}
-							cancelGeneration={cancelGeneration}
-							isFirstLoad={isFirstLoad}
-						/>
+						<div
+							className={`transition-opacity duration-500 ease-in-out ${
+								isDraftingContentReady() ? 'opacity-100' : 'opacity-0 pointer-events-none'
+							}`}
+						>
+							{isDraftingContentReady() && (
+								<EmailGeneration
+									campaign={campaign}
+									contacts={contacts || []}
+									isGenerationDisabled={isGenerationDisabled}
+									isPendingGeneration={isPendingGeneration}
+									isTest={isTest}
+									form={form}
+									handleGenerateDrafts={handleGenerateDrafts}
+									generationProgress={generationProgress}
+									setGenerationProgress={setGenerationProgress}
+									cancelGeneration={cancelGeneration}
+									isFirstLoad={isFirstLoad}
+								/>
+							)}
+						</div>
 					</div>
 				</form>
 			</Form>

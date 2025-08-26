@@ -208,7 +208,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 	return (
 		<>
-			<div className="mb-3 mt-6">
+			<div className="mb-3 mt-3">
 				<FormLabel className="font-inter font-normal">Drafting</FormLabel>
 			</div>
 			<div className="flex gap-[47px] items-start">

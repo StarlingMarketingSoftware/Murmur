@@ -275,6 +275,37 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		);
 	}, [form, generationProgress, contacts?.length, isPendingGeneration]);
 
+	// Check if there's any content ready to draft (excluding contact/progress checks)
+	const isDraftingContentReady = useCallback(() => {
+		const values = form.getValues();
+		const hasFullAutomatedBlock = values.hybridBlockPrompts?.some(
+			(block) => block.type === 'full_automated'
+		);
+		const fullAutomatedBlock = values.hybridBlockPrompts?.find(
+			(block) => block.type === 'full_automated'
+		);
+
+		const isFullAutomatedEmpty =
+			hasFullAutomatedBlock &&
+			(!fullAutomatedBlock?.value || fullAutomatedBlock.value === '');
+
+		const hasNoBlocks =
+			!values.hybridBlockPrompts || values.hybridBlockPrompts.length === 0;
+
+		const hasAIBlocks = values.hybridBlockPrompts?.some((block) => {
+			if (block.type === 'full_automated') {
+				return block.value && block.value.trim() !== '';
+			}
+			if (block.type !== HybridBlock.text) {
+				return true;
+			}
+			return block.value && block.value.trim() !== '';
+		});
+
+		// Content is ready if we have blocks with content
+		return !isFullAutomatedEmpty && !hasNoBlocks && hasAIBlocks;
+	}, [form]);
+
 	// FUNCTIONS
 
 	const batchGenerateHandWrittenDrafts = async (selectedIds?: number[]) => {
@@ -1225,6 +1256,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		hasFullAutomatedBlock,
 		insertPlaceholder,
 		isAiSubject,
+		isDraftingContentReady,
 		isGenerationDisabled,
 		isOpenUpgradeSubscriptionDrawer,
 		isPendingGeneration,
