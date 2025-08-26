@@ -111,7 +111,8 @@ const SortableAIBlock = ({
 	const isCompactBlock =
 		block.value === HybridBlock.introduction ||
 		block.value === HybridBlock.research ||
-		block.value === HybridBlock.action;
+		block.value === HybridBlock.action ||
+		block.value === HybridBlock.text;
 
 	return (
 		<div
@@ -119,7 +120,11 @@ const SortableAIBlock = ({
 			style={style}
 			className={cn(
 				'relative border-2 border-gray-300 rounded-md bg-background',
-				isCompactBlock ? 'w-[864px] h-[44px]' : 'w-full',
+				isTextBlock
+					? 'w-[864px] h-[80px]'
+					: isCompactBlock
+					? 'w-[864px] h-[44px]'
+					: 'w-full',
 				isTextBlock ? 'border-primary' : 'border-secondary',
 				isDragging ? 'opacity-50 z-50 transform-gpu' : ''
 			)}
@@ -130,7 +135,7 @@ const SortableAIBlock = ({
 				{...listeners}
 				className={cn(
 					'absolute top-0 left-0 cursor-move z-[1]',
-					isCompactBlock ? 'h-[44px] w-8' : 'h-12',
+					isTextBlock ? 'h-[80px] w-8' : isCompactBlock ? 'h-[44px] w-8' : 'h-12',
 					isFullAutomatedBlock ? 'w-24' : !isCompactBlock ? 'w-full' : '' // Limit width for Full Automated block and compact blocks
 				)}
 			/>
@@ -172,7 +177,7 @@ const SortableAIBlock = ({
 						</Button>
 					</div>
 					{isCompactBlock ? (
-						// Compact blocks: Hybrid stacked on top, compressed to fit 44px
+						// Compact blocks: compressed to fit 44px
 						<div className="flex items-center w-full h-full">
 							<div className="flex items-center text-gray-300 mr-2 ml-1">
 								<svg
@@ -190,41 +195,77 @@ const SortableAIBlock = ({
 									<circle cx="3" cy="8" r="0.5" fill="currentColor" />
 								</svg>
 							</div>
-							<div className="flex flex-col justify-center w-[140px]">
-								<span className="font-inter font-medium text-[17px] leading-[14px]">
-									Hybrid
-								</span>
-								<span className="font-inter font-normal text-xs leading-[14px] mt-1">
-									{block.label}
-								</span>
-							</div>
-							{(() => {
-								const fieldProps = form.register(
-									`hybridBlockPrompts.${fieldIndex}.value`
-								);
-								return (
-									<input
-										type="text"
-										placeholder={block.placeholder}
-										onClick={(e) => e.stopPropagation()}
-										className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-400 pl-6 pr-12"
-										{...fieldProps}
-										onFocus={(e) => {
-											trackFocusedField?.(
-												`hybridBlockPrompts.${fieldIndex}.value`,
-												e.target as HTMLInputElement
-											);
-										}}
-									/>
-								);
-							})()}
+							{isTextBlock ? (
+								// Manual Text block - aligned with other blocks
+								<>
+									<div className="flex flex-col justify-center w-[140px]">
+										<span className="font-inter font-medium text-[17px] leading-[14px]">
+											Manual Text
+										</span>
+									</div>
+									{(() => {
+										const fieldProps = form.register(
+											`hybridBlockPrompts.${fieldIndex}.value`
+										);
+										return (
+											<input
+												type="text"
+												placeholder={block.placeholder}
+												onClick={(e) => e.stopPropagation()}
+												className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-400 pl-6 pr-12"
+												{...fieldProps}
+												onFocus={(e) => {
+													trackFocusedField?.(
+														`hybridBlockPrompts.${fieldIndex}.value`,
+														e.target as HTMLInputElement
+													);
+												}}
+											/>
+										);
+									})()}
+								</>
+							) : (
+								// Other compact blocks with "Hybrid"
+								<>
+									<div className="flex flex-col justify-center w-[140px]">
+										<span className="font-inter font-medium text-[17px] leading-[14px]">
+											Hybrid
+										</span>
+										<span className="font-inter font-normal text-xs leading-[14px] mt-1">
+											{block.label}
+										</span>
+									</div>
+									{(() => {
+										const fieldProps = form.register(
+											`hybridBlockPrompts.${fieldIndex}.value`
+										);
+										return (
+											<input
+												type="text"
+												placeholder={block.placeholder}
+												onClick={(e) => e.stopPropagation()}
+												className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-400 pl-6 pr-12"
+												{...fieldProps}
+												onFocus={(e) => {
+													trackFocusedField?.(
+														`hybridBlockPrompts.${fieldIndex}.value`,
+														e.target as HTMLInputElement
+													);
+												}}
+											/>
+										);
+									})()}
+								</>
+							)}
 						</div>
 					) : (
 						// Non-compact blocks: existing layout
 						<>
-							<span className="font-inter font-medium text-[17px] mb-2 block">
-								Hybrid
-							</span>
+							{!isTextBlock && (
+								<span className="font-inter font-medium text-[17px] mb-2 block">
+									Hybrid
+								</span>
+							)}
 							<div className="mb-2 flex gap-2 min-h-7 items-center relative z-20">
 								{!isTextBlock ? (
 									<>
@@ -309,7 +350,7 @@ const SortableAIBlock = ({
 											);
 											return (
 												<Input
-													placeholder={block.placeholder}
+													placeholder={(block as any).placeholder}
 													onClick={(e) => e.stopPropagation()}
 													className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
 													{...fieldProps}
@@ -361,11 +402,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 						<div
 							className={`${
 								showTestPreview && testMessage ? 'w-1/2' : 'w-full'
-							} flex flex-col`}
+							} flex flex-col min-h-[530px]`}
 						>
 							<div className="flex-1 flex flex-col">
 								{/* Content area */}
-								<div className="p-3 flex flex-col gap-3 items-start">
+								<div className="p-3 flex flex-col gap-3 items-start flex-1">
 									{fields.length === 0 && (
 										<span className="text-gray-300 font-primary text-[12px]">
 											Add blocks here to build your prompt...
@@ -388,7 +429,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									</SortableContext>
 
 									{/* Add Block Button */}
-									<div className="w-full flex justify-center mt-2">
+									<div className="w-full flex justify-center mt-2"
 										<DropdownMenu>
 											<DropdownMenuTrigger asChild>
 												<Button
@@ -462,8 +503,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									</div>
 								</div>
 
-								{/*  Signature Block */}
-								<div className="px-3 mt-auto">
+								{/*  Signature Block - Always at bottom */}
+								<div className="px-3 pb-3 mt-auto">
 									<FormField
 										control={form.control}
 										name="signature"
@@ -472,7 +513,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												<div
 													className={`${
 														showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]'
-													} mx-auto min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2 mb-[13px]`}
+													} mx-auto min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`}
 												>
 													<FormLabel className="text-base font-semibold font-secondary">
 														Signature
