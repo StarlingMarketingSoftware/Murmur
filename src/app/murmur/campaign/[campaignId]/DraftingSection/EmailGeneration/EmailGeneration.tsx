@@ -32,6 +32,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		isTest,
 		isGenerationDisabled,
 		setSelectedDraftIds,
+		setSelectedDraft,
+		handleDraftSelection,
 		selectedDraftIds,
 		isSendingDisabled,
 		isFreeTrial,
@@ -161,19 +163,11 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		formState: { isDirty },
 	} = form;
 
-	// Live subject from form
 	const subjectValue = form.watch('subject');
 
-	// Debug helper
 	const isDraftDisabled = () => {
 		const genDisabled = isGenerationDisabled();
 		const noSelection = selectedContactIds.size === 0;
-		console.log('Draft button disabled check:', {
-			isGenerationDisabled: genDisabled,
-			selectedContactIds: selectedContactIds.size,
-			noSelection,
-			overall: genDisabled || noSelection,
-		});
 		return genDisabled || noSelection;
 	};
 
@@ -231,7 +225,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 							cancelGeneration={cancelGeneration}
 						/>
 
-						{/* Generate Drafts Button - Absolutely centered */}
+						{/* Generate Drafts Button */}
 						<div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
 							<Button
 								type="button"
@@ -261,12 +255,18 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 							</Button>
 						</div>
 
-						{/* Right table - push to the end */}
+						{/* Right table */}
 						<div className="ml-auto">
 							<DraftedEmails
 								draftEmails={draftEmails}
 								isPendingEmails={isPendingEmails}
 								contacts={contacts}
+								selectedDraftIds={selectedDraftIds}
+								setSelectedDraft={setSelectedDraft}
+								setIsDraftDialogOpen={setIsDraftDialogOpen}
+								handleDraftSelection={handleDraftSelection}
+								setSelectedDraftIds={setSelectedDraftIds}
+								selectedDraft={selectedDraft}
 							/>
 						</div>
 					</div>
@@ -283,19 +283,22 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 					{draftEmails.length > 0 && (
 						<div className="flex justify-end">
 							{isSendingDisabled ? (
-								<UpgradeSubscriptionDrawer
-									triggerButtonText="Send"
-									className={`!w-[891px] !h-[39px] !bg-[rgba(93,171,104,0.47)] !border-2 !border-[#5DAB68] !text-black !font-bold !flex !items-center !justify-center ${
-										selectedDraftIds.size === 0
-											? '!opacity-50 !cursor-not-allowed hover:!bg-[rgba(93,171,104,0.47)] hover:!border-[#5DAB68]'
-											: 'hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]'
-									}`}
-									message={
-										isFreeTrial
-											? `Your free trial subscription does not include the ability to send emails. To send the emails you've drafted, please upgrade your subscription to the paid version.`
-											: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
-									}
-								/>
+								<div className="flex flex-col items-end w-full">
+									<UpgradeSubscriptionDrawer
+										triggerButtonText="Send"
+										buttonVariant="primary"
+										className={`!w-[891px] !h-[39px] !border-2 !border-[#5DAB68] !text-black !font-bold !flex !items-center !justify-center ${
+											selectedDraftIds.size !== 0
+												? '!opacity-50 !cursor-not-allowed hover:!bg-[rgba(93,171,104,0.47)] hover:!border-[#5DAB68]'
+												: 'hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]'
+										}`}
+										message={
+											isFreeTrial
+												? `Your free trial subscription does not include the ability to send emails. To send the emails you've drafted, please upgrade your subscription to the paid version.`
+												: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
+										}
+									/>
+								</div>
 							) : (
 								<div className="flex flex-col items-end w-full">
 									<div className={cn('w-[891px] mb-6', !isWaitingToSend && 'hidden')}>

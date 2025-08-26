@@ -43,7 +43,6 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					</Button>
 				)}
 			</div>
-			{/* Left table - Contacts list */}
 			<div className="bg-background border border-gray-300 overflow-auto custom-scroll w-[336px] h-[441px] overflow-x-hidden overflow-y-auto pr-[10px]">
 				{isPending ? (
 					<div className="flex items-center justify-center h-full">
@@ -63,17 +62,15 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				)}
 			</div>
 
-			{/* Progress bar underneath contacts table */}
+			{/* Progress bar */}
 			{title === 'Contacts' && (
 				<div className="mt-2 w-[336px] flex items-center gap-3">
-					{/* Progress text - left aligned */}
 					<div className="text-xs font-inter text-gray-600 flex-none">
 						{generationProgress >= 0 && totalContacts > 0
 							? `Drafting ${generationProgress}/${totalContacts}`
 							: 'Ready to draft'}
 					</div>
 
-					{/* Progress bar - fills remaining width */}
 					<div className="flex-1 h-[7px] bg-[rgba(93,171,104,0.49)] border-0 relative">
 						<div
 							className="h-full bg-[#5DAB68] transition-all duration-300 ease-out absolute top-0 left-0"
@@ -87,16 +84,15 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						/>
 					</div>
 
-					{/* Cancel button */}
 					{onCancel && generationProgress >= 0 && (
-						<button
+						<Button
 							type="button"
 							onClick={onCancel}
-							className="ml-2 w-[16px] h-[16px] flex items-center justify-center text-white bg-[#DC2626] hover:bg-[#B91C1C] transition-colors cursor-pointer"
+							className="ml-2 p-0 !w-[16px] !h-[16px] flex items-center justify-center text-white bg-destructive hover:bg-destructive-dark transition-colors cursor-pointer rounded-none"
 							aria-label="Cancel drafting"
 						>
 							×
-						</button>
+						</Button>
 					)}
 				</div>
 			)}
