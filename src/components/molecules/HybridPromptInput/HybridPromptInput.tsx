@@ -36,6 +36,8 @@ import {
 } from './useHybridPromptInput';
 import { cn } from '@/utils';
 import React, { useState, FC } from 'react';
+import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
+import DragHandleIcon from '@/components/atoms/_svg/DragHandleIcon';
 
 interface SortableAIBlockProps {
 	block: (typeof BLOCKS)[number];
@@ -177,26 +179,16 @@ const SortableAIBlock = ({
 						</Button>
 					</div>
 					{isCompactBlock ? (
-						// Compact blocks: compressed to fit 44px
+						// Compact blocks
 						<div className="flex items-center w-full h-full">
 							<div className="flex items-center text-gray-300 mr-2 ml-1">
-								<svg
-									width="4"
-									height="10"
-									viewBox="0 0 4 10"
-									fill="none"
-									xmlns="http://www.w3.org/2000/svg"
-								>
-									<circle cx="1" cy="2" r="0.5" fill="currentColor" />
-									<circle cx="3" cy="2" r="0.5" fill="currentColor" />
-									<circle cx="1" cy="5" r="0.5" fill="currentColor" />
-									<circle cx="3" cy="5" r="0.5" fill="currentColor" />
-									<circle cx="1" cy="8" r="0.5" fill="currentColor" />
-									<circle cx="3" cy="8" r="0.5" fill="currentColor" />
-								</svg>
+								<DragHandleIcon
+									width="4px"
+									height="10px"
+									pathClassName="stroke-gray-300"
+								/>
 							</div>
 							{isTextBlock ? (
-								// Manual Text block - aligned with other blocks
 								<>
 									<div className="flex flex-col justify-center w-[140px]">
 										<span className="font-inter font-medium text-[17px] leading-[14px]">
@@ -225,7 +217,7 @@ const SortableAIBlock = ({
 									})()}
 								</>
 							) : (
-								// Other compact blocks with "Hybrid"
+								// Compact blocks with "Hybrid"
 								<>
 									<div className="flex flex-col justify-center w-[140px]">
 										<span className="font-inter font-medium text-[17px] leading-[14px]">
@@ -259,7 +251,7 @@ const SortableAIBlock = ({
 							)}
 						</div>
 					) : (
-						// Non-compact blocks: existing layout
+						// Non-compact blocks
 						<>
 							{!isTextBlock && (
 								<span className="font-inter font-medium text-[17px] mb-2 block">
@@ -404,9 +396,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 					>
 						{/* Left side - Content area */}
 						<div
-							className={`${
+							className={cn(
+								`flex flex-col min-h-[530px]`,
 								showTestPreview && testMessage ? 'w-1/2' : 'w-full'
-							} flex flex-col min-h-[530px]`}
+							)}
 						>
 							<div className="flex-1 flex flex-col">
 								{/* Content area */}
@@ -507,7 +500,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									</div>
 								</div>
 
-								{/*  Signature Block - Always at bottom */}
+								{/*  Signature Block */}
 								<div className="px-3 pb-3 mt-auto">
 									<FormField
 										control={form.control}
@@ -525,9 +518,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<FormControl>
 														<Textarea
 															placeholder="Enter your signature..."
-															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-[25px] mt-1 p-0 resize-none overflow-hidden"
+															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden"
 															style={{
-																height: 'auto',
 																fontFamily: form.watch('font') || 'Arial',
 															}}
 															onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
@@ -547,41 +539,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							</div>
 						</div>
 
-						{/* Right side - Test Preview Panel */}
 						{showTestPreview && testMessage && (
-							<div className="w-1/2 flex flex-col">
-								<div className="flex-1 flex flex-col p-3">
-									<div className="flex-1 border-2 border-black rounded-lg bg-background flex flex-col overflow-hidden mb-[13px]">
-										{/* Header with X Button */}
-										<div className="relative p-4">
-											<h3 className="text-sm font-medium font-inter text-center">
-												Test Prompt
-											</h3>
-											<button
-												type="button"
-												onClick={() => setShowTestPreview(false)}
-												className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded transition-colors"
-												style={{ WebkitAppearance: 'none' }}
-											>
-												<X className="h-5 w-5 text-destructive-dark" />
-											</button>
-										</div>
-
-										{/* Test Email Content */}
-										<div className="flex-1 p-6 overflow-y-auto bg-gray-50">
-											<div
-												dangerouslySetInnerHTML={{ __html: testMessage }}
-												className="max-w-none"
-												style={{
-													fontFamily: form.watch('font') || 'Arial',
-													lineHeight: '1.6',
-													fontSize: '14px',
-												}}
-											/>
-										</div>
-									</div>
-								</div>
-							</div>
+							<TestPreviewPanel
+								setShowTestPreview={setShowTestPreview}
+								testMessage={testMessage}
+							/>
 						)}
 					</div>
 				</Droppable>

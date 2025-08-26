@@ -93,8 +93,8 @@
 	--muted: rgb(82, 82, 82); /* oklch(0.3211 0 0) */
 	--accent: rgb(235, 235, 233); /* oklch(0.923 0.003 48.717) */
 	--accent-foreground: rgb(52, 52, 52); /* oklch(0.205 0 0) */
-	--destructive: rgb(223, 62, 62); /* oklch(59.157% 0.24065 26.32) */
-	--destructive-dark: rgb(162, 0, 0);
+	--destructive: rgb(220, 38, 38); /* oklch(59.157% 0.24065 26.32) */
+	--destructive-dark: rgb(185, 28, 28);
 	--warning: rgb(228, 177, 0); /* oklch(0.77 0.16 70) */
 	--success: rgb(60, 136, 60); /* oklch(0.4953 0.1037 140.3) */
 	--navy: rgb(95, 83, 182); /* oklch(0.4865 0.17 266.18) */
