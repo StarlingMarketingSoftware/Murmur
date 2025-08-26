@@ -61,10 +61,21 @@ export interface HybridPromptInputProps {
 		element: HTMLTextAreaElement | HTMLInputElement | null
 	) => void;
 	testMessage?: string | null;
+	handleGenerateTestDrafts?: () => void;
+	isGenerationDisabled?: () => boolean;
+	isPendingGeneration?: boolean;
+	isTest?: boolean;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {
-	const { testMessage, trackFocusedField } = props;
+	const {
+		testMessage,
+		trackFocusedField,
+		handleGenerateTestDrafts,
+		isGenerationDisabled,
+		isPendingGeneration,
+		isTest,
+	} = props;
 
 	/* HOOKS */
 
@@ -457,5 +468,9 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		setShowTestPreview,
 		trackFocusedField,
 		testMessage,
+		handleGenerateTestDrafts,
+		isGenerationDisabled,
+		isPendingGeneration,
+		isTest,
 	};
 };
