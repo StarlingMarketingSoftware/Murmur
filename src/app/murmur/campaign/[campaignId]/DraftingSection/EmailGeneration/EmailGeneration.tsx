@@ -163,19 +163,11 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		formState: { isDirty },
 	} = form;
 
-	// Live subject from form
 	const subjectValue = form.watch('subject');
 
-	// Debug helper
 	const isDraftDisabled = () => {
 		const genDisabled = isGenerationDisabled();
 		const noSelection = selectedContactIds.size === 0;
-		console.log('Draft button disabled check:', {
-			isGenerationDisabled: genDisabled,
-			selectedContactIds: selectedContactIds.size,
-			noSelection,
-			overall: genDisabled || noSelection,
-		});
 		return genDisabled || noSelection;
 	};
 
