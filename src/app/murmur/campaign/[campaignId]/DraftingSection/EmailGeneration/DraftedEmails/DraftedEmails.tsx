@@ -2,11 +2,10 @@ import { FC, useState } from 'react';
 import { DraftedEmailsProps, useDraftedEmails } from './useDraftedEmails';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { Button } from '@/components/ui/button';
-import { X, ArrowLeft } from 'lucide-react';
+import { X } from 'lucide-react';
 import { cn } from '@/utils';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
 import { EmailWithRelations } from '@/types';
-import { Input } from '@/components/ui/input';
 import { useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { toast } from 'sonner';
 
@@ -87,7 +86,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				},
 			});
 			toast.success('Draft updated successfully');
-		} catch (error) {
+		} catch {
 			toast.error('Failed to update draft');
 		}
 	};
@@ -154,6 +153,14 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					<div className="mt-3 flex justify-end gap-2">
 						<button
 							type="button"
+							onClick={handleSave}
+							disabled={isPendingUpdate}
+							className="w-[100px] h-[20px] bg-[rgba(93,171,104,0.49)] border border-[#5DAB68] rounded-[8px] text-black text-[11px] font-medium flex items-center justify-center hover:bg-[rgba(93,171,104,0.6)] hover:border-[#4a8d56] active:bg-[rgba(93,171,104,0.7)] cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+						>
+							{isPendingUpdate ? '...' : 'Save'}
+						</button>
+						<button
+							type="button"
 							onClick={async (e) => {
 								if (selectedDraft) {
 									await handleDeleteDraft(e, selectedDraft.id);
@@ -165,14 +172,6 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{ backgroundColor: '#E69A9A', borderColor: '#B92929' }}
 						>
 							{isPendingDeleteEmail ? '...' : 'Delete'}
-						</button>
-						<button
-							type="button"
-							onClick={handleSave}
-							disabled={isPendingUpdate}
-							className="w-[100px] h-[20px] bg-[rgba(93,171,104,0.49)] border border-[#5DAB68] rounded-[8px] text-black text-[11px] font-medium flex items-center justify-center hover:bg-[rgba(93,171,104,0.6)] hover:border-[#4a8d56] active:bg-[rgba(93,171,104,0.7)] cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-						>
-							{isPendingUpdate ? '...' : 'Save'}
 						</button>
 					</div>
 				</div>

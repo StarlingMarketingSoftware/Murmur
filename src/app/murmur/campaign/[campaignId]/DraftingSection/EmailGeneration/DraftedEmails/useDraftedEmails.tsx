@@ -1,7 +1,6 @@
 import { useDeleteEmail } from '@/hooks/queryHooks/useEmails';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
-import { Dispatch, SetStateAction } from 'react';
 
 export interface DraftedEmailsProps {
 	contacts: ContactWithName[];

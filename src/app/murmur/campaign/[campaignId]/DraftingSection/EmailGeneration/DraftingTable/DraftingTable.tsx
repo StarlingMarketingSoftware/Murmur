@@ -36,7 +36,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					<Button
 						type="button"
 						variant="ghost"
-						className="text-sm font-inter font-medium text-black bg-none border-none cursor-pointer p-0 hover:underline transition-colors -mt-1"
+						className="text-sm font-inter font-medium text-black bg-none border-none cursor-pointer p-0 hover:underline transition-colors -mt-[10px]"
 						onClick={handleClick}
 					>
 						{areAllSelected ? 'Deselect All' : 'Select All'}

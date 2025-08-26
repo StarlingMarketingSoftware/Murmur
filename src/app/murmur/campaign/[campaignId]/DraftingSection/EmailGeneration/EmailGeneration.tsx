@@ -28,27 +28,20 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		contacts,
 		selectedContactIds,
 		handleContactSelection,
-		isConfirmDialogOpen,
-		setIsConfirmDialogOpen,
 		isPendingGeneration,
 		isTest,
 		isGenerationDisabled,
 		setSelectedDraftIds,
-		setSelectedDraft,
 		selectedDraftIds,
 		isSendingDisabled,
 		isFreeTrial,
 		setSendingProgress,
-		handleGenerateDrafts,
 		generationProgress,
-		setGenerationProgress,
 		generationTotal,
-		handleDraftSelection,
 		selectedDraft,
 		isDraftDialogOpen,
 		setIsDraftDialogOpen,
 		cancelGeneration,
-		sendingProgress,
 		form,
 		autosaveStatus,
 		isJustSaved,
@@ -235,6 +228,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 							handleContactSelection={handleContactSelection}
 							generationProgress={generationProgress}
 							generationTotal={generationTotal}
+							cancelGeneration={cancelGeneration}
 						/>
 
 						{/* Generate Drafts Button - Absolutely centered */}
