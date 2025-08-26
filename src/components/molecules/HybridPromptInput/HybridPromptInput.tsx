@@ -350,7 +350,11 @@ const SortableAIBlock = ({
 											);
 											return (
 												<Input
-													placeholder={(block as any).placeholder}
+													placeholder={
+														'placeholder' in block
+															? (block as (typeof BLOCKS)[number]).placeholder
+															: ''
+													}
 													onClick={(e) => e.stopPropagation()}
 													className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
 													{...fieldProps}
@@ -429,7 +433,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									</SortableContext>
 
 									{/* Add Block Button */}
-									<div className="w-full flex justify-center mt-2"
+									<div className="w-full flex justify-center mt-2">
 										<DropdownMenu>
 											<DropdownMenuTrigger asChild>
 												<Button
