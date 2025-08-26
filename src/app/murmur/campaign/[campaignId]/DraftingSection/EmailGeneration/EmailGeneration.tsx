@@ -274,6 +274,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 								setIsDraftDialogOpen={setIsDraftDialogOpen}
 								handleDraftSelection={handleDraftSelection}
 								setSelectedDraftIds={setSelectedDraftIds}
+								selectedDraft={selectedDraft}
 							/>
 						</div>
 					</div>

@@ -32,11 +32,9 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 					<div className="flex-1 p-6 overflow-y-auto bg-gray-50">
 						<div
 							dangerouslySetInnerHTML={{ __html: testMessage }}
-							className="max-w-none"
+							className="max-w-none leading-[1.6] text-[14px]"
 							style={{
 								fontFamily: form.watch('font') || 'Arial',
-								lineHeight: '1.6',
-								fontSize: '14px',
 							}}
 						/>
 					</div>

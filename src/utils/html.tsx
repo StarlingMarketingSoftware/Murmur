@@ -1,5 +1,3 @@
-
-
 export const replacePTagsInSignature = (html: string): string => {
 	// First capture group is everything before the signature div
 	// Second capture group is the content within signature div
@@ -54,7 +52,7 @@ export const replaceLineBreaksWithRichTextTags = (text: string, font: string): s
 	const paragraphs = text.split(/\n\n+/);
 	// Process each paragraph, converting single newlines to <br> within paragraphs
 	const htmlParagraphs = paragraphs
-		.filter(paragraph => paragraph.trim() !== '') // Remove empty paragraphs
+		.filter((paragraph) => paragraph.trim() !== '') // Remove empty paragraphs
 		.map((paragraph, index, array) => {
 			// Replace single newlines with <br> tags within each paragraph
 			const withLineBreaks = paragraph.replace(/\n/g, '<br>');
@@ -74,7 +72,9 @@ export const convertAiResponseToRichTextEmail = (
 	// Process the text to create proper HTML with paragraphs and line breaks
 	const htmlWithFont = replaceLineBreaksWithRichTextTags(html, font);
 	// Apply font styling to signature as well
-	const styledSignature = signature ? `<span style="font-family: ${font}">${signature}</span>` : null;
+	const styledSignature = signature
+		? `<span style="font-family: ${font}">${signature}</span>`
+		: null;
 	return addSignatureToHtml(htmlWithFont, styledSignature);
 };
 
@@ -96,4 +96,40 @@ export const extractJsonFromPseudoHTML = (
 const cleanLineBreakCharacters = (text: string): string => {
 	const lineBreakRegex = /(\r\n|\r|\n|\u2028|\u2029|\v|\f)/g;
 	return text.replace(lineBreakRegex, '');
+};
+
+export const convertHtmlToPlainText = (html: string): string => {
+	// Strip HTML tags to show plain text, preserving line breaks
+	let plainMessage = html;
+
+	// Handle different paragraph and line break patterns using markers first
+	// Paragraph transitions
+	plainMessage = plainMessage.replace(/<\/p>\s*<p[^>]*>/gi, '§PARA§');
+	plainMessage = plainMessage.replace(/<\/div>\s*<div[^>]*>/gi, '§PARA§');
+	// Standalone closings should also break paragraphs
+	plainMessage = plainMessage.replace(/<\/p>/gi, '§PARA§');
+	plainMessage = plainMessage.replace(/<\/div>/gi, '§PARA§');
+	// Line breaks inside paragraphs
+	plainMessage = plainMessage.replace(/<br\s*\/?>/gi, '§BR§');
+
+	// Remove opening tags for block elements
+	plainMessage = plainMessage.replace(/<p[^>]*>/gi, '');
+	plainMessage = plainMessage.replace(/<div[^>]*>/gi, '');
+
+	// Remove any other HTML tags
+	plainMessage = plainMessage.replace(/<[^>]*>/g, '');
+
+	// Decode minimal entities
+	plainMessage = plainMessage.replace(/&nbsp;/gi, ' ');
+
+	// Replace markers with actual line breaks
+	plainMessage = plainMessage.replace(/§PARA§/g, '\n\n');
+	plainMessage = plainMessage.replace(/§BR§/g, '\n');
+
+	// Normalize newlines (max 2 in a row)
+	plainMessage = plainMessage.replace(/\r\n/g, '\n');
+	plainMessage = plainMessage.replace(/\n{3,}/g, '\n\n');
+
+	// Trim
+	return (plainMessage = plainMessage.trim());
 };

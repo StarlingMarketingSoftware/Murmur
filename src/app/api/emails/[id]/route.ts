@@ -90,7 +90,6 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 
 		const { id } = await params;
 
-		// Idempotent, user-scoped delete to avoid race conditions (P2025) and 500s
 		await prisma.email.deleteMany({
 			where: {
 				id: Number(id),

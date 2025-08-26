@@ -273,7 +273,7 @@ const SortableAIBlock = ({
 													{ value: DraftingTone.concise, label: 'Concise' },
 													{ value: DraftingTone.casual, label: 'Casual' },
 												].map((tone) => (
-													<button
+													<Button
 														key={tone.value}
 														type="button"
 														onClick={(e) => {
@@ -290,15 +290,9 @@ const SortableAIBlock = ({
 																? 'bg-black text-white shadow-sm'
 																: 'bg-gray-200 text-gray-600 hover:bg-gray-300'
 														)}
-														style={{
-															WebkitAppearance: 'none',
-															WebkitTapHighlightColor: 'transparent',
-															pointerEvents: 'auto',
-															cursor: 'pointer',
-														}}
 													>
 														{tone.label}
-													</button>
+													</Button>
 												))}
 											</div>
 										)}
@@ -508,9 +502,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										render={({ field }) => (
 											<FormItem>
 												<div
-													className={`${
+													className={cn(
+														`mx-auto min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
 														showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]'
-													} mx-auto min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`}
+													)}
 												>
 													<FormLabel className="text-base font-semibold font-secondary">
 														Signature

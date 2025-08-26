@@ -1,13 +1,10 @@
-import { FC, useState } from 'react';
+import { FC } from 'react';
 import { DraftedEmailsProps, useDraftedEmails } from './useDraftedEmails';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { cn } from '@/utils';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
-import { EmailWithRelations } from '@/types';
-import { useEditEmail } from '@/hooks/queryHooks/useEmails';
-import { toast } from 'sonner';
 
 export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	const {
@@ -16,88 +13,18 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		isPendingDeleteEmail,
 		handleDeleteDraft,
 		contacts,
+		selectedDraft,
+		handleBack,
+		handleSave,
+		handleDraftSelect,
+		isPendingUpdate,
+		editedSubject,
+		editedMessage,
+		setEditedMessage,
+		setEditedSubject,
+		setSelectedDraft,
 	} = useDraftedEmails(props);
 
-	// State for inline editing
-	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
-	const [editedSubject, setEditedSubject] = useState('');
-	const [editedMessage, setEditedMessage] = useState('');
-	const { mutateAsync: updateEmail, isPending: isPendingUpdate } = useEditEmail();
-
-	const handleDraftSelect = (draft: EmailWithRelations) => {
-		setSelectedDraft(draft);
-		setEditedSubject(draft.subject || '');
-		// Strip HTML tags to show plain text, preserving line breaks
-		let plainMessage = draft.message || '';
-
-		// Handle different paragraph and line break patterns using markers first
-		// Paragraph transitions
-		plainMessage = plainMessage.replace(/<\/p>\s*<p[^>]*>/gi, '§PARA§');
-		plainMessage = plainMessage.replace(/<\/div>\s*<div[^>]*>/gi, '§PARA§');
-		// Standalone closings should also break paragraphs
-		plainMessage = plainMessage.replace(/<\/p>/gi, '§PARA§');
-		plainMessage = plainMessage.replace(/<\/div>/gi, '§PARA§');
-		// Line breaks inside paragraphs
-		plainMessage = plainMessage.replace(/<br\s*\/?>/gi, '§BR§');
-
-		// Remove opening tags for block elements
-		plainMessage = plainMessage.replace(/<p[^>]*>/gi, '');
-		plainMessage = plainMessage.replace(/<div[^>]*>/gi, '');
-
-		// Remove any other HTML tags
-		plainMessage = plainMessage.replace(/<[^>]*>/g, '');
-
-		// Decode minimal entities
-		plainMessage = plainMessage.replace(/&nbsp;/gi, ' ');
-
-		// Replace markers with actual line breaks
-		plainMessage = plainMessage.replace(/§PARA§/g, '\n\n');
-		plainMessage = plainMessage.replace(/§BR§/g, '\n');
-
-		// Normalize newlines (max 2 in a row)
-		plainMessage = plainMessage.replace(/\r\n/g, '\n');
-		plainMessage = plainMessage.replace(/\n{3,}/g, '\n\n');
-
-		// Trim
-		plainMessage = plainMessage.trim();
-
-		setEditedMessage(plainMessage);
-	};
-
-	const handleSave = async () => {
-		if (!selectedDraft) return;
-		try {
-			// Convert plain text back to HTML
-			// Split by double newlines to get paragraphs
-			const paragraphs = editedMessage.split('\n\n');
-			const htmlMessage = paragraphs
-				.map((para) => {
-					// Within each paragraph, convert single newlines to <br>
-					const withBreaks = para.replace(/\n/g, '<br>');
-					return `<p>${withBreaks}</p>`;
-				})
-				.join('');
-
-			await updateEmail({
-				id: selectedDraft.id.toString(),
-				data: {
-					subject: editedSubject,
-					message: htmlMessage,
-				},
-			});
-			toast.success('Draft updated successfully');
-		} catch {
-			toast.error('Failed to update draft');
-		}
-	};
-
-	const handleBack = () => {
-		setSelectedDraft(null);
-		setEditedSubject('');
-		setEditedMessage('');
-	};
-
-	// If a draft is selected, show the inline editor
 	if (selectedDraft) {
 		const contact = contacts?.find((c) => c.id === selectedDraft.contactId);
 		const contactName = contact
@@ -151,15 +78,15 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 
 					{/* Save button */}
 					<div className="mt-3 flex justify-end gap-2">
-						<button
+						<Button
 							type="button"
 							onClick={handleSave}
 							disabled={isPendingUpdate}
-							className="w-[100px] h-[20px] bg-[rgba(93,171,104,0.49)] border border-[#5DAB68] rounded-[8px] text-black text-[11px] font-medium flex items-center justify-center hover:bg-[rgba(93,171,104,0.6)] hover:border-[#4a8d56] active:bg-[rgba(93,171,104,0.7)] cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+							className="w-[100px] font-secondary h-[20px] bg-primary/50 border border-primary rounded-[8px] text-black text-[11px] font-medium flex items-center justify-center hover:bg-primary/60 hover:border-primary-dark active:bg-primary/70 transition-colors"
 						>
 							{isPendingUpdate ? '...' : 'Save'}
-						</button>
-						<button
+						</Button>
+						<Button
 							type="button"
 							onClick={async (e) => {
 								if (selectedDraft) {
@@ -168,11 +95,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								}
 							}}
 							disabled={isPendingDeleteEmail}
-							className="w-[100px] h-[20px] bg-[#E69A9A] border border-[#B92929] rounded-[8px] text-black text-[11px] font-medium flex items-center justify-center hover:bg-[#e48787] hover:border-[#a32424] active:bg-[#e17474] cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-							style={{ backgroundColor: '#E69A9A', borderColor: '#B92929' }}
+							className="font-secondary w-[100px] h-[20px] bg-destructive/50 border border-destructive rounded-[8px] text-black text-[11px] font-medium flex items-center justify-center hover:bg-destructive/60 hover:border-destructive-dark active:bg-destructive/70 transition-colors"
 						>
 							{isPendingDeleteEmail ? '...' : 'Delete'}
-						</button>
+						</Button>
 					</div>
 				</div>
 			</div>

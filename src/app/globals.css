@@ -81,6 +81,7 @@
 	--popover: rgb(255, 255, 255); /* oklch(1 0 0) */
 	--popover-foreground: rgb(37, 37, 37); /* oklch(0.145 0 0) */
 	--primary: rgb(93, 192, 104); /* oklch(0.6795 0.1263 147.14) */
+	--primary-dark: rgb(78, 153, 83);
 	--primary-foreground: rgb(255, 255, 255); /* oklch(1 0 147.14) */
 	--secondary: rgb(134, 134, 229); /* oklch(0.6231 0.188 259.81) */
 	--tertiary: rgb(81, 162, 228);
