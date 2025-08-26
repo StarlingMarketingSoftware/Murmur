@@ -61,10 +61,21 @@ export interface HybridPromptInputProps {
 		element: HTMLTextAreaElement | HTMLInputElement | null
 	) => void;
 	testMessage?: string | null;
+	handleGenerateTestDrafts?: () => void;
+	isGenerationDisabled?: () => boolean;
+	isPendingGeneration?: boolean;
+	isTest?: boolean;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {
-	const { testMessage, trackFocusedField } = props;
+	const {
+		testMessage,
+		trackFocusedField,
+		handleGenerateTestDrafts,
+		isGenerationDisabled,
+		isPendingGeneration,
+		isTest,
+	} = props;
 
 	/* HOOKS */
 
@@ -347,18 +358,9 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 			}
 		}
 
+		// Text blocks can always be removed
 		if (blockToBeRemoved.type === HybridBlock.text) {
-			if (
-				(previousBlock?.type !== HybridBlock.text &&
-					previousBlock?.type !== HybridBlock.introduction &&
-					nextBlock?.type === HybridBlock.research) ||
-				nextBlock?.type === HybridBlock.action
-			) {
-				return {
-					canBeRemoved: false,
-					blockWithIssue: HybridBlock.text,
-				};
-			}
+			// No restrictions on removing text blocks
 		}
 		return {
 			canBeRemoved: true,
@@ -389,35 +391,6 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 			return;
 		}
 
-		const nextBlock = blockIndex + 1 < fields.length ? fields[blockIndex + 1] : null;
-		const previousBlock = blockIndex > 0 ? fields[blockIndex - 1] : null;
-
-		if (blockToBeRemoved.type === HybridBlock.introduction) {
-			if (
-				(previousBlock?.type !== HybridBlock.text &&
-					nextBlock?.type === HybridBlock.research) ||
-				nextBlock?.type === HybridBlock.action
-			) {
-				toast.error(
-					'Introduction cannot be removed if there is Research or Call to Action after it.'
-				);
-				return;
-			}
-		}
-
-		if (blockToBeRemoved.type === HybridBlock.text) {
-			if (
-				(previousBlock?.type !== HybridBlock.text &&
-					nextBlock?.type === HybridBlock.research) ||
-				nextBlock?.type === HybridBlock.action
-			) {
-				toast.error(
-					'Text block cannot be removed from the beginning if there is Research or Call to Action after it.'
-				);
-				return;
-			}
-		}
-
 		const blockType = fields[blockIndex].type;
 
 		if (blockType !== HybridBlock.text) {
@@ -442,11 +415,21 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		}
 	}, [testMessage]);
 
+	const handleAddTextBlockAt = (index: number) => {
+		const newTextId = `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+		insert(index + 1, {
+			id: newTextId,
+			type: HybridBlock.text,
+			value: '',
+		});
+	};
+
 	return {
 		handleDragEnd,
 		handleRemoveBlock,
 		handleAddBlock,
 		handleAddHybridAutomation,
+		handleAddTextBlockAt,
 		getBlock,
 		ORDERED_BLOCKS,
 		form,
@@ -457,5 +440,9 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		setShowTestPreview,
 		trackFocusedField,
 		testMessage,
+		handleGenerateTestDrafts,
+		isGenerationDisabled,
+		isPendingGeneration,
+		isTest,
 	};
 };

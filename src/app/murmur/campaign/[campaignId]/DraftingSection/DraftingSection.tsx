@@ -1,6 +1,5 @@
 import { FC } from 'react';
 import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
-import { Button } from '@/components/ui/button';
 import {
 	FormField,
 	FormItem,
@@ -15,7 +14,6 @@ import { Separator } from '@/components/ui/separator';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { DraftingMode } from '@prisma/client';
-import { cn } from '@/utils';
 import { EmailGeneration } from './EmailGeneration/EmailGeneration';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
@@ -92,21 +90,12 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 								<HybridPromptInput
 									trackFocusedField={trackFocusedField}
 									testMessage={campaign?.testMessage}
+									handleGenerateTestDrafts={handleGenerateTestDrafts}
+									isGenerationDisabled={isGenerationDisabled}
+									isPendingGeneration={isPendingGeneration}
+									isTest={isTest}
 								/>
 							</div>
-						</div>
-						<div className="flex justify-end mt-2 mb-2">
-							<Button
-								type="button"
-								onClick={handleGenerateTestDrafts}
-								disabled={isGenerationDisabled()}
-								className={cn(
-									'w-[94px] h-[39px] bg-[rgba(93,171,104,0.08)] border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary',
-									isGenerationDisabled() ? 'opacity-50 cursor-not-allowed' : 'opacity-100'
-								)}
-							>
-								{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
-							</Button>
 						</div>
 
 						<EmailGeneration
