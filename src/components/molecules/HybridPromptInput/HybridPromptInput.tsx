@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button';
 import { X, Plus } from 'lucide-react';
 import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
 import { HybridBlock, DraftingTone } from '@prisma/client';
+import { StepSlider } from '@/components/atoms/StepSlider/StepSlider';
 import {
 	BLOCKS,
 	HybridPromptInputProps,
@@ -393,21 +394,55 @@ const SortableAIBlock = ({
 											`hybridBlockPrompts.${fieldIndex}.value`
 										);
 										return (
-											<Textarea
-												placeholder={block.placeholder}
-												onClick={(e) => e.stopPropagation()}
-												className={cn(
-													'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
-													isFullAutomatedBlock ? 'h-[300px] px-0' : ''
+											<>
+												<Textarea
+													placeholder={block.placeholder}
+													onClick={(e) => e.stopPropagation()}
+													className={cn(
+														'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
+														isFullAutomatedBlock ? 'h-[300px] px-0' : ''
+													)}
+													{...fieldProps}
+													onFocus={(e) => {
+														trackFocusedField?.(
+															`hybridBlockPrompts.${fieldIndex}.value`,
+															e.target as HTMLTextAreaElement
+														);
+													}}
+												/>
+												{/* Paragraph slider for Full Auto block only */}
+												{isFullAutomatedBlock && (
+													<div className="mt-4 flex justify-start px-4">
+														<div className="flex items-start gap-4">
+															<span className="text-[10px] text-black font-inter font-normal relative top-[-7px]">
+																Auto Paragraphs
+															</span>
+															<div className="w-[189px]">
+																<FormField
+																	control={form.control}
+																	name="paragraphs"
+																	render={({ field }) => (
+																		<FormItem>
+																			<FormControl>
+																				<StepSlider
+																					value={[field.value]}
+																					onValueChange={(value) =>
+																						field.onChange(value[0])
+																					}
+																					max={5}
+																					step={1}
+																					min={0}
+																					showStepIndicators={true}
+																				/>
+																			</FormControl>
+																		</FormItem>
+																	)}
+																/>
+															</div>
+														</div>
+													</div>
 												)}
-												{...fieldProps}
-												onFocus={(e) => {
-													trackFocusedField?.(
-														`hybridBlockPrompts.${fieldIndex}.value`,
-														e.target as HTMLTextAreaElement
-													);
-												}}
-											/>
+											</>
 										);
 									})()
 								) : (
