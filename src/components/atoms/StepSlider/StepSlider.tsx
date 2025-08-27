@@ -81,11 +81,11 @@ export const StepSlider = ({
 					<SliderPrimitive.Thumb
 						data-slot="slider-thumb"
 						key={index}
-						className="bg-transparent ring-ring/50 cursor-pointer block size-4 shrink-0 rounded-full transition-[color] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50 z-10 relative"
+						className="bg-transparent ring-ring/50 cursor-pointer block size-[14px] shrink-0 rounded-full transition-[color] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50 z-10 relative"
 					>
 						{/* Inner dot for visual size reduction */}
 						<div className="absolute inset-0 flex items-center justify-center">
-							<div className="w-3 aspect-square bg-foreground rounded-full"></div>
+							<div className="w-[10px] aspect-square bg-foreground rounded-full"></div>
 						</div>
 					</SliderPrimitive.Thumb>
 				))}

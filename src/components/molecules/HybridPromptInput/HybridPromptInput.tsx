@@ -40,7 +40,6 @@ import {
 import { cn } from '@/utils';
 import React, { useState, FC } from 'react';
 import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
-import DragHandleIcon from '@/components/atoms/_svg/DragHandleIcon';
 
 interface SortableAIBlockProps {
 	block: (typeof BLOCKS)[number];
@@ -245,13 +244,6 @@ const SortableAIBlock = ({
 						{isCompactBlock ? (
 							// Compact blocks
 							<div className="flex items-center w-full h-full">
-								<div className="flex items-center text-gray-300 mr-2 ml-1">
-									<DragHandleIcon
-										width="4px"
-										height="10px"
-										pathClassName="stroke-gray-300"
-									/>
-								</div>
 								{isTextBlock ? (
 									<>
 										<div className="flex flex-col justify-center w-[140px]">
@@ -490,57 +482,143 @@ const SortableAIBlock = ({
 														</button>
 													</div>
 												)}
-											{isFullAutomatedBlock && (!showTestPreview || !testMessage) && (
-												<div className="flex gap-1 relative z-[100] pointer-events-auto">
-													{[
-														{ value: DraftingTone.normal, label: 'Normal' },
-														{ value: DraftingTone.explanatory, label: 'Explanatory' },
-														{ value: DraftingTone.formal, label: 'Formal' },
-														{ value: DraftingTone.concise, label: 'Concise' },
-														{ value: DraftingTone.casual, label: 'Casual' },
-													].map((tone) => (
+											{isFullAutomatedBlock &&
+												(!showTestPreview || !testMessage) &&
+												!isToneExpanded &&
+												(() => {
+													const selectedTone =
+														(form.watch('draftingTone') as DraftingTone) ||
+														DraftingTone.normal;
+													const selectedLabel =
+														selectedTone === DraftingTone.normal
+															? 'Normal'
+															: selectedTone === DraftingTone.explanatory
+															? 'Explanatory'
+															: selectedTone === DraftingTone.formal
+															? 'Formal'
+															: selectedTone === DraftingTone.concise
+															? 'Concise'
+															: 'Casual';
+													return (
+														<div className="flex gap-1 relative z-[100] pointer-events-auto items-center">
+															<button
+																type="button"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	e.preventDefault();
+																}}
+																onMouseDown={(e) => {
+																	e.stopPropagation();
+																}}
+																className={cn(
+																	'w-[85px] h-[20px] rounded-[8px] text-[13px] font-light transition-all flex items-center justify-center font-inter cursor-default',
+																	selectedTone === DraftingTone.normal
+																		? 'bg-[#E8EFFF] text-black border border-black'
+																		: selectedTone === DraftingTone.explanatory
+																		? 'bg-[#F8E8FF] text-black border border-black'
+																		: selectedTone === DraftingTone.formal
+																		? 'bg-[#FFE8EC] text-black border border-black'
+																		: selectedTone === DraftingTone.concise
+																		? 'bg-[#FFF9E8] text-black border border-black'
+																		: 'bg-[#E8FFF1] text-black border border-black'
+																)}
+															>
+																{selectedLabel}
+															</button>
+															<button
+																type="button"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	e.preventDefault();
+																	setIsToneExpanded(true);
+																}}
+																onMouseDown={(e) => {
+																	e.stopPropagation();
+																}}
+																className="w-[20px] h-[20px] rounded-[8px] bg-transparent flex items-center justify-center hover:bg-gray-100"
+															>
+																<Plus className="h-3 w-3" />
+															</button>
+														</div>
+													);
+												})()}
+											{isFullAutomatedBlock &&
+												(!showTestPreview || !testMessage) &&
+												isToneExpanded && (
+													<div
+														className={cn(
+															'flex gap-1 relative z-[100] pointer-events-auto items-center'
+														)}
+													>
+														{[
+															{ value: DraftingTone.normal, label: 'Normal' },
+															{ value: DraftingTone.explanatory, label: 'Explanatory' },
+															{ value: DraftingTone.formal, label: 'Formal' },
+															{ value: DraftingTone.concise, label: 'Concise' },
+															{ value: DraftingTone.casual, label: 'Casual' },
+														].map((tone) => (
+															<button
+																key={tone.value}
+																type="button"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	e.preventDefault();
+																	const currentTone =
+																		(form.getValues('draftingTone') as DraftingTone) ??
+																		(form.watch('draftingTone') as DraftingTone);
+																	form.setValue('draftingTone', tone.value);
+																	if (currentTone !== tone.value) {
+																		setIsToneExpanded(false);
+																	}
+																}}
+																onMouseDown={(e) => {
+																	e.stopPropagation();
+																}}
+																className={cn(
+																	'w-[85px] h-[20px] rounded-[8px] text-[13px] font-light transition-all flex items-center justify-center font-inter cursor-pointer',
+																	'focus:outline-none focus:ring-0 active:outline-none',
+																	tone.value === DraftingTone.normal
+																		? form.watch('draftingTone') === tone.value
+																			? 'bg-[#E8EFFF] text-black border border-black active:bg-[#E8EFFF]'
+																			: 'bg-[#E8EFFF] text-black hover:bg-[#d8e0f2] active:bg-[#d8e0f2]'
+																		: tone.value === DraftingTone.explanatory
+																		? form.watch('draftingTone') === tone.value
+																			? 'bg-[#F8E8FF] text-black border border-black active:bg-[#F8E8FF]'
+																			: 'bg-[#F8E8FF] text-black hover:bg-[#e8d8f2] active:bg-[#e8d8f2]'
+																		: tone.value === DraftingTone.formal
+																		? form.watch('draftingTone') === tone.value
+																			? 'bg-[#FFE8EC] text-black border border-black active:bg-[#FFE8EC]'
+																			: 'bg-[#FFE8EC] text-black hover:bg-[#f2d8dc] active:bg-[#f2d8dc]'
+																		: tone.value === DraftingTone.concise
+																		? form.watch('draftingTone') === tone.value
+																			? 'bg-[#FFF9E8] text-black border border-black active:bg-[#FFF9E8]'
+																			: 'bg-[#FFF9E8] text-black hover:bg-[#f2edd8] active:bg-[#f2edd8]'
+																		: tone.value === DraftingTone.casual
+																		? form.watch('draftingTone') === tone.value
+																			? 'bg-[#E8FFF1] text-black border border-black active:bg-[#E8FFF1]'
+																			: 'bg-[#E8FFF1] text-black hover:bg-[#d8f2e1] active:bg-[#d8f2e1]'
+																		: 'bg-gray-200 text-black hover:bg-gray-300 active:bg-gray-300'
+																)}
+															>
+																{tone.label}
+															</button>
+														))}
 														<button
-															key={tone.value}
 															type="button"
 															onClick={(e) => {
 																e.stopPropagation();
 																e.preventDefault();
-																form.setValue('draftingTone', tone.value);
+																setIsToneExpanded(false);
 															}}
 															onMouseDown={(e) => {
 																e.stopPropagation();
 															}}
-															className={cn(
-																'w-[85px] h-[20px] rounded-[8px] text-[13px] font-light transition-all flex items-center justify-center font-inter cursor-pointer',
-																'focus:outline-none focus:ring-0 active:outline-none',
-																tone.value === DraftingTone.normal
-																	? form.watch('draftingTone') === tone.value
-																		? 'bg-[#E8EFFF] text-black border border-black active:bg-[#E8EFFF]'
-																		: 'bg-[#E8EFFF] text-black hover:bg-[#d8e0f2] active:bg-[#d8e0f2]'
-																	: tone.value === DraftingTone.explanatory
-																	? form.watch('draftingTone') === tone.value
-																		? 'bg-[#F8E8FF] text-black border border-black active:bg-[#F8E8FF]'
-																		: 'bg-[#F8E8FF] text-black hover:bg-[#e8d8f2] active:bg-[#e8d8f2]'
-																	: tone.value === DraftingTone.formal
-																	? form.watch('draftingTone') === tone.value
-																		? 'bg-[#FFE8EC] text-black border border-black active:bg-[#FFE8EC]'
-																		: 'bg-[#FFE8EC] text-black hover:bg-[#f2d8dc] active:bg-[#f2d8dc]'
-																	: tone.value === DraftingTone.concise
-																	? form.watch('draftingTone') === tone.value
-																		? 'bg-[#FFF9E8] text-black border border-black active:bg-[#FFF9E8]'
-																		: 'bg-[#FFF9E8] text-black hover:bg-[#f2edd8] active:bg-[#f2edd8]'
-																	: tone.value === DraftingTone.casual
-																	? form.watch('draftingTone') === tone.value
-																		? 'bg-[#E8FFF1] text-black border border-black active:bg-[#E8FFF1]'
-																		: 'bg-[#E8FFF1] text-black hover:bg-[#d8f2e1] active:bg-[#d8f2e1]'
-																	: 'bg-gray-200 text-black hover:bg-gray-300 active:bg-gray-300'
-															)}
+															className="w-[20px] h-[20px] rounded-[8px] bg-transparent flex items-center justify-center ml-1 hover:bg-gray-100"
 														>
-															{tone.label}
+															<X className="h-3 w-3" />
 														</button>
-													))}
-												</div>
-											)}
+													</div>
+												)}
 										</>
 									) : (
 										<Typography variant="h4" className="font-inter">
@@ -572,10 +650,25 @@ const SortableAIBlock = ({
 												/>
 												{/* Paragraph slider for Full Auto block only */}
 												{isFullAutomatedBlock && (
-													<div className="mt-4 flex justify-start px-4">
+													<div className="mt-4 flex justify-start -ml-10">
 														<div className="flex items-start gap-4">
-															<span className="text-[10px] text-black font-inter font-normal relative top-[-7px]">
-																Auto Paragraphs
+															<span className="text-[10px] text-black font-inter font-normal relative top-[-7px] block w-[140px] text-right whitespace-nowrap shrink-0">
+																{(() => {
+																	const selectedParagraphCount =
+																		form.watch('paragraphs') ?? 0;
+																	if (selectedParagraphCount === 0)
+																		return 'Auto Paragraphs';
+																	const paragraphLabels = [
+																		'One Paragraph',
+																		'Two Paragraphs',
+																		'Three Paragraphs',
+																		'Four Paragraphs',
+																		'Five Paragraphs',
+																	];
+																	const clampedIndex =
+																		Math.min(Math.max(selectedParagraphCount, 1), 5) - 1;
+																	return paragraphLabels[clampedIndex];
+																})()}
 															</span>
 															<div className="w-[189px]">
 																<FormField
@@ -667,6 +760,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const watchedBlocks = form.watch('hybridBlockPrompts') || [];
 	const isHandwrittenMode =
 		watchedBlocks.length > 0 && watchedBlocks.every((b) => b.type === HybridBlock.text);
+	const hasBlocks = (form.watch('hybridBlockPrompts')?.length || 0) > 0;
+
+	const handleClearAllInside = () => {
+		form.setValue('hybridBlockPrompts', []);
+		form.setValue('hybridAvailableBlocks', [
+			HybridBlock.full_automated,
+			HybridBlock.introduction,
+			HybridBlock.research,
+			HybridBlock.action,
+			HybridBlock.text,
+		]);
+	};
 
 	return (
 		<div>
@@ -692,18 +797,33 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									rules={{ required: form.watch('isAiSubject') }}
 									render={({ field }) => (
 										<FormItem>
-											<div className="flex items-center gap-2 mb-2">
-												<FormLabel>Subject</FormLabel>
-												<Separator orientation="vertical" className="!h-5" />
-												<Switch
-													checked={form.watch('isAiSubject')}
-													disabled={isHandwrittenMode}
-													onCheckedChange={(val: boolean) =>
-														form.setValue('isAiSubject', val)
-													}
-													className="data-[state=checked]:bg-primary -translate-y-[2px]"
-												/>
-												<FormLabel className="">Automated Subject</FormLabel>
+											<div className="flex items-center justify-between mb-2">
+												<div className="flex items-center gap-2">
+													<FormLabel className="font-inter text-[16px]">
+														Subject
+													</FormLabel>
+													<Separator orientation="vertical" className="!h-5" />
+													<Switch
+														checked={form.watch('isAiSubject')}
+														disabled={isHandwrittenMode}
+														onCheckedChange={(val: boolean) =>
+															form.setValue('isAiSubject', val)
+														}
+														className="data-[state=checked]:bg-primary -translate-y-[2px]"
+													/>
+													<FormLabel className="font-inter text-[16px]">
+														Automated Subject
+													</FormLabel>
+												</div>
+												{hasBlocks && (
+													<button
+														type="button"
+														onClick={handleClearAllInside}
+														className="text-sm font-inter font-medium text-[#AFAFAF] hover:underline mr-[2px]"
+													>
+														Clear All
+													</button>
+												)}
 											</div>
 											<FormControl>
 												<Input

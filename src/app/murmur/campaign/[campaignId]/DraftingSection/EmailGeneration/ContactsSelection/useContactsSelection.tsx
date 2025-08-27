@@ -26,6 +26,10 @@ export const useContactsSelection = (props: ContactsSelectionProps) => {
 
 	const handleContactSelection = (contactId: number, event?: React.MouseEvent) => {
 		if (event?.shiftKey && lastClickedRef.current !== null) {
+			// Prevent text selection on shift-click
+			event.preventDefault();
+			window.getSelection()?.removeAllRanges();
+
 			// Shift-click: select range
 			const currentIndex = contacts.findIndex((c) => c.id === contactId);
 			const lastIndex = contacts.findIndex((c) => c.id === lastClickedRef.current);
@@ -34,7 +38,8 @@ export const useContactsSelection = (props: ContactsSelectionProps) => {
 				const start = Math.min(currentIndex, lastIndex);
 				const end = Math.max(currentIndex, lastIndex);
 
-				const newSelectedIds = new Set(selectedContactIds);
+				// Clear all selections first, then select only the range
+				const newSelectedIds = new Set<number>();
 
 				// Add all contacts in the range
 				for (let i = start; i <= end; i++) {

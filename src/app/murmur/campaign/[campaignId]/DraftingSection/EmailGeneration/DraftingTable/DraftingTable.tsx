@@ -43,7 +43,10 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					</Button>
 				)}
 			</div>
-			<div className="bg-background border border-gray-300 overflow-auto custom-scroll w-[336px] h-[441px] overflow-x-hidden overflow-y-auto pr-[10px]">
+			<div
+				className="bg-background border border-gray-300 overflow-auto custom-scroll w-[336px] h-[441px] overflow-x-hidden overflow-y-auto pr-[10px]"
+				data-lenis-prevent
+			>
 				{isPending ? (
 					<div className="flex items-center justify-center h-full">
 						<Spinner size="small" />
