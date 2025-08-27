@@ -105,6 +105,7 @@ const SortableAIBlock = ({
 	const [isEdit, setIsEdit] = useState(
 		form.getValues(`hybridBlockPrompts.${fieldIndex}.value`) !== ''
 	);
+	const [isToneExpanded, setIsToneExpanded] = useState(false);
 
 	const style = {
 		transform: CSS.Transform.toString(transform),
@@ -162,6 +163,10 @@ const SortableAIBlock = ({
 					? showTestPreview && testMessage
 						? 'w-[416px] h-[44px]'
 						: 'w-[868px] h-[44px]'
+					: isFullAutomatedBlock
+					? showTestPreview && testMessage
+						? 'w-[416px]'
+						: 'w-[868px]'
 					: 'w-full',
 				!isIntroductionBlock &&
 					!isResearchBlock &&
@@ -186,11 +191,20 @@ const SortableAIBlock = ({
 					className={cn(
 						'absolute top-0 left-0 cursor-move z-[1]',
 						isTextBlock ? 'h-[80px] w-8' : isCompactBlock ? 'h-[44px] w-8' : 'h-12',
-						isFullAutomatedBlock ? 'w-24' : !isCompactBlock ? 'w-full' : '' // Limit width for Full Automated block and compact blocks
+						isFullAutomatedBlock
+							? 'w-24'
+							: !isCompactBlock && !isFullAutomatedBlock
+							? 'w-full'
+							: '' // Limit width for Full Automated block and compact blocks
 					)}
 				/>
-				<div className={cn('flex items-center', isCompactBlock ? 'p-2 h-full' : 'p-4')}>
-					<div className={cn('flex-grow', isCompactBlock && 'flex items-center')}>
+				<div
+					className={cn(
+						'flex items-center w-full',
+						isCompactBlock ? 'p-2 h-full' : 'p-4'
+					)}
+				>
+					<div className={cn('flex-grow min-w-0', isCompactBlock && 'flex items-center')}>
 						{isDragging && (
 							<div className="absolute inset-0 rounded-md bg-background z-10 pointer-events-none" />
 						)}
@@ -313,7 +327,12 @@ const SortableAIBlock = ({
 										Hybrid
 									</span>
 								)}
-								<div className="mb-2 flex gap-2 min-h-7 items-center relative z-20">
+								<div
+									className={cn(
+										'mb-2 flex gap-2 min-h-7 items-center relative z-20',
+										isFullAutomatedBlock && showTestPreview && testMessage && 'flex-wrap'
+									)}
+								>
 									{!isTextBlock ? (
 										<>
 											<Typography
@@ -330,7 +349,146 @@ const SortableAIBlock = ({
 													? 'Full Auto'
 													: (block as { label: string }).label}
 											</Typography>
-											{isFullAutomatedBlock && (
+											{isFullAutomatedBlock &&
+												showTestPreview &&
+												testMessage &&
+												!isToneExpanded &&
+												(() => {
+													const selectedTone =
+														(form.watch('draftingTone') as DraftingTone) ||
+														DraftingTone.normal;
+													const selectedLabel =
+														selectedTone === DraftingTone.normal
+															? 'Normal'
+															: selectedTone === DraftingTone.explanatory
+															? 'Explanatory'
+															: selectedTone === DraftingTone.formal
+															? 'Formal'
+															: selectedTone === DraftingTone.concise
+															? 'Concise'
+															: 'Casual';
+													return (
+														<div className="flex gap-1 relative z-[100] pointer-events-auto items-center">
+															<button
+																type="button"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	e.preventDefault();
+																}}
+																onMouseDown={(e) => {
+																	e.stopPropagation();
+																}}
+																className={cn(
+																	'w-[85px] h-[20px] rounded-[8px] text-[13px] font-light transition-all flex items-center justify-center font-inter cursor-default',
+																	selectedTone === DraftingTone.normal
+																		? 'bg-[#E8EFFF] text-black border border-black'
+																		: selectedTone === DraftingTone.explanatory
+																		? 'bg-[#F8E8FF] text-black border border-black'
+																		: selectedTone === DraftingTone.formal
+																		? 'bg-[#FFE8EC] text-black border border-black'
+																		: selectedTone === DraftingTone.concise
+																		? 'bg-[#FFF9E8] text-black border border-black'
+																		: 'bg-[#E8FFF1] text-black border border-black'
+																)}
+															>
+																{selectedLabel}
+															</button>
+															<button
+																type="button"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	e.preventDefault();
+																	setIsToneExpanded(true);
+																}}
+																onMouseDown={(e) => {
+																	e.stopPropagation();
+																}}
+																className="w-[20px] h-[20px] rounded-[8px] bg-transparent flex items-center justify-center hover:bg-gray-100"
+															>
+																<Plus className="h-3 w-3" />
+															</button>
+														</div>
+													);
+												})()}
+											{isFullAutomatedBlock &&
+												showTestPreview &&
+												testMessage &&
+												isToneExpanded && (
+													<div
+														className={cn(
+															'flex gap-1 relative z-[100] pointer-events-auto w-full flex-wrap'
+														)}
+													>
+														{[
+															{ value: DraftingTone.normal, label: 'Normal' },
+															{ value: DraftingTone.explanatory, label: 'Explanatory' },
+															{ value: DraftingTone.formal, label: 'Formal' },
+															{ value: DraftingTone.concise, label: 'Concise' },
+															{ value: DraftingTone.casual, label: 'Casual' },
+														].map((tone) => (
+															<button
+																key={tone.value}
+																type="button"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	e.preventDefault();
+																	const currentTone =
+																		(form.getValues('draftingTone') as DraftingTone) ??
+																		(form.watch('draftingTone') as DraftingTone);
+																	form.setValue('draftingTone', tone.value);
+																	if (currentTone !== tone.value) {
+																		setIsToneExpanded(false);
+																	}
+																}}
+																onMouseDown={(e) => {
+																	e.stopPropagation();
+																}}
+																className={cn(
+																	'w-[85px] h-[20px] rounded-[8px] text-[13px] font-light transition-all flex items-center justify-center font-inter cursor-pointer',
+																	'focus:outline-none focus:ring-0 active:outline-none',
+																	tone.value === DraftingTone.normal
+																		? form.watch('draftingTone') === tone.value
+																			? 'bg-[#E8EFFF] text-black border border-black active:bg-[#E8EFFF]'
+																			: 'bg-[#E8EFFF] text-black hover:bg-[#d8e0f2] active:bg-[#d8e0f2]'
+																		: tone.value === DraftingTone.explanatory
+																		? form.watch('draftingTone') === tone.value
+																			? 'bg-[#F8E8FF] text-black border border-black active:bg-[#F8E8FF]'
+																			: 'bg-[#F8E8FF] text-black hover:bg-[#e8d8f2] active:bg-[#e8d8f2]'
+																		: tone.value === DraftingTone.formal
+																		? form.watch('draftingTone') === tone.value
+																			? 'bg-[#FFE8EC] text-black border border-black active:bg-[#FFE8EC]'
+																			: 'bg-[#FFE8EC] text-black hover:bg-[#f2d8dc] active:bg-[#f2d8dc]'
+																		: tone.value === DraftingTone.concise
+																		? form.watch('draftingTone') === tone.value
+																			? 'bg-[#FFF9E8] text-black border border-black active:bg-[#FFF9E8]'
+																			: 'bg-[#FFF9E8] text-black hover:bg-[#f2edd8] active:bg-[#f2edd8]'
+																		: tone.value === DraftingTone.casual
+																		? form.watch('draftingTone') === tone.value
+																			? 'bg-[#E8FFF1] text-black border border-black active:bg-[#E8FFF1]'
+																			: 'bg-[#E8FFF1] text-black hover:bg-[#d8f2e1] active:bg-[#d8f2e1]'
+																		: 'bg-gray-200 text-black hover:bg-gray-300 active:bg-gray-300'
+																)}
+															>
+																{tone.label}
+															</button>
+														))}
+														<button
+															type="button"
+															onClick={(e) => {
+																e.stopPropagation();
+																e.preventDefault();
+																setIsToneExpanded(false);
+															}}
+															onMouseDown={(e) => {
+																e.stopPropagation();
+															}}
+															className="w-[20px] h-[20px] rounded-[8px] bg-transparent flex items-center justify-center ml-1 hover:bg-gray-100"
+														>
+															<X className="h-3 w-3" />
+														</button>
+													</div>
+												)}
+											{isFullAutomatedBlock && (!showTestPreview || !testMessage) && (
 												<div className="flex gap-1 relative z-[100] pointer-events-auto">
 													{[
 														{ value: DraftingTone.normal, label: 'Normal' },
@@ -399,7 +557,7 @@ const SortableAIBlock = ({
 													placeholder={block.placeholder}
 													onClick={(e) => e.stopPropagation()}
 													className={cn(
-														'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
+														'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0',
 														isFullAutomatedBlock ? 'h-[300px] px-0' : ''
 													)}
 													{...fieldProps}
