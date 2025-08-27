@@ -358,9 +358,7 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 			}
 		}
 
-		// Text blocks can always be removed
 		if (blockToBeRemoved.type === HybridBlock.text) {
-			// No restrictions on removing text blocks
 		}
 		return {
 			canBeRemoved: true,
