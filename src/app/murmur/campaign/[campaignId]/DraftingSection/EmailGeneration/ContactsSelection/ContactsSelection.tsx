@@ -33,11 +33,17 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 					<div
 						key={contact.id}
 						className={cn(
-							'border-b border-gray-200 cursor-pointer transition-colors grid grid-cols-2 grid-rows-[auto_auto] w-full overflow-visible py-1',
+							'border-b border-gray-200 cursor-pointer transition-colors grid grid-cols-2 grid-rows-[auto_auto] w-full overflow-visible py-1 select-none',
 							selectedContactIds.has(contact.id)
 								? 'bg-[#D6E8D9] border-2 border-primary'
 								: ''
 						)}
+						onMouseDown={(e) => {
+							// Prevent text selection on shift-click
+							if (e.shiftKey) {
+								e.preventDefault();
+							}
+						}}
 						onClick={(e) => handleContactSelection(contact.id, e)}
 					>
 						{(() => {

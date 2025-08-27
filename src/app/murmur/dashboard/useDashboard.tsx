@@ -290,8 +290,8 @@ export const useDashboard = () => {
 			{
 				accessorKey: 'company',
 				id: 'nameAndCompany',
-				size: 200,
-				header: () => <span className="font-bold">Name / Company</span>,
+				size: 18,
+				header: () => <span className="font-bold">Name</span>,
 				cell: ({ row }) => {
 					const contact = row.original as ContactWithName;
 					// Compute name from firstName and lastName fields
@@ -316,8 +316,13 @@ export const useDashboard = () => {
 					// If neither name nor company, show a dash
 					if (!hasName && !hasCompany) {
 						return (
-							<div className="flex items-center h-full">
-								<span className="select-none text-gray-300 dark:text-gray-700">—</span>
+							<div className="flex flex-col gap-0.5 py-1">
+								<div className="truncate">
+									<span className="select-none text-gray-300 dark:text-gray-700">—</span>
+								</div>
+								<div className="truncate text-sm text-gray-500 dark:text-gray-400">
+									&nbsp;
+								</div>
 							</div>
 						);
 					}
@@ -325,22 +330,46 @@ export const useDashboard = () => {
 					// If only name or only company, show in regular size
 					if (!hasName || !hasCompany) {
 						const textToShow = hasName ? nameValue : companyValue;
+						// Center vertically if it's only a company (and make it bold)
+						if (!hasName && hasCompany) {
+							return (
+								<div
+									className="flex flex-col justify-center py-1"
+									style={{ height: '2.75rem' }}
+								>
+									<div className="truncate font-bold">
+										<TableCellTooltip
+											text={textToShow}
+											maxLength={MAX_CELL_LENGTH}
+											positioning="below-right"
+											onHover={handleCellHover}
+										/>
+									</div>
+								</div>
+							);
+						}
+						// Regular layout for name only (bold)
 						return (
-							<div className="flex items-center h-full">
-								<TableCellTooltip
-									text={textToShow}
-									maxLength={MAX_CELL_LENGTH}
-									positioning="below-right"
-									onHover={handleCellHover}
-								/>
+							<div className="flex flex-col gap-0.5 py-1">
+								<div className="truncate font-bold">
+									<TableCellTooltip
+										text={textToShow}
+										maxLength={MAX_CELL_LENGTH}
+										positioning="below-right"
+										onHover={handleCellHover}
+									/>
+								</div>
+								<div className="truncate text-sm text-gray-500 dark:text-gray-400">
+									&nbsp;
+								</div>
 							</div>
 						);
 					}
 
-					// Both name and company present - show name first, company second in smaller font
+					// Both name and company present - show name first (bold), company second in smaller font (not bold)
 					return (
 						<div className="flex flex-col gap-0.5 py-1">
-							<div className="truncate">
+							<div className="truncate font-bold">
 								<TableCellTooltip
 									text={nameValue}
 									maxLength={MAX_CELL_LENGTH}
@@ -362,7 +391,7 @@ export const useDashboard = () => {
 			},
 			{
 				accessorKey: 'city',
-				size: 150,
+				size: 20,
 				header: () => <span className="font-bold">City</span>,
 				cell: ({ row }) => {
 					return (
@@ -377,7 +406,7 @@ export const useDashboard = () => {
 			},
 			{
 				accessorKey: 'state',
-				size: 150,
+				size: 10,
 				header: () => <span className="font-bold">State</span>,
 				cell: ({ row }) => {
 					const fullStateName = row.getValue('state') as string;
@@ -394,7 +423,7 @@ export const useDashboard = () => {
 			},
 			{
 				accessorKey: 'title',
-				size: 150,
+				size: 32,
 				header: () => <span className="font-bold">Description</span>,
 				cell: ({ row }) => {
 					return (
@@ -409,7 +438,7 @@ export const useDashboard = () => {
 			},
 			{
 				accessorKey: 'email',
-				size: 150,
+				size: 20,
 				header: () => <span className="font-bold">Email</span>,
 				cell: ({ row }) => {
 					const email = (row.getValue('email') as string) || '';

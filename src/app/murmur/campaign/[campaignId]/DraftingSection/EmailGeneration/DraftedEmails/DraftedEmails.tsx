@@ -137,9 +137,15 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							<div
 								key={draft.id}
 								className={cn(
-									'border-b border-gray-200 cursor-pointer transition-colors p-3 relative',
+									'border-b border-gray-200 cursor-pointer transition-colors p-3 relative select-none',
 									isSelected && 'bg-[#D6E8D9] border-2 border-primary'
 								)}
+								onMouseDown={(e) => {
+									// Prevent text selection on shift-click
+									if (e.shiftKey) {
+										e.preventDefault();
+									}
+								}}
 								onClick={(e) => handleDraftSelect(draft, e)}
 								onDoubleClick={() => handleDraftDoubleClick(draft)}
 							>
