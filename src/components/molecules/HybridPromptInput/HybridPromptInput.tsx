@@ -254,7 +254,7 @@ const SortableAIBlock = ({
 									<>
 										<div className="flex flex-col justify-center w-[140px]">
 											<span className="font-inter font-medium text-[17px] leading-[14px]">
-												Manual Text
+												Text
 											</span>
 										</div>
 										{(() => {
@@ -542,7 +542,7 @@ const SortableAIBlock = ({
 										</>
 									) : (
 										<Typography variant="h4" className="font-inter">
-											Manual Text
+											Text
 										</Typography>
 									)}
 								</div>
@@ -695,6 +695,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												field.type === HybridBlock.introduction ||
 												field.type === HybridBlock.research ||
 												field.type === HybridBlock.action;
+											const hasImmediateTextBlock =
+												fields[index + 1]?.type === HybridBlock.text;
 
 											return (
 												<React.Fragment key={field.id}>
@@ -708,7 +710,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														testMessage={testMessage}
 													/>
 													{/* Plus button under hybrid blocks */}
-													{isHybridBlock && (
+													{isHybridBlock && !hasImmediateTextBlock && (
 														<div
 															className={cn(
 																'flex justify-end -mt-1',
