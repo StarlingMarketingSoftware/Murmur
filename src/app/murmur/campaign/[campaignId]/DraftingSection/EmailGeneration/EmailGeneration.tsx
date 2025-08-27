@@ -226,15 +226,23 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 				<div className="flex-shrink-0">
 					<div className="relative flex flex-row w-[892px] h-[560px] border-[3px] border-black rounded-lg overflow-x-hidden p-[17px]">
 						{/* Left table container */}
-						<ContactsSelection
-							contacts={contacts}
-							selectedContactIds={selectedContactIds}
-							setSelectedContactIds={setSelectedContactIds}
-							handleContactSelection={handleContactSelection}
-							generationProgress={generationProgress}
-							generationTotal={generationTotal}
-							cancelGeneration={cancelGeneration}
-						/>
+						{(() => {
+							const draftedContactIds = new Set(draftEmails.map((d) => d.contactId));
+							const availableContacts = contacts.filter(
+								(c) => !draftedContactIds.has(c.id)
+							);
+							return (
+								<ContactsSelection
+									contacts={availableContacts}
+									selectedContactIds={selectedContactIds}
+									setSelectedContactIds={setSelectedContactIds}
+									handleContactSelection={handleContactSelection}
+									generationProgress={generationProgress}
+									generationTotal={generationTotal}
+									cancelGeneration={cancelGeneration}
+								/>
+							);
+						})()}
 
 						{/* Generate Drafts Button */}
 						<div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">

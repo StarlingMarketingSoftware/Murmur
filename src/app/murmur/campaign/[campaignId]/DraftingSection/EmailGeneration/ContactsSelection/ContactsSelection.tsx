@@ -28,12 +28,12 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 			totalContacts={generationTotal ?? (selectedContactIds.size || contacts.length)}
 			onCancel={props.cancelGeneration}
 		>
-			<div className="overflow-visible w-[316px]">
+			<div className="overflow-visible w-full">
 				{contacts.map((contact) => (
 					<div
 						key={contact.id}
 						className={cn(
-							'border-b border-gray-200 cursor-pointer transition-colors grid grid-cols-[158px_158px] grid-rows-[auto_auto] w-[316px] overflow-visible py-1',
+							'border-b border-gray-200 cursor-pointer transition-colors grid grid-cols-2 grid-rows-[auto_auto] w-full overflow-visible py-1',
 							selectedContactIds.has(contact.id)
 								? 'bg-[#D6E8D9] border-2 border-primary'
 								: ''
