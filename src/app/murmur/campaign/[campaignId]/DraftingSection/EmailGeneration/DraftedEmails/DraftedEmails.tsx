@@ -44,7 +44,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				<div className="h-[20px] mb-2"></div>
 
 				{/* Editor container matching table dimensions exactly */}
-				<div className="bg-background border border-gray-300 w-[336px] h-[441px] overflow-x-hidden overflow-y-auto pr-[10px] flex flex-col p-3 relative scrollbar-thin scrollbar-thumb-black scrollbar-track-transparent [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-black [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
+				<div
+					className="bg-background border border-gray-300 w-[336px] h-[441px] overflow-x-hidden overflow-y-auto pr-[10px] flex flex-col p-3 relative scrollbar-thin scrollbar-thumb-black scrollbar-track-transparent [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-black [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
+					data-lenis-prevent
+				>
 					{/* Close button */}
 					<Button
 						type="button"
