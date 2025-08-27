@@ -361,20 +361,6 @@ export const useDashboard = () => {
 				},
 			},
 			{
-				accessorKey: 'email',
-				size: 150,
-				header: () => <span className="font-bold">Email</span>,
-				cell: ({ row }) => {
-					const email = (row.getValue('email') as string) || '';
-					return (
-						<div className="text-left whitespace-nowrap overflow-visible relative">
-							<span className="email-obfuscated-local inline-block">{email}</span>
-						</div>
-					);
-				},
-			},
-
-			{
 				accessorKey: 'city',
 				size: 150,
 				header: () => <span className="font-bold">City</span>,
@@ -418,6 +404,19 @@ export const useDashboard = () => {
 							positioning="below-left"
 							onHover={handleCellHover}
 						/>
+					);
+				},
+			},
+			{
+				accessorKey: 'email',
+				size: 150,
+				header: () => <span className="font-bold">Email</span>,
+				cell: ({ row }) => {
+					const email = (row.getValue('email') as string) || '';
+					return (
+						<div className="text-left whitespace-nowrap overflow-visible relative">
+							<span className="email-obfuscated-local inline-block">{email}</span>
+						</div>
 					);
 				},
 			},

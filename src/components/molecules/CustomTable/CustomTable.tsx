@@ -11,6 +11,7 @@ import {
 	SortingState,
 	useReactTable,
 	Table as TableType,
+	Row,
 } from '@tanstack/react-table';
 
 import {
@@ -28,6 +29,7 @@ import {
 	useState,
 	useMemo,
 	useCallback,
+	useRef,
 	ReactNode,
 } from 'react';
 import CustomPagination from '@/components/molecules/CustomPagination/CustomPagination';
@@ -124,6 +126,21 @@ export function CustomTable<TData, TValue>({
 		pageIndex: 0,
 		pageSize: rowsPerPage,
 	});
+
+	// Track last clicked row original id for Shift+click range selection (stable across sorting/filtering)
+	const lastClickedRowIdRef = useRef<string | number | null>(null);
+
+	// Resolve a stable identifier for a row: prefer the domain `original.id`, fallback to TanStack `row.id`
+	const getRowOriginalId = (r: Row<TData>): string | number => {
+		const original = r.original as Record<string, unknown>;
+		if (original && typeof original === 'object' && 'id' in original) {
+			const value = (original as Record<string, unknown>).id as unknown;
+			if (typeof value === 'string' || typeof value === 'number') {
+				return value;
+			}
+		}
+		return r.id;
+	};
 
 	// Initialize all rows as selected
 	const getInitialRowSelection = useCallback(() => {
@@ -270,9 +287,19 @@ export function CustomTable<TData, TValue>({
 			</div>
 			<div
 				className={cn(
-					'border-2 border-black relative overflow-y-auto overflow-x-auto custom-scrollbar w-[1185px] max-w-full mx-auto',
+					'border-2 border-black relative overflow-y-auto overflow-x-auto overscroll-contain custom-scrollbar w-[1185px] max-w-full mx-auto',
 					constrainHeight && 'h-[429px]'
 				)}
+				tabIndex={0}
+				style={{ WebkitOverflowScrolling: 'touch' }}
+				onWheel={(e) => {
+					const el = e.currentTarget;
+					const canScrollDown = el.scrollTop + el.clientHeight < el.scrollHeight;
+					const canScrollUp = el.scrollTop > 0;
+					if ((e.deltaY > 0 && canScrollDown) || (e.deltaY < 0 && canScrollUp)) {
+						e.stopPropagation();
+					}
+				}}
 			>
 				<Table
 					className={cn(
@@ -313,9 +340,45 @@ export function CustomTable<TData, TValue>({
 										(handleRowClick || (setSelectedRows && isSelectable)) &&
 											'cursor-pointer'
 									)}
-									onClick={() => {
+									onMouseDown={(e) => {
+										// Prevent text selection on shift-click
+										if (e.shiftKey && isSelectable) {
+											e.preventDefault();
+										}
+									}}
+									onClick={(e) => {
 										if (isSelectable) {
-											row.toggleSelected();
+											const rows = table.getRowModel().rows as Row<TData>[];
+											const rowOriginalId = getRowOriginalId(row as Row<TData>);
+											const currentIndex = rows.findIndex(
+												(r) => getRowOriginalId(r as Row<TData>) === rowOriginalId
+											);
+											const lastIndex =
+												lastClickedRowIdRef.current !== null
+													? rows.findIndex(
+															(r) =>
+																getRowOriginalId(r as Row<TData>) ===
+																lastClickedRowIdRef.current
+													  )
+													: -1;
+
+											if (e.shiftKey && lastIndex !== -1 && currentIndex !== -1) {
+												// Prevent text selection on shift-click
+												e.preventDefault();
+												window.getSelection()?.removeAllRanges();
+
+												const start = Math.min(currentIndex, lastIndex);
+												const end = Math.max(currentIndex, lastIndex);
+												const newSelection: Record<string, boolean> = { ...rowSelection };
+												for (let i = start; i <= end; i++) {
+													newSelection[rows[i].id] = true;
+												}
+												setRowSelection(newSelection);
+												// Keep the existing anchor on Shift-click (traditional behavior)
+											} else {
+												row.toggleSelected();
+												lastClickedRowIdRef.current = rowOriginalId;
+											}
 										} else if (handleRowClick) {
 											handleRowClick(row.original);
 										}
