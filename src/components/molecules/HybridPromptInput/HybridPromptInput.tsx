@@ -760,6 +760,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const watchedBlocks = form.watch('hybridBlockPrompts') || [];
 	const isHandwrittenMode =
 		watchedBlocks.length > 0 && watchedBlocks.every((b) => b.type === HybridBlock.text);
+	const hasBlocks = (form.watch('hybridBlockPrompts')?.length || 0) > 0;
+
+	const handleClearAllInside = () => {
+		form.setValue('hybridBlockPrompts', []);
+		form.setValue('hybridAvailableBlocks', [
+			HybridBlock.full_automated,
+			HybridBlock.introduction,
+			HybridBlock.research,
+			HybridBlock.action,
+			HybridBlock.text,
+		]);
+	};
 
 	return (
 		<div>
@@ -785,18 +797,33 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									rules={{ required: form.watch('isAiSubject') }}
 									render={({ field }) => (
 										<FormItem>
-											<div className="flex items-center gap-2 mb-2">
-												<FormLabel>Subject</FormLabel>
-												<Separator orientation="vertical" className="!h-5" />
-												<Switch
-													checked={form.watch('isAiSubject')}
-													disabled={isHandwrittenMode}
-													onCheckedChange={(val: boolean) =>
-														form.setValue('isAiSubject', val)
-													}
-													className="data-[state=checked]:bg-primary -translate-y-[2px]"
-												/>
-												<FormLabel className="">Automated Subject</FormLabel>
+											<div className="flex items-center justify-between mb-2">
+												<div className="flex items-center gap-2">
+													<FormLabel className="font-inter text-[16px]">
+														Subject
+													</FormLabel>
+													<Separator orientation="vertical" className="!h-5" />
+													<Switch
+														checked={form.watch('isAiSubject')}
+														disabled={isHandwrittenMode}
+														onCheckedChange={(val: boolean) =>
+															form.setValue('isAiSubject', val)
+														}
+														className="data-[state=checked]:bg-primary -translate-y-[2px]"
+													/>
+													<FormLabel className="font-inter text-[16px]">
+														Automated Subject
+													</FormLabel>
+												</div>
+												{hasBlocks && (
+													<button
+														type="button"
+														onClick={handleClearAllInside}
+														className="text-sm font-inter font-medium text-[#AFAFAF] hover:underline mr-[2px]"
+													>
+														Clear All
+													</button>
+												)}
 											</div>
 											<FormControl>
 												<Input

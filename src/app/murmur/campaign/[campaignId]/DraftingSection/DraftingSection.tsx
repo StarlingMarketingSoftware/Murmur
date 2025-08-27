@@ -57,16 +57,18 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 							className="mb-3 flex justify-between items-center"
 						>
 							<FormLabel className="font-inter font-normal">Email Structure</FormLabel>
-							{isDraftingContentReady() && (
-								<button
-									type="button"
-									onClick={scrollToDrafting}
-									className="flex items-center gap-1 text-[#AFAFAF] font-inter font-medium text-[14px] hover:text-[#8F8F8F] transition-colors"
-								>
-									to Drafting
-									<ChevronDown size={16} />
-								</button>
-							)}
+							<div className="flex items-center gap-4">
+								{isDraftingContentReady() && (
+									<button
+										type="button"
+										onClick={scrollToDrafting}
+										className="flex items-center gap-1 text-[#AFAFAF] font-inter font-medium text-[14px] hover:text-[#8F8F8F] transition-colors"
+									>
+										to Drafting
+										<ChevronDown size={16} />
+									</button>
+								)}
+							</div>
 						</div>
 						<div className="flex gap-[47px] items-start">
 							<div className="flex-shrink-0">
