@@ -42,6 +42,7 @@ module.exports = {
 				scroll: 'scroll 30s linear infinite',
 				'dialog-overlay-show': 'dialog-overlay-show 150ms cubic-bezier(0.16, 1, 0.3, 1)',
 				'dialog-content-show': 'dialog-content-show 150ms cubic-bezier(0.16, 1, 0.3, 1)',
+				fadeIn: 'fadeIn 0.3s ease-in-out',
 			},
 			keyframes: {
 				'dialog-overlay-show': {
@@ -64,8 +65,12 @@ module.exports = {
 					'0%': { transform: 'translateX(0)' },
 					'100%': { transform: 'translateX(calc(-50%))' },
 				},
+				fadeIn: {
+					'0%': { opacity: '0', transform: 'translateX(-10px)' },
+					'100%': { opacity: '1', transform: 'translateX(0)' },
+				},
 			},
 		},
 	},
-	plugins: [],
+	plugins: [require('tailwindcss-animate')],
 };
