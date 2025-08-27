@@ -2884,7 +2884,7 @@ body.murmur-page footer {
 	width: 100%;
 }
 .hover-scroll-container:hover .hover-scroll-text {
-	animation: scrollText 8s linear infinite;
+	animation: scrollText var(--scroll-duration, 8s) linear infinite;
 	text-overflow: initial;
 	max-width: none;
 	width: auto;

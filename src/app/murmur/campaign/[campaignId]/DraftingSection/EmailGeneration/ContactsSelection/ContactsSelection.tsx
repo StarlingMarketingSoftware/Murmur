@@ -33,7 +33,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 					<div
 						key={contact.id}
 						className={cn(
-							'border-b border-gray-200 cursor-pointer transition-colors grid grid-cols-[158px_158px] grid-rows-[24.5px_24.5px] w-[316px] h-[49px] overflow-visible',
+							'border-b border-gray-200 cursor-pointer transition-colors grid grid-cols-[158px_158px] grid-rows-[auto_auto] w-[316px] overflow-visible py-1',
 							selectedContactIds.has(contact.id)
 								? 'bg-[#D6E8D9] border-2 border-primary'
 								: ''
@@ -51,11 +51,10 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								return (
 									<>
 										{/* Top Left - Name */}
-										<div className="p-1 pl-3 flex items-center">
-											<ScrollableText
-												text={fullName}
-												className="font-bold text-xs w-full"
-											/>
+										<div className="p-1 pl-3 flex items-start">
+											<div className="font-bold text-xs w-full whitespace-normal break-words leading-4">
+												{fullName}
+											</div>
 										</div>
 
 										{/* Top Right - Title */}
@@ -73,11 +72,10 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 										</div>
 
 										{/* Bottom Left - Company */}
-										<div className="p-1 pl-3 flex items-center">
-											<ScrollableText
-												text={contact.company || ''}
-												className="text-xs text-black w-full"
-											/>
+										<div className="p-1 pl-3 flex items-start">
+											<div className="text-xs text-black w-full whitespace-normal break-words leading-4">
+												{contact.company || ''}
+											</div>
 										</div>
 
 										{/* Bottom Right - Location */}
@@ -100,11 +98,10 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								return (
 									<>
 										{/* Left column - Company vertically centered */}
-										<div className="row-span-2 p-1 pl-3 flex items-center">
-											<ScrollableText
-												text={contact.company || 'Contact'}
-												className="font-bold text-xs text-black w-full"
-											/>
+										<div className="row-span-2 p-1 pl-3 flex items-start">
+											<div className="font-bold text-xs text-black w-full whitespace-normal break-words leading-4">
+												{contact.company || 'Contact'}
+											</div>
 										</div>
 
 										{/* Right column - Title or Location */}
