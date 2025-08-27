@@ -22,7 +22,6 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		draftEmails,
 		isPendingEmails,
 		setSelectedDraft,
-		setIsDraftDialogOpen,
 		handleDraftSelection,
 		selectedDraftIds,
 		setSelectedDraftIds,
