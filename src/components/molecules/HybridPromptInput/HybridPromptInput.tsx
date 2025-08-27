@@ -40,7 +40,6 @@ import {
 import { cn } from '@/utils';
 import React, { useState, FC } from 'react';
 import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
-import DragHandleIcon from '@/components/atoms/_svg/DragHandleIcon';
 
 interface SortableAIBlockProps {
 	block: (typeof BLOCKS)[number];
@@ -245,13 +244,6 @@ const SortableAIBlock = ({
 						{isCompactBlock ? (
 							// Compact blocks
 							<div className="flex items-center w-full h-full">
-								<div className="flex items-center text-gray-300 mr-2 ml-1">
-									<DragHandleIcon
-										width="4px"
-										height="10px"
-										pathClassName="stroke-gray-300"
-									/>
-								</div>
 								{isTextBlock ? (
 									<>
 										<div className="flex flex-col justify-center w-[140px]">
