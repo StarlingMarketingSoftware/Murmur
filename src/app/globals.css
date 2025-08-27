@@ -1456,22 +1456,6 @@
 	opacity: 0;
 }
 
-/* Campaigns table fade out when search is triggered */
-.campaigns-table-wrapper {
-	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-	opacity: 1;
-	transform: translateY(0);
-	/* Ensure minimum spacing from search bar */
-	min-height: 400px;
-}
-
-.search-active ~ .campaigns-table-wrapper {
-	opacity: 0;
-	transform: translateY(20px);
-	pointer-events: none;
-}
-
 /* Campaigns table container with fixed height */
 .campaigns-table-container {
 	max-height: 382px;
@@ -1497,19 +1481,6 @@
 /* Also hide if pagination is rendered as sibling */
 .campaigns-table-container ~ nav {
 	display: none !important;
-}
-
-/* Target the specific pagination structure */
-.campaigns-table-wrapper .flex.items-center.justify-center.gap-2:has(button) {
-	display: none !important;
-}
-
-/* Fallback for Safari versions that don't support :has() */
-@supports not (selector(:has(*))) {
-	.campaigns-table-wrapper nav,
-	.campaigns-table-wrapper [role='navigation'] {
-		display: none !important;
-	}
 }
 
 /* Handle text overflow in campaigns table cells */
@@ -2346,43 +2317,6 @@
 	}
 }
 
-/* Campaigns table responsive spacing */
-@media (max-width: 640px) {
-	.campaigns-table-wrapper {
-		margin-top: 6rem !important; /* Override Tailwind mt-32 */
-	}
-}
-
-@media (min-width: 641px) and (max-width: 768px) {
-	.campaigns-table-wrapper {
-		margin-top: 8rem !important; /* Override Tailwind mt-36 */
-	}
-}
-
-@media (min-width: 769px) and (max-width: 1024px) {
-	.campaigns-table-wrapper {
-		margin-top: 10rem !important; /* Override Tailwind mt-40 */
-	}
-}
-
-@media (min-width: 1025px) and (max-width: 1280px) {
-	.campaigns-table-wrapper {
-		margin-top: 12rem !important; /* Override Tailwind mt-44 */
-	}
-}
-
-@media (min-width: 1281px) and (max-width: 1536px) {
-	.campaigns-table-wrapper {
-		margin-top: 14rem !important; /* Override Tailwind mt-48 */
-	}
-}
-
-@media (min-width: 1537px) {
-	.campaigns-table-wrapper {
-		margin-top: 16rem !important; /* Override Tailwind mt-56 */
-	}
-}
-
 /* Maintain consistent spacing ratio on zoom */
 @media (min-width: 1920px) {
 	.campaigns-table-wrapper {
@@ -2577,23 +2511,6 @@ body.murmur-page footer {
 	display: none !important;
 }
 
-/* Ensure campaigns block never overlaps the search bar on extreme zoom */
-/* When zoomed out, the search bar's margin-top grows due to vh units, 
-   so we need to ensure the campaigns table is positioned far enough below */
-@media (min-height: 800px) {
-	.dashboard-container:not(.search-active) .campaigns-table-wrapper {
-		/* Add minimal extra margin that scales with viewport height to prevent overlap */
-		margin-top: calc(8rem + 2vh) !important;
-	}
-}
-
-@media (min-height: 1200px) {
-	.dashboard-container:not(.search-active) .campaigns-table-wrapper {
-		/* Slightly more margin for extreme zoom levels */
-		margin-top: calc(8rem + 3vh) !important;
-	}
-}
-
 /* Also ensure the hero wrapper can contain the growing search bar */
 .dashboard-container:not(.search-active) .hero-wrapper {
 	/* Allow hero to grow with viewport height to contain search bar */
@@ -2635,20 +2552,8 @@ body.murmur-page footer {
 	}
 }
 
-.hover-scroll-container {
-	overflow: hidden;
-	position: relative;
-	width: 100%;
-}
+/* Scrolling text on hover */
 
-.hover-scroll-text {
-	display: inline-block;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	max-width: 100%;
-	width: 100%;
-}
 .hover-scroll-container:hover .hover-scroll-text {
 	animation: scrollText 8s linear infinite;
 	text-overflow: initial;

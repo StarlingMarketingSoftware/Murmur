@@ -3,11 +3,10 @@ import { useRef, useEffect, useState } from 'react';
 export interface ScrollableTextProps {
 	text: string;
 	className?: string;
-	style?: React.CSSProperties;
 }
 
 export const useScrollableText = (props: ScrollableTextProps) => {
-	const { text, className, style } = props;
+	const { text, className } = props;
 
 	const containerRef = useRef<HTMLDivElement>(null);
 	const textRef = useRef<HTMLSpanElement>(null);
@@ -43,7 +42,6 @@ export const useScrollableText = (props: ScrollableTextProps) => {
 		containerRef,
 		textRef,
 		isOverflowing,
-		style,
 		className,
 		text,
 	};
