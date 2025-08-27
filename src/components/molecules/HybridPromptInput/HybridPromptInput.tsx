@@ -11,6 +11,8 @@ import { DndContext, closestCenter } from '@dnd-kit/core';
 import { Droppable } from '../DragAndDrop/Droppable';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -662,6 +664,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		isTest,
 	} = useHybridPromptInput(props);
 
+	const watchedBlocks = form.watch('hybridBlockPrompts') || [];
+	const isHandwrittenMode =
+		watchedBlocks.length > 0 && watchedBlocks.every((b) => b.type === HybridBlock.text);
+
 	return (
 		<div>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
@@ -678,9 +684,51 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								showTestPreview && testMessage ? 'w-1/2' : 'w-full'
 							)}
 						>
+							{/* Subject header inside the box */}
+							<div className="px-3 pt-4 pb-0">
+								<FormField
+									control={form.control}
+									name="subject"
+									rules={{ required: form.watch('isAiSubject') }}
+									render={({ field }) => (
+										<FormItem>
+											<div className="flex items-center gap-2 mb-2">
+												<FormLabel>Subject</FormLabel>
+												<Separator orientation="vertical" className="!h-5" />
+												<Switch
+													checked={form.watch('isAiSubject')}
+													disabled={isHandwrittenMode}
+													onCheckedChange={(val: boolean) =>
+														form.setValue('isAiSubject', val)
+													}
+													className="data-[state=checked]:bg-primary -translate-y-[2px]"
+												/>
+												<FormLabel className="">Automated Subject</FormLabel>
+											</div>
+											<FormControl>
+												<Input
+													className="w-full h-[44px]"
+													placeholder={
+														form.watch('isAiSubject')
+															? 'Automated subject...'
+															: 'Enter subject...'
+													}
+													disabled={form.watch('isAiSubject')}
+													{...field}
+													onFocus={(e) =>
+														!form.watch('isAiSubject') &&
+														trackFocusedField?.('subject', e.target)
+													}
+												/>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+							</div>
 							<div className="flex-1 flex flex-col">
 								{/* Content area */}
-								<div className="p-3 flex flex-col gap-4 items-center flex-1">
+								<div className="pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
 									{fields.length === 0 && (
 										<span className="text-gray-300 font-primary text-[12px]">
 											Add blocks here to build your prompt...
