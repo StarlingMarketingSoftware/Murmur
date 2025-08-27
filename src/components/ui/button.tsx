@@ -30,6 +30,7 @@ const buttonVariants = cva(
 					'bg-secondary/10 text-secondary hover:bg-secondary/0 border-secondary border-solid border-1',
 
 				ghost: '',
+				icon: '!h-fit',
 				link: 'text-primary underline-offset-4 hover:underline',
 				product:
 					'bg-medium hover:bg-medium/80 rounded-none !h-19 p-8 text-[30px] !w-full',

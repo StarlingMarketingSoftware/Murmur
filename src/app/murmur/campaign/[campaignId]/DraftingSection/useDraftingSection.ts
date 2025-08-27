@@ -42,11 +42,10 @@ import {
 	Signature,
 } from '@prisma/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { debounce } from 'lodash';
 import { HANDWRITTEN_PLACEHOLDER_OPTIONS } from '@/components/molecules/HandwrittenPromptInput/HandwrittenPromptInput';
 import { ContactWithName } from '@/types/contact';
 
@@ -113,17 +112,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { user } = useMe();
 	const queryClient = useQueryClient();
 
-	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	const [isOpenUpgradeSubscriptionDrawer, setIsOpenUpgradeSubscriptionDrawer] =
 		useState(false);
 	const [generationProgress, setGenerationProgress] = useState(-1);
-	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 	const [isTest, setIsTest] = useState<boolean>(false);
 	const [abortController, setAbortController] = useState<AbortController | null>(null);
-	const [isJustSaved, setIsJustSaved] = useState(false);
-	const [autosaveStatus, setAutosaveStatus] = useState<
-		'idle' | 'saving' | 'saved' | 'error'
-	>('idle');
+	const [isFirstLoad, setIsFirstLoad] = useState(true);
+
 	const [activeTab, setActiveTab] = useState<'settings' | 'test' | 'placeholders'>(
 		'settings'
 	);
@@ -282,7 +277,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	// FUNCTIONS
 
-	const batchGenerateHandWrittenDrafts = () => {
+	const batchGenerateHandWrittenDrafts = async (selectedIds?: number[]) => {
 		const generatedEmails: GeneratedEmail[] = [];
 
 		if (!contacts || contacts.length === 0) {
@@ -290,11 +285,23 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			return generatedEmails;
 		}
 
-		contacts.forEach((contact: ContactWithName) => {
+		const targets =
+			selectedIds && selectedIds.length > 0
+				? contacts.filter((c: ContactWithName) => selectedIds.includes(c.id))
+				: contacts;
+
+		targets.forEach((contact: ContactWithName) => {
 			generatedEmails.push(generateHandwrittenDraft(contact));
 		});
 
-		createEmail(generatedEmails);
+		await createEmail(generatedEmails);
+
+		// Invalidate emails query to refresh the drafts list
+		queryClient.invalidateQueries({
+			queryKey: ['emails', { campaignId: campaign.id }],
+		});
+
+		toast.success('All handwritten drafts generated successfully!');
 	};
 
 	const generateHandwrittenDraft = (contact: ContactWithName): GeneratedEmail => {
@@ -736,6 +743,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					queryClient.invalidateQueries({
 						queryKey: ['user'],
 					});
+					queryClient.invalidateQueries({
+						queryKey: ['emails', { campaignId: campaign.id }],
+					});
 					toast.success('Test email generated successfully!');
 					isSuccess = true;
 				} else {
@@ -899,7 +909,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		});
 	};
 
-	const batchGenerateFullAiDrafts = async () => {
+	const batchGenerateFullAiDrafts = async (selectedIds?: number[]) => {
 		let remainingCredits = draftCredits || 0;
 
 		const controller = new AbortController();
@@ -924,10 +934,15 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 		isGenerationCancelledRef.current = false;
 		setGenerationProgress(0);
+		const targets =
+			selectedIds && selectedIds.length > 0
+				? contacts.filter((c: ContactWithName) => selectedIds.includes(c.id))
+				: contacts;
+
 		try {
 			for (
 				let i = 0;
-				i < contacts.length && !isGenerationCancelledRef.current;
+				i < targets.length && !isGenerationCancelledRef.current;
 				i += BATCH_SIZE
 			) {
 				const maxEmails = Math.floor(remainingCredits / creditCost);
@@ -939,9 +954,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					break;
 				}
 
-				const batch: Contact[] = contacts.slice(
+				const batch: Contact[] = targets.slice(
 					i,
-					Math.min(i + adjustedBatchSize, contacts.length)
+					Math.min(i + adjustedBatchSize, targets.length)
 				);
 
 				const currentBatchPromises: Promise<BatchGenerationResult>[] =
@@ -980,12 +995,19 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				});
 			}
 
+			// Invalidate emails query to refresh the drafts list
+			if (successfulEmails > 0) {
+				queryClient.invalidateQueries({
+					queryKey: ['emails', { campaignId: campaign.id }],
+				});
+			}
+
 			if (!isGenerationCancelledRef.current && !stoppedDueToCredits) {
-				if (successfulEmails === contacts.length) {
+				if (successfulEmails === targets.length) {
 					toast.success('All emails generated successfully!');
 				} else if (successfulEmails > 0) {
 					toast.success(
-						`Email generation completed! ${successfulEmails}/${contacts.length} emails generated successfully.`
+						`Email generation completed! ${successfulEmails}/${targets.length} emails generated successfully.`
 					);
 				} else {
 					toast.error('Email generation failed. Please try again.');
@@ -1010,41 +1032,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	// HANDLERS
 
-	const handleAutoSave = useCallback(
-		async (values: DraftingFormValues) => {
-			try {
-				setAutosaveStatus('saving');
-
-				await saveCampaign({
-					id: campaign.id,
-					data: values,
-				});
-				setAutosaveStatus('saved');
-				setIsJustSaved(true);
-
-				setTimeout(() => {
-					setAutosaveStatus('idle');
-				}, 2000);
-			} catch (error) {
-				setAutosaveStatus('error');
-				console.error('Autosave failed:', error);
-
-				setTimeout(() => {
-					setAutosaveStatus('idle');
-				}, 3000);
-			}
-		},
-		[campaign.id, saveCampaign]
-	);
-
-	const debouncedAutosave = useMemo(
-		() =>
-			debounce((values: DraftingFormValues) => {
-				handleAutoSave(values);
-			}, 1500),
-		[handleAutoSave]
-	);
-
 	const handleGenerateTestDrafts = async () => {
 		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
 			generateAiDraftTest();
@@ -1053,11 +1040,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	};
 
-	const handleGenerateDrafts = async () => {
+	const handleGenerateDrafts = async (contactIds?: number[]) => {
 		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
-			batchGenerateFullAiDrafts();
+			batchGenerateFullAiDrafts(contactIds);
 		} else if (draftingMode === DraftingMode.handwritten) {
-			batchGenerateHandWrittenDrafts();
+			batchGenerateHandWrittenDrafts(contactIds);
 		}
 	};
 
@@ -1201,30 +1188,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		/* eslint-disable-next-line react-hooks/exhaustive-deps */
 	}, []);
 
-	useEffect(() => {
-		if (isFirstLoad) return;
-
-		const subscription = form.watch((value, { name }) => {
-			if (name) {
-				const formValues = form.getValues();
-
-				setIsJustSaved(false);
-				if (Object.keys(form.formState.errors).length === 0) {
-					debouncedAutosave(formValues);
-				}
-			}
-		});
-
-		return () => subscription.unsubscribe();
-	}, [form, debouncedAutosave, isFirstLoad]);
-
-	// Cleanup debounced function on unmount
-	useEffect(() => {
-		return () => {
-			debouncedAutosave.cancel();
-		};
-	}, [debouncedAutosave]);
-
 	const trackFocusedField = useCallback(
 		(fieldName: string, element: HTMLTextAreaElement | HTMLInputElement | null) => {
 			lastFocusedFieldRef.current = { name: fieldName, element };
@@ -1251,7 +1214,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	return {
 		activeTab,
-		autosaveStatus,
 		campaign,
 		cancelGeneration,
 		contacts,
@@ -1263,16 +1225,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		hasFullAutomatedBlock,
 		insertPlaceholder,
 		isAiSubject,
-		isConfirmDialogOpen,
 		isGenerationDisabled,
-		isJustSaved,
 		isOpenUpgradeSubscriptionDrawer,
 		isPendingGeneration,
 		isTest,
 		setActiveTab,
 		setGenerationProgress,
-		setIsConfirmDialogOpen,
 		setIsOpenUpgradeSubscriptionDrawer,
 		trackFocusedField,
+		isFirstLoad,
 	};
 };

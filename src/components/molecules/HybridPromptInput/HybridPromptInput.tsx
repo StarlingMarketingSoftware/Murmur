@@ -16,7 +16,6 @@ import {
 	DropdownMenuContent,
 	DropdownMenuGroup,
 	DropdownMenuItem,
-	DropdownMenuLabel,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -27,15 +26,18 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import { X, Plus } from 'lucide-react';
-import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
+import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
 import { HybridBlock, DraftingTone } from '@prisma/client';
 import {
 	BLOCKS,
 	HybridPromptInputProps,
 	useHybridPromptInput,
+	BlockItem,
 } from './useHybridPromptInput';
 import { cn } from '@/utils';
 import React, { useState, FC } from 'react';
+import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
+import DragHandleIcon from '@/components/atoms/_svg/DragHandleIcon';
 
 interface SortableAIBlockProps {
 	block: (typeof BLOCKS)[number];
@@ -46,7 +48,46 @@ interface SortableAIBlockProps {
 		fieldName: string,
 		element: HTMLTextAreaElement | HTMLInputElement | null
 	) => void;
+	showTestPreview?: boolean;
+	testMessage?: string | null;
 }
+
+interface BlockMenuItemProps {
+	item: BlockItem;
+	onClick: () => void;
+}
+
+const BlockMenuItem: FC<BlockMenuItemProps> = ({ item, onClick }) => {
+	const getBackgroundColor = () => {
+		if (item.value === HybridBlock.text) {
+			return 'bg-primary/25 border-primary';
+		} else if (item.value === 'hybrid_automation') {
+			return 'bg-tertiary/25 border-tertiary';
+		} else if (item.value === HybridBlock.full_automated) {
+			return 'bg-secondary/25 border-secondary';
+		}
+		return '';
+	};
+
+	return (
+		<DropdownMenuItem
+			key={item.value}
+			onClick={onClick}
+			disabled={item.disabled}
+			className="p-0 focus:bg-transparent hover:bg-transparent relative"
+		>
+			<div
+				className={cn(
+					'w-[275.23px] h-[51px] border-2 rounded-[8px] flex items-center justify-start pl-4 cursor-pointer font-bold relative z-10 m-0',
+					getBackgroundColor()
+				)}
+			>
+				{item.label}
+				{item.showUsed && item.disabled && ` (Used)`}
+			</div>
+		</DropdownMenuItem>
+	);
+};
 
 const SortableAIBlock = ({
 	block,
@@ -54,6 +95,8 @@ const SortableAIBlock = ({
 	fieldIndex,
 	onRemove,
 	trackFocusedField,
+	showTestPreview,
+	testMessage,
 }: SortableAIBlockProps) => {
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
 		useSortable({ id });
@@ -71,143 +114,312 @@ const SortableAIBlock = ({
 
 	const isTextBlock = block.value === HybridBlock.text;
 	const isFullAutomatedBlock = block.value === HybridBlock.full_automated;
+	const isIntroductionBlock = block.value === HybridBlock.introduction;
+	const isResearchBlock = block.value === HybridBlock.research;
+	const isActionBlock = block.value === HybridBlock.action;
+	const isCompactBlock =
+		block.value === HybridBlock.introduction ||
+		block.value === HybridBlock.research ||
+		block.value === HybridBlock.action ||
+		block.value === HybridBlock.text;
 
 	return (
 		<div
 			ref={setNodeRef}
-			style={style}
+			style={{
+				...style,
+				...(isIntroductionBlock
+					? {
+							background:
+								'linear-gradient(to right, #C9C9FF 0%, #5E6399 46%, #C9C9FF 100%)',
+							padding: '2px',
+					  }
+					: isResearchBlock
+					? {
+							background:
+								'linear-gradient(to right, #4A4AD9 0%, #272773 57%, #4A4AD9 100%)',
+							padding: '2px',
+					  }
+					: isActionBlock
+					? {
+							background:
+								'linear-gradient(to right, #040488 0%, #020255 50%, #040488 100%)',
+							padding: '2px',
+					  }
+					: {}),
+			}}
 			className={cn(
-				'w-full relative border-2 border-gray-300 rounded-md bg-background',
-				isTextBlock ? 'border-primary' : 'border-secondary',
+				'relative rounded-md',
+				isIntroductionBlock || isResearchBlock || isActionBlock
+					? ''
+					: 'border-2 border-gray-300 bg-background',
+				isTextBlock
+					? showTestPreview && testMessage
+						? 'w-[416px] h-[80px]'
+						: 'w-[868px] h-[80px]'
+					: isCompactBlock
+					? showTestPreview && testMessage
+						? 'w-[416px] h-[44px]'
+						: 'w-[868px] h-[44px]'
+					: 'w-full',
+				!isIntroductionBlock &&
+					!isResearchBlock &&
+					!isActionBlock &&
+					(isTextBlock ? 'border-primary' : 'border-secondary'),
 				isDragging ? 'opacity-50 z-50 transform-gpu' : ''
 			)}
 		>
+			{/* Inner content wrapper for gradient border effect on introduction, research and action blocks */}
 			<div
-				{...attributes}
-				{...listeners}
-				className="absolute top-0 left-0 right-0 h-12 cursor-move z-[5]"
-			/>
-			<div className="flex items-center p-4">
-				<div className="flex-grow">
-					{isDragging && (
-						<div className="absolute inset-0 rounded-md bg-background z-10 pointer-events-none" />
+				className={cn(
+					isIntroductionBlock || isResearchBlock || isActionBlock
+						? 'bg-background rounded-md h-full'
+						: '',
+					'relative'
+				)}
+			>
+				{/* Drag handle - only on the left side to avoid interfering with buttons */}
+				<div
+					{...attributes}
+					{...listeners}
+					className={cn(
+						'absolute top-0 left-0 cursor-move z-[1]',
+						isTextBlock ? 'h-[80px] w-8' : isCompactBlock ? 'h-[44px] w-8' : 'h-12',
+						isFullAutomatedBlock ? 'w-24' : !isCompactBlock ? 'w-full' : '' // Limit width for Full Automated block and compact blocks
 					)}
-					<div className="absolute right-3 top-3 z-30">
-						{!isTextBlock && !isFullAutomatedBlock && (
+				/>
+				<div className={cn('flex items-center', isCompactBlock ? 'p-2 h-full' : 'p-4')}>
+					<div className={cn('flex-grow', isCompactBlock && 'flex items-center')}>
+						{isDragging && (
+							<div className="absolute inset-0 rounded-md bg-background z-10 pointer-events-none" />
+						)}
+						<div
+							className={cn(
+								'absolute z-30',
+								isCompactBlock ? 'right-2 top-1/2 -translate-y-1/2' : 'right-3 top-3'
+							)}
+						>
+							{!isTextBlock && !isFullAutomatedBlock && !isCompactBlock && (
+								<Button
+									type="button"
+									className="mr-1"
+									variant="action-link"
+									onClick={(e) => {
+										e.stopPropagation();
+										setIsEdit(!isEdit);
+									}}
+								>
+									{isEdit ? 'Cancel' : 'Edit'}
+								</Button>
+							)}
 							<Button
 								type="button"
-								className="mr-1"
-								variant="action-link"
+								variant="ghost"
+								size="icon"
+								className={cn(isCompactBlock && 'h-8 w-8')}
 								onClick={(e) => {
 									e.stopPropagation();
-									setIsEdit(!isEdit);
+									onRemove(id);
 								}}
 							>
-								{isEdit ? 'Cancel' : 'Edit'}
+								<X className="h-[13px] w-[13px] text-destructive-dark" />
 							</Button>
-						)}
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon"
-							onClick={(e) => {
-								e.stopPropagation();
-								onRemove(id);
-							}}
-						>
-							<X className="h-[13px] w-[13px] text-destructive-dark" />
-						</Button>
-					</div>
-					<div className="mb-2 flex gap-2 min-h-7 items-center relative z-20">
-						{!isTextBlock ? (
-							<>
-								<Typography variant="h4" className="font-inter">
-									{block.label}
-								</Typography>
-								{isFullAutomatedBlock && (
-									<div className="flex gap-1">
-										{[
-											{ value: DraftingTone.normal, label: 'Normal' },
-											{ value: DraftingTone.explanatory, label: 'Explain' },
-											{ value: DraftingTone.formal, label: 'Formal' },
-											{ value: DraftingTone.concise, label: 'Concise' },
-											{ value: DraftingTone.casual, label: 'Casual' },
-										].map((tone) => (
-											<button
-												key={tone.value}
-												type="button"
-												onClick={(e) => {
-													e.stopPropagation();
-													form.setValue('draftingTone', tone.value);
-												}}
+						</div>
+						{isCompactBlock ? (
+							// Compact blocks
+							<div className="flex items-center w-full h-full">
+								<div className="flex items-center text-gray-300 mr-2 ml-1">
+									<DragHandleIcon
+										width="4px"
+										height="10px"
+										pathClassName="stroke-gray-300"
+									/>
+								</div>
+								{isTextBlock ? (
+									<>
+										<div className="flex flex-col justify-center w-[140px]">
+											<span className="font-inter font-medium text-[17px] leading-[14px]">
+												Manual Text
+											</span>
+										</div>
+										{(() => {
+											const fieldProps = form.register(
+												`hybridBlockPrompts.${fieldIndex}.value`
+											);
+											return (
+												<input
+													type="text"
+													placeholder={block.placeholder}
+													onClick={(e) => e.stopPropagation()}
+													className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-400 pl-6 pr-12"
+													{...fieldProps}
+													onFocus={(e) => {
+														trackFocusedField?.(
+															`hybridBlockPrompts.${fieldIndex}.value`,
+															e.target as HTMLInputElement
+														);
+													}}
+												/>
+											);
+										})()}
+									</>
+								) : (
+									// Compact blocks with "Hybrid"
+									<>
+										<div className="flex flex-col justify-center w-[140px]">
+											<span className="font-inter font-medium text-[17px] leading-[14px]">
+												Hybrid
+											</span>
+											<span
 												className={cn(
-													'w-[53px] h-[15px] rounded-[8px] text-[10px] font-medium transition-all flex items-center justify-center font-secondary',
-													form.watch('draftingTone') === tone.value
-														? 'bg-black text-white shadow-sm'
-														: 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+													'font-inter font-normal text-xs leading-[14px] mt-1',
+													isIntroductionBlock && 'text-[#9D9DFF]',
+													isResearchBlock && 'text-[#4A4AD9]',
+													isActionBlock && 'text-[#040488]'
 												)}
-												style={{
-													WebkitAppearance: 'none',
-													WebkitTapHighlightColor: 'transparent',
-												}}
 											>
-												{tone.label}
-											</button>
-										))}
-									</div>
+												{block.label}
+											</span>
+										</div>
+										{(() => {
+											const fieldProps = form.register(
+												`hybridBlockPrompts.${fieldIndex}.value`
+											);
+											return (
+												<input
+													type="text"
+													placeholder={block.placeholder}
+													onClick={(e) => e.stopPropagation()}
+													className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-400 pl-6 pr-12"
+													{...fieldProps}
+													onFocus={(e) => {
+														trackFocusedField?.(
+															`hybridBlockPrompts.${fieldIndex}.value`,
+															e.target as HTMLInputElement
+														);
+													}}
+												/>
+											);
+										})()}
+									</>
+								)}
+							</div>
+						) : (
+							// Non-compact blocks
+							<>
+								{!isTextBlock && !isFullAutomatedBlock && (
+									<span className="font-inter font-medium text-[17px] mb-2 block">
+										Hybrid
+									</span>
+								)}
+								<div className="mb-2 flex gap-2 min-h-7 items-center relative z-20">
+									{!isTextBlock ? (
+										<>
+											<Typography
+												variant="h4"
+												className={cn(
+													'font-inter',
+													isIntroductionBlock && 'text-[#9D9DFF]',
+													isResearchBlock && 'text-[#4A4AD9]',
+													isActionBlock && 'text-[#040488]'
+												)}
+											>
+												{block.label}
+											</Typography>
+											{isFullAutomatedBlock && (
+												<div className="flex gap-1 relative z-[100] pointer-events-auto">
+													{[
+														{ value: DraftingTone.normal, label: 'Normal' },
+														{ value: DraftingTone.explanatory, label: 'Explain' },
+														{ value: DraftingTone.formal, label: 'Formal' },
+														{ value: DraftingTone.concise, label: 'Concise' },
+														{ value: DraftingTone.casual, label: 'Casual' },
+													].map((tone) => (
+														<Button
+															key={tone.value}
+															type="button"
+															onClick={(e) => {
+																e.stopPropagation();
+																e.preventDefault();
+																form.setValue('draftingTone', tone.value);
+															}}
+															onMouseDown={(e) => {
+																e.stopPropagation();
+															}}
+															className={cn(
+																'w-[53px] h-[15px] rounded-[8px] text-[10px] font-medium transition-all flex items-center justify-center font-secondary cursor-pointer',
+																form.watch('draftingTone') === tone.value
+																	? 'bg-black text-white shadow-sm'
+																	: 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+															)}
+														>
+															{tone.label}
+														</Button>
+													))}
+												</div>
+											)}
+										</>
+									) : (
+										<Typography variant="h4" className="font-inter">
+											Manual Text
+										</Typography>
+									)}
+								</div>
+								{isTextBlock || isFullAutomatedBlock ? (
+									(() => {
+										const fieldProps = form.register(
+											`hybridBlockPrompts.${fieldIndex}.value`
+										);
+										return (
+											<Textarea
+												placeholder={block.placeholder}
+												onClick={(e) => e.stopPropagation()}
+												className={cn(
+													'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
+													isFullAutomatedBlock ? 'h-[300px] px-0' : ''
+												)}
+												{...fieldProps}
+												onFocus={(e) => {
+													trackFocusedField?.(
+														`hybridBlockPrompts.${fieldIndex}.value`,
+														e.target as HTMLTextAreaElement
+													);
+												}}
+											/>
+										);
+									})()
+								) : (
+									// For other blocks, show input only when in edit mode
+									<>
+										{isEdit &&
+											(() => {
+												const fieldProps = form.register(
+													`hybridBlockPrompts.${fieldIndex}.value`
+												);
+												return (
+													<Input
+														placeholder={
+															'placeholder' in block
+																? (block as (typeof BLOCKS)[number]).placeholder
+																: ''
+														}
+														onClick={(e) => e.stopPropagation()}
+														className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+														{...fieldProps}
+														onFocus={(e) => {
+															trackFocusedField?.(
+																`hybridBlockPrompts.${fieldIndex}.value`,
+																e.target as HTMLInputElement
+															);
+														}}
+													/>
+												);
+											})()}
+									</>
 								)}
 							</>
-						) : (
-							<Typography variant="h4" className="font-inter">
-								Manual Text
-							</Typography>
 						)}
 					</div>
-					{isTextBlock || isFullAutomatedBlock ? (
-						(() => {
-							const fieldProps = form.register(`hybridBlockPrompts.${fieldIndex}.value`);
-							return (
-								<Textarea
-									placeholder={block.placeholder}
-									onClick={(e) => e.stopPropagation()}
-									className={cn(
-										'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
-										isFullAutomatedBlock ? 'h-[300px] px-0' : ''
-									)}
-									{...fieldProps}
-									onFocus={(e) => {
-										trackFocusedField?.(
-											`hybridBlockPrompts.${fieldIndex}.value`,
-											e.target as HTMLTextAreaElement
-										);
-									}}
-								/>
-							);
-						})()
-					) : (
-						<>
-							{isEdit &&
-								(() => {
-									const fieldProps = form.register(
-										`hybridBlockPrompts.${fieldIndex}.value`
-									);
-									return (
-										<Input
-											placeholder={block.placeholder}
-											onClick={(e) => e.stopPropagation()}
-											className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-											{...fieldProps}
-											onFocus={(e) => {
-												trackFocusedField?.(
-													`hybridBlockPrompts.${fieldIndex}.value`,
-													e.target as HTMLInputElement
-												);
-											}}
-										/>
-									);
-								})()}
-						</>
-					)}
 				</div>
 			</div>
 		</div>
@@ -222,147 +434,249 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		handleRemoveBlock,
 		getBlock,
 		handleAddBlock,
+		handleAddHybridAutomation,
+		handleAddTextBlockAt,
 		showTestPreview,
 		setShowTestPreview,
 		BLOCK_ITEMS,
 		trackFocusedField,
 		testMessage,
+		handleGenerateTestDrafts,
+		isGenerationDisabled,
+		isPendingGeneration,
+		isTest,
 	} = useHybridPromptInput(props);
 
 	return (
 		<div>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
 				<Droppable id="droppable">
-					<div className="w-[892px] min-h-[530px] border-[3px] border-black rounded-md bg-gray-50 transition mb-4 flex flex-col relative">
-						{/* Test Preview Overlay */}
-						{showTestPreview && testMessage && (
-							<div className="absolute inset-0 bg-background z-50 rounded-md overflow-hidden border-2 border-gray-300">
-								<div className="relative h-full flex flex-col">
-									{/* Header with X Button */}
-									<div className="flex justify-between items-center p-4 border-b border-gray-200">
-										<h3 className="text-lg font-semibold text-gray-800 font-secondary">
-											Test Email Preview
-										</h3>
-										<button
-											type="button"
-											onClick={() => setShowTestPreview(false)}
-											className="p-1 hover:bg-gray-100 rounded transition-colors"
-											style={{ WebkitAppearance: 'none' }}
-										>
-											<X className="h-5 w-5 text-destructive-dark" />
-										</button>
-									</div>
+					<div
+						className={`w-[892px] min-h-[530px] border-[3px] border-black rounded-md bg-gray-50 transition mb-4 flex ${
+							showTestPreview && testMessage ? 'flex-row' : 'flex-col'
+						} relative`}
+					>
+						{/* Left side - Content area */}
+						<div
+							className={cn(
+								`flex flex-col min-h-[530px]`,
+								showTestPreview && testMessage ? 'w-1/2' : 'w-full'
+							)}
+						>
+							<div className="flex-1 flex flex-col">
+								{/* Content area */}
+								<div className="p-3 flex flex-col gap-4 items-center flex-1">
+									{fields.length === 0 && (
+										<span className="text-gray-300 font-primary text-[12px]">
+											Add blocks here to build your prompt...
+										</span>
+									)}
+									<SortableContext
+										items={fields.map((f) => f.id)}
+										strategy={verticalListSortingStrategy}
+									>
+										{fields.map((field, index) => {
+											const isHybridBlock =
+												field.type === HybridBlock.introduction ||
+												field.type === HybridBlock.research ||
+												field.type === HybridBlock.action;
 
-									{/* Test Email Content */}
-									<div className="flex-1 p-6 overflow-y-auto bg-gray-50">
-										<div
-											dangerouslySetInnerHTML={{ __html: testMessage }}
-											className="max-w-none"
-											style={{
-												fontFamily: form.watch('font') || 'Arial',
-												lineHeight: '1.6',
-												fontSize: '14px',
-											}}
-										/>
+											return (
+												<React.Fragment key={field.id}>
+													<SortableAIBlock
+														id={field.id}
+														fieldIndex={index}
+														block={getBlock(field.type)}
+														onRemove={handleRemoveBlock}
+														trackFocusedField={trackFocusedField}
+														showTestPreview={showTestPreview}
+														testMessage={testMessage}
+													/>
+													{/* Plus button under hybrid blocks */}
+													{isHybridBlock && (
+														<div
+															className={cn(
+																'flex justify-end -mt-1',
+																showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]'
+															)}
+														>
+															<button
+																type="button"
+																onClick={() => handleAddTextBlockAt(index)}
+																className="w-[76px] h-[20px] bg-white hover:bg-[rgba(93,171,104,0.15)] active:bg-[rgba(93,171,104,0.25)] border border-[#5DAB68] rounded-[3.59px] flex items-center justify-center gap-[6px] transition-colors duration-200"
+																title="Add text block"
+																style={{
+																	borderWidth: '1px',
+																	borderColor: '#5DAB68',
+																	borderRadius: '3.59px',
+																}}
+															>
+																<svg
+																	width="8"
+																	height="8"
+																	viewBox="0 0 8 8"
+																	fill="none"
+																	xmlns="http://www.w3.org/2000/svg"
+																	className="flex-shrink-0"
+																>
+																	<path
+																		d="M4 1V7M1 4H7"
+																		stroke="black"
+																		strokeWidth="1.5"
+																		strokeLinecap="square"
+																		strokeLinejoin="miter"
+																	/>
+																</svg>
+																<span className="font-inter text-[10px] text-[#838383] leading-none">
+																	Add text
+																</span>
+															</button>
+														</div>
+													)}
+												</React.Fragment>
+											);
+										})}
+									</SortableContext>
+
+									{/* Add Block Button */}
+									<div className="w-full flex justify-center mt-2">
+										<DropdownMenu>
+											<DropdownMenuTrigger asChild>
+												<Button
+													type="button"
+													variant="ghost"
+													size="icon"
+													className="h-12 w-12 hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+												>
+													<Plus className="h-8 w-8" strokeWidth={3} />
+												</Button>
+											</DropdownMenuTrigger>
+											<DropdownMenuContent
+												className="w-[275.23px] h-[190px] !overflow-hidden !border-0"
+												align="center"
+												side="bottom"
+												avoidCollisions={false}
+											>
+												<div className="relative flex flex-col justify-between h-full">
+													{/* Vertical lines that extend from hybrid block's side borders */}
+													<div className="absolute top-[6px] bottom-[6px] left-0 w-[2px] bg-[#51A2E4] z-0" />
+													<div className="absolute top-[6px] bottom-[6px] right-0 w-[2px] bg-[#51A2E4] z-0" />
+
+													<DropdownMenuGroup className="p-0 relative">
+														{BLOCK_ITEMS.filter((item) => item.position === 'top').map(
+															(item) => (
+																<BlockMenuItem
+																	key={item.value}
+																	item={item}
+																	onClick={() => {
+																		if (item.value === 'hybrid_automation') {
+																			handleAddHybridAutomation();
+																		} else if (item.value === HybridBlock.text) {
+																			handleAddBlock(getBlock(HybridBlock.text));
+																		} else {
+																			handleAddBlock(
+																				BLOCKS.find((b) => b.value === item.value)!
+																			);
+																		}
+																	}}
+																/>
+															)
+														)}
+													</DropdownMenuGroup>
+													<div className="flex items-center justify-start pl-4 font-normal relative z-10">
+														<span>or</span>
+													</div>
+													<DropdownMenuGroup className="p-0 relative">
+														{BLOCK_ITEMS.filter((item) => item.position === 'bottom').map(
+															(item) => (
+																<BlockMenuItem
+																	key={item.value}
+																	item={item}
+																	onClick={() => {
+																		if (item.value === 'hybrid_automation') {
+																			handleAddHybridAutomation();
+																		} else if (item.value === HybridBlock.text) {
+																			handleAddBlock(getBlock(HybridBlock.text));
+																		} else {
+																			handleAddBlock(
+																				BLOCKS.find((b) => b.value === item.value)!
+																			);
+																		}
+																	}}
+																/>
+															)
+														)}
+													</DropdownMenuGroup>
+												</div>
+											</DropdownMenuContent>
+										</DropdownMenu>
 									</div>
 								</div>
-							</div>
-						)}
 
-						{/* Content area */}
-						<div className="flex-1 p-3 flex flex-col gap-3 items-start">
-							{fields.length === 0 && (
-								<span className="text-gray-300 font-primary text-[12px]">
-									Add blocks here to build your prompt...
-								</span>
-							)}
-							<SortableContext
-								items={fields.map((f) => f.id)}
-								strategy={verticalListSortingStrategy}
-							>
-								{fields.map((field, index) => (
-									<SortableAIBlock
-										key={field.id}
-										id={field.id}
-										fieldIndex={index}
-										block={getBlock(field.type)}
-										onRemove={handleRemoveBlock}
-										trackFocusedField={trackFocusedField}
-									/>
-								))}
-							</SortableContext>
-
-							{/* Add Block Button */}
-							<div className="w-full flex justify-center mt-2">
-								<DropdownMenu>
-									<DropdownMenuTrigger asChild>
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											className="h-12 w-12 hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-										>
-											<Plus className="h-8 w-8" strokeWidth={3} />
-										</Button>
-									</DropdownMenuTrigger>
-									<DropdownMenuContent className="w-56" align="center">
-										<DropdownMenuLabel>Add Block</DropdownMenuLabel>
-										<DropdownMenuGroup>
-											{BLOCK_ITEMS.map((item) => (
-												<DropdownMenuItem
-													key={item.value}
-													onClick={() => {
-														if (item.value === HybridBlock.text) {
-															handleAddBlock(getBlock(HybridBlock.text));
-														} else {
-															handleAddBlock(BLOCKS.find((b) => b.value === item.value)!);
-														}
-													}}
-													disabled={item.disabled}
+								{/*  Signature Block */}
+								<div className="px-3 pb-0 mt-auto flex justify-center">
+									<FormField
+										control={form.control}
+										name="signature"
+										render={({ field }) => (
+											<FormItem>
+												<div
+													className={cn(
+														`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
+														showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]'
+													)}
 												>
-													{item.label}
-													{item.showUsed && item.disabled && ` (Used)`}
-												</DropdownMenuItem>
-											))}
-										</DropdownMenuGroup>
-									</DropdownMenuContent>
-								</DropdownMenu>
+													<FormLabel className="text-base font-semibold font-secondary">
+														Signature
+													</FormLabel>
+													<FormControl>
+														<Textarea
+															placeholder="Enter your signature..."
+															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden"
+															style={{
+																fontFamily: form.watch('font') || 'Arial',
+															}}
+															onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+																const target = e.currentTarget;
+																target.style.height = 'auto';
+																target.style.height = target.scrollHeight + 'px';
+															}}
+															{...field}
+														/>
+													</FormControl>
+												</div>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+								</div>
+							</div>
+
+							{/* Test Button - Fixed position below signature, centered */}
+							<div className="flex justify-center -mt-2 mb-4 px-3">
+								<Button
+									type="button"
+									onClick={handleGenerateTestDrafts}
+									disabled={isGenerationDisabled?.()}
+									className={cn(
+										'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-[rgba(93,171,104,0.15)] active:bg-[rgba(93,171,104,0.20)]',
+										showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]',
+										isGenerationDisabled?.()
+											? 'opacity-50 cursor-not-allowed'
+											: 'opacity-100'
+									)}
+								>
+									{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+								</Button>
 							</div>
 						</div>
 
-						{/*  Signature Block */}
-						<div className="px-3 pb-[10px]">
-							<FormField
-								control={form.control}
-								name="signature"
-								render={({ field }) => (
-									<FormItem>
-										<div className="w-[868px] mx-auto min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2">
-											<FormLabel className="text-base font-semibold font-secondary">
-												Signature
-											</FormLabel>
-											<FormControl>
-												<Textarea
-													placeholder="Enter your signature..."
-													className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-[25px] mt-1 p-0 resize-none overflow-hidden"
-													style={{
-														height: 'auto',
-														fontFamily: form.watch('font') || 'Arial',
-													}}
-													onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
-														const target = e.currentTarget;
-														target.style.height = 'auto';
-														target.style.height = target.scrollHeight + 'px';
-													}}
-													{...field}
-												/>
-											</FormControl>
-										</div>
-										<FormMessage />
-									</FormItem>
-								)}
+						{showTestPreview && testMessage && (
+							<TestPreviewPanel
+								setShowTestPreview={setShowTestPreview}
+								testMessage={testMessage}
 							/>
-						</div>
+						)}
 					</div>
 				</Droppable>
 			</DndContext>

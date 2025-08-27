@@ -7,13 +7,10 @@ import { IdentityDialog } from '@/components/organisms/_dialogs/IdentityDialog/I
 import { CampaignName } from '@/components/organisms/CampaignName/CampaignName';
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
-import { DraftingSection } from './emailAutomation/draft/DraftingSection';
-import { PrepareSendingSection } from '@/components/organisms/_tables/PrepareSendingSection/PrepareSendingSection';
+import { DraftingSection } from './DraftingSection/DraftingSection';
 import { SentEmailsTable } from '@/components/organisms/_tables/SentEmailsTable/SentEmailsTable';
 import { urls } from '@/constants/urls';
 import Link from 'next/link';
-import { ManageCampaignContactListDialog } from '@/components/organisms/_dialogs/ManageCampaignContactListDialog/ManageCampaignContactListDialog';
-import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { NoMobilePage } from '@/components/atoms/NoMobilePage/NoMobilePage';
 import { cn } from '@/utils';
@@ -22,7 +19,6 @@ const Murmur = () => {
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
 		useCampaignDetail();
 
-	const [isContactListDialogOpen, setIsContactListDialogOpen] = useState(false);
 	const searchParams = useSearchParams();
 	const silentLoad = searchParams.get('silent') === '1';
 
@@ -64,41 +60,24 @@ const Murmur = () => {
 								{campaign?.userContactLists?.map((list) => list.name).join(', ') ||
 									'No recipients selected'}
 							</Typography>
-							<Button
-								variant="action-link"
-								className="ml-2"
-								onClick={() => setIsContactListDialogOpen(true)}
-							>
-								Change
-							</Button>
 						</div>
 
-						<div className="flex items-center">
+						<div
+							className="flex items-center cursor-pointer select-none"
+							onClick={() => setIsIdentityDialogOpen(true)}
+						>
 							<Typography
 								variant="h3"
 								className="text-lg font-semibold w-[60px] text-gray-600 font-secondary"
 							>
 								From:
 							</Typography>
-							<Typography className="ml-2 !text-[15px] text-gray-600 font-secondary">
+							<Typography className="ml-2 !text-[15px] text-gray-600 font-secondary hover:underline">
 								{campaign?.identity?.name}
 							</Typography>
-							<Button
-								variant="action-link"
-								className="ml-2"
-								onClick={() => setIsIdentityDialogOpen(true)}
-							>
-								Change
-							</Button>
 						</div>
 					</div>
 				</div>
-
-				<ManageCampaignContactListDialog
-					campaign={campaign}
-					open={isContactListDialogOpen}
-					onOpenChange={setIsContactListDialogOpen}
-				/>
 
 				<IdentityDialog
 					campaign={campaign}
@@ -109,9 +88,6 @@ const Murmur = () => {
 
 				<div className="mt-6 flex justify-center">
 					<DraftingSection campaign={campaign} />
-				</div>
-				<div className="flex justify-center">
-					<PrepareSendingSection campaign={campaign} />
 				</div>
 				<div className="flex justify-center">
 					<SentEmailsTable campaign={campaign} />

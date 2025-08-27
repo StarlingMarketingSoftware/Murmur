@@ -203,7 +203,33 @@ const Dashboard = () => {
 																			checked={field.value}
 																			onChange={(e) => field.onChange(e.target.checked)}
 																		/>
-																		<div className="peer-checked:after:translate-x-[2px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[#050505] after:rounded-full after:h-[12px] after:w-[12px] after:transition-all w-[26px] h-4 bg-[#E5E5E5] rounded-full relative transition-colors duration-200" />
+																		<div
+																			className={`toggle-switch-track w-[26px] h-4 rounded-full relative overflow-hidden transition-colors duration-200 shadow-none drop-shadow-none ${
+																				field.value ? 'toggle-on' : 'toggle-off'
+																			}`}
+																			style={
+																				{
+																					'--toggle-bg': field.value
+																						? 'rgba(93, 171, 104, 0.49)'
+																						: '#E5E5E5',
+																					backgroundColor: 'var(--toggle-bg)',
+																					background: 'var(--toggle-bg)',
+																				} as React.CSSProperties
+																			}
+																			data-checked={field.value}
+																			data-debug={JSON.stringify({
+																				value: field.value,
+																				type: typeof field.value,
+																			})}
+																		>
+																			<div
+																				className={`absolute top-[2px] transform transition-transform duration-200 ease-in-out ${
+																					field.value
+																						? 'translate-x-[10px] bg-white'
+																						: 'translate-x-0 bg-[#050505]'
+																				} left-[2px] w-[12px] h-[12px] rounded-full shadow-none drop-shadow-none`}
+																			/>
+																		</div>
 																	</label>
 																</FormControl>
 															</FormItem>
@@ -400,13 +426,7 @@ const Dashboard = () => {
 
 				{!hasSearched && (
 					<div className="campaigns-table-wrapper mt-32 sm:mt-36 md:mt-40 lg:mt-44 xl:mt-48 2xl:mt-56 relative">
-						<div
-							className="absolute top-0 left-0 right-0 h-8 z-10 pointer-events-none"
-							style={{
-								background:
-									'linear-gradient(to bottom, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 100%)',
-							}}
-						/>
+						<div className="absolute top-0 left-0 right-0 h-8 z-10 pointer-events-none bg-gradient-to-b from-white to-transparent" />
 						<CampaignsTable />
 					</div>
 				)}

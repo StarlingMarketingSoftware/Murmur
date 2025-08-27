@@ -89,21 +89,11 @@ export async function DELETE(req: NextRequest, { params }: { params: ApiRoutePar
 		}
 
 		const { id } = await params;
-		const existingEmail = await prisma.email.findUnique({
-			where: { id: Number(id) },
-		});
 
-		if (!existingEmail) {
-			return apiNotFound();
-		}
-
-		if (existingEmail.userId !== userId) {
-			return apiUnauthorizedResource();
-		}
-
-		await prisma.email.delete({
+		await prisma.email.deleteMany({
 			where: {
 				id: Number(id),
+				userId,
 			},
 		});
 
