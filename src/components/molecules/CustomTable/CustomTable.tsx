@@ -369,7 +369,9 @@ export function CustomTable<TData, TValue>({
 
 												const start = Math.min(currentIndex, lastIndex);
 												const end = Math.max(currentIndex, lastIndex);
-												const newSelection: Record<string, boolean> = { ...rowSelection };
+
+												// Clear all selections first, then select only the range
+												const newSelection: Record<string, boolean> = {};
 												for (let i = start; i <= end; i++) {
 													newSelection[rows[i].id] = true;
 												}
