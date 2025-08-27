@@ -6,12 +6,11 @@ import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import { IdentityDialog } from '@/components/organisms/_dialogs/IdentityDialog/IdentityDialog';
 import { CampaignName } from '@/components/organisms/CampaignName/CampaignName';
 import { Typography } from '@/components/ui/typography';
-import { Button } from '@/components/ui/button';
 import { DraftingSection } from './DraftingSection/DraftingSection';
 import { SentEmailsTable } from '@/components/organisms/_tables/SentEmailsTable/SentEmailsTable';
+import { useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import { NoMobilePage } from '@/components/atoms/NoMobilePage/NoMobilePage';
 import { cn } from '@/utils';
 
@@ -44,35 +43,39 @@ const Murmur = () => {
 					transition: 'opacity 0.2s',
 				}}
 			>
-				<div className="flex justify-center">
+				<div className="flex justify-center mt-1">
 					<CampaignName campaign={campaign} />
 				</div>
-				<div className="flex justify-center mt-4">
-					<div className="flex flex-col gap-4 w-[400px]">
+				<div className="flex justify-center mt-0.5">
+					<div className="flex flex-col gap-2 w-[400px]">
 						<div className="flex items-center">
-							<Typography
-								variant="h3"
-								className="text-lg font-semibold w-[60px] text-gray-600 font-secondary"
-							>
-								To:
-							</Typography>
+							<Link href={urls.murmur.dashboard.index} className="block">
+								<div className="w-[52px] h-[20.5px] bg-[#EEEEEE] rounded-[8px] flex items-center justify-start pl-1">
+									<span className="font-inter font-normal text-[17px] leading-none text-black">
+										To
+									</span>
+								</div>
+							</Link>
 							<Typography className="ml-2 !text-[15px] text-gray-600 font-secondary">
 								{campaign?.userContactLists?.map((list) => list.name).join(', ') ||
 									'No recipients selected'}
 							</Typography>
 						</div>
 
-						<div
-							className="flex items-center cursor-pointer select-none"
-							onClick={() => setIsIdentityDialogOpen(true)}
-						>
-							<Typography
-								variant="h3"
-								className="text-lg font-semibold w-[60px] text-gray-600 font-secondary"
+						<div className="flex items-center">
+							<button
+								type="button"
+								onClick={() => setIsIdentityDialogOpen(true)}
+								className="w-[52px] h-[20.5px] bg-[#EEEEEE] rounded-[8px] flex items-center justify-start pl-1"
 							>
-								From:
-							</Typography>
-							<Typography className="ml-2 !text-[15px] text-gray-600 font-secondary hover:underline">
+								<span className="font-inter font-normal text-[17px] leading-none text-black">
+									From
+								</span>
+							</button>
+							<Typography
+								className="ml-2 !text-[15px] text-gray-600 font-secondary hover:underline"
+								onClick={() => setIsIdentityDialogOpen(true)}
+							>
 								{campaign?.identity?.name}
 							</Typography>
 						</div>
@@ -91,13 +94,6 @@ const Murmur = () => {
 				</div>
 				<div className="flex justify-center">
 					<SentEmailsTable campaign={campaign} />
-				</div>
-				<div className="flex justify-center mt-8">
-					<Link href={urls.murmur.dashboard.index}>
-						<Button className="font-bold px-8" size="lg" variant="light">
-							Back to Dashboard
-						</Button>
-					</Link>
 				</div>
 			</div>
 		</AppLayout>

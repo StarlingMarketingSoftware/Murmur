@@ -17,12 +17,15 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		handleBack,
 		handleSave,
 		handleDraftSelect,
+		handleDraftDoubleClick,
 		isPendingUpdate,
 		editedSubject,
 		editedMessage,
 		setEditedMessage,
 		setEditedSubject,
 		setSelectedDraft,
+		selectedDraftIds,
+		handleSelectAllDrafts,
 	} = useDraftedEmails(props);
 
 	if (selectedDraft) {
@@ -109,8 +112,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		<>
 			{/* Right table - Generated Drafts */}
 			<DraftingTable
-				handleClick={() => {}}
-				areAllSelected={false}
+				handleClick={handleSelectAllDrafts}
+				areAllSelected={
+					selectedDraftIds.size === draftEmails.length && draftEmails.length > 0
+				}
 				hasData={draftEmails.length > 0}
 				noDataMessage="No drafts generated"
 				noDataDescription='Click "Generate Drafts" to create emails for the selected contacts'
@@ -126,14 +131,17 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							  contact.company ||
 							  'Contact'
 							: 'Unknown Contact';
+						const isSelected = selectedDraftIds.has(draft.id);
 
 						return (
 							<div
 								key={draft.id}
 								className={cn(
-									'border-b border-gray-200 cursor-pointer transition-colors p-3 relative'
+									'border-b border-gray-200 cursor-pointer transition-colors p-3 relative',
+									isSelected && 'bg-[#D6E8D9] border-2 border-primary'
 								)}
-								onClick={() => handleDraftSelect(draft)}
+								onClick={(e) => handleDraftSelect(draft, e)}
+								onDoubleClick={() => handleDraftDoubleClick(draft)}
 							>
 								{/* Delete button */}
 								<Button
