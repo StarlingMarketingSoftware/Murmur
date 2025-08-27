@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Typography } from '@/components/ui/typography';
 
 const ContactVerificationTable = () => {
 	const {
@@ -29,7 +30,9 @@ const ContactVerificationTable = () => {
 	return (
 		<>
 			<div className="mb-4 p-4 border rounded-md">
-				<h3 className="text-lg font-semibold mb-2">Start Contact Verification</h3>
+				<Typography variant="h3" className="mb-2">
+					Start Contact Verification
+				</Typography>
 				<p className="text-sm text-muted-foreground mb-4">
 					Verify email addresses using ZeroBounce. You can filter by a specific email,
 					limit the number of contacts to verify, and choose whether to only verify

@@ -26,6 +26,7 @@ import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptio
 import { useClerk } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { MobileAppComingSoon } from '@/components/molecules/MobileAppComingSoon/MobileAppComingSoon';
+import { cn } from '@/utils/ui';
 
 const Dashboard = () => {
 	const { isSignedIn, openSignIn } = useClerk();
@@ -61,13 +62,18 @@ const Dashboard = () => {
 		return null;
 	}
 
-	if (isMobile) {
-		return <MobileAppComingSoon />;
-	}
+	// if (isMobile) {
+	// 	return <MobileAppComingSoon />;
+	// }
 
 	return (
 		<AppLayout>
-			<div className={`dashboard-container ${hasSearched ? 'search-active' : ''}`}>
+			<div
+				className={cn(
+					'bg-amber-500 !w-[100%] !max-w-[100%]',
+					hasSearched ? 'search-active' : ''
+				)}
+			>
 				<div className="hero-wrapper">
 					<div className="mt-4 flex justify-center w-full px-4">
 						<div className="premium-hero-section text-center w-full max-w-[470px]">
@@ -352,17 +358,19 @@ const Dashboard = () => {
 						) : contacts && contacts.length > 0 ? (
 							<div className="flex justify-center w-full px-4">
 								<div className="w-full max-w-full results-appear results-align">
-									<div className="select-prompt-container">
-										<div className="select-prompt-text">
+									<div className="flex flex-col items-center mb-4">
+										<div className="font-primary text-[1.25rem] text-gray-700">
 											Select who you want to contact
 										</div>
-										<div className="static-tooltip-container">
+										<div className="h-10 flex items-center justify-center mt-2">
 											{hoveredText && (
-												<div className="static-tooltip-text">{hoveredText}</div>
+												<div className="font-primary text-base text-gray-400 py-2 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
+													{hoveredText}
+												</div>
 											)}
 										</div>
 									</div>
-									<Card className="border-0 shadow-none !p-0 w-full">
+									<Card className="border-0 shadow-none !p-0 w-full bg-blue-800">
 										<CardContent className="!p-0 w-full">
 											<CustomTable
 												initialSelectAll={false}
@@ -425,7 +433,7 @@ const Dashboard = () => {
 				)}
 
 				{!hasSearched && (
-					<div className="campaigns-table-wrapper mt-32 sm:mt-36 md:mt-40 lg:mt-44 xl:mt-48 2xl:mt-56 relative">
+					<div className="campaigns-table-wrapper bg-green-500 mt-32 sm:mt-36 md:mt-40 lg:mt-44 xl:mt-48 2xl:mt-56 relative">
 						<div className="absolute top-0 left-0 right-0 h-8 z-10 pointer-events-none bg-gradient-to-b from-white to-transparent" />
 						<CampaignsTable />
 					</div>
