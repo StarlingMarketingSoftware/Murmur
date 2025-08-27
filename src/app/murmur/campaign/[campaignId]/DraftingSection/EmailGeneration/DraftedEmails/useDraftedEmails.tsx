@@ -2,7 +2,7 @@ import { useDeleteEmail, useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
 import { convertHtmlToPlainText } from '@/utils';
-import { Dispatch, SetStateAction, useState } from 'react';
+import { Dispatch, SetStateAction, useState, useRef } from 'react';
 import { toast } from 'sonner';
 
 export interface DraftedEmailsProps {
@@ -32,15 +32,39 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 
 	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
 
-	const handleDraftClick = (draft: EmailWithRelations) => {
-		// Single click - toggle selection only
-		const newSelectedIds = new Set(selectedDraftIds);
-		if (newSelectedIds.has(draft.id)) {
-			newSelectedIds.delete(draft.id);
+	// Track the last clicked draft for shift-click selection
+	const lastClickedRef = useRef<number | null>(null);
+
+	const handleDraftClick = (draft: EmailWithRelations, event?: React.MouseEvent) => {
+		if (event?.shiftKey && lastClickedRef.current !== null) {
+			// Shift-click: select range
+			const currentIndex = draftEmails.findIndex((d) => d.id === draft.id);
+			const lastIndex = draftEmails.findIndex((d) => d.id === lastClickedRef.current);
+
+			if (currentIndex !== -1 && lastIndex !== -1) {
+				const start = Math.min(currentIndex, lastIndex);
+				const end = Math.max(currentIndex, lastIndex);
+
+				const newSelectedIds = new Set(selectedDraftIds);
+
+				// Add all drafts in the range
+				for (let i = start; i <= end; i++) {
+					newSelectedIds.add(draftEmails[i].id);
+				}
+
+				setSelectedDraftIds(newSelectedIds);
+			}
 		} else {
-			newSelectedIds.add(draft.id);
+			// Normal click - toggle selection only
+			const newSelectedIds = new Set(selectedDraftIds);
+			if (newSelectedIds.has(draft.id)) {
+				newSelectedIds.delete(draft.id);
+			} else {
+				newSelectedIds.add(draft.id);
+			}
+			setSelectedDraftIds(newSelectedIds);
+			lastClickedRef.current = draft.id;
 		}
-		setSelectedDraftIds(newSelectedIds);
 	};
 
 	const handleDraftDoubleClick = (draft: EmailWithRelations) => {
@@ -54,8 +78,12 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 	const handleSelectAllDrafts = () => {
 		if (selectedDraftIds.size === draftEmails?.length && draftEmails?.length > 0) {
 			setSelectedDraftIds(new Set());
+			lastClickedRef.current = null;
 		} else {
 			setSelectedDraftIds(new Set(draftEmails?.map((d) => d.id) || []));
+			if (draftEmails.length > 0) {
+				lastClickedRef.current = draftEmails[draftEmails.length - 1].id;
+			}
 		}
 	};
 
@@ -68,8 +96,6 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 	const [editedSubject, setEditedSubject] = useState('');
 	const [editedMessage, setEditedMessage] = useState('');
 	const { mutateAsync: updateEmail, isPending: isPendingUpdate } = useEditEmail();
-
-	const handleDraftSelect = handleDraftClick;
 
 	const handleSave = async () => {
 		if (!selectedDraft) return;
@@ -114,7 +140,7 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		handleSelectAllDrafts,
 		selectedDraftIds,
 		contacts,
-		handleDraftSelect,
+		handleDraftSelect: handleDraftClick,
 		handleSave,
 		handleBack,
 		isPendingUpdate,

@@ -140,7 +140,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									'border-b border-gray-200 cursor-pointer transition-colors p-3 relative',
 									isSelected && 'bg-[#D6E8D9] border-2 border-primary'
 								)}
-								onClick={() => handleDraftSelect(draft)}
+								onClick={(e) => handleDraftSelect(draft, e)}
 								onDoubleClick={() => handleDraftDoubleClick(draft)}
 							>
 								{/* Delete button */}

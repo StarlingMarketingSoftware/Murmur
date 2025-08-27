@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, useRef } from 'react';
 import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
 import {
 	FormField,
@@ -15,6 +15,7 @@ import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/Hybr
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { DraftingMode } from '@prisma/client';
 import { EmailGeneration } from './EmailGeneration/EmailGeneration';
+import { ChevronDown } from 'lucide-react';
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
@@ -37,6 +38,27 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		cancelGeneration,
 		isFirstLoad,
 	} = useDraftingSection(props);
+
+	const draftingRef = useRef<HTMLDivElement>(null);
+	const emailStructureRef = useRef<HTMLDivElement>(null);
+
+	const scrollToDrafting = () => {
+		if (draftingRef.current) {
+			const yOffset = -20; // Small offset from top
+			const element = draftingRef.current;
+			const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+			window.scrollTo({ top: y, behavior: 'smooth' });
+		}
+	};
+
+	const scrollToEmailStructure = () => {
+		if (emailStructureRef.current) {
+			const yOffset = -20; // Small offset from top
+			const element = emailStructureRef.current;
+			const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+			window.scrollTo({ top: y, behavior: 'smooth' });
+		}
+	};
 
 	return (
 		<div className="mb-30 flex flex-col items-center">
@@ -83,8 +105,21 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 								)}
 							/>
 						</div>
-						<div className="mb-3">
+						<div
+							ref={emailStructureRef}
+							className="mb-3 flex justify-between items-center"
+						>
 							<FormLabel className="font-inter font-normal">Email Structure</FormLabel>
+							{isDraftingContentReady() && (
+								<button
+									type="button"
+									onClick={scrollToDrafting}
+									className="flex items-center gap-1 text-[#AFAFAF] font-inter font-medium text-[14px] hover:text-[#8F8F8F] transition-colors"
+								>
+									to Drafting
+									<ChevronDown size={16} />
+								</button>
+							)}
 						</div>
 						<div className="flex gap-[47px] items-start">
 							<div className="flex-shrink-0">
@@ -100,6 +135,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 						</div>
 
 						<div
+							ref={draftingRef}
 							className={`transition-opacity duration-500 ease-in-out ${
 								isDraftingContentReady() ? 'opacity-100' : 'opacity-0 pointer-events-none'
 							}`}
@@ -117,6 +153,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									setGenerationProgress={setGenerationProgress}
 									cancelGeneration={cancelGeneration}
 									isFirstLoad={isFirstLoad}
+									scrollToEmailStructure={scrollToEmailStructure}
 								/>
 							)}
 						</div>

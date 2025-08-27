@@ -6,7 +6,7 @@ import { FormLabel } from '@/components/ui/form';
 import { Typography } from '@/components/ui/typography';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { cn } from '@/utils';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, ChevronUp } from 'lucide-react';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useEditEmail } from '@/hooks/queryHooks/useEmails';
@@ -51,6 +51,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		isPendingEmails,
 		isWaitingForConfirm,
 		handleDraftButtonClick,
+		scrollToEmailStructure,
 	} = useEmailGeneration(props);
 
 	// Inline send confirmation state
@@ -208,8 +209,18 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 	return (
 		<>
-			<div className="mb-3 mt-3">
+			<div className="mb-3 mt-3 flex justify-between items-center">
 				<FormLabel className="font-inter font-normal">Drafting</FormLabel>
+				{scrollToEmailStructure && (
+					<button
+						type="button"
+						onClick={scrollToEmailStructure}
+						className="flex items-center gap-1 text-[#AFAFAF] font-inter font-medium text-[14px] hover:text-[#8F8F8F] transition-colors"
+					>
+						to Email Structure
+						<ChevronUp size={16} />
+					</button>
+				)}
 			</div>
 			<div className="flex gap-[47px] items-start">
 				<div className="flex-shrink-0">

@@ -321,21 +321,24 @@ const SortableAIBlock = ({
 													'font-inter',
 													isIntroductionBlock && 'text-[#9D9DFF]',
 													isResearchBlock && 'text-[#4A4AD9]',
-													isActionBlock && 'text-[#040488]'
+													isActionBlock && 'text-[#040488]',
+													isFullAutomatedBlock && 'font-semibold text-[17px]'
 												)}
 											>
-												{block.label}
+												{isFullAutomatedBlock
+													? 'Full Auto'
+													: (block as { label: string }).label}
 											</Typography>
 											{isFullAutomatedBlock && (
 												<div className="flex gap-1 relative z-[100] pointer-events-auto">
 													{[
 														{ value: DraftingTone.normal, label: 'Normal' },
-														{ value: DraftingTone.explanatory, label: 'Explain' },
+														{ value: DraftingTone.explanatory, label: 'Explanatory' },
 														{ value: DraftingTone.formal, label: 'Formal' },
 														{ value: DraftingTone.concise, label: 'Concise' },
 														{ value: DraftingTone.casual, label: 'Casual' },
 													].map((tone) => (
-														<Button
+														<button
 															key={tone.value}
 															type="button"
 															onClick={(e) => {
@@ -347,14 +350,33 @@ const SortableAIBlock = ({
 																e.stopPropagation();
 															}}
 															className={cn(
-																'w-[53px] h-[15px] rounded-[8px] text-[10px] font-medium transition-all flex items-center justify-center font-secondary cursor-pointer',
-																form.watch('draftingTone') === tone.value
-																	? 'bg-black text-white shadow-sm'
-																	: 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+																'w-[85px] h-[20px] rounded-[8px] text-[13px] font-light transition-all flex items-center justify-center font-inter cursor-pointer',
+																'focus:outline-none focus:ring-0 active:outline-none',
+																tone.value === DraftingTone.normal
+																	? form.watch('draftingTone') === tone.value
+																		? 'bg-[#E8EFFF] text-black border border-black active:bg-[#E8EFFF]'
+																		: 'bg-[#E8EFFF] text-black hover:bg-[#d8e0f2] active:bg-[#d8e0f2]'
+																	: tone.value === DraftingTone.explanatory
+																	? form.watch('draftingTone') === tone.value
+																		? 'bg-[#F8E8FF] text-black border border-black active:bg-[#F8E8FF]'
+																		: 'bg-[#F8E8FF] text-black hover:bg-[#e8d8f2] active:bg-[#e8d8f2]'
+																	: tone.value === DraftingTone.formal
+																	? form.watch('draftingTone') === tone.value
+																		? 'bg-[#FFE8EC] text-black border border-black active:bg-[#FFE8EC]'
+																		: 'bg-[#FFE8EC] text-black hover:bg-[#f2d8dc] active:bg-[#f2d8dc]'
+																	: tone.value === DraftingTone.concise
+																	? form.watch('draftingTone') === tone.value
+																		? 'bg-[#FFF9E8] text-black border border-black active:bg-[#FFF9E8]'
+																		: 'bg-[#FFF9E8] text-black hover:bg-[#f2edd8] active:bg-[#f2edd8]'
+																	: tone.value === DraftingTone.casual
+																	? form.watch('draftingTone') === tone.value
+																		? 'bg-[#E8FFF1] text-black border border-black active:bg-[#E8FFF1]'
+																		: 'bg-[#E8FFF1] text-black hover:bg-[#d8f2e1] active:bg-[#d8f2e1]'
+																	: 'bg-gray-200 text-black hover:bg-gray-300 active:bg-gray-300'
 															)}
 														>
 															{tone.label}
-														</Button>
+														</button>
 													))}
 												</div>
 											)}

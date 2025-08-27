@@ -38,7 +38,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								? 'bg-[#D6E8D9] border-2 border-primary'
 								: ''
 						)}
-						onClick={() => handleContactSelection(contact.id)}
+						onClick={(e) => handleContactSelection(contact.id, e)}
 					>
 						{(() => {
 							const fullName =
