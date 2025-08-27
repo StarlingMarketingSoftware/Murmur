@@ -379,7 +379,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 											onClick={async () => {
 												if (!isWaitingToSend) {
 													setIsWaitingToSend(true);
-													setTimeout(() => setIsWaitingToSend(false), 3000);
+													setTimeout(() => setIsWaitingToSend(false), 30000);
 													return;
 												}
 												setIsWaitingToSend(false);
