@@ -658,10 +658,25 @@ const SortableAIBlock = ({
 												/>
 												{/* Paragraph slider for Full Auto block only */}
 												{isFullAutomatedBlock && (
-													<div className="mt-4 flex justify-start px-4">
+													<div className="mt-4 flex justify-start -ml-10">
 														<div className="flex items-start gap-4">
-															<span className="text-[10px] text-black font-inter font-normal relative top-[-7px]">
-																Auto Paragraphs
+															<span className="text-[10px] text-black font-inter font-normal relative top-[-7px] block w-[140px] text-right whitespace-nowrap shrink-0">
+																{(() => {
+																	const selectedParagraphCount =
+																		form.watch('paragraphs') ?? 0;
+																	if (selectedParagraphCount === 0)
+																		return 'Auto Paragraphs';
+																	const paragraphLabels = [
+																		'One Paragraph',
+																		'Two Paragraphs',
+																		'Three Paragraphs',
+																		'Four Paragraphs',
+																		'Five Paragraphs',
+																	];
+																	const clampedIndex =
+																		Math.min(Math.max(selectedParagraphCount, 1), 5) - 1;
+																	return paragraphLabels[clampedIndex];
+																})()}
 															</span>
 															<div className="w-[189px]">
 																<FormField
