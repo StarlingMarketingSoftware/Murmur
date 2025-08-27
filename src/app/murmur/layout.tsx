@@ -37,15 +37,15 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 			<nav className={cn('w-full px-4 md:px-8', isCampaignPage ? 'py-2' : 'py-5')}>
 				<div className="w-full max-w-full mx-auto flex items-center justify-between">
 					<div className="flex items-center gap-4 md:gap-8">
-						{/* Back to Home button (hidden on campaign pages to avoid duplication) */}
+						{/* Back to Landing button (hidden on campaign pages to avoid duplication) */}
 						{!isCampaignPage && (
 							<Link
-								href={urls.murmur.dashboard.index}
+								href={urls.home.index}
 								className="flex items-center gap-2 text-[13px] transition-all duration-200 font-secondary tracking-[0.02em] text-gray-600 opacity-60 hover:opacity-100 hover:text-black safari-nav-fix"
 							>
 								<ArrowLeft className="w-4 h-4 flex-shrink-0" />
-								<span className="nav-text-full">Back to Home</span>
-								<span className="nav-text-short">Home</span>
+								<span className="nav-text-full">Back to Landing</span>
+								<span className="nav-text-short">Landing</span>
 							</Link>
 						)}
 
