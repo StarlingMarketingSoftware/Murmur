@@ -2899,3 +2899,37 @@ body.murmur-page footer {
 	padding-left: 50px;
 	white-space: nowrap;
 }
+
+
+/* Lenis smooth scrolling styles */
+html.lenis {
+	height: auto;
+}
+
+.lenis.lenis-smooth {
+	scroll-behavior: auto;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+	overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+	overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+	pointer-events: none;
+}
+
+/* Global performance optimizations for scroll animations */
+[data-scroll-animation] {
+	will-change: transform, opacity;
+	-webkit-transform: translateZ(0);
+	backface-visibility: hidden;
+}
+
+/* Prevent layout shifts during animations */
+main {
+	isolation: isolate;
+}

@@ -6,22 +6,31 @@ import { UserButton } from '@clerk/nextjs';
 import { urls } from '@/constants/urls';
 import { useMe } from '@/hooks/useMe';
 import { ArrowLeft } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useAdvancedScrollAnimations } from '@/hooks/useAdvancedScrollAnimations';
 
 export default function MurmurLayout({ children }: { children: React.ReactNode }) {
 	const pathname = usePathname();
 	const { user } = useMe();
+	const { addSlideUp } = useAdvancedScrollAnimations();
+	const navRef = useRef<HTMLElement>(null);
 
 	const showAdminLink = user?.role === 'admin';
 	const isCampaignPage = pathname?.startsWith(urls.murmur.campaign.index);
 
-	// Hide footer for murmur pages
+	// Hide footer for murmur pages and apply animations
 	useEffect(() => {
 		document.body.classList.add('murmur-page');
+
+		// Apply slide up animation to nav
+		if (navRef.current) {
+			addSlideUp(navRef.current);
+		}
+
 		return () => {
 			document.body.classList.remove('murmur-page');
 		};
-	}, []);
+	}, [addSlideUp]);
 
 	return (
 		<>
@@ -34,7 +43,11 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 					</Link>
 				</div>
 			)}
-			<nav className={cn('w-full px-4 md:px-8', isCampaignPage ? 'py-2' : 'py-5')}>
+			<nav
+				ref={navRef}
+				className={cn('w-full px-4 md:px-8', isCampaignPage ? 'py-2' : 'py-5')}
+				data-scroll-animation
+			>
 				<div className="w-full max-w-full mx-auto flex items-center justify-between">
 					<div className="flex items-center gap-4 md:gap-8">
 						{/* Back to Landing button (hidden on campaign pages to avoid duplication) */}
