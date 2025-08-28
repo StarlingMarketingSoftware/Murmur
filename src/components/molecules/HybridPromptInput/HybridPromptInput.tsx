@@ -38,8 +38,9 @@ import {
 	BlockItem,
 } from './useHybridPromptInput';
 import { cn } from '@/utils';
-import React, { useState, FC } from 'react';
+import React, { useState, FC, Fragment } from 'react';
 import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
+import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
 
 interface SortableAIBlockProps {
 	block: (typeof BLOCKS)[number];
@@ -129,30 +130,13 @@ const SortableAIBlock = ({
 	return (
 		<div
 			ref={setNodeRef}
-			style={{
-				...style,
-				...(isIntroductionBlock
-					? {
-							background:
-								'linear-gradient(to right, #C9C9FF 0%, #5E6399 46%, #C9C9FF 100%)',
-							padding: '2px',
-					  }
-					: isResearchBlock
-					? {
-							background:
-								'linear-gradient(to right, #4A4AD9 0%, #272773 57%, #4A4AD9 100%)',
-							padding: '2px',
-					  }
-					: isActionBlock
-					? {
-							background:
-								'linear-gradient(to right, #040488 0%, #020255 50%, #040488 100%)',
-							padding: '2px',
-					  }
-					: {}),
-			}}
+			style={style}
 			className={cn(
-				'relative rounded-md',
+				'relative rounded-md p-0.5',
+				isIntroductionBlock &&
+					'bg-gradient-to-r from-[#C9C9FF] via-[#5E6399] to-[#C9C9FF]',
+				isResearchBlock && 'bg-gradient-to-r from-[#4A4AD9] via-[#272773] to-[#4A4AD9]',
+				isActionBlock && 'bg-gradient-to-r from-[#040488] via-[#020255] to-[#040488]',
 				isIntroductionBlock || isResearchBlock || isActionBlock
 					? ''
 					: 'border-2 border-gray-300 bg-background',
@@ -176,7 +160,7 @@ const SortableAIBlock = ({
 				isDragging ? 'opacity-50 z-50 transform-gpu' : ''
 			)}
 		>
-			{/* Inner content wrapper for gradient border effect on introduction, research and action blocks */}
+			{/* Inner content wrapper */}
 			<div
 				className={cn(
 					isIntroductionBlock || isResearchBlock || isActionBlock
@@ -185,7 +169,7 @@ const SortableAIBlock = ({
 					'relative'
 				)}
 			>
-				{/* Drag handle - only on the left side to avoid interfering with buttons */}
+				{/* Drag handle */}
 				<div
 					{...attributes}
 					{...listeners}
@@ -867,7 +851,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												fields[index + 1]?.type === HybridBlock.text;
 
 											return (
-												<React.Fragment key={field.id}>
+												<Fragment key={field.id}>
 													<SortableAIBlock
 														id={field.id}
 														fieldIndex={index}
@@ -885,40 +869,22 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]'
 															)}
 														>
-															<button
+															<Button
 																type="button"
 																onClick={() => handleAddTextBlockAt(index)}
-																className="w-[76px] h-[20px] bg-white hover:bg-[rgba(93,171,104,0.15)] active:bg-[rgba(93,171,104,0.25)] border border-[#5DAB68] rounded-[3.59px] flex items-center justify-center gap-[6px] transition-colors duration-200"
+																className="w-[76px] h-[20px] bg-background hover:bg-primary/20 active:bg-primary/20 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600"
 																title="Add text block"
-																style={{
-																	borderWidth: '1px',
-																	borderColor: '#5DAB68',
-																	borderRadius: '3.59px',
-																}}
 															>
-																<svg
-																	width="8"
-																	height="8"
-																	viewBox="0 0 8 8"
-																	fill="none"
-																	xmlns="http://www.w3.org/2000/svg"
-																	className="flex-shrink-0"
-																>
-																	<path
-																		d="M4 1V7M1 4H7"
-																		stroke="black"
-																		strokeWidth="1.5"
-																		strokeLinecap="square"
-																		strokeLinejoin="miter"
-																	/>
-																</svg>
-																<span className="font-inter text-[10px] text-[#838383] leading-none">
-																	Add text
-																</span>
-															</button>
+																<TinyPlusIcon
+																	width="5px"
+																	height="5px"
+																	className="!w-[8px] !h-[8px]"
+																/>
+																<span className="font-secondary">Add text</span>
+															</Button>
 														</div>
 													)}
-												</React.Fragment>
+												</Fragment>
 											);
 										})}
 									</SortableContext>
@@ -1044,7 +1010,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									onClick={handleGenerateTestDrafts}
 									disabled={isGenerationDisabled?.()}
 									className={cn(
-										'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-[rgba(93,171,104,0.15)] active:bg-[rgba(93,171,104,0.20)]',
+										'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
 										showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]',
 										isGenerationDisabled?.()
 											? 'opacity-50 cursor-not-allowed'
