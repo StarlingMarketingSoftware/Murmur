@@ -6,7 +6,7 @@ import { urls } from '@/constants/urls';
 import { isProblematicBrowser } from '@/utils/browserDetection';
 
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
-import LogoIcon from '@/components/atoms/_svg/LogoIcon';
+import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -140,144 +140,207 @@ const Dashboard = () => {
 										}
 									}}
 									className={hasSearched ? 'search-form-active' : ''}
+			<div className={`dashboard-container ${hasSearched ? 'search-active' : ''}`}>
+				<div className="hero-wrapper flex flex-col justify-center items-center min-h-screen">
+					<div className="w-full">
+						<div
+							className="flex justify-center items-center w-full px-4"
+							style={{ marginBottom: '0.75rem' }}
+						>
+							<div className="premium-hero-section flex flex-col items-center justify-center w-full max-w-[600px]">
+								<div
+									className="premium-logo-container flex items-center justify-center"
+									style={{ width: '300px', height: '79px' }}
 								>
-									<FormField
-										control={form.control}
-										name="searchText"
-										render={({ field }) => (
-											<FormItem>
-												<FormControl>
-													<div
-														className={`search-input-group ${
-															hasSearched ? 'search-input-group-active' : ''
-														}`}
-													>
+									<MurmurLogoNew width="300px" height="79px" />
+								</div>
+								<Typography
+									font="secondary"
+									className="mt-3 text-center premium-subtitle-gradient w-full"
+									style={{ fontSize: '15px', lineHeight: '1.3' }}
+									color="light"
+								>
+									Let&apos;s <strong style={{ color: '#248531' }}>start</strong> by
+									finding contacts.
+								</Typography>
+							</div>
+						</div>
+
+						<div
+							className={`search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 ${
+								hasSearched ? 'search-bar-active' : ''
+							}`}
+						>
+							<div className="search-bar-inner">
+								{hasSearched && activeSearchQuery && (
+									<div className="search-context-label">
+										<span className="search-query-text">{activeSearchQuery}</span>
+									</div>
+								)}
+								<Form {...form}>
+									<form
+										onSubmit={(e) => {
+											e.preventDefault();
+											if (!isSignedIn) {
+												if (hasProblematicBrowser) {
+													// For Edge/Safari, navigate to sign-in page
+													console.log(
+														'[Dashboard] Edge/Safari detected, navigating to sign-in page'
+													);
+													if (typeof window !== 'undefined') {
+														sessionStorage.setItem(
+															'redirectAfterSignIn',
+															window.location.pathname
+														);
+													}
+													window.location.href = urls.signIn.index;
+												} else {
+													openSignIn();
+												}
+											} else {
+												form.handleSubmit(onSubmit)(e);
+											}
+										}}
+										className={hasSearched ? 'search-form-active' : ''}
+									>
+										<FormField
+											control={form.control}
+											name="searchText"
+											render={({ field }) => (
+												<FormItem>
+													<FormControl>
 														<div
-															className={`search-wave-container ${
-																isLoadingContacts || isRefetchingContacts
-																	? 'search-wave-loading'
-																	: ''
+															className={`search-input-group ${
+																hasSearched ? 'search-input-group-active' : ''
 															}`}
 														>
-															<Input
-																className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent"
-																placeholder='Who do you want to send to?  i.e  "Music venues in North Carolina"'
-																style={{
-																	accentColor: 'transparent',
-																}}
-																autoComplete="off"
-																autoCorrect="off"
-																autoCapitalize="off"
-																spellCheck="false"
-																{...field}
-															/>
-															<div className="search-wave-overlay" />
+															<div
+																className={`search-wave-container ${
+																	isLoadingContacts || isRefetchingContacts
+																		? 'search-wave-loading'
+																		: ''
+																}`}
+															>
+																<Input
+																	className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent"
+																	placeholder='Who do you want to send to?  i.e  "Music venues in North Carolina"'
+																	style={{
+																		accentColor: 'transparent',
+																	}}
+																	autoComplete="off"
+																	autoCorrect="off"
+																	autoCapitalize="off"
+																	spellCheck="false"
+																	{...field}
+																/>
+																<div className="search-wave-overlay" />
+															</div>
 														</div>
-													</div>
-												</FormControl>
-												<FormMessage />
-											</FormItem>
-										)}
-									/>
-									{!hasSearched && (
-										<div className="flex flex-row gap-4 items-center justify-between w-full flex-wrap">
-											<div className="flex flex-row gap-4 items-center h-[39px] justify-start flex-shrink-0">
-												<div className="exclude-contacts-box bg-[#EFEFEF] w-[227px] h-[32px] rounded-[8px] flex items-center px-4 my-auto">
-													<FormField
-														control={form.control}
-														name="excludeUsedContacts"
-														render={({ field }) => (
-															<FormItem className="flex flex-row items-center justify-between space-y-0 m-0 w-full gap-3">
-																<div className="leading-none flex items-center">
-																	<FormLabel
-																		className="font-bold cursor-pointer select-none whitespace-nowrap"
-																		style={{ fontSize: '14px', lineHeight: '16px' }}
-																	>
-																		Exclude Used Contacts
-																	</FormLabel>
-																</div>
-																<FormControl>
-																	<label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-																		<input
-																			type="checkbox"
-																			className="sr-only peer"
-																			checked={field.value}
-																			onChange={(e) => field.onChange(e.target.checked)}
-																		/>
-																		<div
-																			className={`toggle-switch-track w-[26px] h-4 rounded-full relative overflow-hidden transition-colors duration-200 shadow-none drop-shadow-none ${
-																				field.value ? 'toggle-on' : 'toggle-off'
-																			}`}
-																			style={
-																				{
-																					'--toggle-bg': field.value
-																						? 'rgba(93, 171, 104, 0.49)'
-																						: '#E5E5E5',
-																					backgroundColor: 'var(--toggle-bg)',
-																					background: 'var(--toggle-bg)',
-																				} as React.CSSProperties
-																			}
-																			data-checked={field.value}
-																			data-debug={JSON.stringify({
-																				value: field.value,
-																				type: typeof field.value,
-																			})}
+													</FormControl>
+													<FormMessage />
+												</FormItem>
+											)}
+										/>
+										{!hasSearched && (
+											<div className="flex flex-row gap-4 items-center justify-between w-full flex-wrap">
+												<div className="flex flex-row gap-4 items-center h-[39px] justify-start flex-shrink-0">
+													<div className="exclude-contacts-box bg-[#EFEFEF] w-[227px] h-[32px] rounded-[8px] flex items-center px-4 my-auto">
+														<FormField
+															control={form.control}
+															name="excludeUsedContacts"
+															render={({ field }) => (
+																<FormItem className="flex flex-row items-center justify-between space-y-0 m-0 w-full gap-3">
+																	<div className="leading-none flex items-center">
+																		<FormLabel
+																			className="font-bold cursor-pointer select-none whitespace-nowrap"
+																			style={{ fontSize: '14px', lineHeight: '16px' }}
 																		>
-																			<div
-																				className={`absolute top-[2px] transform transition-transform duration-200 ease-in-out ${
-																					field.value
-																						? 'translate-x-[10px] bg-white'
-																						: 'translate-x-0 bg-[#050505]'
-																				} left-[2px] w-[12px] h-[12px] rounded-full shadow-none drop-shadow-none`}
+																			Exclude Used Contacts
+																		</FormLabel>
+																	</div>
+																	<FormControl>
+																		<label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+																			<input
+																				type="checkbox"
+																				className="sr-only peer"
+																				checked={field.value}
+																				onChange={(e) => field.onChange(e.target.checked)}
 																			/>
-																		</div>
-																	</label>
-																</FormControl>
-															</FormItem>
-														)}
-													/>
+																			<div
+																				className={`toggle-switch-track w-[26px] h-4 rounded-full relative overflow-hidden transition-colors duration-200 shadow-none drop-shadow-none ${
+																					field.value ? 'toggle-on' : 'toggle-off'
+																				}`}
+																				style={
+																					{
+																						'--toggle-bg': field.value
+																							? 'rgba(93, 171, 104, 0.49)'
+																							: '#E5E5E5',
+																						backgroundColor: 'var(--toggle-bg)',
+																						background: 'var(--toggle-bg)',
+																					} as React.CSSProperties
+																				}
+																				data-checked={field.value}
+																				data-debug={JSON.stringify({
+																					value: field.value,
+																					type: typeof field.value,
+																				})}
+																			>
+																				<div
+																					className={`absolute top-[2px] transform transition-transform duration-200 ease-in-out ${
+																						field.value
+																							? 'translate-x-[10px] bg-white'
+																							: 'translate-x-0 bg-[#050505]'
+																					} left-[2px] w-[12px] h-[12px] rounded-full shadow-none drop-shadow-none`}
+																				/>
+																			</div>
+																		</label>
+																	</FormControl>
+																</FormItem>
+															)}
+														/>
+													</div>
+												</div>
+												<div className="flex items-center justify-end flex-shrink-0 ml-auto">
+													{isFreeTrial ? (
+														<UpgradeSubscriptionDrawer
+															message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
+															triggerButtonText="Import"
+															buttonVariant="light"
+															className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
+														/>
+													) : (
+														<ContactTSVUploadDialog
+															isAdmin={false}
+															triggerText="Import"
+															buttonVariant="light"
+															className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
+														/>
+													)}
+													<div className="w-[19px]"></div>
+													{!canSearch ? (
+														<UpgradeSubscriptionDrawer
+															message="Searching for contacts requires an active subscription or free trial. Please upgrade your plan to proceed."
+															triggerButtonText="Generate"
+															buttonVariant="primary-light"
+															className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
+														/>
+													) : (
+														<Button
+															variant="primary-light"
+															type="submit"
+															bold
+															className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
+															isLoading={isLoadingContacts || isRefetchingContacts}
+														>
+															Generate
+														</Button>
+													)}
 												</div>
 											</div>
-											<div className="flex items-center justify-end flex-shrink-0 ml-auto">
-												{isFreeTrial ? (
-													<UpgradeSubscriptionDrawer
-														message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
-														triggerButtonText="Import"
-														buttonVariant="light"
-														className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-													/>
-												) : (
-													<ContactTSVUploadDialog
-														isAdmin={false}
-														triggerText="Import"
-														buttonVariant="light"
-														className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-													/>
-												)}
-												<div className="w-[19px]"></div>
-												{!canSearch ? (
-													<UpgradeSubscriptionDrawer
-														message="Searching for contacts requires an active subscription or free trial. Please upgrade your plan to proceed."
-														triggerButtonText="Generate"
-														buttonVariant="primary-light"
-														className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
-													/>
-												) : (
-													<Button
-														variant="primary-light"
-														type="submit"
-														bold
-														className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
-														isLoading={isLoadingContacts || isRefetchingContacts}
-													>
-														Generate
-													</Button>
-												)}
-											</div>
-										</div>
-									)}
-								</form>
-							</Form>
+										)}
+									</form>
+								</Form>
+							</div>
 						</div>
 					</div>
 				</div>

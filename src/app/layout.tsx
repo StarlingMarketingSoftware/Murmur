@@ -3,11 +3,14 @@ import { Inter, Zen_Antique } from 'next/font/google';
 import { Footer } from '@/components/molecules/Footer/Footer';
 import { Toaster } from '@/components/ui/toast';
 import './globals.css';
+import './advanced-scroll.css';
 import SubLayout from './sublayout';
 import localFont from 'next/font/local';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import StoreProvider from './StoreProvider';
 import { PageTransitionProvider } from '@/contexts/PageTransitionContext';
+import { ScrollProvider } from '@/contexts/ScrollContext';
+import { ScrollProgress } from '@/components/atoms/ScrollProgress/ScrollProgress';
 
 const inter = Inter({
 	variable: '--font-inter',
@@ -65,13 +68,16 @@ export default function RootLayout({
 			>
 				<body className={`antialiased min-h-screen flex flex-col`}>
 					<ThemeProvider attribute="class" defaultTheme="light">
-						<PageTransitionProvider>
-							<SubLayout>
-								<main className="flex-1">{children}</main>
-								<Footer />
-								<Toaster />
-							</SubLayout>
-						</PageTransitionProvider>
+						<ScrollProvider>
+							<ScrollProgress />
+							<PageTransitionProvider>
+								<SubLayout>
+									<main className="flex-1">{children}</main>
+									<Footer />
+									<Toaster />
+								</SubLayout>
+							</PageTransitionProvider>
+						</ScrollProvider>
 					</ThemeProvider>
 				</body>
 			</html>

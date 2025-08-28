@@ -1081,53 +1081,22 @@
 	}
 }
 
-@keyframes premium-gradient-move {
-	0%,
-	100% {
-		background-position: 0% 50%;
-	}
-	50% {
-		background-position: 100% 50%;
-	}
-}
+/* Removed dead animations: premium-gradient-move, premium-shimmer, premium-float */
+/* These animations were not being used in the dashboard */
 
-@keyframes premium-shimmer {
-	0% {
-		transform: translateX(-50%);
-		opacity: 0;
-	}
-	50% {
-		opacity: 1;
-	}
-	100% {
-		transform: translateX(50%);
-		opacity: 0;
-	}
-}
-
-@keyframes premium-float {
-	0%,
-	100% {
-		transform: translateY(0px);
-	}
-	50% {
-		transform: translateY(-2px);
-	}
-}
-
-/* Hero section - continuous ambient animation */
+/* Hero section - clean without animations */
 .premium-hero-section {
 	position: relative;
 	z-index: 1;
-	overflow: hidden;
 }
 
-/* Logo container - subtle float only */
+/* Logo container - static display */
 .premium-logo-container {
 	position: relative;
-	display: inline-block;
-	animation: premium-float 12s ease-in-out infinite;
-	opacity: 0.9;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 1;
 }
 
 /* Main title gradient - Murmur */
@@ -1143,7 +1112,7 @@
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	/* Animation removed - not used on dashboard */
 	will-change: auto; /* Changed from background-position for Safari performance */
 	-webkit-transform: translateZ(0); /* Safari GPU acceleration */
 	transform: translateZ(0);
@@ -1171,7 +1140,7 @@
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	/* Animation removed - not used on dashboard */
 	filter: blur(25px);
 	opacity: 0.15;
 	pointer-events: none;
@@ -1194,7 +1163,7 @@
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite reverse;
+	/* Animation removed - not used on dashboard */
 	filter: blur(12px);
 	opacity: 0.2;
 	pointer-events: none;
@@ -1205,7 +1174,7 @@
 	position: relative;
 	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 	color: rgb(107, 114, 128);
-	opacity: 0.9;
+	opacity: 1;
 }
 
 /* Accent word - "start" */
@@ -1244,7 +1213,7 @@
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	/* Animation removed - not used on dashboard */
 }
 
 /* Dark mode NYC high society gradient outline - Layer 1 */
@@ -1261,7 +1230,7 @@
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	/* Animation removed - not used on dashboard */
 	filter: blur(25px);
 	opacity: 0.15;
 }
@@ -1278,7 +1247,7 @@
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite reverse;
+	/* Animation removed - not used on dashboard */
 	filter: blur(12px);
 	opacity: 0.25;
 }
@@ -1346,9 +1315,11 @@
 	position: relative;
 	min-height: 100vh;
 	transition: all 0.6s ease;
+	margin-top: -135px;
+	padding-bottom: 100px;
 }
 
-/* Hero wrapper - contains logo and text that will fade out */
+/* Hero wrapper - vertically centered container */
 .hero-wrapper {
 	opacity: 1;
 	-webkit-transform: translateY(0);
@@ -1358,8 +1329,6 @@
 		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 	position: relative;
 	z-index: 1;
-	height: 320px;
-	--hero-height: 320px;
 }
 
 /* When search is active - hero elegantly fades away */
@@ -1369,12 +1338,14 @@
 	transform: translateY(-20px);
 	pointer-events: none;
 	height: 0;
+	min-height: 0;
 	overflow: hidden;
 	margin-bottom: 0;
 	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		-webkit-transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-		height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
+		height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s,
+		min-height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
 }
 
 /* Search bar wrapper - default state */
@@ -1387,7 +1358,7 @@
 		transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
 		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 	z-index: 20;
-	margin-top: clamp(3rem, calc((100vh - var(--hero-height, 320px)) * 0.35), 26vh);
+	margin-top: clamp(3rem, 10vh, 10rem);
 	width: 100%;
 }
 
@@ -1573,8 +1544,8 @@
 }
 
 .exclude-contacts-box:hover {
-	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-	-webkit-box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	box-shadow: none;
+	-webkit-box-shadow: none;
 }
 
 /* Ensure consistent layout during horizontal compression */
@@ -2320,15 +2291,13 @@
 /* Maintain consistent spacing ratio on zoom */
 @media (min-width: 1920px) {
 	.campaigns-table-wrapper {
-		margin-top: -webkit-calc(16rem + 2vw) !important; /* Safari prefix */
-		margin-top: calc(16rem + 2vw) !important;
+		margin-top: 2rem !important; /* Raised for visibility */
 	}
 }
 
 @media (min-width: 2560px) {
 	.campaigns-table-wrapper {
-		margin-top: -webkit-calc(18rem + 2vw) !important; /* Safari prefix */
-		margin-top: calc(18rem + 2vw) !important;
+		margin-top: 2rem !important; /* Raised for visibility */
 	}
 }
 
@@ -2555,7 +2524,7 @@ body.murmur-page footer {
 /* Scrolling text on hover */
 
 .hover-scroll-container:hover .hover-scroll-text {
-	animation: scrollText 8s linear infinite;
+	animation: scrollText var(--scroll-duration, 8s) linear infinite;
 	text-overflow: initial;
 	max-width: none;
 	width: auto;
@@ -2569,4 +2538,37 @@ body.murmur-page footer {
 	left: 100%;
 	padding-left: 50px;
 	white-space: nowrap;
+}
+
+/* Lenis smooth scrolling styles */
+html.lenis {
+	height: auto;
+}
+
+.lenis.lenis-smooth {
+	scroll-behavior: auto;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+	overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+	overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+	pointer-events: none;
+}
+
+/* Global performance optimizations for scroll animations */
+[data-scroll-animation] {
+	will-change: transform, opacity;
+	-webkit-transform: translateZ(0);
+	backface-visibility: hidden;
+}
+
+/* Prevent layout shifts during animations */
+main {
+	isolation: isolate;
 }

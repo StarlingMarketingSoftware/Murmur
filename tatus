@@ -1,0 +1,3 @@
+src/app/murmur/campaign/[campaignId]/DraftingSection/DraftingSection.tsx
+src/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/EmailGeneration.tsx
+src/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection.ts

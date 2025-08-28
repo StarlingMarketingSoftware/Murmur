@@ -17,12 +17,15 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		handleBack,
 		handleSave,
 		handleDraftSelect,
+		handleDraftDoubleClick,
 		isPendingUpdate,
 		editedSubject,
 		editedMessage,
 		setEditedMessage,
 		setEditedSubject,
 		setSelectedDraft,
+		selectedDraftIds,
+		handleSelectAllDrafts,
 	} = useDraftedEmails(props);
 
 	if (selectedDraft) {
@@ -41,7 +44,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				<div className="h-[20px] mb-2"></div>
 
 				{/* Editor container matching table dimensions exactly */}
-				<div className="bg-background border border-gray-300 w-[336px] h-[441px] overflow-x-hidden overflow-y-auto pr-[10px] flex flex-col p-3 relative scrollbar-thin scrollbar-thumb-black scrollbar-track-transparent [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-black [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
+				<div
+					className="bg-background border border-gray-300 w-[336px] h-[441px] overflow-x-hidden overflow-y-auto pr-[10px] flex flex-col p-3 relative scrollbar-thin scrollbar-thumb-black scrollbar-track-transparent [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-black [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
+					data-lenis-prevent
+				>
 					{/* Close button */}
 					<Button
 						type="button"
@@ -109,8 +115,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		<>
 			{/* Right table - Generated Drafts */}
 			<DraftingTable
-				handleClick={() => {}}
-				areAllSelected={false}
+				handleClick={handleSelectAllDrafts}
+				areAllSelected={
+					selectedDraftIds.size === draftEmails.length && draftEmails.length > 0
+				}
 				hasData={draftEmails.length > 0}
 				noDataMessage="No drafts generated"
 				noDataDescription='Click "Generate Drafts" to create emails for the selected contacts'
@@ -126,14 +134,23 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							  contact.company ||
 							  'Contact'
 							: 'Unknown Contact';
+						const isSelected = selectedDraftIds.has(draft.id);
 
 						return (
 							<div
 								key={draft.id}
 								className={cn(
-									'border-b border-gray-200 cursor-pointer transition-colors p-3 relative'
+									'border-b border-gray-200 cursor-pointer transition-colors p-3 relative select-none',
+									isSelected && 'bg-[#D6E8D9] border-2 border-primary'
 								)}
-								onClick={() => handleDraftSelect(draft)}
+								onMouseDown={(e) => {
+									// Prevent text selection on shift-click
+									if (e.shiftKey) {
+										e.preventDefault();
+									}
+								}}
+								onClick={(e) => handleDraftSelect(draft, e)}
+								onDoubleClick={() => handleDraftDoubleClick(draft)}
 							>
 								{/* Delete button */}
 								<Button
@@ -143,6 +160,33 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									className="absolute top-2 right-2 p-1 transition-colors z-10 group"
 								>
 									<X size={16} className="text-gray-500 group-hover:text-red-500" />
+								</Button>
+
+								{/* Preview button */}
+								<Button
+									type="button"
+									variant="icon"
+									onClick={(e) => {
+										e.preventDefault();
+										e.stopPropagation();
+										handleDraftDoubleClick(draft);
+									}}
+									className="absolute top-8 right-2 p-1 transition-colors z-10"
+									aria-label="Preview draft"
+								>
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 333 138"
+										fill="none"
+										xmlns="http://www.w3.org/2000/svg"
+										className="text-[#4A4A4A]"
+									>
+										<path
+											d="M165.486 0.00878906C129.171 0.566307 99.8995 31.043 99.8994 68.5586C99.8994 106.1 129.211 136.593 165.56 137.11C164.9 137.115 164.24 137.117 163.579 137.117C73.2369 137.117 0 87.5946 0 68.5586C0.000587042 49.5225 73.2373 0 163.579 0C164.215 4.48585e-07 164.851 0.00371488 165.486 0.00878906ZM169.732 0.0791016C257.482 2.32707 333 51.9399 333 74.2725C332.999 96.6601 257.108 135.494 169.083 137.066C204.668 135.669 233.1 105.532 233.1 68.5586C233.099 31.8105 205.013 1.81495 169.732 0.0791016Z"
+											fill="currentColor"
+										/>
+									</svg>
 								</Button>
 
 								{/* Contact name */}

@@ -3,40 +3,48 @@ import { useRef, useEffect, useState } from 'react';
 export interface ScrollableTextProps {
 	text: string;
 	className?: string;
+	scrollPixelsPerSecond?: number;
 }
 
 export const useScrollableText = (props: ScrollableTextProps) => {
-	const { text, className } = props;
+	const { text, className, scrollPixelsPerSecond = 40 } = props;
 
 	const containerRef = useRef<HTMLDivElement>(null);
 	const textRef = useRef<HTMLSpanElement>(null);
 	const [isOverflowing, setIsOverflowing] = useState(false);
 
 	useEffect(() => {
-		const checkOverflow = () => {
+		const updateOverflowAndDuration = () => {
 			if (containerRef.current && textRef.current) {
-				// Check if the text width exceeds the container width
 				const containerWidth = containerRef.current.offsetWidth;
 				const textWidth = textRef.current.scrollWidth;
-				setIsOverflowing(textWidth > containerWidth);
+				const overflowing = textWidth > containerWidth;
+				setIsOverflowing(overflowing);
+				if (overflowing) {
+					// distance to travel = full text width + gap (50px)
+					const distance = textWidth + 50;
+					// duration in seconds at fixed speed
+					const durationSec = distance / scrollPixelsPerSecond;
+					containerRef.current.style.setProperty('--scroll-duration', `${durationSec}s`);
+				} else {
+					containerRef.current.style.removeProperty('--scroll-duration');
+				}
 			}
 		};
 
-		checkOverflow();
-		// Recheck on window resize
-		window.addEventListener('resize', checkOverflow);
+		updateOverflowAndDuration();
+		window.addEventListener('resize', updateOverflowAndDuration);
 
-		// Also check when text changes
-		const observer = new ResizeObserver(checkOverflow);
+		const resizeObserver = new ResizeObserver(updateOverflowAndDuration);
 		if (containerRef.current) {
-			observer.observe(containerRef.current);
+			resizeObserver.observe(containerRef.current);
 		}
 
 		return () => {
-			window.removeEventListener('resize', checkOverflow);
-			observer.disconnect();
+			window.removeEventListener('resize', updateOverflowAndDuration);
+			resizeObserver.disconnect();
 		};
-	}, [text]);
+	}, [text, scrollPixelsPerSecond]);
 
 	return {
 		containerRef,
