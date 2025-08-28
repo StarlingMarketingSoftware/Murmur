@@ -22,7 +22,7 @@ export const CampaignsTable: FC = () => {
 		<>
 			<Card className="relative border-none bg-transparent w-full max-w-[1132px] mx-auto">
 				{isPending && <Spinner size="medium" className="absolute top-2 right-2" />}
-				<CardHeader className="px-6 pb-2 bg-[#F8F8F8]">
+				<CardHeader className="px-6 pb-2 bg-transparent">
 					<CardTitle
 						className="text-left text-[14px] font-normal"
 						style={{ fontFamily: 'Inter, sans-serif' }}
