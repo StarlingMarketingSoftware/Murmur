@@ -2,6 +2,7 @@ import { X } from 'lucide-react';
 import { Dispatch, FC, SetStateAction } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
+import { Typography } from '@/components/ui/typography';
 
 interface TestPreviewPanelProps {
 	setShowTestPreview: Dispatch<SetStateAction<boolean>>;
@@ -18,7 +19,12 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 			<div className="flex-1 flex flex-col p-3">
 				<div className="flex-1 border-2 border-black rounded-lg bg-background flex flex-col overflow-hidden mb-[13px]">
 					<div className="relative p-4">
-						<h3 className="text-sm font-medium font-inter text-center">Test Prompt</h3>
+						<Typography
+							variant="h3"
+							className="text-sm font-medium font-secondary text-center"
+						>
+							Test Prompt
+						</Typography>
 						<Button
 							type="button"
 							variant="icon"

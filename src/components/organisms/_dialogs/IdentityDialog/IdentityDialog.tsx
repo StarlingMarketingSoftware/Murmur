@@ -110,7 +110,9 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 						)}
 
 						<div className="text-center">
-							<h2 className="text-2xl font-semibold text-gray-900">{title}</h2>
+							<Typography variant="h2" className="text-2xl font-semibold">
+								{title}
+							</Typography>
 							<p className="mt-1 text-sm text-gray-500">
 								{identities?.length === 0
 									? 'Create your first profile to get started'

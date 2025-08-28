@@ -67,7 +67,11 @@ const Dashboard = () => {
 
 	return (
 		<AppLayout>
-			<div className={`dashboard-container ${hasSearched ? 'search-active' : ''}`}>
+			<div
+				className={`relative min-h-screen transition-all duration-500 -mt-[135px] pb-[100px] w-full max-w-full ${
+					hasSearched ? 'search-active' : ''
+				}`}
+			>
 				<div className="hero-wrapper flex flex-col justify-center items-center min-h-screen">
 					<div className="w-full">
 						<div

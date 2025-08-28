@@ -3,13 +3,11 @@ import { useRef, useEffect, useState } from 'react';
 export interface ScrollableTextProps {
 	text: string;
 	className?: string;
-	style?: React.CSSProperties;
-	// Optional: override default pixels-per-second speed
 	scrollPixelsPerSecond?: number;
 }
 
 export const useScrollableText = (props: ScrollableTextProps) => {
-	const { text, className, style, scrollPixelsPerSecond = 40 } = props;
+	const { text, className, scrollPixelsPerSecond = 40 } = props;
 
 	const containerRef = useRef<HTMLDivElement>(null);
 	const textRef = useRef<HTMLSpanElement>(null);
@@ -52,7 +50,6 @@ export const useScrollableText = (props: ScrollableTextProps) => {
 		containerRef,
 		textRef,
 		isOverflowing,
-		style,
 		className,
 		text,
 	};
