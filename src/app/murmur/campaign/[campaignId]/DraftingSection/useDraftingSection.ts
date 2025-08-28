@@ -107,7 +107,7 @@ export type DraftingFormValues = z.infer<typeof draftingFormSchema>;
 export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { campaign } = props;
 
-	// HOOKS
+	/* HOOKS */
 
 	const { user } = useMe();
 	const queryClient = useQueryClient();
@@ -118,10 +118,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [isTest, setIsTest] = useState<boolean>(false);
 	const [abortController, setAbortController] = useState<AbortController | null>(null);
 	const [isFirstLoad, setIsFirstLoad] = useState(true);
-
 	const [activeTab, setActiveTab] = useState<'settings' | 'test' | 'placeholders'>(
 		'settings'
 	);
+
+	const draftingRef = useRef<HTMLDivElement>(null);
+	const emailStructureRef = useRef<HTMLDivElement>(null);
 
 	const isGenerationCancelledRef = useRef(false);
 	const lastFocusedFieldRef = useRef<{
@@ -307,6 +309,24 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	}, [form]);
 
 	// FUNCTIONS
+
+	const scrollToDrafting = () => {
+		if (draftingRef.current) {
+			const yOffset = -20; // Small offset from top
+			const element = draftingRef.current;
+			const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+			window.scrollTo({ top: y, behavior: 'smooth' });
+		}
+	};
+
+	const scrollToEmailStructure = () => {
+		if (emailStructureRef.current) {
+			const yOffset = -20; // Small offset from top
+			const element = emailStructureRef.current;
+			const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+			window.scrollTo({ top: y, behavior: 'smooth' });
+		}
+	};
 
 	const batchGenerateHandWrittenDrafts = async (selectedIds?: number[]) => {
 		const generatedEmails: GeneratedEmail[] = [];
@@ -1268,5 +1288,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		setIsOpenUpgradeSubscriptionDrawer,
 		trackFocusedField,
 		isFirstLoad,
+		scrollToDrafting,
+		scrollToEmailStructure,
+		draftingRef,
+		emailStructureRef,
 	};
 };

@@ -212,14 +212,15 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 			<div className="mb-3 mt-3 flex justify-between items-center">
 				<FormLabel className="font-inter font-normal">Drafting</FormLabel>
 				{scrollToEmailStructure && (
-					<button
+					<Button
 						type="button"
 						onClick={scrollToEmailStructure}
-						className="flex items-center gap-1 text-[#AFAFAF] font-inter font-medium text-[14px] hover:text-[#8F8F8F] transition-colors"
+						variant="ghost"
+						className="flex items-center !p-0 h-fit !m-0 gap-1  text-[#AFAFAF] font-inter font-medium text-[14px] hover:text-[#8F8F8F] transition-colors"
 					>
 						to Email Structure
 						<ChevronUp size={16} />
-					</button>
+					</Button>
 				)}
 			</div>
 			<div className="flex gap-[47px] items-start">

@@ -31,16 +31,13 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 
 	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
 
-	// Track the last clicked draft for shift-click selection
 	const lastClickedRef = useRef<number | null>(null);
 
 	const handleDraftClick = (draft: EmailWithRelations, event?: React.MouseEvent) => {
 		if (event?.shiftKey && lastClickedRef.current !== null) {
-			// Prevent text selection on shift-click
 			event.preventDefault();
 			window.getSelection()?.removeAllRanges();
 
-			// Shift-click: select range
 			const currentIndex = draftEmails.findIndex((d) => d.id === draft.id);
 			const lastIndex = draftEmails.findIndex((d) => d.id === lastClickedRef.current);
 
@@ -48,10 +45,8 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 				const start = Math.min(currentIndex, lastIndex);
 				const end = Math.max(currentIndex, lastIndex);
 
-				// Clear all selections first, then select only the range
 				const newSelectedIds = new Set<number>();
 
-				// Add all drafts in the range
 				for (let i = start; i <= end; i++) {
 					newSelectedIds.add(draftEmails[i].id);
 				}
