@@ -18,7 +18,6 @@ const nextConfig: NextConfig = {
 	productionBrowserSourceMaps: false,
 	transpilePackages: ['gsap', 'lenis'],
 	// Optimize for Vercel deployment
-	swcMinify: true,
 	compiler: {
 		removeConsole: process.env.NODE_ENV === 'production',
 	},
