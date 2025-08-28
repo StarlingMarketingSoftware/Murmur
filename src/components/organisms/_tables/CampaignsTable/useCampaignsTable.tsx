@@ -14,7 +14,7 @@ export const useCampaignsTable = () => {
 	const columns: ColumnDef<CampaignWithCounts>[] = [
 		{
 			accessorKey: 'name',
-			header: 'Name',
+			header: () => <div className="text-left font-medium">Name</div>,
 			cell: ({ row }) => {
 				const name: string = row.getValue('name');
 				return name ? (
@@ -28,7 +28,7 @@ export const useCampaignsTable = () => {
 		},
 		{
 			accessorKey: 'draftCount',
-			header: 'Drafts',
+			header: () => <div className="text-left font-medium">Drafts</div>,
 			cell: ({ row }) => {
 				const value = row.getValue<number>('draftCount');
 				const count = typeof value === 'number' ? value : 0;
@@ -37,7 +37,7 @@ export const useCampaignsTable = () => {
 		},
 		{
 			accessorKey: 'sentCount',
-			header: 'Sent',
+			header: () => <div className="text-left font-medium">Sent</div>,
 			cell: ({ row }) => {
 				const value = row.getValue<number>('sentCount');
 				const count = typeof value === 'number' ? value : 0;
@@ -46,7 +46,7 @@ export const useCampaignsTable = () => {
 		},
 		{
 			accessorKey: 'updatedAt',
-			header: 'Updated Last',
+			header: () => <div className="text-left font-medium">Updated</div>,
 			cell: ({ row }) => {
 				const date = new Date(row.getValue('updatedAt'));
 				return date ? (
@@ -60,7 +60,7 @@ export const useCampaignsTable = () => {
 		},
 		{
 			accessorKey: 'createdAt',
-			header: 'Created On',
+			header: () => <div className="text-left font-medium">Created</div>,
 			cell: ({ row }) => {
 				const date = new Date(row.getValue('createdAt'));
 				return date ? (
@@ -75,6 +75,7 @@ export const useCampaignsTable = () => {
 
 		{
 			id: 'delete',
+			header: '',
 			cell: ({ row }) => (
 				<Button
 					variant="ghost" // or any other variant like "outline", "default"

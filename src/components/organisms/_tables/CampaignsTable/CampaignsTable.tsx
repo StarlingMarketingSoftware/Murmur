@@ -38,7 +38,8 @@ export const CampaignsTable: FC = () => {
 							constrainHeight
 							hidePagination={true}
 							searchable={false}
-							excludeFromEqualWidth={[]}
+							excludeFromEqualWidth={['name', 'delete']}
+							customColumnWidths={{ name: '35%', delete: '50px' }}
 						/>
 					</div>
 				</CardContent>

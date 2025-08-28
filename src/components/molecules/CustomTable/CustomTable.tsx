@@ -101,6 +101,7 @@ interface CustomTableProps<TData, TValue> extends DataTableProps<TData, TValue> 
 	useAutoLayout?: boolean;
 	allowColumnOverflow?: boolean;
 	excludeFromEqualWidth?: string[];
+	customColumnWidths?: Record<string, string>;
 }
 
 export function CustomTable<TData, TValue>({
@@ -123,6 +124,7 @@ export function CustomTable<TData, TValue>({
 	useAutoLayout = false,
 	allowColumnOverflow = false,
 	excludeFromEqualWidth = ['delete'],
+	customColumnWidths = {},
 }: CustomTableProps<TData, TValue>) {
 	const [pagination, setPagination] = useState({
 		pageIndex: 0,
@@ -289,7 +291,7 @@ export function CustomTable<TData, TValue>({
 			</div>
 			<div
 				className={cn(
-					'border-2 border-black relative overflow-y-auto overflow-x-hidden overscroll-contain custom-scrollbar w-full max-w-full mx-auto',
+					'border-2 border-black relative overflow-y-auto overflow-x-auto overscroll-contain custom-scrollbar w-full max-w-full mx-auto',
 					constrainHeight && 'h-[429px]'
 				)}
 				tabIndex={0}
@@ -305,8 +307,8 @@ export function CustomTable<TData, TValue>({
 			>
 				<Table
 					className={cn(
-						'relative min-w-full',
-						allowColumnOverflow ? 'w-max' : 'w-full',
+						'relative',
+						allowColumnOverflow ? 'w-max min-w-full' : 'w-full min-w-[800px]',
 						useAutoLayout ? 'table-auto' : 'table-fixed'
 					)}
 					variant={variant}
@@ -322,18 +324,24 @@ export function CustomTable<TData, TValue>({
 								<TableRow className="sticky top-0" key={headerGroup.id} variant={variant}>
 									{headerGroup.headers.map((header) => {
 										const isExcluded = excludedIdSet.has(header.column.id);
+										const customWidth = customColumnWidths[header.column.id];
+
+										let width: string;
+										if (useAutoLayout) {
+											width = 'auto';
+										} else if (customWidth) {
+											width = customWidth;
+										} else if (isExcluded) {
+											width = '48px';
+										} else {
+											width = columnWidth;
+										}
+
 										return (
 											<TableHead
 												key={header.id}
 												variant={variant}
-												style={
-													useAutoLayout
-														? undefined
-														: isExcluded
-														? { width: '48px' }
-														: { width: columnWidth }
-												}
-												className="whitespace-nowrap"
+												style={useAutoLayout ? undefined : { width }}
 											>
 												{header.isPlaceholder
 													? null
@@ -405,15 +413,34 @@ export function CustomTable<TData, TValue>({
 									key={row.id}
 									data-state={row.getIsSelected() && 'selected'}
 								>
-									{row.getVisibleCells().map((cell) => {
-										const totalColumns = row.getVisibleCells().length;
-										const columnWidth = `${100 / totalColumns}%`;
+									{row.getVisibleCells().map((cell, cellIndex) => {
+										const headerGroup = table.getHeaderGroups()[0];
+										const header = headerGroup.headers[cellIndex];
+										const excludedIdSet = new Set(excludeFromEqualWidth);
+										const equalHeaders = headerGroup.headers.filter(
+											(h) => !excludedIdSet.has(h.column.id)
+										);
+										const equalColumnWidth = `${100 / (equalHeaders.length || 1)}%`;
+
+										const isExcluded = excludedIdSet.has(header.column.id);
+										const customWidth = customColumnWidths[header.column.id];
+
+										let width: string;
+										if (useAutoLayout) {
+											width = 'auto';
+										} else if (customWidth) {
+											width = customWidth;
+										} else if (isExcluded) {
+											width = '48px';
+										} else {
+											width = equalColumnWidth;
+										}
+
 										return (
 											<TableCell
 												key={cell.id}
 												variant={variant}
-												style={useAutoLayout ? undefined : { width: columnWidth }}
-												className="whitespace-nowrap"
+												style={useAutoLayout ? undefined : { width }}
 											>
 												{flexRender(cell.column.columnDef.cell, cell.getContext())}
 											</TableCell>
