@@ -26,7 +26,6 @@ import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptio
 import { useClerk } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { MobileAppComingSoon } from '@/components/molecules/MobileAppComingSoon/MobileAppComingSoon';
-import { cn } from '@/utils/ui';
 
 const Dashboard = () => {
 	const { isSignedIn, openSignIn } = useClerk();
@@ -68,78 +67,6 @@ const Dashboard = () => {
 
 	return (
 		<AppLayout>
-			<div className={cn('dashboard-container', hasSearched ? 'search-active' : '')}>
-				<div className="hero-wrapper">
-					<div className="mt-4 flex justify-center w-full px-4">
-						<div className="premium-hero-section text-center w-full max-w-[470px]">
-							<div
-								className="premium-logo-container inline-block"
-								data-transition-element="logo-end"
-							>
-								<LogoIcon width="106px" height="84px" />
-							</div>
-							<Typography
-								variant="h1"
-								className="text-center mt-2 !text-[80px] leading-[0.8] premium-gradient-text"
-								data-text="Murmur"
-								data-transition-element="title-end"
-							>
-								Murmur
-							</Typography>
-							<Typography
-								font="secondary"
-								className="mt-8 text-[19px] text-center premium-subtitle-gradient"
-								color="light"
-							>
-								Let&apos;s <strong className="premium-accent">start</strong> by creating a
-								campaign.
-							</Typography>
-							<Typography
-								font="secondary"
-								className="mt-4 text-[19px] text-center premium-subtitle-gradient"
-								color="light"
-							>
-								Who do you want to contact?
-							</Typography>
-						</div>
-					</div>
-
-					<div
-						className={`search-bar-wrapper mt-[27px] w-full max-w-[1132px] mx-auto px-4 ${
-							hasSearched ? 'search-bar-active' : ''
-						}`}
-					>
-						<div className="search-bar-inner">
-							{hasSearched && activeSearchQuery && (
-								<div className="search-context-label">
-									<span className="search-query-text">{activeSearchQuery}</span>
-								</div>
-							)}
-							<Form {...form}>
-								<form
-									onSubmit={(e) => {
-										e.preventDefault();
-										if (!isSignedIn) {
-											if (hasProblematicBrowser) {
-												// For Edge/Safari, navigate to sign-in page
-												console.log(
-													'[Dashboard] Edge/Safari detected, navigating to sign-in page'
-												);
-												if (typeof window !== 'undefined') {
-													sessionStorage.setItem(
-														'redirectAfterSignIn',
-														window.location.pathname
-													);
-												}
-												window.location.href = urls.signIn.index;
-											} else {
-												openSignIn();
-											}
-										} else {
-											form.handleSubmit(onSubmit)(e);
-										}
-									}}
-									className={hasSearched ? 'search-form-active' : ''}
 			<div className={`dashboard-container ${hasSearched ? 'search-active' : ''}`}>
 				<div className="hero-wrapper flex flex-col justify-center items-center min-h-screen">
 					<div className="w-full">
@@ -416,15 +343,13 @@ const Dashboard = () => {
 						) : contacts && contacts.length > 0 ? (
 							<div className="flex justify-center w-full px-4">
 								<div className="w-full max-w-full results-appear results-align">
-									<div className="flex flex-col items-center mb-4">
-										<div className="font-primary text-[1.25rem] text-gray-700">
+									<div className="select-prompt-container">
+										<div className="select-prompt-text">
 											Select who you want to contact
 										</div>
-										<div className="h-10 flex items-center justify-center mt-2">
+										<div className="static-tooltip-container">
 											{hoveredText && (
-												<div className="font-primary text-base text-gray-400 py-2 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
-													{hoveredText}
-												</div>
+												<div className="static-tooltip-text">{hoveredText}</div>
 											)}
 										</div>
 									</div>
