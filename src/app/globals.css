@@ -1225,53 +1225,22 @@ mux-player {
 	}
 }
 
-@keyframes premium-gradient-move {
-	0%,
-	100% {
-		background-position: 0% 50%;
-	}
-	50% {
-		background-position: 100% 50%;
-	}
-}
+/* Removed dead animations: premium-gradient-move, premium-shimmer, premium-float */
+/* These animations were not being used in the dashboard */
 
-@keyframes premium-shimmer {
-	0% {
-		transform: translateX(-50%);
-		opacity: 0;
-	}
-	50% {
-		opacity: 1;
-	}
-	100% {
-		transform: translateX(50%);
-		opacity: 0;
-	}
-}
-
-@keyframes premium-float {
-	0%,
-	100% {
-		transform: translateY(0px);
-	}
-	50% {
-		transform: translateY(-2px);
-	}
-}
-
-/* Hero section - continuous ambient animation */
+/* Hero section - clean without animations */
 .premium-hero-section {
 	position: relative;
 	z-index: 1;
-	overflow: hidden;
 }
 
-/* Logo container - subtle float only */
+/* Logo container - static display */
 .premium-logo-container {
 	position: relative;
-	display: inline-block;
-	animation: premium-float 12s ease-in-out infinite;
-	opacity: 0.9;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 1;
 }
 
 /* Main title gradient - Murmur */
@@ -1287,7 +1256,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	/* Animation removed - not used on dashboard */
 	will-change: auto; /* Changed from background-position for Safari performance */
 	-webkit-transform: translateZ(0); /* Safari GPU acceleration */
 	transform: translateZ(0);
@@ -1315,7 +1284,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	/* Animation removed - not used on dashboard */
 	filter: blur(25px);
 	opacity: 0.15;
 	pointer-events: none;
@@ -1338,7 +1307,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite reverse;
+	/* Animation removed - not used on dashboard */
 	filter: blur(12px);
 	opacity: 0.2;
 	pointer-events: none;
@@ -1349,7 +1318,7 @@ mux-player {
 	position: relative;
 	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 	color: rgb(107, 114, 128);
-	opacity: 0.9;
+	opacity: 1;
 }
 
 /* Accent word - "start" */
@@ -1388,7 +1357,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	/* Animation removed - not used on dashboard */
 }
 
 /* Dark mode NYC high society gradient outline - Layer 1 */
@@ -1405,7 +1374,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	/* Animation removed - not used on dashboard */
 	filter: blur(25px);
 	opacity: 0.15;
 }
@@ -1422,7 +1391,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite reverse;
+	/* Animation removed - not used on dashboard */
 	filter: blur(12px);
 	opacity: 0.25;
 }
@@ -1490,9 +1459,11 @@ mux-player {
 	position: relative;
 	min-height: 100vh;
 	transition: all 0.6s ease;
+	margin-top: -135px;
+	padding-bottom: 100px;
 }
 
-/* Hero wrapper - contains logo and text that will fade out */
+/* Hero wrapper - vertically centered container */
 .hero-wrapper {
 	opacity: 1;
 	-webkit-transform: translateY(0);
@@ -1502,8 +1473,6 @@ mux-player {
 		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 	position: relative;
 	z-index: 1;
-	height: 320px;
-	--hero-height: 320px;
 }
 
 /* When search is active - hero elegantly fades away */
@@ -1513,12 +1482,14 @@ mux-player {
 	transform: translateY(-20px);
 	pointer-events: none;
 	height: 0;
+	min-height: 0;
 	overflow: hidden;
 	margin-bottom: 0;
 	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		-webkit-transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-		height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
+		height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s,
+		min-height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
 }
 
 /* Search bar wrapper - default state */
@@ -1531,7 +1502,7 @@ mux-player {
 		transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
 		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 	z-index: 20;
-	margin-top: clamp(3rem, calc((100vh - var(--hero-height, 320px)) * 0.35), 26vh);
+	margin-top: clamp(3rem, 10vh, 10rem);
 	width: 100%;
 }
 
@@ -1746,8 +1717,8 @@ mux-player {
 }
 
 .exclude-contacts-box:hover {
-	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-	-webkit-box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	box-shadow: none;
+	-webkit-box-shadow: none;
 }
 
 /* Ensure consistent layout during horizontal compression */
@@ -2575,52 +2546,50 @@ mux-player {
 /* Campaigns table responsive spacing */
 @media (max-width: 640px) {
 	.campaigns-table-wrapper {
-		margin-top: 6rem !important; /* Override Tailwind mt-32 */
+		margin-top: 2rem !important; /* Raised for visibility */
 	}
 }
 
 @media (min-width: 641px) and (max-width: 768px) {
 	.campaigns-table-wrapper {
-		margin-top: 8rem !important; /* Override Tailwind mt-36 */
+		margin-top: 2rem !important; /* Raised for visibility */
 	}
 }
 
 @media (min-width: 769px) and (max-width: 1024px) {
 	.campaigns-table-wrapper {
-		margin-top: 10rem !important; /* Override Tailwind mt-40 */
+		margin-top: 2rem !important; /* Raised for visibility */
 	}
 }
 
 @media (min-width: 1025px) and (max-width: 1280px) {
 	.campaigns-table-wrapper {
-		margin-top: 12rem !important; /* Override Tailwind mt-44 */
+		margin-top: 2rem !important; /* Raised for visibility */
 	}
 }
 
 @media (min-width: 1281px) and (max-width: 1536px) {
 	.campaigns-table-wrapper {
-		margin-top: 14rem !important; /* Override Tailwind mt-48 */
+		margin-top: 2rem !important; /* Raised for visibility */
 	}
 }
 
 @media (min-width: 1537px) {
 	.campaigns-table-wrapper {
-		margin-top: 16rem !important; /* Override Tailwind mt-56 */
+		margin-top: 2rem !important; /* Raised for visibility */
 	}
 }
 
 /* Maintain consistent spacing ratio on zoom */
 @media (min-width: 1920px) {
 	.campaigns-table-wrapper {
-		margin-top: -webkit-calc(16rem + 2vw) !important; /* Safari prefix */
-		margin-top: calc(16rem + 2vw) !important;
+		margin-top: 2rem !important; /* Raised for visibility */
 	}
 }
 
 @media (min-width: 2560px) {
 	.campaigns-table-wrapper {
-		margin-top: -webkit-calc(18rem + 2vw) !important; /* Safari prefix */
-		margin-top: calc(18rem + 2vw) !important;
+		margin-top: 2rem !important; /* Raised for visibility */
 	}
 }
 
@@ -2816,24 +2785,19 @@ body.murmur-page footer {
    so we need to ensure the campaigns table is positioned far enough below */
 @media (min-height: 800px) {
 	.dashboard-container:not(.search-active) .campaigns-table-wrapper {
-		/* Add minimal extra margin that scales with viewport height to prevent overlap */
-		margin-top: calc(8rem + 2vh) !important;
+		/* Reduce extra margin to keep table visible */
+		margin-top: 2rem !important;
 	}
 }
 
 @media (min-height: 1200px) {
 	.dashboard-container:not(.search-active) .campaigns-table-wrapper {
-		/* Slightly more margin for extreme zoom levels */
-		margin-top: calc(8rem + 3vh) !important;
+		/* Keep consistent small margin for visibility */
+		margin-top: 2rem !important;
 	}
 }
 
-/* Also ensure the hero wrapper can contain the growing search bar */
-.dashboard-container:not(.search-active) .hero-wrapper {
-	/* Allow hero to grow with viewport height to contain search bar */
-	min-height: calc(320px + max(0px, 10vh - 80px));
-	height: auto;
-}
+/* Hero wrapper vertical centering is handled in JSX classes */
 
 /* Force square scrollbars */
 .custom-scroll::-webkit-scrollbar,
@@ -2899,7 +2863,6 @@ body.murmur-page footer {
 	padding-left: 50px;
 	white-space: nowrap;
 }
-
 
 /* Lenis smooth scrolling styles */
 html.lenis {
