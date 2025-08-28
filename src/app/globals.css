@@ -1537,6 +1537,29 @@
 	z-index: 1;
 }
 
+/* Figma overlay boxes for campaigns metrics (scaled from 92x19.96 on 160px columns) */
+.campaigns-table-container tbody td {
+	position: relative;
+}
+
+.campaigns-table-container tbody td:nth-child(n + 2):nth-child(-n + 5)::after {
+	content: '';
+	position: absolute;
+	left: 12px; /* align with cell horizontal padding */
+	top: 50%;
+	transform: translateY(-50%);
+	width: 57.5%; /* 92px of a 160px metrics column */
+	height: 20px; /* ~19.96px */
+	border: 1px dashed rgba(0, 0, 0, 0.4);
+	border-radius: 4px;
+	pointer-events: none; /* purely visual guide */
+}
+
+/* Nudge text inside overlay boxes slightly to the right for better spacing */
+.campaigns-table-container tbody td:nth-child(n + 2):nth-child(-n + 5) {
+	padding-left: 18px; /* base 12px + 6px breathing room from box edge */
+}
+
 /* Exclude contacts box styling */
 .exclude-contacts-box {
 	transition: box-shadow 0.2s ease;
