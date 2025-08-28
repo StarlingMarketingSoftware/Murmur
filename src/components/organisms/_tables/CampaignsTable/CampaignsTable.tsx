@@ -22,7 +22,7 @@ export const CampaignsTable: FC = () => {
 		<>
 			<Card className="relative border-none bg-transparent w-full max-w-[1132px] mx-auto">
 				{isPending && <Spinner size="medium" className="absolute top-2 right-2" />}
-				<CardHeader className="px-6 pb-2">
+				<CardHeader className="px-6 pb-2 bg-[#F8F8F8]">
 					<CardTitle
 						className="text-left text-[14px] font-normal"
 						style={{ fontFamily: 'Inter, sans-serif' }}
@@ -34,7 +34,7 @@ export const CampaignsTable: FC = () => {
 					<div className="campaigns-table-container">
 						<CustomTable
 							variant="secondary"
-							containerClassName="border-[2px] border-[#8C8C8C] rounded-[8px]"
+							containerClassName="border-[2px] border-[#8C8C8C] rounded-[8px] my-campaigns-table"
 							handleRowClick={handleRowClick}
 							columns={columns}
 							data={data}
