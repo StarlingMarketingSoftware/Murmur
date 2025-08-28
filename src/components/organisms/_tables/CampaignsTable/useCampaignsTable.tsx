@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/button';
 import { Campaign } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
 import { X } from 'lucide-react';
@@ -191,17 +190,23 @@ export const useCampaignsTable = () => {
 			header: () => <div className="text-right"></div>,
 			cell: ({ row }) => (
 				<div className="flex justify-end">
-					<Button
-						variant="ghost" // or any other variant like "outline", "default"
-						size="icon"
+					<button
+						className="w-[20px] h-[20px] flex items-center justify-center hover:opacity-70 transition-opacity"
+						style={{
+							background: 'transparent',
+							border: 'none',
+							padding: 0,
+							cursor: 'pointer',
+						}}
 						onClick={(e) => {
 							e.stopPropagation();
 							setCurrentRow(row.original);
 							setIsConfirmDialogOpen(true);
 						}}
+						aria-label="Delete campaign"
 					>
-						<X className="h-4 w-4 text-destructive" />
-					</Button>
+						<X className="w-[20px] h-[20px]" style={{ color: '#000000' }} />
+					</button>
 				</div>
 			),
 			size: 60,

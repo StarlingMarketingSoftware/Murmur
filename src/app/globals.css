@@ -171,6 +171,53 @@
 	}
 }
 
+/* Global scrollbar styles: 1px black track/thumb, square corners, no arrows */
+/* WebKit-based browsers (Chrome, Edge (Chromium), Safari) */
+*::-webkit-scrollbar {
+	width: 1px !important;
+	height: 1px !important;
+	background: transparent !important;
+	border-radius: 0 !important;
+}
+*::-webkit-scrollbar-thumb {
+	background-color: #000000 !important;
+	border-radius: 0 !important;
+	border: none !important;
+	min-height: 24px; /* prevents disappearing on fast scroll */
+}
+*::-webkit-scrollbar-track {
+	background: transparent !important;
+	border-radius: 0 !important;
+	border: none !important;
+}
+*::-webkit-scrollbar-corner {
+	background: transparent !important;
+	border-radius: 0 !important;
+}
+/* Hide scrollbar buttons (arrows) */
+*::-webkit-scrollbar-button {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+/* Firefox */
+* {
+	scrollbar-width: thin; /* approximate 1px */
+	scrollbar-color: #000000 transparent;
+}
+
+/* Legacy (non-Chromium) Edge/IE fallback */
+@supports (-ms-ime-align: auto) {
+	* {
+		scrollbar-face-color: #000000;
+		scrollbar-track-color: transparent;
+		scrollbar-arrow-color: #000000;
+		scrollbar-shadow-color: #000000;
+		scrollbar-highlight-color: #000000;
+	}
+}
+
 @keyframes scroll {
 	0% {
 		transform: translate(0);
@@ -2463,22 +2510,34 @@ body.murmur-page footer {
 }
 
 /* Force square scrollbars */
-.custom-scroll::-webkit-scrollbar,
-.custom-scroll::-webkit-scrollbar-thumb,
-.custom-scroll::-webkit-scrollbar-track,
-.custom-scroll::-webkit-scrollbar-corner,
-.custom-scroll::-webkit-scrollbar-button {
-	border-radius: 0 !important;
-	-webkit-border-radius: 0 !important;
-}
-
 .custom-scroll::-webkit-scrollbar {
 	width: 1px !important;
 	height: 1px !important;
+	background: transparent !important;
+	border-radius: 0 !important;
 }
 
 .custom-scroll::-webkit-scrollbar-thumb {
-	background: #000 !important;
+	background: #000000 !important;
+	border-radius: 0 !important;
+	border: none !important;
+}
+
+.custom-scroll::-webkit-scrollbar-track {
+	background: transparent !important;
+	border-radius: 0 !important;
+	border: none !important;
+}
+
+.custom-scroll::-webkit-scrollbar-corner {
+	background: transparent !important;
+	border-radius: 0 !important;
+}
+
+.custom-scroll::-webkit-scrollbar-button {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
 }
 
 .custom-scroll {
@@ -2546,4 +2605,48 @@ html.lenis {
 /* Prevent layout shifts during animations */
 main {
 	isolation: isolate;
+}
+
+/* Add at the end of the file, after existing scrollbar rules */
+
+/* Specific overrides for Radix ScrollArea */
+[data-slot='scroll-area-scrollbar'] {
+	padding: 0 !important;
+	border-radius: 0 !important;
+}
+
+[data-slot='scroll-area-scrollbar']::-webkit-scrollbar {
+	width: 1px !important;
+	height: 1px !important;
+	background: transparent !important;
+	border-radius: 0 !important;
+}
+
+[data-slot='scroll-area-scrollbar']::-webkit-scrollbar-thumb {
+	background-color: #000000 !important;
+	border-radius: 0 !important;
+	border: none !important;
+}
+
+[data-slot='scroll-area-scrollbar']::-webkit-scrollbar-track {
+	background: transparent !important;
+	border-radius: 0 !important;
+	border: none !important;
+}
+
+[data-slot='scroll-area-scrollbar']::-webkit-scrollbar-corner {
+	background: transparent !important;
+	border-radius: 0 !important;
+}
+
+[data-slot='scroll-area-scrollbar']::-webkit-scrollbar-button {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+/* Firefox specific for Radix */
+[data-slot='scroll-area-scrollbar'] {
+	scrollbar-width: thin !important;
+	scrollbar-color: #000000 transparent !important;
 }
