@@ -6,7 +6,7 @@ import { FormLabel } from '@/components/ui/form';
 import { Typography } from '@/components/ui/typography';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { cn } from '@/utils';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, ChevronUp } from 'lucide-react';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useEditEmail } from '@/hooks/queryHooks/useEmails';
@@ -51,6 +51,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		isPendingEmails,
 		isWaitingForConfirm,
 		handleDraftButtonClick,
+		scrollToEmailStructure,
 	} = useEmailGeneration(props);
 
 	// Inline send confirmation state
@@ -208,22 +209,45 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 	return (
 		<>
-			<div className="mb-3 mt-6">
+			<div className="mb-3 mt-3 flex justify-between items-center">
 				<FormLabel className="font-inter font-normal">Drafting</FormLabel>
+				{scrollToEmailStructure && (
+					<button
+						type="button"
+						onClick={scrollToEmailStructure}
+						className="flex items-center gap-1 text-[#AFAFAF] font-inter font-medium text-[14px] hover:text-[#8F8F8F] transition-colors"
+					>
+						to Email Structure
+						<ChevronUp size={16} />
+					</button>
+				)}
 			</div>
 			<div className="flex gap-[47px] items-start">
 				<div className="flex-shrink-0">
-					<div className="relative flex flex-row w-[892px] h-[560px] border-[3px] border-black rounded-lg overflow-x-hidden p-[17px]">
+					<div
+						className={cn(
+							'relative flex flex-row w-[892px] h-[620px] border-[3px] border-black rounded-lg overflow-x-hidden p-[17px] pb-[120px]',
+							isWaitingToSend && 'h-[700px] pb-[200px]'
+						)}
+					>
 						{/* Left table container */}
-						<ContactsSelection
-							contacts={contacts}
-							selectedContactIds={selectedContactIds}
-							setSelectedContactIds={setSelectedContactIds}
-							handleContactSelection={handleContactSelection}
-							generationProgress={generationProgress}
-							generationTotal={generationTotal}
-							cancelGeneration={cancelGeneration}
-						/>
+						{(() => {
+							const draftedContactIds = new Set(draftEmails.map((d) => d.contactId));
+							const availableContacts = contacts.filter(
+								(c) => !draftedContactIds.has(c.id)
+							);
+							return (
+								<ContactsSelection
+									contacts={availableContacts}
+									selectedContactIds={selectedContactIds}
+									setSelectedContactIds={setSelectedContactIds}
+									handleContactSelection={handleContactSelection}
+									generationProgress={generationProgress}
+									generationTotal={generationTotal}
+									cancelGeneration={cancelGeneration}
+								/>
+							);
+						})()}
 
 						{/* Generate Drafts Button */}
 						<div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -269,39 +293,12 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 								selectedDraft={selectedDraft}
 							/>
 						</div>
-					</div>
-				</div>
-			</div>
 
-			<div>
-				<div className="flex flex-col gap-4 mt-4">
-					{getAutosaveStatusDisplay() && (
-						<div className="flex flex-col sm:flex-row gap-4 items-center justify-end">
-							{getAutosaveStatusDisplay()}
-						</div>
-					)}
-					{draftEmails.length > 0 && (
-						<div className="flex justify-end">
-							{isSendingDisabled ? (
+						{/* Bottom fixed send bar inside the drafting box */}
+						{draftEmails.length > 0 && (
+							<div className="absolute left-[17px] right-[17px] bottom-[17px]">
 								<div className="flex flex-col items-end w-full">
-									<UpgradeSubscriptionDrawer
-										triggerButtonText="Send"
-										buttonVariant="primary"
-										className={`!w-[891px] !h-[39px] !border-2 !border-[#5DAB68] !text-black !font-bold !flex !items-center !justify-center ${
-											selectedDraftIds.size !== 0
-												? '!opacity-50 !cursor-not-allowed hover:!bg-[rgba(93,171,104,0.47)] hover:!border-[#5DAB68]'
-												: 'hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]'
-										}`}
-										message={
-											isFreeTrial
-												? `Your free trial subscription does not include the ability to send emails. To send the emails you've drafted, please upgrade your subscription to the paid version.`
-												: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
-										}
-									/>
-								</div>
-							) : (
-								<div className="flex flex-col items-end w-full">
-									<div className={cn('w-[891px] mb-6', !isWaitingToSend && 'hidden')}>
+									<div className={cn('w-full mb-3', !isWaitingToSend && 'hidden')}>
 										<div className="grid grid-cols-3 items-start w-full">
 											<div className="flex flex-col items-start">
 												<Typography
@@ -314,7 +311,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 													selectedDraftIds.size > 0
 														? selectedDraftIds.size
 														: draftEmails.length
-												} emails selected`}</Typography>
+												}
+												 emails selected`}</Typography>
 												<Typography className="hidden">{draftEmails.length}</Typography>
 											</div>
 											<div className="flex justify-center">
@@ -352,30 +350,57 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 											</div>
 										)}
 									</div>
-									<Button
-										type="button"
-										className={cn(
-											'w-[891px] !h-[39px] font-bold flex items-center justify-center transition-colors',
-											draftEmails.length === 0 && 'opacity-50 cursor-not-allowed',
-											isWaitingToSend
-												? 'bg-[#5DAB68] border-0 text-white'
-												: 'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]'
-										)}
-										disabled={draftEmails.length === 0}
-										onClick={async () => {
-											if (!isWaitingToSend) {
-												setIsWaitingToSend(true);
-												setTimeout(() => setIsWaitingToSend(false), 3000);
-												return;
+									{isSendingDisabled ? (
+										<UpgradeSubscriptionDrawer
+											triggerButtonText="Send"
+											buttonVariant="primary"
+											className={`w-full h-[39px] !border-2 !border-[#5DAB68] !text-black !font-bold !flex !items-center !justify-center ${
+												selectedDraftIds.size !== 0
+													? '!opacity-50 !cursor-not-allowed hover:!bg-[rgba(93,171,104,0.47)] hover:!border-[#5DAB68]'
+													: 'hover:!bg-[rgba(93,171,104,0.6)] hover:!border-[#5DAB68] active:!bg-[rgba(93,171,104,0.7)]'
+											}`}
+											message={
+												isFreeTrial
+													? `Your free trial subscription does not include the ability to send emails. To send the emails you've drafted, please upgrade your subscription to the paid version.`
+													: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
 											}
-											setIsWaitingToSend(false);
-											await handleSend();
-										}}
-									>
-										{isWaitingToSend ? 'Click to Confirm and Send' : 'Send'}
-									</Button>
+										/>
+									) : (
+										<Button
+											type="button"
+											className={cn(
+												'w-full h-[39px] font-bold flex items-center justify-center transition-all duration-200',
+												draftEmails.length === 0 && 'opacity-50 cursor-not-allowed',
+												isWaitingToSend
+													? 'bg-[#5DAB68] border-0 text-white scale-[1.02] h-[44px]'
+													: 'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]'
+											)}
+											disabled={draftEmails.length === 0}
+											onClick={async () => {
+												if (!isWaitingToSend) {
+													setIsWaitingToSend(true);
+													setTimeout(() => setIsWaitingToSend(false), 30000);
+													return;
+												}
+												setIsWaitingToSend(false);
+												await handleSend();
+											}}
+										>
+											{isWaitingToSend ? 'Click to Confirm and Send' : 'Send'}
+										</Button>
+									)}
 								</div>
-							)}
+							</div>
+						)}
+					</div>
+				</div>
+			</div>
+
+			<div>
+				<div className="flex flex-col gap-4 mt-4">
+					{getAutosaveStatusDisplay() && (
+						<div className="flex flex-col sm:flex-row gap-4 items-center justify-end">
+							{getAutosaveStatusDisplay()}
 						</div>
 					)}
 				</div>

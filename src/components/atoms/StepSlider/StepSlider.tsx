@@ -2,7 +2,6 @@
 
 import * as SliderPrimitive from '@radix-ui/react-slider';
 import { cn } from '@/utils/index';
-import { Typography } from '@/components/ui/typography';
 import { useMemo } from 'react';
 
 interface StepSliderProps extends React.ComponentProps<typeof SliderPrimitive.Root> {
@@ -61,7 +60,7 @@ export const StepSlider = ({
 				<SliderPrimitive.Track
 					data-slot="slider-track"
 					className={cn(
-						'bg-gray-400 cursor-pointer relative grow overflow-visible data-[orientation=horizontal]:h-[2px] data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-[1px] data-[disabled]:opacity-50'
+						'bg-black cursor-pointer relative grow overflow-visible data-[orientation=horizontal]:h-[2px] data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-[1px] data-[disabled]:opacity-50'
 					)}
 					style={{
 						marginLeft: '8px',
@@ -82,49 +81,35 @@ export const StepSlider = ({
 					<SliderPrimitive.Thumb
 						data-slot="slider-thumb"
 						key={index}
-						className="bg-transparent ring-ring/50 cursor-pointer block size-4 shrink-0 rounded-full transition-[color] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50 z-10 relative"
+						className="bg-transparent ring-ring/50 cursor-pointer block size-[14px] shrink-0 rounded-full transition-[color] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50 z-10 relative"
 					>
 						{/* Inner dot for visual size reduction */}
 						<div className="absolute inset-0 flex items-center justify-center">
-							<div className="w-3 aspect-square bg-foreground rounded-full"></div>
+							<div className="w-[10px] aspect-square bg-foreground rounded-full"></div>
 						</div>
 					</SliderPrimitive.Thumb>
 				))}
 			</SliderPrimitive.Root>
-			{/* Step indicators */}
+			{/* Step indicators with pipe symbols */}
 			{showStepIndicators && (
 				<div
-					className={cn('absolute top-0 w-full h-[2px] pointer-events-none transition')}
+					className={cn(
+						'absolute top-0 w-full h-full pointer-events-none flex items-center'
+					)}
 					style={{ left: '8px', right: '8px', width: 'calc(100% - 16px)' }}
 				>
 					{stepPositions.map((position, index) => (
-						<div
+						<span
 							key={index}
-							className="absolute w-[2px] h-8 !bg-foreground -z-10"
+							className="absolute text-foreground text-xs"
 							style={{
 								left: `${position}%`,
-								transform: 'translateX(-50%) translateY(-14px)',
+								transform: 'translateX(-50%)',
 							}}
-						/>
+						>
+							|
+						</span>
 					))}
-				</div>
-			)}{' '}
-			{/* Step labels */}
-			{showStepIndicators && (
-				<div className={cn('flex justify-between w-full mt-2 px-0.5 transition')}>
-					{Array.from({ length: max - min + 1 }, (_, index) => {
-						const value = min + index;
-						return (
-							<div key={index} className="flex justify-center w-2">
-								<Typography
-									className="!text-[10px] mt-3 text-muted-foreground text-center"
-									font="secondary"
-								>
-									{value === 0 ? 'Auto' : value}
-								</Typography>
-							</div>
-						);
-					})}
 				</div>
 			)}
 		</div>

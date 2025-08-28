@@ -1,6 +1,7 @@
 import MuxPlayer from '@mux/mux-player-react';
 import { cn } from '@/utils';
 import { useRef, useEffect } from 'react';
+import './styles.css';
 
 interface VideoPlayerProps {
 	className?: string;

@@ -1,0 +1,6 @@
+@supports (-webkit-touch-callout: none) {
+	/* iOS Safari specific styles */
+	.fixed.inset-0 {
+		min-height: -webkit-fill-available;
+	}
+}

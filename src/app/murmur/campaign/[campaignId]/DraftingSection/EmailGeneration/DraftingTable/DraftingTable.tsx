@@ -32,7 +32,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 		<div>
 			<div className="text-sm font-inter font-medium text-black">{title}</div>
 			<div className="flex w-full justify-end h-[20px] mb-2">
-				{title !== 'Drafts' && (
+				{hasData && (
 					<Button
 						type="button"
 						variant="ghost"
@@ -43,7 +43,10 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					</Button>
 				)}
 			</div>
-			<div className="bg-background border border-gray-300 overflow-auto custom-scroll w-[336px] h-[441px] overflow-x-hidden overflow-y-auto pr-[10px]">
+			<div
+				className="bg-background border border-gray-300 overflow-auto custom-scroll w-[336px] h-[441px] overflow-x-hidden overflow-y-auto pr-[10px]"
+				data-lenis-prevent
+			>
 				{isPending ? (
 					<div className="flex items-center justify-center h-full">
 						<Spinner size="small" />
@@ -67,7 +70,12 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				<div className="mt-2 w-[336px] flex items-center gap-3">
 					<div className="text-xs font-inter text-gray-600 flex-none">
 						{generationProgress >= 0 && totalContacts > 0
-							? `Drafting ${generationProgress}/${totalContacts}`
+							? generationProgress >= totalContacts
+								? `Drafted ${Math.min(
+										generationProgress,
+										totalContacts
+								  )}/${totalContacts}`
+								: `Drafting ${generationProgress}/${totalContacts}`
 							: 'Ready to draft'}
 					</div>
 
@@ -85,14 +93,14 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					</div>
 
 					{onCancel && generationProgress >= 0 && (
-						<Button
+						<button
 							type="button"
 							onClick={onCancel}
-							className="ml-2 p-0 !w-[16px] !h-[16px] flex items-center justify-center text-white bg-destructive hover:bg-destructive-dark transition-colors cursor-pointer rounded-none"
+							className="ml-2 p-0 h-auto w-auto bg-transparent border-0 text-black hover:text-red-600 transition-colors cursor-pointer"
 							aria-label="Cancel drafting"
 						>
 							×
-						</Button>
+						</button>
 					)}
 				</div>
 			)}

@@ -11,6 +11,7 @@ import {
 	SortingState,
 	useReactTable,
 	Table as TableType,
+	Row,
 } from '@tanstack/react-table';
 
 import {
@@ -28,6 +29,7 @@ import {
 	useState,
 	useMemo,
 	useCallback,
+	useRef,
 	ReactNode,
 } from 'react';
 import CustomPagination from '@/components/molecules/CustomPagination/CustomPagination';
@@ -124,6 +126,21 @@ export function CustomTable<TData, TValue>({
 		pageIndex: 0,
 		pageSize: rowsPerPage,
 	});
+
+	// Track last clicked row original id for Shift+click range selection (stable across sorting/filtering)
+	const lastClickedRowIdRef = useRef<string | number | null>(null);
+
+	// Resolve a stable identifier for a row: prefer the domain `original.id`, fallback to TanStack `row.id`
+	const getRowOriginalId = (r: Row<TData>): string | number => {
+		const original = r.original as Record<string, unknown>;
+		if (original && typeof original === 'object' && 'id' in original) {
+			const value = (original as Record<string, unknown>).id as unknown;
+			if (typeof value === 'string' || typeof value === 'number') {
+				return value;
+			}
+		}
+		return r.id;
+	};
 
 	// Initialize all rows as selected
 	const getInitialRowSelection = useCallback(() => {
@@ -225,7 +242,7 @@ export function CustomTable<TData, TValue>({
 
 	return (
 		<div className="w-full [&_::-webkit-scrollbar]:h-[4px] [&_::-webkit-scrollbar]:md:h-[7px] [&_::-webkit-scrollbar-thumb]:bg-gray-300 [&_::-webkit-scrollbar-thumb]:rounded-full [&_::-webkit-scrollbar]:w-[4px] [&_::-webkit-scrollbar]:md:w-[7px]">
-			<div className="flex items-center justify-between py-4 gap-4 w-[1185px] max-w-full mx-auto">
+			<div className="flex items-center justify-between py-4 gap-4 w-full max-w-full mx-auto">
 				<div className="flex items-center gap-4 flex-wrap">
 					{searchable && (
 						<Input
@@ -270,9 +287,19 @@ export function CustomTable<TData, TValue>({
 			</div>
 			<div
 				className={cn(
-					'border-2 border-black relative overflow-y-auto overflow-x-auto custom-scrollbar w-[1185px] max-w-full mx-auto',
+					'border-2 border-black relative overflow-y-auto overflow-x-hidden overscroll-contain custom-scrollbar w-full max-w-full mx-auto',
 					constrainHeight && 'h-[429px]'
 				)}
+				tabIndex={0}
+				style={{ WebkitOverflowScrolling: 'touch' }}
+				onWheel={(e) => {
+					const el = e.currentTarget;
+					const canScrollDown = el.scrollTop + el.clientHeight < el.scrollHeight;
+					const canScrollUp = el.scrollTop > 0;
+					if ((e.deltaY > 0 && canScrollDown) || (e.deltaY < 0 && canScrollUp)) {
+						e.stopPropagation();
+					}
+				}}
 			>
 				<Table
 					className={cn(
@@ -293,7 +320,7 @@ export function CustomTable<TData, TValue>({
 											key={header.id}
 											variant={variant}
 											style={useAutoLayout ? undefined : { width: columnWidth }}
-											className="whitespace-nowrap min-w-[120px]"
+											className="whitespace-nowrap"
 										>
 											{header.isPlaceholder
 												? null
@@ -313,9 +340,47 @@ export function CustomTable<TData, TValue>({
 										(handleRowClick || (setSelectedRows && isSelectable)) &&
 											'cursor-pointer'
 									)}
-									onClick={() => {
+									onMouseDown={(e) => {
+										// Prevent text selection on shift-click
+										if (e.shiftKey && isSelectable) {
+											e.preventDefault();
+										}
+									}}
+									onClick={(e) => {
 										if (isSelectable) {
-											row.toggleSelected();
+											const rows = table.getRowModel().rows as Row<TData>[];
+											const rowOriginalId = getRowOriginalId(row as Row<TData>);
+											const currentIndex = rows.findIndex(
+												(r) => getRowOriginalId(r as Row<TData>) === rowOriginalId
+											);
+											const lastIndex =
+												lastClickedRowIdRef.current !== null
+													? rows.findIndex(
+															(r) =>
+																getRowOriginalId(r as Row<TData>) ===
+																lastClickedRowIdRef.current
+													  )
+													: -1;
+
+											if (e.shiftKey && lastIndex !== -1 && currentIndex !== -1) {
+												// Prevent text selection on shift-click
+												e.preventDefault();
+												window.getSelection()?.removeAllRanges();
+
+												const start = Math.min(currentIndex, lastIndex);
+												const end = Math.max(currentIndex, lastIndex);
+
+												// Clear all selections first, then select only the range
+												const newSelection: Record<string, boolean> = {};
+												for (let i = start; i <= end; i++) {
+													newSelection[rows[i].id] = true;
+												}
+												setRowSelection(newSelection);
+												// Keep the existing anchor on Shift-click (traditional behavior)
+											} else {
+												row.toggleSelected();
+												lastClickedRowIdRef.current = rowOriginalId;
+											}
 										} else if (handleRowClick) {
 											handleRowClick(row.original);
 										}
@@ -331,7 +396,7 @@ export function CustomTable<TData, TValue>({
 												key={cell.id}
 												variant={variant}
 												style={useAutoLayout ? undefined : { width: columnWidth }}
-												className="whitespace-nowrap min-w-[120px]"
+												className="whitespace-nowrap"
 											>
 												{flexRender(cell.column.columnDef.cell, cell.getContext())}
 											</TableCell>
@@ -354,7 +419,7 @@ export function CustomTable<TData, TValue>({
 				</Table>
 			</div>
 			{!hidePagination && (
-				<div className="w-[1185px] max-w-full mx-auto">
+				<div className="w-full max-w-full mx-auto">
 					<CustomPagination<TData> currentPage={pagination.pageIndex} table={table} />
 				</div>
 			)}

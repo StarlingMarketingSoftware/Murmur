@@ -28,6 +28,7 @@ export interface EmailGenerationProps {
 	setGenerationProgress: Dispatch<SetStateAction<number>>;
 	cancelGeneration: () => void;
 	isFirstLoad: boolean;
+	scrollToEmailStructure?: () => void;
 }
 
 export const useEmailGeneration = (props: EmailGenerationProps) => {
@@ -43,6 +44,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		setGenerationProgress,
 		cancelGeneration,
 		isFirstLoad,
+		scrollToEmailStructure,
 	} = props;
 
 	/* HOOKS */
@@ -98,7 +100,8 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		}
 	};
 
-	const handleContactSelection = (contactId: number) => {
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const handleContactSelection = (contactId: number, event?: React.MouseEvent) => {
 		setSelectedContactIds((prev) => {
 			const newSet = new Set(prev);
 			if (newSet.has(contactId)) {
@@ -110,7 +113,8 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		});
 	};
 
-	const handleDraftSelection = (draftId: number) => {
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const handleDraftSelection = (draftId: number, event?: React.MouseEvent) => {
 		setSelectedDraftIds((prev) => {
 			const newSet = new Set(prev);
 			if (newSet.has(draftId)) {
@@ -221,5 +225,6 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		isPendingEmails,
 		isWaitingForConfirm,
 		handleDraftButtonClick,
+		scrollToEmailStructure,
 	};
 };

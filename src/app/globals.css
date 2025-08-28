@@ -1,3 +1,8 @@
+/* The globals.css file is used to define variables used across the application, as well as animations. 
+* It should not contain any styles that are specific to a component or page.
+* Do not create any custom classes or media queries here.
+*/
+
 @import 'tailwindcss';
 @plugin "tailwindcss-animate";
 
@@ -155,6 +160,17 @@
 	--sidebar-ring: rgb(142, 142, 142); /* oklch(0.556 0 0) */
 }
 
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+	body {
+		@apply bg-background text-foreground;
+		overflow-x: hidden;
+		position: relative;
+	}
+}
+
 @keyframes scroll {
 	0% {
 		transform: translate(0);
@@ -195,6 +211,8 @@
 		transform: scale(1.2);
 	}
 }
+
+/* Scrolling reviews */
 
 .animate-scroll {
 	-webkit-animation: scroll 50s linear infinite;
@@ -319,16 +337,6 @@
 	}
 }
 
-.animate-fade-in {
-	-webkit-animation: fade-in 0.6s ease-out forwards;
-	animation: fade-in 0.6s ease-out forwards;
-}
-
-.animate-pulse-once {
-	-webkit-animation: pulse-once 0.4s ease-out;
-	animation: pulse-once 0.4s ease-out;
-}
-
 /* Console loader animations */
 
 @keyframes blink {
@@ -378,34 +386,6 @@
 	}
 }
 
-/* Simple dialog fade animations */
-@keyframes dialog-fade-in {
-	0% {
-		opacity: 0;
-	}
-	100% {
-		opacity: 1;
-	}
-}
-
-@keyframes dialog-fade-out {
-	0% {
-		opacity: 1;
-	}
-	100% {
-		opacity: 0;
-	}
-}
-
-/* Dialog smooth fade class */
-.dialog-smooth-fade {
-	animation: dialog-fade-in 0.4s ease-out;
-}
-
-.dialog-smooth-fade[data-state='closed'] {
-	animation: dialog-fade-out 0.3s ease-in;
-}
-
 /* Smooth dialog entrance animation */
 
 @keyframes dialog-smooth-in {
@@ -417,130 +397,6 @@
 		opacity: 1;
 		background-color: rgba(255, 255, 255, 1);
 	}
-}
-
-/* White overlay fade animations */
-@keyframes white-fade-out {
-	0% {
-		opacity: 1;
-	}
-	100% {
-		opacity: 0;
-	}
-}
-
-@keyframes white-fade-in {
-	0% {
-		opacity: 0;
-	}
-	100% {
-		opacity: 1;
-	}
-}
-
-.animate-white-fade-out {
-	animation: white-fade-out 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-	animation-delay: 0.1s;
-}
-
-.animate-white-fade-in {
-	animation: white-fade-in 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
-}
-
-/* Gentle content fade animations */
-@keyframes gentle-fade-in {
-	0% {
-		opacity: 0;
-	}
-	100% {
-		opacity: 1;
-	}
-}
-
-@keyframes gentle-fade-out {
-	0% {
-		opacity: 1;
-	}
-	100% {
-		opacity: 0;
-	}
-}
-
-.animate-gentle-fade-in {
-	animation: gentle-fade-in 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.animate-gentle-fade-out {
-	animation: gentle-fade-out 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
-}
-
-/* Apple-style overlay animation */
-.dialog-overlay-apple {
-	background: rgba(0, 0, 0, 0.3);
-	backdrop-filter: blur(10px);
-	-webkit-backdrop-filter: blur(10px);
-}
-
-.dialog-overlay-apple[data-state='open'] {
-	animation: apple-overlay-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-.dialog-overlay-apple[data-state='closed'] {
-	animation: apple-overlay-out 0.35s cubic-bezier(0.55, 0, 1, 0.45) forwards;
-}
-
-@keyframes apple-overlay-in {
-	0% {
-		opacity: 0;
-		backdrop-filter: blur(0);
-		-webkit-backdrop-filter: blur(0);
-	}
-	100% {
-		opacity: 1;
-		backdrop-filter: blur(10px);
-		-webkit-backdrop-filter: blur(10px);
-	}
-}
-
-@keyframes apple-overlay-out {
-	0% {
-		opacity: 1;
-		backdrop-filter: blur(10px);
-		-webkit-backdrop-filter: blur(10px);
-	}
-	100% {
-		opacity: 0;
-		backdrop-filter: blur(0);
-		-webkit-backdrop-filter: blur(0);
-	}
-}
-
-@layer base {
-	* {
-		@apply border-border outline-ring/50;
-	}
-	body {
-		@apply bg-background text-foreground;
-		overflow-x: hidden;
-		position: relative;
-	}
-	h1 {
-		@apply text-2xl font-bold;
-	}
-	h2 {
-		@apply text-xl font-bold;
-	}
-	h3 {
-		@apply text-lg font-bold;
-	}
-}
-
-mux-player {
-	--seek-backward-button: none;
-	--seek-forward-button: none;
-	--cast-button: none;
-	--pip-button: none;
-	--playback-rate-button: none;
 }
 
 /* TipTap Placeholder Styles */
@@ -1225,53 +1081,22 @@ mux-player {
 	}
 }
 
-@keyframes premium-gradient-move {
-	0%,
-	100% {
-		background-position: 0% 50%;
-	}
-	50% {
-		background-position: 100% 50%;
-	}
-}
+/* Removed dead animations: premium-gradient-move, premium-shimmer, premium-float */
+/* These animations were not being used in the dashboard */
 
-@keyframes premium-shimmer {
-	0% {
-		transform: translateX(-50%);
-		opacity: 0;
-	}
-	50% {
-		opacity: 1;
-	}
-	100% {
-		transform: translateX(50%);
-		opacity: 0;
-	}
-}
-
-@keyframes premium-float {
-	0%,
-	100% {
-		transform: translateY(0px);
-	}
-	50% {
-		transform: translateY(-2px);
-	}
-}
-
-/* Hero section - continuous ambient animation */
+/* Hero section - clean without animations */
 .premium-hero-section {
 	position: relative;
 	z-index: 1;
-	overflow: hidden;
 }
 
-/* Logo container - subtle float only */
+/* Logo container - static display */
 .premium-logo-container {
 	position: relative;
-	display: inline-block;
-	animation: premium-float 12s ease-in-out infinite;
-	opacity: 0.9;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 1;
 }
 
 /* Main title gradient - Murmur */
@@ -1287,7 +1112,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	/* Animation removed - not used on dashboard */
 	will-change: auto; /* Changed from background-position for Safari performance */
 	-webkit-transform: translateZ(0); /* Safari GPU acceleration */
 	transform: translateZ(0);
@@ -1315,7 +1140,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	/* Animation removed - not used on dashboard */
 	filter: blur(25px);
 	opacity: 0.15;
 	pointer-events: none;
@@ -1338,7 +1163,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite reverse;
+	/* Animation removed - not used on dashboard */
 	filter: blur(12px);
 	opacity: 0.2;
 	pointer-events: none;
@@ -1349,7 +1174,7 @@ mux-player {
 	position: relative;
 	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 	color: rgb(107, 114, 128);
-	opacity: 0.9;
+	opacity: 1;
 }
 
 /* Accent word - "start" */
@@ -1388,7 +1213,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	/* Animation removed - not used on dashboard */
 }
 
 /* Dark mode NYC high society gradient outline - Layer 1 */
@@ -1405,7 +1230,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	/* Animation removed - not used on dashboard */
 	filter: blur(25px);
 	opacity: 0.15;
 }
@@ -1422,7 +1247,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite reverse;
+	/* Animation removed - not used on dashboard */
 	filter: blur(12px);
 	opacity: 0.25;
 }
@@ -1481,18 +1306,7 @@ mux-player {
 	opacity: 1;
 }
 
-/* ========================================
-   Elegant Search Animation - Simple & Beautiful
-   ======================================== */
-
-/* Dashboard container - holds the entire search experience */
-.dashboard-container {
-	position: relative;
-	min-height: 100vh;
-	transition: all 0.6s ease;
-}
-
-/* Hero wrapper - contains logo and text that will fade out */
+/* Hero wrapper - vertically centered container */
 .hero-wrapper {
 	opacity: 1;
 	-webkit-transform: translateY(0);
@@ -1502,8 +1316,6 @@ mux-player {
 		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 	position: relative;
 	z-index: 1;
-	height: 320px;
-	--hero-height: 320px;
 }
 
 /* When search is active - hero elegantly fades away */
@@ -1513,12 +1325,14 @@ mux-player {
 	transform: translateY(-20px);
 	pointer-events: none;
 	height: 0;
+	min-height: 0;
 	overflow: hidden;
 	margin-bottom: 0;
 	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		-webkit-transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-		height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
+		height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s,
+		min-height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
 }
 
 /* Search bar wrapper - default state */
@@ -1531,7 +1345,7 @@ mux-player {
 		transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
 		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 	z-index: 20;
-	margin-top: clamp(3rem, calc((100vh - var(--hero-height, 320px)) * 0.35), 26vh);
+	margin-top: clamp(3rem, 10vh, 10rem);
 	width: 100%;
 }
 
@@ -1600,22 +1414,6 @@ mux-player {
 	opacity: 0;
 }
 
-/* Campaigns table fade out when search is triggered */
-.campaigns-table-wrapper {
-	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-	opacity: 1;
-	transform: translateY(0);
-	/* Ensure minimum spacing from search bar */
-	min-height: 400px;
-}
-
-.search-active ~ .campaigns-table-wrapper {
-	opacity: 0;
-	transform: translateY(20px);
-	pointer-events: none;
-}
-
 /* Campaigns table container with fixed height */
 .campaigns-table-container {
 	max-height: 382px;
@@ -1641,19 +1439,6 @@ mux-player {
 /* Also hide if pagination is rendered as sibling */
 .campaigns-table-container ~ nav {
 	display: none !important;
-}
-
-/* Target the specific pagination structure */
-.campaigns-table-wrapper .flex.items-center.justify-center.gap-2:has(button) {
-	display: none !important;
-}
-
-/* Fallback for Safari versions that don't support :has() */
-@supports not (selector(:has(*))) {
-	.campaigns-table-wrapper nav,
-	.campaigns-table-wrapper [role='navigation'] {
-		display: none !important;
-	}
 }
 
 /* Handle text overflow in campaigns table cells */
@@ -1746,8 +1531,8 @@ mux-player {
 }
 
 .exclude-contacts-box:hover {
-	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-	-webkit-box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	box-shadow: none;
+	-webkit-box-shadow: none;
 }
 
 /* Ensure consistent layout during horizontal compression */
@@ -2366,88 +2151,6 @@ mux-player {
 	}
 }
 
-.name-header-fade-in {
-	-webkit-animation: fadeIn 0.5s ease-in-out forwards;
-	animation: fadeIn 0.5s ease-in-out forwards;
-}
-
-.name-header-fade-out {
-	-webkit-animation: fadeOut 0.5s ease-in-out forwards;
-	animation: fadeOut 0.5s ease-in-out forwards;
-}
-
-@keyframes appleSlideIn {
-	0% {
-		opacity: 0;
-		transform: translateY(20px) scale(0.95);
-		filter: blur(10px);
-	}
-	50% {
-		opacity: 0.5;
-		filter: blur(5px);
-	}
-	100% {
-		opacity: 1;
-		transform: translateY(0) scale(1);
-		filter: blur(0);
-	}
-}
-
-@keyframes appleFadeGlow {
-	0%,
-	100% {
-		opacity: 1;
-	}
-	50% {
-		opacity: 0.85;
-	}
-}
-
-.select-prompt-container {
-	display: -webkit-flex;
-	display: -moz-box;
-	display: flex;
-	-webkit-flex-direction: column;
-	-moz-box-orient: vertical;
-	-moz-box-direction: normal;
-	flex-direction: column;
-	-webkit-align-items: center;
-	-moz-box-align: center;
-	align-items: center;
-	margin-bottom: 1rem; /* Adjust as needed */
-}
-
-.select-prompt-text {
-	font-family: 'Times New Roman', Times, serif;
-	font-size: 1.25rem; /* 20px */
-	color: #333; /* Dark gray for readability */
-}
-
-.static-tooltip-container {
-	height: 2.5rem; /* Allocate space for the text */
-	display: -webkit-flex;
-	display: -moz-box;
-	display: flex;
-	-webkit-align-items: center;
-	-moz-box-align: center;
-	align-items: center;
-	-webkit-justify-content: center;
-	-moz-box-pack: center;
-	justify-content: center;
-	margin-top: 0.5rem; /* Lower the text vertically */
-}
-
-.static-tooltip-text {
-	font-family: 'Times New Roman', Times, serif;
-	font-size: 1rem; /* 16px - Smaller font size */
-	color: #888888; /* A nice gray color */
-	padding: 0.5rem 0;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	max-width: 100%;
-}
-
 /* Responsive table layout */
 .results-appear {
 	width: 100%;
@@ -2488,12 +2191,6 @@ mux-player {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-}
-
-/* Dashboard responsive improvements */
-.dashboard-container {
-	width: 100%;
-	max-width: 100%;
 }
 
 .hero-wrapper {
@@ -2572,55 +2269,16 @@ mux-player {
 	}
 }
 
-/* Campaigns table responsive spacing */
-@media (max-width: 640px) {
-	.campaigns-table-wrapper {
-		margin-top: 6rem !important; /* Override Tailwind mt-32 */
-	}
-}
-
-@media (min-width: 641px) and (max-width: 768px) {
-	.campaigns-table-wrapper {
-		margin-top: 8rem !important; /* Override Tailwind mt-36 */
-	}
-}
-
-@media (min-width: 769px) and (max-width: 1024px) {
-	.campaigns-table-wrapper {
-		margin-top: 10rem !important; /* Override Tailwind mt-40 */
-	}
-}
-
-@media (min-width: 1025px) and (max-width: 1280px) {
-	.campaigns-table-wrapper {
-		margin-top: 12rem !important; /* Override Tailwind mt-44 */
-	}
-}
-
-@media (min-width: 1281px) and (max-width: 1536px) {
-	.campaigns-table-wrapper {
-		margin-top: 14rem !important; /* Override Tailwind mt-48 */
-	}
-}
-
-@media (min-width: 1537px) {
-	.campaigns-table-wrapper {
-		margin-top: 16rem !important; /* Override Tailwind mt-56 */
-	}
-}
-
 /* Maintain consistent spacing ratio on zoom */
 @media (min-width: 1920px) {
 	.campaigns-table-wrapper {
-		margin-top: -webkit-calc(16rem + 2vw) !important; /* Safari prefix */
-		margin-top: calc(16rem + 2vw) !important;
+		margin-top: 2rem !important; /* Raised for visibility */
 	}
 }
 
 @media (min-width: 2560px) {
 	.campaigns-table-wrapper {
-		margin-top: -webkit-calc(18rem + 2vw) !important; /* Safari prefix */
-		margin-top: calc(18rem + 2vw) !important;
+		margin-top: 2rem !important; /* Raised for visibility */
 	}
 }
 
@@ -2709,14 +2367,6 @@ mux-player {
 			-moz-osx-font-smoothing: grayscale;
 			text-rendering: optimizeLegibility;
 		}
-	}
-}
-
-/* Safari-specific mobile app coming soon page styles */
-@supports (-webkit-touch-callout: none) {
-	/* iOS Safari specific styles */
-	.fixed.inset-0 {
-		min-height: -webkit-fill-available;
 	}
 }
 
@@ -2811,23 +2461,6 @@ body.murmur-page footer {
 	display: none !important;
 }
 
-/* Ensure campaigns block never overlaps the search bar on extreme zoom */
-/* When zoomed out, the search bar's margin-top grows due to vh units, 
-   so we need to ensure the campaigns table is positioned far enough below */
-@media (min-height: 800px) {
-	.dashboard-container:not(.search-active) .campaigns-table-wrapper {
-		/* Add minimal extra margin that scales with viewport height to prevent overlap */
-		margin-top: calc(8rem + 2vh) !important;
-	}
-}
-
-@media (min-height: 1200px) {
-	.dashboard-container:not(.search-active) .campaigns-table-wrapper {
-		/* Slightly more margin for extreme zoom levels */
-		margin-top: calc(8rem + 3vh) !important;
-	}
-}
-
 /* Also ensure the hero wrapper can contain the growing search bar */
 .dashboard-container:not(.search-active) .hero-wrapper {
 	/* Allow hero to grow with viewport height to contain search bar */
@@ -2869,22 +2502,10 @@ body.murmur-page footer {
 	}
 }
 
-.hover-scroll-container {
-	overflow: hidden;
-	position: relative;
-	width: 100%;
-}
+/* Scrolling text on hover */
 
-.hover-scroll-text {
-	display: inline-block;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	max-width: 100%;
-	width: 100%;
-}
 .hover-scroll-container:hover .hover-scroll-text {
-	animation: scrollText 8s linear infinite;
+	animation: scrollText var(--scroll-duration, 8s) linear infinite;
 	text-overflow: initial;
 	max-width: none;
 	width: auto;
@@ -2898,4 +2519,37 @@ body.murmur-page footer {
 	left: 100%;
 	padding-left: 50px;
 	white-space: nowrap;
+}
+
+/* Lenis smooth scrolling styles */
+html.lenis {
+	height: auto;
+}
+
+.lenis.lenis-smooth {
+	scroll-behavior: auto;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+	overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+	overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+	pointer-events: none;
+}
+
+/* Global performance optimizations for scroll animations */
+[data-scroll-animation] {
+	will-change: transform, opacity;
+	-webkit-transform: translateZ(0);
+	backface-visibility: hidden;
+}
+
+/* Prevent layout shifts during animations */
+main {
+	isolation: isolate;
 }
