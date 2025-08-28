@@ -2311,15 +2311,19 @@
 }
 
 /* Maintain consistent spacing ratio on zoom */
+.campaigns-table-wrapper {
+	margin-top: -12rem !important; /* Lift table into viewport without moving hero */
+}
+
 @media (min-width: 1920px) {
 	.campaigns-table-wrapper {
-		margin-top: 2rem !important; /* Raised for visibility */
+		margin-top: -14rem !important; /* Keep lifted on large screens */
 	}
 }
 
 @media (min-width: 2560px) {
 	.campaigns-table-wrapper {
-		margin-top: 2rem !important; /* Raised for visibility */
+		margin-top: -18rem !important; /* Keep lifted on very large screens */
 	}
 }
 
