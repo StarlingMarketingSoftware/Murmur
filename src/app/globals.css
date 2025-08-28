@@ -1504,12 +1504,16 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 .campaigns-table-container {
 	max-height: 382px;
 	overflow: hidden;
+	position: relative;
+	z-index: 40; /* Ensure container is clickable */
 }
 
 /* Override the default constrainHeight of 429px */
 .campaigns-table-container > div > div:last-child {
 	height: 382px !important;
 	max-height: 382px !important;
+	position: relative;
+	z-index: 41; /* Ensure scrollable area is above container but below rows */
 }
 
 /* Hide rows per page and search in campaigns table header */
@@ -1600,6 +1604,37 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 .campaigns-table-container td:last-child button {
 	position: relative;
 	z-index: 1;
+}
+
+/* Ensure all table rows are clickable */
+.campaigns-table-container tbody tr {
+	position: relative;
+	z-index: 45; /* Higher than container to ensure clickability */
+}
+
+/* Ensure table body is interactive */
+.campaigns-table-container tbody {
+	position: relative;
+	z-index: 42;
+}
+
+/* Make table header non-interactive */
+.campaigns-table-container thead,
+.campaigns-table-container thead tr,
+.campaigns-table-container thead th {
+	pointer-events: none !important;
+	cursor: default !important;
+	user-select: none !important;
+}
+
+/* Ensure only table body rows are clickable */
+.campaigns-table-container tbody tr {
+	cursor: pointer;
+}
+
+/* Override any hover effects on header */
+.campaigns-table-container thead tr:hover {
+	background-color: transparent !important;
 }
 
 /* Exclude contacts box styling */
@@ -2352,6 +2387,8 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 /* Maintain consistent spacing ratio on zoom */
 .campaigns-table-wrapper {
 	margin-top: -12rem !important; /* Lift table into viewport without moving hero */
+	position: relative;
+	z-index: 30; /* Ensure table is above other elements */
 }
 
 @media (min-width: 1920px) {
