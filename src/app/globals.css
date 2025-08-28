@@ -1442,7 +1442,7 @@
 }
 
 /* Handle text overflow in campaigns table cells */
-.campaigns-table-container td:not(:nth-child(4)) {
+.campaigns-table-container td:not(:nth-child(3)) {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -1450,7 +1450,7 @@
 }
 
 /* Also apply text clipping to table headers */
-.campaigns-table-container th:not(:nth-child(4)) {
+.campaigns-table-container th:not(:nth-child(3)) {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -1458,7 +1458,7 @@
 }
 
 /* Ensure the delete column header is centered */
-.campaigns-table-container th:nth-child(4) {
+.campaigns-table-container th:nth-child(3) {
 	text-align: center;
 }
 
@@ -1476,23 +1476,27 @@
 	}
 }
 
-/* First three columns share the space evenly */
+/* Name column fixed width */
 .campaigns-table-container th:nth-child(1),
-.campaigns-table-container td:nth-child(1),
-.campaigns-table-container th:nth-child(2),
-.campaigns-table-container td:nth-child(2),
-.campaigns-table-container th:nth-child(3),
-.campaigns-table-container td:nth-child(3) {
-	width: calc((100% - 60px) / 3) !important;
-	width: -webkit-calc((100% - 60px) / 3) !important;
-	min-width: 0 !important;
-	max-width: calc((100% - 60px) / 3) !important;
-	max-width: -webkit-calc((100% - 60px) / 3) !important;
+.campaigns-table-container td:nth-child(1) {
+	width: 350px !important;
+	min-width: 350px !important;
+	max-width: 350px !important;
 }
 
-/* Delete button column - small fixed width at far right */
-.campaigns-table-container th:nth-child(4),
-.campaigns-table-container td:nth-child(4) {
+/* Metrics column stretches to fill remaining space between name and delete */
+.campaigns-table-container th:nth-child(2),
+.campaigns-table-container td:nth-child(2) {
+	width: calc(100% - 410px) !important; /* 350 (name) + 60 (delete) */
+	width: -webkit-calc(100% - 410px) !important;
+	min-width: 0 !important;
+	max-width: calc(100% - 410px) !important;
+	max-width: -webkit-calc(100% - 410px) !important;
+}
+
+/* Delete button column - fixed width at far right */
+.campaigns-table-container th:nth-child(3),
+.campaigns-table-container td:nth-child(3) {
 	width: 60px !important;
 	min-width: 60px !important;
 	max-width: 60px !important;
@@ -1502,18 +1506,8 @@
 }
 
 /* Hide the header text for delete column */
-.campaigns-table-container th:nth-child(4) button {
+.campaigns-table-container th:nth-child(3) button {
 	visibility: hidden;
-}
-
-/* Override any generic selectors for the specific columns */
-.campaigns-table-container [role='columnheader']:not(:nth-child(4)),
-.campaigns-table-container [role='cell']:not(:nth-child(4)) {
-	width: calc((100% - 60px) / 3) !important;
-	width: -webkit-calc((100% - 60px) / 3) !important;
-	min-width: 0 !important;
-	max-width: calc((100% - 60px) / 3) !important;
-	max-width: -webkit-calc((100% - 60px) / 3) !important;
 }
 
 /* Ensure buttons in the last column are not clipped */

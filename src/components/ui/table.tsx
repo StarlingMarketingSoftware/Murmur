@@ -31,10 +31,10 @@ function Table({
 	);
 }
 
-const tableHeaderVariants = cva('[&_tr]:border-b-2 [&_tr]:border-black', {
+const tableHeaderVariants = cva('', {
 	variants: {
 		variant: {
-			primary: 'text-[15px] font-primary',
+			primary: 'text-[15px] font-primary [&_tr]:border-b-2 [&_tr]:border-black',
 			secondary: 'text-[15px] font-secondary bg-primary',
 		},
 	},
@@ -154,12 +154,12 @@ function TableRow({
 }
 
 const tableHeadVariants = cva(
-	'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap overflow-hidden text-ellipsis [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] bg-background border-b-2 border-black',
+	'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap overflow-hidden text-ellipsis [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] bg-background',
 	{
 		variants: {
 			variant: {
-				primary: '',
-				secondary: 'font-secondary',
+				primary: 'border-b-2 border-black',
+				secondary: 'font-secondary border-b border-[#8C8C8C]',
 			},
 		},
 		defaultVariants: {

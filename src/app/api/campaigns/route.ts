@@ -78,12 +78,42 @@ export async function GET() {
 				userId: userId,
 				status: Status.active,
 			},
+			include: {
+				_count: {
+					select: {
+						emails: true,
+					},
+				},
+				emails: {
+					select: {
+						status: true,
+					},
+				},
+			},
 			orderBy: {
 				createdAt: 'desc',
 			},
 		});
 
-		return apiResponse(campaigns);
+		// Transform the data to include draft and sent counts
+		const campaignsWithCounts = campaigns.map((campaign) => {
+			const draftCount = campaign.emails.filter(
+				(email) => email.status === 'draft'
+			).length;
+			const sentCount = campaign.emails.filter((email) => email.status === 'sent').length;
+
+			// Remove the emails array from the response, keep only counts
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars
+			const { emails, ...campaignWithoutEmails } = campaign;
+
+			return {
+				...campaignWithoutEmails,
+				draftCount,
+				sentCount,
+			};
+		});
+
+		return apiResponse(campaignsWithCounts);
 	} catch (error) {
 		return handleApiError(error);
 	}
