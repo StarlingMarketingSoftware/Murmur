@@ -20,15 +20,21 @@ export const CampaignsTable: FC = () => {
 
 	return (
 		<>
-			<Card className="relative border-none bg-gradient-to-l from-gray-100 via-background to-gray-100 w-full max-w-[1132px] mx-auto">
+			<Card className="relative border-none bg-transparent w-full max-w-[1132px] mx-auto">
 				{isPending && <Spinner size="medium" className="absolute top-2 right-2" />}
-				<CardHeader>
-					<CardTitle className="text-center text-2xl">Campaigns</CardTitle>
+				<CardHeader className="px-6 pb-2 bg-[#F8F8F8]">
+					<CardTitle
+						className="text-left text-[14px] font-normal"
+						style={{ fontFamily: 'Inter, sans-serif' }}
+					>
+						My Campaigns
+					</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-2 w-full px-6 pb-6 pt-0">
 					<div className="campaigns-table-container">
 						<CustomTable
 							variant="secondary"
+							containerClassName="border-[2px] border-[#8C8C8C] rounded-[8px] my-campaigns-table"
 							handleRowClick={handleRowClick}
 							columns={columns}
 							data={data}
@@ -38,6 +44,7 @@ export const CampaignsTable: FC = () => {
 							constrainHeight
 							hidePagination={true}
 							searchable={false}
+							useAutoLayout
 						/>
 					</div>
 				</CardContent>

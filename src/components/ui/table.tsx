@@ -31,10 +31,10 @@ function Table({
 	);
 }
 
-const tableHeaderVariants = cva('[&_tr]:border-b-2 [&_tr]:border-black', {
+const tableHeaderVariants = cva('', {
 	variants: {
 		variant: {
-			primary: 'text-[15px] font-primary',
+			primary: 'text-[15px] font-primary [&_tr]:border-b-2 [&_tr]:border-black',
 			secondary: 'text-[15px] font-secondary bg-primary',
 		},
 	},
@@ -130,7 +130,7 @@ const tableRowVariants = cva(
 			variant: {
 				primary:
 					'text-[15px] odd:bg-gray-50 even:bg-background border-black data-[state=selected]:!bg-primary/30 data-[state=selected]:shadow-inner data-[state=selected]:font-medium data-[state=selected]:scale-[1.005]',
-				secondary: 'text-[15px] font-secondary bg-background border-gray-200',
+				secondary: 'text-[15px] font-secondary bg-background border-gray-200 py-2',
 			},
 		},
 		defaultVariants: {
@@ -154,12 +154,12 @@ function TableRow({
 }
 
 const tableHeadVariants = cva(
-	'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap overflow-hidden text-ellipsis [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] bg-background border-b-2 border-black',
+	'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap overflow-hidden text-ellipsis [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] bg-background',
 	{
 		variants: {
 			variant: {
-				primary: '',
-				secondary: 'font-secondary',
+				primary: 'border-b-2 border-black',
+				secondary: 'font-secondary border-b border-[#8C8C8C]',
 			},
 		},
 		defaultVariants: {
@@ -188,7 +188,7 @@ const tableCellVariants = cva(
 		variants: {
 			variant: {
 				primary: 'text-sm font-secondary',
-				secondary: 'text-[15px] font-secondary bg-background',
+				secondary: 'text-[15px] font-secondary bg-background py-3',
 			},
 		},
 		defaultVariants: {

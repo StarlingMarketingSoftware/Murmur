@@ -100,6 +100,7 @@ interface CustomTableProps<TData, TValue> extends DataTableProps<TData, TValue> 
 	tableRef?: (table: TableType<TData>) => void;
 	useAutoLayout?: boolean;
 	allowColumnOverflow?: boolean;
+	containerClassName?: string;
 }
 
 export function CustomTable<TData, TValue>({
@@ -121,7 +122,9 @@ export function CustomTable<TData, TValue>({
 	headerAction,
 	useAutoLayout = false,
 	allowColumnOverflow = false,
+	containerClassName,
 }: CustomTableProps<TData, TValue>) {
+	type ColumnDefWithSize = ColumnDef<TData, TValue> & { size?: number };
 	const [pagination, setPagination] = useState({
 		pageIndex: 0,
 		pageSize: rowsPerPage,
@@ -241,7 +244,7 @@ export function CustomTable<TData, TValue>({
 	}, [pagination.pageIndex, pagination.pageSize, data]);
 
 	return (
-		<div className="w-full [&_::-webkit-scrollbar]:h-[4px] [&_::-webkit-scrollbar]:md:h-[7px] [&_::-webkit-scrollbar-thumb]:bg-gray-300 [&_::-webkit-scrollbar-thumb]:rounded-full [&_::-webkit-scrollbar]:w-[4px] [&_::-webkit-scrollbar]:md:w-[7px]">
+		<div className="w-full">
 			<div className="flex items-center justify-between py-4 gap-4 w-full max-w-full mx-auto">
 				<div className="flex items-center gap-4 flex-wrap">
 					{searchable && (
@@ -287,8 +290,9 @@ export function CustomTable<TData, TValue>({
 			</div>
 			<div
 				className={cn(
-					'border-2 border-black relative overflow-y-auto overflow-x-hidden overscroll-contain custom-scrollbar w-full max-w-full mx-auto',
-					constrainHeight && 'h-[429px]'
+					'border-2 border-black relative overflow-y-auto overflow-x-hidden overscroll-contain w-full max-w-full mx-auto',
+					constrainHeight && 'h-[429px]',
+					containerClassName
 				)}
 				tabIndex={0}
 				style={{ WebkitOverflowScrolling: 'touch' }}
@@ -311,15 +315,38 @@ export function CustomTable<TData, TValue>({
 				>
 					<TableHeader variant={variant} sticky>
 						{table.getHeaderGroups().map((headerGroup) => (
-							<TableRow className="sticky top-0" key={headerGroup.id} variant={variant}>
+							<TableRow
+								className="sticky top-0 border-0"
+								key={headerGroup.id}
+								variant={variant}
+							>
 								{headerGroup.headers.map((header) => {
 									const totalColumns = headerGroup.headers.length;
-									const columnWidth = `${100 / totalColumns}%`;
+									const fallbackWidth = `${100 / totalColumns}%`;
+									const defSize = (header.column.columnDef as ColumnDefWithSize)?.size;
+									const headerSize = header.column.getSize
+										? header.column.getSize()
+										: undefined;
 									return (
 										<TableHead
 											key={header.id}
 											variant={variant}
-											style={useAutoLayout ? undefined : { width: columnWidth }}
+											style={
+												useAutoLayout
+													? undefined
+													: {
+															width:
+																defSize && defSize > 0
+																	? `${defSize}px`
+																	: headerSize && headerSize > 0
+																	? `${headerSize}px`
+																	: fallbackWidth,
+															minWidth:
+																defSize && defSize > 0 ? `${defSize}px` : undefined,
+															maxWidth:
+																defSize && defSize > 0 ? `${defSize}px` : undefined,
+													  }
+											}
 											className="whitespace-nowrap"
 										>
 											{header.isPlaceholder
@@ -390,12 +417,31 @@ export function CustomTable<TData, TValue>({
 								>
 									{row.getVisibleCells().map((cell) => {
 										const totalColumns = row.getVisibleCells().length;
-										const columnWidth = `${100 / totalColumns}%`;
+										const fallbackWidth = `${100 / totalColumns}%`;
+										const defSize = (cell.column.columnDef as ColumnDefWithSize)?.size;
+										const cellSize = cell.column.getSize
+											? cell.column.getSize()
+											: undefined;
 										return (
 											<TableCell
 												key={cell.id}
 												variant={variant}
-												style={useAutoLayout ? undefined : { width: columnWidth }}
+												style={
+													useAutoLayout
+														? undefined
+														: {
+																width:
+																	defSize && defSize > 0
+																		? `${defSize}px`
+																		: cellSize && cellSize > 0
+																		? `${cellSize}px`
+																		: fallbackWidth,
+																minWidth:
+																	defSize && defSize > 0 ? `${defSize}px` : undefined,
+																maxWidth:
+																	defSize && defSize > 0 ? `${defSize}px` : undefined,
+														  }
+												}
 												className="whitespace-nowrap"
 											>
 												{flexRender(cell.column.columnDef.cell, cell.getContext())}
