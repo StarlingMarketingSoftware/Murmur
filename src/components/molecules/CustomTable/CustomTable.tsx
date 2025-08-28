@@ -100,6 +100,7 @@ interface CustomTableProps<TData, TValue> extends DataTableProps<TData, TValue> 
 	tableRef?: (table: TableType<TData>) => void;
 	useAutoLayout?: boolean;
 	allowColumnOverflow?: boolean;
+	excludeFromEqualWidth?: string[];
 }
 
 export function CustomTable<TData, TValue>({
@@ -121,6 +122,7 @@ export function CustomTable<TData, TValue>({
 	headerAction,
 	useAutoLayout = false,
 	allowColumnOverflow = false,
+	excludeFromEqualWidth = ['delete'],
 }: CustomTableProps<TData, TValue>) {
 	const [pagination, setPagination] = useState({
 		pageIndex: 0,
@@ -310,26 +312,41 @@ export function CustomTable<TData, TValue>({
 					variant={variant}
 				>
 					<TableHeader variant={variant} sticky>
-						{table.getHeaderGroups().map((headerGroup) => (
-							<TableRow className="sticky top-0" key={headerGroup.id} variant={variant}>
-								{headerGroup.headers.map((header) => {
-									const totalColumns = headerGroup.headers.length;
-									const columnWidth = `${100 / totalColumns}%`;
-									return (
-										<TableHead
-											key={header.id}
-											variant={variant}
-											style={useAutoLayout ? undefined : { width: columnWidth }}
-											className="whitespace-nowrap"
-										>
-											{header.isPlaceholder
-												? null
-												: flexRender(header.column.columnDef.header, header.getContext())}
-										</TableHead>
-									);
-								})}
-							</TableRow>
-						))}
+						{table.getHeaderGroups().map((headerGroup) => {
+							const excludedIdSet = new Set(excludeFromEqualWidth);
+							const equalHeaders = headerGroup.headers.filter(
+								(h) => !excludedIdSet.has(h.column.id)
+							);
+							const columnWidth = `${100 / (equalHeaders.length || 1)}%`;
+							return (
+								<TableRow className="sticky top-0" key={headerGroup.id} variant={variant}>
+									{headerGroup.headers.map((header) => {
+										const isExcluded = excludedIdSet.has(header.column.id);
+										return (
+											<TableHead
+												key={header.id}
+												variant={variant}
+												style={
+													useAutoLayout
+														? undefined
+														: isExcluded
+														? { width: '48px' }
+														: { width: columnWidth }
+												}
+												className="whitespace-nowrap"
+											>
+												{header.isPlaceholder
+													? null
+													: flexRender(
+															header.column.columnDef.header,
+															header.getContext()
+													  )}
+											</TableHead>
+										);
+									})}
+								</TableRow>
+							);
+						})}
 					</TableHeader>
 					<TableBody variant={variant}>
 						{table.getRowModel().rows?.length ? (

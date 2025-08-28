@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
-import { AiModel, Status } from '@prisma/client';
+import { AiModel, Status, EmailStatus } from '@prisma/client';
 import {
 	apiBadRequest,
 	apiCreated,
@@ -83,7 +83,40 @@ export async function GET() {
 			},
 		});
 
-		return apiResponse(campaigns);
+		// Aggregate email counts per campaign by status
+		const emailCounts = await prisma.email.groupBy({
+			by: ['campaignId', 'status'],
+			where: {
+				campaign: {
+					userId: userId,
+					status: Status.active,
+				},
+			},
+			_count: { _all: true },
+		});
+
+		const countsByCampaign: Record<number, { draft: number; sent: number }> = {};
+		for (const row of emailCounts) {
+			const campaignId = row.campaignId as number;
+			const status = row.status as EmailStatus;
+			const count = (row._count as unknown as { _all: number })._all;
+			if (!countsByCampaign[campaignId]) {
+				countsByCampaign[campaignId] = { draft: 0, sent: 0 };
+			}
+			if (status === EmailStatus.draft) {
+				countsByCampaign[campaignId].draft += count;
+			} else if (status === EmailStatus.sent) {
+				countsByCampaign[campaignId].sent += count;
+			}
+		}
+
+		const campaignsWithCounts = campaigns.map((c) => ({
+			...c,
+			draftCount: countsByCampaign[c.id]?.draft ?? 0,
+			sentCount: countsByCampaign[c.id]?.sent ?? 0,
+		}));
+
+		return apiResponse(campaignsWithCounts);
 	} catch (error) {
 		return handleApiError(error);
 	}

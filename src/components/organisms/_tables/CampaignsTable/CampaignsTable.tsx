@@ -38,6 +38,7 @@ export const CampaignsTable: FC = () => {
 							constrainHeight
 							hidePagination={true}
 							searchable={false}
+							excludeFromEqualWidth={[]}
 						/>
 					</div>
 				</CardContent>
