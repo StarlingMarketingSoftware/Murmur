@@ -346,7 +346,10 @@ const Dashboard = () => {
 							</div>
 						) : contacts && contacts.length > 0 ? (
 							<div className="flex justify-center w-full px-4">
-								<div className="w-full max-w-full results-appear results-align">
+								<div
+									className="w-full max-w-full results-appear results-align"
+									style={{ transform: 'scale(0.9)', transformOrigin: 'top center' }}
+								>
 									<div className="select-prompt-container">
 										<div className="select-prompt-text text-center w-full">
 											Select who you want to contact
