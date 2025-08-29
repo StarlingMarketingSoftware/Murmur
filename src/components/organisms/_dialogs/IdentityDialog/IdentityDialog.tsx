@@ -1,8 +1,7 @@
 import { FC, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
+import { Form, FormField, FormItem } from '@/components/ui/form';
 import { IdentityDialogProps, useIdentityDialog } from './useIdentityDialog';
 import {
 	Dialog,
@@ -20,7 +19,6 @@ import { Typography } from '@/components/ui/typography';
 export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 	const router = useRouter();
 	const [isContentReady, setIsContentReady] = useState(false);
-	const [expandedProfileId, setExpandedProfileId] = useState<number | null>(null);
 	const {
 		title,
 		open,
@@ -31,7 +29,6 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 		identities,
 		form,
 		isEdit,
-		setIsEdit,
 		selectedIdentity,
 		handleAssignIdentity,
 		isPendingAssignIdentity,
@@ -152,12 +149,12 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 											/* Show grid layout when profiles exist */
 											<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
 												{/* Existing Profiles Section */}
-												<div>
+												<div className="-ml-8">
 													<Typography
 														variant="h3"
-														className="text-xl font-semibold text-gray-900 mb-4"
+														className="!text-[18.77px] !leading-[22.1px] font-medium text-[#000000] mb-4 font-secondary"
 													>
-														Select Existing Profile
+														Select User Profile
 													</Typography>
 													<Form {...form}>
 														<FormField
@@ -165,102 +162,50 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 															name="identityId"
 															render={({ field }) => (
 																<FormItem>
-																	<FormControl>
-																		<RadioGroup
-																			value={field.value}
-																			onValueChange={field.onChange}
-																			className="space-y-4"
-																		>
-																			{identities.map((identity) => (
-																				<div
-																					key={identity.id}
-																					className="bg-background rounded-lg hover:bg-gray-50 transition-all cursor-pointer"
-																					onClick={() =>
-																						setExpandedProfileId(
-																							expandedProfileId === identity.id
-																								? null
-																								: identity.id
-																						)
-																					}
-																				>
-																					<div className="flex items-center gap-4 px-0 py-4">
-																						<RadioGroupItem
-																							value={identity.id.toString()}
-																							id={`identity-${identity.id}`}
-																							className="mt-0"
-																							onClick={(e) => e.stopPropagation()}
-																						/>
-																						<div className="flex-1">
-																							<Label
-																								className="block text-lg font-semibold text-gray-900 cursor-pointer"
-																								htmlFor={`identity-${identity.id}`}
+																	<div className="box-border shrink-0 w-[520px] h-[326.75px] rounded-[8.83px] border-[2.21px] border-[#000000] overflow-hidden">
+																		<div className="w-full h-full overflow-y-auto overflow-x-hidden">
+																			<Table className="w-full !rounded-none">
+																				<TableBody>
+																					{identities.map((identity) => {
+																						const isSelected =
+																							field.value === identity.id.toString();
+																						return (
+																							<TableRow
+																								key={identity.id}
+																								onClick={() =>
+																									field.onChange(identity.id.toString())
+																								}
+																								data-state={
+																									isSelected ? 'selected' : undefined
+																								}
+																								className="!border-0 !border-t-0 hover:!bg-transparent"
 																							>
-																								{identity.name}
-																							</Label>
-																						</div>
-																						<svg
-																							width="20"
-																							height="20"
-																							viewBox="0 0 20 20"
-																							fill="none"
-																							xmlns="http://www.w3.org/2000/svg"
-																							className={cn(
-																								'transform transition-transform duration-200',
-																								expandedProfileId === identity.id
-																									? 'rotate-180'
-																									: ''
-																							)}
-																						>
-																							<path
-																								d="M5 7.5L10 12.5L15 7.5"
-																								stroke="currentColor"
-																								strokeWidth="1.5"
-																								strokeLinecap="round"
-																								strokeLinejoin="round"
-																							/>
-																						</svg>
-																					</div>
-																					<div
-																						className={cn(
-																							'overflow-hidden transition-all duration-200',
-																							expandedProfileId === identity.id
-																								? 'max-h-[200px] border-t border-gray-100'
-																								: 'max-h-0'
-																						)}
-																					>
-																						<div className="px-0 py-3">
-																							<Label
-																								className="block text-sm font-medium text-gray-600 mb-1"
-																								htmlFor={`identity-${identity.id}`}
-																							>
-																								{identity.email}
-																							</Label>
-																							<Label
-																								className={cn(
-																									'block text-sm text-gray-500 mb-3',
-																									!identity.website && 'italic'
-																								)}
-																								htmlFor={`identity-${identity.id}`}
-																							>
-																								{identity.website || 'No website'}
-																							</Label>
-																							<button
-																								type="button"
-																								className="text-sm text-blue-600 hover:text-blue-700 underline"
-																								onClick={(e) => {
-																									e.stopPropagation();
-																									setIsEdit(true);
-																									setShowCreatePanel(true);
-																								}}
-																							>
-																								Edit Profile
-																							</button>
-																						</div>
-																					</div>
-																				</div>
-																			))}
-																		</RadioGroup>
-																	</FormControl>
+																								<TableCell className="p-0">
+																									<div className="w-full h-[117.01px] flex flex-col justify-center gap-0 pl-4">
+																										<div className="font-medium text-black">
+																											{identity.name}
+																										</div>
+																										<div className="text-gray-700">
+																											{identity.email}
+																										</div>
+																										<div
+																											className={cn(
+																												'text-gray-500',
+																												!identity.website &&
+																													'italic text-gray-500'
+																											)}
+																										>
+																											{identity.website || 'No website'}
+																										</div>
+																									</div>
+																								</TableCell>
+																							</TableRow>
+																						);
+																					})}
+																				</TableBody>
+																			</Table>
+																		</div>
+																	</div>
 																</FormItem>
 															)}
 														/>
@@ -271,13 +216,13 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 												<div>
 													<div className="bg-background rounded-lg transition-all">
 														<div
-															className="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-pointer"
+															className="flex items-center gap-4 p-0 hover:bg-gray-50 cursor-pointer mb-4"
 															onClick={() => setShowCreatePanel((prev) => !prev)}
 														>
 															<div className="flex items-center gap-2">
 																<Typography
 																	variant="h3"
-																	className="text-lg font-semibold text-gray-900"
+																	className="!text-[18.77px] !leading-[22.1px] font-medium text-[#000000] font-secondary"
 																>
 																	Create New Profile
 																</Typography>
