@@ -29,8 +29,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import { X, Plus } from 'lucide-react';
 import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
-import { HybridBlock, DraftingTone } from '@prisma/client';
-import { StepSlider } from '@/components/atoms/StepSlider/StepSlider';
+import { HybridBlock } from '@prisma/client';
 import {
 	BLOCKS,
 	HybridPromptInputProps,
@@ -109,7 +108,6 @@ const SortableAIBlock = ({
 	const [isEdit, setIsEdit] = useState(
 		form.getValues(`hybridBlockPrompts.${fieldIndex}.value`) !== ''
 	);
-	const [isToneExpanded, setIsToneExpanded] = useState(false);
 
 	const style = {
 		transform: CSS.Transform.toString(transform),
