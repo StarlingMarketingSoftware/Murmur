@@ -374,7 +374,9 @@ export const useDashboard = () => {
 			{
 				accessorKey: 'company',
 				id: 'nameAndCompany',
-				header: () => <span className="font-bold">Name</span>,
+				header: () => (
+					<span className="font-medium font-secondary text-[14px]">Name</span>
+				),
 				cell: ({ row }) => {
 					const contact = row.original as ContactWithName;
 					// Compute name from firstName and lastName fields
@@ -420,7 +422,7 @@ export const useDashboard = () => {
 									className="flex flex-col justify-center py-1"
 									style={{ height: '2.75rem' }}
 								>
-									<div className="truncate font-bold">
+									<div className="truncate font-bold font-primary text-[16px]">
 										<TableCellTooltip
 											text={textToShow}
 											maxLength={MAX_CELL_LENGTH}
@@ -434,7 +436,7 @@ export const useDashboard = () => {
 						// Regular layout for name only (bold)
 						return (
 							<div className="flex flex-col gap-0.5 py-1">
-								<div className="truncate font-bold">
+								<div className="truncate font-bold font-primary text-[16px]">
 									<TableCellTooltip
 										text={textToShow}
 										maxLength={MAX_CELL_LENGTH}
@@ -452,7 +454,7 @@ export const useDashboard = () => {
 					// Both name and company present - show name first (bold), company second in smaller font (not bold)
 					return (
 						<div className="flex flex-col gap-0.5 py-1">
-							<div className="truncate font-bold">
+							<div className="truncate font-bold font-primary text-[16px]">
 								<TableCellTooltip
 									text={nameValue}
 									maxLength={MAX_CELL_LENGTH}
@@ -474,7 +476,9 @@ export const useDashboard = () => {
 			},
 			{
 				accessorKey: 'title',
-				header: () => <span className="font-bold">Description</span>,
+				header: () => (
+					<span className="font-medium font-secondary text-[14px]">Title</span>
+				),
 				cell: ({ row }) => {
 					const text = (row.getValue('title') as string) || '';
 					return (
@@ -499,7 +503,9 @@ export const useDashboard = () => {
 			},
 			{
 				id: 'place',
-				header: () => <span className="font-bold">Place</span>,
+				header: () => (
+					<span className="font-medium font-secondary text-[14px]">Place</span>
+				),
 				cell: ({ row }) => {
 					const contact = row.original as ContactWithName;
 					const fullStateName = (contact.state as string) || '';
@@ -576,7 +582,9 @@ export const useDashboard = () => {
 			},
 			{
 				accessorKey: 'email',
-				header: () => <span className="font-bold">Email</span>,
+				header: () => (
+					<span className="font-medium font-secondary text-[14px]">Email</span>
+				),
 				cell: ({ row }) => {
 					const email = (row.getValue('email') as string) || '';
 					return (
