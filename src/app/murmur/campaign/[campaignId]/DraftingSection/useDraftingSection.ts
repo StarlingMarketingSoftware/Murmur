@@ -1078,7 +1078,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			}
 		} finally {
 			setAbortController(null);
-			// Reset progress so Draft button re-enables after completion
 			setGenerationProgress(-1);
 		}
 	};

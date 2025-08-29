@@ -180,7 +180,7 @@ const SortableAIBlock = ({
 							? 'w-24'
 							: !isCompactBlock && !isFullAutomatedBlock
 							? 'w-full'
-							: '' // Limit width for Full Automated block and compact blocks
+							: ''
 					)}
 				/>
 				<div
