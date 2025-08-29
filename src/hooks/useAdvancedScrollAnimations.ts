@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { urls } from '@/constants/urls';
 
 export const useAdvancedScrollAnimations = () => {
 	const pathname = usePathname();
-	const isHomePage = pathname === '/';
+	const isHomePage = pathname === urls.home.index;
 	const animatedElements = useRef<Map<string, Set<HTMLElement>>>(new Map());
 	const triggersRef = useRef<any[]>([]);
 	const [isReady, setIsReady] = useState(false);

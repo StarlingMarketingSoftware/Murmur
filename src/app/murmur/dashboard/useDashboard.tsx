@@ -412,16 +412,11 @@ export const useDashboard = () => {
 						);
 					}
 
-					// If only name or only company, show in regular size
 					if (!hasName || !hasCompany) {
 						const textToShow = hasName ? nameValue : companyValue;
-						// Center vertically if it's only a company (and make it bold)
 						if (!hasName && hasCompany) {
 							return (
-								<div
-									className="flex flex-col justify-center py-1"
-									style={{ height: '2.75rem' }}
-								>
+								<div className="flex flex-col justify-center py-1 h-[2.75rem]">
 									<div className="truncate font-bold font-primary text-[16px]">
 										<TableCellTooltip
 											text={textToShow}
@@ -433,7 +428,6 @@ export const useDashboard = () => {
 								</div>
 							);
 						}
-						// Regular layout for name only (bold)
 						return (
 							<div className="flex flex-col gap-0.5 py-1">
 								<div className="truncate font-bold font-primary text-[16px]">
@@ -451,7 +445,6 @@ export const useDashboard = () => {
 						);
 					}
 
-					// Both name and company present - show name first (bold), company second in smaller font (not bold)
 					return (
 						<div className="flex flex-col gap-0.5 py-1">
 							<div className="truncate font-bold font-primary text-[16px]">

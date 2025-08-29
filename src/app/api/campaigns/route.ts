@@ -103,6 +103,7 @@ export async function GET() {
 			const sentCount = campaign.emails.filter((email) => email.status === 'sent').length;
 
 			// Remove the emails array from the response, keep only counts
+
 			// eslint-disable-next-line @typescript-eslint/no-unused-vars
 			const { emails, ...campaignWithoutEmails } = campaign;
 

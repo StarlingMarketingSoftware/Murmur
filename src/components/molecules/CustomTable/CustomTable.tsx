@@ -408,13 +408,11 @@ export function CustomTable<TData, TValue>({
 												const start = Math.min(currentIndex, lastIndex);
 												const end = Math.max(currentIndex, lastIndex);
 
-												// Clear all selections first, then select only the range
 												const newSelection: Record<string, boolean> = {};
 												for (let i = start; i <= end; i++) {
 													newSelection[rows[i].id] = true;
 												}
 												setRowSelection(newSelection);
-												// Keep the existing anchor on Shift-click (traditional behavior)
 											} else {
 												row.toggleSelected();
 												lastClickedRowIdRef.current = rowOriginalId;

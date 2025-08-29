@@ -66,7 +66,7 @@ const Murmur = () => {
 							<button
 								type="button"
 								onClick={() => setIsIdentityDialogOpen(true)}
-								className="w-[52px] h-[20.5px] bg-[#EEEEEE] rounded-[8px] flex items-center justify-start pl-1"
+								className="w-[52px] h-[20.5px] bg-[#EEEEEE] rounded-[8px] flex items-center justify-start pl-1 cursor-pointer"
 							>
 								<span className="font-inter font-normal text-[17px] leading-none text-black">
 									From

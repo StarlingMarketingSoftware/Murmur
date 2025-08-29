@@ -1,5 +1,5 @@
 import { ContactWithName } from '@/types/contact';
-import { Dispatch, SetStateAction, useRef } from 'react';
+import { Dispatch, MouseEvent, SetStateAction, useRef } from 'react';
 
 export interface ContactsSelectionProps {
 	contacts: ContactWithName[];
@@ -21,16 +21,13 @@ export const useContactsSelection = (props: ContactsSelectionProps) => {
 		generationTotal,
 	} = props;
 
-	// Track the last clicked contact for shift-click selection
 	const lastClickedRef = useRef<number | null>(null);
 
-	const handleContactSelection = (contactId: number, event?: React.MouseEvent) => {
+	const handleContactSelection = (contactId: number, event?: MouseEvent) => {
 		if (event?.shiftKey && lastClickedRef.current !== null) {
-			// Prevent text selection on shift-click
 			event.preventDefault();
 			window.getSelection()?.removeAllRanges();
 
-			// Shift-click: select range
 			const currentIndex = contacts.findIndex((c) => c.id === contactId);
 			const lastIndex = contacts.findIndex((c) => c.id === lastClickedRef.current);
 
@@ -38,10 +35,8 @@ export const useContactsSelection = (props: ContactsSelectionProps) => {
 				const start = Math.min(currentIndex, lastIndex);
 				const end = Math.max(currentIndex, lastIndex);
 
-				// Clear all selections first, then select only the range
 				const newSelectedIds = new Set<number>();
 
-				// Add all contacts in the range
 				for (let i = start; i <= end; i++) {
 					newSelectedIds.add(contacts[i].id);
 				}
@@ -49,7 +44,6 @@ export const useContactsSelection = (props: ContactsSelectionProps) => {
 				setSelectedContactIds(newSelectedIds);
 			}
 		} else {
-			// Normal click: toggle single selection
 			originalHandleContactSelection(contactId);
 			lastClickedRef.current = contactId;
 		}
