@@ -101,6 +101,10 @@ interface CustomTableProps<TData, TValue> extends DataTableProps<TData, TValue> 
 	useAutoLayout?: boolean;
 	allowColumnOverflow?: boolean;
 	containerClassName?: string;
+	tableClassName?: string;
+	headerClassName?: string;
+	theadCellClassName?: string;
+	rowClassName?: string;
 }
 
 export function CustomTable<TData, TValue>({
@@ -123,6 +127,10 @@ export function CustomTable<TData, TValue>({
 	useAutoLayout = false,
 	allowColumnOverflow = false,
 	containerClassName,
+	tableClassName,
+	headerClassName,
+	theadCellClassName,
+	rowClassName,
 }: CustomTableProps<TData, TValue>) {
 	type ColumnDefWithSize = ColumnDef<TData, TValue> & { size?: number };
 	const [pagination, setPagination] = useState({
@@ -307,13 +315,15 @@ export function CustomTable<TData, TValue>({
 			>
 				<Table
 					className={cn(
-						'relative min-w-full',
-						allowColumnOverflow ? 'w-max' : 'w-full',
-						useAutoLayout ? 'table-auto' : 'table-fixed'
+						'relative',
+						!tableClassName && 'min-w-full',
+						!tableClassName && (allowColumnOverflow ? 'w-max' : 'w-full'),
+						useAutoLayout ? 'table-auto' : 'table-fixed',
+						tableClassName
 					)}
 					variant={variant}
 				>
-					<TableHeader variant={variant} sticky>
+					<TableHeader variant={variant} sticky className={cn(headerClassName)}>
 						{table.getHeaderGroups().map((headerGroup) => (
 							<TableRow
 								className="sticky top-0 border-0"
@@ -347,7 +357,7 @@ export function CustomTable<TData, TValue>({
 																defSize && defSize > 0 ? `${defSize}px` : undefined,
 													  }
 											}
-											className="whitespace-nowrap"
+											className={cn('whitespace-nowrap', theadCellClassName)}
 										>
 											{header.isPlaceholder
 												? null
@@ -365,7 +375,8 @@ export function CustomTable<TData, TValue>({
 									variant={variant}
 									className={cn(
 										(handleRowClick || (setSelectedRows && isSelectable)) &&
-											'cursor-pointer'
+											'cursor-pointer',
+										rowClassName
 									)}
 									onMouseDown={(e) => {
 										// Prevent text selection on shift-click
