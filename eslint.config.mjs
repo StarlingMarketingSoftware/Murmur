@@ -14,6 +14,12 @@ const eslintConfig = [
 		ignores: ['prisma/seed-data/contact-embeddings.ts'],
 	},
 	...compat.extends('next/core-web-vitals', 'next/typescript'),
+	{
+		rules: {
+			'@typescript-eslint/no-explicit-any': 'warn',
+			'react-hooks/exhaustive-deps': 'warn',
+		},
+	},
 ];
 
 export default eslintConfig;

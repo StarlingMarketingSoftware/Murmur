@@ -3251,6 +3251,19 @@ body,
 	display: none !important;
 }
 
+/* Murmur route compact scaling (90%) */
+html.murmur-compact {
+	zoom: 0.9;
+}
+
+@supports not (zoom: 0.9) {
+	html.murmur-compact body {
+		transform: scale(0.9);
+		transform-origin: top center;
+		width: calc(100% / 0.9);
+	}
+}
+
 /* Re-enable necessary transform and ensure stacking for the left icon */
 .results-search-icon-btn {
 	transform: translateY(-50%) !important;

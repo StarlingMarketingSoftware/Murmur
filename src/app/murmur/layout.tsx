@@ -21,6 +21,7 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 	// Hide footer for murmur pages and apply animations
 	useEffect(() => {
 		document.body.classList.add('murmur-page');
+		document.documentElement.classList.add('murmur-compact');
 
 		if (navRef.current) {
 			addSlideUp(navRef.current);
@@ -28,6 +29,7 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 
 		return () => {
 			document.body.classList.remove('murmur-page');
+			document.documentElement.classList.remove('murmur-compact');
 		};
 	}, [addSlideUp]);
 
