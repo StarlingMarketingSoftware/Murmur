@@ -26,11 +26,18 @@ export interface CreateIdentityPanelProps {
 	setShowCreatePanel: Dispatch<SetStateAction<boolean>>;
 	showCreatePanel: boolean;
 	setValue: UseFormSetValue<z.infer<typeof identityFormSchema>>;
+	onContinueWithIdentity?: (identityId: number) => void;
 }
 
 export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
-	const { isEdit, selectedIdentity, setShowCreatePanel, showCreatePanel, setValue } =
-		props;
+	const {
+		isEdit,
+		selectedIdentity,
+		setShowCreatePanel,
+		showCreatePanel,
+		setValue,
+		onContinueWithIdentity,
+	} = props;
 
 	const [countdown, setCountdown] = useState<number | null>(null);
 	const [isCodeVerified, setIsCodeVerified] = useState(false);
@@ -162,6 +169,9 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 					name: 'Default Signature',
 					content: `<p><span style="font-family: ${DEFAULT_FONT}">Sincerely,</span></p><p></p><p><span style="font-family: ${DEFAULT_FONT}">${values.name}</span></p>`,
 				});
+			}
+			if (onContinueWithIdentity) {
+				onContinueWithIdentity(newIdentity.id);
 			}
 		}
 	};

@@ -10,7 +10,6 @@ import {
 	DialogTrigger,
 } from '@/components/ui/dialog';
 import { CreateIdentityPanel } from './CreateIdentityPanel/CreateIdentityPanel';
-import { cn } from '@/utils';
 import { Button } from '@/components/ui/button';
 
 import { urls } from '@/constants/urls';
@@ -34,6 +33,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 		isPendingAssignIdentity,
 		setValue,
 		isPendingIdentities,
+		handleAssignIdentityById,
 	} = useIdentityDialog(props);
 
 	// Ensure dialog content renders after page transition completes
@@ -44,6 +44,21 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 			setIsContentReady(false);
 		}
 	}, [open]);
+
+	useEffect(() => {
+		const handleEsc = (event: KeyboardEvent) => {
+			if (!showCreatePanel) return;
+			if (event.key === 'Escape' || event.key === 'Esc') {
+				event.preventDefault();
+				event.stopPropagation();
+				setShowCreatePanel(false);
+			}
+		};
+		document.addEventListener('keydown', handleEsc);
+		return () => {
+			document.removeEventListener('keydown', handleEsc);
+		};
+	}, [showCreatePanel, setShowCreatePanel]);
 
 	return (
 		<Dialog
@@ -119,9 +134,9 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 					</div>
 
 					{/* Main content area - scrollable */}
-					<div className="flex-1 min-h-0 overflow-y-auto bg-gray-50/30">
-						<div className="flex justify-start py-6">
-							<div className="w-full max-w-6xl px-8 mx-auto">
+					<div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-gray-50/30">
+						<div className="flex justify-center py-6">
+							<div className="w-full max-w-[1443.9px] px-0 mx-auto">
 								{isPendingIdentities ? (
 									<div className="h-full flex items-center justify-center">
 										{/* Empty space during load - fade transition handles the visual feedback */}
@@ -143,13 +158,14 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 													selectedIdentity={isEdit ? selectedIdentity : undefined}
 													showCreatePanel={true}
 													setValue={setValue}
+													onContinueWithIdentity={(id) => handleAssignIdentityById(id)}
 												/>
 											</div>
 										) : (
 											/* Show grid layout when profiles exist */
-											<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+											<div className="grid grid-cols-1 w-full lg:grid-cols-[652.4px_650.5px] lg:gap-[141px] lg:w-[1443.9px] lg:mx-auto">
 												{/* Existing Profiles Section */}
-												<div className="-ml-8">
+												<div style={{ opacity: showCreatePanel ? 0.26 : 1 }}>
 													<Typography
 														variant="h3"
 														className="!text-[18.77px] !leading-[22.1px] font-medium text-[#000000] mb-4 font-secondary"
@@ -162,7 +178,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 															name="identityId"
 															render={({ field }) => (
 																<FormItem>
-																	<div className="box-border shrink-0 w-[520px] h-[326.75px] rounded-[8.83px] border-[2.21px] border-[#000000] overflow-hidden">
+																	<div className="box-border shrink-0 w-[652.4px] h-[326.75px] rounded-[8.83px] border-[2.21px] border-[#000000] overflow-hidden">
 																		<div className="w-full h-full overflow-y-auto overflow-x-hidden">
 																			<Table className="w-full !rounded-none">
 																				<TableBody>
@@ -178,24 +194,22 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 																								data-state={
 																									isSelected ? 'selected' : undefined
 																								}
-																								className="!border-0 !border-t-0 hover:!bg-transparent"
+																								className="border-0 border-b border-[#000000] last:border-b-0 hover:!bg-transparent"
 																							>
 																								<TableCell className="p-0">
 																									<div className="w-full h-[117.01px] flex flex-col justify-center gap-0 pl-4">
-																										<div className="font-medium text-black">
+																										<div className="font-primary font-normal text-[21.5px] text-black pl-1 mb-1">
 																											{identity.name}
 																										</div>
-																										<div className="text-gray-700">
-																											{identity.email}
+																										<div className="w-[267.13px] h-[22.79px] bg-[#E8EFFF] border-[0.91px] border-[#000000] rounded-[7.29px] flex items-center px-2 overflow-hidden">
+																											<span className="font-secondary font-light text-[15.5px] text-[#000000] truncate">
+																												{identity.email}
+																											</span>
 																										</div>
-																										<div
-																											className={cn(
-																												'text-gray-500',
-																												!identity.website &&
-																													'italic text-gray-500'
-																											)}
-																										>
-																											{identity.website || 'No website'}
+																										<div className="w-[267.13px] h-[22.79px] bg-[#E8EFFF] border-[0.91px] border-[#000000] rounded-[7.29px] flex items-center px-2 overflow-hidden mt-1">
+																											<span className="font-secondary font-light text-[15.5px] text-[#000000] truncate">
+																												{identity.website || 'No website'}
+																											</span>
 																										</div>
 																									</div>
 																								</TableCell>
@@ -210,6 +224,23 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 															)}
 														/>
 													</Form>
+													{/* Continue button 17px below left box */}
+													{!showCreatePanel && (
+														<div className="mt-[17px]">
+															<Button
+																onClick={handleAssignIdentity}
+																isLoading={isPendingAssignIdentity}
+																className="w-[652.4px] h-[43.05px] rounded-[8.83px] border-[1.1px] text-black"
+																style={{
+																	backgroundColor: 'rgba(93,171,104,0.49)',
+																	borderColor: '#5DAB68',
+																}}
+																disabled={!selectedIdentity}
+															>
+																Continue
+															</Button>
+														</div>
+													)}
 												</div>
 
 												{/* Create New Profile Section */}
@@ -226,46 +257,76 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 																>
 																	Create New Profile
 																</Typography>
-																<svg
-																	width="16"
-																	height="16"
-																	viewBox="0 0 16 16"
-																	fill="none"
-																	xmlns="http://www.w3.org/2000/svg"
-																	className={cn(
-																		'transform transition-transform duration-200',
-																		showCreatePanel ? 'rotate-45' : ''
-																	)}
+															</div>
+														</div>
+														{/* Fixed create panel launcher box */}
+														{!showCreatePanel && (
+															<div className="w-[650.5px] h-[326.75px] bg-[#F8F8F8] rounded-none flex items-center justify-center mb-2">
+																<button
+																	type="button"
+																	onClick={() => setShowCreatePanel(true)}
+																	aria-label="Open create profile"
+																	className="w-[28.7px] h-[28.7px] flex items-center justify-center cursor-pointer rounded-none"
 																>
-																	<path
-																		d="M8 2V14M2 8H14"
-																		stroke="currentColor"
-																		strokeWidth="2"
-																		strokeLinecap="round"
-																		strokeLinejoin="round"
+																	<svg
+																		width="28.7"
+																		height="28.7"
+																		viewBox="0 0 16 16"
+																		fill="none"
+																		xmlns="http://www.w3.org/2000/svg"
+																		className=""
+																	>
+																		<path
+																			d="M8 2V14M2 8H14"
+																			stroke="#000000"
+																			strokeWidth="2"
+																			strokeLinecap="square"
+																			strokeLinejoin="miter"
+																		/>
+																	</svg>
+																</button>
+															</div>
+														)}
+														{showCreatePanel && (
+															<div
+																onClick={(e) => e.stopPropagation()}
+																className="relative w-[651px]"
+															>
+																{/* Close (X) button positioned just above the top-right of the box */}
+																<button
+																	type="button"
+																	onClick={() => setShowCreatePanel(false)}
+																	aria-label="Close create profile"
+																	className="absolute -top-5 right-[8px] w-[13.05px] h-[13.05px] flex items-center justify-center rounded-none cursor-pointer bg-transparent"
+																>
+																	<svg
+																		width="13.05"
+																		height="13.05"
+																		viewBox="0 0 12 12"
+																		fill="none"
+																		xmlns="http://www.w3.org/2000/svg"
+																	>
+																		<path
+																			d="M1 1L11 11M11 1L1 11"
+																			stroke="#000000"
+																			strokeWidth="2"
+																			strokeLinecap="square"
+																		/>
+																	</svg>
+																</button>
+																<div className="p-0">
+																	<CreateIdentityPanel
+																		setShowCreatePanel={setShowCreatePanel}
+																		isEdit={isEdit}
+																		selectedIdentity={
+																			isEdit ? selectedIdentity : undefined
+																		}
+																		showCreatePanel={true}
+																		setValue={setValue}
 																	/>
-																</svg>
+																</div>
 															</div>
-														</div>
-														<div
-															className={cn(
-																'overflow-hidden transition-all duration-200',
-																showCreatePanel
-																	? 'max-h-[500px] border-t border-gray-100'
-																	: 'max-h-0'
-															)}
-															onClick={(e) => e.stopPropagation()}
-														>
-															<div className="p-4 pt-3">
-																<CreateIdentityPanel
-																	setShowCreatePanel={setShowCreatePanel}
-																	isEdit={isEdit}
-																	selectedIdentity={isEdit ? selectedIdentity : undefined}
-																	showCreatePanel={true}
-																	setValue={setValue}
-																/>
-															</div>
-														</div>
+														)}
 													</div>
 												</div>
 											</div>
@@ -273,21 +334,6 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 									</div>
 								)}
 							</div>
-						</div>
-					</div>
-
-					{/* Footer */}
-					<div className="bg-background px-8 py-4 flex-shrink-0 border-t border-gray-200">
-						<div className="max-w-6xl mx-auto flex justify-center">
-							<Button
-								isLoading={isPendingAssignIdentity}
-								onClick={handleAssignIdentity}
-								variant="primary-light"
-								disabled={!selectedIdentity}
-								className="min-w-[200px]"
-							>
-								Continue
-							</Button>
 						</div>
 					</div>
 				</div>

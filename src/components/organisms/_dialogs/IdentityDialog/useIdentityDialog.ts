@@ -83,6 +83,15 @@ export const useIdentityDialog = (props: IdentityDialogProps) => {
 		}
 	};
 
+	const handleAssignIdentityById = (identityId: number) => {
+		assignIdentity({
+			id: campaign.id,
+			data: {
+				identityId,
+			},
+		});
+	};
+
 	return {
 		title,
 		form,
@@ -102,5 +111,6 @@ export const useIdentityDialog = (props: IdentityDialogProps) => {
 		handleAssignIdentity,
 		isPendingAssignIdentity,
 		setValue,
+		handleAssignIdentityById,
 	};
 };
