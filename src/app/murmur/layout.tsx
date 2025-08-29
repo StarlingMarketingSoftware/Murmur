@@ -22,7 +22,6 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 	useEffect(() => {
 		document.body.classList.add('murmur-page');
 
-		// Apply slide up animation to nav
 		if (navRef.current) {
 			addSlideUp(navRef.current);
 		}
@@ -50,7 +49,6 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 			>
 				<div className="w-full max-w-full mx-auto flex items-center justify-between">
 					<div className="flex items-center gap-4 md:gap-8">
-						{/* Back to Landing button (hidden on campaign pages to avoid duplication) */}
 						{!isCampaignPage && (
 							<Link
 								href={urls.home.index}

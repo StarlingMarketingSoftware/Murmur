@@ -15,7 +15,6 @@ export function ScrollProgress({ className, height = '3px' }: ScrollProgressProp
 	const pathname = usePathname();
 	const [isVisible, setIsVisible] = useState(false);
 
-	// Hide on all app pages (murmur, admin, auth)
 	const shouldHide =
 		pathname?.includes('/murmur') ||
 		pathname?.includes('/admin') ||
@@ -23,7 +22,6 @@ export function ScrollProgress({ className, height = '3px' }: ScrollProgressProp
 		pathname?.includes('/sign-up');
 
 	useEffect(() => {
-		// Show progress bar after a small delay
 		const timer = setTimeout(() => setIsVisible(true), 500);
 		return () => clearTimeout(timer);
 	}, []);
