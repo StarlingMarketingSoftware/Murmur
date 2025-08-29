@@ -348,7 +348,7 @@ const Dashboard = () => {
 							<div className="flex justify-center w-full px-4">
 								<div className="w-full max-w-full results-appear results-align">
 									<div className="select-prompt-container">
-										<div className="select-prompt-text">
+										<div className="select-prompt-text text-center w-full">
 											Select who you want to contact
 										</div>
 										<div className="static-tooltip-container">
@@ -370,6 +370,11 @@ const Dashboard = () => {
 												rowsPerPage={100}
 												displayRowsPerPage={false}
 												constrainHeight
+												containerClassName="w-[1209px] h-[499px] rounded-[8px] border-[#737373]"
+												tableClassName="w-[1185px] mx-auto"
+												headerClassName="[&_tr]:border-[#737373]"
+												theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
+												rowClassName="border-[#737373]"
 												hidePagination
 												headerAction={
 													<button
