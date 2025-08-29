@@ -100,8 +100,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		}
 	};
 
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	const handleContactSelection = (contactId: number, event?: React.MouseEvent) => {
+	const handleContactSelection = (contactId: number) => {
 		setSelectedContactIds((prev) => {
 			const newSet = new Set(prev);
 			if (newSet.has(contactId)) {
@@ -113,8 +112,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		});
 	};
 
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	const handleDraftSelection = (draftId: number, event?: React.MouseEvent) => {
+	const handleDraftSelection = (draftId: number) => {
 		setSelectedDraftIds((prev) => {
 			const newSet = new Set(prev);
 			if (newSet.has(draftId)) {

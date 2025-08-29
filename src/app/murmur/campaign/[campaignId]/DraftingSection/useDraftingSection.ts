@@ -277,7 +277,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		);
 	}, [form, generationProgress, contacts?.length, isPendingGeneration]);
 
-	// Check if there's any content ready to draft (excluding contact/progress checks)
 	const isDraftingContentReady = useCallback(() => {
 		const values = form.getValues();
 		const hasFullAutomatedBlock = values.hybridBlockPrompts?.some(

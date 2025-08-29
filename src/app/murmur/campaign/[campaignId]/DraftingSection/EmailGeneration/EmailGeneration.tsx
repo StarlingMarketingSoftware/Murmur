@@ -355,11 +355,12 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 										<UpgradeSubscriptionDrawer
 											triggerButtonText="Send"
 											buttonVariant="primary"
-											className={`w-full h-[39px] !border-2 !border-[#5DAB68] !text-black !font-bold !flex !items-center !justify-center ${
+											className={cn(
+												`w-full h-[39px] !border-2 !border-[#5DAB68] !text-black !font-bold !flex !items-center !justify-center`,
 												selectedDraftIds.size !== 0
 													? '!opacity-50 !cursor-not-allowed hover:!bg-[rgba(93,171,104,0.47)] hover:!border-[#5DAB68]'
 													: 'hover:!bg-[rgba(93,171,104,0.6)] hover:!border-[#5DAB68] active:!bg-[rgba(93,171,104,0.7)]'
-											}`}
+											)}
 											message={
 												isFreeTrial
 													? `Your free trial subscription does not include the ability to send emails. To send the emails you've drafted, please upgrade your subscription to the paid version.`
