@@ -59,6 +59,7 @@ interface DataTableProps<TData, TValue> {
 	constrainHeight?: boolean;
 	hidePagination?: boolean;
 	headerAction?: ReactNode;
+	headerInlineAction?: ReactNode;
 }
 
 interface TableSortingButtonProps<TData> {
@@ -124,6 +125,7 @@ export function CustomTable<TData, TValue>({
 	constrainHeight = false,
 	hidePagination = false,
 	headerAction,
+	headerInlineAction,
 	useAutoLayout = false,
 	allowColumnOverflow = false,
 	containerClassName,
@@ -253,7 +255,7 @@ export function CustomTable<TData, TValue>({
 
 	return (
 		<div className="w-full">
-			<div className="flex items-center justify-between py-4 gap-4 w-full max-w-full mx-auto">
+			<div className="relative z-[70] flex items-center justify-between py-4 gap-4 w-full max-w-full mx-auto">
 				<div className="flex items-center gap-4 flex-wrap">
 					{searchable && (
 						<Input
@@ -330,7 +332,7 @@ export function CustomTable<TData, TValue>({
 								key={headerGroup.id}
 								variant={variant}
 							>
-								{headerGroup.headers.map((header) => {
+								{headerGroup.headers.map((header, headerIndex) => {
 									const totalColumns = headerGroup.headers.length;
 									const fallbackWidth = `${100 / totalColumns}%`;
 									const defSize = (header.column.columnDef as ColumnDefWithSize)?.size;
@@ -357,11 +359,30 @@ export function CustomTable<TData, TValue>({
 																defSize && defSize > 0 ? `${defSize}px` : undefined,
 													  }
 											}
-											className={cn('whitespace-nowrap', theadCellClassName)}
+											className={cn(
+												'whitespace-nowrap',
+												theadCellClassName,
+												isSelectable &&
+													headerInlineAction &&
+													headerIndex === headerGroup.headers.length - 1 &&
+													'relative'
+											)}
 										>
-											{header.isPlaceholder
-												? null
-												: flexRender(header.column.columnDef.header, header.getContext())}
+											{header.isPlaceholder ? null : (
+												<>
+													{flexRender(
+														header.column.columnDef.header,
+														header.getContext()
+													)}
+													{isSelectable &&
+													headerInlineAction &&
+													headerIndex === headerGroup.headers.length - 1 ? (
+														<div className="absolute right-2 top-1/2 -translate-y-1/2 z-10 pointer-events-auto">
+															{headerInlineAction}
+														</div>
+													) : null}
+												</>
+											)}
 										</TableHead>
 									);
 								})}

@@ -214,6 +214,19 @@ export const useDashboard = () => {
 		}
 	}, [hasSearched, activeSearchQuery, activeExcludeUsedContacts, limit]);
 
+	// Keep the form input in sync with the active query on results view
+	useEffect(() => {
+		if (hasSearched) {
+			const current = form.getValues('searchText');
+			if (activeSearchQuery !== current) {
+				form.setValue('searchText', activeSearchQuery, {
+					shouldValidate: false,
+					shouldDirty: false,
+				});
+			}
+		}
+	}, [hasSearched, activeSearchQuery, form]);
+
 	useEffect(() => {
 		if (isError && error && hasSearched && activeSearchQuery) {
 			console.error('Contact search error details:', {
@@ -469,16 +482,17 @@ export const useDashboard = () => {
 			},
 			{
 				accessorKey: 'title',
+				size: 250, // Even width distribution
 				header: () => (
-					<span className="font-medium font-secondary text-[14px]">Title</span>
+					<span className="font-medium font-secondary text-[14px] ml-2">Title</span>
 				),
 				cell: ({ row }) => {
 					const text = (row.getValue('title') as string) || '';
 					return (
 						<div
-							className="overflow-hidden"
+							className="overflow-hidden ml-2"
 							style={{
-								width: '260.23px',
+								width: '230px',
 								height: '19px',
 								backgroundColor: '#E8EFFF',
 								border: '0.7px solid #000000',
@@ -496,6 +510,7 @@ export const useDashboard = () => {
 			},
 			{
 				id: 'place',
+				size: 180, // Even width distribution
 				header: () => (
 					<span className="font-medium font-secondary text-[14px]">Place</span>
 				),
@@ -575,6 +590,7 @@ export const useDashboard = () => {
 			},
 			{
 				accessorKey: 'email',
+				size: 280, // Even width distribution
 				header: () => (
 					<span className="font-medium font-secondary text-[14px]">Email</span>
 				),

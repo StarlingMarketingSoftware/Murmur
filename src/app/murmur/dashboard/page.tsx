@@ -4,7 +4,6 @@ import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsT
 import { useDashboard } from './useDashboard';
 import { urls } from '@/constants/urls';
 import { isProblematicBrowser } from '@/utils/browserDetection';
-
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
 import { Typography } from '@/components/ui/typography';
@@ -53,7 +52,6 @@ const Dashboard = () => {
 		handleResetSearch,
 		handleSelectAll,
 		isAllSelected,
-		hoveredText,
 	} = useDashboard();
 
 	// Return null during initial load to prevent hydration mismatch
@@ -108,206 +106,320 @@ const Dashboard = () => {
 										<span className="search-query-text">{activeSearchQuery}</span>
 									</div>
 								)}
-								<Form {...form}>
-									<form
-										onSubmit={(e) => {
-											e.preventDefault();
-											if (!isSignedIn) {
-												if (hasProblematicBrowser) {
-													// For Edge/Safari, navigate to sign-in page
-													console.log(
-														'[Dashboard] Edge/Safari detected, navigating to sign-in page'
-													);
-													if (typeof window !== 'undefined') {
-														sessionStorage.setItem(
-															'redirectAfterSignIn',
-															window.location.pathname
+								{!hasSearched && (
+									<Form {...form}>
+										<form
+											onSubmit={(e) => {
+												e.preventDefault();
+												if (!isSignedIn) {
+													if (hasProblematicBrowser) {
+														// For Edge/Safari, navigate to sign-in page
+														console.log(
+															'[Dashboard] Edge/Safari detected, navigating to sign-in page'
 														);
+														if (typeof window !== 'undefined') {
+															sessionStorage.setItem(
+																'redirectAfterSignIn',
+																window.location.pathname
+															);
+														}
+														window.location.href = urls.signIn.index;
+													} else {
+														openSignIn();
 													}
-													window.location.href = urls.signIn.index;
 												} else {
-													openSignIn();
+													form.handleSubmit(onSubmit)(e);
 												}
-											} else {
-												form.handleSubmit(onSubmit)(e);
-											}
-										}}
-										className={hasSearched ? 'search-form-active' : ''}
-									>
-										<FormField
-											control={form.control}
-											name="searchText"
-											render={({ field }) => (
-												<FormItem>
-													<FormControl>
-														<div
-															className={`search-input-group ${
-																hasSearched ? 'search-input-group-active' : ''
-															}`}
-														>
+											}}
+											className={hasSearched ? 'search-form-active' : ''}
+										>
+											<FormField
+												control={form.control}
+												name="searchText"
+												render={({ field }) => (
+													<FormItem>
+														<FormControl>
 															<div
-																className={`search-wave-container ${
-																	isLoadingContacts || isRefetchingContacts
-																		? 'search-wave-loading'
-																		: ''
+																className={`search-input-group ${
+																	hasSearched ? 'search-input-group-active' : ''
 																}`}
 															>
-																<Input
-																	className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent"
-																	placeholder='Who do you want to send to?  i.e  "Music venues in North Carolina"'
-																	style={{
-																		accentColor: 'transparent',
-																	}}
-																	autoComplete="off"
-																	autoCorrect="off"
-																	autoCapitalize="off"
-																	spellCheck="false"
-																	{...field}
-																/>
-																<div className="search-wave-overlay" />
+																<div
+																	className={`search-wave-container ${
+																		isLoadingContacts || isRefetchingContacts
+																			? 'search-wave-loading'
+																			: ''
+																	}`}
+																>
+																	<Input
+																		className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent"
+																		placeholder='Who do you want to send to?  i.e  "Music venues in North Carolina"'
+																		style={{
+																			accentColor: 'transparent',
+																		}}
+																		autoComplete="off"
+																		autoCorrect="off"
+																		autoCapitalize="off"
+																		spellCheck="false"
+																		{...field}
+																	/>
+																	<div className="search-wave-overlay" />
+																</div>
 															</div>
-														</div>
-													</FormControl>
-													<FormMessage />
-												</FormItem>
-											)}
-										/>
-										{!hasSearched && (
-											<div className="flex flex-row gap-4 items-center justify-between w-full flex-wrap">
-												<div className="flex flex-row gap-4 items-center h-[39px] justify-start flex-shrink-0">
-													<div className="exclude-contacts-box bg-[#EFEFEF] w-[227px] h-[32px] rounded-[8px] flex items-center px-4 my-auto">
-														<FormField
-															control={form.control}
-															name="excludeUsedContacts"
-															render={({ field }) => (
-																<FormItem className="flex flex-row items-center justify-between space-y-0 m-0 w-full gap-3">
-																	<div className="leading-none flex items-center">
-																		<FormLabel
-																			className="font-bold cursor-pointer select-none whitespace-nowrap"
-																			style={{ fontSize: '14px', lineHeight: '16px' }}
-																		>
-																			Exclude Used Contacts
-																		</FormLabel>
-																	</div>
-																	<FormControl>
-																		<label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-																			<input
-																				type="checkbox"
-																				className="sr-only peer"
-																				checked={field.value}
-																				onChange={(e) => field.onChange(e.target.checked)}
-																			/>
-																			<div
-																				className={`toggle-switch-track w-[26px] h-4 rounded-full relative overflow-hidden transition-colors duration-200 shadow-none drop-shadow-none ${
-																					field.value ? 'toggle-on' : 'toggle-off'
-																				}`}
-																				style={
-																					{
-																						'--toggle-bg': field.value
-																							? 'rgba(93, 171, 104, 0.49)'
-																							: '#E5E5E5',
-																						backgroundColor: 'var(--toggle-bg)',
-																						background: 'var(--toggle-bg)',
-																					} as React.CSSProperties
-																				}
-																				data-checked={field.value}
-																				data-debug={JSON.stringify({
-																					value: field.value,
-																					type: typeof field.value,
-																				})}
+														</FormControl>
+														<FormMessage />
+													</FormItem>
+												)}
+											/>
+											{!hasSearched && (
+												<div className="flex flex-row gap-4 items-center justify-between w-full flex-wrap">
+													<div className="flex flex-row gap-4 items-center h-[39px] justify-start flex-shrink-0">
+														<div className="exclude-contacts-box bg-[#EFEFEF] w-[227px] h-[32px] rounded-[8px] flex items-center px-4 my-auto">
+															<FormField
+																control={form.control}
+																name="excludeUsedContacts"
+																render={({ field }) => (
+																	<FormItem className="flex flex-row items-center justify-between space-y-0 m-0 w-full gap-3">
+																		<div className="leading-none flex items-center">
+																			<FormLabel
+																				className="font-bold cursor-pointer select-none whitespace-nowrap"
+																				style={{ fontSize: '14px', lineHeight: '16px' }}
 																			>
-																				<div
-																					className={`absolute top-[2px] transform transition-transform duration-200 ease-in-out ${
-																						field.value
-																							? 'translate-x-[10px] bg-white'
-																							: 'translate-x-0 bg-[#050505]'
-																					} left-[2px] w-[12px] h-[12px] rounded-full shadow-none drop-shadow-none`}
+																				Exclude Used Contacts
+																			</FormLabel>
+																		</div>
+																		<FormControl>
+																			<label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+																				<input
+																					type="checkbox"
+																					className="sr-only peer"
+																					checked={field.value}
+																					onChange={(e) =>
+																						field.onChange(e.target.checked)
+																					}
 																				/>
-																			</div>
-																		</label>
-																	</FormControl>
-																</FormItem>
-															)}
-														/>
+																				<div
+																					className={`toggle-switch-track w-[26px] h-4 rounded-full relative overflow-hidden transition-colors duration-200 shadow-none drop-shadow-none ${
+																						field.value ? 'toggle-on' : 'toggle-off'
+																					}`}
+																					style={
+																						{
+																							'--toggle-bg': field.value
+																								? 'rgba(93, 171, 104, 0.49)'
+																								: '#E5E5E5',
+																							backgroundColor: 'var(--toggle-bg)',
+																							background: 'var(--toggle-bg)',
+																						} as React.CSSProperties
+																					}
+																					data-checked={field.value}
+																					data-debug={JSON.stringify({
+																						value: field.value,
+																						type: typeof field.value,
+																					})}
+																				>
+																					<div
+																						className={`absolute top-[2px] transform transition-transform duration-200 ease-in-out ${
+																							field.value
+																								? 'translate-x-[10px] bg-white'
+																								: 'translate-x-0 bg-[#050505]'
+																						} left-[2px] w-[12px] h-[12px] rounded-full shadow-none drop-shadow-none`}
+																					/>
+																				</div>
+																			</label>
+																		</FormControl>
+																	</FormItem>
+																)}
+															/>
+														</div>
+													</div>
+													<div className="flex items-center justify-end flex-shrink-0 ml-auto">
+														{isFreeTrial ? (
+															<UpgradeSubscriptionDrawer
+																message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
+																triggerButtonText="Import"
+																buttonVariant="light"
+																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
+															/>
+														) : (
+															<ContactTSVUploadDialog
+																isAdmin={false}
+																triggerText="Import"
+																buttonVariant="light"
+																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
+															/>
+														)}
+														<div className="w-[19px]"></div>
+														{!canSearch ? (
+															<UpgradeSubscriptionDrawer
+																message="Searching for contacts requires an active subscription or free trial. Please upgrade your plan to proceed."
+																triggerButtonText="Generate"
+																buttonVariant="primary-light"
+																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
+															/>
+														) : (
+															<Button
+																variant="primary-light"
+																type="submit"
+																bold
+																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
+																isLoading={isLoadingContacts || isRefetchingContacts}
+															>
+																Generate
+															</Button>
+														)}
 													</div>
 												</div>
-												<div className="flex items-center justify-end flex-shrink-0 ml-auto">
-													{isFreeTrial ? (
-														<UpgradeSubscriptionDrawer
-															message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
-															triggerButtonText="Import"
-															buttonVariant="light"
-															className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-														/>
-													) : (
-														<ContactTSVUploadDialog
-															isAdmin={false}
-															triggerText="Import"
-															buttonVariant="light"
-															className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-														/>
-													)}
-													<div className="w-[19px]"></div>
-													{!canSearch ? (
-														<UpgradeSubscriptionDrawer
-															message="Searching for contacts requires an active subscription or free trial. Please upgrade your plan to proceed."
-															triggerButtonText="Generate"
-															buttonVariant="primary-light"
-															className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
-														/>
-													) : (
-														<Button
-															variant="primary-light"
-															type="submit"
-															bold
-															className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
-															isLoading={isLoadingContacts || isRefetchingContacts}
-														>
-															Generate
-														</Button>
-													)}
-												</div>
-											</div>
-										)}
-									</form>
-								</Form>
+											)}
+										</form>
+									</Form>
+								)}
 							</div>
 						</div>
 					</div>
 				</div>
 
 				{/* Search query display with back button */}
-				{hasSearched && activeSearchQuery && (
-					<div className="search-query-display mt-20">
-						<div className="search-query-display-inner">
-							<button
-								onClick={handleResetSearch}
-								className="search-back-button"
-								aria-label="Back to search"
-							>
-								<svg
-									width="20"
-									height="20"
-									viewBox="0 0 20 20"
-									fill="none"
-									xmlns="http://www.w3.org/2000/svg"
-									className="search-back-icon"
+				{hasSearched &&
+					activeSearchQuery &&
+					(isLoadingContacts || isRefetchingContacts) && (
+						<div className="search-query-display mt-20">
+							<div className="search-query-display-inner">
+								<button
+									onClick={handleResetSearch}
+									className="search-back-button"
+									aria-label="Back to search"
 								>
-									<path
-										d="M12 16L6 10L12 4"
-										stroke="currentColor"
-										strokeWidth="1.5"
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									/>
-								</svg>
-								<span className="search-back-text">Back</span>
-							</button>
-							<div className="search-query-display-text">
-								<span className="search-query-quote-left">&ldquo;</span>
-								{activeSearchQuery}
-								<span className="search-query-quote-right">&rdquo;</span>
+									<svg
+										width="20"
+										height="20"
+										viewBox="0 0 20 20"
+										fill="none"
+										xmlns="http://www.w3.org/2000/svg"
+										className="search-back-icon"
+									>
+										<path
+											d="M12 16L6 10L12 4"
+											stroke="currentColor"
+											strokeWidth="1.5"
+											strokeLinecap="round"
+											strokeLinejoin="round"
+										/>
+									</svg>
+									<span className="search-back-text">Back</span>
+								</button>
+								<div className="search-query-display-text">
+									<span className="search-query-quote-left">&ldquo;</span>
+									{activeSearchQuery}
+									<span className="search-query-quote-right">&rdquo;</span>
+								</div>
 							</div>
+						</div>
+					)}
+
+				{hasSearched && !isLoadingContacts && !isRefetchingContacts && (
+					<div className="results-search-bar-wrapper w-full max-w-[1132px] mx-auto px-4">
+						<div className="results-search-bar-inner">
+							<Form {...form}>
+								<form
+									onSubmit={(e) => {
+										e.preventDefault();
+										if (!isSignedIn) {
+											if (hasProblematicBrowser) {
+												console.log(
+													'[Dashboard] Edge/Safari detected, navigating to sign-in page'
+												);
+												if (typeof window !== 'undefined') {
+													sessionStorage.setItem(
+														'redirectAfterSignIn',
+														window.location.pathname
+													);
+												}
+												window.location.href = urls.signIn.index;
+											} else {
+												openSignIn();
+											}
+										} else {
+											form.handleSubmit(onSubmit)(e);
+										}
+									}}
+									className="results-search-form"
+								>
+									<FormField
+										control={form.control}
+										name="searchText"
+										render={({ field }) => (
+											<FormItem className="w-full">
+												<FormControl>
+													<div className="results-search-input-group">
+														<div
+															className={`search-wave-container ${
+																isLoadingContacts || isRefetchingContacts
+																	? 'search-wave-loading'
+																	: ''
+															}`}
+														>
+															<button
+																type="submit"
+																className="results-search-icon-btn"
+																aria-label="Search"
+															>
+																<svg
+																	width="20"
+																	height="21"
+																	viewBox="0 0 20 21"
+																	fill="none"
+																	xmlns="http://www.w3.org/2000/svg"
+																	aria-hidden="true"
+																>
+																	<path
+																		d="M12 1C15.9278 1 19 3.96996 19 7.5C19 11.03 15.9278 14 12 14C8.07223 14 5 11.03 5 7.5C5 3.96996 8.07223 1 12 1Z"
+																		stroke="#A0A0A0"
+																		strokeWidth="2"
+																	/>
+																	<line
+																		x1="7.75258"
+																		y1="11.6585"
+																		x2="0.752577"
+																		y2="19.6585"
+																		stroke="#A0A0A0"
+																		strokeWidth="2"
+																	/>
+																</svg>
+															</button>
+															<Input
+																className={`search-wave-input results-search-input !border-2 !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-[#cfcfcf] ${
+																	field.value === activeSearchQuery &&
+																	(field.value?.trim()?.length ?? 0) > 0
+																		? 'text-center'
+																		: 'text-left'
+																}`}
+																placeholder='Refine your search... e.g. "Music venues in North Carolina"'
+																style={{ accentColor: 'transparent' }}
+																autoComplete="off"
+																autoCorrect="off"
+																autoCapitalize="off"
+																spellCheck="false"
+																{...field}
+															/>
+															<div className="search-wave-overlay" />
+														</div>
+													</div>
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+									{/* Generate action removed; awaiting left-side SVG submit icon */}
+								</form>
+								<div className="w-full text-center mt-2">
+									<span
+										className="font-secondary"
+										style={{ fontSize: '13px', fontWeight: 400, color: '#7f7f7f' }}
+									>
+										Select who you want to contact.
+									</span>
+								</div>
+							</Form>
 						</div>
 					</div>
 				)}
@@ -347,16 +459,6 @@ const Dashboard = () => {
 						) : contacts && contacts.length > 0 ? (
 							<div className="flex justify-center w-full px-4">
 								<div className="w-full max-w-full results-appear results-align">
-									<div className="select-prompt-container">
-										<div className="select-prompt-text text-center w-full">
-											Select who you want to contact
-										</div>
-										<div className="static-tooltip-container">
-											{hoveredText && (
-												<div className="static-tooltip-text">{hoveredText}</div>
-											)}
-										</div>
-									</div>
 									<Card className="border-0 shadow-none !p-0 w-full">
 										<CardContent className="!p-0 w-full">
 											<CustomTable
@@ -383,6 +485,37 @@ const Dashboard = () => {
 														type="button"
 													>
 														{isAllSelected ? 'Unselect all' : 'Select all'}
+													</button>
+												}
+												headerInlineAction={
+													<button
+														type="button"
+														onClick={handleCreateCampaign}
+														disabled={selectedContacts.length === 0}
+														className="font-secondary"
+														style={{
+															width: '149px',
+															height: '31px',
+															background:
+																selectedContacts.length === 0
+																	? 'rgba(93, 171, 104, 0.1)'
+																	: 'rgba(93, 171, 104, 0.22)',
+															border: 'none',
+															color:
+																selectedContacts.length === 0
+																	? 'rgba(0, 0, 0, 0.4)'
+																	: '#000000',
+															fontSize: '14px',
+															fontWeight: 500,
+															borderRadius: '6px',
+															lineHeight: '31px',
+															textAlign: 'center',
+															cursor:
+																selectedContacts.length === 0 ? 'default' : 'pointer',
+															opacity: selectedContacts.length === 0 ? 0.6 : 1,
+														}}
+													>
+														Generate Campaign
 													</button>
 												}
 											/>
