@@ -29,81 +29,114 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	onCancel,
 }) => {
 	return (
-		<div>
-			<div className="text-sm font-inter font-medium text-black">{title}</div>
-			<div className="flex w-full justify-end h-[20px] mb-2">
-				{hasData && (
-					<Button
-						type="button"
-						variant="ghost"
-						className="text-sm font-inter font-medium text-black bg-none border-none cursor-pointer p-0 hover:underline transition-colors -mt-[10px]"
-						onClick={handleClick}
-					>
-						{areAllSelected ? 'Deselect All' : 'Select All'}
-					</Button>
-				)}
-			</div>
+		<div style={{ width: '320px', height: '489px', position: 'relative' }}>
+			{/* Container box with header */}
 			<div
-				className="bg-background border border-gray-300 overflow-auto w-[336px] h-[441px] overflow-x-hidden overflow-y-auto pr-[10px]"
-				data-lenis-prevent
+				data-drafting-table
+				style={{
+					width: '100%',
+					height: '100%',
+					border: '1px solid #ABABAB',
+					borderRadius: '8px',
+					position: 'relative',
+					display: 'flex',
+					flexDirection: 'column',
+				}}
 			>
-				{isPending ? (
-					<div className="flex items-center justify-center h-full">
-						<Spinner size="small" />
-					</div>
-				) : (
-					<>
-						{hasData ? (
-							children
-						) : (
-							<div className="flex flex-col items-center justify-center h-full text-gray-500 px-4">
-								<div className="text-sm font-semibold mb-2">{noDataMessage}</div>
-								<div className="text-xs text-center">{noDataDescription}</div>
-							</div>
-						)}
-					</>
-				)}
-			</div>
-
-			{/* Progress bar */}
-			{title === 'Contacts' && (
-				<div className="mt-2 w-[336px] flex items-center gap-3">
-					<div className="text-xs font-inter text-gray-600 flex-none">
-						{generationProgress >= 0 && totalContacts > 0
-							? generationProgress >= totalContacts
-								? `Drafted ${Math.min(
-										generationProgress,
-										totalContacts
-								  )}/${totalContacts}`
-								: `Drafting ${generationProgress}/${totalContacts}`
-							: 'Ready to draft'}
-					</div>
-
-					<div className="flex-1 h-[7px] bg-[rgba(93,171,104,0.49)] border-0 relative">
-						<div
-							className="h-full bg-[#5DAB68] transition-all duration-300 ease-out absolute top-0 left-0"
-							style={{
-								width: `${
-									generationProgress >= 0 && totalContacts > 0
-										? Math.min((generationProgress / totalContacts) * 100, 100)
-										: 0
-								}%`,
-							}}
-						/>
-					</div>
-
-					{onCancel && generationProgress >= 0 && (
-						<button
+				{/* Header section with top rounded corners */}
+				<div
+					data-drafting-table-header
+					style={{
+						borderTopLeftRadius: '8px',
+						borderTopRightRadius: '8px',
+						borderBottom: '1px solid #ABABAB',
+						padding: '12px 16px',
+						display: 'flex',
+						justifyContent: 'space-between',
+						alignItems: 'center',
+						height: '48px',
+						backgroundColor: 'white',
+					}}
+				>
+					<div className="text-sm font-inter font-medium text-black">{title}</div>
+					{hasData && (
+						<Button
 							type="button"
-							onClick={onCancel}
-							className="ml-2 p-0 h-auto w-auto bg-transparent border-0 text-black hover:text-red-600 transition-colors cursor-pointer"
-							aria-label="Cancel drafting"
+							variant="ghost"
+							className="text-sm font-inter font-medium text-black bg-none border-none cursor-pointer p-0 hover:underline transition-colors"
+							onClick={handleClick}
 						>
-							×
-						</button>
+							{areAllSelected ? 'Deselect All' : 'Select All'}
+						</Button>
 					)}
 				</div>
-			)}
+
+				{/* Content area */}
+				<div
+					className="bg-background overflow-auto flex-1 overflow-x-hidden overflow-y-auto pr-[10px]"
+					data-lenis-prevent
+					style={{ margin: '0', border: 'none' }}
+				>
+					{isPending ? (
+						<div className="flex items-center justify-center h-full">
+							<Spinner size="small" />
+						</div>
+					) : (
+						<>
+							{hasData ? (
+								children
+							) : (
+								<div className="flex flex-col items-center justify-center h-full text-gray-500 px-4">
+									<div className="text-sm font-semibold mb-2">{noDataMessage}</div>
+									<div className="text-xs text-center">{noDataDescription}</div>
+								</div>
+							)}
+						</>
+					)}
+				</div>
+
+				{/* Progress bar - positioned at bottom of container */}
+				{title === 'Contacts' && (
+					<div className="px-4 py-2 border-t border-[#ABABAB]">
+						<div className="flex items-center gap-3">
+							<div className="text-xs font-inter text-gray-600 flex-none">
+								{generationProgress >= 0 && totalContacts > 0
+									? generationProgress >= totalContacts
+										? `Drafted ${Math.min(
+												generationProgress,
+												totalContacts
+										  )}/${totalContacts}`
+										: `Drafting ${generationProgress}/${totalContacts}`
+									: 'Ready to draft'}
+							</div>
+
+							<div className="flex-1 h-[7px] bg-[rgba(93,171,104,0.49)] border-0 relative">
+								<div
+									className="h-full bg-[#5DAB68] transition-all duration-300 ease-out absolute top-0 left-0"
+									style={{
+										width: `${
+											generationProgress >= 0 && totalContacts > 0
+												? Math.min((generationProgress / totalContacts) * 100, 100)
+												: 0
+										}%`,
+									}}
+								/>
+							</div>
+
+							{onCancel && generationProgress >= 0 && (
+								<button
+									type="button"
+									onClick={onCancel}
+									className="ml-2 p-0 h-auto w-auto bg-transparent border-0 text-black hover:text-red-600 transition-colors cursor-pointer"
+									aria-label="Cancel drafting"
+								>
+									×
+								</button>
+							)}
+						</div>
+					</div>
+				)}
+			</div>
 		</div>
 	);
 };

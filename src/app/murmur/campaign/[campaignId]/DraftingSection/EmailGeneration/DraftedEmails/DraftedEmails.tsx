@@ -39,73 +39,100 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 			: 'Unknown Contact';
 
 		return (
-			<div className="w-[336px]">
-				{/* Title area to match contacts table header */}
-				<div className="text-sm font-inter font-medium text-black">Drafts</div>
-				<div className="h-[20px] mb-2"></div>
-
-				{/* Editor container matching table dimensions exactly */}
+			<div style={{ width: '320px', height: '489px', position: 'relative' }}>
+				{/* Container box with header - matching the table view */}
 				<div
-					className="bg-background border border-gray-300 w-[336px] h-[441px] overflow-x-hidden overflow-y-auto pr-[10px] flex flex-col p-3 relative"
-					data-lenis-prevent
+					style={{
+						width: '100%',
+						height: '100%',
+						border: '1px solid #ABABAB',
+						borderRadius: '8px',
+						position: 'relative',
+						display: 'flex',
+						flexDirection: 'column',
+					}}
 				>
-					{/* Close button */}
-					<Button
-						type="button"
-						variant="ghost"
-						onClick={handleBack}
-						className="absolute top-2 right-2 p-1 h-auto w-auto hover:bg-gray-100 rounded"
+					{/* Header section with top rounded corners */}
+					<div
+						style={{
+							borderTopLeftRadius: '8px',
+							borderTopRightRadius: '8px',
+							borderBottom: '1px solid #ABABAB',
+							padding: '12px 16px',
+							display: 'flex',
+							justifyContent: 'space-between',
+							alignItems: 'center',
+							height: '48px',
+							backgroundColor: 'white',
+						}}
 					>
-						<X size={16} className="text-black" />
-					</Button>
-					{/* Recipient info */}
-					<div className="mb-3">
-						<div className="text-sm font-medium">{contactName}</div>
+						<div className="text-sm font-inter font-medium text-black">Drafts</div>
 					</div>
 
-					{/* Subject input */}
-					<div className="mb-3">
-						<input
-							type="text"
-							value={editedSubject}
-							onChange={(e) => setEditedSubject(e.target.value)}
-							className="h-8 text-xs w-full bg-transparent border-0 p-0 focus:outline-none focus:ring-0"
-						/>
-					</div>
-
-					{/* Message editor - plain text */}
-					<div className="flex-1 flex flex-col min-h-0">
-						<textarea
-							value={editedMessage}
-							onChange={(e) => setEditedMessage(e.target.value)}
-							className="flex-1 w-full p-0 text-sm resize-none focus:outline-none focus:ring-0 bg-transparent border-0 whitespace-pre-wrap"
-							placeholder="Type your message here..."
-						/>
-					</div>
-
-					{/* Save button */}
-					<div className="mt-3 flex justify-end gap-2">
+					{/* Editor container */}
+					<div
+						className="bg-background flex-1 overflow-x-hidden overflow-y-auto pr-[10px] flex flex-col p-3 relative"
+						data-lenis-prevent
+						style={{ margin: '0', border: 'none' }}
+					>
+						{/* Close button */}
 						<Button
 							type="button"
-							onClick={handleSave}
-							disabled={isPendingUpdate}
-							className="w-[100px] font-secondary h-[20px] bg-primary/50 border border-primary rounded-[8px] text-black text-[11px] font-medium flex items-center justify-center hover:bg-primary/60 hover:border-primary-dark active:bg-primary/70 transition-colors"
+							variant="ghost"
+							onClick={handleBack}
+							className="absolute top-2 right-2 p-1 h-auto w-auto hover:bg-gray-100 rounded"
 						>
-							{isPendingUpdate ? '...' : 'Save'}
+							<X size={16} className="text-black" />
 						</Button>
-						<Button
-							type="button"
-							onClick={async (e) => {
-								if (selectedDraft) {
-									await handleDeleteDraft(e, selectedDraft.id);
-									setSelectedDraft(null);
-								}
-							}}
-							disabled={isPendingDeleteEmail}
-							className="font-secondary w-[100px] h-[20px] bg-destructive/50 border border-destructive rounded-[8px] text-black text-[11px] font-medium flex items-center justify-center hover:bg-destructive/60 hover:border-destructive-dark active:bg-destructive/70 transition-colors"
-						>
-							{isPendingDeleteEmail ? '...' : 'Delete'}
-						</Button>
+						{/* Recipient info */}
+						<div className="mb-3">
+							<div className="text-sm font-medium">{contactName}</div>
+						</div>
+
+						{/* Subject input */}
+						<div className="mb-3">
+							<input
+								type="text"
+								value={editedSubject}
+								onChange={(e) => setEditedSubject(e.target.value)}
+								className="h-8 text-xs w-full bg-transparent border-0 p-0 focus:outline-none focus:ring-0"
+							/>
+						</div>
+
+						{/* Message editor - plain text */}
+						<div className="flex-1 flex flex-col min-h-0">
+							<textarea
+								value={editedMessage}
+								onChange={(e) => setEditedMessage(e.target.value)}
+								className="flex-1 w-full p-0 text-sm resize-none focus:outline-none focus:ring-0 bg-transparent border-0 whitespace-pre-wrap"
+								placeholder="Type your message here..."
+							/>
+						</div>
+
+						{/* Save button */}
+						<div className="mt-3 flex justify-end gap-2">
+							<Button
+								type="button"
+								onClick={handleSave}
+								disabled={isPendingUpdate}
+								className="w-[100px] font-secondary h-[20px] bg-primary/50 border border-primary rounded-[8px] text-black text-[11px] font-medium flex items-center justify-center hover:bg-primary/60 hover:border-primary-dark active:bg-primary/70 transition-colors"
+							>
+								{isPendingUpdate ? '...' : 'Save'}
+							</Button>
+							<Button
+								type="button"
+								onClick={async (e) => {
+									if (selectedDraft) {
+										await handleDeleteDraft(e, selectedDraft.id);
+										setSelectedDraft(null);
+									}
+								}}
+								disabled={isPendingDeleteEmail}
+								className="font-secondary w-[100px] h-[20px] bg-destructive/50 border border-destructive rounded-[8px] text-black text-[11px] font-medium flex items-center justify-center hover:bg-destructive/60 hover:border-destructive-dark active:bg-destructive/70 transition-colors"
+							>
+								{isPendingDeleteEmail ? '...' : 'Delete'}
+							</Button>
+						</div>
 					</div>
 				</div>
 			</div>
