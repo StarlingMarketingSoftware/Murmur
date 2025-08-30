@@ -227,31 +227,52 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 				<div className="flex-shrink-0">
 					<div
 						className={cn(
-							'relative flex flex-row w-[892px] h-[620px] border-[3px] border-black rounded-lg overflow-x-hidden p-[17px] pb-[120px]',
+							'relative w-[892px] h-[620px] border-[3px] border-black rounded-lg overflow-x-hidden p-[17px] pb-[120px]',
 							isWaitingToSend && 'h-[700px] pb-[200px]'
 						)}
 					>
-						{/* Left table container */}
-						{(() => {
-							const draftedContactIds = new Set(draftEmails.map((d) => d.contactId));
-							const availableContacts = contacts.filter(
-								(c) => !draftedContactIds.has(c.id)
-							);
-							return (
-								<ContactsSelection
-									contacts={availableContacts}
-									selectedContactIds={selectedContactIds}
-									setSelectedContactIds={setSelectedContactIds}
-									handleContactSelection={handleContactSelection}
-									generationProgress={generationProgress}
-									generationTotal={generationTotal}
-									cancelGeneration={cancelGeneration}
-								/>
-							);
-						})()}
+						{/* Tables container - positioned at bottom */}
+						<div
+							className={cn(
+								'absolute left-[17px] right-[17px] flex flex-row justify-between top-[35px]',
+								isWaitingToSend ? '' : ''
+							)}
+						>
+							{/* Left table container */}
+							{(() => {
+								const draftedContactIds = new Set(draftEmails.map((d) => d.contactId));
+								const availableContacts = contacts.filter(
+									(c) => !draftedContactIds.has(c.id)
+								);
+								return (
+									<ContactsSelection
+										contacts={availableContacts}
+										selectedContactIds={selectedContactIds}
+										setSelectedContactIds={setSelectedContactIds}
+										handleContactSelection={handleContactSelection}
+										generationProgress={generationProgress}
+										generationTotal={generationTotal}
+										cancelGeneration={cancelGeneration}
+									/>
+								);
+							})()}
+
+							{/* Right table */}
+							<DraftedEmails
+								draftEmails={draftEmails}
+								isPendingEmails={isPendingEmails}
+								contacts={contacts}
+								selectedDraftIds={selectedDraftIds}
+								setSelectedDraft={setSelectedDraft}
+								setIsDraftDialogOpen={setIsDraftDialogOpen}
+								handleDraftSelection={handleDraftSelection}
+								setSelectedDraftIds={setSelectedDraftIds}
+								selectedDraft={selectedDraft}
+							/>
+						</div>
 
 						{/* Generate Drafts Button */}
-						<div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+						<div className="absolute left-1/2 top-[280px] -translate-x-1/2">
 							<Button
 								type="button"
 								onClick={handleDraftButtonClick}
@@ -278,21 +299,6 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 									</span>
 								)}
 							</Button>
-						</div>
-
-						{/* Right table */}
-						<div className="ml-auto">
-							<DraftedEmails
-								draftEmails={draftEmails}
-								isPendingEmails={isPendingEmails}
-								contacts={contacts}
-								selectedDraftIds={selectedDraftIds}
-								setSelectedDraft={setSelectedDraft}
-								setIsDraftDialogOpen={setIsDraftDialogOpen}
-								handleDraftSelection={handleDraftSelection}
-								setSelectedDraftIds={setSelectedDraftIds}
-								selectedDraft={selectedDraft}
-							/>
 						</div>
 
 						{/* Bottom fixed send bar inside the drafting box */}
