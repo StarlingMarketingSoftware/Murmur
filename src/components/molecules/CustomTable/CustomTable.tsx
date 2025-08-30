@@ -399,6 +399,9 @@ export function CustomTable<TData, TValue>({
 											'cursor-pointer',
 										rowClassName
 									)}
+									data-campaign-id={
+										(row.original as Record<string, unknown>)?.id || undefined
+									}
 									onMouseDown={(e) => {
 										// Prevent text selection on shift-click
 										if (e.shiftKey && isSelectable) {
