@@ -207,6 +207,7 @@ export const useCampaignsTable = () => {
 					rowEl.style.setProperty('background-color', '#A20000', 'important');
 					rowEl.style.setProperty('border-color', '#A20000', 'important');
 					rowEl.style.setProperty('will-change', 'background-position', 'important');
+					rowEl.style.setProperty('cursor', 'pointer', 'important');
 
 					// Animate only the row's highlight layer for a smooth, unified effect
 					gradientAnimationRef.current = gsap.to(rowEl, {
@@ -237,6 +238,7 @@ export const useCampaignsTable = () => {
 				(row as HTMLElement).style.removeProperty('background-position');
 				(row as HTMLElement).style.removeProperty('will-change');
 				(row as HTMLElement).style.removeProperty('border-color');
+				(row as HTMLElement).style.removeProperty('cursor');
 				// Also reset cells
 				const cells = row.querySelectorAll('td');
 				cells.forEach((cell) => {
@@ -312,6 +314,7 @@ export const useCampaignsTable = () => {
 									fontFamily: 'Inter, sans-serif',
 									fontSize: '14px',
 									fontWeight: 400,
+									pointerEvents: 'none',
 								}}
 							>
 								Click to confirm <span style={{ marginLeft: '8px' }}>{countdown}</span>
