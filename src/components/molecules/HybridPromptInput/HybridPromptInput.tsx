@@ -475,7 +475,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														onCheckedChange={(val: boolean) =>
 															form.setValue('isAiSubject', val)
 														}
-														className="data-[state=checked]:bg-primary -translate-y-[2px]"
+														className="data-[state=checked]:!bg-[#5dab68] -translate-y-[2px]"
 													/>
 													<FormLabel className="font-inter text-[16px]">
 														Automated Subject

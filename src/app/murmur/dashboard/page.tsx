@@ -205,7 +205,7 @@ const Dashboard = () => {
 																					style={
 																						{
 																							'--toggle-bg': field.value
-																								? 'rgba(93, 171, 104, 0.49)'
+																								? '#5dab68'
 																								: '#E5E5E5',
 																							backgroundColor: 'var(--toggle-bg)',
 																							background: 'var(--toggle-bg)',
