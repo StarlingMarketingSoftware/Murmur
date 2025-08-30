@@ -52,6 +52,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		isWaitingForConfirm,
 		handleDraftButtonClick,
 		scrollToEmailStructure,
+		countdown,
 	} = useEmailGeneration(props);
 
 	// Inline send confirmation state
@@ -226,6 +227,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 			<div className="flex gap-[47px] items-start">
 				<div className="flex-shrink-0">
 					<div
+						data-drafting-container
 						className={cn(
 							'relative w-[892px] h-[620px] border-[3px] border-black rounded-lg overflow-x-hidden p-[17px] pb-[120px]',
 							isWaitingToSend && 'h-[700px] pb-[200px]'
@@ -290,7 +292,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 								) : isWaitingForConfirm ? (
 									<span className="flex flex-col items-center leading-tight">
 										<span className="text-xs">Click to</span>
-										<span className="text-sm font-semibold">Confirm</span>
+										<span className="text-sm font-semibold">Confirm {countdown}</span>
 									</span>
 								) : (
 									<span className="flex items-center gap-1">

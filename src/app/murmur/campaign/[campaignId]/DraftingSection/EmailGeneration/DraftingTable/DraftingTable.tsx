@@ -32,6 +32,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 		<div style={{ width: '320px', height: '489px', position: 'relative' }}>
 			{/* Container box with header */}
 			<div
+				data-drafting-table
 				style={{
 					width: '100%',
 					height: '100%',
@@ -44,6 +45,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 			>
 				{/* Header section with top rounded corners */}
 				<div
+					data-drafting-table-header
 					style={{
 						borderTopLeftRadius: '8px',
 						borderTopRightRadius: '8px',

@@ -8,6 +8,7 @@ import {
 	useState,
 	useMemo,
 	useCallback,
+	useRef,
 } from 'react';
 import { DraftingFormValues } from '../useDraftingSection';
 import { UseFormReturn } from 'react-hook-form';
@@ -15,6 +16,7 @@ import { debounce } from 'lodash';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { EmailStatus } from '@prisma/client';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { gsap } from 'gsap';
 
 export interface EmailGenerationProps {
 	campaign: CampaignWithRelations;
@@ -51,6 +53,11 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 	const [isWaitingForConfirm, setIsWaitingForConfirm] = useState(false);
+	const [countdown, setCountdown] = useState<number>(5);
+	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+	const gradientAnimationRef = useRef<gsap.core.Tween | null>(null);
+	const isAnimatingRef = useRef(false);
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
 	const [isJustSaved, setIsJustSaved] = useState(false);
@@ -82,14 +89,105 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 
 	/* HANDLERS */
 
+	const stopAnimation = useCallback(() => {
+		if (gradientAnimationRef.current) {
+			gradientAnimationRef.current.kill();
+			gradientAnimationRef.current = null;
+		}
+		const containerElement = document.querySelector('[data-drafting-container]');
+		if (containerElement) {
+			const containerEl = containerElement as HTMLElement;
+			containerEl.style.removeProperty('background-image');
+			containerEl.style.removeProperty('background-size');
+			containerEl.style.removeProperty('background-position');
+			containerEl.style.removeProperty('border-color');
+			containerEl.style.removeProperty('will-change');
+
+			const allElements = containerElement.querySelectorAll('*');
+			allElements.forEach((element) => {
+				const el = element as HTMLElement;
+				if (el.style.backgroundColor === 'white') {
+					el.style.removeProperty('background-color');
+				}
+			});
+		}
+		isAnimatingRef.current = false;
+	}, []);
+
+	const startAnimation = useCallback(() => {
+		if (isAnimatingRef.current) return;
+
+		const containerElement = document.querySelector('[data-drafting-container]');
+		if (!containerElement) return;
+
+		const containerEl = containerElement as HTMLElement;
+		// Setup ocean wave-like gradient - multiple soft waves
+		containerEl.style.setProperty(
+			'background-image',
+			`linear-gradient(90deg, 
+				rgba(93, 171, 104, 0) 0%, 
+				rgba(93, 171, 104, 0.08) 10%, 
+				rgba(93, 171, 104, 0.15) 20%, 
+				rgba(93, 171, 104, 0.08) 30%, 
+				rgba(93, 171, 104, 0.12) 40%, 
+				rgba(93, 171, 104, 0.20) 50%, 
+				rgba(93, 171, 104, 0.12) 60%, 
+				rgba(93, 171, 104, 0.08) 70%, 
+				rgba(93, 171, 104, 0.15) 80%, 
+				rgba(93, 171, 104, 0.08) 90%, 
+				rgba(93, 171, 104, 0) 100%)`
+		);
+		containerEl.style.setProperty('background-size', '300% 100%');
+		containerEl.style.setProperty('background-position', '-50% 0%');
+		containerEl.style.setProperty('border-color', '#5DAB68');
+		containerEl.style.setProperty('will-change', 'background-position');
+
+		// Protect tables
+		const draftingTables = containerElement.querySelectorAll('[data-drafting-table]');
+		draftingTables.forEach((element) => {
+			const el = element as HTMLElement;
+			el.style.setProperty('background-color', 'white', 'important');
+			const headers = el.querySelectorAll('[data-drafting-table-header]');
+			headers.forEach((header) => {
+				(header as HTMLElement).style.setProperty(
+					'background-color',
+					'white',
+					'important'
+				);
+			});
+		});
+
+		// Create smooth ocean wave animation
+		gradientAnimationRef.current = gsap.to(containerEl, {
+			backgroundPosition: '350% 0%',
+			duration: 12,
+			ease: 'sine.inOut',
+			repeat: -1,
+		});
+		isAnimatingRef.current = true;
+	}, []);
+
 	const handleDraftButtonClick = async () => {
 		if (!isWaitingForConfirm) {
 			// First click - show confirm state
 			setIsWaitingForConfirm(true);
-			// Reset after 3 seconds if not confirmed
-			setTimeout(() => {
+			setCountdown(5);
+			startAnimation();
+
+			if (confirmationTimeoutRef.current) {
+				clearTimeout(confirmationTimeoutRef.current);
+			}
+			if (countdownIntervalRef.current) {
+				clearInterval(countdownIntervalRef.current);
+			}
+
+			countdownIntervalRef.current = setInterval(() => {
+				setCountdown((prev) => (prev > 1 ? prev - 1 : 1));
+			}, 1000);
+
+			confirmationTimeoutRef.current = setTimeout(() => {
 				setIsWaitingForConfirm(false);
-			}, 3000);
+			}, 5000);
 		} else {
 			// Second click - execute draft generation
 			setIsWaitingForConfirm(false);
@@ -161,6 +259,24 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 	/* EFFECTS */
 
 	useEffect(() => {
+		return () => {
+			if (confirmationTimeoutRef.current) {
+				clearTimeout(confirmationTimeoutRef.current);
+			}
+			if (countdownIntervalRef.current) {
+				clearInterval(countdownIntervalRef.current);
+			}
+			stopAnimation();
+		};
+	}, [stopAnimation]);
+
+	useEffect(() => {
+		if (!isWaitingForConfirm && isAnimatingRef.current) {
+			stopAnimation();
+		}
+	}, [isWaitingForConfirm, stopAnimation]);
+
+	useEffect(() => {
 		if (sendingProgress === selectedDraftIds.size && selectedDraftIds.size > 0) {
 			setSelectedDraftIds(new Set());
 		}
@@ -224,5 +340,6 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		isWaitingForConfirm,
 		handleDraftButtonClick,
 		scrollToEmailStructure,
+		countdown,
 	};
 };
