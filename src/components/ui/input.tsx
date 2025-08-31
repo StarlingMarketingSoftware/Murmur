@@ -32,7 +32,7 @@ function Input({ className, type, variant, rounded, ...props }: InputProps) {
 		<input
 			type={type}
 			data-slot="input"
-			className={cn(className, inputVariants({ variant, rounded }))}
+			className={cn(inputVariants({ variant, rounded }), className)}
 			{...props}
 		/>
 	);

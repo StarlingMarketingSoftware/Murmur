@@ -515,14 +515,22 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											</div>
 											<FormControl>
 												<Input
-													className="w-full h-[44px] bg-white"
+													className={cn(
+														'w-full h-[44px] !bg-white',
+														form.watch('isAiSubject')
+															? '!border-[2px] !border-[#969696] !text-[#969696] placeholder:!text-[#969696] disabled:!bg-white disabled:!text-[#969696] disabled:!opacity-100'
+															: '!border-[2px] !border-[#000000] !text-black placeholder:!text-black'
+													)}
 													placeholder={
 														form.watch('isAiSubject')
-															? 'Automated subject...'
-															: 'Enter subject...'
+															? 'Autmated subject'
+															: 'Write your subject here'
 													}
 													disabled={form.watch('isAiSubject')}
 													{...field}
+													value={
+														form.watch('isAiSubject') ? 'Autmated subject' : field.value
+													}
 													onFocus={(e) =>
 														!form.watch('isAiSubject') &&
 														trackFocusedField?.('subject', e.target)
