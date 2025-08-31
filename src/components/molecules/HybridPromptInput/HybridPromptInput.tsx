@@ -187,9 +187,13 @@ const SortableAIBlock = ({
 					{...listeners}
 					className={cn(
 						'absolute top-0 left-0 cursor-move z-[1]',
-						isTextBlock ? 'h-[80px] w-8' : isCompactBlock ? 'h-[44px] w-8' : 'h-12',
+						isTextBlock
+							? 'h-[80px] w-[172px]'
+							: isCompactBlock
+							? 'h-[44px] w-[172px]'
+							: 'h-12',
 						isFullAutomatedBlock
-							? 'w-24'
+							? 'w-[172px]'
 							: !isCompactBlock && !isFullAutomatedBlock
 							? 'w-full'
 							: ''
