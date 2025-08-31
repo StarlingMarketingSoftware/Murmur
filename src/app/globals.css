@@ -1502,7 +1502,7 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 
 /* Campaigns table container with fixed height */
 .campaigns-table-container {
-	max-height: 382px;
+	max-height: 279px;
 	overflow: hidden;
 	position: relative;
 	z-index: 40; /* Ensure container is clickable */
@@ -1510,8 +1510,8 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 
 /* Override the default constrainHeight of 429px */
 .campaigns-table-container > div > div:last-child {
-	height: 382px !important;
-	max-height: 382px !important;
+	height: 279px !important;
+	max-height: 279px !important;
 	position: relative;
 	z-index: 41; /* Ensure scrollable area is above container but below rows */
 }
@@ -2472,6 +2472,8 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 .hero-wrapper {
 	width: 100%;
 	max-width: 100%;
+	min-height: 720px !important; /* Fixed height that approximates viewport at 100% zoom */
+	height: 720px !important; /* Prevent expansion with zoom */
 }
 
 .search-bar-wrapper {
@@ -2545,23 +2547,11 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 	}
 }
 
-/* Maintain consistent spacing ratio on zoom */
+/* Keep table in normal flow with consistent spacing */
 .campaigns-table-wrapper {
-	margin-top: -12rem !important; /* Lift table into viewport without moving hero */
+	margin-top: -200px; /* Pull table up for better positioning */
 	position: relative;
 	z-index: 30; /* Ensure table is above other elements */
-}
-
-@media (min-width: 1920px) {
-	.campaigns-table-wrapper {
-		margin-top: -14rem !important; /* Keep lifted on large screens */
-	}
-}
-
-@media (min-width: 2560px) {
-	.campaigns-table-wrapper {
-		margin-top: -18rem !important; /* Keep lifted on very large screens */
-	}
 }
 
 /* Safari-specific fix for campaigns table */

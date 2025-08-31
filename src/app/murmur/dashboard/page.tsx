@@ -70,7 +70,7 @@ const Dashboard = () => {
 					hasSearched ? 'search-active' : ''
 				}`}
 			>
-				<div className="hero-wrapper flex flex-col justify-center items-center min-h-screen">
+				<div className="hero-wrapper flex flex-col justify-center items-center">
 					<div className="w-full">
 						<div
 							className="flex justify-center items-center w-full px-4"
@@ -558,7 +558,7 @@ const Dashboard = () => {
 				)}
 
 				{!hasSearched && (
-					<div className="campaigns-table-wrapper mt-32 sm:mt-36 md:mt-40 lg:mt-44 xl:mt-48 2xl:mt-56 relative">
+					<div className="campaigns-table-wrapper">
 						<div className="absolute top-0 left-0 right-0 h-8 z-[5] pointer-events-none bg-gradient-to-b from-white to-transparent" />
 						<CampaignsTable />
 					</div>
