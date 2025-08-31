@@ -236,7 +236,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 						{/* Tables container - positioned at bottom */}
 						<div
 							className={cn(
-								'absolute left-[17px] right-[17px] flex flex-row justify-between top-[35px]',
+								'absolute left-[19px] right-[19px] flex flex-row justify-between top-[35px]',
 								isWaitingToSend ? '' : ''
 							)}
 						>
@@ -305,7 +305,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 						{/* Bottom fixed send bar inside the drafting box */}
 						{draftEmails.length > 0 && (
-							<div className="absolute left-[17px] right-[17px] bottom-[17px]">
+							<div className="absolute left-[19px] right-[19px] bottom-[17px]">
 								<div className="flex flex-col items-end w-full">
 									<div className={cn('w-full mb-3', !isWaitingToSend && 'hidden')}>
 										<div className="grid grid-cols-3 items-start w-full">

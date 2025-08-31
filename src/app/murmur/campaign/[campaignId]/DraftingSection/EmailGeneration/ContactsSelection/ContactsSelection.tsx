@@ -33,9 +33,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 					<div
 						key={contact.id}
 						className={cn(
-							'border-b border-gray-200 cursor-pointer transition-colors grid grid-cols-2 grid-rows-[auto_auto] w-full overflow-visible py-1 select-none',
+							'border-b-2 border-[#ABABAB] cursor-pointer transition-colors grid grid-cols-2 grid-rows-[auto_auto] w-full overflow-visible py-1 select-none',
 							selectedContactIds.has(contact.id)
-								? 'bg-[#D6E8D9] border-2 border-primary'
+								? 'bg-[#D6E8D9] border-2 border-[#ABABAB]'
 								: ''
 						)}
 						onMouseDown={(e) => {
