@@ -127,6 +127,10 @@ const SortableAIBlock = ({
 		block.value === HybridBlock.action ||
 		block.value === HybridBlock.text;
 
+	// Watch the field value to determine if text block is empty
+	const fieldValue = form.watch(`hybridBlockPrompts.${fieldIndex}.value`);
+	const isTextBlockEmpty = isTextBlock && !fieldValue;
+
 	return (
 		<div
 			ref={setNodeRef}
@@ -156,7 +160,11 @@ const SortableAIBlock = ({
 				!isIntroductionBlock &&
 					!isResearchBlock &&
 					!isActionBlock &&
-					(isTextBlock ? 'border-primary' : 'border-secondary'),
+					(isTextBlockEmpty
+						? 'border-[#A20000]'
+						: isTextBlock
+						? 'border-primary'
+						: 'border-secondary'),
 				isDragging ? 'opacity-50 z-50 transform-gpu' : ''
 			)}
 		>
@@ -232,7 +240,12 @@ const SortableAIBlock = ({
 								{isTextBlock ? (
 									<>
 										<div className="flex flex-col justify-center w-[140px]">
-											<span className="font-inter font-medium text-[17px] leading-[14px]">
+											<span
+												className={cn(
+													'font-inter font-medium text-[17px] leading-[14px]',
+													isTextBlockEmpty && 'text-[#A20000]'
+												)}
+											>
 												Text
 											</span>
 										</div>
@@ -245,7 +258,12 @@ const SortableAIBlock = ({
 													type="text"
 													placeholder={block.placeholder}
 													onClick={(e) => e.stopPropagation()}
-													className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-400 pl-6 pr-12"
+													className={cn(
+														'flex-1 bg-white outline-none text-sm pl-6 pr-12',
+														isTextBlockEmpty
+															? 'placeholder:text-[#A20000]'
+															: 'placeholder:text-gray-400'
+													)}
 													{...fieldProps}
 													onFocus={(e) => {
 														trackFocusedField?.(
@@ -284,7 +302,7 @@ const SortableAIBlock = ({
 													type="text"
 													placeholder={block.placeholder}
 													onClick={(e) => e.stopPropagation()}
-													className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-400 pl-6 pr-12"
+													className="flex-1 bg-white outline-none text-sm placeholder:text-gray-400 pl-6 pr-12"
 													{...fieldProps}
 													onFocus={(e) => {
 														trackFocusedField?.(
@@ -332,7 +350,10 @@ const SortableAIBlock = ({
 											<ToneSelector isCompact={!!showTestPreview && !!testMessage} />
 										</>
 									) : (
-										<Typography variant="h4" className="font-inter">
+										<Typography
+											variant="h4"
+											className={cn('font-inter', isTextBlockEmpty && 'text-[#A20000]')}
+										>
 											Text
 										</Typography>
 									)}
@@ -348,8 +369,9 @@ const SortableAIBlock = ({
 													placeholder={block.placeholder}
 													onClick={(e) => e.stopPropagation()}
 													className={cn(
-														'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0',
-														isFullAutomatedBlock ? 'h-[300px] px-0' : ''
+														'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 bg-white',
+														isFullAutomatedBlock ? 'h-[300px] px-0' : '',
+														isTextBlockEmpty ? 'placeholder:text-[#A20000]' : ''
 													)}
 													{...fieldProps}
 													onFocus={(e) => {
@@ -379,7 +401,7 @@ const SortableAIBlock = ({
 																: ''
 														}
 														onClick={(e) => e.stopPropagation()}
-														className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+														className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-white"
 														{...fieldProps}
 														onFocus={(e) => {
 															trackFocusedField?.(
@@ -493,7 +515,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											</div>
 											<FormControl>
 												<Input
-													className="w-full h-[44px]"
+													className="w-full h-[44px] bg-white"
 													placeholder={
 														form.watch('isAiSubject')
 															? 'Automated subject...'
@@ -573,31 +595,58 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 									{/* Add Block Button */}
 									<div className="w-full flex justify-center mt-2">
-										<DropdownMenu>
-											<DropdownMenuTrigger asChild>
-												<Button
-													type="button"
-													variant="ghost"
-													size="icon"
-													className="h-12 w-12 hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+										<div style={{ position: 'relative' }}>
+											<DropdownMenu>
+												<DropdownMenuTrigger asChild>
+													<Button
+														type="button"
+														variant="ghost"
+														size="icon"
+														className="h-12 w-12 hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+													>
+														<Plus className="h-8 w-8" strokeWidth={3} />
+													</Button>
+												</DropdownMenuTrigger>
+												<DropdownMenuContent
+													className="w-[275.23px] h-[190px] !overflow-hidden !border-0"
+													align="center"
+													side="bottom"
+													sideOffset={32}
+													avoidCollisions={false}
 												>
-													<Plus className="h-8 w-8" strokeWidth={3} />
-												</Button>
-											</DropdownMenuTrigger>
-											<DropdownMenuContent
-												className="w-[275.23px] h-[190px] !overflow-hidden !border-0"
-												align="center"
-												side="bottom"
-												avoidCollisions={false}
-											>
-												<div className="relative flex flex-col justify-between h-full">
-													{/* Vertical lines that extend from hybrid block's side borders */}
-													<div className="absolute top-[6px] bottom-[6px] left-0 w-[2px] bg-[#51A2E4] z-0" />
-													<div className="absolute top-[6px] bottom-[6px] right-0 w-[2px] bg-[#51A2E4] z-0" />
+													<div className="relative flex flex-col justify-between h-full">
+														{/* Vertical lines that extend from hybrid block's side borders */}
+														<div className="absolute top-[6px] bottom-[6px] left-0 w-[2px] bg-[#51A2E4] z-0" />
+														<div className="absolute top-[6px] bottom-[6px] right-0 w-[2px] bg-[#51A2E4] z-0" />
 
-													<DropdownMenuGroup className="p-0 relative">
-														{BLOCK_ITEMS.filter((item) => item.position === 'top').map(
-															(item) => (
+														<DropdownMenuGroup className="p-0 relative">
+															{BLOCK_ITEMS.filter((item) => item.position === 'top').map(
+																(item) => (
+																	<BlockMenuItem
+																		key={item.value}
+																		item={item}
+																		onClick={() => {
+																			if (item.value === 'hybrid_automation') {
+																				handleAddHybridAutomation();
+																			} else if (item.value === HybridBlock.text) {
+																				handleAddBlock(getBlock(HybridBlock.text));
+																			} else {
+																				handleAddBlock(
+																					BLOCKS.find((b) => b.value === item.value)!
+																				);
+																			}
+																		}}
+																	/>
+																)
+															)}
+														</DropdownMenuGroup>
+														<div className="flex items-center justify-start pl-4 font-normal relative z-10">
+															<span>or</span>
+														</div>
+														<DropdownMenuGroup className="p-0 relative">
+															{BLOCK_ITEMS.filter(
+																(item) => item.position === 'bottom'
+															).map((item) => (
 																<BlockMenuItem
 																	key={item.value}
 																	item={item}
@@ -613,36 +662,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		}
 																	}}
 																/>
-															)
-														)}
-													</DropdownMenuGroup>
-													<div className="flex items-center justify-start pl-4 font-normal relative z-10">
-														<span>or</span>
+															))}
+														</DropdownMenuGroup>
 													</div>
-													<DropdownMenuGroup className="p-0 relative">
-														{BLOCK_ITEMS.filter((item) => item.position === 'bottom').map(
-															(item) => (
-																<BlockMenuItem
-																	key={item.value}
-																	item={item}
-																	onClick={() => {
-																		if (item.value === 'hybrid_automation') {
-																			handleAddHybridAutomation();
-																		} else if (item.value === HybridBlock.text) {
-																			handleAddBlock(getBlock(HybridBlock.text));
-																		} else {
-																			handleAddBlock(
-																				BLOCKS.find((b) => b.value === item.value)!
-																			);
-																		}
-																	}}
-																/>
-															)
-														)}
-													</DropdownMenuGroup>
-												</div>
-											</DropdownMenuContent>
-										</DropdownMenu>
+												</DropdownMenuContent>
+											</DropdownMenu>
+										</div>
 									</div>
 								</div>
 
@@ -665,7 +690,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<FormControl>
 														<Textarea
 															placeholder="Enter your signature..."
-															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden"
+															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white"
 															style={{
 																fontFamily: form.watch('font') || 'Arial',
 															}}
