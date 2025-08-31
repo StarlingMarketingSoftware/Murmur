@@ -31,7 +31,7 @@ export const BLOCKS = [
 		value: HybridBlock.research,
 		help: 'Optional. Write a brief prompt for the AI about how to write about the recipient.',
 		placeholder:
-			'Automated Contact Research on the Recipient. Type to specify further, i.e "reference similar acts to ..."',
+			'Automated research. Type to specify further, i.e "reference similar acts to ..."',
 	},
 	{
 		label: 'Call to Action',
