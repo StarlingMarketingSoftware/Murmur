@@ -484,7 +484,7 @@ const Dashboard = () => {
 														className="select-all-button"
 														type="button"
 													>
-														{isAllSelected ? 'Unselect all' : 'Select all'}
+														{isAllSelected ? 'Deselect All' : 'Select all'}
 													</button>
 												}
 												headerInlineAction={
