@@ -1672,8 +1672,8 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 
 /* Toggle switch styles - using data attributes for maximum specificity */
 .toggle-switch-track[data-checked='true'] {
-	background-color: rgba(93, 171, 104, 0.49) !important;
-	background: rgba(93, 171, 104, 0.49) !important;
+	background-color: #5dab68 !important;
+	background: #5dab68 !important;
 }
 
 .toggle-switch-track[data-checked='false'] {
@@ -1683,8 +1683,8 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 
 /* Fallback with class names */
 .toggle-switch-track.toggle-on {
-	background-color: rgba(93, 171, 104, 0.49) !important;
-	background: rgba(93, 171, 104, 0.49) !important;
+	background-color: #5dab68 !important;
+	background: #5dab68 !important;
 }
 
 .toggle-switch-track.toggle-off {
@@ -1694,8 +1694,8 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 
 /* Even more specific rules to override any parent background */
 .exclude-contacts-box .toggle-switch-track[data-checked='true'] {
-	background-color: rgba(93, 171, 104, 0.49) !important;
-	background: rgba(93, 171, 104, 0.49) !important;
+	background-color: #5dab68 !important;
+	background: #5dab68 !important;
 }
 
 .exclude-contacts-box .toggle-switch-track[data-checked='false'] {
@@ -2665,21 +2665,6 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 	background-clip: text;
 	-webkit-background-clip: text;
 	mask-image: linear-gradient(
-		90deg,
-		transparent 0%,
-		rgba(0, 0, 0, 0.1) 5%,
-		rgba(0, 0, 0, 0.3) 10%,
-		rgba(0, 0, 0, 0.6) 15%,
-		rgba(0, 0, 0, 0.8) 20%,
-		rgba(0, 0, 0, 1) 30%,
-		rgba(0, 0, 0, 1) 70%,
-		rgba(0, 0, 0, 0.8) 80%,
-		rgba(0, 0, 0, 0.6) 85%,
-		rgba(0, 0, 0, 0.3) 90%,
-		rgba(0, 0, 0, 0.1) 95%,
-		transparent 100%
-	);
-	-webkit-mask-image: linear-gradient(
 		90deg,
 		transparent 0%,
 		rgba(0, 0, 0, 0.1) 5%,

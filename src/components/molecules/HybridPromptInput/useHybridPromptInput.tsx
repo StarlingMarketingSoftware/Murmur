@@ -51,7 +51,7 @@ export const BLOCKS = [
 		label: 'Custom Text',
 		value: HybridBlock.text,
 		help: 'This is a custom text block. Here you should write exact text that you want included in your email.',
-		placeholder: 'Write the exact text you want included in your email...',
+		placeholder: 'Write the exact text you want in your email here. *required',
 	},
 ];
 
