@@ -267,10 +267,20 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			return block.value && block.value.trim() !== '';
 		});
 
+		// Also allow generation if automated subjects are enabled with text blocks
+		const hasAutomatedSubject = values.isAiSubject === true;
+		const hasContentToGenerate =
+			hasAIBlocks ||
+			(hasAutomatedSubject &&
+				values.hybridBlockPrompts?.some(
+					(block) =>
+						block.type === HybridBlock.text && block.value && block.value.trim() !== ''
+				));
+
 		return (
 			isFullAutomatedEmpty ||
 			hasNoBlocks ||
-			!hasAIBlocks ||
+			!hasContentToGenerate ||
 			generationProgress > -1 ||
 			contacts?.length === 0 ||
 			isPendingGeneration
@@ -303,8 +313,18 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			return block.value && block.value.trim() !== '';
 		});
 
+		// Also check if automated subjects are enabled with text blocks
+		const hasAutomatedSubject = values.isAiSubject === true;
+		const hasContentToGenerate =
+			hasAIBlocks ||
+			(hasAutomatedSubject &&
+				values.hybridBlockPrompts?.some(
+					(block) =>
+						block.type === HybridBlock.text && block.value && block.value.trim() !== ''
+				));
+
 		// Content is ready if we have blocks with content
-		return !isFullAutomatedEmpty && !hasNoBlocks && hasAIBlocks;
+		return !isFullAutomatedEmpty && !hasNoBlocks && hasContentToGenerate;
 	}, [form]);
 
 	// FUNCTIONS

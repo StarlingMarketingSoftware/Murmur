@@ -445,9 +445,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		isTest,
 	} = useHybridPromptInput(props);
 
-	const watchedBlocks = form.watch('hybridBlockPrompts') || [];
-	const isHandwrittenMode =
-		watchedBlocks.length > 0 && watchedBlocks.every((b) => b.type === HybridBlock.text);
 	const hasBlocks = (form.watch('hybridBlockPrompts')?.length || 0) > 0;
 
 	const handleClearAllInside = () => {
@@ -493,7 +490,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<Separator orientation="vertical" className="!h-5" />
 													<Switch
 														checked={form.watch('isAiSubject')}
-														disabled={isHandwrittenMode}
 														onCheckedChange={(val: boolean) =>
 															form.setValue('isAiSubject', val)
 														}
