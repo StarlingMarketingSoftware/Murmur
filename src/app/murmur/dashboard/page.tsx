@@ -282,7 +282,7 @@ const Dashboard = () => {
 				{hasSearched &&
 					activeSearchQuery &&
 					(isLoadingContacts || isRefetchingContacts) && (
-						<div className="search-query-display mt-20">
+						<div className="search-query-display mt-8">
 							<div className="search-query-display-inner">
 								<button
 									onClick={handleResetSearch}
