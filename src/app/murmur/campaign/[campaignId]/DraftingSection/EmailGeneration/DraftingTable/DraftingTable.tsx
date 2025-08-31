@@ -29,14 +29,14 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	onCancel,
 }) => {
 	return (
-		<div style={{ width: '320px', height: '489px', position: 'relative' }}>
+		<div style={{ width: '366px', height: '489px', position: 'relative' }}>
 			{/* Container box with header */}
 			<div
 				data-drafting-table
 				style={{
 					width: '100%',
 					height: '100%',
-					border: '1px solid #ABABAB',
+					border: '2px solid #ABABAB',
 					borderRadius: '8px',
 					position: 'relative',
 					display: 'flex',
@@ -49,7 +49,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					style={{
 						borderTopLeftRadius: '8px',
 						borderTopRightRadius: '8px',
-						borderBottom: '1px solid #ABABAB',
+						borderBottom: '2px solid #ABABAB',
 						padding: '12px 16px',
 						display: 'flex',
 						justifyContent: 'space-between',
@@ -58,16 +58,20 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						backgroundColor: 'white',
 					}}
 				>
-					<div className="text-sm font-inter font-medium text-black">{title}</div>
+					<div style={{ transform: 'translateY(-6px)' }}>
+						<div className="text-sm font-inter font-medium text-black">{title}</div>
+					</div>
 					{hasData && (
-						<Button
-							type="button"
-							variant="ghost"
-							className="text-sm font-inter font-medium text-black bg-none border-none cursor-pointer p-0 hover:underline transition-colors"
-							onClick={handleClick}
-						>
-							{areAllSelected ? 'Deselect All' : 'Select All'}
-						</Button>
+						<div style={{ transform: 'translateY(6px)' }}>
+							<Button
+								type="button"
+								variant="ghost"
+								className="text-sm font-inter font-medium text-black bg-none border-none cursor-pointer p-0 hover:underline transition-colors"
+								onClick={handleClick}
+							>
+								{areAllSelected ? 'Deselect All' : 'Select All'}
+							</Button>
+						</div>
 					)}
 				</div>
 
@@ -97,7 +101,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 
 				{/* Progress bar - positioned at bottom of container */}
 				{title === 'Contacts' && (
-					<div className="px-4 py-2 border-t border-[#ABABAB]">
+					<div className="px-4 py-2 border-t-2 border-[#ABABAB]">
 						<div className="flex items-center gap-3">
 							<div className="text-xs font-inter text-gray-600 flex-none">
 								{generationProgress >= 0 && totalContacts > 0

@@ -58,6 +58,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 	const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const gradientAnimationRef = useRef<gsap.core.Tween | null>(null);
 	const isAnimatingRef = useRef(false);
+	const hasConfirmedRef = useRef(false);
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
 	const [isJustSaved, setIsJustSaved] = useState(false);
@@ -167,9 +168,29 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		isAnimatingRef.current = true;
 	}, []);
 
+	const executeDraftNow = async () => {
+		if (hasConfirmedRef.current) return;
+		hasConfirmedRef.current = true;
+		if (confirmationTimeoutRef.current) {
+			clearTimeout(confirmationTimeoutRef.current);
+			confirmationTimeoutRef.current = null;
+		}
+		if (countdownIntervalRef.current) {
+			clearInterval(countdownIntervalRef.current);
+			countdownIntervalRef.current = null;
+		}
+		setIsWaitingForConfirm(false);
+		stopAnimation();
+		const ids = Array.from(selectedContactIds);
+		setGenerationTotal(ids.length);
+		await handleGenerateDrafts(ids);
+		setSelectedContactIds(new Set());
+		hasConfirmedRef.current = false;
+	};
+
 	const handleDraftButtonClick = async () => {
 		if (!isWaitingForConfirm) {
-			// First click - show confirm state
+			// First click - show confirm state and require explicit confirmation
 			setIsWaitingForConfirm(true);
 			setCountdown(5);
 			startAnimation();
@@ -187,14 +208,11 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 
 			confirmationTimeoutRef.current = setTimeout(() => {
 				setIsWaitingForConfirm(false);
+				stopAnimation();
 			}, 5000);
 		} else {
-			// Second click - execute draft generation
-			setIsWaitingForConfirm(false);
-			const ids = Array.from(selectedContactIds);
-			setGenerationTotal(ids.length);
-			await handleGenerateDrafts(ids);
-			setSelectedContactIds(new Set());
+			// Second click - execute immediately
+			await executeDraftNow();
 		}
 	};
 

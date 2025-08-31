@@ -70,7 +70,7 @@ const Dashboard = () => {
 					hasSearched ? 'search-active' : ''
 				}`}
 			>
-				<div className="hero-wrapper flex flex-col justify-center items-center min-h-screen">
+				<div className="hero-wrapper flex flex-col justify-center items-center">
 					<div className="w-full">
 						<div
 							className="flex justify-center items-center w-full px-4"
@@ -218,7 +218,7 @@ const Dashboard = () => {
 																					})}
 																				>
 																					<div
-																						className={`absolute top-[2px] transform transition-transform duration-200 ease-in-out ${
+																						className={`absolute top-1/2 -translate-y-1/2 transform transition-transform duration-200 ease-in-out ${
 																							field.value
 																								? 'translate-x-[10px] bg-white'
 																								: 'translate-x-0 bg-[#050505]'
@@ -282,7 +282,7 @@ const Dashboard = () => {
 				{hasSearched &&
 					activeSearchQuery &&
 					(isLoadingContacts || isRefetchingContacts) && (
-						<div className="search-query-display mt-20">
+						<div className="search-query-display mt-8">
 							<div className="search-query-display-inner">
 								<button
 									onClick={handleResetSearch}
@@ -558,7 +558,7 @@ const Dashboard = () => {
 				)}
 
 				{!hasSearched && (
-					<div className="campaigns-table-wrapper mt-32 sm:mt-36 md:mt-40 lg:mt-44 xl:mt-48 2xl:mt-56 relative">
+					<div className="campaigns-table-wrapper">
 						<div className="absolute top-0 left-0 right-0 h-8 z-[5] pointer-events-none bg-gradient-to-b from-white to-transparent" />
 						<CampaignsTable />
 					</div>

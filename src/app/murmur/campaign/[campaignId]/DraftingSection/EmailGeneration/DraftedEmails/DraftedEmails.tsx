@@ -39,13 +39,13 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 			: 'Unknown Contact';
 
 		return (
-			<div style={{ width: '320px', height: '489px', position: 'relative' }}>
+			<div style={{ width: '366px', height: '489px', position: 'relative' }}>
 				{/* Container box with header - matching the table view */}
 				<div
 					style={{
 						width: '100%',
 						height: '100%',
-						border: '1px solid #ABABAB',
+						border: '2px solid #ABABAB',
 						borderRadius: '8px',
 						position: 'relative',
 						display: 'flex',
@@ -57,7 +57,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						style={{
 							borderTopLeftRadius: '8px',
 							borderTopRightRadius: '8px',
-							borderBottom: '1px solid #ABABAB',
+							borderBottom: '2px solid #ABABAB',
 							padding: '12px 16px',
 							display: 'flex',
 							justifyContent: 'space-between',
@@ -66,7 +66,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							backgroundColor: 'white',
 						}}
 					>
-						<div className="text-sm font-inter font-medium text-black">Drafts</div>
+						<div style={{ transform: 'translateY(-6px)' }}>
+							<div className="text-sm font-inter font-medium text-black">Drafts</div>
+						</div>
 					</div>
 
 					{/* Editor container */}
@@ -168,8 +170,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							<div
 								key={draft.id}
 								className={cn(
-									'border-b border-gray-200 cursor-pointer transition-colors p-3 relative select-none',
-									isSelected && 'bg-[#D6E8D9] border-2 border-primary'
+									'border-b-2 border-[#ABABAB] cursor-pointer transition-colors p-3 relative select-none',
+									isSelected && 'bg-[#D6E8D9] border-2 border-[#ABABAB]'
 								)}
 								onMouseDown={(e) => {
 									// Prevent text selection on shift-click
