@@ -66,7 +66,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							backgroundColor: 'white',
 						}}
 					>
-						<div className="text-sm font-inter font-medium text-black">Drafts</div>
+						<div style={{ transform: 'translateY(-6px)' }}>
+							<div className="text-sm font-inter font-medium text-black">Drafts</div>
+						</div>
 					</div>
 
 					{/* Editor container */}
