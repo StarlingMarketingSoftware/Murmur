@@ -218,7 +218,7 @@ const Dashboard = () => {
 																					})}
 																				>
 																					<div
-																						className={`absolute top-[2px] transform transition-transform duration-200 ease-in-out ${
+																						className={`absolute top-1/2 -translate-y-1/2 transform transition-transform duration-200 ease-in-out ${
 																							field.value
 																								? 'translate-x-[10px] bg-white'
 																								: 'translate-x-0 bg-[#050505]'

@@ -1650,6 +1650,16 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 	-webkit-box-shadow: none;
 }
 
+/* Ensure contents are vertically centered within the box */
+.exclude-contacts-box [data-slot='form-item'],
+.exclude-contacts-box [data-slot='form-control'],
+.exclude-contacts-box [data-slot='form-label'] {
+	display: flex;
+	align-items: center;
+	height: 100%;
+	margin: 0 !important;
+}
+
 /* Ensure consistent layout during horizontal compression */
 .search-bar-wrapper .flex-wrap {
 	min-height: 39px;
