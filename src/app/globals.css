@@ -2570,6 +2570,31 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 	z-index: 30; /* Ensure table is above other elements */
 }
 
+/* Adjust table position for portrait orientation screens to prevent overlap */
+@media (orientation: portrait) {
+	.campaigns-table-wrapper {
+		margin-top: -100px; /* Less aggressive pull-up on portrait screens */
+	}
+
+	/* Add extra spacing between search area and table on portrait */
+	.hero-wrapper {
+		min-height: 600px !important; /* Reduce min-height on portrait */
+		height: auto !important; /* Allow flexible height */
+	}
+
+	/* Ensure search bar area has enough bottom spacing */
+	.search-bar-wrapper {
+		margin-bottom: 40px;
+	}
+}
+
+/* Additional fix for tall portrait monitors (aspect ratio taller than 3:4) */
+@media (orientation: portrait) and (min-aspect-ratio: 3/4) {
+	.campaigns-table-wrapper {
+		margin-top: -50px; /* Even less pull-up for very tall portrait screens */
+	}
+}
+
 /* Safari-specific fix for campaigns table */
 @supports (-webkit-appearance: none) {
 	.campaigns-table-wrapper {

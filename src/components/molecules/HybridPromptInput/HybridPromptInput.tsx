@@ -108,6 +108,8 @@ const SortableAIBlock = ({
 	const [isEdit, setIsEdit] = useState(
 		form.getValues(`hybridBlockPrompts.${fieldIndex}.value`) !== ''
 	);
+	// Track if the text field has been touched (user has interacted with it)
+	const [hasBeenTouched, setHasBeenTouched] = useState(false);
 
 	const style = {
 		transform: CSS.Transform.toString(transform),
@@ -130,6 +132,8 @@ const SortableAIBlock = ({
 	// Watch the field value to determine if text block is empty
 	const fieldValue = form.watch(`hybridBlockPrompts.${fieldIndex}.value`);
 	const isTextBlockEmpty = isTextBlock && !fieldValue;
+	// Only show red styling if the field has been touched and is empty
+	const shouldShowRedStyling = isTextBlockEmpty && hasBeenTouched;
 
 	return (
 		<div
@@ -160,7 +164,7 @@ const SortableAIBlock = ({
 				!isIntroductionBlock &&
 					!isResearchBlock &&
 					!isActionBlock &&
-					(isTextBlockEmpty
+					(shouldShowRedStyling
 						? 'border-[#A20000]'
 						: isTextBlock
 						? 'border-primary'
@@ -183,9 +187,13 @@ const SortableAIBlock = ({
 					{...listeners}
 					className={cn(
 						'absolute top-0 left-0 cursor-move z-[1]',
-						isTextBlock ? 'h-[80px] w-8' : isCompactBlock ? 'h-[44px] w-8' : 'h-12',
+						isTextBlock
+							? 'h-[80px] w-[172px]'
+							: isCompactBlock
+							? 'h-[44px] w-[172px]'
+							: 'h-12',
 						isFullAutomatedBlock
-							? 'w-24'
+							? 'w-[172px]'
 							: !isCompactBlock && !isFullAutomatedBlock
 							? 'w-full'
 							: ''
@@ -243,7 +251,7 @@ const SortableAIBlock = ({
 											<span
 												className={cn(
 													'font-inter font-medium text-[17px] leading-[14px]',
-													isTextBlockEmpty && 'text-[#A20000]'
+													shouldShowRedStyling && 'text-[#A20000]'
 												)}
 											>
 												Text
@@ -260,7 +268,7 @@ const SortableAIBlock = ({
 													onClick={(e) => e.stopPropagation()}
 													className={cn(
 														'flex-1 bg-white outline-none text-sm pl-6 pr-12',
-														isTextBlockEmpty
+														shouldShowRedStyling
 															? 'placeholder:text-[#A20000]'
 															: 'placeholder:text-gray-400'
 													)}
@@ -270,6 +278,19 @@ const SortableAIBlock = ({
 															`hybridBlockPrompts.${fieldIndex}.value`,
 															e.target as HTMLInputElement
 														);
+													}}
+													onBlur={() => {
+														// Mark as touched when the user leaves the field
+														if (isTextBlock) {
+															setHasBeenTouched(true);
+														}
+													}}
+													onChange={(e) => {
+														// Mark as touched when user types
+														if (isTextBlock && e.target.value) {
+															setHasBeenTouched(true);
+														}
+														fieldProps.onChange(e);
 													}}
 												/>
 											);
@@ -352,7 +373,10 @@ const SortableAIBlock = ({
 									) : (
 										<Typography
 											variant="h4"
-											className={cn('font-inter', isTextBlockEmpty && 'text-[#A20000]')}
+											className={cn(
+												'font-inter',
+												shouldShowRedStyling && 'text-[#A20000]'
+											)}
 										>
 											Text
 										</Typography>
@@ -371,7 +395,7 @@ const SortableAIBlock = ({
 													className={cn(
 														'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 bg-white',
 														isFullAutomatedBlock ? 'h-[300px] px-0' : '',
-														isTextBlockEmpty ? 'placeholder:text-[#A20000]' : ''
+														shouldShowRedStyling ? 'placeholder:text-[#A20000]' : ''
 													)}
 													{...fieldProps}
 													onFocus={(e) => {
@@ -379,6 +403,19 @@ const SortableAIBlock = ({
 															`hybridBlockPrompts.${fieldIndex}.value`,
 															e.target as HTMLTextAreaElement
 														);
+													}}
+													onBlur={() => {
+														// Mark as touched when the user leaves the field
+														if (isTextBlock) {
+															setHasBeenTouched(true);
+														}
+													}}
+													onChange={(e) => {
+														// Mark as touched when user types
+														if (isTextBlock && e.target.value) {
+															setHasBeenTouched(true);
+														}
+														fieldProps.onChange(e);
 													}}
 												/>
 												{isFullAutomatedBlock && <ParagraphSlider />}
@@ -449,6 +486,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const isHandwrittenMode =
 		watchedBlocks.length > 0 && watchedBlocks.every((b) => b.type === HybridBlock.text);
 	const hasBlocks = (form.watch('hybridBlockPrompts')?.length || 0) > 0;
+
+	// Check for empty text blocks
+	const hasEmptyTextBlocks = watchedBlocks.some(
+		(block) =>
+			block.type === HybridBlock.text && (!block.value || block.value.trim() === '')
+	);
 
 	const handleClearAllInside = () => {
 		form.setValue('hybridBlockPrompts', []);
@@ -719,21 +762,35 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							</div>
 
 							{/* Test Button - Fixed position below signature, centered */}
-							<div className="flex justify-center -mt-2 mb-4 px-3">
-								<Button
-									type="button"
-									onClick={handleGenerateTestDrafts}
-									disabled={isGenerationDisabled?.()}
-									className={cn(
-										'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
-										showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]',
-										isGenerationDisabled?.()
-											? 'opacity-50 cursor-not-allowed'
-											: 'opacity-100'
-									)}
-								>
-									{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
-								</Button>
+							<div className="flex flex-col items-center px-3">
+								<div className="flex justify-center -mt-2 mb-4 w-full">
+									<Button
+										type="button"
+										onClick={handleGenerateTestDrafts}
+										disabled={isGenerationDisabled?.()}
+										className={cn(
+											'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
+											showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]',
+											isGenerationDisabled?.()
+												? 'opacity-50 cursor-not-allowed'
+												: 'opacity-100'
+										)}
+									>
+										{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+									</Button>
+								</div>
+
+								{/* Error message for empty text blocks */}
+								{hasEmptyTextBlocks && (
+									<div
+										className={cn(
+											'text-destructive text-sm font-medium -mt-2 mb-2',
+											showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]'
+										)}
+									>
+										Fill in all text blocks in order to compose an email.
+									</div>
+								)}
 							</div>
 						</div>
 

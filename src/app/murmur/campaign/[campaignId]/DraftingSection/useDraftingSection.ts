@@ -257,6 +257,25 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const hasNoBlocks =
 			!values.hybridBlockPrompts || values.hybridBlockPrompts.length === 0;
 
+		// Check if we're in handwritten mode (only text blocks)
+		const isOnlyTextBlocks = values.hybridBlockPrompts?.every(
+			(block) => block.type === HybridBlock.text
+		);
+
+		// For handwritten mode, check both text content and subject
+		if (isOnlyTextBlocks && values.hybridBlockPrompts?.length > 0) {
+			const hasTextContent = values.hybridBlockPrompts.some(
+				(block) => block.value && block.value.trim() !== ''
+			);
+			const hasSubject =
+				values.isAiSubject || (values.subject && values.subject.trim() !== '');
+
+			// Disable if either text content or subject is missing
+			if (!hasTextContent || !hasSubject) {
+				return true;
+			}
+		}
+
 		const hasAIBlocks = values.hybridBlockPrompts?.some((block) => {
 			if (block.type === 'full_automated') {
 				return block.value && block.value.trim() !== '';
@@ -292,6 +311,23 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 		const hasNoBlocks =
 			!values.hybridBlockPrompts || values.hybridBlockPrompts.length === 0;
+
+		// Check if we're in handwritten mode (only text blocks)
+		const isOnlyTextBlocks = values.hybridBlockPrompts?.every(
+			(block) => block.type === HybridBlock.text
+		);
+
+		// For handwritten mode, check both text content and subject
+		if (isOnlyTextBlocks && values.hybridBlockPrompts?.length > 0) {
+			const hasTextContent = values.hybridBlockPrompts.some(
+				(block) => block.value && block.value.trim() !== ''
+			);
+			const hasSubject =
+				values.isAiSubject || (values.subject && values.subject.trim() !== '');
+
+			// In handwritten mode, both text content AND subject must be present
+			return hasTextContent && hasSubject;
+		}
 
 		const hasAIBlocks = values.hybridBlockPrompts?.some((block) => {
 			if (block.type === 'full_automated') {
