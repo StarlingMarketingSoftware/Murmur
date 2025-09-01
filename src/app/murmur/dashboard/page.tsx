@@ -476,7 +476,7 @@ const Dashboard = () => {
 												tableClassName="w-[1185px] mx-auto"
 												headerClassName="[&_tr]:border-[#737373]"
 												theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
-												rowClassName="border-[#737373]"
+												rowClassName="border-[#737373] row-hover-scroll"
 												hidePagination
 												headerAction={
 													<button

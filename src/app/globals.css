@@ -2870,6 +2870,23 @@ body.murmur-page footer {
 	white-space: nowrap;
 }
 
+/* Also trigger scrolling when hovering the entire table row (dashboard results) */
+.row-hover-scroll:hover .hover-scroll-text {
+	animation: scrollText var(--scroll-duration, 8s) linear infinite;
+	text-overflow: initial;
+	max-width: none;
+	width: auto;
+	padding-right: 50px;
+}
+
+.row-hover-scroll:hover .hover-scroll-text::after {
+	content: attr(data-text);
+	position: absolute;
+	left: 100%;
+	padding-left: 50px;
+	white-space: nowrap;
+}
+
 /* Lenis smooth scrolling styles */
 html.lenis {
 	height: auto;
