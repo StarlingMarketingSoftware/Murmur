@@ -2582,13 +2582,23 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 
 /* Dashboard main offset: default for landscape (unchanged visual) */
 .dashboard-main-offset {
-	margin-top: -200px;
+	margin-top: -164px;
+}
+
+/* Keep search results view at previous position */
+.dashboard-main-offset.search-active {
+	margin-top: -176px;
 }
 
 /* Portrait monitors: lower the dashboard to avoid top clipping */
 @media (orientation: portrait) {
 	.dashboard-main-offset {
-		margin-top: -120px;
+		margin-top: -84px;
+	}
+
+	/* Keep search results view at previous position on portrait */
+	.dashboard-main-offset.search-active {
+		margin-top: -96px;
 	}
 }
 
