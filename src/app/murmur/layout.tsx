@@ -38,7 +38,7 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 			{isCampaignPage && (
 				<div className="hidden lg:flex justify-center mt-2">
 					<Link href={urls.murmur.dashboard.index} className="block w-[320px] h-[24px]">
-						<div className="w-full h-full flex items-center justify-center text-[14px] font-inter font-normal text-black bg-[#EEEEEE] hover:bg-[#E5E5E5] transition-colors rounded-[8px]">
+						<div className="w-full h-full flex items-center justify-center text-[14px] font-inter font-normal text-black bg-[#EEEEEE] transition-colors hover:bg-[#696969] hover:text-white rounded-[8px]">
 							Back to Home
 						</div>
 					</Link>
