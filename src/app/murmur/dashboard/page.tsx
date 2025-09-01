@@ -2,6 +2,8 @@
 
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { useDashboard } from './useDashboard';
+import { urls } from '@/constants/urls';
+import { isProblematicBrowser } from '@/utils/browserDetection';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
 import { Typography } from '@/components/ui/typography';
@@ -20,15 +22,14 @@ import ConsoleLoader from '@/components/atoms/ConsoleLoader/ConsoleLoader';
 import { Card, CardContent } from '@/components/ui/card';
 import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
-
-import { MobileAppComingSoon } from '@/components/molecules/MobileAppComingSoon/MobileAppComingSoon';
-import SearchIcon from '@/components/atoms/_svg/SearchIcon';
-import { FormEvent } from 'react';
-import { cn } from '@/utils';
+import { useClerk } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import ArrowLeftIcon from '@/components/atoms/_svg/ArrowLeftIcon';
+import { MobileAppComingSoon } from '@/components/molecules/MobileAppComingSoon/MobileAppComingSoon';
 
 const Dashboard = () => {
+	const { isSignedIn, openSignIn } = useClerk();
+	const isMobile = useIsMobile();
+	const hasProblematicBrowser = isProblematicBrowser();
 	const {
 		form,
 		onSubmit,
@@ -51,12 +52,10 @@ const Dashboard = () => {
 		handleResetSearch,
 		handleSelectAll,
 		isAllSelected,
-		handleSubmitSearch,
 	} = useDashboard();
 
-	const isMobile = useIsMobile();
 	// Return null during initial load to prevent hydration mismatch
-	if (useIsMobile === null) {
+	if (isMobile === null) {
 		return null;
 	}
 
@@ -110,7 +109,28 @@ const Dashboard = () => {
 								{!hasSearched && (
 									<Form {...form}>
 										<form
-											onSubmit={(e: FormEvent<HTMLFormElement>) => handleSubmitSearch(e)}
+											onSubmit={(e) => {
+												e.preventDefault();
+												if (!isSignedIn) {
+													if (hasProblematicBrowser) {
+														// For Edge/Safari, navigate to sign-in page
+														console.log(
+															'[Dashboard] Edge/Safari detected, navigating to sign-in page'
+														);
+														if (typeof window !== 'undefined') {
+															sessionStorage.setItem(
+																'redirectAfterSignIn',
+																window.location.pathname
+															);
+														}
+														window.location.href = urls.signIn.index;
+													} else {
+														openSignIn();
+													}
+												} else {
+													form.handleSubmit(onSubmit)(e);
+												}
+											}}
 											className={hasSearched ? 'search-form-active' : ''}
 										>
 											<FormField
@@ -120,18 +140,16 @@ const Dashboard = () => {
 													<FormItem>
 														<FormControl>
 															<div
-																className={cn(
-																	'search-input-group',
+																className={`search-input-group ${
 																	hasSearched ? 'search-input-group-active' : ''
-																)}
+																}`}
 															>
 																<div
-																	className={cn(
-																		'search-wave-container',
+																	className={`search-wave-container ${
 																		isLoadingContacts || isRefetchingContacts
 																			? 'search-wave-loading'
 																			: ''
-																	)}
+																	}`}
 																>
 																	<Input
 																		className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent"
@@ -163,7 +181,10 @@ const Dashboard = () => {
 																render={({ field }) => (
 																	<FormItem className="flex flex-row items-center justify-between space-y-0 m-0 w-full gap-3">
 																		<div className="leading-none flex items-center">
-																			<FormLabel className="font-bold cursor-pointer select-none whitespace-nowrap text-[14px] leading-[16px]">
+																			<FormLabel
+																				className="font-bold cursor-pointer select-none whitespace-nowrap"
+																				style={{ fontSize: '14px', lineHeight: '16px' }}
+																			>
 																				Exclude Used Contacts
 																			</FormLabel>
 																		</div>
@@ -268,12 +289,22 @@ const Dashboard = () => {
 									className="search-back-button"
 									aria-label="Back to search"
 								>
-									<ArrowLeftIcon
-										width="20px"
-										height="20px"
+									<svg
+										width="20"
+										height="20"
+										viewBox="0 0 20 20"
+										fill="none"
+										xmlns="http://www.w3.org/2000/svg"
 										className="search-back-icon"
-										pathClassName="currentColor"
-									/>
+									>
+										<path
+											d="M12 16L6 10L12 4"
+											stroke="currentColor"
+											strokeWidth="1.5"
+											strokeLinecap="round"
+											strokeLinejoin="round"
+										/>
+									</svg>
 									<span className="search-back-text">Back</span>
 								</button>
 								<div className="search-query-display-text">
@@ -290,7 +321,27 @@ const Dashboard = () => {
 						<div className="results-search-bar-inner">
 							<Form {...form}>
 								<form
-									onSubmit={(e: FormEvent<HTMLFormElement>) => handleSubmitSearch(e)}
+									onSubmit={(e) => {
+										e.preventDefault();
+										if (!isSignedIn) {
+											if (hasProblematicBrowser) {
+												console.log(
+													'[Dashboard] Edge/Safari detected, navigating to sign-in page'
+												);
+												if (typeof window !== 'undefined') {
+													sessionStorage.setItem(
+														'redirectAfterSignIn',
+														window.location.pathname
+													);
+												}
+												window.location.href = urls.signIn.index;
+											} else {
+												openSignIn();
+											}
+										} else {
+											form.handleSubmit(onSubmit)(e);
+										}
+									}}
 									className="results-search-form"
 								>
 									<FormField
@@ -301,33 +352,47 @@ const Dashboard = () => {
 												<FormControl>
 													<div className="results-search-input-group">
 														<div
-															className={cn(
-																'search-wave-container',
+															className={`search-wave-container ${
 																isLoadingContacts || isRefetchingContacts
 																	? 'search-wave-loading'
 																	: ''
-															)}
+															}`}
 														>
 															<button
 																type="submit"
 																className="results-search-icon-btn"
 																aria-label="Search"
 															>
-																<SearchIcon
-																	width="20px"
-																	height="21px"
-																	pathClassName="stroke-[#A0A0A0]"
-																/>
+																<svg
+																	width="20"
+																	height="21"
+																	viewBox="0 0 20 21"
+																	fill="none"
+																	xmlns="http://www.w3.org/2000/svg"
+																	aria-hidden="true"
+																>
+																	<path
+																		d="M12 1C15.9278 1 19 3.96996 19 7.5C19 11.03 15.9278 14 12 14C8.07223 14 5 11.03 5 7.5C5 3.96996 8.07223 1 12 1Z"
+																		stroke="#A0A0A0"
+																		strokeWidth="2"
+																	/>
+																	<line
+																		x1="7.75258"
+																		y1="11.6585"
+																		x2="0.752577"
+																		y2="19.6585"
+																		stroke="#A0A0A0"
+																		strokeWidth="2"
+																	/>
+																</svg>
 															</button>
-
 															<Input
-																className={cn(
-																	'search-wave-input results-search-input !border-2 !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-[#cfcfcf]',
+																className={`search-wave-input results-search-input !border-2 !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-[#cfcfcf] ${
 																	field.value === activeSearchQuery &&
-																		(field.value?.trim()?.length ?? 0) > 0
+																	(field.value?.trim()?.length ?? 0) > 0
 																		? 'text-center'
 																		: 'text-left'
-																)}
+																}`}
 																placeholder='Refine your search... e.g. "Music venues in North Carolina"'
 																style={{ accentColor: 'transparent' }}
 																autoComplete="off"
@@ -344,14 +409,15 @@ const Dashboard = () => {
 											</FormItem>
 										)}
 									/>
+									{/* Generate action removed; awaiting left-side SVG submit icon */}
 								</form>
 								<div className="w-full text-center mt-2">
-									<Typography
-										variant="p"
-										className="font-secondary !text-[13px] !font-normal !text-[#7f7f7f]"
+									<span
+										className="font-secondary"
+										style={{ fontSize: '13px', fontWeight: 400, color: '#7f7f7f' }}
 									>
 										Select who you want to contact.
-									</Typography>
+									</span>
 								</div>
 							</Form>
 						</div>
@@ -426,12 +492,28 @@ const Dashboard = () => {
 														type="button"
 														onClick={handleCreateCampaign}
 														disabled={selectedContacts.length === 0}
-														className={cn(
-															'font-secondary w-[149px] h-[31px] border-none text-[14px] font-[500] leading-[31px] rounded-[6px]',
-															selectedContacts.length === 0
-																? 'opacity-60 cursor-default !bg-[rgba(93,171,104,0.1)] !text-[rgba(0,0,0,0.4)]'
-																: 'opacity-100 cursor-pointer !bg-[rgba(93,171,104,0.22)] text-[#000000]'
-														)}
+														className="font-secondary"
+														style={{
+															width: '149px',
+															height: '31px',
+															background:
+																selectedContacts.length === 0
+																	? 'rgba(93, 171, 104, 0.1)'
+																	: 'rgba(93, 171, 104, 0.22)',
+															border: 'none',
+															color:
+																selectedContacts.length === 0
+																	? 'rgba(0, 0, 0, 0.4)'
+																	: '#000000',
+															fontSize: '14px',
+															fontWeight: 500,
+															borderRadius: '6px',
+															lineHeight: '31px',
+															textAlign: 'center',
+															cursor:
+																selectedContacts.length === 0 ? 'default' : 'pointer',
+															opacity: selectedContacts.length === 0 ? 0.6 : 1,
+														}}
 													>
 														Generate Campaign
 													</button>

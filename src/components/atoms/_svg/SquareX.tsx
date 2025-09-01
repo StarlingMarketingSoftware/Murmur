@@ -1,7 +1,7 @@
 import { cn, CommonIconProps, defaultPathClassName } from '@/utils';
 import { FC } from 'react';
 
-const SquareXIcon: FC<CommonIconProps> = (props) => {
+const SquareCheck: FC<CommonIconProps> = (props) => {
 	const {
 		width = '100%',
 		height = '100%',
@@ -30,4 +30,4 @@ const SquareXIcon: FC<CommonIconProps> = (props) => {
 	);
 };
 
-export default SquareXIcon;
+export default SquareCheck;
