@@ -1517,18 +1517,28 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 
 /* Campaigns table container with fixed height */
 .campaigns-table-container {
-	max-height: 279px;
-	overflow: hidden;
+	max-height: none;
+	overflow: visible;
 	position: relative;
 	z-index: 40; /* Ensure container is clickable */
 }
 
+/* Set a compact, scrollable height for the My Campaigns table */
+.campaigns-table-container .my-campaigns-table {
+	height: 305px !important;
+	max-height: 305px !important;
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+}
+
 /* Override the default constrainHeight of 429px */
 .campaigns-table-container > div > div:last-child {
-	height: 279px !important;
-	max-height: 279px !important;
+	height: 305px !important;
+	max-height: 305px !important;
 	position: relative;
 	z-index: 41; /* Ensure scrollable area is above container but below rows */
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
 }
 
 /* Hide rows per page and search in campaigns table header */
@@ -2568,6 +2578,18 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 	margin-top: -200px; /* Pull table up for better positioning */
 	position: relative;
 	z-index: 30; /* Ensure table is above other elements */
+}
+
+/* Dashboard main offset: default for landscape (unchanged visual) */
+.dashboard-main-offset {
+	margin-top: -200px;
+}
+
+/* Portrait monitors: lower the dashboard to avoid top clipping */
+@media (orientation: portrait) {
+	.dashboard-main-offset {
+		margin-top: -120px;
+	}
 }
 
 /* Adjust table position for portrait orientation screens to prevent overlap */

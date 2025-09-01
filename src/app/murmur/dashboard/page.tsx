@@ -66,7 +66,7 @@ const Dashboard = () => {
 	return (
 		<AppLayout>
 			<div
-				className={`relative min-h-screen transition-all duration-500 -mt-[135px] pb-[100px] w-full max-w-full ${
+				className={`relative min-h-screen transition-all duration-500 dashboard-main-offset pb-[100px] w-full max-w-full ${
 					hasSearched ? 'search-active' : ''
 				}`}
 			>
