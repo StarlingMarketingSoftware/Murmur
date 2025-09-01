@@ -39,9 +39,9 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 					<div className="w-[892px]">
 						<div
 							ref={emailStructureRef}
-							className="mb-3 flex justify-between items-center"
+							className="mb-[4px] flex justify-between items-center"
 						>
-							<FormLabel className="font-inter font-normal">Email Structure</FormLabel>
+							<FormLabel className="font-inter font-medium">Email structure</FormLabel>
 							<div className="flex items-center gap-4">
 								{isDraftingContentReady() && (
 									<>

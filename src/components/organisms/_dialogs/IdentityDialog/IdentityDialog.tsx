@@ -168,7 +168,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 												<div style={{ opacity: showCreatePanel ? 0.26 : 1 }}>
 													<Typography
 														variant="h3"
-														className="!text-[18.77px] !leading-[22.1px] font-medium text-[#000000] mb-4 font-secondary"
+														className="!text-[18.77px] !leading-[22.1px] font-medium text-[#000000] mb-2 font-secondary"
 													>
 														Select User Profile
 													</Typography>
@@ -178,7 +178,15 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 															name="identityId"
 															render={({ field }) => (
 																<FormItem>
-																	<div className="box-border shrink-0 w-[652.4px] h-[326.75px] rounded-[8.83px] border-[2.21px] border-[#000000] overflow-hidden">
+																	<div
+																		className="box-border shrink-0 w-[652.4px] h-[326.75px] rounded-[8.83px] border-[2.21px] border-[#000000] overflow-hidden"
+																		onClick={() => {
+																			if (showCreatePanel) setShowCreatePanel(false);
+																		}}
+																		style={{
+																			cursor: showCreatePanel ? 'pointer' : undefined,
+																		}}
+																	>
 																		<div className="w-full h-full overflow-y-auto overflow-x-hidden">
 																			<Table className="w-full !rounded-none">
 																				<TableBody>
@@ -188,9 +196,10 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 																						return (
 																							<TableRow
 																								key={identity.id}
-																								onClick={() =>
-																									field.onChange(identity.id.toString())
-																								}
+																								onClick={() => {
+																									if (showCreatePanel) return;
+																									field.onChange(identity.id.toString());
+																								}}
 																								data-state={
 																									isSelected ? 'selected' : undefined
 																								}
@@ -247,7 +256,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 												<div>
 													<div className="bg-background rounded-lg transition-all">
 														<div
-															className="flex items-center gap-4 p-0 hover:bg-gray-50 cursor-pointer mb-4"
+															className="flex items-center gap-4 p-0 cursor-pointer mb-2"
 															onClick={() => setShowCreatePanel((prev) => !prev)}
 														>
 															<div className="flex items-center gap-2">
@@ -261,7 +270,10 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 														</div>
 														{/* Fixed create panel launcher box */}
 														{!showCreatePanel && (
-															<div className="w-[650.5px] h-[326.75px] bg-[#F8F8F8] rounded-none flex items-center justify-center mb-2">
+															<div
+																className="w-[650.5px] h-[326.75px] bg-[#F8F8F8] rounded-none flex items-center justify-center mb-2 cursor-pointer"
+																onClick={() => setShowCreatePanel(true)}
+															>
 																<button
 																	type="button"
 																	onClick={() => setShowCreatePanel(true)}
