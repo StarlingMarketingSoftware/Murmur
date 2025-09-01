@@ -481,7 +481,7 @@ const Dashboard = () => {
 												headerAction={
 													<button
 														onClick={handleSelectAll}
-														className="select-all-button"
+														className="text-[14px] font-secondary font-normal text-black hover:underline"
 														type="button"
 													>
 														{isAllSelected ? 'Deselect All' : 'Select all'}
@@ -515,7 +515,7 @@ const Dashboard = () => {
 															opacity: selectedContacts.length === 0 ? 0.6 : 1,
 														}}
 													>
-														Generate Campaign
+														Create Campaign
 													</button>
 												}
 											/>

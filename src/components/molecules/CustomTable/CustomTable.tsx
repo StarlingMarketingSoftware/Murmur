@@ -255,7 +255,12 @@ export function CustomTable<TData, TValue>({
 
 	return (
 		<div className="w-full">
-			<div className="relative z-[70] flex items-center justify-between py-4 gap-4 w-full max-w-full mx-auto">
+			<div
+				className={cn(
+					'relative z-[70] flex items-end justify-between pt-2 pb-1 gap-4 w-full max-w-full mx-auto',
+					tableClassName
+				)}
+			>
 				<div className="flex items-center gap-4 flex-wrap">
 					{searchable && (
 						<Input
@@ -289,14 +294,16 @@ export function CustomTable<TData, TValue>({
 							</Select>
 						</div>
 					)}
-					{isSelectable && (
-						<div className="text-sm text-muted-foreground">
-							{table.getFilteredSelectedRowModel().rows.length} of{' '}
-							{table.getFilteredRowModel().rows.length} rows selected.
-						</div>
-					)}
 				</div>
-				{isSelectable && headerAction ? headerAction : null}
+				{isSelectable && headerAction ? (
+					<div className="flex flex-col items-end gap-0">
+						<div className="text-[14px] font-secondary font-normal text-black">
+							{table.getFilteredSelectedRowModel().rows.length} of{' '}
+							{table.getFilteredRowModel().rows.length} rows selected
+						</div>
+						{headerAction}
+					</div>
+				) : null}
 			</div>
 			<div
 				className={cn(
