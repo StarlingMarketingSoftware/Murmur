@@ -2649,10 +2649,14 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 /* Default: show full text on desktop */
 .nav-text-full {
 	display: inline;
+	pointer-events: auto !important;
+	cursor: pointer !important;
 }
 
 .nav-text-short {
 	display: none;
+	pointer-events: auto !important;
+	cursor: pointer !important;
 }
 
 /* Mobile: show short text */
@@ -2663,6 +2667,28 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 
 	.nav-text-short {
 		display: inline;
+	}
+}
+
+/* Portrait/Vertical monitor fix: ensure nav links are fully clickable */
+@media (orientation: portrait) {
+	.safari-nav-fix {
+		overflow: visible !important;
+		max-width: none !important;
+	}
+
+	.safari-nav-fix span {
+		pointer-events: auto !important;
+		cursor: pointer !important;
+		position: relative;
+		z-index: 10;
+	}
+
+	/* Ensure the entire link area is clickable */
+	nav a {
+		pointer-events: auto !important;
+		position: relative;
+		z-index: 10;
 	}
 }
 

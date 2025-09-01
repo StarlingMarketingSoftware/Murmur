@@ -38,15 +38,19 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 							href={urls.murmur.dashboard.index}
 							className="flex items-center gap-2 text-[13px] transition-all duration-200 font-secondary tracking-[0.02em] text-gray-600 opacity-60 hover:opacity-100 hover:text-black safari-nav-fix cursor-pointer pointer-events-auto"
 						>
-							<ArrowLeft className="w-4 h-4 flex-shrink-0" />
-							<span className="nav-text-full">Home</span>
-							<span className="nav-text-short">Home</span>
+							<ArrowLeft className="w-4 h-4 flex-shrink-0 pointer-events-auto" />
+							<span className="nav-text-full pointer-events-auto cursor-pointer">
+								Home
+							</span>
+							<span className="nav-text-short pointer-events-auto cursor-pointer">
+								Home
+							</span>
 						</Link>
 					</div>
 					<div className="justify-self-center">
 						<Link href={urls.murmur.dashboard.index} className="block w-[320px] h-[24px]">
 							<div className="w-full h-full flex items-center justify-center text-[14px] font-inter font-normal text-black bg-[#EEEEEE] transition-colors hover:bg-[#696969] hover:text-white rounded-[8px]">
-								Home
+								Back to Home
 							</div>
 						</Link>
 					</div>
@@ -61,9 +65,13 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 								href={urls.home.index}
 								className="flex items-center gap-2 text-[13px] transition-all duration-200 font-secondary tracking-[0.02em] text-gray-600 opacity-60 hover:opacity-100 hover:text-black safari-nav-fix cursor-pointer pointer-events-auto"
 							>
-								<ArrowLeft className="w-4 h-4 flex-shrink-0" />
-								<span className="nav-text-full">Back to Landing</span>
-								<span className="nav-text-short">Landing</span>
+								<ArrowLeft className="w-4 h-4 flex-shrink-0 pointer-events-auto" />
+								<span className="nav-text-full pointer-events-auto cursor-pointer">
+									Back to Landing
+								</span>
+								<span className="nav-text-short pointer-events-auto cursor-pointer">
+									Landing
+								</span>
 							</Link>
 						)}
 
