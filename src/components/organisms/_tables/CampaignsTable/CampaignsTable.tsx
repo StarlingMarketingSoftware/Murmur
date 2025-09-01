@@ -10,9 +10,10 @@ export const CampaignsTable: FC = () => {
 	return (
 		<Card className="relative border-none bg-transparent w-full max-w-[1132px] mx-auto">
 			{isPending && <Spinner size="medium" className="absolute top-2 right-2" />}
-			<CardHeader className="px-6 pb-2 bg-transparent">
+			<CardHeader className="px-6 pb-0 bg-transparent">
 				<CardTitle
-					className="text-left text-[14px] font-normal"
+					className="text-left text-[14px] font-inter font-medium mb-0.5"
+					variant="secondary"
 					style={{ fontFamily: 'Inter, sans-serif' }}
 				>
 					My Campaigns

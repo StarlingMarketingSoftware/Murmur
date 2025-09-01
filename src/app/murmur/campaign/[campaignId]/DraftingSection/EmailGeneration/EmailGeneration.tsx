@@ -210,8 +210,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 	return (
 		<>
-			<div className="mb-3 mt-3 flex justify-between items-center">
-				<FormLabel className="font-inter font-normal">Drafting</FormLabel>
+			<div className="mb-[4px] mt-3 flex justify-between items-center">
+				<FormLabel className="font-inter font-medium">Drafting</FormLabel>
 				{scrollToEmailStructure && (
 					<Button
 						type="button"
