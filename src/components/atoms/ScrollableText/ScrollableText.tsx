@@ -10,7 +10,7 @@ export const ScrollableText: FC<ScrollableTextProps> = (props) => {
 		<div
 			ref={containerRef}
 			className={cn(
-				'hover-scroll-container overflow-hidden relative w-full hover:scrollText'
+				'hover-scroll-container overflow-hidden relative w-full hover:scrollText flex items-center h-full'
 			)}
 		>
 			<span

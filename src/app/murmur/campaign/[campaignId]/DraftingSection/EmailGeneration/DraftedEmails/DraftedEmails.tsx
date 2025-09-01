@@ -216,7 +216,6 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 
 								{/* Email subject */}
 								<div className="text-xs text-gray-600 mb-1 pr-8">
-									<span className="font-semibold">Subject:</span>{' '}
 									{draft.subject || 'No subject'}
 								</div>
 

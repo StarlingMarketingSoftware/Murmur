@@ -115,7 +115,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 					<div
 						key={contact.id}
 						className={cn(
-							'border-b-2 border-[#ABABAB] cursor-pointer transition-colors grid grid-cols-2 grid-rows-[auto_auto] w-full overflow-visible py-1 select-none',
+							'border-b-2 border-[#ABABAB] cursor-pointer transition-colors grid grid-cols-2 grid-rows-[auto_auto] w-full overflow-visible py-1 select-none row-hover-scroll',
 							selectedContactIds.has(contact.id)
 								? 'bg-[#D6E8D9] border-2 border-[#ABABAB]'
 								: ''
@@ -148,10 +148,11 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 										{/* Top Right - Title */}
 										<div className="p-1 flex items-center overflow-visible">
 											{contact.headline ? (
-												<div className="h-5 rounded-[6px] px-2 flex items-center w-fit max-w-[calc(100%-8px)] bg-[#E8EFFF] border-1 border-black">
+												<div className="h-5 rounded-[6px] px-2 flex items-center w-full max-w-[150px] bg-[#E8EFFF] border-1 border-black overflow-hidden">
 													<ScrollableText
 														text={contact.headline}
 														className="text-xs text-black"
+														scrollPixelsPerSecond={60}
 													/>
 												</div>
 											) : (
@@ -255,7 +256,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 											<>
 												{/* Top Right - Title */}
 												<div className="p-1 flex items-center overflow-visible">
-													<div className="h-[20.54px] rounded-[6.64px] px-2 flex items-center w-fit max-w-full bg-[#E8EFFF] border-[0.83px] border-black">
+													<div className="h-[20.54px] rounded-[6.64px] px-2 flex items-center w-full max-w-[150px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
 														<ScrollableText
 															text={contact.headline}
 															className="text-xs text-black"

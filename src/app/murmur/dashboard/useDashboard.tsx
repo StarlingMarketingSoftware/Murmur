@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 
 import { capitalize, getStateAbbreviation } from '@/utils/string';
 import { TableCellTooltip } from '@/components/molecules/TableCellTooltip/TableCellTooltip';
+import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { useMe } from '@/hooks/useMe';
 import { StripeSubscriptionStatus } from '@/types';
 import { usePageTransition } from '@/contexts/PageTransitionContext';
@@ -500,8 +501,11 @@ export const useDashboard = () => {
 							}}
 						>
 							<div className="h-full w-full flex items-center px-2">
-								<div className="w-full">
-									<TableCellTooltip text={text} />
+								<div className="w-full flex items-center h-full">
+									<ScrollableText
+										text={text}
+										className="text-[14px] leading-none text-black"
+									/>
 								</div>
 							</div>
 						</div>

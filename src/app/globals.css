@@ -1517,18 +1517,28 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 
 /* Campaigns table container with fixed height */
 .campaigns-table-container {
-	max-height: 279px;
-	overflow: hidden;
+	max-height: none;
+	overflow: visible;
 	position: relative;
 	z-index: 40; /* Ensure container is clickable */
 }
 
+/* Set a compact, scrollable height for the My Campaigns table */
+.campaigns-table-container .my-campaigns-table {
+	height: 305px !important;
+	max-height: 305px !important;
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+}
+
 /* Override the default constrainHeight of 429px */
 .campaigns-table-container > div > div:last-child {
-	height: 279px !important;
-	max-height: 279px !important;
+	height: 305px !important;
+	max-height: 305px !important;
 	position: relative;
 	z-index: 41; /* Ensure scrollable area is above container but below rows */
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
 }
 
 /* Hide rows per page and search in campaigns table header */
@@ -2570,6 +2580,28 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 	z-index: 30; /* Ensure table is above other elements */
 }
 
+/* Dashboard main offset: default for landscape (unchanged visual) */
+.dashboard-main-offset {
+	margin-top: -164px;
+}
+
+/* Keep search results view at previous position */
+.dashboard-main-offset.search-active {
+	margin-top: -176px;
+}
+
+/* Portrait monitors: lower the dashboard to avoid top clipping */
+@media (orientation: portrait) {
+	.dashboard-main-offset {
+		margin-top: -84px;
+	}
+
+	/* Keep search results view at previous position on portrait */
+	.dashboard-main-offset.search-active {
+		margin-top: -96px;
+	}
+}
+
 /* Adjust table position for portrait orientation screens to prevent overlap */
 @media (orientation: portrait) {
 	.campaigns-table-wrapper {
@@ -2617,10 +2649,14 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 /* Default: show full text on desktop */
 .nav-text-full {
 	display: inline;
+	pointer-events: auto !important;
+	cursor: pointer !important;
 }
 
 .nav-text-short {
 	display: none;
+	pointer-events: auto !important;
+	cursor: pointer !important;
 }
 
 /* Mobile: show short text */
@@ -2631,6 +2667,28 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 
 	.nav-text-short {
 		display: inline;
+	}
+}
+
+/* Portrait/Vertical monitor fix: ensure nav links are fully clickable */
+@media (orientation: portrait) {
+	.safari-nav-fix {
+		overflow: visible !important;
+		max-width: none !important;
+	}
+
+	.safari-nav-fix span {
+		pointer-events: auto !important;
+		cursor: pointer !important;
+		position: relative;
+		z-index: 10;
+	}
+
+	/* Ensure the entire link area is clickable */
+	nav a {
+		pointer-events: auto !important;
+		position: relative;
+		z-index: 10;
 	}
 }
 
@@ -2863,6 +2921,23 @@ body.murmur-page footer {
 
 /* Create a seamless loop by duplicating the text */
 .hover-scroll-container:hover .hover-scroll-text::after {
+	content: attr(data-text);
+	position: absolute;
+	left: 100%;
+	padding-left: 50px;
+	white-space: nowrap;
+}
+
+/* Also trigger scrolling when hovering the entire table row (dashboard results) */
+.row-hover-scroll:hover .hover-scroll-text {
+	animation: scrollText var(--scroll-duration, 8s) linear infinite;
+	text-overflow: initial;
+	max-width: none;
+	width: auto;
+	padding-right: 50px;
+}
+
+.row-hover-scroll:hover .hover-scroll-text::after {
 	content: attr(data-text);
 	position: absolute;
 	left: 100%;

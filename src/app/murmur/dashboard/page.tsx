@@ -66,7 +66,7 @@ const Dashboard = () => {
 	return (
 		<AppLayout>
 			<div
-				className={`relative min-h-screen transition-all duration-500 -mt-[135px] pb-[100px] w-full max-w-full ${
+				className={`relative min-h-screen transition-all duration-500 dashboard-main-offset pb-[100px] w-full max-w-full ${
 					hasSearched ? 'search-active' : ''
 				}`}
 			>
@@ -476,12 +476,12 @@ const Dashboard = () => {
 												tableClassName="w-[1185px] mx-auto"
 												headerClassName="[&_tr]:border-[#737373]"
 												theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
-												rowClassName="border-[#737373]"
+												rowClassName="border-[#737373] row-hover-scroll"
 												hidePagination
 												headerAction={
 													<button
 														onClick={handleSelectAll}
-														className="select-all-button"
+														className="text-[14px] font-secondary font-normal text-black hover:underline"
 														type="button"
 													>
 														{isAllSelected ? 'Deselect All' : 'Select all'}
@@ -515,7 +515,7 @@ const Dashboard = () => {
 															opacity: selectedContacts.length === 0 ? 0.6 : 1,
 														}}
 													>
-														Generate Campaign
+														Create Campaign
 													</button>
 												}
 											/>

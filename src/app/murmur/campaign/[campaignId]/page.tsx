@@ -59,8 +59,8 @@ const Murmur = () => {
 						<div className="flex flex-col gap-2 w-[400px]">
 							<div className="flex items-center">
 								<Link href={urls.murmur.dashboard.index} className="block">
-									<div className="w-[52px] h-[20.5px] bg-[#EEEEEE] rounded-[8px] flex items-center justify-start pl-1">
-										<span className="font-inter font-normal text-[17px] leading-none text-black">
+									<div className="w-[52px] h-[20.5px] bg-[#EEEEEE] rounded-[8px] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]">
+										<span className="font-inter font-normal text-[17px] leading-none text-black transition-colors group-hover:text-white">
 											To
 										</span>
 									</div>
@@ -75,9 +75,9 @@ const Murmur = () => {
 								<button
 									type="button"
 									onClick={() => setIsIdentityDialogOpen(true)}
-									className="w-[52px] h-[20.5px] bg-[#EEEEEE] rounded-[8px] flex items-center justify-start pl-1 cursor-pointer"
+									className="w-[52px] h-[20.5px] bg-[#EEEEEE] rounded-[8px] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969]"
 								>
-									<span className="font-inter font-normal text-[17px] leading-none text-black">
+									<span className="font-inter font-normal text-[17px] leading-none text-black transition-colors group-hover:text-white">
 										From
 									</span>
 								</button>
