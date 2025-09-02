@@ -237,14 +237,13 @@ export const useCampaignsTable = () => {
 					rowEl.style.setProperty('border-color', '#A00000', 'important');
 					rowEl.style.setProperty(
 						'will-change',
-						'background-position, box-shadow, filter',
+						'background-position, filter',
 						'important'
 					);
 					rowEl.style.setProperty('cursor', 'pointer', 'important');
 
-					// Add cyber neon glow
+					// Set initial filter (no shadow)
 					gsap.set(rowEl, {
-						boxShadow: '0 0 0 rgba(255, 0, 0, 0.5)',
 						filter: 'brightness(1) contrast(1)',
 					});
 
@@ -259,18 +258,7 @@ export const useCampaignsTable = () => {
 							},
 							0
 						)
-						.to(
-							rowEl,
-							{
-								boxShadow:
-									'0 0 20px rgba(255, 0, 0, 0.8), inset 0 0 10px rgba(255, 0, 0, 0.6)', // Pulsing neon glow
-								duration: 1,
-								repeat: -1,
-								yoyo: true,
-								ease: 'sine.inOut',
-							},
-							0
-						)
+						// (Shadow animation removed)
 						.to(
 							rowEl,
 							{
