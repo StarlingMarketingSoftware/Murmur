@@ -35,6 +35,7 @@ export const CampaignsTable: FC = () => {
 						searchable={false}
 						useAutoLayout
 						useCustomScrollbar={true}
+						scrollbarOffsetRight={-5}
 					/>
 				</div>
 			</CardContent>

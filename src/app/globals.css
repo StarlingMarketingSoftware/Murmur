@@ -1393,6 +1393,11 @@ body {
 	display: block !important; /* Ensure it's a block element */
 }
 
+/* Ensure the scrollable content respects rounded corners */
+.campaigns-table-container .my-campaigns-table .scrollbar-hide {
+	border-radius: 8px !important;
+}
+
 /* Override default h-[429px] class when campaigns table uses constrainHeight */
 .campaigns-table-container .my-campaigns-table.h-\[429px\] {
 	height: 260px !important;
@@ -3065,6 +3070,7 @@ body,
 /* --- Search Results Table Custom Scrollbar --- */
 .search-results-table {
 	overflow: visible !important;
+	border-radius: 8px !important;
 }
 
 .search-results-table .scrollbar-hide {
@@ -3081,3 +3087,8 @@ body,
 	height: 0 !important;
 }
 /* -------------------------------------- */
+
+/* Ensure search results content respects rounded corners when scrollbar is outside */
+.search-results-table .scrollbar-hide {
+	border-radius: 8px !important;
+}

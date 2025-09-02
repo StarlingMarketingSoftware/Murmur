@@ -10,8 +10,10 @@ export function GlobalScrollbar() {
 	const [dragStartY, setDragStartY] = useState(0);
 	const [scrollStartY, setScrollStartY] = useState(0);
 	const [isVisible, setIsVisible] = useState(true);
-	const visibilityTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-	const rafRef = useRef<number>();
+	const visibilityTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+		undefined
+	);
+	const rafRef = useRef<number | undefined>(undefined);
 
 	const updateScrollbar = useCallback(() => {
 		const { scrollTop, scrollHeight, clientHeight } = document.documentElement;

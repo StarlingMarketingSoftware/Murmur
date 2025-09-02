@@ -109,6 +109,7 @@ interface CustomTableProps<TData, TValue> extends DataTableProps<TData, TValue> 
 	theadCellClassName?: string;
 	rowClassName?: string;
 	useCustomScrollbar?: boolean;
+	scrollbarOffsetRight?: number;
 }
 
 export function CustomTable<TData, TValue>({
@@ -137,6 +138,7 @@ export function CustomTable<TData, TValue>({
 	theadCellClassName,
 	rowClassName,
 	useCustomScrollbar = false,
+	scrollbarOffsetRight = -4,
 }: CustomTableProps<TData, TValue>) {
 	type ColumnDefWithSize = ColumnDef<TData, TValue> & { size?: number };
 	const [pagination, setPagination] = useState({
@@ -318,6 +320,7 @@ export function CustomTable<TData, TValue>({
 					thumbWidth={2}
 					thumbColor="#000000"
 					trackColor="transparent"
+					offsetRight={scrollbarOffsetRight}
 				>
 					<div className="min-w-full">
 						<Table
