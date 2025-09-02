@@ -79,8 +79,8 @@
 
 :root {
 	--radius: 0.625rem;
-	--foreground: rgb(48, 50, 64); /* oklch(0.25 0.03 270) */
-	--background: rgb(250, 250, 251); /* oklch(0.98 0.005 270) */
+	--foreground: rgb(37, 37, 38); /* oklch(0.147 0.004 49.25) */
+	--background: rgb(255, 255, 255); /* oklch(1 0 0) */
 	--card: rgb(255, 255, 255); /* oklch(1 0 0) */
 	--card-foreground: rgb(37, 37, 37); /* oklch(0.145 0 0) */
 	--popover: rgb(255, 255, 255); /* oklch(1 0 0) */
@@ -119,8 +119,8 @@
 	--sidebar-primary-foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
 	--sidebar-accent: rgb(247, 247, 247); /* oklch(0.97 0 0) */
 	--sidebar-accent-foreground: rgb(52, 52, 52); /* oklch(0.205 0 0) */
-	--sidebar-border: rgb(235, 235, 235); /* oklch(0.922 0 0) */
-	--sidebar-ring: rgb(180, 180, 180); /* oklch(0.708 0 0) */
+	--sidebar-border: rgba(255, 255, 255, 0.1); /* oklch(1 0 0 / 10%) */
+	--sidebar-ring: rgb(142, 142, 142); /* oklch(0.556 0 0) */
 	--background: rgb(255, 255, 255); /* oklch(1 0 0) */
 	--foreground: rgb(37, 37, 38); /* oklch(0.147 0.004 49.25) */
 
@@ -177,84 +177,43 @@
 	}
 }
 
-/* AGGRESSIVE GLOBAL SCROLLBAR OVERRIDE: 1px black line, NO rounded corners, NO arrows */
-/* WebKit-based browsers (Chrome, Edge, Safari) - MAXIMUM SPECIFICITY */
-/* Exclude My Campaigns table which has its own specific styles */
-html *:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar,
-body *:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar,
-div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar,
-*:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar {
-	width: 1px !important;
-	height: 1px !important;
-	background: transparent !important;
-	background-color: transparent !important;
-	border-radius: 0px !important;
-	-webkit-border-radius: 0px !important;
-	border: none !important;
-}
-
-html *:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-thumb,
-body *:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-thumb,
-div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-thumb,
-*:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-thumb {
-	background: #000000 !important;
-	background-color: #000000 !important;
-	border-radius: 0px !important;
-	-webkit-border-radius: 0px !important;
-	border: none !important;
-	box-shadow: none !important;
-	min-height: 20px !important;
-}
-
-html *:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-track,
-body *:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-track,
-div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-track,
-*:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-track {
-	background: transparent !important;
-	background-color: transparent !important;
-	border-radius: 0px !important;
-	-webkit-border-radius: 0px !important;
-	border: none !important;
-	box-shadow: none !important;
-}
-
-html *:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-corner,
-body *:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-corner,
-div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-corner,
-*:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-corner {
-	background: transparent !important;
-	background-color: transparent !important;
-	border-radius: 0px !important;
-	-webkit-border-radius: 0px !important;
-}
-
-/* FORCE HIDE ALL SCROLLBAR BUTTONS/ARROWS */
-html *:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-button,
-body *:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-button,
-div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-button,
-*:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-button {
+/* CUSTOM SCROLLBAR SYSTEM - Hide ALL native scrollbars globally */
+/* Maximum specificity to override all other rules */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+div::-webkit-scrollbar,
+*::-webkit-scrollbar {
 	display: none !important;
-	width: 0px !important;
-	height: 0px !important;
-	background: transparent !important;
-	border: none !important;
+	width: 0 !important;
+	height: 0 !important;
 }
 
-/* Firefox */
-*:not(.my-campaigns-table):not(.my-campaigns-table *) {
-	scrollbar-width: thin; /* approximate 1px */
-	scrollbar-color: #000000 transparent;
+/* Firefox and IE/Edge */
+html {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
 }
 
-/* Legacy (non-Chromium) Edge/IE fallback */
-@supports (-ms-ime-align: auto) {
-	* {
-		scrollbar-face-color: #000000;
-		scrollbar-track-color: transparent;
-		scrollbar-arrow-color: #000000;
-		scrollbar-shadow-color: #000000;
-		scrollbar-highlight-color: #000000;
-	}
+body {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+* {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+/* Hide scrollbar for custom scrollbar component */
+.scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+.scrollbar-hide {
+	-ms-overflow-style: none !important; /* IE and Edge */
+	scrollbar-width: none !important; /* Firefox */
 }
 
 @keyframes scroll {
@@ -1429,18 +1388,149 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 .campaigns-table-container .my-campaigns-table {
 	height: 260px !important;
 	max-height: 260px !important;
-	overflow-y: auto !important;
-	overflow-x: hidden !important;
+	min-height: 260px !important; /* Force exact height */
+	position: relative !important;
+	display: block !important; /* Ensure it's a block element */
 }
 
-/* Override the default constrainHeight of 429px */
-.campaigns-table-container > div > div:last-child {
+/* Override default h-[429px] class when campaigns table uses constrainHeight */
+.campaigns-table-container .my-campaigns-table.h-\[429px\] {
 	height: 260px !important;
 	max-height: 260px !important;
-	position: relative;
-	z-index: 41; /* Ensure scrollable area is above container but below rows */
+	min-height: 260px !important;
+}
+
+/* Force hide ALL native scrollbars in campaigns table and its children */
+.campaigns-table-container::-webkit-scrollbar,
+.campaigns-table-container *::-webkit-scrollbar,
+.campaigns-table-container .my-campaigns-table::-webkit-scrollbar,
+.campaigns-table-container .my-campaigns-table *::-webkit-scrollbar,
+.custom-table-wrapper::-webkit-scrollbar,
+.custom-table-wrapper *::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+.campaigns-table-container,
+.campaigns-table-container *,
+.campaigns-table-container .my-campaigns-table,
+.campaigns-table-container .my-campaigns-table *,
+.custom-table-wrapper,
+.custom-table-wrapper * {
+	-ms-overflow-style: none !important;
+	scrollbar-width: none !important;
+}
+
+/* Ensure the CustomScrollbar component wrapper has proper dimensions */
+.campaigns-table-container .custom-table-wrapper {
+	height: 100% !important;
+	position: relative !important;
+}
+
+/* Ensure custom scrollbar track is visible and interactive */
+.campaigns-table-container .my-campaigns-table .custom-table-wrapper > div:last-child {
+	z-index: 100 !important; /* Make sure the custom scrollbar track is on top */
+	pointer-events: auto !important;
+	position: absolute !important;
+	top: 0 !important;
+	right: 0 !important;
+	height: 100% !important;
+}
+
+/* Ensure all elements in the scroll chain are interactive */
+.campaigns-table-container,
+.campaigns-table-container *,
+.campaigns-table-container .my-campaigns-table,
+.campaigns-table-container .my-campaigns-table *,
+.campaigns-table-container .scrollbar-hide,
+.campaigns-table-container .scrollbar-hide * {
+	pointer-events: auto !important;
+}
+
+/* Ensure proper z-index layering */
+.campaigns-table-container .scrollbar-hide {
+	z-index: 1 !important;
+}
+
+.campaigns-table-container table {
+	z-index: 2 !important;
+	position: relative !important;
+}
+
+/* Additional rules to hide scrollbars on overflow elements in campaigns table */
+.campaigns-table-container .overflow-y-auto::-webkit-scrollbar,
+.campaigns-table-container .overflow-auto::-webkit-scrollbar,
+.campaigns-table-container .overflow-x-auto::-webkit-scrollbar,
+.campaigns-table-container .overflow-scroll::-webkit-scrollbar,
+.campaigns-table-container .h-full::-webkit-scrollbar,
+.campaigns-table-container .scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+.campaigns-table-container .overflow-y-auto,
+.campaigns-table-container .overflow-auto,
+.campaigns-table-container .overflow-x-auto,
+.campaigns-table-container .overflow-scroll,
+.campaigns-table-container .h-full,
+.campaigns-table-container .scrollbar-hide {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+/* Debug: Make sure the wrapper div also hides scrollbars */
+.campaigns-table-container > div::-webkit-scrollbar {
+	display: none !important;
+}
+
+/* Ensure proper scrolling behavior for campaigns table with custom scrollbar */
+.campaigns-table-container .my-campaigns-table {
+	position: relative !important;
+	height: 260px !important;
+}
+
+/* Ensure the scrollbar components have proper dimensions and scrolling */
+.campaigns-table-container .my-campaigns-table > div {
+	height: 100% !important;
+}
+
+/* This is the actual scrollable container - target the correct DOM path */
+.campaigns-table-container .my-campaigns-table .custom-table-wrapper .scrollbar-hide {
+	height: 100% !important;
 	overflow-y: auto !important;
 	overflow-x: hidden !important;
+	-webkit-overflow-scrolling: touch !important;
+	position: relative !important;
+}
+
+/* Ensure the custom scrollbar works properly */
+.campaigns-table-container .scrollbar-hide {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+.campaigns-table-container .scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+}
+
+/* Maximum specificity using ID selector to hide ALL scrollbars in campaigns table */
+#campaigns-table-container::-webkit-scrollbar,
+#campaigns-table-container *::-webkit-scrollbar,
+#campaigns-table-container .my-campaigns-table::-webkit-scrollbar,
+#campaigns-table-container .my-campaigns-table *::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+#campaigns-table-container,
+#campaigns-table-container *,
+#campaigns-table-container .my-campaigns-table,
+#campaigns-table-container .my-campaigns-table * {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
 }
 
 /* Hide rows per page and search in campaigns table header */
@@ -2719,71 +2809,15 @@ body.murmur-page footer {
 	height: auto;
 }
 
-/* OVERRIDE ANY ELEMENT WITH OVERFLOW SCROLL/AUTO (except My Campaigns table) */
-[style*='overflow']:not(.my-campaigns-table)::-webkit-scrollbar,
-.overflow-auto:not(.my-campaigns-table)::-webkit-scrollbar,
-.overflow-y-auto:not(.my-campaigns-table)::-webkit-scrollbar,
-.overflow-x-auto:not(.my-campaigns-table)::-webkit-scrollbar,
-.overflow-scroll:not(.my-campaigns-table)::-webkit-scrollbar,
-.custom-scroll:not(.my-campaigns-table)::-webkit-scrollbar {
-	width: 1px !important;
-	height: 1px !important;
-	background: transparent !important;
-	background-color: transparent !important;
-	border-radius: 0px !important;
-	-webkit-border-radius: 0px !important;
-	border: none !important;
-}
+/* Removed - Using custom GlobalScrollbar component instead */
 
-[style*='overflow']:not(.my-campaigns-table)::-webkit-scrollbar-thumb,
-.overflow-auto:not(.my-campaigns-table)::-webkit-scrollbar-thumb,
-.overflow-y-auto:not(.my-campaigns-table)::-webkit-scrollbar-thumb,
-.overflow-x-auto:not(.my-campaigns-table)::-webkit-scrollbar-thumb,
-.overflow-scroll:not(.my-campaigns-table)::-webkit-scrollbar-thumb,
-.custom-scroll:not(.my-campaigns-table)::-webkit-scrollbar-thumb {
-	background: #000000 !important;
-	background-color: #000000 !important;
-	border-radius: 0px !important;
-	-webkit-border-radius: 0px !important;
-	border: none !important;
-}
+/* Removed - Using custom GlobalScrollbar component instead */
 
-[style*='overflow']:not(.my-campaigns-table)::-webkit-scrollbar-track,
-.overflow-auto:not(.my-campaigns-table)::-webkit-scrollbar-track,
-.overflow-y-auto:not(.my-campaigns-table)::-webkit-scrollbar-track,
-.overflow-x-auto:not(.my-campaigns-table)::-webkit-scrollbar-track,
-.overflow-scroll:not(.my-campaigns-table)::-webkit-scrollbar-track,
-.custom-scroll:not(.my-campaigns-table)::-webkit-scrollbar-track {
-	background: transparent !important;
-	background-color: transparent !important;
-	border-radius: 0px !important;
-	-webkit-border-radius: 0px !important;
-	border: none !important;
-	box-shadow: none !important;
-}
+/* Removed - Using custom GlobalScrollbar component instead */
 
-[style*='overflow']:not(.my-campaigns-table)::-webkit-scrollbar-corner,
-.overflow-auto:not(.my-campaigns-table)::-webkit-scrollbar-corner,
-.overflow-y-auto:not(.my-campaigns-table)::-webkit-scrollbar-corner,
-.overflow-x-auto:not(.my-campaigns-table)::-webkit-scrollbar-corner,
-.overflow-scroll:not(.my-campaigns-table)::-webkit-scrollbar-corner,
-.custom-scroll:not(.my-campaigns-table)::-webkit-scrollbar-corner {
-	background: transparent !important;
-	background-color: transparent !important;
-	border-radius: 0px !important;
-	-webkit-border-radius: 0px !important;
-}
+/* Removed - Using custom GlobalScrollbar component instead */
 
-[style*='overflow']:not(.my-campaigns-table)::-webkit-scrollbar-button,
-.overflow-auto:not(.my-campaigns-table)::-webkit-scrollbar-button,
-.overflow-y-auto:not(.my-campaigns-table)::-webkit-scrollbar-button,
-.overflow-x-auto:not(.my-campaigns-table)::-webkit-scrollbar-button,
-.overflow-scroll:not(.my-campaigns-table)::-webkit-scrollbar-button,
-.custom-scroll:not(.my-campaigns-table)::-webkit-scrollbar-button {
-	display: none !important;
-	width: 0px !important;
-	height: 0px !important;
-}
+/* Removed - Using custom GlobalScrollbar component instead */
 
 .custom-scroll:not(.my-campaigns-table),
 .overflow-auto:not(.my-campaigns-table),
@@ -2875,170 +2909,17 @@ main {
 
 /* Add at the end of the file, after existing scrollbar rules */
 
-/* Specific overrides for Radix ScrollArea */
-[data-slot='scroll-area-scrollbar'] {
-	padding: 0 !important;
-	border-radius: 0 !important;
-}
+/* Removed - Using custom GlobalScrollbar component instead */
 
-[data-slot='scroll-area-scrollbar']::-webkit-scrollbar {
-	width: 1px !important;
-	height: 1px !important;
-	background: transparent !important;
-	border-radius: 0 !important;
-}
+/* Removed - Using custom GlobalScrollbar component instead */
 
-[data-slot='scroll-area-scrollbar']::-webkit-scrollbar-thumb {
-	background-color: #000000 !important;
-	border-radius: 0 !important;
-	border: none !important;
-}
+/* Removed - Using custom GlobalScrollbar component instead */
 
-[data-slot='scroll-area-scrollbar']::-webkit-scrollbar-track {
-	background: transparent !important;
-	border-radius: 0 !important;
-	border: none !important;
-}
+/* Removed - Using custom GlobalScrollbar component instead */
 
-[data-slot='scroll-area-scrollbar']::-webkit-scrollbar-corner {
-	background: transparent !important;
-	border-radius: 0 !important;
-}
+/* Removed - Using custom GlobalScrollbar component instead */
 
-[data-slot='scroll-area-scrollbar']::-webkit-scrollbar-button {
-	display: none !important;
-	width: 0 !important;
-	height: 0 !important;
-}
-
-/* Firefox specific for Radix */
-[data-slot='scroll-area-scrollbar'] {
-	scrollbar-width: thin !important;
-	scrollbar-color: #000000 transparent !important;
-}
-
-/* FINAL OVERRIDE - ABSOLUTE MAXIMUM SPECIFICITY */
-html body * *::-webkit-scrollbar,
-html body *::-webkit-scrollbar,
-body *::-webkit-scrollbar,
-*::-webkit-scrollbar {
-	width: 1px !important;
-	height: 1px !important;
-	background: transparent !important;
-}
-
-html body * *::-webkit-scrollbar-thumb,
-html body *::-webkit-scrollbar-thumb,
-body *::-webkit-scrollbar-thumb,
-*::-webkit-scrollbar-thumb {
-	background: #000000 !important;
-	background-color: #000000 !important;
-	border-radius: 0 !important;
-	-webkit-border-radius: 0 !important;
-}
-
-html body * *::-webkit-scrollbar-track,
-html body *::-webkit-scrollbar-track,
-body *::-webkit-scrollbar-track,
-*::-webkit-scrollbar-track {
-	background: transparent !important;
-	border-radius: 0 !important;
-	-webkit-border-radius: 0 !important;
-}
-
-html
-	body
-	*
-	*:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-button,
-html body *:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-button,
-body *:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-button,
-*:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-button {
-	width: 0 !important;
-	height: 0 !important;
-	display: none !important;
-}
-
-/* Specific styles for My Campaigns table scrollbars - Higher specificity */
-.campaigns-table-container .my-campaigns-table::-webkit-scrollbar,
-.my-campaigns-table::-webkit-scrollbar,
-.my-campaigns-table *::-webkit-scrollbar {
-	width: 1px !important;
-	height: 1px !important;
-	background: transparent !important;
-	background-color: transparent !important;
-	border-radius: 0px !important;
-	-webkit-border-radius: 0px !important;
-	border: none !important;
-}
-
-.campaigns-table-container .my-campaigns-table::-webkit-scrollbar-thumb,
-.my-campaigns-table::-webkit-scrollbar-thumb,
-.my-campaigns-table *::-webkit-scrollbar-thumb {
-	background: #000000 !important;
-	background-color: #000000 !important;
-	border-radius: 0px !important;
-	-webkit-border-radius: 0px !important;
-	border: none !important;
-	box-shadow: none !important;
-}
-
-.campaigns-table-container .my-campaigns-table::-webkit-scrollbar-track,
-.my-campaigns-table::-webkit-scrollbar-track,
-.my-campaigns-table *::-webkit-scrollbar-track {
-	background: transparent !important;
-	background-color: transparent !important;
-	border-radius: 0px !important;
-	-webkit-border-radius: 0px !important;
-	border: none !important;
-	box-shadow: none !important;
-}
-
-.campaigns-table-container .my-campaigns-table::-webkit-scrollbar-corner,
-.my-campaigns-table::-webkit-scrollbar-corner,
-.my-campaigns-table *::-webkit-scrollbar-corner {
-	background: transparent !important;
-	background-color: transparent !important;
-	border-radius: 0px !important;
-	-webkit-border-radius: 0px !important;
-}
-
-/* Hide scrollbar buttons (arrows) completely - MAXIMUM FORCE */
-.campaigns-table-container .my-campaigns-table::-webkit-scrollbar-button,
-.campaigns-table-container .my-campaigns-table *::-webkit-scrollbar-button,
-.campaigns-table-container *::-webkit-scrollbar-button,
-.my-campaigns-table::-webkit-scrollbar-button,
-.my-campaigns-table *::-webkit-scrollbar-button,
-div.campaigns-table-container ::-webkit-scrollbar-button,
-div.campaigns-table-container div::-webkit-scrollbar-button {
-	display: none !important;
-	width: 0px !important;
-	height: 0px !important;
-	background: transparent !important;
-	border: none !important;
-	visibility: hidden !important;
-	opacity: 0 !important;
-	pointer-events: none !important;
-}
-
-/* Hide increment/decrement buttons specifically */
-.campaigns-table-container .my-campaigns-table::-webkit-scrollbar-button:increment,
-.campaigns-table-container .my-campaigns-table::-webkit-scrollbar-button:decrement,
-.my-campaigns-table::-webkit-scrollbar-button:increment,
-.my-campaigns-table::-webkit-scrollbar-button:decrement,
-.campaigns-table-container *::-webkit-scrollbar-button:increment,
-.campaigns-table-container *::-webkit-scrollbar-button:decrement {
-	display: none !important;
-	width: 0px !important;
-	height: 0px !important;
-}
-
-/* Hide vertical and horizontal scrollbar buttons */
-.campaigns-table-container .my-campaigns-table::-webkit-scrollbar-button:vertical,
-.campaigns-table-container .my-campaigns-table::-webkit-scrollbar-button:horizontal,
-.my-campaigns-table::-webkit-scrollbar-button:vertical,
-.my-campaigns-table::-webkit-scrollbar-button:horizontal {
-	display: none !important;
-}
+/* Removed - Using custom GlobalScrollbar component instead */
 
 /* Firefox scrollbar styles */
 .campaigns-table-container .my-campaigns-table,
@@ -3053,43 +2934,11 @@ div.campaigns-table-container div::-webkit-scrollbar-button {
 	scrollbar-gutter: stable !important;
 }
 
-/* Target the actual scrollable container div with maximum specificity */
-.campaigns-table-container > div::-webkit-scrollbar-button,
-.campaigns-table-container > div > div::-webkit-scrollbar-button,
-.campaigns-table-container div[class*='overflow']::-webkit-scrollbar-button,
-.campaigns-table-container .border-2.border-black::-webkit-scrollbar-button,
-.campaigns-table-container .overflow-y-auto::-webkit-scrollbar-button,
-.campaigns-table-container .overflow-x-hidden::-webkit-scrollbar-button {
-	display: none !important;
-	width: 0 !important;
-	height: 0 !important;
-}
+/* Removed - Using custom GlobalScrollbar component instead */
 
-/* Target ALL possible button states */
-.campaigns-table-container ::-webkit-scrollbar-button:single-button,
-.campaigns-table-container ::-webkit-scrollbar-button:double-button,
-.campaigns-table-container ::-webkit-scrollbar-button:start,
-.campaigns-table-container ::-webkit-scrollbar-button:end {
-	display: none !important;
-	width: 0 !important;
-	height: 0 !important;
-}
+/* Removed - Using custom GlobalScrollbar component instead */
 
-/* ULTIMATE OVERRIDE - Place at the very end for maximum specificity */
-body .campaigns-table-container *::-webkit-scrollbar-button,
-html body .campaigns-table-container *::-webkit-scrollbar-button,
-#__next .campaigns-table-container *::-webkit-scrollbar-button {
-	display: none !important;
-	width: 0 !important;
-	height: 0 !important;
-	visibility: hidden !important;
-	opacity: 0 !important;
-	background: transparent !important;
-	border: none !important;
-	pointer-events: none !important;
-	-webkit-appearance: none !important;
-	appearance: none !important;
-}
+/* Removed - Using custom GlobalScrollbar component instead */
 
 /* Specific styles for My Campaigns table header */
 .my-campaigns-table thead th {
@@ -3097,117 +2946,11 @@ html body .campaigns-table-container *::-webkit-scrollbar-button,
 }
 
 /* Specific styles for My Campaigns table scrollbars - DEBUGGING */
-.my-campaigns-table::-webkit-scrollbar {
-	width: 10px !important;
-	height: 10px !important;
-}
+/* Remove debug My Campaigns specific scrollbar visuals; use global 2px style */
 
-.my-campaigns-table::-webkit-scrollbar-track {
-	background: #f1f1f1 !important;
-}
+/* Removed - Using custom GlobalScrollbar component instead */
 
-.my-campaigns-table::-webkit-scrollbar-thumb {
-	background: #ff0000 !important;
-}
-
-.my-campaigns-table::-webkit-scrollbar-thumb:hover {
-	background: #cc0000 !important;
-}
-
-.my-campaigns-table::-webkit-scrollbar-button {
-	display: none !important;
-}
-
-/* Firefox scrollbar styles */
-.my-campaigns-table {
-	scrollbar-width: thin !important;
-	scrollbar-color: #ff0000 #f1f1f1 !important;
-}
-
-/* === FINAL & SPECIFIC STYLES FOR MY CAMPAIGNS TABLE SCROLLBAR === */
-
-/* WebKit (Chrome, Safari, Edge) */
-.campaigns-table-container .my-campaigns-table::-webkit-scrollbar {
-	width: 1px !important;
-	height: 1px !important;
-}
-
-.campaigns-table-container .my-campaigns-table::-webkit-scrollbar-track {
-	background: transparent !important;
-}
-
-.campaigns-table-container .my-campaigns-table::-webkit-scrollbar-thumb {
-	background: #000000 !important;
-	border-radius: 0px !important;
-}
-
-.campaigns-table-container .my-campaigns-table::-webkit-scrollbar-button {
-	display: none !important;
-	width: 0 !important;
-	height: 0 !important;
-}
-
-/* Firefox */
-.campaigns-table-container .my-campaigns-table {
-	scrollbar-width: thin !important;
-	scrollbar-color: #000000 transparent !important;
-}
-
-/* === GLOBAL TAILWIND-LIKE SCROLLBAR (APPLIED SITE-WIDE, LAST WINS) === */
-:root {
-	--tw-scrollbar-track: #f3f4f6; /* gray-100 */
-	--tw-scrollbar-thumb: #d1d5db; /* gray-300 */
-}
-.dark {
-	--tw-scrollbar-track: #404040; /* neutral-700 */
-	--tw-scrollbar-thumb: #737373; /* neutral-500 */
-}
-
-/* WebKit (Chrome, Edge, Safari) - Use max specificity and !important, placed last */
-html body * *::-webkit-scrollbar,
-html body *::-webkit-scrollbar,
-body *::-webkit-scrollbar,
-*::-webkit-scrollbar {
-	width: 8px !important; /* w-2 */
-	height: 8px !important; /* h-2 */
-}
-
-html body * *::-webkit-scrollbar-track,
-html body *::-webkit-scrollbar-track,
-body *::-webkit-scrollbar-track,
-*::-webkit-scrollbar-track {
-	background: var(
-		--tw-scrollbar-track
-	) !important; /* bg-gray-100 | dark:bg-neutral-700 */
-}
-
-html body * *::-webkit-scrollbar-thumb,
-html body *::-webkit-scrollbar-thumb,
-body *::-webkit-scrollbar-thumb,
-*::-webkit-scrollbar-thumb {
-	background: var(
-		--tw-scrollbar-thumb
-	) !important; /* bg-gray-300 | dark:bg-neutral-500 */
-	border-radius: 9999px !important; /* rounded-full */
-	border: 2px solid var(--tw-scrollbar-track) !important; /* match Tailwind look on light/dark */
-}
-
-html body * *::-webkit-scrollbar-button,
-html body *::-webkit-scrollbar-button,
-body *::-webkit-scrollbar-button,
-*::-webkit-scrollbar-button {
-	display: none !important; /* no arrows */
-	width: 0 !important;
-	height: 0 !important;
-}
-
-/* Firefox */
-html,
-body,
-* {
-	scrollbar-width: thin !important; /* closest to w-2 */
-	scrollbar-color: var(--tw-scrollbar-thumb) var(--tw-scrollbar-track) !important;
-}
+/* Removed - Using custom GlobalScrollbar component instead */
 
 /* === ALLOW GSAP ANIMATIONS FOR SEARCH BAR === */
 /* Commented out to allow GSAP animations to work
@@ -3239,4 +2982,80 @@ html.murmur-compact {
 .results-search-icon-btn {
 	transform: translateY(-50%) !important;
 	z-index: 4 !important;
+}
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+.table-header-secondary {
+	border-bottom: 2px solid #8c8c8c;
+}
+
+/* --- Campaigns Table Custom Scrollbar --- */
+.my-campaigns-table {
+	height: 260px !important;
+	max-height: 260px !important;
+}
+
+.my-campaigns-table .scrollbar-hide {
+	height: 100% !important;
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+.my-campaigns-table .scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+/* -------------------------------------- */
+
+/* --- Drafting Table Custom Scrollbar --- */
+.drafting-table-content {
+	height: 100% !important;
+	min-height: 0 !important;
+}
+
+.drafting-table-content .scrollbar-hide {
+	height: 100% !important;
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+/* Remove debug child borders */
+/* .drafting-table-content .scrollbar-hide > * { }
+*/
+
+.drafting-table-content .scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+/* Ensure flex calculation works properly */
+[data-drafting-table] {
+	display: flex !important;
+	flex-direction: column !important;
+	height: 100% !important;
+}
+
+[data-drafting-table-header] {
+	flex-shrink: 0 !important;
+}
+
+/* Make sure content area can scroll */
+.drafting-table-content > div:first-child {
+	height: 100% !important;
+}
+/* -------------------------------------- */
+
+/* Body, html, root global scrollbar hide */
+html,
+body,
+#root {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
 }

@@ -20,7 +20,7 @@ export const CampaignsTable: FC = () => {
 				</CardTitle>
 			</CardHeader>
 			<CardContent className="space-y-2 w-full px-6 pb-6 pt-0">
-				<div className="campaigns-table-container">
+				<div className="campaigns-table-container" id="campaigns-table-container">
 					<CustomTable
 						variant="secondary"
 						containerClassName="border-[2px] border-[#8C8C8C] rounded-[8px] my-campaigns-table"
@@ -34,6 +34,7 @@ export const CampaignsTable: FC = () => {
 						hidePagination={true}
 						searchable={false}
 						useAutoLayout
+						useCustomScrollbar={true}
 					/>
 				</div>
 			</CardContent>

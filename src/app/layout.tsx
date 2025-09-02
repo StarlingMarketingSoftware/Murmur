@@ -4,6 +4,7 @@ import { Footer } from '@/components/molecules/Footer/Footer';
 import { Toaster } from '@/components/ui/toast';
 import './globals.css';
 import './advanced-scroll.css';
+import './hide-scrollbars.css';
 import SubLayout from './sublayout';
 import localFont from 'next/font/local';
 import { ThemeProvider } from '@/components/ThemeProvider';
@@ -11,6 +12,7 @@ import StoreProvider from './StoreProvider';
 import { PageTransitionProvider } from '@/contexts/PageTransitionContext';
 import { ScrollProvider } from '@/contexts/ScrollContext';
 import { ScrollProgress } from '@/components/atoms/ScrollProgress/ScrollProgress';
+import { GlobalScrollbar } from '@/components/ui/GlobalScrollbar';
 
 const inter = Inter({
 	variable: '--font-inter',
@@ -78,6 +80,7 @@ export default function RootLayout({
 								</SubLayout>
 							</PageTransitionProvider>
 						</ScrollProvider>
+						<GlobalScrollbar />
 					</ThemeProvider>
 				</body>
 			</html>

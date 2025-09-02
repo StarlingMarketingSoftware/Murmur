@@ -1,0 +1,89 @@
+/* FORCE HIDE ALL NATIVE SCROLLBARS - Maximum specificity */
+/* This file is loaded last to ensure it overrides everything */
+
+/* WebKit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+div::-webkit-scrollbar,
+section::-webkit-scrollbar,
+main::-webkit-scrollbar,
+aside::-webkit-scrollbar,
+nav::-webkit-scrollbar,
+*::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+/* Firefox */
+* {
+	scrollbar-width: none !important;
+}
+
+html {
+	scrollbar-width: none !important;
+}
+
+body {
+	scrollbar-width: none !important;
+}
+
+/* IE and Edge Legacy */
+* {
+	-ms-overflow-style: none !important;
+}
+
+html {
+	-ms-overflow-style: none !important;
+}
+
+body {
+	-ms-overflow-style: none !important;
+}
+
+/* Ensure scrolling still works */
+html,
+body {
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+}
+
+/* Force hide on all elements with overflow */
+.overflow-auto::-webkit-scrollbar,
+.overflow-y-auto::-webkit-scrollbar,
+.overflow-x-auto::-webkit-scrollbar,
+.overflow-scroll::-webkit-scrollbar,
+.overflow-y-scroll::-webkit-scrollbar,
+.overflow-x-scroll::-webkit-scrollbar,
+[style*='overflow: auto']::-webkit-scrollbar,
+[style*='overflow-y: auto']::-webkit-scrollbar,
+[style*='overflow-x: auto']::-webkit-scrollbar,
+[style*='overflow: scroll']::-webkit-scrollbar,
+[style*='overflow-y: scroll']::-webkit-scrollbar,
+[style*='overflow-x: scroll']::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+/* Specific rules for campaigns table */
+.my-campaigns-table::-webkit-scrollbar,
+.my-campaigns-table *::-webkit-scrollbar,
+.campaigns-table-container *::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+.my-campaigns-table,
+.my-campaigns-table *,
+.campaigns-table-container * {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
