@@ -13,8 +13,8 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 	const { user } = useMe();
 	const navRef = useRef<HTMLElement>(null);
 
-	const showAdminLink = user?.role === 'admin';
 	const isCampaignPage = pathname?.startsWith(urls.murmur.campaign.index);
+	const showAdminLink = user?.role === 'admin' && !isCampaignPage;
 
 	// Hide footer for murmur pages and apply animations
 	useEffect(() => {
