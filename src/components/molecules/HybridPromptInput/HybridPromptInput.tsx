@@ -268,7 +268,9 @@ const SortableAIBlock = ({
 													placeholder={block.placeholder}
 													onClick={(e) => e.stopPropagation()}
 													className={cn(
-														'flex-1 bg-white outline-none text-sm pl-6 pr-12',
+														'flex-1 bg-white outline-none text-sm',
+														showTestPreview ? 'pl-0 -ml-4' : 'pl-6',
+														'pr-12',
 														shouldShowRedStyling
 															? 'placeholder:text-[#A20000]'
 															: 'placeholder:text-gray-400'
@@ -324,7 +326,11 @@ const SortableAIBlock = ({
 													type="text"
 													placeholder={block.placeholder}
 													onClick={(e) => e.stopPropagation()}
-													className="flex-1 bg-white outline-none text-sm placeholder:text-gray-400 pl-6 pr-12"
+													className={cn(
+														'flex-1 bg-white outline-none text-sm placeholder:text-gray-400',
+														showTestPreview ? 'pl-0 -ml-4' : 'pl-6',
+														'pr-12'
+													)}
 													{...fieldProps}
 													onFocus={(e) => {
 														trackFocusedField?.(
