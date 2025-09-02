@@ -10,7 +10,7 @@ export const useScrollableText = (props: ScrollableTextProps) => {
 	const { text, className, scrollPixelsPerSecond = 40 } = props;
 
 	const containerRef = useRef<HTMLDivElement>(null);
-	const textRef = useRef<HTMLSpanElement>(null);
+	const textRef = useRef<HTMLDivElement>(null);
 	const [isOverflowing, setIsOverflowing] = useState(false);
 
 	useEffect(() => {
@@ -21,8 +21,9 @@ export const useScrollableText = (props: ScrollableTextProps) => {
 				const overflowing = textWidth > containerWidth;
 				setIsOverflowing(overflowing);
 				if (overflowing) {
-					// distance to travel = full text width + gap (50px)
-					const distance = textWidth + 50;
+					// When text is duplicated, we scroll 50% of the total width
+					// This creates a seamless loop as the second copy takes the place of the first
+					const distance = textWidth + 50; // textWidth + gap
 					// duration in seconds at fixed speed
 					const durationSec = distance / scrollPixelsPerSecond;
 					containerRef.current.style.setProperty('--scroll-duration', `${durationSec}s`);

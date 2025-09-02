@@ -10,20 +10,23 @@ export const ScrollableText: FC<ScrollableTextProps> = (props) => {
 		<div
 			ref={containerRef}
 			className={cn(
-				'hover-scroll-container overflow-hidden relative w-full hover:scrollText flex items-center h-full'
+				'hover-scroll-container overflow-hidden relative w-full flex items-center h-full'
 			)}
 		>
-			<span
+			<div
 				ref={textRef}
 				className={cn(
-					isOverflowing && 'hover-scroll-text',
-					'inline-block whitespace-nowrap overflow-hidden text-ellipsis max-w-full w-full',
+					'inline-block whitespace-nowrap',
+					isOverflowing
+						? 'hover-scroll-text'
+						: 'overflow-hidden text-ellipsis max-w-full',
 					className
 				)}
 				data-text={text}
 			>
 				{text}
-			</span>
+				{isOverflowing && <span className="inline-block pl-[50px]">{text}</span>}
+			</div>
 		</div>
 	);
 };
