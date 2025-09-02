@@ -395,7 +395,7 @@ const SortableAIBlock = ({
 													onClick={(e) => e.stopPropagation()}
 													className={cn(
 														'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 bg-white',
-														isFullAutomatedBlock ? 'h-[300px] px-0' : '',
+														isFullAutomatedBlock ? 'h-[300px] px-0 resize-none' : '',
 														shouldShowRedStyling ? 'placeholder:text-[#A20000]' : ''
 													)}
 													{...fieldProps}
