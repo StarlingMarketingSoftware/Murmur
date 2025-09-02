@@ -68,6 +68,8 @@ interface TableSortingButtonProps<TData> {
 }
 
 import { cn } from '@/utils';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+// import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface NoDataCellProps {
 	className?: string;
@@ -106,6 +108,8 @@ interface CustomTableProps<TData, TValue> extends DataTableProps<TData, TValue> 
 	headerClassName?: string;
 	theadCellClassName?: string;
 	rowClassName?: string;
+	useCustomScrollbar?: boolean;
+	scrollbarOffsetRight?: number;
 }
 
 export function CustomTable<TData, TValue>({
@@ -133,6 +137,8 @@ export function CustomTable<TData, TValue>({
 	headerClassName,
 	theadCellClassName,
 	rowClassName,
+	useCustomScrollbar = false,
+	scrollbarOffsetRight = -4,
 }: CustomTableProps<TData, TValue>) {
 	type ColumnDefWithSize = ColumnDef<TData, TValue> & { size?: number };
 	const [pagination, setPagination] = useState({
@@ -305,166 +311,248 @@ export function CustomTable<TData, TValue>({
 					</div>
 				) : null}
 			</div>
-			<div
-				className={cn(
-					'border-2 border-black relative overflow-y-auto overflow-x-hidden overscroll-contain w-full max-w-full mx-auto',
-					constrainHeight && 'h-[429px]',
-					containerClassName
-				)}
-				tabIndex={0}
-				style={{ WebkitOverflowScrolling: 'touch' }}
-				onWheel={(e) => {
-					const el = e.currentTarget;
-					const canScrollDown = el.scrollTop + el.clientHeight < el.scrollHeight;
-					const canScrollUp = el.scrollTop > 0;
-					if ((e.deltaY > 0 && canScrollDown) || (e.deltaY < 0 && canScrollUp)) {
-						e.stopPropagation();
-					}
-				}}
-			>
-				<Table
+			{useCustomScrollbar ? (
+				<CustomScrollbar
 					className={cn(
-						'relative',
-						!tableClassName && 'min-w-full',
-						!tableClassName && (allowColumnOverflow ? 'w-max' : 'w-full'),
-						useAutoLayout ? 'table-auto' : 'table-fixed',
-						tableClassName
+						'border-2 border-black w-full max-w-full mx-auto',
+						containerClassName
 					)}
-					variant={variant}
+					thumbWidth={2}
+					thumbColor="#000000"
+					trackColor="transparent"
+					offsetRight={scrollbarOffsetRight}
 				>
-					<TableHeader variant={variant} sticky className={cn(headerClassName)}>
-						{table.getHeaderGroups().map((headerGroup) => (
-							<TableRow
-								className="sticky top-0 border-0"
-								key={headerGroup.id}
-								variant={variant}
-							>
-								{headerGroup.headers.map((header, headerIndex) => {
-									const totalColumns = headerGroup.headers.length;
-									const fallbackWidth = `${100 / totalColumns}%`;
-									const defSize = (header.column.columnDef as ColumnDefWithSize)?.size;
-									const headerSize = header.column.getSize
-										? header.column.getSize()
-										: undefined;
-									return (
-										<TableHead
-											key={header.id}
-											variant={variant}
-											style={
-												useAutoLayout
-													? undefined
-													: {
-															width:
-																defSize && defSize > 0
-																	? `${defSize}px`
-																	: headerSize && headerSize > 0
-																	? `${headerSize}px`
-																	: fallbackWidth,
-															minWidth:
-																defSize && defSize > 0 ? `${defSize}px` : undefined,
-															maxWidth:
-																defSize && defSize > 0 ? `${defSize}px` : undefined,
-													  }
-											}
-											className={cn(
-												'whitespace-nowrap',
-												theadCellClassName,
-												isSelectable &&
-													headerInlineAction &&
-													headerIndex === headerGroup.headers.length - 1 &&
-													'relative'
-											)}
-										>
-											{header.isPlaceholder ? null : (
-												<>
-													{flexRender(
-														header.column.columnDef.header,
-														header.getContext()
+					<div className="min-w-full">
+						<Table
+							className={cn(
+								'relative',
+								!tableClassName && 'min-w-full',
+								!tableClassName && (allowColumnOverflow ? 'w-max' : 'w-full'),
+								useAutoLayout ? 'table-auto' : 'table-fixed',
+								tableClassName
+							)}
+							variant={variant}
+						>
+							<TableHeader variant={variant} sticky className={cn(headerClassName)}>
+								{table.getHeaderGroups().map((headerGroup) => (
+									<TableRow
+										className="sticky top-0 border-0"
+										key={headerGroup.id}
+										variant={variant}
+									>
+										{headerGroup.headers.map((header, headerIndex) => {
+											const totalColumns = headerGroup.headers.length;
+											const fallbackWidth = `${100 / totalColumns}%`;
+											const defSize = (header.column.columnDef as ColumnDefWithSize)
+												?.size;
+											const headerSize = header.column.getSize
+												? header.column.getSize()
+												: undefined;
+											return (
+												<TableHead
+													key={header.id}
+													variant={variant}
+													style={
+														useAutoLayout
+															? undefined
+															: {
+																	width:
+																		defSize && defSize > 0
+																			? `${defSize}px`
+																			: headerSize && headerSize > 0
+																			? `${headerSize}px`
+																			: fallbackWidth,
+																	minWidth:
+																		defSize && defSize > 0 ? `${defSize}px` : undefined,
+																	maxWidth:
+																		defSize && defSize > 0 ? `${defSize}px` : undefined,
+															  }
+													}
+													className={cn(
+														'whitespace-nowrap',
+														theadCellClassName,
+														isSelectable &&
+															headerInlineAction &&
+															headerIndex === headerGroup.headers.length - 1 &&
+															'relative'
 													)}
-													{isSelectable &&
-													headerInlineAction &&
-													headerIndex === headerGroup.headers.length - 1 ? (
-														<div className="absolute right-2 top-1/2 -translate-y-1/2 z-10 pointer-events-auto">
-															{headerInlineAction}
-														</div>
-													) : null}
-												</>
-											)}
-										</TableHead>
-									);
-								})}
-							</TableRow>
-						))}
-					</TableHeader>
-					<TableBody variant={variant}>
-						{table.getRowModel().rows?.length ? (
-							table.getRowModel().rows.map((row) => (
-								<TableRow
-									variant={variant}
-									className={cn(
-										(handleRowClick || (setSelectedRows && isSelectable)) &&
-											'cursor-pointer',
-										rowClassName
-									)}
-									data-campaign-id={
-										(row.original as Record<string, unknown>)?.id || undefined
-									}
-									onMouseDown={(e) => {
-										// Prevent text selection on shift-click
-										if (e.shiftKey && isSelectable) {
-											e.preventDefault();
-										}
-									}}
-									onClick={(e) => {
-										if (isSelectable) {
-											const rows = table.getRowModel().rows as Row<TData>[];
-											const rowOriginalId = getRowOriginalId(row as Row<TData>);
-											const currentIndex = rows.findIndex(
-												(r) => getRowOriginalId(r as Row<TData>) === rowOriginalId
+												>
+													{header.isPlaceholder ? null : (
+														<>
+															{flexRender(
+																header.column.columnDef.header,
+																header.getContext()
+															)}
+															{isSelectable &&
+															headerInlineAction &&
+															headerIndex === headerGroup.headers.length - 1 ? (
+																<div className="absolute right-2 top-1/2 -translate-y-1/2 z-10 pointer-events-auto">
+																	{headerInlineAction}
+																</div>
+															) : null}
+														</>
+													)}
+												</TableHead>
 											);
-											const lastIndex =
-												lastClickedRowIdRef.current !== null
-													? rows.findIndex(
-															(r) =>
-																getRowOriginalId(r as Row<TData>) ===
-																lastClickedRowIdRef.current
-													  )
-													: -1;
-
-											if (e.shiftKey && lastIndex !== -1 && currentIndex !== -1) {
-												// Prevent text selection on shift-click
-												e.preventDefault();
-												window.getSelection()?.removeAllRanges();
-
-												const start = Math.min(currentIndex, lastIndex);
-												const end = Math.max(currentIndex, lastIndex);
-
-												const newSelection: Record<string, boolean> = {};
-												for (let i = start; i <= end; i++) {
-													newSelection[rows[i].id] = true;
-												}
-												setRowSelection(newSelection);
-											} else {
-												row.toggleSelected();
-												lastClickedRowIdRef.current = rowOriginalId;
+										})}
+									</TableRow>
+								))}
+							</TableHeader>
+							<TableBody variant={variant}>
+								{table.getRowModel().rows?.length ? (
+									table.getRowModel().rows.map((row) => (
+										<TableRow
+											variant={variant}
+											className={cn(
+												(handleRowClick || (setSelectedRows && isSelectable)) &&
+													'cursor-pointer',
+												rowClassName
+											)}
+											data-campaign-id={
+												(row.original as Record<string, unknown>)?.id || undefined
 											}
-										} else if (handleRowClick) {
-											handleRowClick(row.original);
-										}
-									}}
-									key={row.id}
-									data-state={row.getIsSelected() && 'selected'}
+											onMouseDown={(e) => {
+												// Prevent text selection on shift-click
+												if (e.shiftKey && isSelectable) {
+													e.preventDefault();
+												}
+											}}
+											onClick={(e) => {
+												if (isSelectable) {
+													const rows = table.getRowModel().rows as Row<TData>[];
+													const rowOriginalId = getRowOriginalId(row as Row<TData>);
+													const currentIndex = rows.findIndex(
+														(r) => getRowOriginalId(r as Row<TData>) === rowOriginalId
+													);
+													const lastIndex =
+														lastClickedRowIdRef.current !== null
+															? rows.findIndex(
+																	(r) =>
+																		getRowOriginalId(r as Row<TData>) ===
+																		lastClickedRowIdRef.current
+															  )
+															: -1;
+
+													if (e.shiftKey && lastIndex !== -1 && currentIndex !== -1) {
+														// Prevent text selection on shift-click
+														e.preventDefault();
+														window.getSelection()?.removeAllRanges();
+
+														const start = Math.min(currentIndex, lastIndex);
+														const end = Math.max(currentIndex, lastIndex);
+
+														const newSelection: Record<string, boolean> = {};
+														for (let i = start; i <= end; i++) {
+															newSelection[rows[i].id] = true;
+														}
+														setRowSelection(newSelection);
+													} else {
+														row.toggleSelected();
+														lastClickedRowIdRef.current = rowOriginalId;
+													}
+												} else if (handleRowClick) {
+													handleRowClick(row.original);
+												}
+											}}
+											key={row.id}
+											data-state={row.getIsSelected() && 'selected'}
+										>
+											{row.getVisibleCells().map((cell) => {
+												const totalColumns = row.getVisibleCells().length;
+												const fallbackWidth = `${100 / totalColumns}%`;
+												const defSize = (cell.column.columnDef as ColumnDefWithSize)
+													?.size;
+												const cellSize = cell.column.getSize
+													? cell.column.getSize()
+													: undefined;
+												return (
+													<TableCell
+														key={cell.id}
+														variant={variant}
+														style={
+															useAutoLayout
+																? undefined
+																: {
+																		width:
+																			defSize && defSize > 0
+																				? `${defSize}px`
+																				: cellSize && cellSize > 0
+																				? `${cellSize}px`
+																				: fallbackWidth,
+																		minWidth:
+																			defSize && defSize > 0 ? `${defSize}px` : undefined,
+																		maxWidth:
+																			defSize && defSize > 0 ? `${defSize}px` : undefined,
+																  }
+														}
+														className="whitespace-nowrap"
+													>
+														{flexRender(cell.column.columnDef.cell, cell.getContext())}
+													</TableCell>
+												);
+											})}
+										</TableRow>
+									))
+								) : (
+									<TableRow variant={variant}>
+										<TableCell
+											variant={variant}
+											colSpan={columns.length}
+											className="h-24 text-center"
+										>
+											{noDataMessage}
+										</TableCell>
+									</TableRow>
+								)}
+							</TableBody>
+						</Table>
+					</div>
+				</CustomScrollbar>
+			) : (
+				<div
+					className={cn(
+						'border-2 border-black relative overflow-y-auto overflow-x-hidden overscroll-contain w-full max-w-full mx-auto',
+						constrainHeight && 'h-[429px]',
+						containerClassName
+					)}
+					tabIndex={0}
+					style={{ WebkitOverflowScrolling: 'touch' }}
+					onWheel={(e) => {
+						const el = e.currentTarget;
+						const canScrollDown = el.scrollTop + el.clientHeight < el.scrollHeight;
+						const canScrollUp = el.scrollTop > 0;
+						if ((e.deltaY > 0 && canScrollDown) || (e.deltaY < 0 && canScrollUp)) {
+							e.stopPropagation();
+						}
+					}}
+				>
+					<Table
+						className={cn(
+							'relative',
+							!tableClassName && 'min-w-full',
+							!tableClassName && (allowColumnOverflow ? 'w-max' : 'w-full'),
+							useAutoLayout ? 'table-auto' : 'table-fixed',
+							tableClassName
+						)}
+						variant={variant}
+					>
+						<TableHeader variant={variant} sticky className={cn(headerClassName)}>
+							{table.getHeaderGroups().map((headerGroup) => (
+								<TableRow
+									className="sticky top-0 border-0"
+									key={headerGroup.id}
+									variant={variant}
 								>
-									{row.getVisibleCells().map((cell) => {
-										const totalColumns = row.getVisibleCells().length;
+									{headerGroup.headers.map((header, headerIndex) => {
+										const totalColumns = headerGroup.headers.length;
 										const fallbackWidth = `${100 / totalColumns}%`;
-										const defSize = (cell.column.columnDef as ColumnDefWithSize)?.size;
-										const cellSize = cell.column.getSize
-											? cell.column.getSize()
+										const defSize = (header.column.columnDef as ColumnDefWithSize)?.size;
+										const headerSize = header.column.getSize
+											? header.column.getSize()
 											: undefined;
 										return (
-											<TableCell
-												key={cell.id}
+											<TableHead
+												key={header.id}
 												variant={variant}
 												style={
 													useAutoLayout
@@ -473,8 +561,8 @@ export function CustomTable<TData, TValue>({
 																width:
 																	defSize && defSize > 0
 																		? `${defSize}px`
-																		: cellSize && cellSize > 0
-																		? `${cellSize}px`
+																		: headerSize && headerSize > 0
+																		? `${headerSize}px`
 																		: fallbackWidth,
 																minWidth:
 																	defSize && defSize > 0 ? `${defSize}px` : undefined,
@@ -482,28 +570,145 @@ export function CustomTable<TData, TValue>({
 																	defSize && defSize > 0 ? `${defSize}px` : undefined,
 														  }
 												}
-												className="whitespace-nowrap"
+												className={cn(
+													'whitespace-nowrap',
+													theadCellClassName,
+													isSelectable &&
+														headerInlineAction &&
+														headerIndex === headerGroup.headers.length - 1 &&
+														'relative'
+												)}
 											>
-												{flexRender(cell.column.columnDef.cell, cell.getContext())}
-											</TableCell>
+												{header.isPlaceholder ? null : (
+													<>
+														{flexRender(
+															header.column.columnDef.header,
+															header.getContext()
+														)}
+														{isSelectable &&
+														headerInlineAction &&
+														headerIndex === headerGroup.headers.length - 1 ? (
+															<div className="absolute right-2 top-1/2 -translate-y-1/2 z-10 pointer-events-auto">
+																{headerInlineAction}
+															</div>
+														) : null}
+													</>
+												)}
+											</TableHead>
 										);
 									})}
 								</TableRow>
-							))
-						) : (
-							<TableRow variant={variant}>
-								<TableCell
-									variant={variant}
-									colSpan={columns.length}
-									className="h-24 text-center"
-								>
-									{noDataMessage}
-								</TableCell>
-							</TableRow>
-						)}
-					</TableBody>
-				</Table>
-			</div>
+							))}
+						</TableHeader>
+						<TableBody variant={variant}>
+							{table.getRowModel().rows?.length ? (
+								table.getRowModel().rows.map((row) => (
+									<TableRow
+										variant={variant}
+										className={cn(
+											(handleRowClick || (setSelectedRows && isSelectable)) &&
+												'cursor-pointer',
+											rowClassName
+										)}
+										data-campaign-id={
+											(row.original as Record<string, unknown>)?.id || undefined
+										}
+										onMouseDown={(e) => {
+											// Prevent text selection on shift-click
+											if (e.shiftKey && isSelectable) {
+												e.preventDefault();
+											}
+										}}
+										onClick={(e) => {
+											if (isSelectable) {
+												const rows = table.getRowModel().rows as Row<TData>[];
+												const rowOriginalId = getRowOriginalId(row as Row<TData>);
+												const currentIndex = rows.findIndex(
+													(r) => getRowOriginalId(r as Row<TData>) === rowOriginalId
+												);
+												const lastIndex =
+													lastClickedRowIdRef.current !== null
+														? rows.findIndex(
+																(r) =>
+																	getRowOriginalId(r as Row<TData>) ===
+																	lastClickedRowIdRef.current
+														  )
+														: -1;
+
+												if (e.shiftKey && lastIndex !== -1 && currentIndex !== -1) {
+													// Prevent text selection on shift-click
+													e.preventDefault();
+													window.getSelection()?.removeAllRanges();
+
+													const start = Math.min(currentIndex, lastIndex);
+													const end = Math.max(currentIndex, lastIndex);
+
+													const newSelection: Record<string, boolean> = {};
+													for (let i = start; i <= end; i++) {
+														newSelection[rows[i].id] = true;
+													}
+													setRowSelection(newSelection);
+												} else {
+													row.toggleSelected();
+													lastClickedRowIdRef.current = rowOriginalId;
+												}
+											} else if (handleRowClick) {
+												handleRowClick(row.original);
+											}
+										}}
+										key={row.id}
+										data-state={row.getIsSelected() && 'selected'}
+									>
+										{row.getVisibleCells().map((cell) => {
+											const totalColumns = row.getVisibleCells().length;
+											const fallbackWidth = `${100 / totalColumns}%`;
+											const defSize = (cell.column.columnDef as ColumnDefWithSize)?.size;
+											const cellSize = cell.column.getSize
+												? cell.column.getSize()
+												: undefined;
+											return (
+												<TableCell
+													key={cell.id}
+													variant={variant}
+													style={
+														useAutoLayout
+															? undefined
+															: {
+																	width:
+																		defSize && defSize > 0
+																			? `${defSize}px`
+																			: cellSize && cellSize > 0
+																			? `${cellSize}px`
+																			: fallbackWidth,
+																	minWidth:
+																		defSize && defSize > 0 ? `${defSize}px` : undefined,
+																	maxWidth:
+																		defSize && defSize > 0 ? `${defSize}px` : undefined,
+															  }
+													}
+													className="whitespace-nowrap"
+												>
+													{flexRender(cell.column.columnDef.cell, cell.getContext())}
+												</TableCell>
+											);
+										})}
+									</TableRow>
+								))
+							) : (
+								<TableRow variant={variant}>
+									<TableCell
+										variant={variant}
+										colSpan={columns.length}
+										className="h-24 text-center"
+									>
+										{noDataMessage}
+									</TableCell>
+								</TableRow>
+							)}
+						</TableBody>
+					</Table>
+				</div>
+			)}
 			{!hidePagination && (
 				<div className="w-full max-w-full mx-auto">
 					<CustomPagination<TData> currentPage={pagination.pageIndex} table={table} />

@@ -1,6 +1,7 @@
 import { FC, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
 interface DraftingTableProps {
 	handleClick: () => void;
@@ -76,10 +77,12 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				</div>
 
 				{/* Content area */}
-				<div
-					className="bg-background overflow-auto flex-1 overflow-x-hidden overflow-y-auto pr-[10px]"
-					data-lenis-prevent
-					style={{ margin: '0', border: 'none' }}
+				<CustomScrollbar
+					className="flex-1 pr-[10px] drafting-table-content"
+					thumbWidth={2}
+					thumbColor="#000000"
+					trackColor="transparent"
+					offsetRight={0}
 				>
 					{isPending ? (
 						<div className="flex items-center justify-center h-full">
@@ -97,7 +100,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							)}
 						</>
 					)}
-				</div>
+				</CustomScrollbar>
 
 				{/* Progress bar - positioned at bottom of container */}
 				{title === 'Contacts' && (
