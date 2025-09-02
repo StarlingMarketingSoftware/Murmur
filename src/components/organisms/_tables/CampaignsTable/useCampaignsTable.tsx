@@ -88,7 +88,7 @@ export const useCampaignsTable = () => {
 	const [countdown, setCountdown] = useState<number>(5);
 	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
-	const gradientAnimationRef = useRef<gsap.core.Tween | null>(null);
+	const gradientAnimationRef = useRef<gsap.core.Timeline | gsap.core.Tween | null>(null);
 
 	// Clear timeout and animation on unmount
 	useEffect(() => {
@@ -102,6 +102,13 @@ export const useCampaignsTable = () => {
 			if (gradientAnimationRef.current) {
 				gradientAnimationRef.current.kill();
 			}
+			// Clean up any lingering styles on unmount
+			const allRows = document.querySelectorAll('[data-campaign-id]');
+			allRows.forEach((row) => {
+				(row as HTMLElement).style.removeProperty('box-shadow');
+				(row as HTMLElement).style.removeProperty('filter');
+				(row as HTMLElement).style.removeProperty('border-color');
+			});
 		};
 	}, []);
 
@@ -143,6 +150,11 @@ export const useCampaignsTable = () => {
 						r.style.removeProperty('background-position');
 						r.style.removeProperty('will-change');
 						r.style.removeProperty('border-color');
+						r.style.removeProperty('transform');
+						r.style.removeProperty('transition');
+						r.style.removeProperty('transform-origin');
+						r.style.removeProperty('box-shadow');
+						r.style.removeProperty('filter'); // Also remove filter to prevent leftover brightness/contrast
 						const tds = row.querySelectorAll('td');
 						tds.forEach((cell) => {
 							const c = cell as HTMLElement;
@@ -195,27 +207,69 @@ export const useCampaignsTable = () => {
 						});
 					});
 
-					// Apply a single-row shimmer: top layer highlight over a solid base
+					// Cyber-futuristic continuous red wave animation (Elon Musk style: bold, innovative, high-tech)
 					const rowEl = rowElement as HTMLElement;
+
+					// Set up multi-layer cyber wave with parallax speeds and neon glow
 					rowEl.style.setProperty(
 						'background-image',
-						'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0) 100%), linear-gradient(0deg, #A20000, #A20000)',
+						// Fast-moving foreground wave (sharp cyber lines)
+						'linear-gradient(90deg, transparent 0%, rgba(200, 0, 0, 0.4) 10%, rgba(180, 0, 0, 0.7) 20%, rgba(150, 0, 0, 0.9) 30%, rgba(180, 0, 0, 0.7) 40%, rgba(200, 0, 0, 0.4) 50%, transparent 60%), ' +
+							// Medium-speed midground wave (deeper red pulses)
+							'linear-gradient(95deg, transparent 0%, rgba(140, 0, 0, 0.5) 15%, rgba(120, 0, 0, 0.8) 30%, rgba(100, 0, 0, 0.9) 45%, rgba(120, 0, 0, 0.8) 60%, rgba(140, 0, 0, 0.5) 75%, transparent 90%), ' +
+							// Slow background wave (subtle depth)
+							'linear-gradient(100deg, transparent 0%, rgba(160, 0, 0, 0.3) 20%, rgba(130, 0, 0, 0.6) 40%, rgba(110, 0, 0, 0.8) 60%, rgba(130, 0, 0, 0.6) 80%, rgba(160, 0, 0, 0.3) 100%), ' +
+							// Base gradient for solid red foundation
+							'linear-gradient(0deg, #B00000, #900000)',
 						'important'
 					);
-					rowEl.style.setProperty('background-size', '200% 100%, 100% 100%', 'important');
-					rowEl.style.setProperty('background-position', '0% 0%, 0% 0%', 'important');
-					rowEl.style.setProperty('background-color', '#A20000', 'important');
-					rowEl.style.setProperty('border-color', '#A20000', 'important');
-					rowEl.style.setProperty('will-change', 'background-position', 'important');
+					rowEl.style.setProperty(
+						'background-size',
+						'300% 100%, 400% 100%, 500% 100%, 100% 100%', // Different sizes for parallax effect
+						'important'
+					);
+					rowEl.style.setProperty(
+						'background-position',
+						'0% 0%, 0% 0%, 0% 0%, 0% 0%',
+						'important'
+					);
+					rowEl.style.setProperty('background-color', '#A00000', 'important');
+					rowEl.style.setProperty('border-color', '#A00000', 'important');
+					rowEl.style.setProperty(
+						'will-change',
+						'background-position, filter',
+						'important'
+					);
 					rowEl.style.setProperty('cursor', 'pointer', 'important');
 
-					// Animate only the row's highlight layer for a smooth, unified effect
-					gradientAnimationRef.current = gsap.to(rowEl, {
-						backgroundPosition: '200% 0%, 0% 0%',
-						duration: 2.2,
-						ease: 'power1.inOut',
-						repeat: -1,
+					// Set initial filter (no shadow)
+					gsap.set(rowEl, {
+						filter: 'brightness(1) contrast(1)',
 					});
+
+					// Create timeline for continuous, infinite animation
+					gradientAnimationRef.current = gsap
+						.timeline({ repeat: -1, defaults: { ease: 'none' } })
+						.to(
+							rowEl,
+							{
+								backgroundPosition: '-300% 0%, -400% 0%, -500% 0%, 0% 0%',
+								duration: 4, // Overall cycle time for continuous flow
+							},
+							0
+						)
+						// (Shadow animation removed)
+						.to(
+							rowEl,
+							{
+								filter: 'brightness(1.2) contrast(1.1)', // Subtle brightness pulse for energy
+								duration: 1.5,
+								repeat: -1,
+								yoyo: true,
+								ease: 'sine.inOut',
+							},
+							0
+						);
 				}
 			}, 0);
 		} else {
@@ -239,6 +293,8 @@ export const useCampaignsTable = () => {
 				(row as HTMLElement).style.removeProperty('will-change');
 				(row as HTMLElement).style.removeProperty('border-color');
 				(row as HTMLElement).style.removeProperty('cursor');
+				(row as HTMLElement).style.removeProperty('box-shadow'); // Remove neon glow
+				(row as HTMLElement).style.removeProperty('filter'); // Remove brightness/contrast
 				// Also reset cells
 				const cells = row.querySelectorAll('td');
 				cells.forEach((cell) => {
@@ -247,6 +303,7 @@ export const useCampaignsTable = () => {
 					(cell as HTMLElement).style.removeProperty('background-image');
 					(cell as HTMLElement).style.removeProperty('background-size');
 					(cell as HTMLElement).style.removeProperty('background-position');
+					(cell as HTMLElement).style.removeProperty('border-color'); // Ensure cell borders are reset
 				});
 			});
 		}

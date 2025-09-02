@@ -102,35 +102,24 @@ export const PageTransitionProvider: React.FC<PageTransitionProviderProps> = ({
 
 	const startTransition = useCallback(
 		(to: string) => {
+			// Animation globally disabled: always navigate immediately
 			try {
-				console.log('[PageTransition] startTransition called:', { to, isChromeBrowser });
-
-				// Double-check browser support at call time
-				const canAnimate = isChromeBrowser && shouldUseChromeAnimation();
-
-				if (canAnimate) {
-					console.log('[PageTransition] Starting animation transition');
-					setIsTransitioning(true);
-					setTransitionTo(to);
-				} else {
-					console.log('[PageTransition] Skipping animation, direct navigation');
-					// Non-Chrome: skip animation and navigate immediately
-					resetScrollLocks();
-
-					// Ensure we don't accidentally trigger any transitions
-					setIsTransitioning(false);
-					setTransitionTo(null);
-
-					// Use Next.js router for navigation to ensure proper routing
-					router.push(to);
-				}
+				console.log('[PageTransition] startTransition called (animation disabled):', {
+					to,
+				});
+				resetScrollLocks();
+				setIsTransitioning(false);
+				setTransitionTo(null);
+				router.push(to);
 			} catch (error) {
-				console.error('[PageTransition] Critical error in startTransition:', error);
-				// Emergency fallback - use Next.js router
+				console.error(
+					'[PageTransition] Error in startTransition (animation disabled):',
+					error
+				);
 				router.push(to);
 			}
 		},
-		[isChromeBrowser, router]
+		[router]
 	);
 
 	const onTransitionComplete = useCallback(() => {
