@@ -1427,16 +1427,16 @@ div:not(.my-campaigns-table):not(.my-campaigns-table *)::-webkit-scrollbar-butto
 
 /* Set a compact, scrollable height for the My Campaigns table */
 .campaigns-table-container .my-campaigns-table {
-	height: 305px !important;
-	max-height: 305px !important;
+	height: 260px !important;
+	max-height: 260px !important;
 	overflow-y: auto !important;
 	overflow-x: hidden !important;
 }
 
 /* Override the default constrainHeight of 429px */
 .campaigns-table-container > div > div:last-child {
-	height: 305px !important;
-	max-height: 305px !important;
+	height: 260px !important;
+	max-height: 260px !important;
 	position: relative;
 	z-index: 41; /* Ensure scrollable area is above container but below rows */
 	overflow-y: auto !important;
