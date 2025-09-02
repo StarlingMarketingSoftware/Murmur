@@ -1628,6 +1628,8 @@ body {
 	z-index: 1;
 }
 
+/* Removed gradient-based dividers - using absolute positioned elements instead */
+
 /* Ensure all table rows are clickable */
 .campaigns-table-container tbody tr {
 	position: relative;
@@ -3092,3 +3094,87 @@ body,
 .search-results-table .scrollbar-hide {
 	border-radius: 8px !important;
 }
+
+/* Remove any background dividers from metrics column */
+.campaigns-table-container thead th:nth-child(2),
+.campaigns-table-container tbody td:nth-child(2) {
+	background: none !important;
+}
+
+/* Center the metric dividers in the gaps (accounting for 2px divider width) */
+.campaigns-table-container td:nth-child(2) .absolute[style*='right'] {
+	/* Default: gap-8 (32px) - divider centered at 16px - 1px = 15px */
+	right: calc(-1rem - 1px) !important;
+}
+
+/* Medium screens: gap-10 (40px) - divider centered at 20px - 1px = 19px */
+@media (min-width: 768px) {
+	.campaigns-table-container td:nth-child(2) .absolute[style*='right'] {
+		right: calc(-1.25rem - 1px) !important;
+	}
+}
+
+/* Large screens: gap-12 (48px) - divider centered at 24px - 1px = 23px */
+@media (min-width: 1024px) {
+	.campaigns-table-container td:nth-child(2) .absolute[style*='right'] {
+		right: calc(-1.5rem - 1px) !important;
+	}
+}
+
+/* Ensure dividers maintain consistent 2px width in portrait orientation */
+@media (orientation: portrait) {
+	.campaigns-table-container td:nth-child(2) .absolute.top-1\/2 {
+		width: 2px !important;
+		min-width: 2px !important;
+		max-width: 2px !important;
+		/* Prevent any distortion */
+		box-sizing: border-box !important;
+		border: none !important;
+		outline: none !important;
+	}
+}
+
+/* Force divider dimensions to be consistent */
+.campaigns-table-container td:nth-child(2) .h-\[17px\].w-\[2px\] {
+	height: 17px !important;
+	width: 2px !important;
+	min-width: 2px !important;
+	max-width: 2px !important;
+	/* Prevent any scaling or transform issues */
+	transform-origin: center center;
+	backface-visibility: hidden;
+	-webkit-backface-visibility: hidden;
+}
+
+/* Additional specificity for portrait mode height changes */
+@media (orientation: portrait) and (max-height: 1000px) {
+	.campaigns-table-container td:nth-child(2) .absolute {
+		width: 2px !important;
+		transform: translateY(-50%) scaleX(1) !important;
+		-webkit-transform: translateY(-50%) scaleX(1) !important;
+	}
+}
+
+/* Prevent sub-pixel rendering issues on all dividers */
+.campaigns-table-container td:nth-child(2) .absolute.h-\[17px\].w-\[2px\] {
+	/* Force pixel-perfect rendering */
+	image-rendering: -webkit-optimize-contrast;
+	image-rendering: crisp-edges;
+	-webkit-font-smoothing: none;
+	/* Ensure consistent rendering */
+	will-change: auto;
+	contain: strict;
+}
+
+/* Fix for high DPI displays and zoom levels */
+@media (-webkit-min-device-pixel-ratio: 1.5), (min-resolution: 144dpi) {
+	.campaigns-table-container td:nth-child(2) .absolute {
+		width: 2px !important;
+		transform: translateY(-50%) translateZ(0) !important;
+		-webkit-transform: translateY(-50%) translateZ(0) !important;
+	}
+}
+
+/* Removed gradient-based dividers - using absolute positioned elements instead */
+
+/* Make entire row light up on hover in My Campaigns table but keep metric boxes' original colors */

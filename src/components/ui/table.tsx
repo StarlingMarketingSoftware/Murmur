@@ -35,7 +35,8 @@ const tableHeaderVariants = cva('', {
 	variants: {
 		variant: {
 			primary: 'text-[15px] font-primary [&_tr]:border-b-2 [&_tr]:border-black',
-			secondary: 'text-[15px] font-secondary bg-primary',
+			secondary:
+				'text-[15px] font-secondary bg-[#F8F8F8] [&_tr]:bg-[#F8F8F8] [&_th]:bg-[#F8F8F8]',
 		},
 	},
 	defaultVariants: {
@@ -188,7 +189,7 @@ const tableCellVariants = cva(
 		variants: {
 			variant: {
 				primary: 'text-sm font-secondary',
-				secondary: 'text-[15px] font-secondary bg-background py-3',
+				secondary: 'text-[15px] font-secondary py-3',
 			},
 		},
 		defaultVariants: {
