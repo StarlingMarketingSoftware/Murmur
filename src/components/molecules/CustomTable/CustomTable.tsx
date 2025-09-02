@@ -312,7 +312,7 @@ export function CustomTable<TData, TValue>({
 			{useCustomScrollbar ? (
 				<CustomScrollbar
 					className={cn(
-						'border-2 border-black w-full max-w-full mx-auto my-campaigns-table',
+						'border-2 border-black w-full max-w-full mx-auto',
 						containerClassName
 					)}
 					thumbWidth={2}

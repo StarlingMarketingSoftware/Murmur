@@ -3059,3 +3059,25 @@ body,
 	scrollbar-width: none !important;
 	-ms-overflow-style: none !important;
 }
+
+/* -------------------------------------- */
+
+/* --- Search Results Table Custom Scrollbar --- */
+.search-results-table {
+	overflow: visible !important;
+}
+
+.search-results-table .scrollbar-hide {
+	height: 100% !important;
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+.search-results-table .scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+/* -------------------------------------- */
