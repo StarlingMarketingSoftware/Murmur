@@ -404,65 +404,86 @@ export const useCampaignsTable = () => {
 								'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr)',
 						}}
 					>
-						<div className="relative flex items-center">
+						<div className="relative flex items-center w-full">
 							<div
-								className="inline-flex items-center justify-start w-[6.13em] h-[1.33em] rounded-[4px] border border-[#8C8C8C] pl-3 pr-2 leading-none truncate"
-								style={{
-									backgroundColor: isConfirming ? 'transparent' : draftFill,
-									color: isConfirming ? 'white' : 'inherit',
-									borderColor: isConfirming ? '#A20000' : '#8C8C8C',
-								}}
+								className="metric-box inline-flex items-center justify-start w-[6.13em] h-[1.33em] rounded-[4px] border border-[#8C8C8C] px-2.5 leading-none truncate"
+								style={
+									{
+										'--draft-fill-color': draftFill,
+										backgroundColor: isConfirming ? 'transparent' : draftFill,
+										color: isConfirming ? 'white' : 'inherit',
+										borderColor: isConfirming ? '#A20000' : '#8C8C8C',
+									} as React.CSSProperties
+								}
 								data-draft-fill={draftFill}
 							>
 								{draftLabel}
 							</div>
 							<div
-								className="absolute -right-4 md:-right-5 lg:-right-6 h-[14px] w-[1.5px]"
-								style={{ backgroundColor: isConfirming ? 'transparent' : 'black' }}
+								className="absolute top-1/2 -translate-y-1/2 h-[17px] w-[2px]"
+								style={{
+									backgroundColor: isConfirming ? 'transparent' : 'black',
+									right: 'calc(-1rem - 1px)', // Default: center in gap-8 (32px gap)
+								}}
 							/>
 						</div>
-						<div className="relative flex items-center">
+						<div className="relative flex items-center w-full">
 							<div
-								className="inline-flex items-center justify-start w-[6.13em] h-[1.33em] rounded-[4px] border border-[#8C8C8C] pl-3 pr-2 leading-none truncate"
-								style={{
-									backgroundColor: isConfirming ? 'transparent' : sentFill,
-									color: isConfirming ? 'white' : 'inherit',
-									borderColor: isConfirming ? '#A20000' : '#8C8C8C',
-								}}
+								className="metric-box inline-flex items-center justify-start w-[6.13em] h-[1.33em] rounded-[4px] border border-[#8C8C8C] px-2.5 leading-none truncate"
+								style={
+									{
+										'--sent-fill-color': sentFill,
+										backgroundColor: isConfirming ? 'transparent' : sentFill,
+										color: isConfirming ? 'white' : 'inherit',
+										borderColor: isConfirming ? '#A20000' : '#8C8C8C',
+									} as React.CSSProperties
+								}
 								data-sent-fill={sentFill}
 							>
 								{sentLabel}
 							</div>
 							<div
-								className="absolute -right-4 md:-right-5 lg:-right-6 h-[14px] w-[1.5px]"
-								style={{ backgroundColor: isConfirming ? 'transparent' : 'black' }}
+								className="absolute top-1/2 -translate-y-1/2 h-[17px] w-[2px]"
+								style={{
+									backgroundColor: isConfirming ? 'transparent' : 'black',
+									right: 'calc(-1rem - 1px)', // Default: center in gap-8 (32px gap)
+								}}
 							/>
 						</div>
-						<div className="relative flex items-center">
+						<div className="relative flex items-center w-full">
 							<div
-								className="inline-flex items-center justify-start w-[6.13em] h-[1.33em] rounded-[4px] border border-[#8C8C8C] pl-3 pr-2 leading-none truncate"
-								style={{
-									backgroundColor: isConfirming ? 'transparent' : updatedFill,
-									color: isConfirming ? 'white' : 'inherit',
-									borderColor: isConfirming ? '#A20000' : '#8C8C8C',
-								}}
+								className="metric-box inline-flex items-center justify-start w-[6.13em] h-[1.33em] rounded-[4px] border border-[#8C8C8C] px-2.5 leading-none truncate"
+								style={
+									{
+										'--updated-fill-color': updatedFill,
+										backgroundColor: isConfirming ? 'transparent' : updatedFill,
+										color: isConfirming ? 'white' : 'inherit',
+										borderColor: isConfirming ? '#A20000' : '#8C8C8C',
+									} as React.CSSProperties
+								}
 								data-updated-fill={updatedFill}
 							>
 								{formatDate(updatedAt)}
 							</div>
 							<div
-								className="absolute -right-4 md:-right-5 lg:-right-6 h-[14px] w-[1.5px]"
-								style={{ backgroundColor: isConfirming ? 'transparent' : 'black' }}
+								className="absolute top-1/2 -translate-y-1/2 h-[17px] w-[2px]"
+								style={{
+									backgroundColor: isConfirming ? 'transparent' : 'black',
+									right: 'calc(-1rem - 1px)', // Default: center in gap-8 (32px gap)
+								}}
 							/>
 						</div>
 						<div className="relative flex items-center">
 							<div
-								className="inline-flex items-center justify-start w-[6.13em] h-[1.33em] rounded-[4px] border border-[#8C8C8C] pl-3 pr-2 leading-none truncate"
-								style={{
-									backgroundColor: isConfirming ? 'transparent' : createdFill,
-									color: isConfirming ? 'white' : 'inherit',
-									borderColor: isConfirming ? '#A20000' : '#8C8C8C',
-								}}
+								className="metric-box inline-flex items-center justify-start w-[6.13em] h-[1.33em] rounded-[4px] border border-[#8C8C8C] px-2.5 leading-none truncate"
+								style={
+									{
+										'--created-fill-color': createdFill,
+										backgroundColor: isConfirming ? 'transparent' : createdFill,
+										color: isConfirming ? 'white' : 'inherit',
+										borderColor: isConfirming ? '#A20000' : '#8C8C8C',
+									} as React.CSSProperties
+								}
 								data-created-fill={createdFill}
 							>
 								{formatDate(createdAt)}

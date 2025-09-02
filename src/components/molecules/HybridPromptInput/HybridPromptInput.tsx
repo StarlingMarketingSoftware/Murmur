@@ -18,6 +18,7 @@ import {
 	DropdownMenuContent,
 	DropdownMenuGroup,
 	DropdownMenuItem,
+	DropdownMenuPortal,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -149,15 +150,15 @@ const SortableAIBlock = ({
 					? ''
 					: 'border-2 border-gray-300 bg-background',
 				isTextBlock
-					? showTestPreview && testMessage
+					? showTestPreview
 						? 'w-[416px] h-[80px]'
 						: 'w-[868px] h-[80px]'
 					: isCompactBlock
-					? showTestPreview && testMessage
+					? showTestPreview
 						? 'w-[416px] h-[44px]'
 						: 'w-[868px] h-[44px]'
 					: isFullAutomatedBlock
-					? showTestPreview && testMessage
+					? showTestPreview
 						? 'w-[416px]'
 						: 'w-[868px]'
 					: 'w-full',
@@ -510,14 +511,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 				<Droppable id="droppable">
 					<div
 						className={`w-[892px] min-h-[530px] border-[3px] border-black rounded-md bg-gray-50 transition mb-4 flex ${
-							showTestPreview && testMessage ? 'flex-row' : 'flex-col'
+							showTestPreview ? 'flex-row' : 'flex-col'
 						} relative`}
 					>
 						{/* Left side - Content area */}
 						<div
 							className={cn(
 								`flex flex-col min-h-[530px]`,
-								showTestPreview && testMessage ? 'w-1/2' : 'w-full'
+								showTestPreview ? 'w-1/2' : 'w-full'
 							)}
 						>
 							{/* Subject header inside the box */}
@@ -621,7 +622,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<div
 															className={cn(
 																'flex justify-end -mt-1',
-																showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]'
+																showTestPreview ? 'w-[416px]' : 'w-[868px]'
 															)}
 														>
 															<Button
@@ -658,21 +659,27 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<Plus className="h-8 w-8" strokeWidth={3} />
 													</Button>
 												</DropdownMenuTrigger>
-												<DropdownMenuContent
-													className="w-[275.23px] h-[190px] !overflow-hidden !border-0"
-													align="center"
-													side="bottom"
-													sideOffset={32}
-													avoidCollisions={false}
-												>
-													<div className="relative flex flex-col justify-between h-full">
-														{/* Vertical lines that extend from hybrid block's side borders */}
-														<div className="absolute top-[6px] bottom-[6px] left-0 w-[2px] bg-[#51A2E4] z-0" />
-														<div className="absolute top-[6px] bottom-[6px] right-0 w-[2px] bg-[#51A2E4] z-0" />
+												<DropdownMenuPortal>
+													<DropdownMenuContent
+														className="w-[275.23px] h-[190px] !overflow-hidden !border-0 !animate-none data-[state=open]:!animate-none data-[state=closed]:!animate-none"
+														align="start"
+														alignOffset={-45}
+														side="bottom"
+														sideOffset={48}
+														avoidCollisions={false}
+														style={{
+															transform: 'translateY(20px)',
+														}}
+													>
+														<div className="relative flex flex-col justify-between h-full">
+															{/* Vertical lines that extend from hybrid block's side borders */}
+															<div className="absolute top-[6px] bottom-[6px] left-0 w-[2px] bg-[#51A2E4] z-0" />
+															<div className="absolute top-[6px] bottom-[6px] right-0 w-[2px] bg-[#51A2E4] z-0" />
 
-														<DropdownMenuGroup className="p-0 relative">
-															{BLOCK_ITEMS.filter((item) => item.position === 'top').map(
-																(item) => (
+															<DropdownMenuGroup className="p-0 relative">
+																{BLOCK_ITEMS.filter(
+																	(item) => item.position === 'top'
+																).map((item) => (
 																	<BlockMenuItem
 																		key={item.value}
 																		item={item}
@@ -688,35 +695,35 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			}
 																		}}
 																	/>
-																)
-															)}
-														</DropdownMenuGroup>
-														<div className="flex items-center justify-start pl-4 font-normal relative z-10">
-															<span>or</span>
+																))}
+															</DropdownMenuGroup>
+															<div className="flex items-center justify-start pl-4 font-normal relative z-10">
+																<span>or</span>
+															</div>
+															<DropdownMenuGroup className="p-0 relative">
+																{BLOCK_ITEMS.filter(
+																	(item) => item.position === 'bottom'
+																).map((item) => (
+																	<BlockMenuItem
+																		key={item.value}
+																		item={item}
+																		onClick={() => {
+																			if (item.value === 'hybrid_automation') {
+																				handleAddHybridAutomation();
+																			} else if (item.value === HybridBlock.text) {
+																				handleAddBlock(getBlock(HybridBlock.text));
+																			} else {
+																				handleAddBlock(
+																					BLOCKS.find((b) => b.value === item.value)!
+																				);
+																			}
+																		}}
+																	/>
+																))}
+															</DropdownMenuGroup>
 														</div>
-														<DropdownMenuGroup className="p-0 relative">
-															{BLOCK_ITEMS.filter(
-																(item) => item.position === 'bottom'
-															).map((item) => (
-																<BlockMenuItem
-																	key={item.value}
-																	item={item}
-																	onClick={() => {
-																		if (item.value === 'hybrid_automation') {
-																			handleAddHybridAutomation();
-																		} else if (item.value === HybridBlock.text) {
-																			handleAddBlock(getBlock(HybridBlock.text));
-																		} else {
-																			handleAddBlock(
-																				BLOCKS.find((b) => b.value === item.value)!
-																			);
-																		}
-																	}}
-																/>
-															))}
-														</DropdownMenuGroup>
-													</div>
-												</DropdownMenuContent>
+													</DropdownMenuContent>
+												</DropdownMenuPortal>
 											</DropdownMenu>
 										</div>
 									</div>
@@ -732,7 +739,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												<div
 													className={cn(
 														`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
-														showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]'
+														showTestPreview ? 'w-[416px]' : 'w-[868px]'
 													)}
 												>
 													<FormLabel className="text-base font-semibold font-secondary">
@@ -766,11 +773,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								<div className="flex justify-center -mt-2 mb-4 w-full">
 									<Button
 										type="button"
-										onClick={handleGenerateTestDrafts}
+										onClick={() => {
+											setShowTestPreview?.(true);
+											handleGenerateTestDrafts?.();
+										}}
 										disabled={isGenerationDisabled?.()}
 										className={cn(
 											'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
-											showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]',
+											showTestPreview ? 'w-[416px]' : 'w-[868px]',
 											isGenerationDisabled?.()
 												? 'opacity-50 cursor-not-allowed'
 												: 'opacity-100'
@@ -785,7 +795,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									<div
 										className={cn(
 											'text-destructive text-sm font-medium -mt-2 mb-2',
-											showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]'
+											showTestPreview ? 'w-[416px]' : 'w-[868px]'
 										)}
 									>
 										Fill in all text blocks in order to compose an email.
@@ -794,10 +804,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							</div>
 						</div>
 
-						{showTestPreview && testMessage && (
+						{showTestPreview && (
 							<TestPreviewPanel
 								setShowTestPreview={setShowTestPreview}
-								testMessage={testMessage}
+								testMessage={testMessage || ''}
+								isLoading={Boolean(isTest) || Boolean(isPendingGeneration)}
 							/>
 						)}
 					</div>
