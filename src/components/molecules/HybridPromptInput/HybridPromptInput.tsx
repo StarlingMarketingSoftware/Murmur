@@ -150,15 +150,15 @@ const SortableAIBlock = ({
 					? ''
 					: 'border-2 border-gray-300 bg-background',
 				isTextBlock
-					? showTestPreview && testMessage
+					? showTestPreview
 						? 'w-[416px] h-[80px]'
 						: 'w-[868px] h-[80px]'
 					: isCompactBlock
-					? showTestPreview && testMessage
+					? showTestPreview
 						? 'w-[416px] h-[44px]'
 						: 'w-[868px] h-[44px]'
 					: isFullAutomatedBlock
-					? showTestPreview && testMessage
+					? showTestPreview
 						? 'w-[416px]'
 						: 'w-[868px]'
 					: 'w-full',
@@ -511,14 +511,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 				<Droppable id="droppable">
 					<div
 						className={`w-[892px] min-h-[530px] border-[3px] border-black rounded-md bg-gray-50 transition mb-4 flex ${
-							showTestPreview && testMessage ? 'flex-row' : 'flex-col'
+							showTestPreview ? 'flex-row' : 'flex-col'
 						} relative`}
 					>
 						{/* Left side - Content area */}
 						<div
 							className={cn(
 								`flex flex-col min-h-[530px]`,
-								showTestPreview && testMessage ? 'w-1/2' : 'w-full'
+								showTestPreview ? 'w-1/2' : 'w-full'
 							)}
 						>
 							{/* Subject header inside the box */}
@@ -622,7 +622,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<div
 															className={cn(
 																'flex justify-end -mt-1',
-																showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]'
+																showTestPreview ? 'w-[416px]' : 'w-[868px]'
 															)}
 														>
 															<Button
@@ -739,7 +739,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												<div
 													className={cn(
 														`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
-														showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]'
+														showTestPreview ? 'w-[416px]' : 'w-[868px]'
 													)}
 												>
 													<FormLabel className="text-base font-semibold font-secondary">
@@ -773,11 +773,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								<div className="flex justify-center -mt-2 mb-4 w-full">
 									<Button
 										type="button"
-										onClick={handleGenerateTestDrafts}
+										onClick={() => {
+											setShowTestPreview?.(true);
+											handleGenerateTestDrafts?.();
+										}}
 										disabled={isGenerationDisabled?.()}
 										className={cn(
 											'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
-											showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]',
+											showTestPreview ? 'w-[416px]' : 'w-[868px]',
 											isGenerationDisabled?.()
 												? 'opacity-50 cursor-not-allowed'
 												: 'opacity-100'
@@ -792,7 +795,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									<div
 										className={cn(
 											'text-destructive text-sm font-medium -mt-2 mb-2',
-											showTestPreview && testMessage ? 'w-[416px]' : 'w-[868px]'
+											showTestPreview ? 'w-[416px]' : 'w-[868px]'
 										)}
 									>
 										Fill in all text blocks in order to compose an email.
@@ -801,10 +804,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							</div>
 						</div>
 
-						{showTestPreview && testMessage && (
+						{showTestPreview && (
 							<TestPreviewPanel
 								setShowTestPreview={setShowTestPreview}
-								testMessage={testMessage}
+								testMessage={testMessage || ''}
+								isLoading={Boolean(isTest) || Boolean(isPendingGeneration)}
 							/>
 						)}
 					</div>
