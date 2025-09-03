@@ -45,7 +45,7 @@ export const BLOCKS = [
 		value: HybridBlock.full_automated,
 		help: 'Let AI generate the entire email based on your prompt. This will override all other blocks.',
 		placeholder:
-			'Prompt Murmur here. Tell it what you want to say in an email and it will compose a batch of emails based on your instructions. "Write a clear and concise music booking email, mentioning simple facts about the venue and presenting my band as accurately as possibly."',
+			'Prompt Murmur here. \nTell it what you want to say and it will compose emails based on your instructions. \n\nEx. \n"Compose a professional booking pitch email. Include one or two facts about the venue, introduce my band honestly, highlight our fit for their space, and end with a straightforward next-steps question. Keep tone warm, clear, and brief."',
 	},
 	{
 		label: 'Custom Text',

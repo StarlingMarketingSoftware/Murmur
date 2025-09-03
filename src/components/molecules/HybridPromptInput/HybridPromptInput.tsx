@@ -402,36 +402,72 @@ const SortableAIBlock = ({
 										const fieldProps = form.register(
 											`hybridBlockPrompts.${fieldIndex}.value`
 										);
+										const fieldValue = form.watch(
+											`hybridBlockPrompts.${fieldIndex}.value`
+										);
+										const showCustomPlaceholder = isFullAutomatedBlock && !fieldValue;
+
 										return (
 											<>
-												<Textarea
-													placeholder={block.placeholder}
-													onClick={(e) => e.stopPropagation()}
-													className={cn(
-														'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 bg-white',
-														isFullAutomatedBlock ? 'h-[300px] px-0 resize-none' : '',
-														shouldShowRedStyling ? 'placeholder:text-[#A20000]' : ''
+												<div className={isFullAutomatedBlock ? 'relative' : ''}>
+													{showCustomPlaceholder && (
+														<div className="absolute inset-0 pointer-events-none py-2 pr-10 text-[#505050] text-base md:text-sm">
+															<div className="space-y-3">
+																<div>
+																	<p>Prompt Murmur here.</p>
+																	<p>
+																		Tell it what you want to say and it will compose
+																		emails based on your instructions.
+																	</p>
+																</div>
+																<div>
+																	<p>Ex.</p>
+																	<p>
+																		&ldquo;Compose a professional booking pitch email.
+																		Include one or two facts about the venue, introduce my
+																		band honestly, highlight our fit for their space, and
+																		end with a straightforward next-steps question. Keep
+																		tone warm, clear, and brief.&rdquo;
+																	</p>
+																</div>
+															</div>
+														</div>
 													)}
-													{...fieldProps}
-													onFocus={(e) => {
-														trackFocusedField?.(
-															`hybridBlockPrompts.${fieldIndex}.value`,
-															e.target as HTMLTextAreaElement
-														);
-													}}
-													onBlur={(e) => {
-														if (isTextBlock) {
-															setHasBeenTouched(true);
+													<Textarea
+														placeholder={
+															isFullAutomatedBlock
+																? ''
+																: 'placeholder' in block
+																? (block as { placeholder?: string }).placeholder || ''
+																: ''
 														}
-														fieldProps.onBlur(e);
-													}}
-													onChange={(e) => {
-														if (isTextBlock && e.target.value) {
-															setHasBeenTouched(true);
-														}
-														fieldProps.onChange(e);
-													}}
-												/>
+														onClick={(e) => e.stopPropagation()}
+														className={cn(
+															'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 bg-white',
+															isFullAutomatedBlock ? 'h-[300px] px-0 resize-none' : '',
+															shouldShowRedStyling ? 'placeholder:text-[#A20000]' : ''
+														)}
+														{...fieldProps}
+														onFocus={(e) => {
+															trackFocusedField?.(
+																`hybridBlockPrompts.${fieldIndex}.value`,
+																e.target as HTMLTextAreaElement
+															);
+														}}
+														onBlur={(e) => {
+															if (isTextBlock) {
+																setHasBeenTouched(true);
+															}
+															fieldProps.onBlur(e);
+														}}
+														onChange={(e) => {
+															if (isTextBlock && e.target.value) {
+																setHasBeenTouched(true);
+															}
+															fieldProps.onChange(e);
+														}}
+													/>
+												</div>
 												{isFullAutomatedBlock && <ParagraphSlider />}
 											</>
 										);
