@@ -67,6 +67,7 @@ export const useProductCard = (props: ProductCardProps) => {
 				user={user}
 				priceId={price.id}
 				buttonText="Buy Now"
+				billingCycle={billingCycle}
 			/>
 		);
 		if (!user) {

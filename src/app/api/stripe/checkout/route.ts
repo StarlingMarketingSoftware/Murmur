@@ -16,6 +16,7 @@ import { BASE_URL } from '@/constants';
 
 const stripeCheckoutRequestSchema = z.object({
 	priceId: z.string().min(1),
+	isYearly: z.boolean().optional(),
 	freeTrial: z.boolean().optional(),
 });
 
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
 			return apiBadRequest(validatedData.error);
 		}
 
-		const { priceId, freeTrial } = validatedData.data;
+		const { priceId, freeTrial, isYearly } = validatedData.data;
 		if (!priceId) {
 			return apiBadRequest('Price ID is required');
 		}
@@ -48,9 +49,16 @@ export async function POST(req: Request) {
 			return apiServerError('User does not have a Stripe customer ID');
 		}
 
+		const payment_method_types = ['card'];
+
+		if (isYearly) {
+			payment_method_types.push('klarna');
+		}
+
 		const session: Stripe.Response<Stripe.Checkout.Session> =
 			await stripe.checkout.sessions.create({
-				payment_method_types: ['card'],
+				payment_method_types:
+					payment_method_types as Stripe.Checkout.SessionCreateParams.PaymentMethodType[],
 				customer: user.stripeCustomerId,
 				line_items: [
 					{
