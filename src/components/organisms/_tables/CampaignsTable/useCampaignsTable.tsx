@@ -389,7 +389,9 @@ export const useCampaignsTable = () => {
 				const createdAt = new Date(campaign.createdAt);
 				const updatedAt = new Date(campaign.updatedAt);
 
-				const draftLabel = draftCount.toString().padStart(2, '0') + ' drafts';
+				const draftLabel =
+					draftCount.toString().padStart(2, '0') +
+					(draftCount === 1 ? ' draft' : ' drafts');
 				const sentLabel = sentCount.toString().padStart(2, '0') + ' sent';
 				const draftFill = getDraftFillColor(draftCount);
 				const sentFill = getSentFillColor(sentCount);
