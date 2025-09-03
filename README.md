@@ -73,6 +73,8 @@ For Stripe subscription functionality, set up a webhook:
 
    - If the Stripe CLI API key has expired, run `stripe login` and authenticate via browser.
 
+5. For testing Klarna payments, reference these docs: https://docs.stripe.com/payments/klarna/accept-a-payment?platform=web&ui=API&country=united-states#testmode-guide
+
 ## Clerk Webhook Setup
 
 1. https://clerk.com/docs/webhooks/sync-data
