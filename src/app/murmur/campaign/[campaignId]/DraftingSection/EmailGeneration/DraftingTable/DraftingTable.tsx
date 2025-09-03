@@ -78,7 +78,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 
 				{/* Content area */}
 				<CustomScrollbar
-					className="flex-1 pr-[10px] drafting-table-content"
+					className="flex-1 drafting-table-content"
 					thumbWidth={2}
 					thumbColor="#000000"
 					trackColor="transparent"
