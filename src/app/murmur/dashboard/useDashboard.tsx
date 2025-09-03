@@ -491,7 +491,7 @@ export const useDashboard = () => {
 					const text = (row.getValue('title') as string) || '';
 					return (
 						<div
-							className="overflow-hidden ml-2"
+							className="relative ml-2 title-cell-container overflow-hidden"
 							style={{
 								width: '230px',
 								height: '19px',
@@ -501,12 +501,10 @@ export const useDashboard = () => {
 							}}
 						>
 							<div className="h-full w-full flex items-center px-2">
-								<div className="w-full flex items-center h-full">
-									<ScrollableText
-										text={text}
-										className="text-[14px] leading-none text-black"
-									/>
-								</div>
+								<ScrollableText
+									text={text}
+									className="text-[14px] leading-none text-black"
+								/>
 							</div>
 						</div>
 					);

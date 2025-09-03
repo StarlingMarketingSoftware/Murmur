@@ -43,7 +43,6 @@ import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
 import { ParagraphSlider } from '@/components/atoms/ParagraphSlider/ParagraphSlider';
 import { ToneSelector } from '../ToneSelector/ToneSelector';
-
 interface SortableAIBlockProps {
 	block: (typeof BLOCKS)[number];
 	id: string;
@@ -151,7 +150,7 @@ const SortableAIBlock = ({
 					: 'border-2 border-gray-300 bg-background',
 				isTextBlock
 					? showTestPreview
-						? 'w-[416px] h-[80px]'
+						? 'w-[416px] h-[44px]'
 						: 'w-[868px] h-[80px]'
 					: isCompactBlock
 					? showTestPreview
@@ -189,9 +188,13 @@ const SortableAIBlock = ({
 					className={cn(
 						'absolute top-0 left-0 cursor-move z-[1]',
 						isTextBlock
-							? 'h-[80px] w-[172px]'
+							? showTestPreview
+								? 'h-[44px] w-[80px]'
+								: 'h-[80px] w-[172px]'
 							: isCompactBlock
-							? 'h-[44px] w-[172px]'
+							? showTestPreview
+								? 'h-[44px] w-[80px]'
+								: 'h-[44px] w-[140px]'
 							: 'h-12',
 						isFullAutomatedBlock
 							? 'w-[172px]'
@@ -268,10 +271,12 @@ const SortableAIBlock = ({
 													placeholder={block.placeholder}
 													onClick={(e) => e.stopPropagation()}
 													className={cn(
-														'flex-1 bg-white outline-none text-sm pl-6 pr-12',
+														'flex-1 bg-white outline-none text-sm',
+														showTestPreview ? 'pl-0 -ml-[72px]' : 'pl-6',
+														'pr-12',
 														shouldShowRedStyling
 															? 'placeholder:text-[#A20000]'
-															: 'placeholder:text-gray-400'
+															: 'placeholder:text-[#000000]'
 													)}
 													{...fieldProps}
 													onFocus={(e) => {
@@ -280,14 +285,13 @@ const SortableAIBlock = ({
 															e.target as HTMLInputElement
 														);
 													}}
-													onBlur={() => {
-														// Mark as touched when the user leaves the field
+													onBlur={(e) => {
 														if (isTextBlock) {
 															setHasBeenTouched(true);
 														}
+														fieldProps.onBlur(e);
 													}}
 													onChange={(e) => {
-														// Mark as touched when user types
 														if (isTextBlock && e.target.value) {
 															setHasBeenTouched(true);
 														}
@@ -312,7 +316,13 @@ const SortableAIBlock = ({
 													isActionBlock && 'text-[#040488]'
 												)}
 											>
-												{block.label}
+												{isIntroductionBlock
+													? 'Intro'
+													: isResearchBlock
+													? 'RC'
+													: isActionBlock
+													? 'CTA'
+													: (block as { label: string }).label}
 											</span>
 										</div>
 										{(() => {
@@ -324,7 +334,11 @@ const SortableAIBlock = ({
 													type="text"
 													placeholder={block.placeholder}
 													onClick={(e) => e.stopPropagation()}
-													className="flex-1 bg-white outline-none text-sm placeholder:text-gray-400 pl-6 pr-12"
+													className={cn(
+														'flex-1 bg-white outline-none text-sm placeholder:text-gray-400',
+														showTestPreview ? 'pl-0 -ml-[72px]' : 'pl-6',
+														'pr-12'
+													)}
 													{...fieldProps}
 													onFocus={(e) => {
 														trackFocusedField?.(
@@ -388,37 +402,72 @@ const SortableAIBlock = ({
 										const fieldProps = form.register(
 											`hybridBlockPrompts.${fieldIndex}.value`
 										);
+										const fieldValue = form.watch(
+											`hybridBlockPrompts.${fieldIndex}.value`
+										);
+										const showCustomPlaceholder = isFullAutomatedBlock && !fieldValue;
+
 										return (
 											<>
-												<Textarea
-													placeholder={block.placeholder}
-													onClick={(e) => e.stopPropagation()}
-													className={cn(
-														'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 bg-white',
-														isFullAutomatedBlock ? 'h-[300px] px-0' : '',
-														shouldShowRedStyling ? 'placeholder:text-[#A20000]' : ''
+												<div className={isFullAutomatedBlock ? 'relative' : ''}>
+													{showCustomPlaceholder && (
+														<div className="absolute inset-0 pointer-events-none py-2 pr-10 text-[#505050] text-base md:text-sm">
+															<div className="space-y-3">
+																<div>
+																	<p>Prompt Murmur here.</p>
+																	<p>
+																		Tell it what you want to say and it will compose
+																		emails based on your instructions.
+																	</p>
+																</div>
+																<div>
+																	<p>Ex.</p>
+																	<p>
+																		&ldquo;Compose a professional booking pitch email.
+																		Include one or two facts about the venue, introduce my
+																		band honestly, highlight our fit for their space, and
+																		end with a straightforward next-steps question. Keep
+																		tone warm, clear, and brief.&rdquo;
+																	</p>
+																</div>
+															</div>
+														</div>
 													)}
-													{...fieldProps}
-													onFocus={(e) => {
-														trackFocusedField?.(
-															`hybridBlockPrompts.${fieldIndex}.value`,
-															e.target as HTMLTextAreaElement
-														);
-													}}
-													onBlur={() => {
-														// Mark as touched when the user leaves the field
-														if (isTextBlock) {
-															setHasBeenTouched(true);
+													<Textarea
+														placeholder={
+															isFullAutomatedBlock
+																? ''
+																: 'placeholder' in block
+																? (block as { placeholder?: string }).placeholder || ''
+																: ''
 														}
-													}}
-													onChange={(e) => {
-														// Mark as touched when user types
-														if (isTextBlock && e.target.value) {
-															setHasBeenTouched(true);
-														}
-														fieldProps.onChange(e);
-													}}
-												/>
+														onClick={(e) => e.stopPropagation()}
+														className={cn(
+															'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 bg-white',
+															isFullAutomatedBlock ? 'h-[300px] px-0 resize-none' : '',
+															shouldShowRedStyling ? 'placeholder:text-[#A20000]' : ''
+														)}
+														{...fieldProps}
+														onFocus={(e) => {
+															trackFocusedField?.(
+																`hybridBlockPrompts.${fieldIndex}.value`,
+																e.target as HTMLTextAreaElement
+															);
+														}}
+														onBlur={(e) => {
+															if (isTextBlock) {
+																setHasBeenTouched(true);
+															}
+															fieldProps.onBlur(e);
+														}}
+														onChange={(e) => {
+															if (isTextBlock && e.target.value) {
+																setHasBeenTouched(true);
+															}
+															fieldProps.onChange(e);
+														}}
+													/>
+												</div>
 												{isFullAutomatedBlock && <ParagraphSlider />}
 											</>
 										);
@@ -483,6 +532,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		isTest,
 	} = useHybridPromptInput(props);
 
+	// Track if the user has attempted to Test to control error styling
+	const [hasAttemptedTest, setHasAttemptedTest] = useState(false);
+
 	const watchedBlocks = form.watch('hybridBlockPrompts') || [];
 	const isHandwrittenMode =
 		watchedBlocks.length > 0 && watchedBlocks.every((b) => b.type === HybridBlock.text);
@@ -493,6 +545,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		(block) =>
 			block.type === HybridBlock.text && (!block.value || block.value.trim() === '')
 	);
+
+	// Determine if any empty text block has been touched (blurred) to align with per-block red logic
+	// Access touchedFields to subscribe to touch updates
+	const touchedFields: any = form.formState.touchedFields;
+	const hasTouchedEmptyTextBlocks = watchedBlocks.some((block, index) => {
+		if (block.type !== HybridBlock.text) return false;
+		const isTouched = Boolean(touchedFields?.hybridBlockPrompts?.[index]?.value);
+		const isEmpty = !block.value || block.value.trim() === '';
+		return isTouched && isEmpty;
+	});
 
 	const handleClearAllInside = () => {
 		form.setValue('hybridBlockPrompts', []);
@@ -776,6 +838,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										onClick={() => {
 											setShowTestPreview?.(true);
 											handleGenerateTestDrafts?.();
+											setHasAttemptedTest(true);
 										}}
 										disabled={isGenerationDisabled?.()}
 										className={cn(
@@ -794,7 +857,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								{hasEmptyTextBlocks && (
 									<div
 										className={cn(
-											'text-destructive text-sm font-medium -mt-2 mb-2',
+											hasTouchedEmptyTextBlocks || hasAttemptedTest
+												? 'text-destructive'
+												: 'text-black',
+											'text-sm font-medium -mt-2 mb-2',
 											showTestPreview ? 'w-[416px]' : 'w-[868px]'
 										)}
 									>

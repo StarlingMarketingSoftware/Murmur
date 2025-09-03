@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { NoMobilePage } from '@/components/atoms/NoMobilePage/NoMobilePage';
 import { cn } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useState } from 'react';
 
 const Murmur = () => {
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
@@ -22,6 +23,9 @@ const Murmur = () => {
 
 	const searchParams = useSearchParams();
 	const silentLoad = searchParams.get('silent') === '1';
+	const [identityDialogOrigin, setIdentityDialogOrigin] = useState<'campaign' | 'search'>(
+		silentLoad ? 'search' : 'campaign'
+	);
 
 	if (isPendingCampaign || !campaign) {
 		return silentLoad ? null : <Spinner />;
@@ -74,7 +78,10 @@ const Murmur = () => {
 							<div className="flex items-center">
 								<button
 									type="button"
-									onClick={() => setIsIdentityDialogOpen(true)}
+									onClick={() => {
+										setIdentityDialogOrigin('campaign');
+										setIsIdentityDialogOpen(true);
+									}}
 									className="w-[52px] h-[20.5px] bg-[#EEEEEE] rounded-[8px] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969]"
 								>
 									<span className="font-inter font-normal text-[17px] leading-none text-black transition-colors group-hover:text-white">
@@ -83,7 +90,10 @@ const Murmur = () => {
 								</button>
 								<Typography
 									className="ml-2 !text-[15px] text-gray-600 font-secondary hover:underline"
-									onClick={() => setIsIdentityDialogOpen(true)}
+									onClick={() => {
+										setIdentityDialogOrigin('campaign');
+										setIsIdentityDialogOpen(true);
+									}}
 								>
 									{campaign?.identity?.name}
 								</Typography>
@@ -96,6 +106,11 @@ const Murmur = () => {
 						title="User Settings"
 						open={isIdentityDialogOpen}
 						onOpenChange={setIsIdentityDialogOpen}
+						backButtonText={
+							identityDialogOrigin === 'search'
+								? 'Back to Search Results'
+								: 'Back to Campaign'
+						}
 					/>
 
 					<div className="mt-6 flex justify-center">

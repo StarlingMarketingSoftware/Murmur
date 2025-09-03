@@ -12,7 +12,6 @@ import {
 import { CreateIdentityPanel } from './CreateIdentityPanel/CreateIdentityPanel';
 import { Button } from '@/components/ui/button';
 
-import { urls } from '@/constants/urls';
 import { Typography } from '@/components/ui/typography';
 
 export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
@@ -94,12 +93,24 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 				>
 					{/* Full screen header with back button - fixed position */}
 					<div className="relative bg-background px-8 py-6 flex-shrink-0">
-						{/* Back button - always visible, goes to dashboard */}
+						{/* Back button - closes dialog if possible, otherwise navigates back */}
 						{isContentReady && (
 							<button
-								onClick={() => router.push(urls.murmur.dashboard.index)}
+								onClick={() => {
+									try {
+										if (props.backButtonMode === 'historyBack') {
+											router.back();
+											return;
+										}
+										if (onOpenChange) {
+											onOpenChange(false);
+											return;
+										}
+									} catch {}
+									router.back();
+								}}
 								className="absolute left-8 top-1/2 -translate-y-1/2 inline-flex items-center gap-2 px-3 py-1.5 bg-transparent border-0 rounded-lg text-gray-600/60 text-sm font-normal cursor-pointer transition-all duration-200 hover:bg-gray-100/50 hover:text-gray-900 active:scale-95 font-primary"
-								aria-label="Back to dashboard"
+								aria-label="Back"
 							>
 								<svg
 									width="20"
@@ -117,7 +128,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 										strokeLinejoin="round"
 									/>
 								</svg>
-								<span>Back</span>
+								<span>{props.backButtonText ?? 'Back'}</span>
 							</button>
 						)}
 

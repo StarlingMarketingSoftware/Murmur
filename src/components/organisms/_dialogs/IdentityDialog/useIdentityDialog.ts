@@ -15,6 +15,8 @@ export interface IdentityDialogProps {
 	triggerButton?: ReactNode;
 	onOpenChange: (open: boolean) => void;
 	campaign: Campaign;
+	backButtonText?: string;
+	backButtonMode?: 'close' | 'historyBack';
 }
 
 export const identityFormSchema = z.object({

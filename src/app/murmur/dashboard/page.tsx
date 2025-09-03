@@ -548,9 +548,9 @@ const Dashboard = () => {
 												displayRowsPerPage={false}
 												constrainHeight
 												useCustomScrollbar
-												scrollbarOffsetRight={-5}
+												scrollbarOffsetRight={0}
 												containerClassName="search-results-table w-[1209px] h-[499px] rounded-[8px] border-[#737373]"
-												tableClassName="w-[1185px] mx-auto"
+												tableClassName="w-full"
 												headerClassName="[&_tr]:border-[#737373]"
 												theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
 												rowClassName="border-[#737373] row-hover-scroll"
