@@ -93,6 +93,18 @@ export const removeMarkdownCodeBlocks = (text: string): string => {
 };
 
 /**
+ * Removes all em dashes (—) from text and replaces them with regular dashes (-)
+ * This is used to post-process AI-generated content
+ * @param text - The text to process
+ * @returns The text with em dashes replaced
+ */
+export const removeEmDashes = (text: string): string => {
+	// Replace em dashes (—) with regular dashes (-)
+	// Unicode for em dash is U+2014
+	return text.replace(/—/g, '-');
+};
+
+/**
  * Encodes a user ID into a unique code using base64 encoding
  * @param userId - The user ID to encode (e.g., "user_2uWz1PD000PHE2v7WO5rsRqgmWt")
  * @returns The encoded string
