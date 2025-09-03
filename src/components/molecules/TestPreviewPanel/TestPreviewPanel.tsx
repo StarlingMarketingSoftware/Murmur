@@ -160,14 +160,6 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 		} else {
 			waveTweensRef.current.forEach((t) => t.kill());
 			waveTweensRef.current = [];
-			gsap.to(overlay, {
-				opacity: 0,
-				duration: 0.45,
-				ease: 'power1.out',
-				onComplete: () => {
-					if (overlay) overlay.style.display = 'none';
-				},
-			});
 		}
 		return () => {
 			waveTweensRef.current.forEach((t) => t.kill());
@@ -190,10 +182,13 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 		if (typingTimerRef.current) {
 			window.clearInterval(typingTimerRef.current);
 		}
+
 		typingTimerRef.current = window.setInterval(() => {
-			setTypedText((prev) => prev + (tokens[index] || ''));
-			index += 1;
-			if (index >= tokens.length) {
+			if (index < tokens.length) {
+				const token = tokens[index];
+				setTypedText((prev) => prev + token);
+				index += 1;
+			} else {
 				if (typingTimerRef.current) {
 					window.clearInterval(typingTimerRef.current);
 					typingTimerRef.current = null;
@@ -265,79 +260,78 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 						</Button>
 					</div>
 
-					<div className="relative flex-1 p-6 overflow-y-auto bg-white">
+					<div className="relative flex-1 bg-white" style={{ minHeight: '400px' }}>
 						{/* Organic grayscale blob animation overlay */}
-						<div
-							ref={overlayRef}
-							className="absolute inset-0 pointer-events-none overflow-hidden"
-							style={{
-								opacity: isLoading ? 1 : 0,
-								display: isLoading ? 'block' : 'none',
-								WebkitMaskImage:
-									'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,.25) 8%, rgba(0,0,0,.85) 18%, rgba(0,0,0,1) 26%, rgba(0,0,0,1) 100%)',
-								maskImage:
-									'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,.25) 8%, rgba(0,0,0,.85) 18%, rgba(0,0,0,1) 26%, rgba(0,0,0,1) 100%)',
-							}}
-						>
+						{isLoading && (
 							<div
-								ref={layer1Ref}
-								className="absolute inset-0"
-								style={{
-									filter: 'blur(10px)',
-									willChange: 'transform',
-									background: `
+								ref={overlayRef}
+								className="absolute inset-0 pointer-events-none overflow-hidden"
+								style={
+									{
+										// Removed mask gradient to prevent text cutoff
+									}
+								}
+							>
+								<div
+									ref={layer1Ref}
+									className="absolute inset-0"
+									style={{
+										filter: 'blur(10px)',
+										willChange: 'transform',
+										background: `
 										radial-gradient(ellipse 70% 55% at 10% 40%, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0) 42%),
 										radial-gradient(ellipse 80% 60% at 35% 70%, rgba(0,0,0,0.07) 0%, rgba(0,0,0,0) 48%),
 										radial-gradient(ellipse 65% 50% at 75% 35%, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0) 45%)
 									`,
-									backgroundSize: '180% 100%',
-									backgroundPosition: '0% 0%',
-								}}
-							/>
-							<div
-								ref={layer2Ref}
-								className="absolute inset-0"
-								style={{
-									filter: 'blur(14px)',
-									willChange: 'transform',
-									background: `
+										backgroundSize: '180% 100%',
+										backgroundPosition: '0% 0%',
+									}}
+								/>
+								<div
+									ref={layer2Ref}
+									className="absolute inset-0"
+									style={{
+										filter: 'blur(14px)',
+										willChange: 'transform',
+										background: `
 										radial-gradient(ellipse 55% 45% at 20% 65%, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0) 40%),
 										radial-gradient(ellipse 60% 50% at 55% 30%, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0) 44%),
 										radial-gradient(ellipse 50% 40% at 85% 75%, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0) 38%)
 									`,
-									backgroundSize: '220% 100%',
-									backgroundPosition: '-20% 0%',
-								}}
-							/>
-							<div
-								ref={layer3Ref}
-								className="absolute inset-0"
-								style={{
-									filter: 'blur(18px)',
-									opacity: 0.9,
-									willChange: 'transform',
-									background: `
+										backgroundSize: '220% 100%',
+										backgroundPosition: '-20% 0%',
+									}}
+								/>
+								<div
+									ref={layer3Ref}
+									className="absolute inset-0"
+									style={{
+										filter: 'blur(18px)',
+										opacity: 0.9,
+										willChange: 'transform',
+										background: `
 										radial-gradient(ellipse 60% 50% at 15% 85%, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 36%),
 										radial-gradient(ellipse 75% 55% at 65% 55%, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0) 42%),
 										radial-gradient(ellipse 55% 45% at 92% 20%, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 34%)
 									`,
-									backgroundSize: '260% 100%',
-									backgroundPosition: '-40% 0%',
-								}}
-							/>
+										backgroundSize: '260% 100%',
+										backgroundPosition: '-40% 0%',
+									}}
+								/>
 
-							{/* Centered typewriter loading text */}
-							<div className="absolute inset-0 flex items-center justify-center">
-								<span className="font-inter text-[#737373] text-sm tracking-wide select-none">
-									{loadingTyped}
-								</span>
+								{/* Centered typewriter loading text */}
+								<div className="absolute inset-0 flex items-center justify-center">
+									<span className="font-inter text-[#737373] text-sm tracking-wide select-none">
+										{loadingTyped}
+									</span>
+								</div>
 							</div>
-						</div>
+						)}
 
 						{/* Typing content */}
 						<div
 							ref={contentRef}
-							className="max-w-none leading-[1.6] text-[14px] whitespace-pre-wrap"
+							className="max-w-none leading-[1.6] text-[14px] whitespace-pre-wrap relative z-20 p-6"
 							style={{ fontFamily }}
 						>
 							{typedText}
