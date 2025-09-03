@@ -30,6 +30,7 @@ import {
 	generateEmailTemplateFromBlocks,
 	generatePromptsFromBlocks,
 	stringifyJsonSubset,
+	removeEmDashes,
 } from '@/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -582,12 +583,15 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			console.log(
 				'[Full AI] No paragraph formatting requested, returning parsed response'
 			);
-			return mistralResponse1Parsed;
+			return {
+				subject: removeEmDashes(mistralResponse1Parsed.subject),
+				message: removeEmDashes(mistralResponse1Parsed.message),
+			};
 		}
 
 		return {
-			subject: mistralResponse1Parsed.subject,
-			message: mistralResponse2,
+			subject: removeEmDashes(mistralResponse1Parsed.subject),
+			message: removeEmDashes(mistralResponse2),
 		};
 	};
 
@@ -690,8 +694,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 
 		return {
-			subject: isAiSubject ? mistralResponseParsed.subject : form.getValues('subject'),
-			message: mistralResponseParsed.message,
+			subject: isAiSubject
+				? removeEmDashes(mistralResponseParsed.subject)
+				: form.getValues('subject'),
+			message: removeEmDashes(mistralResponseParsed.message),
 		};
 	};
 

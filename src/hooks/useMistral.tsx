@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { urls } from '@/constants/urls';
 import { PostMistralData } from '@/app/api/mistral/route';
-import { removeMarkdownCodeBlocks } from '@/utils';
+import { removeMarkdownCodeBlocks, removeEmDashes } from '@/utils';
 
 export interface PostMistralDataWithSignal extends PostMistralData {
 	signal?: AbortSignal;
@@ -50,7 +50,7 @@ export const useMistral = (options: CustomMutationOptions = {}) => {
 				typeof res === 'string' ? res : JSON.stringify(res)
 			);
 
-			return removeMarkdownCodeBlocks(res);
+			return removeEmDashes(removeMarkdownCodeBlocks(res));
 		},
 		onSuccess: () => {
 			if (!suppressToasts) {
