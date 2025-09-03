@@ -150,7 +150,7 @@ const SortableAIBlock = ({
 					: 'border-2 border-gray-300 bg-background',
 				isTextBlock
 					? showTestPreview
-						? 'w-[416px] h-[80px]'
+						? 'w-[416px] h-[44px]'
 						: 'w-[868px] h-[80px]'
 					: isCompactBlock
 					? showTestPreview
@@ -188,9 +188,13 @@ const SortableAIBlock = ({
 					className={cn(
 						'absolute top-0 left-0 cursor-move z-[1]',
 						isTextBlock
-							? 'h-[80px] w-[172px]'
+							? showTestPreview
+								? 'h-[44px] w-[80px]'
+								: 'h-[80px] w-[172px]'
 							: isCompactBlock
-							? 'h-[44px] w-[172px]'
+							? showTestPreview
+								? 'h-[44px] w-[80px]'
+								: 'h-[44px] w-[140px]'
 							: 'h-12',
 						isFullAutomatedBlock
 							? 'w-[172px]'
@@ -268,11 +272,11 @@ const SortableAIBlock = ({
 													onClick={(e) => e.stopPropagation()}
 													className={cn(
 														'flex-1 bg-white outline-none text-sm',
-														showTestPreview ? 'pl-0 -ml-4' : 'pl-6',
+														showTestPreview ? 'pl-0 -ml-[72px]' : 'pl-6',
 														'pr-12',
 														shouldShowRedStyling
 															? 'placeholder:text-[#A20000]'
-															: 'placeholder:text-gray-400'
+															: 'placeholder:text-[#000000]'
 													)}
 													{...fieldProps}
 													onFocus={(e) => {
@@ -312,7 +316,13 @@ const SortableAIBlock = ({
 													isActionBlock && 'text-[#040488]'
 												)}
 											>
-												{block.label}
+												{isIntroductionBlock
+													? 'Intro'
+													: isResearchBlock
+													? 'RC'
+													: isActionBlock
+													? 'CTA'
+													: (block as { label: string }).label}
 											</span>
 										</div>
 										{(() => {
@@ -326,7 +336,7 @@ const SortableAIBlock = ({
 													onClick={(e) => e.stopPropagation()}
 													className={cn(
 														'flex-1 bg-white outline-none text-sm placeholder:text-gray-400',
-														showTestPreview ? 'pl-0 -ml-4' : 'pl-6',
+														showTestPreview ? 'pl-0 -ml-[72px]' : 'pl-6',
 														'pr-12'
 													)}
 													{...fieldProps}
