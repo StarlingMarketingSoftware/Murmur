@@ -49,10 +49,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		isJustSaved,
 		draftEmails,
 		isPendingEmails,
-		isWaitingForConfirm,
 		handleDraftButtonClick,
 		scrollToEmailStructure,
-		countdown,
 	} = useEmailGeneration(props);
 
 	// Inline send confirmation state
@@ -280,7 +278,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 								onClick={handleDraftButtonClick}
 								disabled={isDraftDisabled()}
 								className={cn(
-									'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black font-inter font-medium rounded-[6px] cursor-pointer transition-all duration-200 hover:bg-[rgba(93,171,104,0.6)] hover:border-[#4a8d56] active:bg-[rgba(93,171,104,0.7)] active:border-[#3d7346] h-[52px] w-[95px] flex items-center justify-center appearance-none text-sm font-inter p-0 m-0 leading-normal box-border text-center',
+									'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black font-inter font-medium rounded-[4px] cursor-pointer transition-all duration-200 hover:bg-[rgba(93,171,104,0.6)] hover:border-[#4a8d56] active:bg-[rgba(93,171,104,0.7)] active:border-[#3d7346] h-[38px] w-[87px] flex items-center justify-center appearance-none text-sm font-inter p-0 m-0 leading-normal box-border text-center',
 									isDraftDisabled()
 										? 'opacity-50 cursor-not-allowed hover:bg-[rgba(93,171,104,0.47)] hover:border-[#5DAB68]'
 										: ''
@@ -289,11 +287,6 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 							>
 								{isPendingGeneration && !isTest ? (
 									<Spinner size="small" />
-								) : isWaitingForConfirm ? (
-									<span className="flex flex-col items-center leading-tight">
-										<span className="text-xs">Click to</span>
-										<span className="text-sm font-semibold">Confirm {countdown}</span>
-									</span>
 								) : (
 									<span className="flex items-center gap-1">
 										Draft
