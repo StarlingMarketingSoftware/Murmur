@@ -43,7 +43,6 @@ import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
 import { ParagraphSlider } from '@/components/atoms/ParagraphSlider/ParagraphSlider';
 import { ToneSelector } from '../ToneSelector/ToneSelector';
-
 interface SortableAIBlockProps {
 	block: (typeof BLOCKS)[number];
 	id: string;
@@ -282,14 +281,13 @@ const SortableAIBlock = ({
 															e.target as HTMLInputElement
 														);
 													}}
-													onBlur={() => {
-														// Mark as touched when the user leaves the field
+													onBlur={(e) => {
 														if (isTextBlock) {
 															setHasBeenTouched(true);
 														}
+														fieldProps.onBlur(e);
 													}}
 													onChange={(e) => {
-														// Mark as touched when user types
 														if (isTextBlock && e.target.value) {
 															setHasBeenTouched(true);
 														}
@@ -411,14 +409,13 @@ const SortableAIBlock = ({
 															e.target as HTMLTextAreaElement
 														);
 													}}
-													onBlur={() => {
-														// Mark as touched when the user leaves the field
+													onBlur={(e) => {
 														if (isTextBlock) {
 															setHasBeenTouched(true);
 														}
+														fieldProps.onBlur(e);
 													}}
 													onChange={(e) => {
-														// Mark as touched when user types
 														if (isTextBlock && e.target.value) {
 															setHasBeenTouched(true);
 														}
@@ -489,6 +486,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		isTest,
 	} = useHybridPromptInput(props);
 
+	// Track if the user has attempted to Test to control error styling
+	const [hasAttemptedTest, setHasAttemptedTest] = useState(false);
+
 	const watchedBlocks = form.watch('hybridBlockPrompts') || [];
 	const isHandwrittenMode =
 		watchedBlocks.length > 0 && watchedBlocks.every((b) => b.type === HybridBlock.text);
@@ -499,6 +499,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		(block) =>
 			block.type === HybridBlock.text && (!block.value || block.value.trim() === '')
 	);
+
+	// Determine if any empty text block has been touched (blurred) to align with per-block red logic
+	// Access touchedFields to subscribe to touch updates
+	const touchedFields: any = form.formState.touchedFields;
+	const hasTouchedEmptyTextBlocks = watchedBlocks.some((block, index) => {
+		if (block.type !== HybridBlock.text) return false;
+		const isTouched = Boolean(touchedFields?.hybridBlockPrompts?.[index]?.value);
+		const isEmpty = !block.value || block.value.trim() === '';
+		return isTouched && isEmpty;
+	});
 
 	const handleClearAllInside = () => {
 		form.setValue('hybridBlockPrompts', []);
@@ -782,6 +792,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										onClick={() => {
 											setShowTestPreview?.(true);
 											handleGenerateTestDrafts?.();
+											setHasAttemptedTest(true);
 										}}
 										disabled={isGenerationDisabled?.()}
 										className={cn(
@@ -800,7 +811,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								{hasEmptyTextBlocks && (
 									<div
 										className={cn(
-											'text-destructive text-sm font-medium -mt-2 mb-2',
+											hasTouchedEmptyTextBlocks || hasAttemptedTest
+												? 'text-destructive'
+												: 'text-black',
+											'text-sm font-medium -mt-2 mb-2',
 											showTestPreview ? 'w-[416px]' : 'w-[868px]'
 										)}
 									>
