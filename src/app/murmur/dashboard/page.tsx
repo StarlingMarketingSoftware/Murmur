@@ -228,7 +228,7 @@ const Dashboard = () => {
 																>
 																	<Input
 																		className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent"
-																		placeholder='Who do you want to send to?  i.e  "Music venues in North Carolina"'
+																		placeholder=""
 																		style={{
 																			accentColor: 'transparent',
 																		}}
@@ -239,6 +239,26 @@ const Dashboard = () => {
 																		{...field}
 																	/>
 																	<div className="search-wave-overlay" />
+																	<div
+																		className="custom-placeholder"
+																		aria-hidden="true"
+																		style={{
+																			opacity:
+																				(field.value?.trim()?.length ?? 0) > 0 ? 0 : 1,
+																		}}
+																	>
+																		<span className="custom-placeholder-bold">
+																			Type who you want to contact, then click generate
+																		</span>
+																		<span> </span>
+																		<span className="custom-placeholder-regular">
+																			i.e.
+																		</span>
+																		<span> </span>
+																		<span className="custom-placeholder-italic">
+																			“Music Venues in North Carolina”
+																		</span>
+																	</div>
 																</div>
 															</div>
 														</FormControl>
@@ -548,7 +568,7 @@ const Dashboard = () => {
 												displayRowsPerPage={false}
 												constrainHeight
 												useCustomScrollbar
-												scrollbarOffsetRight={0}
+												scrollbarOffsetRight={-5}
 												containerClassName="search-results-table w-[1209px] h-[499px] rounded-[8px] border-[#737373]"
 												tableClassName="w-full"
 												headerClassName="[&_tr]:border-[#737373]"

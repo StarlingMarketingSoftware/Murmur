@@ -666,6 +666,59 @@ body {
 	will-change: background-position; /* Optimize for what we're animating */
 }
 
+/* Custom rich placeholder for dashboard search input */
+.custom-placeholder {
+	position: absolute;
+	top: 50%;
+	left: 1rem; /* match input padding-left */
+	right: 1rem; /* match input padding-right */
+	transform: translateY(-50%);
+	display: inline-flex;
+	align-items: baseline;
+	gap: 0.25rem;
+	font-family: var(--font-secondary), 'Inter', system-ui, -apple-system, Segoe UI, Roboto,
+		sans-serif;
+	font-size: 1rem;
+	line-height: 1.4;
+	color: #000000;
+	pointer-events: none; /* let clicks focus the input */
+	z-index: 3; /* above gradient overlay and input box */
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+
+.custom-placeholder-bold {
+	font-weight: 700;
+	font-family: var(--font-secondary), 'Inter', system-ui, -apple-system, Segoe UI, Roboto,
+		sans-serif;
+}
+
+.custom-placeholder-regular {
+	font-weight: 400;
+	font-family: var(--font-secondary), 'Inter', system-ui, -apple-system, Segoe UI, Roboto,
+		sans-serif;
+}
+
+.custom-placeholder-italic {
+	font-style: italic;
+	font-family: var(--font-secondary), 'Inter', system-ui, -apple-system, Segoe UI, Roboto,
+		sans-serif;
+}
+
+/* Optionally soften visibility when focused, disappears once typing begins via inline style */
+.search-wave-container:focus-within .custom-placeholder {
+	opacity: 0.9;
+}
+
+.dark .custom-placeholder {
+	color: #ffffff;
+}
+
 .search-wave-container:focus-within .search-wave-overlay {
 	transform: none;
 }
@@ -1293,8 +1346,10 @@ body {
 		transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
 		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 	z-index: 20;
-	margin-top: clamp(3rem, 10vh, 10rem);
+	margin-top: 96px;
 	width: 100%;
+	/* Keep consistent spacing below the search area regardless of zoom */
+	margin-bottom: 40px;
 }
 
 /* Search bar when active - elegantly disappears */

@@ -812,12 +812,18 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				}
 
 				if (parsedRes.message && parsedRes.subject) {
+					// Determine final subject: manual when AI subject is disabled
+					const finalSubject = values.isAiSubject
+						? parsedRes.subject
+						: values.subject || parsedRes.subject;
+					// Prepend subject line in Inter bold to the message
+					const messageWithSubject = `<span style="font-family: Inter; font-weight: bold;">${finalSubject}</span><br><br>${parsedRes.message}`;
 					await saveTestEmail({
 						id: campaign.id,
 						data: {
-							testSubject: parsedRes.subject,
+							testSubject: finalSubject,
 							testMessage: convertAiResponseToRichTextEmail(
-								parsedRes.message,
+								messageWithSubject,
 								values.font,
 								signatureText || null
 							),
