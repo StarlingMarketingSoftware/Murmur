@@ -2669,6 +2669,12 @@ body.murmur-page footer {
 	display: none !important;
 }
 
+/* Apply 90% zoom to dashboard page */
+.dashboard-main-offset {
+	transform: scale(0.9);
+	transform-origin: top center;
+}
+
 /* Default: show full text on desktop */
 .nav-text-full {
 	display: inline;
