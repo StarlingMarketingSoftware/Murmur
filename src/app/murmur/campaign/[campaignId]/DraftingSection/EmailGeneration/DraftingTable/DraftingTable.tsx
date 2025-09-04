@@ -82,7 +82,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					thumbWidth={2}
 					thumbColor="#000000"
 					trackColor="transparent"
-					offsetRight={-6}
+					offsetRight={0}
 				>
 					{isPending ? (
 						<div className="flex items-center justify-center h-full">
