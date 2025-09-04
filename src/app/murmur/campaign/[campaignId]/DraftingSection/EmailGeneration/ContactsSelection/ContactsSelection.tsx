@@ -110,12 +110,12 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 			totalContacts={generationTotal ?? (selectedContactIds.size || contacts.length)}
 			onCancel={props.cancelGeneration}
 		>
-			<div className="overflow-visible w-full">
+			<div className="w-full">
 				{contacts.map((contact) => (
 					<div
 						key={contact.id}
 						className={cn(
-							'border-b-2 border-[#ABABAB] cursor-pointer transition-colors grid grid-cols-2 grid-rows-[auto_auto] w-full overflow-visible py-1 select-none row-hover-scroll',
+							'border-b-2 border-[#ABABAB] cursor-pointer transition-colors grid grid-cols-2 grid-rows-[auto_auto] w-full py-1 select-none row-hover-scroll',
 							selectedContactIds.has(contact.id)
 								? 'bg-[#D6E8D9] border-2 border-[#ABABAB]'
 								: ''
@@ -146,7 +146,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 										</div>
 
 										{/* Top Right - Title */}
-										<div className="p-1 flex items-center overflow-visible">
+										<div className="p-1 flex items-center">
 											{contact.headline ? (
 												<div className="h-5 rounded-[6px] px-2 flex items-center w-full max-w-[150px] bg-[#E8EFFF] border-1 border-black overflow-hidden">
 													<ScrollableText
@@ -255,7 +255,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 										{contact.headline ? (
 											<>
 												{/* Top Right - Title */}
-												<div className="p-1 flex items-center overflow-visible">
+												<div className="p-1 flex items-center">
 													<div className="h-[20.54px] rounded-[6.64px] px-2 flex items-center w-full max-w-[150px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
 														<ScrollableText
 															text={contact.headline}
