@@ -227,7 +227,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 					<div
 						data-drafting-container
 						className={cn(
-							'relative w-[892px] h-[620px] border-[3px] border-black rounded-lg overflow-visible p-[17px] pb-[120px]',
+							'relative w-[892px] h-[620px] border-[3px] border-black rounded-lg overflow-x-hidden p-[17px] pb-[120px]',
 							isWaitingToSend && 'h-[700px] pb-[200px]'
 						)}
 					>

@@ -504,7 +504,6 @@ export const useDashboard = () => {
 								<ScrollableText
 									text={text}
 									className="text-[14px] leading-none text-black"
-									scrollPixelsPerSecond={30}
 								/>
 							</div>
 						</div>

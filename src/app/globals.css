@@ -856,44 +856,6 @@ body {
 	transition: background-color 5000s ease-in-out 0s;
 }
 
-/* Custom search placeholder with different font styles */
-.search-custom-placeholder {
-	position: absolute;
-	top: 50%;
-	left: 1rem;
-	transform: translateY(-50%);
-	pointer-events: none;
-	z-index: 3;
-	color: #000000;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	max-width: calc(100% - 2rem);
-}
-
-.search-placeholder-bold {
-	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-	font-weight: 700;
-	font-style: normal;
-}
-
-.search-placeholder-regular {
-	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-	font-weight: 400;
-	font-style: normal;
-}
-
-.search-placeholder-italic {
-	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-	font-weight: 400;
-	font-style: italic;
-}
-
-/* Dark mode custom placeholder */
-.dark .search-custom-placeholder {
-	color: #000000;
-}
-
 .dark .search-wave-container:focus-within {
 	background: linear-gradient(
 		135deg,
@@ -1086,15 +1048,6 @@ body {
 	align-items: center;
 	justify-content: center;
 	opacity: 1;
-	overflow: visible !important;
-	z-index: 10;
-}
-
-/* Ensure SVG is fully visible without fade */
-.premium-logo-container svg {
-	overflow: visible !important;
-	opacity: 1 !important;
-	transform: none !important;
 }
 
 /* Main title gradient - Murmur */
@@ -2503,62 +2456,626 @@ body {
 	max-width: 100%;
 }
 
-/* Ensure table is collapsed (already set, but reinforce) */
-.search-results-table table {
-	border-collapse: collapse !important;
+/* Ensure table is responsive on all screen sizes */
+@media (max-width: 1200px) {
+	.results-appear,
+	.results-align {
+		padding: 0 1rem;
+	}
 }
 
-/* For selected rows: Keep horizontal lines, remove vertical */
-.search-results-table tr[data-state='selected'] {
-	border-top: 1px solid #737373 !important; /* Match existing horizontal color */
-	border-bottom: 1px solid #737373 !important;
-	border-left: none !important;
-	border-right: none !important;
+@media (max-width: 768px) {
+	.results-appear,
+	.results-align {
+		padding: 0 0.5rem;
+	}
 }
 
-/* Remove all borders from cells in selected rows */
-.search-results-table tr[data-state='selected'] td {
-	border: none !important;
-	background-color: transparent !important; /* Let row background show */
+/* Table container responsive behavior */
+.table-responsive-container {
+	width: 100%;
+	max-width: 100%;
+	overflow-x: auto;
+	overflow-y: auto;
 }
 
-/* Handle any internal borders in columns like Title */
-.search-results-table tr[data-state='selected'] .title-cell-container {
-	border: none !important;
-	box-shadow: none !important;
+/* Ensure table cells don't break on small screens */
+.table-cell-responsive {
+	min-width: 120px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
-/* Reduce email padding to minimize gaps */
-.search-results-table tr[data-state='selected'] .email-obfuscated-local {
-	padding-left: 0 !important;
-	padding-right: 0 !important;
-	margin: 0 !important;
+.hero-wrapper {
+	width: 100%;
+	max-width: 100%;
+	min-height: 720px !important; /* Fixed height that approximates viewport at 100% zoom */
+	height: 720px !important; /* Prevent expansion with zoom */
 }
+
+.search-bar-wrapper {
+	width: 100%;
+	max-width: 100%;
+}
+
+.search-bar-inner {
+	width: 100%;
+	max-width: 100%;
+}
+
+/* Ensure search form is responsive */
+.search-form-active {
+	width: 100%;
+	max-width: 100%;
+}
+
+/* Responsive button layouts */
+@media (max-width: 640px) {
+	.search-form-active .flex.flex-col.md\\:flex-row {
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.search-form-active .flex.flex-col.md\\:flex-row > div {
+		width: 100%;
+	}
+}
+
+/* Table scroll improvements for vertical monitors */
+@media (max-height: 800px) {
+	.table-responsive-container {
+		max-height: 60vh;
+	}
+}
+
+@media (max-height: 600px) {
+	.table-responsive-container {
+		max-height: 50vh;
+	}
+}
+
+/* CampaignsTable responsive improvements */
+@media (max-width: 768px) {
+	.mx-4 {
+		margin-left: 1rem;
+		margin-right: 1rem;
+	}
+}
+
+@media (max-width: 640px) {
+	.mx-4 {
+		margin-left: 0.5rem;
+		margin-right: 0.5rem;
+	}
+}
+
+/* Navigation responsive improvements */
+@media (max-width: 640px) {
+	nav {
+		padding-left: 1rem;
+		padding-right: 1rem;
+	}
+}
+
+@media (max-width: 480px) {
+	nav {
+		padding-left: 0.5rem;
+		padding-right: 0.5rem;
+	}
+}
+
+/* Keep table in normal flow with consistent spacing */
+.campaigns-table-wrapper {
+	margin-top: -200px; /* Pull table up for better positioning */
+	position: relative;
+	z-index: 30; /* Ensure table is above other elements */
+}
+
+/* Dashboard main offset: default for landscape (unchanged visual) */
+.dashboard-main-offset {
+	margin-top: -164px;
+}
+
+/* Keep search results view at previous position */
+.dashboard-main-offset.search-active {
+	margin-top: -176px;
+}
+
+/* Portrait monitors: lower the dashboard to avoid top clipping */
+@media (orientation: portrait) {
+	.dashboard-main-offset {
+		margin-top: -84px;
+	}
+
+	/* Keep search results view at previous position on portrait */
+	.dashboard-main-offset.search-active {
+		margin-top: -96px;
+	}
+}
+
+/* Adjust table position for portrait orientation screens to prevent overlap */
+@media (orientation: portrait) {
+	.campaigns-table-wrapper {
+		margin-top: -100px; /* Less aggressive pull-up on portrait screens */
+	}
+
+	/* Add extra spacing between search area and table on portrait */
+	.hero-wrapper {
+		min-height: 600px !important; /* Reduce min-height on portrait */
+		height: auto !important; /* Allow flexible height */
+	}
+
+	/* Ensure search bar area has enough bottom spacing */
+	.search-bar-wrapper {
+		margin-bottom: 40px;
+	}
+}
+
+/* Additional fix for tall portrait monitors (aspect ratio taller than 3:4) */
+@media (orientation: portrait) and (min-aspect-ratio: 3/4) {
+	.campaigns-table-wrapper {
+		margin-top: -50px; /* Even less pull-up for very tall portrait screens */
+	}
+}
+
+/* Safari-specific fix for campaigns table */
+@supports (-webkit-appearance: none) {
+	.campaigns-table-wrapper {
+		-webkit-transform: translateZ(0); /* Hardware acceleration */
+		transform: translateZ(0);
+		-webkit-backface-visibility: hidden;
+		backface-visibility: hidden;
+	}
+}
+
+/* Safari-specific navigation fixes for mobile landscape */
+.safari-nav-fix {
+	white-space: nowrap;
+	overflow: hidden;
+	position: relative;
+	-webkit-text-size-adjust: 100%; /* Prevent text size changes in Safari */
+	text-size-adjust: 100%;
+}
+
+/* Default: show full text on desktop */
+.nav-text-full {
+	display: inline;
+	pointer-events: auto !important;
+	cursor: pointer !important;
+}
+
+.nav-text-short {
+	display: none;
+	pointer-events: auto !important;
+	cursor: pointer !important;
+}
+
+/* Mobile: show short text */
+@media (max-width: 640px) {
+	.nav-text-full {
+		display: none;
+	}
+
+	.nav-text-short {
+		display: inline;
+	}
+}
+
+/* Portrait/Vertical monitor fix: ensure nav links are fully clickable */
+@media (orientation: portrait) {
+	.safari-nav-fix {
+		overflow: visible !important;
+		max-width: none !important;
+	}
+
+	.safari-nav-fix span {
+		pointer-events: auto !important;
+		cursor: pointer !important;
+		position: relative;
+		z-index: 10;
+	}
+
+	/* Ensure the entire link area is clickable */
+	nav a {
+		pointer-events: auto !important;
+		position: relative;
+		z-index: 10;
+	}
+}
+
+/* Safari-specific fix for landscape mode */
+@supports (-webkit-touch-callout: none) {
+	/* iOS Safari landscape mode fix */
+	@media (orientation: landscape) and (max-height: 500px) {
+		nav {
+			position: relative;
+			z-index: 10;
+			background-color: white;
+			contain: layout;
+		}
+
+		.safari-nav-fix {
+			display: flex !important;
+			align-items: center !important;
+			white-space: nowrap !important;
+			overflow: hidden !important;
+			text-overflow: ellipsis !important;
+			max-width: 150px;
+		}
+
+		.nav-text-full,
+		.nav-text-short {
+			position: relative;
+			z-index: 1;
+		}
+
+		/* Ensure text doesn't overflow in landscape */
+		nav .flex {
+			flex-wrap: nowrap !important;
+		}
+
+		/* Fix potential text bleed issues */
+		nav span {
+			-webkit-backface-visibility: hidden;
+			backface-visibility: hidden;
+			transform: translateZ(0);
+		}
+	}
+
+	/* Additional fix for regular mobile Safari */
+	@media (max-width: 768px) {
+		.safari-nav-fix span {
+			-webkit-font-smoothing: antialiased;
+			-moz-osx-font-smoothing: grayscale;
+			text-rendering: optimizeLegibility;
+		}
+	}
+}
+
+/* Email obfuscation for rows past the first 3 - Apple-style aesthetic blur */
+.email-obfuscated-local {
+	display: inline-block;
+	filter: blur(3px);
+	opacity: 0.5;
+	transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+	user-select: none;
+	pointer-events: none;
+	position: relative;
+	transform: scale(0.98);
+	letter-spacing: 0.5px;
+	padding: 0 40px;
+	margin: 0 -40px;
+	background: linear-gradient(
+		90deg,
+		rgba(255, 255, 255, 0.9) 0%,
+		rgba(255, 255, 255, 0) 15%,
+		rgba(255, 255, 255, 0) 85%,
+		rgba(255, 255, 255, 0.9) 100%
+	);
+	background-clip: text;
+	-webkit-background-clip: text;
+	mask-image: linear-gradient(
+		90deg,
+		transparent 0%,
+		rgba(0, 0, 0, 0.1) 5%,
+		rgba(0, 0, 0, 0.3) 10%,
+		rgba(0, 0, 0, 0.6) 15%,
+		rgba(0, 0, 0, 0.8) 20%,
+		rgba(0, 0, 0, 1) 30%,
+		rgba(0, 0, 0, 1) 70%,
+		rgba(0, 0, 0, 0.8) 80%,
+		rgba(0, 0, 0, 0.6) 85%,
+		rgba(0, 0, 0, 0.3) 90%,
+		rgba(0, 0, 0, 0.1) 95%,
+		transparent 100%
+	);
+}
+
+/* Apple-style glass morphism effect with smooth horizontal edges */
+.email-obfuscated-local::before {
+	content: '';
+	position: absolute;
+	top: -2px;
+	left: 0;
+	right: 0;
+	bottom: -2px;
+	background: linear-gradient(
+		90deg,
+		transparent 0%,
+		rgba(255, 255, 255, 0.02) 5%,
+		rgba(255, 255, 255, 0.03) 12%,
+		rgba(255, 255, 255, 0.05) 25%,
+		rgba(255, 255, 255, 0.05) 75%,
+		rgba(255, 255, 255, 0.03) 88%,
+		rgba(255, 255, 255, 0.02) 95%,
+		transparent 100%
+	);
+	border-radius: 8px;
+	backdrop-filter: blur(1px);
+	pointer-events: none;
+	z-index: 1;
+}
+
+/* Subtle hover state for the entire row (not the blurred email itself) */
+tr:hover .email-obfuscated-local {
+	filter: blur(2px);
+	opacity: 0.75;
+	transform: scale(1);
+}
+
+/* Hide footer on murmur pages (dashboard and campaign) */
+body.murmur-page footer {
+	display: none !important;
+}
+
+/* Also ensure the hero wrapper can contain the growing search bar */
+.dashboard-container:not(.search-active) .hero-wrapper {
+	/* Allow hero to grow with viewport height to contain search bar */
+	min-height: calc(320px + max(0px, 10vh - 80px));
+	height: auto;
+}
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+.custom-scroll:not(.my-campaigns-table),
+.overflow-auto:not(.my-campaigns-table),
+.overflow-y-auto:not(.my-campaigns-table),
+.overflow-x-auto:not(.my-campaigns-table),
+.overflow-scroll:not(.my-campaigns-table) {
+	scrollbar-width: thin !important;
+	scrollbar-color: #000000 transparent !important;
+}
+
+/* Scrolling text on hover */
+@keyframes scrollText {
+	0% {
+		transform: translateX(0);
+	}
+	100% {
+		transform: translateX(-50%);
+	}
+}
+
+/* Scrolling text on hover */
+.hover-scroll-container {
+	position: relative;
+	overflow: hidden;
+}
+
+.hover-scroll-container:hover .hover-scroll-text {
+	animation: scrollText var(--scroll-duration, 8s) linear infinite;
+	text-overflow: initial !important;
+	width: max-content !important;
+}
+
+/* Also trigger scrolling when hovering the entire table row (dashboard results) */
+.row-hover-scroll:hover .hover-scroll-text {
+	animation: scrollText var(--scroll-duration, 8s) linear infinite;
+	text-overflow: initial !important;
+	width: max-content !important;
+}
+
+/* Lenis smooth scrolling styles */
+html.lenis {
+	height: auto;
+}
+
+.lenis.lenis-smooth {
+	scroll-behavior: auto;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+	overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+	overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+	pointer-events: none;
+}
+
+/* Global performance optimizations for scroll animations */
+[data-scroll-animation] {
+	will-change: transform, opacity;
+	-webkit-transform: translateZ(0);
+	backface-visibility: hidden;
+}
+
+/* Prevent layout shifts during animations */
+main {
+	isolation: isolate;
+}
+
+/* Add at the end of the file, after existing scrollbar rules */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Firefox scrollbar styles */
+.campaigns-table-container .my-campaigns-table,
+.my-campaigns-table,
+.my-campaigns-table * {
+	scrollbar-width: thin !important;
+	scrollbar-color: #000000 transparent !important;
+}
+
+/* Ensure no scrollbar gutter spacing */
+.campaigns-table-container .my-campaigns-table {
+	scrollbar-gutter: stable !important;
+}
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Specific styles for My Campaigns table header */
+.my-campaigns-table thead th {
+	background-color: #f8f8f8 !important;
+}
+
+/* Specific styles for My Campaigns table scrollbars - DEBUGGING */
+/* Remove debug My Campaigns specific scrollbar visuals; use global 2px style */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* === ALLOW GSAP ANIMATIONS FOR SEARCH BAR === */
+/* Commented out to allow GSAP animations to work
+.results-search-input-group,
+.results-search-input-group * {
+	-webkit-animation: none !important;
+	animation: none !important;
+	-webkit-transition: none !important;
+	transition: none !important;
+	transform: none !important;
+	will-change: auto !important;
+}
+*/
+
+/* Murmur route compact scaling (90%) */
+html.murmur-compact {
+	zoom: 0.9;
+}
+
+@supports not (zoom: 0.9) {
+	html.murmur-compact body {
+		transform: scale(0.9);
+		transform-origin: top center;
+		width: calc(100% / 0.9);
+	}
+}
+
+/* Re-enable necessary transform and ensure stacking for the left icon */
+.results-search-icon-btn {
+	transform: translateY(-50%) !important;
+	z-index: 4 !important;
+}
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+.table-header-secondary {
+	border-bottom: 2px solid #8c8c8c;
+}
+
+/* --- Campaigns Table Custom Scrollbar --- */
+.my-campaigns-table {
+	height: 260px !important;
+	max-height: 260px !important;
+}
+
+.my-campaigns-table .scrollbar-hide {
+	height: 100% !important;
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+.my-campaigns-table .scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+/* -------------------------------------- */
+
+/* --- Drafting Table Custom Scrollbar --- */
+.drafting-table-content {
+	height: 100% !important;
+	min-height: 0 !important;
+}
+
+.drafting-table-content .scrollbar-hide {
+	height: 100% !important;
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+/* Remove debug child borders */
+/* .drafting-table-content .scrollbar-hide > * { }
+*/
+
+.drafting-table-content .scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+/* Ensure flex calculation works properly */
+[data-drafting-table] {
+	display: flex !important;
+	flex-direction: column !important;
+	height: 100% !important;
+}
+
+[data-drafting-table-header] {
+	flex-shrink: 0 !important;
+}
+
+/* Make sure content area can scroll */
+.drafting-table-content > div:first-child {
+	height: 100% !important;
+}
+/* -------------------------------------- */
+
+/* Body, html, root global scrollbar hide */
+html,
+body,
+#root {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+/* -------------------------------------- */
+
+/* --- Search Results Table Custom Scrollbar --- */
+.search-results-table {
+	overflow: visible !important;
+	border-radius: 8px !important;
+}
+
+.search-results-table .scrollbar-hide {
+	height: 100% !important;
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+.search-results-table .scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+/* -------------------------------------- */
 
 /* Ensure search results content respects rounded corners when scrollbar is outside */
 .search-results-table .scrollbar-hide {
 	border-radius: 8px !important;
-}
-
-/* Ensure the Title pill doesn't show its own border through selection */
-.search-results-table tr[data-state='selected'] .title-cell-container {
-	border-color: transparent !important;
-	background-clip: padding-box !important;
-}
-
-/* Keep email obfuscation layout unchanged on selection */
-.search-results-table tr[data-state='selected'] .email-obfuscated-local {
-	padding: 0 40px !important;
-	margin: 0 -40px !important;
-}
-
-/* Target the specific gap between Name and Title */
-.search-results-table tr[data-state='selected'] td:nth-child(2) {
-	border-right-color: rgba(93, 192, 104, 0.3) !important;
-}
-
-.search-results-table tr[data-state='selected'] td:nth-child(3) {
-	border-left-color: rgba(93, 192, 104, 0.3) !important;
 }
 
 /* Remove any background dividers from metrics column */
@@ -2644,149 +3161,3 @@ body {
 /* Removed gradient-based dividers - using absolute positioned elements instead */
 
 /* Make entire row light up on hover in My Campaigns table but keep metric boxes' original colors */
-
-/* Root fix: Collapse table to eliminate all gaps between cells */
-.search-results-table table {
-	border-collapse: collapse !important;
-}
-
-/* Preserve horizontal lines but remove vertical ones for selected rows */
-.search-results-table tr[data-state='selected'] {
-	border-top: none !important; /* Avoid double horizontal borders */
-	border-bottom: 1px solid #737373 !important; /* Match existing horizontal border color from summary */
-}
-
-.search-results-table tr[data-state='selected'] td {
-	border-left: none !important;
-	border-right: none !important;
-	border-top: none !important;
-	border-bottom: none !important; /* Horizontal separation handled by row */
-}
-
-/* Ensure Title and Email columns don't introduce gaps */
-.search-results-table tr[data-state='selected'] .title-cell-container {
-	border: none !important;
-}
-
-.search-results-table tr[data-state='selected'] .email-obfuscated-local {
-	margin: 0 !important;
-	padding: 0 !important;
-}
-
-/* Restore title box border for selected rows */
-.search-results-table tr[data-state='selected'] .title-cell-container {
-	border: 0.7px solid #000000 !important; /* Restore original black border */
-	box-shadow: none !important; /* Keep no shadow if not needed */
-}
-
-/* Ensure font inside title boxes stays the same (prevent medium weight) */
-.search-results-table tr[data-state='selected'] .title-cell-container * {
-	font-weight: normal !important; /* Override any selected row font-medium */
-	color: black !important; /* Keep original text color */
-}
-
-/* Scrolling text animation */
-@keyframes scrollText {
-	0% {
-		transform: translateX(0);
-	}
-	100% {
-		transform: translateX(-50%);
-	}
-}
-
-/* Enable scrolling on hover for any row in search results */
-.row-hover-scroll:hover .hover-scroll-text {
-	animation: scrollText var(--scroll-duration) linear infinite !important;
-	text-overflow: initial !important;
-	width: max-content !important;
-}
-
-/* Hide footer on murmur pages (dashboard and campaign) */
-body.murmur-page footer {
-	display: none !important;
-}
-
-/* Fix for drafting table scrolling - High specificity to override conflicts */
-[data-drafting-table] {
-	display: flex !important;
-	flex-direction: column !important;
-	height: 489px !important; /* Match the fixed height in the component */
-	width: 366px !important; /* Match the fixed width in the component */
-	overflow: visible !important; /* Allow scrollbar to render outside */
-	position: relative !important;
-}
-
-/* Header should not shrink */
-[data-drafting-table] [data-drafting-table-header] {
-	flex-shrink: 0;
-}
-
-/* Content area should take remaining space */
-[data-drafting-table] .drafting-table-content {
-	flex: 1 1 auto !important;
-	min-height: 0 !important; /* Critical for flex children */
-	position: relative !important;
-	overflow: visible !important; /* Allow scrollbar to render outside */
-	height: auto !important; /* Let flex handle the height */
-}
-
-/* CustomScrollbar's wrapper div */
-[data-drafting-table] .drafting-table-content > div.relative {
-	height: 100% !important;
-	position: relative !important;
-	overflow: hidden !important;
-}
-
-/* The actual scrollable container */
-[data-drafting-table] .drafting-table-content .h-full.overflow-auto.scrollbar-hide {
-	height: 100% !important;
-	overflow-y: auto !important;
-	overflow-x: hidden !important;
-	position: relative !important;
-}
-
-/* Content wrapper inside scrollable area */
-[data-drafting-table] .drafting-table-content .scrollbar-hide > div {
-	min-height: fit-content !important;
-	width: 100% !important;
-}
-
-/* Progress bar container should not affect scrolling */
-[data-drafting-table] > div > div:last-child {
-	flex-shrink: 0;
-}
-
-/* Fix for draft editor scrolling when a draft is selected */
-.bg-background.flex-1.overflow-x-hidden.overflow-y-auto[data-lenis-prevent] {
-	overflow-y: auto !important;
-	overflow-x: hidden !important;
-	min-height: 0;
-	flex: 1 1 0%;
-}
-
-/* Apply 90% zoom to dashboard page */
-.dashboard-main-offset {
-	transform: scale(0.9);
-	transform-origin: top center;
-}
-
-/* Default: show full text on desktop */
-.nav-text-full {
-	display: inline;
-}
-
-.nav-text-short {
-	display: none;
-}
-
-/* Mobile: show short text */
-@media (max-width: 640px) {
-	.nav-text-full {
-		display: none;
-	}
-
-	.nav-text-short {
-		display: inline;
-	}
-}
