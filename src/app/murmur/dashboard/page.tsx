@@ -228,7 +228,7 @@ const Dashboard = () => {
 																>
 																	<Input
 																		className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent"
-																		placeholder='Who do you want to send to?  i.e  "Music venues in North Carolina"'
+																		placeholder=""
 																		style={{
 																			accentColor: 'transparent',
 																		}}
@@ -238,6 +238,20 @@ const Dashboard = () => {
 																		spellCheck="false"
 																		{...field}
 																	/>
+																	{!field.value && (
+																		<div className="search-custom-placeholder">
+																			<span className="search-placeholder-bold">
+																				Type who you want to contact, then click generate
+																			</span>
+																			<span className="search-placeholder-regular">
+																				{' '}
+																				i.e.{' '}
+																			</span>
+																			<span className="search-placeholder-italic">
+																				&ldquo;Music Venues in North Carolina&rdquo;
+																			</span>
+																		</div>
+																	)}
 																	<div className="search-wave-overlay" />
 																</div>
 															</div>
