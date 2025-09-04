@@ -2675,7 +2675,8 @@ body.murmur-page footer {
 	flex-direction: column !important;
 	height: 489px !important; /* Match the fixed height in the component */
 	width: 366px !important; /* Match the fixed width in the component */
-	overflow: hidden !important;
+	overflow: visible !important; /* Allow scrollbar to render outside */
+	position: relative !important;
 }
 
 /* Header should not shrink */
@@ -2688,7 +2689,7 @@ body.murmur-page footer {
 	flex: 1 1 auto !important;
 	min-height: 0 !important; /* Critical for flex children */
 	position: relative !important;
-	overflow: hidden !important;
+	overflow: visible !important; /* Allow scrollbar to render outside */
 	height: auto !important; /* Let flex handle the height */
 }
 
