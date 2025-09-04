@@ -3161,3 +3161,42 @@ body,
 /* Removed gradient-based dividers - using absolute positioned elements instead */
 
 /* Make entire row light up on hover in My Campaigns table but keep metric boxes' original colors */
+
+/* Search results: selected row fill without white column dividers */
+.search-results-table [data-slot='table-row'][data-state='selected'] {
+	transform: none !important;
+	-webkit-transform: none !important; /* Safari/macOS */
+	background-color: #d6e8d9 !important;
+}
+
+.search-results-table
+	[data-slot='table-row'][data-state='selected']
+	[data-slot='table-cell'] {
+	background-color: #d6e8d9 !important;
+	background-clip: padding-box;
+	-webkit-background-clip: padding-box; /* Safari/macOS */
+}
+
+/* macOS/Safari: eliminate hairline gaps by using separate borders and no spacing */
+.search-results-table table[data-slot='table'] {
+	border-collapse: separate !important;
+	border-spacing: 0 !important;
+}
+
+/* Keep cell backgrounds unified at edges on selection */
+.search-results-table
+	[data-slot='table-row'][data-state='selected']
+	[data-slot='table-cell'] {
+	outline: 0;
+	border-left-color: transparent;
+	border-right-color: transparent;
+}
+
+/* Search results: restore horizontal dividers between body rows */
+.search-results-table
+	[data-slot='table-body']
+	[data-slot='table-row']
+	+ [data-slot='table-row']
+	[data-slot='table-cell'] {
+	border-top: 1px solid #ababab !important;
+}
