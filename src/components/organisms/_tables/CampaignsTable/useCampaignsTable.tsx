@@ -422,8 +422,9 @@ export const useCampaignsTable = () => {
 								{draftLabel}
 							</div>
 							<div
-								className="absolute top-1/2 -translate-y-1/2 h-[17px] w-[2px]"
+								className="absolute h-[17px] w-[2px]"
 								style={{
+									top: 'calc(50% - 8.5px)',
 									backgroundColor: isConfirming ? 'transparent' : 'black',
 									right: 'calc(-1rem - 1px)', // Default: center in gap-8 (32px gap)
 								}}
@@ -445,8 +446,9 @@ export const useCampaignsTable = () => {
 								{sentLabel}
 							</div>
 							<div
-								className="absolute top-1/2 -translate-y-1/2 h-[17px] w-[2px]"
+								className="absolute h-[17px] w-[2px]"
 								style={{
+									top: 'calc(50% - 8.5px)',
 									backgroundColor: isConfirming ? 'transparent' : 'black',
 									right: 'calc(-1rem - 1px)', // Default: center in gap-8 (32px gap)
 								}}
@@ -468,8 +470,9 @@ export const useCampaignsTable = () => {
 								{formatDate(updatedAt)}
 							</div>
 							<div
-								className="absolute top-1/2 -translate-y-1/2 h-[17px] w-[2px]"
+								className="absolute h-[17px] w-[2px]"
 								style={{
+									top: 'calc(50% - 8.5px)',
 									backgroundColor: isConfirming ? 'transparent' : 'black',
 									right: 'calc(-1rem - 1px)', // Default: center in gap-8 (32px gap)
 								}}
