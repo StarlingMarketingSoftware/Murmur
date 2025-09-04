@@ -34,15 +34,30 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	const waveTweensRef = useRef<gsap.core.Tween[]>([]);
 	const typingTimerRef = useRef<number | null>(null);
 	const loadingTypingTimerRef = useRef<number | null>(null);
-	const [typedText, setTypedText] = useState<string>('');
+	const [typedSubject, setTypedSubject] = useState<string>('');
+	const [typedBody, setTypedBody] = useState<string>('');
 	const [loadingTyped, setLoadingTyped] = useState<string>('');
 
 	const fontFamily = form.watch('font') || 'Arial';
 
-	const tokens = useMemo(() => {
-		if (!testMessage) return [] as string[];
-		const plain = convertHtmlToPlainText(testMessage);
-		return plain.split(/(\s+)/);
+	const { subjectTokens, bodyTokens } = useMemo(() => {
+		if (!testMessage)
+			return { subjectTokens: [] as string[], bodyTokens: [] as string[] };
+		// We inject the subject followed by two <br> tags before the body.
+		const doubleBreakRegex = /<br\s*\/?>(?:\s*|\n|\r)*<br\s*\/?>(?:\s*)/i;
+		const match = testMessage.match(doubleBreakRegex);
+		let subjectHtml = '';
+		let bodyHtml = testMessage;
+		if (match && typeof match.index === 'number') {
+			subjectHtml = testMessage.slice(0, match.index);
+			bodyHtml = testMessage.slice(match.index + match[0].length);
+		}
+		const subjectPlain = subjectHtml ? convertHtmlToPlainText(subjectHtml) : '';
+		const bodyPlain = convertHtmlToPlainText(bodyHtml);
+		return {
+			subjectTokens: subjectPlain.split(/(\s+)/),
+			bodyTokens: bodyPlain.split(/(\s+)/),
+		};
 	}, [testMessage]);
 
 	// Multi-layer grayscale blobs with soft edges and top fade mask
@@ -169,29 +184,43 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 
 	// Typewriter effect after loading completes
 	useEffect(() => {
-		if (isLoading || tokens.length === 0) {
-			setTypedText('');
+		if (isLoading || (subjectTokens.length === 0 && bodyTokens.length === 0)) {
+			setTypedSubject('');
+			setTypedBody('');
 			if (typingTimerRef.current) {
 				window.clearInterval(typingTimerRef.current);
 				typingTimerRef.current = null;
 			}
 			return;
 		}
-		setTypedText('');
+		setTypedSubject('');
+		setTypedBody('');
+		let phase: 'subject' | 'body' = subjectTokens.length > 0 ? 'subject' : 'body';
 		let index = 0;
 		if (typingTimerRef.current) {
 			window.clearInterval(typingTimerRef.current);
 		}
 
 		typingTimerRef.current = window.setInterval(() => {
-			if (index < tokens.length) {
-				const token = tokens[index];
-				setTypedText((prev) => prev + token);
-				index += 1;
+			if (phase === 'subject') {
+				if (index < subjectTokens.length) {
+					const token = subjectTokens[index];
+					setTypedSubject((prev) => prev + token);
+					index += 1;
+				} else {
+					phase = 'body';
+					index = 0;
+				}
 			} else {
-				if (typingTimerRef.current) {
-					window.clearInterval(typingTimerRef.current);
-					typingTimerRef.current = null;
+				if (index < bodyTokens.length) {
+					const token = bodyTokens[index];
+					setTypedBody((prev) => prev + token);
+					index += 1;
+				} else {
+					if (typingTimerRef.current) {
+						window.clearInterval(typingTimerRef.current);
+						typingTimerRef.current = null;
+					}
 				}
 			}
 		}, 30);
@@ -201,7 +230,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 				typingTimerRef.current = null;
 			}
 		};
-	}, [isLoading, tokens]);
+	}, [isLoading, subjectTokens, bodyTokens]);
 
 	// Typewriter effect for loading overlay text: "Writing Test Email..."
 	useEffect(() => {
@@ -329,12 +358,19 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 						)}
 
 						{/* Typing content */}
-						<div
-							ref={contentRef}
-							className="max-w-none leading-[1.6] text-[14px] whitespace-pre-wrap relative z-20 p-6"
-							style={{ fontFamily }}
-						>
-							{typedText}
+						<div ref={contentRef} className="max-w-none text-[14px] relative z-20 p-6">
+							<div
+								className="whitespace-pre-wrap leading-[1.6] font-bold font-inter"
+								style={{ fontFamily: 'Inter' }}
+							>
+								{typedSubject}
+							</div>
+							{typedSubject && (typedBody || bodyTokens.length > 0) && (
+								<div className="h-3" />
+							)}
+							<div className="whitespace-pre-wrap leading-[1.6]" style={{ fontFamily }}>
+								{typedBody}
+							</div>
 						</div>
 					</div>
 				</div>
