@@ -1346,8 +1346,10 @@ body {
 		transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
 		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 	z-index: 20;
-	margin-top: clamp(3rem, 10vh, 10rem);
+	margin-top: 96px;
 	width: 100%;
+	/* Keep consistent spacing below the search area regardless of zoom */
+	margin-bottom: 40px;
 }
 
 /* Search bar when active - elegantly disappears */
