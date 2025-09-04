@@ -2669,6 +2669,63 @@ body.murmur-page footer {
 	display: none !important;
 }
 
+/* Fix for drafting table scrolling - High specificity to override conflicts */
+[data-drafting-table] {
+	display: flex !important;
+	flex-direction: column !important;
+	height: 489px !important; /* Match the fixed height in the component */
+	width: 366px !important; /* Match the fixed width in the component */
+	overflow: hidden !important;
+}
+
+/* Header should not shrink */
+[data-drafting-table] [data-drafting-table-header] {
+	flex-shrink: 0;
+}
+
+/* Content area should take remaining space */
+[data-drafting-table] .drafting-table-content {
+	flex: 1 1 auto !important;
+	min-height: 0 !important; /* Critical for flex children */
+	position: relative !important;
+	overflow: hidden !important;
+	height: auto !important; /* Let flex handle the height */
+}
+
+/* CustomScrollbar's wrapper div */
+[data-drafting-table] .drafting-table-content > div.relative {
+	height: 100% !important;
+	position: relative !important;
+	overflow: hidden !important;
+}
+
+/* The actual scrollable container */
+[data-drafting-table] .drafting-table-content .h-full.overflow-auto.scrollbar-hide {
+	height: 100% !important;
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	position: relative !important;
+}
+
+/* Content wrapper inside scrollable area */
+[data-drafting-table] .drafting-table-content .scrollbar-hide > div {
+	min-height: fit-content !important;
+	width: 100% !important;
+}
+
+/* Progress bar container should not affect scrolling */
+[data-drafting-table] > div > div:last-child {
+	flex-shrink: 0;
+}
+
+/* Fix for draft editor scrolling when a draft is selected */
+.bg-background.flex-1.overflow-x-hidden.overflow-y-auto[data-lenis-prevent] {
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	min-height: 0;
+	flex: 1 1 0%;
+}
+
 /* Apply 90% zoom to dashboard page */
 .dashboard-main-offset {
 	transform: scale(0.9);
