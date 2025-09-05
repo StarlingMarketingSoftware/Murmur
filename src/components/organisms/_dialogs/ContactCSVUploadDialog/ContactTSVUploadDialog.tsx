@@ -4,6 +4,7 @@ import {
 	DialogContent,
 	DialogTrigger,
 	DialogFooter,
+	DialogDescription,
 } from '@/components/ui/dialog';
 
 import {
@@ -12,7 +13,6 @@ import {
 } from './useContactTSVUploadDialog';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import { FC } from 'react';
-import { DialogDescription } from '@radix-ui/react-dialog';
 import { cn } from '@/utils';
 
 export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) => {
