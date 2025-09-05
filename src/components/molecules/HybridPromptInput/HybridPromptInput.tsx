@@ -12,7 +12,6 @@ import { Droppable } from '../DragAndDrop/Droppable';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -601,23 +600,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									render={({ field }) => (
 										<FormItem>
 											<div className="flex items-center justify-between mb-2">
-												<div className="flex items-center gap-2">
-													<FormLabel className="font-inter text-[16px]">
-														Subject
-													</FormLabel>
-													<Separator orientation="vertical" className="!h-5" />
-													<Switch
-														checked={form.watch('isAiSubject')}
-														disabled={isHandwrittenMode}
-														onCheckedChange={(val: boolean) =>
-															form.setValue('isAiSubject', val)
-														}
-														className="data-[state=checked]:!bg-[#5dab68] -translate-y-[2px]"
-													/>
-													<FormLabel className="font-inter text-[16px]">
-														Automated Subject
-													</FormLabel>
-												</div>
+												<div className="flex items-center gap-2"></div>
 												{hasBlocks && (
 													<button
 														type="button"
@@ -629,42 +612,60 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												)}
 											</div>
 											<FormControl>
-												<Input
-													className={cn(
-														'w-full h-[44px] !bg-white',
-														form.watch('isAiSubject')
-															? '!border-[2px] !border-[#969696] !text-[#969696] placeholder:!text-[#969696] disabled:!bg-white disabled:!text-[#969696] disabled:!opacity-100'
-															: shouldShowSubjectRedStyling
-															? '!border-[2px] !border-[#A20000] !text-[#A20000] placeholder:!text-[#A20000]'
-															: '!border-[2px] !border-[#000000] !text-black placeholder:!text-black'
-													)}
-													placeholder={
-														form.watch('isAiSubject')
-															? 'Autmated subject'
-															: 'Write your subject here'
-													}
-													disabled={form.watch('isAiSubject')}
-													{...field}
-													value={
-														form.watch('isAiSubject') ? 'Autmated subject' : field.value
-													}
-													onFocus={(e) =>
-														!form.watch('isAiSubject') &&
-														trackFocusedField?.('subject', e.target)
-													}
-													onBlur={() => {
-														if (!form.watch('isAiSubject')) {
-															setHasSubjectBeenTouched(true);
+												<div className="relative">
+													<div className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex items-center gap-2">
+														<span className="font-inter font-medium text-[16px]">
+															Subject
+														</span>
+														<Switch
+															checked={form.watch('isAiSubject')}
+															disabled={isHandwrittenMode}
+															onCheckedChange={(val: boolean) => {
+																form.setValue('isAiSubject', val);
+																if (val) {
+																	form.setValue('subject', '');
+																}
+															}}
+															className="data-[state=checked]:!bg-[#5dab68]"
+														/>
+														<span className="font-inter font-normal text-[16px]">
+															Auto
+														</span>
+													</div>
+													<Input
+														className={cn(
+															'w-full h-[44px] !bg-white pl-[180px] pr-3',
+															form.watch('isAiSubject')
+																? '!border-[2px] !border-[#969696] !text-[#969696] placeholder:!text-[#969696] disabled:!bg-white disabled:!text-[#969696] disabled:!opacity-100'
+																: shouldShowSubjectRedStyling
+																? '!border-[2px] !border-[#A20000] !text-[#A20000] placeholder:!text-[#A20000]'
+																: '!border-[2px] !border-[#000000] !text-black placeholder:!text-black'
+														)}
+														placeholder={
+															form.watch('isAiSubject')
+																? 'Automated subject'
+																: 'Write your subject here'
 														}
-														field.onBlur();
-													}}
-													onChange={(e) => {
-														if (!form.watch('isAiSubject') && e.target.value) {
-															setHasSubjectBeenTouched(true);
+														disabled={form.watch('isAiSubject')}
+														{...field}
+														onFocus={(e) =>
+															!form.watch('isAiSubject') &&
+															trackFocusedField?.('subject', e.target)
 														}
-														field.onChange(e);
-													}}
-												/>
+														onBlur={() => {
+															if (!form.watch('isAiSubject')) {
+																setHasSubjectBeenTouched(true);
+															}
+															field.onBlur();
+														}}
+														onChange={(e) => {
+															if (!form.watch('isAiSubject') && e.target.value) {
+																setHasSubjectBeenTouched(true);
+															}
+															field.onChange(e);
+														}}
+													/>
+												</div>
 											</FormControl>
 											<FormMessage />
 										</FormItem>
