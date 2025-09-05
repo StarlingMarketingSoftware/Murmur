@@ -13,29 +13,16 @@ import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuGroup,
-	DropdownMenuItem,
-	DropdownMenuPortal,
-	DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
 	SortableContext,
 	useSortable,
 	verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
-import { X, Plus } from 'lucide-react';
+import { X } from 'lucide-react';
 import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
 import { HybridBlock } from '@prisma/client';
-import {
-	BLOCKS,
-	HybridPromptInputProps,
-	useHybridPromptInput,
-	BlockItem,
-} from './useHybridPromptInput';
+import { HybridPromptInputProps, useHybridPromptInput } from './useHybridPromptInput';
 import { cn } from '@/utils';
 import React, { useState, FC, Fragment } from 'react';
 import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
@@ -43,7 +30,7 @@ import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
 import { ParagraphSlider } from '@/components/atoms/ParagraphSlider/ParagraphSlider';
 import { ToneSelector } from '../ToneSelector/ToneSelector';
 interface SortableAIBlockProps {
-	block: (typeof BLOCKS)[number];
+	block: { value: HybridBlock; label: string; placeholder?: string };
 	id: string;
 	fieldIndex: number;
 	onRemove: (id: string) => void;
@@ -54,43 +41,6 @@ interface SortableAIBlockProps {
 	showTestPreview?: boolean;
 	testMessage?: string | null;
 }
-
-interface BlockMenuItemProps {
-	item: BlockItem;
-	onClick: () => void;
-}
-
-const BlockMenuItem: FC<BlockMenuItemProps> = ({ item, onClick }) => {
-	const getBackgroundColor = () => {
-		if (item.value === HybridBlock.text) {
-			return 'bg-primary/25 border-primary';
-		} else if (item.value === 'hybrid_automation') {
-			return 'bg-tertiary/25 border-tertiary';
-		} else if (item.value === HybridBlock.full_automated) {
-			return 'bg-secondary/25 border-secondary';
-		}
-		return '';
-	};
-
-	return (
-		<DropdownMenuItem
-			key={item.value}
-			onClick={onClick}
-			disabled={item.disabled}
-			className="p-0 focus:bg-transparent hover:bg-transparent relative"
-		>
-			<div
-				className={cn(
-					'w-[275.23px] h-[51px] border-2 rounded-[8px] flex items-center justify-start pl-4 cursor-pointer font-bold relative z-10 m-0',
-					getBackgroundColor()
-				)}
-			>
-				{item.label}
-				{item.showUsed && item.disabled && ` (Used)`}
-			</div>
-		</DropdownMenuItem>
-	);
-};
 
 const SortableAIBlock = ({
 	block,
@@ -483,7 +433,7 @@ const SortableAIBlock = ({
 													<Input
 														placeholder={
 															'placeholder' in block
-																? (block as (typeof BLOCKS)[number]).placeholder
+																? (block as { placeholder?: string }).placeholder || ''
 																: ''
 														}
 														onClick={(e) => e.stopPropagation()}
@@ -517,12 +467,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		handleDragEnd,
 		handleRemoveBlock,
 		getBlock,
-		handleAddBlock,
-		handleAddHybridAutomation,
 		handleAddTextBlockAt,
 		showTestPreview,
 		setShowTestPreview,
-		BLOCK_ITEMS,
 		trackFocusedField,
 		testMessage,
 		handleGenerateTestDrafts,
@@ -603,6 +550,43 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										type="button"
 										className={cn(
 											'!p-0 h-fit !m-0 text-[14px] font-inter',
+											watchedBlocks.some((b) => b.type === HybridBlock.full_automated)
+												? 'text-black font-medium'
+												: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
+										)}
+										onClick={() => {
+											const current: { id: string; type: HybridBlock; value: string }[] =
+												form.getValues('hybridBlockPrompts') || [];
+											// Save current non-full blocks to appropriate stash
+											if (
+												current.length > 0 &&
+												current.every((b) => b.type === HybridBlock.text)
+											) {
+												form.setValue('savedManualBlocks', current);
+											} else if (
+												current.length > 0 &&
+												!current.some((b) => b.type === HybridBlock.full_automated)
+											) {
+												form.setValue('savedHybridBlocks', current);
+											}
+											form.setValue('hybridBlockPrompts', [
+												{
+													id: 'full_automated',
+													type: HybridBlock.full_automated,
+													value: form.getValues('fullAiPrompt') || '',
+												},
+											]);
+											form.setValue('isAiSubject', true);
+										}}
+									>
+										Full Auto
+									</Button>
+									<span className="text-[#D0D0D0]">|</span>
+									<Button
+										variant="ghost"
+										type="button"
+										className={cn(
+											'!p-0 h-fit !m-0 text-[14px] font-inter',
 											!watchedBlocks.some((b) => b.type === HybridBlock.full_automated) &&
 												!watchedBlocks.every((b) => b.type === HybridBlock.text)
 												? 'text-black font-medium'
@@ -650,43 +634,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										}}
 									>
 										Hybrid
-									</Button>
-									<span className="text-[#D0D0D0]">|</span>
-									<Button
-										variant="ghost"
-										type="button"
-										className={cn(
-											'!p-0 h-fit !m-0 text-[14px] font-inter',
-											watchedBlocks.some((b) => b.type === HybridBlock.full_automated)
-												? 'text-black font-medium'
-												: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
-										)}
-										onClick={() => {
-											const current: { id: string; type: HybridBlock; value: string }[] =
-												form.getValues('hybridBlockPrompts') || [];
-											// Save current non-full blocks to appropriate stash
-											if (
-												current.length > 0 &&
-												current.every((b) => b.type === HybridBlock.text)
-											) {
-												form.setValue('savedManualBlocks', current);
-											} else if (
-												current.length > 0 &&
-												!current.some((b) => b.type === HybridBlock.full_automated)
-											) {
-												form.setValue('savedHybridBlocks', current);
-											}
-											form.setValue('hybridBlockPrompts', [
-												{
-													id: 'full_automated',
-													type: HybridBlock.full_automated,
-													value: form.getValues('fullAiPrompt') || '',
-												},
-											]);
-											form.setValue('isAiSubject', true);
-										}}
-									>
-										Full automated
 									</Button>
 									<span className="text-[#D0D0D0]">|</span>
 									<Button
@@ -869,166 +816,85 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											);
 										})}
 									</SortableContext>
+								</div>
+							</div>
 
-									{/* Add Block Button */}
-									<div className="w-full flex justify-center mt-2">
-										<div style={{ position: 'relative' }}>
-											<DropdownMenu>
-												<DropdownMenuTrigger asChild>
-													<Button
-														type="button"
-														variant="ghost"
-														size="icon"
-														className="h-12 w-12 hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-													>
-														<Plus className="h-8 w-8" strokeWidth={3} />
-													</Button>
-												</DropdownMenuTrigger>
-												<DropdownMenuPortal>
-													<DropdownMenuContent
-														className="w-[275.23px] h-[190px] !overflow-hidden !border-0 !animate-none data-[state=open]:!animate-none data-[state=closed]:!animate-none"
-														align="start"
-														alignOffset={-45}
-														side="bottom"
-														sideOffset={48}
-														avoidCollisions={false}
+							{/*  Signature Block */}
+							<div className="px-3 pb-0 mt-auto flex justify-center">
+								<FormField
+									control={form.control}
+									name="signature"
+									render={({ field }) => (
+										<FormItem>
+											<div
+												className={cn(
+													`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
+													showTestPreview ? 'w-[416px]' : 'w-[868px]'
+												)}
+											>
+												<FormLabel className="text-base font-semibold font-secondary">
+													Signature
+												</FormLabel>
+												<FormControl>
+													<Textarea
+														placeholder="Enter your signature..."
+														className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white"
 														style={{
-															transform: 'translateY(20px)',
+															fontFamily: form.watch('font') || 'Arial',
 														}}
-													>
-														<div className="relative flex flex-col justify-between h-full">
-															{/* Vertical lines that extend from hybrid block's side borders */}
-															<div className="absolute top-[6px] bottom-[6px] left-0 w-[2px] bg-[#51A2E4] z-0" />
-															<div className="absolute top-[6px] bottom-[6px] right-0 w-[2px] bg-[#51A2E4] z-0" />
+														onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+															const target = e.currentTarget;
+															target.style.height = 'auto';
+															target.style.height = target.scrollHeight + 'px';
+														}}
+														{...field}
+													/>
+												</FormControl>
+											</div>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+							</div>
+						</div>
 
-															<DropdownMenuGroup className="p-0 relative">
-																{BLOCK_ITEMS.filter(
-																	(item) => item.position === 'top'
-																).map((item) => (
-																	<BlockMenuItem
-																		key={item.value}
-																		item={item}
-																		onClick={() => {
-																			if (item.value === HybridBlock.text) {
-																				handleAddBlock(getBlock(HybridBlock.text));
-																			} else {
-																				handleAddBlock(
-																					BLOCKS.find((b) => b.value === item.value)!
-																				);
-																			}
-																		}}
-																	/>
-																))}
-															</DropdownMenuGroup>
-															<div className="flex items-center justify-start pl-4 font-normal relative z-10">
-																<span>or</span>
-															</div>
-															<DropdownMenuGroup className="p-0 relative">
-																{BLOCK_ITEMS.filter(
-																	(item) => item.position === 'bottom'
-																).map((item) => (
-																	<BlockMenuItem
-																		key={item.value}
-																		item={item}
-																		onClick={() => {
-																			if (item.value === 'hybrid_automation') {
-																				handleAddHybridAutomation();
-																			} else if (item.value === HybridBlock.text) {
-																				handleAddBlock(getBlock(HybridBlock.text));
-																			} else {
-																				handleAddBlock(
-																					BLOCKS.find((b) => b.value === item.value)!
-																				);
-																			}
-																		}}
-																	/>
-																))}
-															</DropdownMenuGroup>
-														</div>
-													</DropdownMenuContent>
-												</DropdownMenuPortal>
-											</DropdownMenu>
-										</div>
-									</div>
-								</div>
-
-								{/*  Signature Block */}
-								<div className="px-3 pb-0 mt-auto flex justify-center">
-									<FormField
-										control={form.control}
-										name="signature"
-										render={({ field }) => (
-											<FormItem>
-												<div
-													className={cn(
-														`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
-														showTestPreview ? 'w-[416px]' : 'w-[868px]'
-													)}
-												>
-													<FormLabel className="text-base font-semibold font-secondary">
-														Signature
-													</FormLabel>
-													<FormControl>
-														<Textarea
-															placeholder="Enter your signature..."
-															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white"
-															style={{
-																fontFamily: form.watch('font') || 'Arial',
-															}}
-															onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
-																const target = e.currentTarget;
-																target.style.height = 'auto';
-																target.style.height = target.scrollHeight + 'px';
-															}}
-															{...field}
-														/>
-													</FormControl>
-												</div>
-												<FormMessage />
-											</FormItem>
-										)}
-									/>
-								</div>
+						{/* Test Button - Fixed position below signature, centered */}
+						<div className="flex flex-col items-center px-3">
+							<div className="flex justify-center -mt-2 mb-4 w-full">
+								<Button
+									type="button"
+									onClick={() => {
+										setShowTestPreview?.(true);
+										handleGenerateTestDrafts?.();
+										setHasAttemptedTest(true);
+									}}
+									disabled={isGenerationDisabled?.()}
+									className={cn(
+										'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
+										showTestPreview ? 'w-[416px]' : 'w-[868px]',
+										isGenerationDisabled?.()
+											? 'opacity-50 cursor-not-allowed'
+											: 'opacity-100'
+									)}
+								>
+									{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+								</Button>
 							</div>
 
-							{/* Test Button - Fixed position below signature, centered */}
-							<div className="flex flex-col items-center px-3">
-								<div className="flex justify-center -mt-2 mb-4 w-full">
-									<Button
-										type="button"
-										onClick={() => {
-											setShowTestPreview?.(true);
-											handleGenerateTestDrafts?.();
-											setHasAttemptedTest(true);
-										}}
-										disabled={isGenerationDisabled?.()}
-										className={cn(
-											'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
-											showTestPreview ? 'w-[416px]' : 'w-[868px]',
-											isGenerationDisabled?.()
-												? 'opacity-50 cursor-not-allowed'
-												: 'opacity-100'
-										)}
-									>
-										{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
-									</Button>
+							{/* Error message for empty text blocks */}
+							{hasEmptyTextBlocks && (
+								<div
+									className={cn(
+										hasTouchedEmptyTextBlocks || hasAttemptedTest
+											? 'text-destructive'
+											: 'text-black',
+										'text-sm font-medium -mt-2 mb-2',
+										showTestPreview ? 'w-[416px]' : 'w-[868px]'
+									)}
+								>
+									Fill in all text blocks in order to compose an email.
 								</div>
-
-								{/* Error message for empty text blocks */}
-								{hasEmptyTextBlocks && (
-									<div
-										className={cn(
-											hasTouchedEmptyTextBlocks || hasAttemptedTest
-												? 'text-destructive'
-												: 'text-black',
-											'text-sm font-medium -mt-2 mb-2',
-											showTestPreview ? 'w-[416px]' : 'w-[868px]'
-										)}
-									>
-										Fill in all text blocks in order to compose an email.
-									</div>
-								)}
-							</div>
+							)}
 						</div>
 
 						{showTestPreview && (
