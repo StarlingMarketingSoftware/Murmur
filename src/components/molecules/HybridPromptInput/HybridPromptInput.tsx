@@ -754,13 +754,21 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 						<div
 							className={cn(
 								`flex flex-col min-h-[530px]`,
-								showTestPreview ? 'w-1/2' : 'w-full'
+								showTestPreview ? 'w-1/2 pt-[18px]' : 'w-full'
 							)}
 						>
 							{/* Subject header inside the box */}
 							<div className="px-3 pt-0 pb-0">
 								<div className="h-[36px] flex items-center relative z-20">
-									<span className="font-inter font-semibold text-[17px] mr-[56px] text-black">
+									{showTestPreview && (
+										<div className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 w-[416px] h-[44px] border-[2px] border-black rounded-[8px] bg-white -z-10" />
+									)}
+									<span
+										className={cn(
+											'font-inter font-semibold text-[17px] mr-[56px] text-black',
+											showTestPreview && 'ml-3'
+										)}
+									>
 										Mode
 									</span>
 									<div
@@ -822,20 +830,33 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										</Button>
 									</div>
 								</div>
-								<div className="-mx-3 h-[2px] bg-black" />
+								<div
+									className={cn('-mx-3 h-[2px] bg-black', showTestPreview && 'hidden')}
+								/>
+								{showTestPreview && <div className="h-2" />}
 								<FormField
 									control={form.control}
 									name="subject"
 									rules={{ required: form.watch('isAiSubject') }}
 									render={({ field }) => (
 										<FormItem>
-											<div className="flex items-center justify-between mb-2">
+											<div
+												className={cn(
+													'flex items-center',
+													showTestPreview
+														? 'justify-end pr-[8px] mt-1 mb-1'
+														: 'justify-between mb-2'
+												)}
+											>
 												<div className="flex items-center gap-2"></div>
 												{hasBlocks && (
 													<button
 														type="button"
 														onClick={handleClearAllInside}
-														className="text-sm font-inter font-medium text-[#AFAFAF] hover:underline mr-[2px]"
+														className={cn(
+															showTestPreview ? 'text-xs' : 'text-sm',
+															'font-inter font-medium text-[#AFAFAF] hover:underline mr-[2px]'
+														)}
 													>
 														Clear All
 													</button>
@@ -1003,7 +1024,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 						</div>
 
 						{/* Test Button - Fixed position below signature, centered */}
-						<div className="flex flex-col items-center px-3">
+						<div
+							className={cn(
+								'flex flex-col items-center px-3',
+								showTestPreview && 'hidden'
+							)}
+						>
 							<div className="flex justify-center -mt-2 mb-4 w-full">
 								<Button
 									type="button"
@@ -1046,6 +1072,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								setShowTestPreview={setShowTestPreview}
 								testMessage={testMessage || ''}
 								isLoading={Boolean(isTest) || Boolean(isPendingGeneration)}
+								onTest={() => {
+									setShowTestPreview?.(true);
+									handleGenerateTestDrafts?.();
+									setHasAttemptedTest(true);
+								}}
+								isDisabled={isGenerationDisabled?.()}
+								isTesting={Boolean(isPendingGeneration) && Boolean(isTest)}
 							/>
 						)}
 					</div>

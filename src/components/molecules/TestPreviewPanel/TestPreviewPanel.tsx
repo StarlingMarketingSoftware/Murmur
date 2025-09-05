@@ -18,12 +18,18 @@ export interface TestPreviewPanelProps {
 	setShowTestPreview: Dispatch<SetStateAction<boolean>>;
 	testMessage: string;
 	isLoading?: boolean;
+	onTest?: () => void;
+	isDisabled?: boolean;
+	isTesting?: boolean;
 }
 
 export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	setShowTestPreview,
 	testMessage,
 	isLoading = false,
+	onTest,
+	isDisabled,
+	isTesting,
 }) => {
 	const form = useFormContext();
 	const contentRef = useRef<HTMLDivElement | null>(null);
@@ -270,8 +276,8 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 
 	return (
 		<div className="w-1/2 flex flex-col">
-			<div className="flex-1 flex flex-col px-3 pt-3 pb-0">
-				<div className="flex-1 border-2 border-black rounded-lg bg-background flex flex-col overflow-hidden mb-4 mt-[40px]">
+			<div className="flex-1 flex flex-col px-3 pt-[18px] pb-0">
+				<div className="flex-1 border-2 border-black rounded-lg bg-background flex flex-col overflow-hidden mb-4 mt-[-4px]">
 					<div className="relative p-4">
 						<Typography
 							variant="h3"
@@ -372,6 +378,21 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 								{typedBody}
 							</div>
 						</div>
+					</div>
+
+					{/* Footer with Test button */}
+					<div className="p-4 border-t bg-background">
+						<Button
+							type="button"
+							onClick={onTest}
+							disabled={isDisabled}
+							className={
+								'h-[42px] w-full bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20' +
+								(isDisabled ? ' opacity-50 cursor-not-allowed' : ' opacity-100')
+							}
+						>
+							{isTesting ? 'Testing...' : 'Test Again'}
+						</Button>
 					</div>
 				</div>
 			</div>
