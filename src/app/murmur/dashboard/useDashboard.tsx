@@ -169,6 +169,7 @@ export const useDashboard = () => {
 	const [tableInstance, setTableInstance] = useState<Table<ContactWithName>>();
 	const [usedContactIdsSet, setUsedContactIdsSet] = useState<Set<number>>(new Set());
 	const [hoveredText, setHoveredText] = useState('');
+	const [hoveredContact, setHoveredContact] = useState<ContactWithName | null>(null);
 
 	const {
 		data: contacts,
@@ -653,5 +654,7 @@ export const useDashboard = () => {
 		hasSearched,
 		handleResetSearch,
 		hoveredText,
+		hoveredContact,
+		setHoveredContact,
 	};
 };

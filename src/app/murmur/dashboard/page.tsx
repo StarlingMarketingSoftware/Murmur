@@ -55,6 +55,8 @@ const Dashboard = () => {
 		handleResetSearch,
 		handleSelectAll,
 		isAllSelected,
+		setHoveredContact,
+		hoveredContact,
 	} = useDashboard();
 
 	useEffect(() => {
@@ -412,8 +414,10 @@ const Dashboard = () => {
 					)}
 
 				{hasSearched && !isLoadingContacts && !isRefetchingContacts && (
-					<div className="results-search-bar-wrapper w-full max-w-[1132px] mx-auto px-4">
-						<div className="results-search-bar-inner">
+					<div className="results-search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 relative">
+						<div
+							className={`results-search-bar-inner ${hoveredContact ? 'invisible' : ''}`}
+						>
 							<Form {...form}>
 								<form
 									onSubmit={(e) => {
@@ -516,6 +520,52 @@ const Dashboard = () => {
 								</div>
 							</Form>
 						</div>
+						{hoveredContact && (
+							<div className="absolute inset-0 z-[90] flex items-start justify-center pointer-events-none bg-white">
+								<div className="w-full max-w-[1132px] mx-auto px-4 py-3 text-center">
+									<div className="font-secondary font-bold text-[19px] leading-tight truncate">
+										{`${hoveredContact.firstName || ''} ${
+											hoveredContact.lastName || ''
+										}`.trim() ||
+											hoveredContact.name ||
+											hoveredContact.company ||
+											'—'}
+									</div>
+									<div className="mt-1 w-full flex justify-center">
+										<div
+											className="inline-flex items-center justify-center h-[19px] rounded-[8px] px-2 whitespace-nowrap"
+											style={{
+												backgroundColor: '#E8EFFF',
+												border: '0.7px solid #000000',
+											}}
+										>
+											<span className="text-[14px] leading-none font-secondary font-medium">
+												{hoveredContact.title || '—'}
+											</span>
+										</div>
+									</div>
+									{((hoveredContact.firstName && hoveredContact.firstName.length > 0) ||
+										(hoveredContact.lastName && hoveredContact.lastName.length > 0) ||
+										(hoveredContact.name && hoveredContact.name.length > 0)) &&
+									hoveredContact.company ? (
+										<div
+											className="mt-1 text-[14px] leading-tight truncate"
+											style={{ color: '#838383' }}
+										>
+											{hoveredContact.company}
+										</div>
+									) : null}
+									<div
+										className="mt-1 text-[14px] leading-tight truncate"
+										style={{ color: '#838383' }}
+									>
+										{[hoveredContact.city, hoveredContact.state]
+											.filter(Boolean)
+											.join(', ') || '—'}
+									</div>
+								</div>
+							</div>
+						)}
 					</div>
 				)}
 
@@ -575,6 +625,7 @@ const Dashboard = () => {
 												theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
 												rowClassName="border-[#737373] row-hover-scroll"
 												hidePagination
+												onRowHover={(row) => setHoveredContact(row)}
 												headerAction={
 													<button
 														onClick={handleSelectAll}
