@@ -26,13 +26,19 @@ function DialogClose({ ...props }: React.ComponentProps<typeof DialogPrimitive.C
 
 function DialogOverlay({
 	className,
+	variant = 'default',
 	...props
-}: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
+}: React.ComponentProps<typeof DialogPrimitive.Overlay> & {
+	variant?: 'default' | 'plain';
+}) {
 	return (
 		<DialogPrimitive.Overlay
 			data-slot="dialog-overlay"
 			className={cn(
-				'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-gradient-to-b from-background to-background/20 backdrop-blur-xs opacity-100',
+				'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 opacity-100',
+				variant === 'plain'
+					? 'bg-background backdrop-blur-0'
+					: 'bg-gradient-to-b from-background to-background/20 backdrop-blur-xs',
 				className
 			)}
 			{...props}
@@ -45,6 +51,7 @@ interface DialogContentProps
 	hideCloseButton?: boolean;
 	disableEscapeKeyDown?: boolean;
 	disableOutsideClick?: boolean;
+	fullScreen?: boolean;
 }
 
 function DialogContent({
@@ -53,19 +60,22 @@ function DialogContent({
 	hideCloseButton = false,
 	disableEscapeKeyDown = false,
 	disableOutsideClick = false,
+	fullScreen = false,
 	...props
 }: DialogContentProps) {
 	return (
 		<DialogPortal data-slot="dialog-portal">
-			<DialogOverlay />
+			<DialogOverlay variant={fullScreen ? 'plain' : 'default'} />
 			<DialogPrimitive.Content
 				data-slot="dialog-content"
 				onEscapeKeyDown={disableEscapeKeyDown ? (e) => e.preventDefault() : undefined}
 				onInteractOutside={disableOutsideClick ? (e) => e.preventDefault() : undefined}
 				{...props}
 				className={cn(
-					'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 flex flex-col w-full translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border-2 border-primary p-6 duration-300',
-					'max-h-[80vh] max-w-[97vw] md:max-w-[900px] overflow-y-auto overflow-x-hidden',
+					'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed z-50 flex flex-col duration-300',
+					fullScreen
+						? 'inset-0 max-w-none max-h-none rounded-none p-0 overflow-y-auto overflow-x-hidden'
+						: 'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 top-[50%] left-[50%] w-full translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border-2 border-primary p-6 max-h-[80vh] max-w-[97vw] md:max-w-[900px] overflow-y-auto overflow-x-hidden',
 					className
 				)}
 				{...props}
