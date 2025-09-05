@@ -11,21 +11,18 @@ export const DraggableHighlight = ({
 	style,
 	isInitialRender,
 }: DraggableHighlightProps) => {
-	const { attributes, listeners, setNodeRef, transform } = useDraggable({
+	const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
 		id: 'mode-highlight',
 	});
 
 	const combinedStyle = {
 		...style,
 		transform: CSS.Translate.toString(transform),
-		transition: isInitialRender
-			? 'none'
-			: `transform 0s, left 0.3s ease-in-out, width 0.3s ease-in-out`,
+		transition:
+			isInitialRender || isDragging
+				? 'none'
+				: `left 0.3s ease-in-out, width 0.3s ease-in-out`,
 	};
-
-	if (transform) {
-		combinedStyle.transition = 'none';
-	}
 
 	return (
 		<div
@@ -33,7 +30,9 @@ export const DraggableHighlight = ({
 			style={combinedStyle}
 			{...listeners}
 			{...attributes}
-			className="absolute top-1/2 -translate-y-1/2 z-10 rounded-[8px] cursor-grab"
+			className={`absolute top-1/2 -translate-y-1/2 z-10 rounded-[8px] ${
+				isDragging ? 'cursor-grabbing' : 'cursor-grab'
+			}`}
 		>
 			<div
 				style={{
@@ -42,6 +41,8 @@ export const DraggableHighlight = ({
 					backgroundColor: '#DAE6FE',
 					border: '1.3px solid #000000',
 					borderRadius: '8px',
+					transform: isDragging ? 'scale(1.05)' : 'scale(1)',
+					transition: 'transform 0.2s ease-in-out',
 				}}
 			/>
 		</div>
