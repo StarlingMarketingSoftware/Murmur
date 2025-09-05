@@ -556,13 +556,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	// Determine if any empty text block has been touched (blurred) to align with per-block red logic
 	// Access touchedFields to subscribe to touch updates
-	const touchedFields: any = form.formState.touchedFields;
-	const hasTouchedEmptyTextBlocks = watchedBlocks.some((block, index) => {
-		if (block.type !== HybridBlock.text) return false;
-		const isTouched = Boolean(touchedFields?.hybridBlockPrompts?.[index]?.value);
-		const isEmpty = !block.value || block.value.trim() === '';
-		return isTouched && isEmpty;
-	});
+	const touchedFields = form.formState.touchedFields as unknown as {
+		hybridBlockPrompts?: Array<{ value?: boolean }>;
+	};
+	const hasTouchedEmptyTextBlocks = watchedBlocks.some(
+		(block: { type: HybridBlock; value: string }, index: number) => {
+			if (block.type !== HybridBlock.text) return false;
+			const isTouched = Boolean(touchedFields?.hybridBlockPrompts?.[index]?.value);
+			const isEmpty = !block.value || block.value.trim() === '';
+			return isTouched && isEmpty;
+		}
+	);
 
 	const handleClearAllInside = () => {
 		form.setValue('hybridBlockPrompts', []);
@@ -593,6 +597,141 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 						>
 							{/* Subject header inside the box */}
 							<div className="px-3 pt-4 pb-0">
+								<div className="flex items-center gap-3 mb-2">
+									<Button
+										variant="ghost"
+										type="button"
+										className={cn(
+											'!p-0 h-fit !m-0 text-[14px] font-inter',
+											!watchedBlocks.some((b) => b.type === HybridBlock.full_automated) &&
+												!watchedBlocks.every((b) => b.type === HybridBlock.text)
+												? 'text-black font-medium'
+												: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
+										)}
+										onClick={() => {
+											const current: { id: string; type: HybridBlock; value: string }[] =
+												form.getValues('hybridBlockPrompts') || [];
+											// Save current mode's content
+											if (current.some((b) => b.type === HybridBlock.full_automated)) {
+												form.setValue(
+													'fullAiPrompt',
+													(current.find((b) => b.type === HybridBlock.full_automated)
+														?.value as string) || ''
+												);
+											} else if (
+												current.length > 0 &&
+												current.every((b) => b.type === HybridBlock.text)
+											) {
+												form.setValue('savedManualBlocks', current);
+											} else if (current.length > 0) {
+												form.setValue('savedHybridBlocks', current);
+											}
+											// Restore saved hybrid blocks if any; else use default trio
+											const savedHybrid: {
+												id: string;
+												type: HybridBlock;
+												value: string;
+											}[] = form.getValues('savedHybridBlocks') || [];
+											form.setValue(
+												'hybridBlockPrompts',
+												savedHybrid.length > 0
+													? savedHybrid
+													: [
+															{
+																id: 'introduction',
+																type: HybridBlock.introduction,
+																value: '',
+															},
+															{ id: 'research', type: HybridBlock.research, value: '' },
+															{ id: 'action', type: HybridBlock.action, value: '' },
+													  ]
+											);
+											form.setValue('isAiSubject', true);
+										}}
+									>
+										Hybrid
+									</Button>
+									<span className="text-[#D0D0D0]">|</span>
+									<Button
+										variant="ghost"
+										type="button"
+										className={cn(
+											'!p-0 h-fit !m-0 text-[14px] font-inter',
+											watchedBlocks.some((b) => b.type === HybridBlock.full_automated)
+												? 'text-black font-medium'
+												: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
+										)}
+										onClick={() => {
+											const current: { id: string; type: HybridBlock; value: string }[] =
+												form.getValues('hybridBlockPrompts') || [];
+											// Save current non-full blocks to appropriate stash
+											if (
+												current.length > 0 &&
+												current.every((b) => b.type === HybridBlock.text)
+											) {
+												form.setValue('savedManualBlocks', current);
+											} else if (
+												current.length > 0 &&
+												!current.some((b) => b.type === HybridBlock.full_automated)
+											) {
+												form.setValue('savedHybridBlocks', current);
+											}
+											form.setValue('hybridBlockPrompts', [
+												{
+													id: 'full_automated',
+													type: HybridBlock.full_automated,
+													value: form.getValues('fullAiPrompt') || '',
+												},
+											]);
+											form.setValue('isAiSubject', true);
+										}}
+									>
+										Full automated
+									</Button>
+									<span className="text-[#D0D0D0]">|</span>
+									<Button
+										variant="ghost"
+										type="button"
+										className={cn(
+											'!p-0 h-fit !m-0 text-[14px] font-inter',
+											watchedBlocks.every((b) => b.type === HybridBlock.text)
+												? 'text-black font-medium'
+												: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
+										)}
+										onClick={() => {
+											const current: { id: string; type: HybridBlock; value: string }[] =
+												form.getValues('hybridBlockPrompts') || [];
+											// Save current mode content
+											if (current.some((b) => b.type === HybridBlock.full_automated)) {
+												form.setValue(
+													'fullAiPrompt',
+													(current.find((b) => b.type === HybridBlock.full_automated)
+														?.value as string) || ''
+												);
+											} else if (
+												current.length > 0 &&
+												!current.every((b) => b.type === HybridBlock.text)
+											) {
+												form.setValue('savedHybridBlocks', current);
+											}
+											// Restore saved manual blocks if available
+											const savedManual: {
+												id: string;
+												type: HybridBlock;
+												value: string;
+											}[] = form.getValues('savedManualBlocks') || [];
+											form.setValue(
+												'hybridBlockPrompts',
+												savedManual.length > 0
+													? savedManual
+													: [{ id: 'text-0', type: HybridBlock.text, value: '' }]
+											);
+											form.setValue('isAiSubject', false);
+										}}
+									>
+										Manual
+									</Button>
+								</div>
 								<FormField
 									control={form.control}
 									name="subject"
@@ -770,9 +909,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		key={item.value}
 																		item={item}
 																		onClick={() => {
-																			if (item.value === 'hybrid_automation') {
-																				handleAddHybridAutomation();
-																			} else if (item.value === HybridBlock.text) {
+																			if (item.value === HybridBlock.text) {
 																				handleAddBlock(getBlock(HybridBlock.text));
 																			} else {
 																				handleAddBlock(

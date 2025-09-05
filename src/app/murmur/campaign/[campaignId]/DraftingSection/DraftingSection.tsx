@@ -7,6 +7,7 @@ import { EmailGeneration } from './EmailGeneration/EmailGeneration';
 import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/utils';
+// removed unused DraftingMode/HybridBlock imports after moving mode toggles inside
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	const {
@@ -30,6 +31,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		emailStructureRef,
 		scrollToDrafting,
 		scrollToEmailStructure,
+		// draftingMode,
 	} = useDraftingSection(props);
 
 	return (

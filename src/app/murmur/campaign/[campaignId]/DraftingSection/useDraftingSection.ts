@@ -95,6 +95,25 @@ export const draftingFormSchema = z.object({
 			value: z.string(),
 		})
 	),
+	// Preserve user-written content when switching modes
+	savedHybridBlocks: z
+		.array(
+			z.object({
+				id: z.string(),
+				type: z.nativeEnum(HybridBlock),
+				value: z.string(),
+			})
+		)
+		.default([]),
+	savedManualBlocks: z
+		.array(
+			z.object({
+				id: z.string(),
+				type: z.nativeEnum(HybridBlock),
+				value: z.string(),
+			})
+		)
+		.default([]),
 	handwrittenPrompt: z.string().default(''),
 	font: z.enum(FONT_VALUES),
 	signatureId: z.number().optional(),
@@ -151,6 +170,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			hybridBlockPrompts: [
 				{ id: 'full_automated', type: HybridBlock.full_automated, value: '' },
 			],
+			savedHybridBlocks: [],
+			savedManualBlocks: [],
 			handwrittenPrompt: '',
 			font: (campaign.font as Font) ?? DEFAULT_FONT,
 			signatureId: campaign.signatureId ?? signatures?.[0]?.id,
@@ -1242,6 +1263,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					'Generate a professional email based on the template below.',
 				hybridAvailableBlocks: hybridAvailableBlocksToUse,
 				hybridBlockPrompts: hybridBlockPromptsToUse,
+				savedHybridBlocks: [],
+				savedManualBlocks: [],
 				handwrittenPrompt: campaign.handwrittenPrompt ?? '',
 				font: (campaign.font as Font) ?? DEFAULT_FONT,
 				signatureId: campaign.signatureId ?? signatures?.[0]?.id,

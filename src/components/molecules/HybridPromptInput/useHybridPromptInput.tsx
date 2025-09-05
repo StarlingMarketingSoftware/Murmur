@@ -100,20 +100,6 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 			showUsed: false,
 			position: 'top',
 		},
-		{
-			value: 'hybrid_automation',
-			label: 'Hybrid Automation',
-			disabled: false,
-			showUsed: false,
-			position: 'top',
-		},
-		{
-			value: HybridBlock.full_automated,
-			label: 'Full Automated',
-			disabled: false,
-			showUsed: false,
-			position: 'bottom',
-		},
 	];
 
 	/* FUNCTIONS */
