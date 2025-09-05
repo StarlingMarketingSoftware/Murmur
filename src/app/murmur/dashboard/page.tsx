@@ -343,7 +343,6 @@ const Dashboard = () => {
 																triggerText="Import"
 																buttonVariant="light"
 																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-																fullScreen
 															/>
 														)}
 														<div className="w-[19px]"></div>

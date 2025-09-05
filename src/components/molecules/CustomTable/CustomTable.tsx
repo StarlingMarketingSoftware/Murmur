@@ -515,7 +515,7 @@ export function CustomTable<TData, TValue>({
 			) : (
 				<div
 					className={cn(
-						'border-2 border-black rounded-[8px] relative overflow-y-auto overflow-x-hidden overscroll-contain w-full max-w-full mx-auto',
+						'border-2 border-black relative overflow-y-auto overflow-x-hidden overscroll-contain w-full max-w-full mx-auto',
 						constrainHeight && 'h-[429px]',
 						containerClassName
 					)}
