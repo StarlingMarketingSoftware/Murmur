@@ -863,9 +863,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												)}
 											</div>
 											<FormControl>
-												<div className="relative">
+												<div className={cn('relative', showTestPreview && 'w-[416px]')}>
 													<div className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex items-center gap-2">
-														<span className="font-inter font-medium text-[16px]">
+														<span className="font-inter font-semibold text-[17px] text-black">
 															Subject
 														</span>
 														<Switch
@@ -885,7 +885,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													</div>
 													<Input
 														className={cn(
-															'w-full h-[44px] !bg-white pl-[180px] pr-3',
+															'w-full h-[44px] !bg-white pl-[180px] pr-3 !rounded-[8px]',
 															form.watch('isAiSubject')
 																? '!border-[2px] !border-[#969696] !text-[#969696] placeholder:!text-[#969696] disabled:!bg-white disabled:!text-[#969696] disabled:!opacity-100'
 																: shouldShowSubjectRedStyling
