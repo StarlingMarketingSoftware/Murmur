@@ -444,7 +444,7 @@ const SortableAIBlock = ({
 														onClick={(e) => e.stopPropagation()}
 														className={cn(
 															'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 bg-white',
-															isFullAutomatedBlock ? 'h-[300px] px-0 resize-none' : '',
+															isFullAutomatedBlock ? 'h-[260px] px-0 resize-none' : '',
 															shouldShowRedStyling ? 'placeholder:text-[#A20000]' : ''
 														)}
 														{...fieldProps}
@@ -534,6 +534,15 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	// Track if the user has attempted to Test to control error styling
 	const [hasAttemptedTest, setHasAttemptedTest] = useState(false);
+
+	// Subject field red styling (manual mode): mirror text block behavior
+	const subjectValue = form.watch('subject');
+	const isManualSubject = !form.watch('isAiSubject');
+	const [hasSubjectBeenTouched, setHasSubjectBeenTouched] = useState(false);
+	const shouldShowSubjectRedStyling =
+		isManualSubject &&
+		hasSubjectBeenTouched &&
+		(!subjectValue || subjectValue.trim() === '');
 
 	const watchedBlocks = form.watch('hybridBlockPrompts') || [];
 	const isHandwrittenMode =
@@ -625,6 +634,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														'w-full h-[44px] !bg-white',
 														form.watch('isAiSubject')
 															? '!border-[2px] !border-[#969696] !text-[#969696] placeholder:!text-[#969696] disabled:!bg-white disabled:!text-[#969696] disabled:!opacity-100'
+															: shouldShowSubjectRedStyling
+															? '!border-[2px] !border-[#A20000] !text-[#A20000] placeholder:!text-[#A20000]'
 															: '!border-[2px] !border-[#000000] !text-black placeholder:!text-black'
 													)}
 													placeholder={
@@ -641,6 +652,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														!form.watch('isAiSubject') &&
 														trackFocusedField?.('subject', e.target)
 													}
+													onBlur={() => {
+														if (!form.watch('isAiSubject')) {
+															setHasSubjectBeenTouched(true);
+														}
+														field.onBlur();
+													}}
+													onChange={(e) => {
+														if (!form.watch('isAiSubject') && e.target.value) {
+															setHasSubjectBeenTouched(true);
+														}
+														field.onChange(e);
+													}}
 												/>
 											</FormControl>
 											<FormMessage />

@@ -26,6 +26,7 @@ const Murmur = () => {
 	const [identityDialogOrigin, setIdentityDialogOrigin] = useState<'campaign' | 'search'>(
 		silentLoad ? 'search' : 'campaign'
 	);
+	const [isIdentityInfoOpen, setIsIdentityInfoOpen] = useState(false);
 
 	if (isPendingCampaign || !campaign) {
 		return silentLoad ? null : <Spinner />;
@@ -75,7 +76,7 @@ const Murmur = () => {
 								</Typography>
 							</div>
 
-							<div className="flex items-center">
+							<div className="flex items-start">
 								<button
 									type="button"
 									onClick={() => {
@@ -88,15 +89,39 @@ const Murmur = () => {
 										From
 									</span>
 								</button>
-								<Typography
-									className="ml-2 !text-[15px] text-gray-600 font-secondary hover:underline"
-									onClick={() => {
-										setIdentityDialogOrigin('campaign');
-										setIsIdentityDialogOpen(true);
-									}}
-								>
-									{campaign?.identity?.name}
-								</Typography>
+								<div className="ml-2 flex flex-col items-start">
+									<button
+										type="button"
+										className="!text-[15px] text-gray-600 font-secondary hover:underline cursor-pointer text-left"
+										onClick={() => setIsIdentityInfoOpen((open) => !open)}
+										aria-expanded={isIdentityInfoOpen}
+									>
+										{campaign?.identity?.name}
+									</button>
+									{isIdentityInfoOpen && (
+										<div className="mt-1 text-left">
+											{campaign?.identity?.email && (
+												<div className="!text-[15px] text-gray-600 font-secondary">
+													{campaign.identity.email}
+												</div>
+											)}
+											{campaign?.identity?.website && (
+												<a
+													href={
+														(campaign.identity.website || '').startsWith('http')
+															? campaign.identity.website
+															: `https://${campaign.identity.website}`
+													}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="!text-[15px] text-gray-600 font-secondary hover:underline break-all"
+												>
+													{campaign.identity.website}
+												</a>
+											)}
+										</div>
+									)}
+								</div>
 							</div>
 						</div>
 					</div>

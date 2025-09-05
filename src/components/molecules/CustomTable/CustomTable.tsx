@@ -110,6 +110,7 @@ interface CustomTableProps<TData, TValue> extends DataTableProps<TData, TValue> 
 	rowClassName?: string;
 	useCustomScrollbar?: boolean;
 	scrollbarOffsetRight?: number;
+	onRowHover?: (rowData: TData | null) => void;
 }
 
 export function CustomTable<TData, TValue>({
@@ -139,6 +140,7 @@ export function CustomTable<TData, TValue>({
 	rowClassName,
 	useCustomScrollbar = false,
 	scrollbarOffsetRight = -4,
+	onRowHover,
 }: CustomTableProps<TData, TValue>) {
 	type ColumnDefWithSize = ColumnDef<TData, TValue> & { size?: number };
 	const [pagination, setPagination] = useState({
@@ -454,6 +456,8 @@ export function CustomTable<TData, TValue>({
 													handleRowClick(row.original);
 												}
 											}}
+											onMouseEnter={() => onRowHover && onRowHover(row.original)}
+											onMouseLeave={() => onRowHover && onRowHover(null)}
 											key={row.id}
 											data-state={row.getIsSelected() && 'selected'}
 										>
@@ -656,6 +660,8 @@ export function CustomTable<TData, TValue>({
 												handleRowClick(row.original);
 											}
 										}}
+										onMouseEnter={() => onRowHover && onRowHover(row.original)}
+										onMouseLeave={() => onRowHover && onRowHover(null)}
 										key={row.id}
 										data-state={row.getIsSelected() && 'selected'}
 									>
