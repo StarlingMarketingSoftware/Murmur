@@ -277,7 +277,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	return (
 		<div className="w-1/2 flex flex-col">
 			<div className="flex-1 flex flex-col px-3 pt-[18px] pb-0">
-				<div className="flex-1 border-2 border-black rounded-lg bg-background flex flex-col overflow-hidden mb-4 mt-[-4px]">
+				<div className="flex-1 border-2 border-black rounded-lg bg-background flex flex-col overflow-hidden mb-6 mt-[-4px]">
 					<div className="relative p-4">
 						<Typography
 							variant="h3"
