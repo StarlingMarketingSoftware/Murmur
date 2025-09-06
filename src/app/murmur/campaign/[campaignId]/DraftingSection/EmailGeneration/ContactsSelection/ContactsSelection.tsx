@@ -7,85 +7,11 @@ import { getStateAbbreviation } from '@/utils/string';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
-// State badge colors matching dashboard page
-const stateBadgeColorMap: Record<string, string> = {
-	AL: '#F3D7D7',
-	AK: '#D7D7F3',
-	AZ: '#E7F307',
-	AR: '#F3D7F0',
-	CA: '#D7F3EE',
-	CO: '#F3E6D7',
-	CT: '#DEB7F3',
-	DE: '#DBF3D7',
-	FL: '#F3D7E0',
-	GA: '#D7F3F3',
-	HI: '#F1B7F3',
-	ID: '#EDF7F3',
-	IL: '#D7F3E5',
-	IN: '#F3DDD7',
-	IA: '#D7D9F3',
-	KS: '#E2F3D7',
-	KY: '#F3DFA2',
-	LA: '#D7F3F3',
-	ME: '#F3ECD7',
-	MD: '#EDF7F3',
-	MA: '#D7F3DC',
-	MI: '#F3D7D8',
-	MN: '#D7F3E3',
-	MS: '#EBF307',
-	MO: '#F3D7F3',
-	MT: '#D7F3EB',
-	NE: '#F3EBD7',
-	NV: '#DAD7F3',
-	NH: '#DCF3D7',
-	NJ: '#DCF3D7',
-	NM: '#DCF3C7',
-	NY: '#F3F2D7',
-	NC: '#EAD7F3',
-	ND: '#D7F3E1',
-	OH: '#F3D9D7',
-	OK: '#D0F3D7',
-	OR: '#E5F3D7',
-	PA: '#F3D7ED',
-	RI: '#D7F3F1',
-	SC: '#F3E8D7',
-	SD: '#E0F7F3',
-	TN: '#D7F3B8',
-	TX: '#F3D7DE',
-	UT: '#D7E6F3',
-	VT: '#EFF3D7',
-	VA: '#EDF7F3',
-	WA: '#D7F3E7',
-	WV: '#F3DFD7',
-	WI: '#D7F3F3',
-	WY: '#DFF307',
-};
-const canadianProvinceNames = new Set(
-	[
-		'Alberta',
-		'British Columbia',
-		'Manitoba',
-		'New Brunswick',
-		'Newfoundland and Labrador',
-		'Nova Scotia',
-		'Ontario',
-		'Prince Edward Island',
-		'Quebec',
-		'Saskatchewan',
-	].map((s) => s.toLowerCase())
-);
-const canadianProvinceAbbreviations = new Set([
-	'AB',
-	'BC',
-	'MB',
-	'NB',
-	'NL',
-	'NS',
-	'ON',
-	'PE',
-	'QC',
-	'SK',
-]);
+import {
+	canadianProvinceAbbreviations,
+	canadianProvinceNames,
+	stateBadgeColorMap,
+} from '@/constants/ui';
 
 export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 	const {
@@ -176,12 +102,18 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 														const fullStateName = (contact.state as string) || '';
 														const stateAbbr = getStateAbbreviation(fullStateName) || '';
 														const normalizedState = fullStateName.trim();
+														const lowercaseCanadianProvinceNames =
+															canadianProvinceNames.map((s) => s.toLowerCase());
 														const isCanadianProvince =
-															canadianProvinceNames.has(normalizedState.toLowerCase()) ||
-															canadianProvinceAbbreviations.has(
+															lowercaseCanadianProvinceNames.includes(
+																normalizedState.toLowerCase()
+															) ||
+															canadianProvinceAbbreviations.includes(
 																normalizedState.toUpperCase()
 															) ||
-															canadianProvinceAbbreviations.has(stateAbbr.toUpperCase());
+															canadianProvinceAbbreviations.includes(
+																stateAbbr.toUpperCase()
+															);
 														const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
 
 														if (!stateAbbr) return null;
@@ -263,14 +195,16 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																const stateAbbr =
 																	getStateAbbreviation(fullStateName) || '';
 																const normalizedState = fullStateName.trim();
+																const lowercaseCanadianProvinceNames =
+																	canadianProvinceNames.map((s) => s.toLowerCase());
 																const isCanadianProvince =
-																	canadianProvinceNames.has(
+																	lowercaseCanadianProvinceNames.includes(
 																		normalizedState.toLowerCase()
 																	) ||
-																	canadianProvinceAbbreviations.has(
+																	canadianProvinceAbbreviations.includes(
 																		normalizedState.toUpperCase()
 																	) ||
-																	canadianProvinceAbbreviations.has(
+																	canadianProvinceAbbreviations.includes(
 																		stateAbbr.toUpperCase()
 																	);
 																const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
@@ -330,13 +264,13 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 															const stateAbbr = getStateAbbreviation(fullStateName) || '';
 															const normalizedState = fullStateName.trim();
 															const isCanadianProvince =
-																canadianProvinceNames.has(
+																canadianProvinceNames.includes(
 																	normalizedState.toLowerCase()
 																) ||
-																canadianProvinceAbbreviations.has(
+																canadianProvinceAbbreviations.includes(
 																	normalizedState.toUpperCase()
 																) ||
-																canadianProvinceAbbreviations.has(
+																canadianProvinceAbbreviations.includes(
 																	stateAbbr.toUpperCase()
 																);
 															const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
