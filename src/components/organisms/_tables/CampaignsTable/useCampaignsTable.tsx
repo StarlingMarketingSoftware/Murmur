@@ -6,7 +6,7 @@ import { useDeleteCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampai
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import { useState, useEffect, useRef } from 'react';
-import { mmdd } from '@/utils';
+import { cn, mmdd } from '@/utils';
 import { useRowConfirmationAnimation } from '@/hooks/useRowConfirmationAnimation';
 
 type CampaignWithCounts = Campaign & {
@@ -104,11 +104,10 @@ export const useCampaignsTable = () => {
 				const isConfirming = row.original.id === confirmingCampaignId;
 				return name ? (
 					<div
-						className="text-left pr-8 font-bold text-[18px]"
-						style={{
-							fontFamily: '"Times New Roman", Times, serif',
-							color: isConfirming ? 'white' : 'inherit',
-						}}
+						className={cn(
+							'text-left pr-8 font-bold font-primary text-[18px]',
+							isConfirming && 'text-white'
+						)}
 					>
 						{name}
 					</div>
@@ -140,7 +139,6 @@ export const useCampaignsTable = () => {
 				const campaign = row.original as CampaignWithCounts;
 				const isConfirming = campaign.id === confirmingCampaignId;
 
-				// Show white text on red background when confirming
 				if (isConfirming) {
 					return (
 						<div
@@ -150,19 +148,9 @@ export const useCampaignsTable = () => {
 									'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr)',
 							}}
 						>
-							{/* Show "Click to confirm" with countdown in first column */}
-							<div
-								style={{
-									color: 'white',
-									fontFamily: 'Inter, sans-serif',
-									fontSize: '14px',
-									fontWeight: 400,
-									pointerEvents: 'none',
-								}}
-							>
-								Click to confirm <span style={{ marginLeft: '8px' }}>{countdown}</span>
+							<div className="text-white font-inter text-[14px] font-normal pointer-events-none">
+								Click to confirm <span className="ml-2">{countdown}</span>
 							</div>
-							{/* Empty cells for other columns */}
 							<div></div>
 							<div></div>
 							<div></div>
