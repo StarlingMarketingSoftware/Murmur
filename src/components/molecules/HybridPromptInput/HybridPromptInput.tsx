@@ -100,16 +100,16 @@ const SortableAIBlock = ({
 					: 'border-2 border-gray-300 bg-background',
 				isTextBlock
 					? showTestPreview
-						? 'w-full h-[44px]'
-						: 'w-full h-[80px]'
+						? 'w-[416px] h-[44px]'
+						: 'w-[868px] h-[80px]'
 					: isCompactBlock
 					? showTestPreview
-						? 'w-full h-[44px]'
-						: 'w-full h-[44px]'
+						? 'w-[416px] h-[44px]'
+						: 'w-[868px] h-[44px]'
 					: isFullAutomatedBlock
 					? showTestPreview
-						? 'w-full'
-						: 'w-full'
+						? 'w-[416px]'
+						: 'w-[868px]'
 					: 'w-full',
 				!isIntroductionBlock &&
 					!isResearchBlock &&
@@ -778,7 +778,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							<div className="px-3 pt-0 pb-0">
 								<div className="h-[36px] flex items-center relative z-20">
 									{showTestPreview && (
-										<div className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 w-full h-[44px] border-[2px] border-black rounded-[8px] bg-white -z-10" />
+										<div className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 w-[416px] h-[44px] border-[2px] border-black rounded-[8px] bg-white -z-10" />
 									)}
 									<span
 										className={cn(
@@ -873,9 +873,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														className={cn(
 															showTestPreview ? 'text-xs' : 'text-sm',
 															'font-inter font-medium text-[#AFAFAF] hover:underline',
-															showTestPreview
-																? 'mr-[12px] -translate-x-[8px]'
-																: 'relative top-[4px]'
+															showTestPreview ? 'mr-[12px]' : 'relative top-[4px]'
 														)}
 													>
 														Clear All
@@ -883,59 +881,66 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												)}
 											</div>
 											<FormControl>
-												<div className={cn('relative w-full')}>
-													<div className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex items-center gap-2">
-														<span className="font-inter font-semibold text-[17px] text-black">
-															Subject
-														</span>
-														<Switch
-															checked={form.watch('isAiSubject')}
-															disabled={isHandwrittenMode}
-															onCheckedChange={(val: boolean) => {
-																form.setValue('isAiSubject', val);
-																if (val) {
-																	form.setValue('subject', '');
-																}
-															}}
-															className="data-[state=checked]:!bg-[#5dab68]"
-														/>
-														<span className="font-inter font-normal text-[16px]">
-															Auto
-														</span>
-													</div>
-													<Input
+												<div className="flex justify-center">
+													<div
 														className={cn(
-															'w-full h-[44px] !bg-white pl-[180px] pr-3 !rounded-[8px]',
-															form.watch('isAiSubject')
-																? '!border-[2px] !border-[#969696] !text-[#969696] placeholder:!text-[#969696] disabled:!bg-white disabled:!text-[#969696] disabled:!opacity-100'
-																: shouldShowSubjectRedStyling
-																? '!border-[2px] !border-[#A20000] !text-[#A20000] placeholder:!text-[#A20000]'
-																: '!border-[2px] !border-[#000000] !text-black placeholder:!text-black'
+															'relative',
+															showTestPreview ? 'w-[416px]' : 'w-[868px]'
 														)}
-														placeholder={
-															form.watch('isAiSubject')
-																? 'Automated subject'
-																: 'Write your subject here'
-														}
-														disabled={form.watch('isAiSubject')}
-														{...field}
-														onFocus={(e) =>
-															!form.watch('isAiSubject') &&
-															trackFocusedField?.('subject', e.target)
-														}
-														onBlur={() => {
-															if (!form.watch('isAiSubject')) {
-																setHasSubjectBeenTouched(true);
+													>
+														<div className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex items-center gap-2">
+															<span className="font-inter font-semibold text-[17px] text-black">
+																Subject
+															</span>
+															<Switch
+																checked={form.watch('isAiSubject')}
+																disabled={isHandwrittenMode}
+																onCheckedChange={(val: boolean) => {
+																	form.setValue('isAiSubject', val);
+																	if (val) {
+																		form.setValue('subject', '');
+																	}
+																}}
+																className="data-[state=checked]:!bg-[#5dab68]"
+															/>
+															<span className="font-inter font-normal text-[16px]">
+																Auto
+															</span>
+														</div>
+														<Input
+															className={cn(
+																'w-full h-[44px] !bg-white pl-[180px] pr-3 !rounded-[8px]',
+																form.watch('isAiSubject')
+																	? '!border-[2px] !border-[#969696] !text-[#969696] placeholder:!text-[#969696] disabled:!bg-white disabled:!text-[#969696] disabled:!opacity-100'
+																	: shouldShowSubjectRedStyling
+																	? '!border-[2px] !border-[#A20000] !text-[#A20000] placeholder:!text-[#A20000]'
+																	: '!border-[2px] !border-[#000000] !text-black placeholder:!text-black'
+															)}
+															placeholder={
+																form.watch('isAiSubject')
+																	? 'Automated subject'
+																	: 'Write your subject here'
 															}
-															field.onBlur();
-														}}
-														onChange={(e) => {
-															if (!form.watch('isAiSubject') && e.target.value) {
-																setHasSubjectBeenTouched(true);
+															disabled={form.watch('isAiSubject')}
+															{...field}
+															onFocus={(e) =>
+																!form.watch('isAiSubject') &&
+																trackFocusedField?.('subject', e.target)
 															}
-															field.onChange(e);
-														}}
-													/>
+															onBlur={() => {
+																if (!form.watch('isAiSubject')) {
+																	setHasSubjectBeenTouched(true);
+																}
+																field.onBlur();
+															}}
+															onChange={(e) => {
+																if (!form.watch('isAiSubject') && e.target.value) {
+																	setHasSubjectBeenTouched(true);
+																}
+																field.onChange(e);
+															}}
+														/>
+													</div>
 												</div>
 											</FormControl>
 											<FormMessage />
@@ -976,7 +981,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													/>
 													{/* Plus button under hybrid blocks */}
 													{isHybridBlock && !hasImmediateTextBlock && (
-														<div className={cn('flex justify-end -mt-1 w-full')}>
+														<div
+															className={cn(
+																'flex justify-end -mt-1',
+																showTestPreview ? 'w-[416px]' : 'w-[868px]'
+															)}
+														>
 															<Button
 																type="button"
 																onClick={() => handleAddTextBlockAt(index)}
@@ -1008,7 +1018,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										<FormItem>
 											<div
 												className={cn(
-													`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2 w-full`
+													`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
+													showTestPreview ? 'w-[416px]' : 'w-[868px]'
 												)}
 											>
 												<FormLabel className="text-base font-semibold font-secondary">
@@ -1054,7 +1065,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									}}
 									disabled={isGenerationDisabled?.()}
 									className={cn(
-										'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20 w-full',
+										'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
+										showTestPreview ? 'w-[416px]' : 'w-[868px]',
 										isGenerationDisabled?.()
 											? 'opacity-50 cursor-not-allowed'
 											: 'opacity-100'
@@ -1071,7 +1083,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										hasTouchedEmptyTextBlocks || hasAttemptedTest
 											? 'text-destructive'
 											: 'text-black',
-										'text-sm font-medium -mt-2 mb-2 w-full'
+										'text-sm font-medium -mt-2 mb-2',
+										showTestPreview ? 'w-[416px]' : 'w-[868px]'
 									)}
 								>
 									Fill in all text blocks in order to compose an email.
