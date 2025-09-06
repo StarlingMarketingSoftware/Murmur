@@ -157,7 +157,11 @@ const SortableAIBlock = ({
 				<div
 					className={cn(
 						'flex items-center w-full',
-						isCompactBlock ? 'p-2 h-full' : 'p-4'
+						isCompactBlock
+							? 'p-2 h-full'
+							: isFullAutomatedBlock || isTextBlock
+							? 'px-4 pt-2 pb-4'
+							: 'p-4'
 					)}
 				>
 					<div className={cn('flex-grow min-w-0', isCompactBlock && 'flex items-center')}>
@@ -167,7 +171,11 @@ const SortableAIBlock = ({
 						<div
 							className={cn(
 								'absolute z-30',
-								isCompactBlock ? 'right-2 top-1/2 -translate-y-1/2' : 'right-3 top-3'
+								isCompactBlock
+									? 'right-2 top-1/2 -translate-y-1/2'
+									: isFullAutomatedBlock || isTextBlock
+									? 'right-3 top-2'
+									: 'right-3 top-3'
 							)}
 						>
 							{!isTextBlock && !isFullAutomatedBlock && !isCompactBlock && (
@@ -312,7 +320,8 @@ const SortableAIBlock = ({
 								)}
 								<div
 									className={cn(
-										'mb-2 flex gap-2 min-h-7 items-center relative z-20',
+										'flex gap-2 min-h-7 items-center relative z-20',
+										isFullAutomatedBlock || isTextBlock ? 'mb-1' : 'mb-2',
 										isFullAutomatedBlock && showTestPreview && testMessage && 'flex-wrap'
 									)}
 								>
@@ -971,15 +980,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 											return (
 												<Fragment key={field.id}>
-													<SortableAIBlock
-														id={field.id}
-														fieldIndex={index}
-														block={getBlock(field.type)}
-														onRemove={handleRemoveBlock}
-														trackFocusedField={trackFocusedField}
-														showTestPreview={showTestPreview}
-														testMessage={testMessage}
-													/>
+													<div className={cn(index === 0 && '-mt-6')}>
+														<SortableAIBlock
+															id={field.id}
+															fieldIndex={index}
+															block={getBlock(field.type)}
+															onRemove={handleRemoveBlock}
+															trackFocusedField={trackFocusedField}
+															showTestPreview={showTestPreview}
+															testMessage={testMessage}
+														/>
+													</div>
 													{/* Plus button under hybrid blocks */}
 													{isHybridBlock && !hasImmediateTextBlock && (
 														<div
