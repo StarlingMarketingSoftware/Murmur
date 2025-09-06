@@ -405,7 +405,7 @@ const SortableAIBlock = ({
 														onClick={(e) => e.stopPropagation()}
 														className={cn(
 															'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 bg-white',
-															isFullAutomatedBlock ? 'h-[260px] px-0 resize-none' : '',
+															isFullAutomatedBlock ? 'h-[195px] px-0 resize-none' : '',
 															shouldShowRedStyling ? 'placeholder:text-[#A20000]' : ''
 														)}
 														{...fieldProps}
@@ -1021,7 +1021,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							</div>
 
 							{/*  Signature Block */}
-							<div className="px-3 pb-0 mt-auto flex justify-center">
+							<div className="px-3 pb-0 mt-auto pt-12 flex justify-center">
 								<FormField
 									control={form.control}
 									name="signature"
@@ -1066,7 +1066,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								showTestPreview && 'hidden'
 							)}
 						>
-							<div className="flex justify-center -mt-2 mb-4 w-full">
+							<div className="flex justify-center mt-1 mb-4 w-full">
 								<Button
 									type="button"
 									onClick={() => {
