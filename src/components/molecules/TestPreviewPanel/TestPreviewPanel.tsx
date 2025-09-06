@@ -10,9 +10,10 @@ import {
 } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
-import { Typography } from '@/components/ui/typography';
 import { gsap } from 'gsap';
 import { convertHtmlToPlainText } from '@/utils/html';
+import { ContactWithName } from '@/types/contact';
+import { getStateAbbreviation } from '@/utils/string';
 
 export interface TestPreviewPanelProps {
 	setShowTestPreview: Dispatch<SetStateAction<boolean>>;
@@ -21,6 +22,7 @@ export interface TestPreviewPanelProps {
 	onTest?: () => void;
 	isDisabled?: boolean;
 	isTesting?: boolean;
+	contact?: ContactWithName | null;
 }
 
 export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
@@ -30,6 +32,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	onTest,
 	isDisabled,
 	isTesting,
+	contact,
 }) => {
 	const form = useFormContext();
 	const contentRef = useRef<HTMLDivElement | null>(null);
@@ -45,6 +48,16 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	const [loadingTyped, setLoadingTyped] = useState<string>('');
 
 	const fontFamily = form.watch('font') || 'Arial';
+
+	const fullName = useMemo(() => {
+		if (!contact) return '';
+		return contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+	}, [contact]);
+
+	const stateAbbr = useMemo(() => {
+		if (!contact?.state) return '';
+		return getStateAbbreviation(contact.state) || '';
+	}, [contact?.state]);
 
 	const { subjectTokens, bodyTokens } = useMemo(() => {
 		if (!testMessage)
@@ -278,13 +291,62 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 		<div className="w-1/2 flex flex-col">
 			<div className="flex-1 flex flex-col px-3 pt-[18px] pb-0">
 				<div className="flex-1 border-2 border-black rounded-lg bg-background flex flex-col overflow-hidden mb-6 mt-[-4px]">
-					<div className="relative p-4">
-						<Typography
-							variant="h3"
-							className="text-sm font-medium font-secondary text-center"
-						>
-							Test Prompt
-						</Typography>
+					<div className="relative p-4 pb-2">
+						{contact && (
+							<div className="grid grid-cols-2 grid-rows-[auto_auto] w-full overflow-visible">
+								{/* Top Left - Name */}
+								<div className="p-1 pl-3 flex items-start">
+									<div className="font-bold text-xs w-full whitespace-normal break-words leading-4">
+										{fullName || 'Contact'}
+									</div>
+								</div>
+								{/* Top Right - Title */}
+								<div className="p-1 flex items-center overflow-visible">
+									{contact.headline ? (
+										<div className="h-[20.54px] rounded-[6.64px] px-2 flex items-center w-full max-w-[150px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
+											<span className="text-xs text-black truncate">
+												{contact.headline}
+											</span>
+										</div>
+									) : (
+										<div className="w-full" />
+									)}
+								</div>
+								{/* Bottom Left - Company */}
+								<div className="p-1 pl-3 flex items-start">
+									<div className="text-xs text-black w-full whitespace-normal break-words leading-4">
+										{contact.company || ''}
+									</div>
+								</div>
+								{/* Bottom Right - Location */}
+								<div className="p-1 flex items-center">
+									{contact.city || stateAbbr ? (
+										<div className="flex items-center gap-2 w-full">
+											{stateAbbr && (
+												<span
+													className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
+													style={{
+														borderColor: 'rgba(0,0,0,0.7)',
+														backgroundColor: 'transparent',
+													}}
+												>
+													{stateAbbr}
+												</span>
+											)}
+											{contact.city ? (
+												<span className="text-xs text-black truncate w-full">
+													{contact.city}
+												</span>
+											) : (
+												<div className="w-full" />
+											)}
+										</div>
+									) : (
+										<div className="w-full" />
+									)}
+								</div>
+							</div>
+						)}
 						<Button
 							type="button"
 							variant="icon"
@@ -294,6 +356,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 							<X className="h-5 w-5 text-destructive-dark" />
 						</Button>
 					</div>
+					<div className="-mx-4 h-[2px] bg-black" />
 
 					<div className="relative flex-1 bg-white" style={{ minHeight: '400px' }}>
 						{/* Organic grayscale blob animation overlay */}
@@ -317,7 +380,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 										radial-gradient(ellipse 70% 55% at 10% 40%, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0) 42%),
 										radial-gradient(ellipse 80% 60% at 35% 70%, rgba(0,0,0,0.07) 0%, rgba(0,0,0,0) 48%),
 										radial-gradient(ellipse 65% 50% at 75% 35%, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0) 45%)
-									`,
+										`,
 										backgroundSize: '180% 100%',
 										backgroundPosition: '0% 0%',
 									}}
@@ -332,7 +395,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 										radial-gradient(ellipse 55% 45% at 20% 65%, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0) 40%),
 										radial-gradient(ellipse 60% 50% at 55% 30%, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0) 44%),
 										radial-gradient(ellipse 50% 40% at 85% 75%, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0) 38%)
-									`,
+										`,
 										backgroundSize: '220% 100%',
 										backgroundPosition: '-20% 0%',
 									}}
@@ -348,7 +411,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 										radial-gradient(ellipse 60% 50% at 15% 85%, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 36%),
 										radial-gradient(ellipse 75% 55% at 65% 55%, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0) 42%),
 										radial-gradient(ellipse 55% 45% at 92% 20%, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 34%)
-									`,
+										`,
 										backgroundSize: '260% 100%',
 										backgroundPosition: '-40% 0%',
 									}}

@@ -477,6 +477,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		isGenerationDisabled,
 		isPendingGeneration,
 		isTest,
+		contact,
 	} = useHybridPromptInput(props);
 
 	// Track if the user has attempted to Test to control error styling
@@ -1079,6 +1080,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								}}
 								isDisabled={isGenerationDisabled?.()}
 								isTesting={Boolean(isPendingGeneration) && Boolean(isTest)}
+								contact={contact}
 							/>
 						)}
 					</div>

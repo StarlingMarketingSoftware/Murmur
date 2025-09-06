@@ -69,6 +69,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									isGenerationDisabled={isGenerationDisabled}
 									isPendingGeneration={isPendingGeneration}
 									isTest={isTest}
+									contact={contacts?.[0]}
 								/>
 							</div>
 						</div>

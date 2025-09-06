@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
 import { HybridBlock } from '@prisma/client';
+import { ContactWithName } from '@/types/contact';
 
 export const ORDERED_BLOCKS = [
 	HybridBlock.introduction,
@@ -65,6 +66,7 @@ export interface HybridPromptInputProps {
 	isGenerationDisabled?: () => boolean;
 	isPendingGeneration?: boolean;
 	isTest?: boolean;
+	contact?: ContactWithName | null;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {
@@ -75,6 +77,7 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		isGenerationDisabled,
 		isPendingGeneration,
 		isTest,
+		contact,
 	} = props;
 
 	/* HOOKS */
@@ -428,5 +431,6 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		isGenerationDisabled,
 		isPendingGeneration,
 		isTest,
+		contact,
 	};
 };
