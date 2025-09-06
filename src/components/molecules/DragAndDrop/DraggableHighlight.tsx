@@ -5,11 +5,13 @@ import { CSS } from '@dnd-kit/utilities';
 interface DraggableHighlightProps {
 	style: React.CSSProperties;
 	isInitialRender: boolean;
+	mode?: 'full' | 'hybrid' | 'manual';
 }
 
 export const DraggableHighlight = ({
 	style,
 	isInitialRender,
+	mode = 'full',
 }: DraggableHighlightProps) => {
 	const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
 		id: 'mode-highlight',
@@ -22,6 +24,19 @@ export const DraggableHighlight = ({
 			isInitialRender || isDragging
 				? 'none'
 				: `left 0.3s ease-in-out, width 0.3s ease-in-out`,
+	};
+
+	// Set background color based on mode
+	const getBackgroundColor = () => {
+		switch (mode) {
+			case 'hybrid':
+				return 'rgba(74, 74, 217, 0.31)'; // #4A4AD9 at 31% opacity
+			case 'manual':
+				return 'rgba(109, 171, 104, 0.47)'; // #6DAB68 at 47% opacity
+			case 'full':
+			default:
+				return '#DAE6FE'; // Keep existing color for Full Auto
+		}
 	};
 
 	return (
@@ -38,7 +53,7 @@ export const DraggableHighlight = ({
 				style={{
 					width: '80.38px',
 					height: '19px',
-					backgroundColor: '#DAE6FE',
+					backgroundColor: getBackgroundColor(),
 					border: '1.3px solid #000000',
 					borderRadius: '8px',
 					transform: isDragging ? 'scale(1.05)' : 'scale(1)',

@@ -799,6 +799,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											<DraggableHighlight
 												style={highlightStyle}
 												isInitialRender={isInitialRender}
+												mode={selectedModeKey as 'full' | 'hybrid' | 'manual'}
 											/>
 										</DndContext>
 										<Button
