@@ -110,7 +110,9 @@ const SortableAIBlock = ({
 					? showTestPreview
 						? 'w-[416px]'
 						: 'w-[868px]'
-					: 'w-full',
+					: showTestPreview
+					? 'w-[416px]'
+					: 'w-[868px]',
 				!isIntroductionBlock &&
 					!isResearchBlock &&
 					!isActionBlock &&
@@ -861,43 +863,40 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									className={cn('-mx-3 h-[2px] bg-black', showTestPreview && 'hidden')}
 								/>
 								{showTestPreview && <div className="h-2" />}
-								<FormField
-									control={form.control}
-									name="subject"
-									rules={{ required: form.watch('isAiSubject') }}
-									render={({ field }) => (
-										<FormItem>
-											<div
-												className={cn(
-													'flex items-center',
-													showTestPreview
-														? 'justify-end pr-[24px] mt-1 mb-1'
-														: 'justify-end mb-2 pr-5'
-												)}
+								<div className="flex flex-col items-center">
+									<FormField
+										control={form.control}
+										name="subject"
+										rules={{ required: form.watch('isAiSubject') }}
+										render={({ field }) => (
+											<FormItem
+												className={cn(showTestPreview ? 'w-[416px]' : 'w-[868px]')}
 											>
-												<div className="flex items-center gap-2"></div>
-												{hasBlocks && (
-													<button
-														type="button"
-														onClick={handleClearAllInside}
-														className={cn(
-															showTestPreview ? 'text-xs' : 'text-sm',
-															'font-inter font-medium text-[#AFAFAF] hover:underline',
-															showTestPreview ? 'mr-[12px]' : 'relative top-[4px]'
-														)}
-													>
-														Clear All
-													</button>
-												)}
-											</div>
-											<FormControl>
-												<div className="flex justify-center">
-													<div
-														className={cn(
-															'relative',
-															showTestPreview ? 'w-[416px]' : 'w-[868px]'
-														)}
-													>
+												<div
+													className={cn(
+														'flex items-center',
+														showTestPreview
+															? 'justify-end pr-[24px] mt-1 mb-1'
+															: 'justify-end mb-2 pr-5'
+													)}
+												>
+													<div className="flex items-center gap-2"></div>
+													{hasBlocks && (
+														<button
+															type="button"
+															onClick={handleClearAllInside}
+															className={cn(
+																showTestPreview ? 'text-xs' : 'text-sm',
+																'font-inter font-medium text-[#AFAFAF] hover:underline',
+																showTestPreview ? 'mr-[12px]' : 'relative top-[4px]'
+															)}
+														>
+															Clear All
+														</button>
+													)}
+												</div>
+												<FormControl>
+													<div className="relative">
 														<div className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex items-center gap-2">
 															<span className="font-inter font-semibold text-[17px] text-black">
 																Subject
@@ -951,12 +950,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															}}
 														/>
 													</div>
-												</div>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
-								/>
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+								</div>
 							</div>
 							<div className="flex-1 flex flex-col">
 								{/* Content area */}
