@@ -15,3 +15,12 @@ export const yyyyMMddHHmm = (date: Date | undefined): string | undefined | null 
 export const MMddyyyyHHmm = (date: Date | undefined): string | undefined | null => {
 	return _format(date, 'MM/dd/yyyy h:mm a');
 };
+
+export const mmdd = (date: Date) => {
+	if (date && !isNaN(date.getTime())) {
+		const month = (date.getMonth() + 1).toString().padStart(2, '0');
+		const day = date.getDate().toString().padStart(2, '0');
+		return `${month}.${day}`;
+	}
+	return 'No Data';
+};

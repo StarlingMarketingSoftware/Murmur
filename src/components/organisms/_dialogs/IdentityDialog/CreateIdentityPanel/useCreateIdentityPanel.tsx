@@ -20,6 +20,8 @@ const upsertIdentityFormSchema = z.object({
 	verificationCode: z.string().optional(),
 });
 
+export type UpsertIdentityFormValues = z.infer<typeof upsertIdentityFormSchema>;
+
 export interface CreateIdentityPanelProps {
 	isEdit: boolean;
 	selectedIdentity?: Identity;
@@ -45,7 +47,7 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 
 	const isCodeExpired = countdown === 0;
 
-	const form = useForm<z.infer<typeof upsertIdentityFormSchema>>({
+	const form = useForm<UpsertIdentityFormValues>({
 		mode: 'onTouched',
 		resolver: zodResolver(upsertIdentityFormSchema),
 		defaultValues: {

@@ -1,5 +1,6 @@
 import {
 	CreateIdentityPanelProps,
+	UpsertIdentityFormValues,
 	useCreateIdentityPanel,
 } from './useCreateIdentityPanel';
 
@@ -13,11 +14,42 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
-import { FormProvider } from 'react-hook-form';
+import { ControllerRenderProps, FormProvider } from 'react-hook-form';
 import { CheckCircleIcon } from 'lucide-react';
 import { Typography } from '@/components/ui/typography';
 import { FC } from 'react';
 import InfoTooltip from '@/components/atoms/InfoTooltip/InfoTooltip';
+
+interface StyledInputProps {
+	field: ControllerRenderProps<UpsertIdentityFormValues>;
+	width?: string;
+	paddingRight?: string;
+	disabled?: boolean;
+}
+
+const StyledInput: FC<StyledInputProps> = ({
+	field,
+	width = 'w-[615.75px]',
+	paddingRight = '12px',
+	disabled = false,
+}) => {
+	return (
+		<div
+			className={`${width} h-[44px] rounded-[7px] border-[#7D7D7D] border-[1px] bg-[#F3F6FF] flex items-center`}
+		>
+			<Input
+				className="!bg-transparent !border-0 !outline-none !ring-0 !focus-visible:ring-0 !focus:ring-0 h-full w-full pl-[12px]"
+				variant="light"
+				rounded={false}
+				style={{
+					paddingRight: paddingRight,
+				}}
+				{...field}
+				disabled={disabled}
+			/>
+		</div>
+	);
+};
 
 export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 	const {
@@ -49,22 +81,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 											{'Name (First and Last)*'}
 										</FormLabel>
 										<FormControl>
-											<div className="w-[615.75px] h-[44.06px] rounded-[7.28px] border-[#7D7D7D] border-[0.91px] bg-[#F3F6FF] flex items-center">
-												<Input
-													className="!bg-transparent !border-0 !outline-none !ring-0 !focus-visible:ring-0 !focus:ring-0"
-													variant="light"
-													rounded={false}
-													style={{
-														height: '100%',
-														width: '100%',
-														paddingLeft: '12px',
-														paddingRight: '12px',
-														backgroundColor: 'transparent',
-														border: 0,
-													}}
-													{...field}
-												/>
-											</div>
+											<StyledInput field={field} />
 										</FormControl>
 										<FormMessage />
 									</FormItem>
@@ -79,22 +96,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 											Website Link
 										</FormLabel>
 										<FormControl>
-											<div className="w-[615.75px] h-[44.06px] rounded-[7.28px] border-[#7D7D7D] border-[0.91px] bg-[#F3F6FF] flex items-center">
-												<Input
-													className="!bg-transparent !border-0 !outline-none !ring-0 !focus-visible:ring-0 !focus:ring-0"
-													variant="light"
-													rounded={false}
-													style={{
-														height: '100%',
-														width: '100%',
-														paddingLeft: '12px',
-														paddingRight: '12px',
-														backgroundColor: 'transparent',
-														border: 0,
-													}}
-													{...field}
-												/>
-											</div>
+											<StyledInput field={field} />
 										</FormControl>
 										<FormMessage />
 									</FormItem>
@@ -114,23 +116,12 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 										<FormControl>
 											<div className="flex gap-2 items-center">
 												<div className="flex-1 relative">
-													<div className="w-[510.01px] h-[44.06px] rounded-[7.28px] border-[#7D7D7D] border-[0.91px] bg-[#F3F6FF] flex items-center">
-														<Input
-															className="!bg-transparent !border-0 !outline-none !ring-0 !focus-visible:ring-0 !focus:ring-0"
-															variant="light"
-															rounded={false}
-															style={{
-																height: '100%',
-																width: '100%',
-																paddingLeft: '12px',
-																paddingRight: '32px',
-																backgroundColor: 'transparent',
-																border: 0,
-															}}
-															{...field}
-															disabled={isCodeVerified}
-														/>
-													</div>
+													<StyledInput
+														field={field}
+														width="w-[510.01px]"
+														paddingRight="32px"
+														disabled={isCodeVerified}
+													/>
 													{isCodeVerified && (
 														<CheckCircleIcon className="absolute top-1/2 -translate-y-1/2 right-2 stroke-primary" />
 													)}
@@ -151,7 +142,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 													{isCodeVerified
 														? 'Reset'
 														: isEmailVerificationCodeSent && !isCodeExpired
-														? 'Resend Code'
+														? 'Resend'
 														: 'Verify'}
 												</Button>
 											</div>
@@ -163,7 +154,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 						</div>
 					</div>
 
-					{/* Verify button moved inline with email field above */}
+					{/* Verify button */}
 					{isEmailVerificationCodeSent && !isCodeVerified && (
 						<FormField
 							control={form.control}
