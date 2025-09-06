@@ -749,13 +749,29 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 					<div
 						className={`w-[892px] min-h-[530px] border-[3px] border-black rounded-md bg-gray-50 transition mb-4 flex ${
 							showTestPreview ? 'flex-row' : 'flex-col'
-						} relative`}
+						} relative overflow-hidden`}
 					>
+						{/* Left-side blurred backdrop fill for test preview */}
+						{showTestPreview && (
+							<div className="pointer-events-none absolute left-3 top-[18px] bottom-3 w-[416px] z-0">
+								<div
+									className="absolute inset-0"
+									style={{
+										background:
+											'radial-gradient(ellipse 115% 100% at 45% 45%, rgba(222,242,225,1) 0%, rgba(222,242,225,0.85) 45%, rgba(222,242,225,0.4) 70%, rgba(222,242,225,0.12) 88%, rgba(222,242,225,0) 100%)',
+										opacity: 1,
+										filter: 'blur(140px)',
+										willChange: 'transform',
+										transform: 'scale(1.3)',
+									}}
+								/>
+							</div>
+						)}
 						{/* Left side - Content area */}
 						<div
 							className={cn(
 								`flex flex-col min-h-[530px]`,
-								showTestPreview ? 'w-1/2 pt-[18px]' : 'w-full'
+								showTestPreview ? 'w-1/2 pt-[18px] relative z-10' : 'w-full'
 							)}
 						>
 							{/* Subject header inside the box */}
