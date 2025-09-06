@@ -6,20 +6,12 @@ import { useDeleteCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampai
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import { useState, useEffect, useRef } from 'react';
-import { gsap } from 'gsap';
+import { mmdd } from '@/utils';
+import { useRowConfirmationAnimation } from '@/hooks/useRowConfirmationAnimation';
 
 type CampaignWithCounts = Campaign & {
 	draftCount?: number;
 	sentCount?: number;
-};
-
-const formatDate = (date: Date) => {
-	if (date && !isNaN(date.getTime())) {
-		const month = (date.getMonth() + 1).toString().padStart(2, '0');
-		const day = date.getDate().toString().padStart(2, '0');
-		return `${month}.${day}`;
-	}
-	return 'No Data';
 };
 
 const getDraftFillColor = (value: number): string => {
@@ -87,227 +79,21 @@ export const useCampaignsTable = () => {
 	const [confirmingCampaignId, setConfirmingCampaignId] = useState<number | null>(null);
 	const [countdown, setCountdown] = useState<number>(5);
 	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-	const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
-	const gradientAnimationRef = useRef<gsap.core.Timeline | gsap.core.Tween | null>(null);
 
-	// Clear timeout and animation on unmount
+	// Use the custom animation hook
+	useRowConfirmationAnimation({
+		confirmingCampaignId,
+		setCountdown,
+	});
+
+	// Clear timeout on unmount
 	useEffect(() => {
 		return () => {
 			if (confirmationTimeoutRef.current) {
 				clearTimeout(confirmationTimeoutRef.current);
 			}
-			if (countdownIntervalRef.current) {
-				clearInterval(countdownIntervalRef.current);
-			}
-			if (gradientAnimationRef.current) {
-				gradientAnimationRef.current.kill();
-			}
-			// Clean up any lingering styles on unmount
-			const allRows = document.querySelectorAll('[data-campaign-id]');
-			allRows.forEach((row) => {
-				(row as HTMLElement).style.removeProperty('box-shadow');
-				(row as HTMLElement).style.removeProperty('filter');
-				(row as HTMLElement).style.removeProperty('border-color');
-			});
 		};
 	}, []);
-
-	// Animate gradient when confirmation state changes
-	useEffect(() => {
-		if (confirmingCampaignId !== null) {
-			// Reset countdown
-			setCountdown(5);
-
-			// Start countdown interval
-			if (countdownIntervalRef.current) {
-				clearInterval(countdownIntervalRef.current);
-			}
-			countdownIntervalRef.current = setInterval(() => {
-				setCountdown((prev) => {
-					if (prev <= 1) {
-						return 1;
-					}
-					return prev - 1;
-				});
-			}, 1000);
-
-			// Use setTimeout to ensure DOM is updated
-			setTimeout(() => {
-				// Start gradient animation
-				const rowElement = document.querySelector(
-					`[data-campaign-id="${confirmingCampaignId}"]`
-				);
-
-				if (rowElement) {
-					// Clear any previous inline animation styles from all rows to avoid leftover seams
-					const allRows = document.querySelectorAll('[data-campaign-id]');
-					allRows.forEach((row) => {
-						const r = row as HTMLElement;
-						r.style.removeProperty('background');
-						r.style.removeProperty('background-color');
-						r.style.removeProperty('background-image');
-						r.style.removeProperty('background-size');
-						r.style.removeProperty('background-position');
-						r.style.removeProperty('will-change');
-						r.style.removeProperty('border-color');
-						r.style.removeProperty('transform');
-						r.style.removeProperty('transition');
-						r.style.removeProperty('transform-origin');
-						r.style.removeProperty('box-shadow');
-						r.style.removeProperty('filter'); // Also remove filter to prevent leftover brightness/contrast
-						const tds = row.querySelectorAll('td');
-						tds.forEach((cell) => {
-							const c = cell as HTMLElement;
-							c.style.removeProperty('background');
-							c.style.removeProperty('background-color');
-							c.style.removeProperty('background-image');
-							c.style.removeProperty('background-size');
-							c.style.removeProperty('background-position');
-						});
-					});
-
-					// Kill previous animation if exists
-					if (gradientAnimationRef.current) {
-						gradientAnimationRef.current.kill();
-					}
-
-					// Make all cells transparent so the row background shows seamlessly
-					const cells = rowElement.querySelectorAll('td');
-					cells.forEach((cell) => {
-						(cell as HTMLElement).style.setProperty(
-							'background',
-							'transparent',
-							'important'
-						);
-						(cell as HTMLElement).style.setProperty(
-							'background-color',
-							'transparent',
-							'important'
-						);
-						(cell as HTMLElement).style.removeProperty('background-image');
-						(cell as HTMLElement).style.removeProperty('background-size');
-						// Also make all child elements transparent
-						const childDivs = cell.querySelectorAll('div');
-						childDivs.forEach((div) => {
-							(div as HTMLElement).style.setProperty(
-								'background',
-								'transparent',
-								'important'
-							);
-							(div as HTMLElement).style.setProperty(
-								'background-color',
-								'transparent',
-								'important'
-							);
-							(div as HTMLElement).style.setProperty(
-								'border-color',
-								'#A20000',
-								'important'
-							);
-						});
-					});
-
-					// Cyber-futuristic continuous red wave animation (Elon Musk style: bold, innovative, high-tech)
-					const rowEl = rowElement as HTMLElement;
-
-					// Set up multi-layer cyber wave with parallax speeds and neon glow
-					rowEl.style.setProperty(
-						'background-image',
-						// Fast-moving foreground wave (sharp cyber lines)
-						'linear-gradient(90deg, transparent 0%, rgba(200, 0, 0, 0.4) 10%, rgba(180, 0, 0, 0.7) 20%, rgba(150, 0, 0, 0.9) 30%, rgba(180, 0, 0, 0.7) 40%, rgba(200, 0, 0, 0.4) 50%, transparent 60%), ' +
-							// Medium-speed midground wave (deeper red pulses)
-							'linear-gradient(95deg, transparent 0%, rgba(140, 0, 0, 0.5) 15%, rgba(120, 0, 0, 0.8) 30%, rgba(100, 0, 0, 0.9) 45%, rgba(120, 0, 0, 0.8) 60%, rgba(140, 0, 0, 0.5) 75%, transparent 90%), ' +
-							// Slow background wave (subtle depth)
-							'linear-gradient(100deg, transparent 0%, rgba(160, 0, 0, 0.3) 20%, rgba(130, 0, 0, 0.6) 40%, rgba(110, 0, 0, 0.8) 60%, rgba(130, 0, 0, 0.6) 80%, rgba(160, 0, 0, 0.3) 100%), ' +
-							// Base gradient for solid red foundation
-							'linear-gradient(0deg, #B00000, #900000)',
-						'important'
-					);
-					rowEl.style.setProperty(
-						'background-size',
-						'300% 100%, 400% 100%, 500% 100%, 100% 100%', // Different sizes for parallax effect
-						'important'
-					);
-					rowEl.style.setProperty(
-						'background-position',
-						'0% 0%, 0% 0%, 0% 0%, 0% 0%',
-						'important'
-					);
-					rowEl.style.setProperty('background-color', '#A00000', 'important');
-					rowEl.style.setProperty('border-color', '#A00000', 'important');
-					rowEl.style.setProperty(
-						'will-change',
-						'background-position, filter',
-						'important'
-					);
-					rowEl.style.setProperty('cursor', 'pointer', 'important');
-
-					// Set initial filter (no shadow)
-					gsap.set(rowEl, {
-						filter: 'brightness(1) contrast(1)',
-					});
-
-					// Create timeline for continuous, infinite animation
-					gradientAnimationRef.current = gsap
-						.timeline({ repeat: -1, defaults: { ease: 'none' } })
-						.to(
-							rowEl,
-							{
-								backgroundPosition: '-300% 0%, -400% 0%, -500% 0%, 0% 0%',
-								duration: 4, // Overall cycle time for continuous flow
-							},
-							0
-						)
-						// (Shadow animation removed)
-						.to(
-							rowEl,
-							{
-								filter: 'brightness(1.2) contrast(1.1)', // Subtle brightness pulse for energy
-								duration: 1.5,
-								repeat: -1,
-								yoyo: true,
-								ease: 'sine.inOut',
-							},
-							0
-						);
-				}
-			}, 0);
-		} else {
-			// Clean up animation, countdown and reset backgrounds
-			if (countdownIntervalRef.current) {
-				clearInterval(countdownIntervalRef.current);
-				countdownIntervalRef.current = null;
-			}
-			if (gradientAnimationRef.current) {
-				gradientAnimationRef.current.kill();
-				gradientAnimationRef.current = null;
-			}
-			// Reset all row backgrounds and cells
-			const allRows = document.querySelectorAll('[data-campaign-id]');
-			allRows.forEach((row) => {
-				(row as HTMLElement).style.removeProperty('background');
-				(row as HTMLElement).style.removeProperty('background-color');
-				(row as HTMLElement).style.removeProperty('background-image');
-				(row as HTMLElement).style.removeProperty('background-size');
-				(row as HTMLElement).style.removeProperty('background-position');
-				(row as HTMLElement).style.removeProperty('will-change');
-				(row as HTMLElement).style.removeProperty('border-color');
-				(row as HTMLElement).style.removeProperty('cursor');
-				(row as HTMLElement).style.removeProperty('box-shadow'); // Remove neon glow
-				(row as HTMLElement).style.removeProperty('filter'); // Remove brightness/contrast
-				// Also reset cells
-				const cells = row.querySelectorAll('td');
-				cells.forEach((cell) => {
-					(cell as HTMLElement).style.removeProperty('background');
-					(cell as HTMLElement).style.removeProperty('background-color');
-					(cell as HTMLElement).style.removeProperty('background-image');
-					(cell as HTMLElement).style.removeProperty('background-size');
-					(cell as HTMLElement).style.removeProperty('background-position');
-					(cell as HTMLElement).style.removeProperty('border-color'); // Ensure cell borders are reset
-				});
-			});
-		}
-	}, [confirmingCampaignId]);
 
 	const columns: ColumnDef<CampaignWithCounts>[] = [
 		{
@@ -467,7 +253,7 @@ export const useCampaignsTable = () => {
 								}
 								data-updated-fill={updatedFill}
 							>
-								{formatDate(updatedAt)}
+								{mmdd(updatedAt)}
 							</div>
 							<div
 								className="absolute h-[17px] w-[2px]"
@@ -491,7 +277,7 @@ export const useCampaignsTable = () => {
 								}
 								data-created-fill={createdFill}
 							>
-								{formatDate(createdAt)}
+								{mmdd(createdAt)}
 							</div>
 						</div>
 					</div>
@@ -516,12 +302,9 @@ export const useCampaignsTable = () => {
 							onClick={(e) => {
 								e.stopPropagation();
 
-								// Clear any existing timeout and interval
+								// Clear any existing timeout
 								if (confirmationTimeoutRef.current) {
 									clearTimeout(confirmationTimeoutRef.current);
-								}
-								if (countdownIntervalRef.current) {
-									clearInterval(countdownIntervalRef.current);
 								}
 
 								// If clicking the same campaign that's confirming, execute delete
@@ -568,12 +351,9 @@ export const useCampaignsTable = () => {
 	const handleRowClick = (rowData: Campaign) => {
 		// If clicking on the confirming row, execute deletion
 		if (rowData.id === confirmingCampaignId) {
-			// Clear any existing timeout and interval
+			// Clear any existing timeout
 			if (confirmationTimeoutRef.current) {
 				clearTimeout(confirmationTimeoutRef.current);
-			}
-			if (countdownIntervalRef.current) {
-				clearInterval(countdownIntervalRef.current);
 			}
 			// Execute deletion
 			deleteCampaign(rowData.id);
