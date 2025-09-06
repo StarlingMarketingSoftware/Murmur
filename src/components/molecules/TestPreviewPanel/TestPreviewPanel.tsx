@@ -10,20 +10,29 @@ import {
 } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
-import { Typography } from '@/components/ui/typography';
 import { gsap } from 'gsap';
 import { convertHtmlToPlainText } from '@/utils/html';
+import { ContactWithName } from '@/types/contact';
+import { getStateAbbreviation } from '@/utils/string';
 
 export interface TestPreviewPanelProps {
 	setShowTestPreview: Dispatch<SetStateAction<boolean>>;
 	testMessage: string;
 	isLoading?: boolean;
+	onTest?: () => void;
+	isDisabled?: boolean;
+	isTesting?: boolean;
+	contact?: ContactWithName | null;
 }
 
 export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	setShowTestPreview,
 	testMessage,
 	isLoading = false,
+	onTest,
+	isDisabled,
+	isTesting,
+	contact,
 }) => {
 	const form = useFormContext();
 	const contentRef = useRef<HTMLDivElement | null>(null);
@@ -39,6 +48,16 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	const [loadingTyped, setLoadingTyped] = useState<string>('');
 
 	const fontFamily = form.watch('font') || 'Arial';
+
+	const fullName = useMemo(() => {
+		if (!contact) return '';
+		return contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+	}, [contact]);
+
+	const stateAbbr = useMemo(() => {
+		if (!contact?.state) return '';
+		return getStateAbbreviation(contact.state) || '';
+	}, [contact?.state]);
 
 	const { subjectTokens, bodyTokens } = useMemo(() => {
 		if (!testMessage)
@@ -270,15 +289,116 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 
 	return (
 		<div className="w-1/2 flex flex-col">
-			<div className="flex-1 flex flex-col px-3 pt-3 pb-0">
-				<div className="flex-1 border-2 border-black rounded-lg bg-background flex flex-col overflow-hidden mb-4 mt-[40px]">
-					<div className="relative p-4">
-						<Typography
-							variant="h3"
-							className="text-sm font-medium font-secondary text-center"
-						>
-							Test Prompt
-						</Typography>
+			<div className="flex-1 flex flex-col px-3 pt-[18px] pb-0">
+				<div className="flex-1 border-2 border-black rounded-lg bg-background flex flex-col overflow-hidden mb-6 mt-[-4px] relative z-20">
+					<div className="relative px-2">
+						{contact && (
+							<div className="grid grid-cols-2 grid-rows-[auto_auto] w-full overflow-visible">
+								{fullName ? (
+									<>
+										{/* Top Left - Name */}
+										<div className="p-1 pl-3 pb-[1.5px] flex items-start">
+											<div className="font-inter font-bold text-[15.45px] w-full whitespace-normal break-words leading-4">
+												{fullName}
+											</div>
+										</div>
+										{/* Top Right - Location */}
+										<div className="p-1 pb-[1.5px] flex items-center">
+											{contact.city || stateAbbr ? (
+												<div className="flex items-center gap-2 w-full">
+													{stateAbbr && (
+														<span
+															className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
+															style={{
+																borderColor: 'rgba(0,0,0,0.7)',
+																backgroundColor: 'transparent',
+															}}
+														>
+															{stateAbbr}
+														</span>
+													)}
+													{contact.city ? (
+														<span className="text-xs text-black truncate w-full">
+															{contact.city}
+														</span>
+													) : (
+														<div className="w-full" />
+													)}
+												</div>
+											) : (
+												<div className="w-full" />
+											)}
+										</div>
+										{/* Bottom Left - Company */}
+										<div className="p-1 pl-3 pt-0 flex items-start">
+											<div className="text-xs text-black w-full whitespace-normal break-words leading-4">
+												{contact.company || ''}
+											</div>
+										</div>
+										{/* Bottom Right - Title */}
+										<div className="p-1 pt-0 flex items-center overflow-visible">
+											{contact.headline ? (
+												<div className="h-[20.54px] rounded-[6.64px] px-2 flex items-center w-full max-w-[150px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
+													<span className="text-xs text-black truncate">
+														{contact.headline}
+													</span>
+												</div>
+											) : (
+												<div className="w-full" />
+											)}
+										</div>
+									</>
+								) : (
+									<>
+										{/* Left Column - Company Name (Vertically Centered) */}
+										<div className="p-1 pl-3 row-span-2 flex items-center">
+											<div className="font-inter font-bold text-[15.45px] w-full whitespace-normal break-words leading-4">
+												{contact.company || ''}
+											</div>
+										</div>
+										{/* Top Right - Location */}
+										<div className="p-1 pb-[1.5px] flex items-center">
+											{contact.city || stateAbbr ? (
+												<div className="flex items-center gap-2 w-full">
+													{stateAbbr && (
+														<span
+															className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
+															style={{
+																borderColor: 'rgba(0,0,0,0.7)',
+																backgroundColor: 'transparent',
+															}}
+														>
+															{stateAbbr}
+														</span>
+													)}
+													{contact.city ? (
+														<span className="text-xs text-black truncate w-full">
+															{contact.city}
+														</span>
+													) : (
+														<div className="w-full" />
+													)}
+												</div>
+											) : (
+												<div className="w-full" />
+											)}
+										</div>
+										{/* Bottom Right - Title */}
+										<div className="p-1 pt-0 flex items-center overflow-visible">
+											{contact.headline ? (
+												<div className="h-[20.54px] rounded-[6.64px] px-2 flex items-center w-full max-w-[150px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
+													<span className="text-xs text-black truncate">
+														{contact.headline}
+													</span>
+												</div>
+											) : (
+												<div className="w-full" />
+											)}
+										</div>
+									</>
+								)}
+							</div>
+						)}
 						<Button
 							type="button"
 							variant="icon"
@@ -288,6 +408,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 							<X className="h-5 w-5 text-destructive-dark" />
 						</Button>
 					</div>
+					<div className="-mx-4 h-[2px] bg-black" />
 
 					<div className="relative flex-1 bg-white" style={{ minHeight: '400px' }}>
 						{/* Organic grayscale blob animation overlay */}
@@ -311,7 +432,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 										radial-gradient(ellipse 70% 55% at 10% 40%, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0) 42%),
 										radial-gradient(ellipse 80% 60% at 35% 70%, rgba(0,0,0,0.07) 0%, rgba(0,0,0,0) 48%),
 										radial-gradient(ellipse 65% 50% at 75% 35%, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0) 45%)
-									`,
+										`,
 										backgroundSize: '180% 100%',
 										backgroundPosition: '0% 0%',
 									}}
@@ -326,7 +447,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 										radial-gradient(ellipse 55% 45% at 20% 65%, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0) 40%),
 										radial-gradient(ellipse 60% 50% at 55% 30%, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0) 44%),
 										radial-gradient(ellipse 50% 40% at 85% 75%, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0) 38%)
-									`,
+										`,
 										backgroundSize: '220% 100%',
 										backgroundPosition: '-20% 0%',
 									}}
@@ -342,7 +463,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 										radial-gradient(ellipse 60% 50% at 15% 85%, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 36%),
 										radial-gradient(ellipse 75% 55% at 65% 55%, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0) 42%),
 										radial-gradient(ellipse 55% 45% at 92% 20%, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 34%)
-									`,
+										`,
 										backgroundSize: '260% 100%',
 										backgroundPosition: '-40% 0%',
 									}}
@@ -372,6 +493,21 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 								{typedBody}
 							</div>
 						</div>
+					</div>
+
+					{/* Footer with Test button */}
+					<div className="p-4 border-t bg-background">
+						<Button
+							type="button"
+							onClick={onTest}
+							disabled={isDisabled}
+							className={
+								'h-[42px] w-full bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20' +
+								(isDisabled ? ' opacity-50 cursor-not-allowed' : ' opacity-100')
+							}
+						>
+							{isTesting ? 'Testing...' : 'Test Again'}
+						</Button>
 					</div>
 				</div>
 			</div>
