@@ -530,10 +530,35 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	// Derive selected mode key for stable overlay updates
 	const isFullSelected = watchedBlocks.some((b) => b.type === HybridBlock.full_automated);
-	const isManualSelected = watchedBlocks.every((b) => b.type === HybridBlock.text);
+	const isManualSelected =
+		watchedBlocks.length > 0 && watchedBlocks.every((b) => b.type === HybridBlock.text);
+	const lastModeRef = useRef<'full' | 'hybrid' | 'manual' | null>(null);
+	const [modeOverride, setModeOverride] = useState<'none' | null>(null);
+	useEffect(() => {
+		if (isFullSelected) {
+			lastModeRef.current = 'full';
+			setModeOverride(null);
+			return;
+		}
+		if (watchedBlocks.length === 0 && lastModeRef.current === 'full') {
+			setModeOverride('none');
+		} else {
+			setModeOverride(null);
+			if (isManualSelected) lastModeRef.current = 'manual';
+			else if (watchedBlocks.length > 0) lastModeRef.current = 'hybrid';
+			else lastModeRef.current = null;
+		}
+	}, [isFullSelected, isManualSelected, watchedBlocks.length]);
 	const selectedModeKey = useMemo(
-		() => (isFullSelected ? 'full' : isManualSelected ? 'manual' : 'hybrid'),
-		[isFullSelected, isManualSelected]
+		() =>
+			modeOverride === 'none'
+				? 'none'
+				: isFullSelected
+				? 'full'
+				: isManualSelected
+				? 'manual'
+				: 'hybrid',
+		[modeOverride, isFullSelected, isManualSelected]
 	);
 
 	const switchToFull = () => {
@@ -657,6 +682,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const dragBounds = useRef({ min: 0, max: 0 });
 
 	useEffect(() => {
+		if (selectedModeKey === 'none') {
+			setHighlightStyle({
+				left: 0,
+				width: 0,
+				opacity: 0,
+			});
+			if (isInitialRender) {
+				setIsInitialRender(false);
+			}
+			return;
+		}
 		let targetButton;
 		if (selectedModeKey === 'full') {
 			targetButton = fullModeButtonRef.current;
@@ -807,11 +843,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											onDragEnd={handleHighlightDragEnd}
 											modifiers={[restrictToHorizontalAxisAndBounds]}
 										>
-											<DraggableHighlight
-												style={highlightStyle}
-												isInitialRender={isInitialRender}
-												mode={selectedModeKey as 'full' | 'hybrid' | 'manual'}
-											/>
+											{selectedModeKey !== 'none' && (
+												<DraggableHighlight
+													style={highlightStyle}
+													isInitialRender={isInitialRender}
+													mode={selectedModeKey as 'full' | 'hybrid' | 'manual'}
+												/>
+											)}
 										</DndContext>
 										<Button
 											ref={fullModeButtonRef}
@@ -819,7 +857,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											type="button"
 											className={cn(
 												'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
-												watchedBlocks.some((b) => b.type === HybridBlock.full_automated)
+												selectedModeKey !== 'none' &&
+													watchedBlocks.some((b) => b.type === HybridBlock.full_automated)
 													? 'text-black'
 													: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 											)}
@@ -833,9 +872,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											type="button"
 											className={cn(
 												'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
-												!watchedBlocks.some(
-													(b) => b.type === HybridBlock.full_automated
-												) && !watchedBlocks.every((b) => b.type === HybridBlock.text)
+												selectedModeKey !== 'none' &&
+													!watchedBlocks.some(
+														(b) => b.type === HybridBlock.full_automated
+													) &&
+													!watchedBlocks.every((b) => b.type === HybridBlock.text)
 													? 'text-black'
 													: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 											)}
@@ -849,7 +890,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											type="button"
 											className={cn(
 												'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
-												watchedBlocks.every((b) => b.type === HybridBlock.text)
+												selectedModeKey !== 'none' &&
+													watchedBlocks.length > 0 &&
+													watchedBlocks.every((b) => b.type === HybridBlock.text)
 													? 'text-black'
 													: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 											)}
