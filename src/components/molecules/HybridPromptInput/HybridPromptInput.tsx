@@ -540,7 +540,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			setModeOverride(null);
 			return;
 		}
-		if (watchedBlocks.length === 0 && lastModeRef.current === 'full') {
+		if (
+			watchedBlocks.length === 0 &&
+			(lastModeRef.current === 'full' || lastModeRef.current === 'manual')
+		) {
 			setModeOverride('none');
 		} else {
 			setModeOverride(null);
