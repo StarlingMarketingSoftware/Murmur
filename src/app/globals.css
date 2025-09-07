@@ -3133,6 +3133,40 @@ body,
 	border-radius: 8px !important;
 }
 
+/* --- Test Preview Panel Custom Scrollbar --- */
+.test-preview-panel-content {
+	overflow: visible !important;
+}
+
+.test-preview-panel-content .scrollbar-hide {
+	height: 100% !important;
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+.test-preview-panel-content .scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+/* Force hide webkit scrollbar */
+.test-preview-panel-content::-webkit-scrollbar,
+.test-preview-panel-content *::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+.test-preview-panel-content,
+.test-preview-panel-content * {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+/* -------------------------------------- */
+
 /* Remove any background dividers from metrics column */
 .campaigns-table-container thead th:nth-child(2),
 .campaigns-table-container tbody td:nth-child(2) {

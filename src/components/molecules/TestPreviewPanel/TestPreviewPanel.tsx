@@ -15,6 +15,7 @@ import { convertHtmlToPlainText } from '@/utils/html';
 import { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
 export interface TestPreviewPanelProps {
 	setShowTestPreview: Dispatch<SetStateAction<boolean>>;
@@ -44,9 +45,12 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	const waveTweensRef = useRef<gsap.core.Tween[]>([]);
 	const typingTimerRef = useRef<number | null>(null);
 	const loadingTypingTimerRef = useRef<number | null>(null);
+	const boxRef = useRef<HTMLDivElement | null>(null);
 	const [typedSubject, setTypedSubject] = useState<string>('');
 	const [typedBody, setTypedBody] = useState<string>('');
 	const [loadingTyped, setLoadingTyped] = useState<string>('');
+	const WORD_LIMIT = 100;
+	const [clipAtHeight, setClipAtHeight] = useState<number | null>(null);
 
 	const fontFamily = form.watch('font') || 'Arial';
 
@@ -211,6 +215,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 		if (isLoading || (subjectTokens.length === 0 && bodyTokens.length === 0)) {
 			setTypedSubject('');
 			setTypedBody('');
+			setClipAtHeight(null);
 			if (typingTimerRef.current) {
 				window.clearInterval(typingTimerRef.current);
 				typingTimerRef.current = null;
@@ -219,6 +224,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 		}
 		setTypedSubject('');
 		setTypedBody('');
+		setClipAtHeight(null);
 		let phase: 'subject' | 'body' = subjectTokens.length > 0 ? 'subject' : 'body';
 		let index = 0;
 		if (typingTimerRef.current) {
@@ -292,10 +298,20 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 		};
 	}, [isLoading]);
 
+	// Capture full box height at 100 words and enable scroll
+	useEffect(() => {
+		const wordCount = typedBody.trim().split(/\s+/).filter(Boolean).length;
+		if (clipAtHeight === null && wordCount >= WORD_LIMIT) {
+			const box = boxRef.current;
+			const height = box?.clientHeight || 400;
+			setClipAtHeight(height);
+		}
+	}, [typedBody, clipAtHeight]);
+
 	return (
 		<div className="w-1/2 flex flex-col">
 			<div className="flex-1 flex flex-col px-3 pt-[18px] pb-0">
-				<div className="flex-1 border-2 border-black rounded-lg bg-background flex flex-col overflow-hidden mb-6 mt-[-4px] relative z-20">
+				<div className="flex-1 border-2 border-black rounded-lg bg-background flex flex-col overflow-visible mb-6 mt-[-4px] relative z-20">
 					<div className="relative px-2">
 						{contact && (
 							<div className="grid grid-cols-2 grid-rows-[auto_auto] w-full overflow-visible">
@@ -417,14 +433,74 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 							<X className="h-5 w-5 text-destructive-dark" />
 						</Button>
 					</div>
-					<div className="-mx-4 h-[2px] bg-black" />
+					<div className="h-[2px] bg-black" />
 
-					<div className="relative flex-1 bg-white" style={{ minHeight: '400px' }}>
+					<div
+						ref={boxRef}
+						className="relative flex-1 bg-white flex flex-col rounded-b-lg"
+						style={{
+							minHeight: '400px',
+							borderBottomLeftRadius: 'calc(var(--radius) - 2px)',
+							borderBottomRightRadius: 'calc(var(--radius) - 2px)',
+						}}
+					>
+						{/* Typing content with custom 2px scrollbar */}
+						{clipAtHeight !== null ? (
+							<div
+								style={{
+									height: (clipAtHeight as number) ?? '100%',
+									position: 'relative',
+									overflow: 'visible',
+								}}
+							>
+								<CustomScrollbar
+									className="h-full test-preview-panel-content"
+									thumbColor="#000000"
+									trackColor="transparent"
+									thumbWidth={2}
+									offsetRight={-5}
+								>
+									<div ref={contentRef} className="max-w-none text-[14px] p-6">
+										<div
+											className="whitespace-pre-wrap leading-[1.6] font-bold font-inter"
+											style={{ fontFamily: 'Inter' }}
+										>
+											{typedSubject}
+										</div>
+										{typedSubject && (typedBody || bodyTokens.length > 0) && (
+											<div className="h-3" />
+										)}
+										<div
+											className="whitespace-pre-wrap leading-[1.6]"
+											style={{ fontFamily }}
+										>
+											{typedBody}
+										</div>
+									</div>
+								</CustomScrollbar>
+							</div>
+						) : (
+							<div ref={contentRef} className="max-w-none text-[14px] p-6 flex-1">
+								<div
+									className="whitespace-pre-wrap leading-[1.6] font-bold font-inter"
+									style={{ fontFamily: 'Inter' }}
+								>
+									{typedSubject}
+								</div>
+								{typedSubject && (typedBody || bodyTokens.length > 0) && (
+									<div className="h-3" />
+								)}
+								<div className="whitespace-pre-wrap leading-[1.6]" style={{ fontFamily }}>
+									{typedBody}
+								</div>
+							</div>
+						)}
+
 						{/* Organic grayscale blob animation overlay */}
 						{isLoading && (
 							<div
 								ref={overlayRef}
-								className="absolute inset-0 pointer-events-none overflow-hidden"
+								className="absolute inset-0 pointer-events-none overflow-hidden z-30"
 								style={
 									{
 										// Removed mask gradient to prevent text cutoff
@@ -486,26 +562,16 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 								</div>
 							</div>
 						)}
-
-						{/* Typing content */}
-						<div ref={contentRef} className="max-w-none text-[14px] relative z-20 p-6">
-							<div
-								className="whitespace-pre-wrap leading-[1.6] font-bold font-inter"
-								style={{ fontFamily: 'Inter' }}
-							>
-								{typedSubject}
-							</div>
-							{typedSubject && (typedBody || bodyTokens.length > 0) && (
-								<div className="h-3" />
-							)}
-							<div className="whitespace-pre-wrap leading-[1.6]" style={{ fontFamily }}>
-								{typedBody}
-							</div>
-						</div>
 					</div>
 
 					{/* Footer with Test button */}
-					<div className="p-4 border-t bg-background">
+					<div
+						className="p-4 border-t bg-background rounded-b-md"
+						style={{
+							borderBottomLeftRadius: 'calc(0.625rem - 2px)',
+							borderBottomRightRadius: 'calc(0.625rem - 2px)',
+						}}
+					>
 						<Button
 							type="button"
 							onClick={onTest}
