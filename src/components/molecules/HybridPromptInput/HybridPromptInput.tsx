@@ -110,7 +110,9 @@ const SortableAIBlock = ({
 					? showTestPreview
 						? 'w-[416px]'
 						: 'w-[868px]'
-					: 'w-full',
+					: showTestPreview
+					? 'w-[416px]'
+					: 'w-[868px]',
 				!isIntroductionBlock &&
 					!isResearchBlock &&
 					!isActionBlock &&
@@ -157,7 +159,11 @@ const SortableAIBlock = ({
 				<div
 					className={cn(
 						'flex items-center w-full',
-						isCompactBlock ? 'p-2 h-full' : 'p-4'
+						isCompactBlock
+							? 'p-2 h-full'
+							: isFullAutomatedBlock || isTextBlock
+							? 'px-4 pt-2 pb-4'
+							: 'p-4'
 					)}
 				>
 					<div className={cn('flex-grow min-w-0', isCompactBlock && 'flex items-center')}>
@@ -167,7 +173,11 @@ const SortableAIBlock = ({
 						<div
 							className={cn(
 								'absolute z-30',
-								isCompactBlock ? 'right-2 top-1/2 -translate-y-1/2' : 'right-3 top-3'
+								isCompactBlock
+									? 'right-2 top-1/2 -translate-y-1/2'
+									: isFullAutomatedBlock || isTextBlock
+									? 'right-3 top-2'
+									: 'right-3 top-3'
 							)}
 						>
 							{!isTextBlock && !isFullAutomatedBlock && !isCompactBlock && (
@@ -312,7 +322,8 @@ const SortableAIBlock = ({
 								)}
 								<div
 									className={cn(
-										'mb-2 flex gap-2 min-h-7 items-center relative z-20',
+										'flex gap-2 min-h-7 items-center relative z-20',
+										isFullAutomatedBlock || isTextBlock ? 'mb-1' : 'mb-2',
 										isFullAutomatedBlock && showTestPreview && testMessage && 'flex-wrap'
 									)}
 								>
@@ -394,7 +405,7 @@ const SortableAIBlock = ({
 														onClick={(e) => e.stopPropagation()}
 														className={cn(
 															'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 bg-white',
-															isFullAutomatedBlock ? 'h-[260px] px-0 resize-none' : '',
+															isFullAutomatedBlock ? 'h-[195px] px-0 resize-none' : '',
 															shouldShowRedStyling ? 'placeholder:text-[#A20000]' : ''
 														)}
 														{...fieldProps}
@@ -799,6 +810,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											<DraggableHighlight
 												style={highlightStyle}
 												isInitialRender={isInitialRender}
+												mode={selectedModeKey as 'full' | 'hybrid' | 'manual'}
 											/>
 										</DndContext>
 										<Button
@@ -851,43 +863,40 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									className={cn('-mx-3 h-[2px] bg-black', showTestPreview && 'hidden')}
 								/>
 								{showTestPreview && <div className="h-2" />}
-								<FormField
-									control={form.control}
-									name="subject"
-									rules={{ required: form.watch('isAiSubject') }}
-									render={({ field }) => (
-										<FormItem>
-											<div
-												className={cn(
-													'flex items-center',
-													showTestPreview
-														? 'justify-end pr-[24px] mt-1 mb-1'
-														: 'justify-end mb-2 pr-5'
-												)}
+								<div className="flex flex-col items-center">
+									<FormField
+										control={form.control}
+										name="subject"
+										rules={{ required: form.watch('isAiSubject') }}
+										render={({ field }) => (
+											<FormItem
+												className={cn(showTestPreview ? 'w-[416px]' : 'w-[868px]')}
 											>
-												<div className="flex items-center gap-2"></div>
-												{hasBlocks && (
-													<button
-														type="button"
-														onClick={handleClearAllInside}
-														className={cn(
-															showTestPreview ? 'text-xs' : 'text-sm',
-															'font-inter font-medium text-[#AFAFAF] hover:underline',
-															showTestPreview ? 'mr-[12px]' : 'relative top-[4px]'
-														)}
-													>
-														Clear All
-													</button>
-												)}
-											</div>
-											<FormControl>
-												<div className="flex justify-center">
-													<div
-														className={cn(
-															'relative',
-															showTestPreview ? 'w-[416px]' : 'w-[868px]'
-														)}
-													>
+												<div
+													className={cn(
+														'flex items-center',
+														showTestPreview
+															? 'justify-end pr-[24px] mt-1 mb-1'
+															: 'justify-end mb-2 pr-5'
+													)}
+												>
+													<div className="flex items-center gap-2"></div>
+													{hasBlocks && (
+														<button
+															type="button"
+															onClick={handleClearAllInside}
+															className={cn(
+																showTestPreview ? 'text-xs' : 'text-sm',
+																'font-inter font-medium text-[#AFAFAF] hover:underline',
+																showTestPreview ? 'mr-[12px]' : 'relative top-[4px]'
+															)}
+														>
+															Clear All
+														</button>
+													)}
+												</div>
+												<FormControl>
+													<div className="relative">
 														<div className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex items-center gap-2">
 															<span className="font-inter font-semibold text-[17px] text-black">
 																Subject
@@ -941,12 +950,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															}}
 														/>
 													</div>
-												</div>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
-								/>
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+								</div>
 							</div>
 							<div className="flex-1 flex flex-col">
 								{/* Content area */}
@@ -970,15 +979,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 											return (
 												<Fragment key={field.id}>
-													<SortableAIBlock
-														id={field.id}
-														fieldIndex={index}
-														block={getBlock(field.type)}
-														onRemove={handleRemoveBlock}
-														trackFocusedField={trackFocusedField}
-														showTestPreview={showTestPreview}
-														testMessage={testMessage}
-													/>
+													<div className={cn(index === 0 && '-mt-6')}>
+														<SortableAIBlock
+															id={field.id}
+															fieldIndex={index}
+															block={getBlock(field.type)}
+															onRemove={handleRemoveBlock}
+															trackFocusedField={trackFocusedField}
+															showTestPreview={showTestPreview}
+															testMessage={testMessage}
+														/>
+													</div>
 													{/* Plus button under hybrid blocks */}
 													{isHybridBlock && !hasImmediateTextBlock && (
 														<div
@@ -1010,7 +1021,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							</div>
 
 							{/*  Signature Block */}
-							<div className="px-3 pb-0 mt-auto flex justify-center">
+							<div className="px-3 pb-0 mt-auto pt-12 flex justify-center">
 								<FormField
 									control={form.control}
 									name="signature"
@@ -1055,7 +1066,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								showTestPreview && 'hidden'
 							)}
 						>
-							<div className="flex justify-center -mt-2 mb-4 w-full">
+							<div className="flex justify-center mt-1 mb-4 w-full">
 								<Button
 									type="button"
 									onClick={() => {

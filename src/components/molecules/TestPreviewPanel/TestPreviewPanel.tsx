@@ -14,6 +14,7 @@ import { gsap } from 'gsap';
 import { convertHtmlToPlainText } from '@/utils/html';
 import { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
+import { stateBadgeColorMap } from '@/constants/ui';
 
 export interface TestPreviewPanelProps {
 	setShowTestPreview: Dispatch<SetStateAction<boolean>>;
@@ -58,6 +59,10 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 		if (!contact?.state) return '';
 		return getStateAbbreviation(contact.state) || '';
 	}, [contact?.state]);
+
+	const isUSState = useMemo(() => {
+		return stateAbbr && stateBadgeColorMap.hasOwnProperty(stateAbbr);
+	}, [stateAbbr]);
 
 	const { subjectTokens, bodyTokens } = useMemo(() => {
 		if (!testMessage)
@@ -311,7 +316,9 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 															className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
 															style={{
 																borderColor: 'rgba(0,0,0,0.7)',
-																backgroundColor: 'transparent',
+																backgroundColor: isUSState
+																	? stateBadgeColorMap[stateAbbr]
+																	: 'transparent',
 															}}
 														>
 															{stateAbbr}
@@ -365,7 +372,9 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 															className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
 															style={{
 																borderColor: 'rgba(0,0,0,0.7)',
-																backgroundColor: 'transparent',
+																backgroundColor: isUSState
+																	? stateBadgeColorMap[stateAbbr]
+																	: 'transparent',
 															}}
 														>
 															{stateAbbr}
