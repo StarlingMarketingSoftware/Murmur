@@ -90,22 +90,22 @@ const SortableAIBlock = ({
 			ref={setNodeRef}
 			style={style}
 			className={cn(
-				'relative rounded-md p-0.5',
-				isIntroductionBlock &&
-					'bg-gradient-to-r from-[#C9C9FF] via-[#5E6399] to-[#C9C9FF]',
-				isResearchBlock && 'bg-gradient-to-r from-[#4A4AD9] via-[#272773] to-[#4A4AD9]',
-				isActionBlock && 'bg-gradient-to-r from-[#040488] via-[#020255] to-[#040488]',
-				isIntroductionBlock || isResearchBlock || isActionBlock
-					? ''
-					: 'border-2 border-gray-300 bg-background',
+				'relative rounded-md',
+				isIntroductionBlock && 'border-2 border-[#6673FF] bg-background',
+				isResearchBlock && 'border-2 border-[#1010E7] bg-background',
+				isActionBlock && 'border-2 border-[#0E0E7F] bg-background',
+				!isIntroductionBlock &&
+					!isResearchBlock &&
+					!isActionBlock &&
+					'border-2 border-gray-300 bg-background',
 				isTextBlock
 					? showTestPreview
 						? 'w-[416px] h-[44px]'
 						: 'w-[868px] h-[80px]'
 					: isCompactBlock
 					? showTestPreview
-						? 'w-[416px] h-[44px]'
-						: 'w-[868px] h-[44px]'
+						? 'w-[416px] h-[31px]'
+						: 'w-[868px] h-[31px]'
 					: isFullAutomatedBlock
 					? showTestPreview
 						? 'w-[416px]'
@@ -145,8 +145,8 @@ const SortableAIBlock = ({
 								: 'h-[80px] w-[172px]'
 							: isCompactBlock
 							? showTestPreview
-								? 'h-[44px] w-[80px]'
-								: 'h-[44px] w-[140px]'
+								? 'h-[31px] w-[80px]'
+								: 'h-[31px] w-[140px]'
 							: 'h-12',
 						isFullAutomatedBlock
 							? 'w-[172px]'
@@ -265,21 +265,18 @@ const SortableAIBlock = ({
 									// Compact blocks with "Hybrid"
 									<>
 										<div className="flex flex-col justify-center w-[140px]">
-											<span className="font-inter font-medium text-[17px] leading-[14px]">
-												Hybrid
-											</span>
 											<span
 												className={cn(
-													'font-inter font-normal text-xs leading-[14px] mt-1',
-													isIntroductionBlock && 'text-[#9D9DFF]',
-													isResearchBlock && 'text-[#4A4AD9]',
-													isActionBlock && 'text-[#040488]'
+													'font-inter font-medium text-[17px] leading-[17px] text-[#000000]',
+													isIntroductionBlock && '',
+													isResearchBlock && '',
+													isActionBlock && ''
 												)}
 											>
 												{isIntroductionBlock
 													? 'Intro'
 													: isResearchBlock
-													? 'RC'
+													? 'Resarch'
 													: isActionBlock
 													? 'CTA'
 													: (block as { label: string }).label}
@@ -315,11 +312,7 @@ const SortableAIBlock = ({
 						) : (
 							// Non-compact blocks
 							<>
-								{!isTextBlock && !isFullAutomatedBlock && (
-									<span className="font-inter font-medium text-[17px] mb-2 block">
-										Hybrid
-									</span>
-								)}
+								{!isTextBlock && !isFullAutomatedBlock && <></>}
 								<div
 									className={cn(
 										'flex gap-2 min-h-7 items-center relative z-20',
