@@ -127,9 +127,8 @@ const SortableAIBlock = ({
 			{/* Inner content wrapper */}
 			<div
 				className={cn(
-					isIntroductionBlock || isResearchBlock || isActionBlock
-						? 'bg-background rounded-md h-full'
-						: '',
+					(isIntroductionBlock || isResearchBlock || isActionBlock) &&
+						'bg-[#DADAFC] rounded-md h-full',
 					'relative'
 				)}
 			>
@@ -228,15 +227,19 @@ const SortableAIBlock = ({
 											return (
 												<input
 													type="text"
-													placeholder={block.placeholder}
+													placeholder={
+														isIntroductionBlock ? 'Automated Intro' : block.placeholder
+													}
 													onClick={(e) => e.stopPropagation()}
 													className={cn(
-														'flex-1 bg-white outline-none text-sm',
+														'flex-1 outline-none text-sm',
+														isIntroductionBlock || isResearchBlock || isActionBlock
+															? '!bg-[#DADAFC] [&]:!bg-[#DADAFC]'
+															: 'bg-white',
+														(isIntroductionBlock || isResearchBlock || isActionBlock) &&
+															'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
 														showTestPreview ? 'pl-0 -ml-[72px]' : 'pl-6',
-														'pr-12',
-														shouldShowRedStyling
-															? 'placeholder:text-[#A20000]'
-															: 'placeholder:text-[#000000]'
+														'pr-12'
 													)}
 													{...fieldProps}
 													onFocus={(e) => {
@@ -292,10 +295,20 @@ const SortableAIBlock = ({
 													placeholder={block.placeholder}
 													onClick={(e) => e.stopPropagation()}
 													className={cn(
-														'flex-1 bg-white outline-none text-sm placeholder:text-gray-400',
+														'flex-1 outline-none text-sm',
+														isIntroductionBlock || isResearchBlock || isActionBlock
+															? '!bg-[#DADAFC]'
+															: 'bg-white placeholder:text-gray-400',
+														(isIntroductionBlock || isResearchBlock || isActionBlock) &&
+															'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
 														showTestPreview ? 'pl-0 -ml-[72px]' : 'pl-6',
 														'pr-12'
 													)}
+													style={
+														isIntroductionBlock || isResearchBlock || isActionBlock
+															? { backgroundColor: '#DADAFC' }
+															: undefined
+													}
 													{...fieldProps}
 													onFocus={(e) => {
 														trackFocusedField?.(
@@ -397,10 +410,20 @@ const SortableAIBlock = ({
 														}
 														onClick={(e) => e.stopPropagation()}
 														className={cn(
-															'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 bg-white',
+															'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0',
+															isIntroductionBlock
+																? '!bg-[#DADAFC] [&]:!bg-[#DADAFC]'
+																: 'bg-white',
 															isFullAutomatedBlock ? 'h-[195px] px-0 resize-none' : '',
-															shouldShowRedStyling ? 'placeholder:text-[#A20000]' : ''
+															shouldShowRedStyling ? 'placeholder:text-[#A20000]' : '',
+															(isIntroductionBlock || isResearchBlock || isActionBlock) &&
+																'font-inter placeholder:italic placeholder:text-[#5d5d5d]'
 														)}
+														style={
+															isIntroductionBlock
+																? { backgroundColor: '#DADAFC' }
+																: undefined
+														}
 														{...fieldProps}
 														onFocus={(e) => {
 															trackFocusedField?.(
@@ -438,11 +461,25 @@ const SortableAIBlock = ({
 													<Input
 														placeholder={
 															'placeholder' in block
-																? (block as { placeholder?: string }).placeholder || ''
+																? isIntroductionBlock
+																	? 'Automated Intro'
+																	: (block as { placeholder?: string }).placeholder || ''
 																: ''
 														}
 														onClick={(e) => e.stopPropagation()}
-														className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-white"
+														className={cn(
+															'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
+															isIntroductionBlock
+																? '!bg-[#DADAFC] [&]:!bg-[#DADAFC]'
+																: 'bg-white',
+															(isIntroductionBlock || isResearchBlock || isActionBlock) &&
+																'font-inter placeholder:italic placeholder:text-[#5d5d5d]'
+														)}
+														style={
+															isIntroductionBlock
+																? { backgroundColor: '#DADAFC' }
+																: undefined
+														}
 														{...fieldProps}
 														onFocus={(e) => {
 															trackFocusedField?.(
