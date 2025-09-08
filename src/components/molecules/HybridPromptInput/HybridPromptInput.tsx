@@ -55,11 +55,10 @@ const SortableAIBlock = ({
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
 		useSortable({ id });
 	const form = useFormContext<DraftingFormValues>();
-	const [isEdit, setIsEdit] = useState(
-		form.getValues(`hybridBlockPrompts.${fieldIndex}.value`) !== ''
-	);
 	// Track if the text field has been touched (user has interacted with it)
 	const [hasBeenTouched, setHasBeenTouched] = useState(false);
+	// Track if advanced mode is enabled for hybrid blocks
+	const [isAdvancedEnabled, setIsAdvancedEnabled] = useState(false);
 
 	const style = {
 		transform: CSS.Transform.toString(transform),
@@ -180,17 +179,18 @@ const SortableAIBlock = ({
 							)}
 						>
 							{!isTextBlock && !isFullAutomatedBlock && !isCompactBlock && (
-								<Button
+								<button
 									type="button"
-									className="mr-1"
-									variant="action-link"
 									onClick={(e) => {
 										e.stopPropagation();
-										setIsEdit(!isEdit);
+										setIsAdvancedEnabled(!isAdvancedEnabled);
 									}}
+									className="mr-2 flex items-center gap-[2px] text-[11px] font-inter text-[#000000]"
 								>
-									{isEdit ? 'Cancel' : 'Edit'}
-								</Button>
+									<span>|</span>
+									<span>Advanced</span>
+									<span>|</span>
+								</button>
 							)}
 							<Button
 								type="button"
@@ -290,33 +290,58 @@ const SortableAIBlock = ({
 												`hybridBlockPrompts.${fieldIndex}.value`
 											);
 											return (
-												<input
-													type="text"
-													placeholder={block.placeholder}
-													onClick={(e) => e.stopPropagation()}
-													className={cn(
-														'flex-1 outline-none text-sm',
-														isIntroductionBlock || isResearchBlock || isActionBlock
-															? '!bg-[#DADAFC]'
-															: 'bg-white placeholder:text-gray-400',
-														(isIntroductionBlock || isResearchBlock || isActionBlock) &&
-															'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
-														showTestPreview ? 'pl-0 -ml-[72px]' : 'pl-6',
-														'pr-12'
+												<>
+													<input
+														type="text"
+														placeholder={block.placeholder}
+														onClick={(e) => e.stopPropagation()}
+														disabled={
+															(isIntroductionBlock || isResearchBlock || isActionBlock) &&
+															!isAdvancedEnabled
+														}
+														className={cn(
+															'flex-1 outline-none text-sm',
+															isIntroductionBlock || isResearchBlock || isActionBlock
+																? '!bg-[#DADAFC]'
+																: 'bg-white placeholder:text-gray-400',
+															(isIntroductionBlock || isResearchBlock || isActionBlock) &&
+																'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
+															showTestPreview ? 'pl-0 -ml-[72px]' : 'pl-6',
+															isIntroductionBlock || isResearchBlock || isActionBlock
+																? 'pr-24'
+																: 'pr-12',
+															(isIntroductionBlock || isResearchBlock || isActionBlock) &&
+																!isAdvancedEnabled &&
+																'cursor-not-allowed'
+														)}
+														style={
+															isIntroductionBlock || isResearchBlock || isActionBlock
+																? { backgroundColor: '#DADAFC' }
+																: undefined
+														}
+														{...fieldProps}
+														onFocus={(e) => {
+															trackFocusedField?.(
+																`hybridBlockPrompts.${fieldIndex}.value`,
+																e.target as HTMLInputElement
+															);
+														}}
+													/>
+													{(isIntroductionBlock || isResearchBlock || isActionBlock) && (
+														<button
+															type="button"
+															onClick={(e) => {
+																e.stopPropagation();
+																setIsAdvancedEnabled(!isAdvancedEnabled);
+															}}
+															className="absolute right-10 flex items-center gap-[2px] text-[10px] font-inter text-[#000000]"
+														>
+															<span>|</span>
+															<span>Advanced</span>
+															<span>|</span>
+														</button>
 													)}
-													style={
-														isIntroductionBlock || isResearchBlock || isActionBlock
-															? { backgroundColor: '#DADAFC' }
-															: undefined
-													}
-													{...fieldProps}
-													onFocus={(e) => {
-														trackFocusedField?.(
-															`hybridBlockPrompts.${fieldIndex}.value`,
-															e.target as HTMLInputElement
-														);
-													}}
-												/>
+												</>
 											);
 										})()}
 									</>
@@ -450,46 +475,43 @@ const SortableAIBlock = ({
 										);
 									})()
 								) : (
-									// For other blocks, show input only when in edit mode
+									// For other blocks, show input always but disabled until Advanced is clicked
 									<>
-										{isEdit &&
-											(() => {
-												const fieldProps = form.register(
-													`hybridBlockPrompts.${fieldIndex}.value`
-												);
-												return (
-													<Input
-														placeholder={
-															'placeholder' in block
-																? isIntroductionBlock
-																	? 'Automated Intro'
-																	: (block as { placeholder?: string }).placeholder || ''
-																: ''
-														}
-														onClick={(e) => e.stopPropagation()}
-														className={cn(
-															'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
-															isIntroductionBlock
-																? '!bg-[#DADAFC] [&]:!bg-[#DADAFC]'
-																: 'bg-white',
-															(isIntroductionBlock || isResearchBlock || isActionBlock) &&
-																'font-inter placeholder:italic placeholder:text-[#5d5d5d]'
-														)}
-														style={
-															isIntroductionBlock
-																? { backgroundColor: '#DADAFC' }
-																: undefined
-														}
-														{...fieldProps}
-														onFocus={(e) => {
-															trackFocusedField?.(
-																`hybridBlockPrompts.${fieldIndex}.value`,
-																e.target as HTMLInputElement
-															);
-														}}
-													/>
-												);
-											})()}
+										{(() => {
+											const fieldProps = form.register(
+												`hybridBlockPrompts.${fieldIndex}.value`
+											);
+											const isHybridBlock =
+												isIntroductionBlock || isResearchBlock || isActionBlock;
+											if (!isHybridBlock) return null;
+											return (
+												<Input
+													placeholder={
+														'placeholder' in block
+															? isIntroductionBlock
+																? 'Automated Intro'
+																: (block as { placeholder?: string }).placeholder || ''
+															: ''
+													}
+													onClick={(e) => e.stopPropagation()}
+													disabled={!isAdvancedEnabled}
+													className={cn(
+														'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
+														'!bg-[#DADAFC] [&]:!bg-[#DADAFC]',
+														'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
+														!isAdvancedEnabled && 'cursor-not-allowed'
+													)}
+													style={{ backgroundColor: '#DADAFC' }}
+													{...fieldProps}
+													onFocus={(e) => {
+														trackFocusedField?.(
+															`hybridBlockPrompts.${fieldIndex}.value`,
+															e.target as HTMLInputElement
+														);
+													}}
+												/>
+											);
+										})()}
 									</>
 								)}
 							</>
