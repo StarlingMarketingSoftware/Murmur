@@ -24,22 +24,19 @@ export const BLOCKS = [
 		label: 'Introduction',
 		value: HybridBlock.introduction,
 		help: 'Optional. Write a brief prompt for the AI about how to introduce you. This will include the greeting line and the first paragraph of the email.',
-		placeholder:
-			'Automated Introduction. Type to specify further, i.e "I am ... and I lead ..."',
+		placeholder: 'Automated Intro',
 	},
 	{
 		label: 'Research Contact',
 		value: HybridBlock.research,
 		help: 'Optional. Write a brief prompt for the AI about how to write about the recipient.',
-		placeholder:
-			'Automated research. Type to specify further, i.e "reference similar acts to ..."',
+		placeholder: 'Automated Research on who you’re sending to',
 	},
 	{
 		label: 'Call to Action',
 		value: HybridBlock.action,
 		help: 'Optional. Write a brief prompt for the AI about how you want the recipient to respond (email, phone call, etc.)',
-		placeholder:
-			'Automated Call to Action. Type to specify further, i.e "direct towards phone call"',
+		placeholder: 'Automated Call to Action',
 	},
 	{
 		label: 'Full Automated',
