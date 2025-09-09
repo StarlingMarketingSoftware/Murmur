@@ -96,7 +96,7 @@ const SortableAIBlock = ({
 			ref={setNodeRef}
 			style={style}
 			className={cn(
-				'relative rounded-md',
+				'relative rounded-md overflow-hidden',
 				isIntroductionBlock && 'border-2 border-[#6673FF] bg-background',
 				isResearchBlock && 'border-2 border-[#1010E7] bg-background',
 				isActionBlock && 'border-2 border-[#0E0E7F] bg-background',
@@ -135,7 +135,7 @@ const SortableAIBlock = ({
 				className={cn(
 					(isIntroductionBlock || isResearchBlock || isActionBlock) &&
 						!isAdvancedEnabled &&
-						'bg-[#DADAFC] rounded-md h-full',
+						'bg-[#DADAFC] h-full',
 					'relative'
 				)}
 			>
@@ -183,8 +183,8 @@ const SortableAIBlock = ({
 								'absolute z-30',
 								isCompactBlock
 									? isAdvancedEnabled
-										? 'right-2 top-[12.5px] -translate-y-1/2'
-										: 'right-2 top-1/2 -translate-y-1/2'
+										? 'right-1 top-[12.5px] -translate-y-1/2'
+										: 'right-1 top-1/2 -translate-y-1/2'
 									: isFullAutomatedBlock || isTextBlock
 									? 'right-3 top-2'
 									: 'right-3 top-3'
@@ -287,7 +287,7 @@ const SortableAIBlock = ({
 										{isAdvancedEnabled &&
 										(isIntroductionBlock || isResearchBlock || isActionBlock) ? (
 											// Expanded layout with top section and input below
-											<div className="w-full h-full flex flex-col bg-[#DADAFC] rounded-md overflow-hidden">
+											<div className="w-full h-full flex flex-col bg-[#DADAFC]">
 												{/* Top section - maintains original compact layout */}
 												<div className="relative flex items-center h-[25px] px-2 bg-[#DADAFC]">
 													<div className="flex flex-col justify-center w-[90px]">
@@ -327,7 +327,18 @@ const SortableAIBlock = ({
 													</button>
 												</div>
 												{/* Horizontal divider */}
-												<div className="w-full border-b border-black" />
+												<div
+													className="w-full border-b-2"
+													style={{
+														borderColor: isIntroductionBlock
+															? '#6673FF'
+															: isResearchBlock
+															? '#1010E7'
+															: isActionBlock
+															? '#0E0E7F'
+															: '#000000',
+													}}
+												/>
 												{/* Input section below */}
 												<div className="flex-1 flex items-end pb-2 pt-1 px-2 bg-white">
 													<div className="w-[90px] flex-shrink-0" />
@@ -1223,7 +1234,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							</div>
 							<div className="flex-1 flex flex-col">
 								{/* Content area */}
-								<div className="pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
+								<div className="pt-[16px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
 									{fields.length === 0 && (
 										<span className="text-gray-300 font-primary text-[12px]">
 											Add blocks here to build your prompt...
@@ -1243,7 +1254,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 											return (
 												<Fragment key={field.id}>
-													<div className={cn(index === 0 && '-mt-6')}>
+													<div className={cn(index === 0 && '-mt-2')}>
 														<SortableAIBlock
 															id={field.id}
 															fieldIndex={index}
