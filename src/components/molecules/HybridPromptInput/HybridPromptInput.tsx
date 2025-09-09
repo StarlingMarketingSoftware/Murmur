@@ -183,13 +183,13 @@ const SortableAIBlock = ({
 									type="button"
 									onClick={(e) => {
 										e.stopPropagation();
-										setIsAdvancedEnabled(!isAdvancedEnabled);
+										setIsAdvancedEnabled(true);
 									}}
-									className="mr-2 flex items-center gap-[2px] text-[11px] font-inter text-[#000000]"
+									className="absolute top-0 bottom-0 right-14 w-[75px] flex items-center justify-center text-[12px] font-inter font-normal text-[#000000] cursor-pointer hover:bg-[#C4C4F5] active:bg-[#B0B0E8] transition-colors"
 								>
-									<span>|</span>
+									<span className="absolute left-0 h-full border-l border-[#000000]"></span>
 									<span>Advanced</span>
-									<span>|</span>
+									<span className="absolute right-0 h-full border-r border-[#000000]"></span>
 								</button>
 							)}
 							<Button
@@ -289,6 +289,7 @@ const SortableAIBlock = ({
 											const fieldProps = form.register(
 												`hybridBlockPrompts.${fieldIndex}.value`
 											);
+
 											return (
 												<>
 													<input
@@ -312,7 +313,7 @@ const SortableAIBlock = ({
 																: 'pr-12',
 															(isIntroductionBlock || isResearchBlock || isActionBlock) &&
 																!isAdvancedEnabled &&
-																'cursor-not-allowed'
+																'cursor-default'
 														)}
 														style={
 															isIntroductionBlock || isResearchBlock || isActionBlock
@@ -320,11 +321,42 @@ const SortableAIBlock = ({
 																: undefined
 														}
 														{...fieldProps}
+														ref={(el) => {
+															// Combine react-hook-form ref with our custom ref
+															fieldProps.ref(el);
+															// Auto-focus when advanced is enabled
+															if (
+																el &&
+																isAdvancedEnabled &&
+																(isIntroductionBlock || isResearchBlock || isActionBlock)
+															) {
+																setTimeout(() => el.focus(), 0);
+															}
+														}}
 														onFocus={(e) => {
 															trackFocusedField?.(
 																`hybridBlockPrompts.${fieldIndex}.value`,
 																e.target as HTMLInputElement
 															);
+															// Hide cursor when focused
+															if (
+																isIntroductionBlock ||
+																isResearchBlock ||
+																isActionBlock
+															) {
+																e.target.style.cursor = 'text';
+															}
+														}}
+														onBlur={(e) => {
+															fieldProps.onBlur(e);
+															// Restore cursor when unfocused
+															if (
+																isIntroductionBlock ||
+																isResearchBlock ||
+																isActionBlock
+															) {
+																e.target.style.cursor = '';
+															}
 														}}
 													/>
 													{(isIntroductionBlock || isResearchBlock || isActionBlock) && (
@@ -332,13 +364,13 @@ const SortableAIBlock = ({
 															type="button"
 															onClick={(e) => {
 																e.stopPropagation();
-																setIsAdvancedEnabled(!isAdvancedEnabled);
+																setIsAdvancedEnabled(true);
 															}}
-															className="absolute right-10 flex items-center gap-[2px] text-[10px] font-inter text-[#000000]"
+															className="absolute right-10 top-0 bottom-0 w-[75px] flex items-center justify-center text-[12px] font-inter font-normal text-[#000000] cursor-pointer hover:bg-[#C4C4F5] active:bg-[#B0B0E8] transition-colors"
 														>
-															<span>|</span>
+															<span className="absolute left-0 h-full border-l border-[#000000]"></span>
 															<span>Advanced</span>
-															<span>|</span>
+															<span className="absolute right-0 h-full border-r border-[#000000]"></span>
 														</button>
 													)}
 												</>
@@ -484,6 +516,7 @@ const SortableAIBlock = ({
 											const isHybridBlock =
 												isIntroductionBlock || isResearchBlock || isActionBlock;
 											if (!isHybridBlock) return null;
+
 											return (
 												<Input
 													placeholder={
@@ -499,15 +532,30 @@ const SortableAIBlock = ({
 														'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
 														'!bg-[#DADAFC] [&]:!bg-[#DADAFC]',
 														'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
-														!isAdvancedEnabled && 'cursor-not-allowed'
+														!isAdvancedEnabled && 'cursor-default'
 													)}
 													style={{ backgroundColor: '#DADAFC' }}
 													{...fieldProps}
+													ref={(el) => {
+														// Combine react-hook-form ref with our custom ref
+														fieldProps.ref(el);
+														// Auto-focus when advanced is enabled
+														if (el && isAdvancedEnabled) {
+															setTimeout(() => el.focus(), 0);
+														}
+													}}
 													onFocus={(e) => {
 														trackFocusedField?.(
 															`hybridBlockPrompts.${fieldIndex}.value`,
 															e.target as HTMLInputElement
 														);
+														// Set text cursor when focused
+														e.target.style.cursor = 'text';
+													}}
+													onBlur={(e) => {
+														fieldProps.onBlur(e);
+														// Restore cursor when unfocused
+														e.target.style.cursor = '';
 													}}
 												/>
 											);
