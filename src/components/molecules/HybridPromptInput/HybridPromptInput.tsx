@@ -59,6 +59,13 @@ const SortableAIBlock = ({
 	const [hasBeenTouched, setHasBeenTouched] = useState(false);
 	// Track if advanced mode is enabled for hybrid blocks
 	const [isAdvancedEnabled, setIsAdvancedEnabled] = useState(false);
+	// When a block is opened (advanced), focus its input once
+	const advancedInputRef = useRef<HTMLInputElement | null>(null);
+	useEffect(() => {
+		if (isAdvancedEnabled) {
+			advancedInputRef.current?.focus();
+		}
+	}, [isAdvancedEnabled]);
 
 	const style = {
 		transform: CSS.Transform.toString(transform),
@@ -282,7 +289,7 @@ const SortableAIBlock = ({
 											// Expanded layout with top section and input below
 											<div className="w-full h-full flex flex-col bg-[#DADAFC] rounded-md overflow-hidden">
 												{/* Top section - maintains original compact layout */}
-												<div className="flex items-center h-[25px] px-2 bg-[#DADAFC]">
+												<div className="relative flex items-center h-[25px] px-2 bg-[#DADAFC]">
 													<div className="flex flex-col justify-center w-[90px]">
 														<span
 															className={cn(
@@ -306,6 +313,18 @@ const SortableAIBlock = ({
 															{block.placeholder}
 														</span>
 													</div>
+													<button
+														type="button"
+														onClick={(e) => {
+															e.stopPropagation();
+															setIsAdvancedEnabled(false);
+														}}
+														className="absolute right-10 top-0 bottom-0 w-[75px] flex items-center justify-center text-[12px] font-inter font-normal text-white bg-[#5353AF] cursor-pointer hover:bg-[#4a4a9d] active:bg-[#42428c] transition-colors"
+													>
+														<span className="absolute left-0 h-full border-l border-black"></span>
+														<span>Advanced</span>
+														<span className="absolute right-0 h-full border-r border-black"></span>
+													</button>
 												</div>
 												{/* Horizontal divider */}
 												<div className="w-full border-b border-black" />
@@ -330,10 +349,8 @@ const SortableAIBlock = ({
 																	style={{ backgroundColor: '#FFFFFF' }}
 																	{...fieldProps}
 																	ref={(el) => {
+																		advancedInputRef.current = el;
 																		fieldProps.ref(el);
-																		if (el) {
-																			setTimeout(() => el.focus(), 0);
-																		}
 																	}}
 																	onFocus={(e) => {
 																		trackFocusedField?.(
@@ -418,10 +435,6 @@ const SortableAIBlock = ({
 																ref={(el) => {
 																	// Combine react-hook-form ref with our custom ref
 																	fieldProps.ref(el);
-																	// Auto-focus when advanced is enabled
-																	if (el && isAdvancedEnabled) {
-																		setTimeout(() => el.focus(), 0);
-																	}
 																}}
 																onFocus={(e) => {
 																	trackFocusedField?.(
@@ -634,10 +647,6 @@ const SortableAIBlock = ({
 													ref={(el) => {
 														// Combine react-hook-form ref with our custom ref
 														fieldProps.ref(el);
-														// Auto-focus when advanced is enabled
-														if (el && isAdvancedEnabled) {
-															setTimeout(() => el.focus(), 0);
-														}
 													}}
 													onFocus={(e) => {
 														trackFocusedField?.(
@@ -698,45 +707,51 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		hasSubjectBeenTouched &&
 		(!subjectValue || subjectValue.trim() === '');
 
-	const watchedBlocks = form.watch('hybridBlockPrompts') || [];
 	const isHandwrittenMode =
-		watchedBlocks.length > 0 && watchedBlocks.every((b) => b.type === HybridBlock.text);
-	const hasBlocks = (form.watch('hybridBlockPrompts')?.length || 0) > 0;
+		(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
+		form.getValues('hybridBlockPrompts').every((b) => b.type === HybridBlock.text);
+	const hasBlocks = (form.getValues('hybridBlockPrompts')?.length || 0) > 0;
 
 	// Check for empty text blocks
-	const hasEmptyTextBlocks = watchedBlocks.some(
-		(block) =>
-			block.type === HybridBlock.text && (!block.value || block.value.trim() === '')
-	);
+	const hasEmptyTextBlocks = form
+		.getValues('hybridBlockPrompts')
+		?.some(
+			(block) =>
+				block.type === HybridBlock.text && (!block.value || block.value.trim() === '')
+		);
 
 	// Determine if any empty text block has been touched (blurred) to align with per-block red logic
 	// Access touchedFields to subscribe to touch updates
 	const touchedFields = form.formState.touchedFields as unknown as {
 		hybridBlockPrompts?: Array<{ value?: boolean }>;
 	};
-	const hasTouchedEmptyTextBlocks = watchedBlocks.some(
-		(block: { type: HybridBlock; value: string }, index: number) => {
+	const hasTouchedEmptyTextBlocks = form
+		.getValues('hybridBlockPrompts')
+		?.some((block: { type: HybridBlock; value: string }, index: number) => {
 			if (block.type !== HybridBlock.text) return false;
 			const isTouched = Boolean(touchedFields?.hybridBlockPrompts?.[index]?.value);
 			const isEmpty = !block.value || block.value.trim() === '';
 			return isTouched && isEmpty;
-		}
-	);
+		});
 
 	// Derive selected mode key for stable overlay updates
-	const isFullSelected = watchedBlocks.some((b) => b.type === HybridBlock.full_automated);
+	const isFullSelected = form
+		.getValues('hybridBlockPrompts')
+		?.some((b) => b.type === HybridBlock.full_automated);
 	const isManualSelected =
-		watchedBlocks.length > 0 && watchedBlocks.every((b) => b.type === HybridBlock.text);
+		(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
+		form.getValues('hybridBlockPrompts').every((b) => b.type === HybridBlock.text);
 	const lastModeRef = useRef<'full' | 'hybrid' | 'manual' | null>(null);
 	const [modeOverride, setModeOverride] = useState<'none' | null>(null);
 	useEffect(() => {
+		const blocks = form.getValues('hybridBlockPrompts') || [];
 		if (isFullSelected) {
 			lastModeRef.current = 'full';
 			setModeOverride(null);
 			return;
 		}
 		if (
-			watchedBlocks.length === 0 &&
+			blocks.length === 0 &&
 			(lastModeRef.current === 'full' ||
 				lastModeRef.current === 'manual' ||
 				lastModeRef.current === 'hybrid')
@@ -745,10 +760,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		} else {
 			setModeOverride(null);
 			if (isManualSelected) lastModeRef.current = 'manual';
-			else if (watchedBlocks.length > 0) lastModeRef.current = 'hybrid';
+			else if (blocks.length > 0) lastModeRef.current = 'hybrid';
 			else lastModeRef.current = null;
 		}
-	}, [isFullSelected, isManualSelected, watchedBlocks.length]);
+	}, [isFullSelected, isManualSelected, fields]); // depends on fields length now
 	const selectedModeKey = useMemo(
 		() =>
 			modeOverride === 'none'
@@ -1058,7 +1073,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											className={cn(
 												'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
 												selectedModeKey !== 'none' &&
-													watchedBlocks.some((b) => b.type === HybridBlock.full_automated)
+													form
+														.getValues('hybridBlockPrompts')
+														?.some((b) => b.type === HybridBlock.full_automated)
 													? 'text-black'
 													: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 											)}
@@ -1073,10 +1090,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											className={cn(
 												'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
 												selectedModeKey !== 'none' &&
-													!watchedBlocks.some(
-														(b) => b.type === HybridBlock.full_automated
-													) &&
-													!watchedBlocks.every((b) => b.type === HybridBlock.text)
+													!form
+														.getValues('hybridBlockPrompts')
+														?.some((b) => b.type === HybridBlock.full_automated) &&
+													!form
+														.getValues('hybridBlockPrompts')
+														?.every((b) => b.type === HybridBlock.text)
 													? 'text-black'
 													: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 											)}
@@ -1091,8 +1110,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											className={cn(
 												'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
 												selectedModeKey !== 'none' &&
-													watchedBlocks.length > 0 &&
-													watchedBlocks.every((b) => b.type === HybridBlock.text)
+													(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
+													form
+														.getValues('hybridBlockPrompts')
+														?.every((b) => b.type === HybridBlock.text)
 													? 'text-black'
 													: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 											)}
