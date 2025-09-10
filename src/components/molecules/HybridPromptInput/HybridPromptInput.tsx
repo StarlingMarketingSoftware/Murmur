@@ -1481,15 +1481,15 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																<Button
 																	type="button"
 																	onClick={() => handleAddTextBlockAt(index)}
-																	className="w-[76px] h-[20px] bg-background hover:bg-primary/20 active:bg-primary/20 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600"
-																	title="Add text block"
+																	className="w-[52px] h-[20px] bg-background hover:bg-primary/20 active:bg-primary/20 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600"
+																	title="Text block"
 																>
 																	<TinyPlusIcon
 																		width="5px"
 																		height="5px"
 																		className="!w-[8px] !h-[8px]"
 																	/>
-																	<span className="font-secondary">Add text</span>
+																	<span className="font-secondary">Text</span>
 																</Button>
 															</div>
 														)}
