@@ -1078,11 +1078,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 					<div
 						className={`w-[892px] min-h-[530px] border-[3px] border-black rounded-md bg-gray-50 transition mb-4 flex ${
 							showTestPreview ? 'flex-row' : 'flex-col'
-						} relative overflow-hidden`}
+						} relative overflow-visible`}
 					>
 						{/* Left-side blurred backdrop fill for test preview */}
 						{showTestPreview && (
-							<div className="pointer-events-none absolute left-3 top-[18px] bottom-3 w-[416px] z-0">
+							<div className="pointer-events-none absolute left-3 top-[18px] bottom-3 w-[416px] z-0 overflow-hidden">
 								<div
 									className="absolute inset-0"
 									style={{
@@ -1474,7 +1474,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														{isHybridBlock && !hasImmediateTextBlock && (
 															<div
 																className={cn(
-																	'flex justify-end -mt-1',
+																	'flex justify-end -mt-1 -mr-[26px] relative z-30',
 																	showTestPreview ? 'w-[416px]' : 'w-[868px]'
 																)}
 															>
