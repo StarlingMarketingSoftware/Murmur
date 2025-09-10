@@ -119,7 +119,7 @@ const SortableAIBlock = ({
 				<Button
 					type="button"
 					onClick={() => onExpand?.(id)}
-					className="w-[76px] h-[30px] bg-background hover:bg-primary/20 active:bg-primary/20 border rounded-[4px] !font-normal text-[10px] text-gray-600"
+					className="w-[76px] h-[30px] bg-background hover:bg-primary/20 active:bg-primary/20 border-2 rounded-[8px] !font-normal text-[10px] text-gray-600"
 					style={{ borderColor: getBorderColor() }}
 				>
 					<span className="font-secondary">
@@ -1378,10 +1378,19 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<Button
 															type="button"
 															onClick={() => handleAddBlock(getBlock(type))}
-															className="w-[76px] h-[30px] bg-background hover:bg-primary/20 active:bg-primary/20 border rounded-[4px] !font-normal text-[10px] text-gray-600"
+															font="secondary"
+															className="w-[76px] h-[30px] bg-background hover:bg-primary/20 active:bg-primary/20 border-2 rounded-[8px] !font-normal text-[10px] text-gray-600 inline-flex items-center justify-start gap-[4px] pl-[4px]"
 															style={{ borderColor }}
+															title={`Add ${label}`}
 														>
-															<span className="font-secondary">{label}</span>
+															<TinyPlusIcon
+																width="8px"
+																height="8px"
+																className="!w-[8px] !h-[8px]"
+															/>
+															<span className="font-inter font-medium text-[10px] text-[#0A0A0A]">
+																{label}
+															</span>
 														</Button>
 													</div>
 												);
