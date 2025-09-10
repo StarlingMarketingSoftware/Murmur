@@ -222,11 +222,13 @@ const SortableAIBlock = ({
 								'absolute z-30',
 								isCompactBlock
 									? isTextBlock
-										? 'right-3 top-0'
+										? 'right-1 top-0'
 										: isAdvancedEnabled
 										? 'right-1 top-[12.5px] -translate-y-1/2'
 										: 'right-1 top-1/2 -translate-y-1/2'
-									: isFullAutomatedBlock || isTextBlock
+									: isFullAutomatedBlock
+									? 'right-1 top-0'
+									: isTextBlock
 									? 'right-3 top-2'
 									: 'right-3 top-3'
 							)}
@@ -357,7 +359,9 @@ const SortableAIBlock = ({
 													</div>
 													<div className="flex-1 flex items-center pl-0 pr-12">
 														<span className="text-sm font-inter italic text-[#5d5d5d]">
-															{block.placeholder}
+															{isResearchBlock && showTestPreview
+																? 'Automated Research'
+																: block.placeholder}
 														</span>
 													</div>
 													<button
