@@ -294,7 +294,7 @@ const SortableAIBlock = ({
 															: 'bg-white',
 														(isIntroductionBlock || isResearchBlock || isActionBlock) &&
 															'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
-														showTestPreview ? 'pl-0 -ml-[72px]' : 'pl-0',
+														'pl-0',
 														'pr-12'
 													)}
 													{...fieldProps}
@@ -449,7 +449,11 @@ const SortableAIBlock = ({
 														<>
 															<input
 																type="text"
-																placeholder={block.placeholder}
+																placeholder={
+																	isResearchBlock && showTestPreview
+																		? 'Automated Research'
+																		: block.placeholder
+																}
 																onClick={(e) => e.stopPropagation()}
 																disabled={
 																	(isIntroductionBlock ||
@@ -466,7 +470,7 @@ const SortableAIBlock = ({
 																		isResearchBlock ||
 																		isActionBlock) &&
 																		'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
-																	showTestPreview ? 'pl-0 -ml-[72px]' : 'pl-0',
+																	'pl-0',
 																	isIntroductionBlock || isResearchBlock || isActionBlock
 																		? 'pr-24'
 																		: 'pr-12',
