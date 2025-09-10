@@ -31,10 +31,18 @@ import { ParagraphSlider } from '@/components/atoms/ParagraphSlider/ParagraphSli
 import { ToneSelector } from '../ToneSelector/ToneSelector';
 import { DraggableHighlight } from '../DragAndDrop/DraggableHighlight';
 interface SortableAIBlockProps {
-	block: { value: HybridBlock; label: string; placeholder?: string };
+	block: {
+		value: HybridBlock;
+		label: string;
+		placeholder?: string;
+		isCollapsed?: boolean;
+	};
 	id: string;
 	fieldIndex: number;
 	onRemove: (id: string) => void;
+	onCollapse?: (id: string) => void;
+	isCollapsed?: boolean;
+	onExpand?: (id: string) => void;
 	trackFocusedField?: (
 		fieldName: string,
 		element: HTMLTextAreaElement | HTMLInputElement | null
@@ -48,6 +56,8 @@ const SortableAIBlock = ({
 	id,
 	fieldIndex,
 	onRemove,
+	isCollapsed = false,
+	onExpand,
 	trackFocusedField,
 	showTestPreview,
 	testMessage,
@@ -79,6 +89,7 @@ const SortableAIBlock = ({
 	const isIntroductionBlock = block.value === HybridBlock.introduction;
 	const isResearchBlock = block.value === HybridBlock.research;
 	const isActionBlock = block.value === HybridBlock.action;
+	const isHybridBlock = isIntroductionBlock || isResearchBlock || isActionBlock;
 	const isCompactBlock =
 		block.value === HybridBlock.introduction ||
 		block.value === HybridBlock.research ||
@@ -90,6 +101,34 @@ const SortableAIBlock = ({
 	const isTextBlockEmpty = isTextBlock && !fieldValue;
 	// Only show red styling if the field has been touched and is empty
 	const shouldShowRedStyling = isTextBlockEmpty && hasBeenTouched;
+
+	// Get the border color for the block
+	const getBorderColor = () => {
+		if (isIntroductionBlock) return '#6673FF';
+		if (isResearchBlock) return '#1010E7';
+		if (isActionBlock) return '#0E0E7F';
+		return 'gray-300';
+	};
+
+	// If this is a collapsed hybrid block, show a collapsed button
+	if (isCollapsed && isHybridBlock) {
+		return (
+			<div
+				className={cn('flex justify-end', showTestPreview ? 'w-[416px]' : 'w-[868px]')}
+			>
+				<Button
+					type="button"
+					onClick={() => onExpand?.(id)}
+					className="w-[76px] h-[30px] bg-background hover:bg-primary/20 active:bg-primary/20 border rounded-[4px] !font-normal text-[10px] text-gray-600"
+					style={{ borderColor: getBorderColor() }}
+				>
+					<span className="font-secondary">
+						{isIntroductionBlock ? 'Intro' : isResearchBlock ? 'Research' : 'CTA'}
+					</span>
+				</Button>
+			</div>
+		);
+	}
 
 	return (
 		<div
@@ -694,7 +733,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		handleDragEnd,
 		handleRemoveBlock,
 		getBlock,
+		handleAddBlock,
 		handleAddTextBlockAt,
+		handleToggleCollapse,
 		showTestPreview,
 		setShowTestPreview,
 		trackFocusedField,
@@ -774,7 +815,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			else if (blocks.length > 0) lastModeRef.current = 'hybrid';
 			else lastModeRef.current = null;
 		}
-	}, [isFullSelected, isManualSelected, fields]); // depends on fields length now
+	}, [isFullSelected, isManualSelected, fields, form]); // depends on fields length now
 	const selectedModeKey = useMemo(
 		() =>
 			modeOverride === 'none'
@@ -1244,53 +1285,165 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										items={fields.map((f) => f.id)}
 										strategy={verticalListSortingStrategy}
 									>
-										{fields.map((field, index) => {
-											const isHybridBlock =
-												field.type === HybridBlock.introduction ||
-												field.type === HybridBlock.research ||
-												field.type === HybridBlock.action;
-											const hasImmediateTextBlock =
-												fields[index + 1]?.type === HybridBlock.text;
-
-											return (
-												<Fragment key={field.id}>
-													<div className={cn(index === 0 && '-mt-2')}>
-														<SortableAIBlock
-															id={field.id}
-															fieldIndex={index}
-															block={getBlock(field.type)}
-															onRemove={handleRemoveBlock}
-															trackFocusedField={trackFocusedField}
-															showTestPreview={showTestPreview}
-															testMessage={testMessage}
-														/>
-													</div>
-													{/* Plus button under hybrid blocks */}
-													{isHybridBlock && !hasImmediateTextBlock && (
-														<div
-															className={cn(
-																'flex justify-end -mt-1',
-																showTestPreview ? 'w-[416px]' : 'w-[868px]'
-															)}
-														>
-															<Button
-																type="button"
-																onClick={() => handleAddTextBlockAt(index)}
-																className="w-[76px] h-[20px] bg-background hover:bg-primary/20 active:bg-primary/20 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600"
-																title="Add text block"
-															>
-																<TinyPlusIcon
-																	width="5px"
-																	height="5px"
-																	className="!w-[8px] !h-[8px]"
-																/>
-																<span className="font-secondary">Add text</span>
-															</Button>
-														</div>
-													)}
-												</Fragment>
+										{(() => {
+											const orderedHybridTypes = [
+												HybridBlock.introduction,
+												HybridBlock.research,
+												HybridBlock.action,
+											];
+											const presentHybridTypes = new Set(
+												fields
+													.filter(
+														(f) =>
+															f.type === HybridBlock.introduction ||
+															f.type === HybridBlock.research ||
+															f.type === HybridBlock.action
+													)
+													.map((f) => f.type)
 											);
-										})}
+
+											const shouldShowPlaceholders = selectedModeKey === 'hybrid';
+											const missingHybridTypes = shouldShowPlaceholders
+												? orderedHybridTypes.filter((t) => !presentHybridTypes.has(t))
+												: [];
+
+											const inserted = new Set<string>();
+											const augmented: Array<
+												| { kind: 'field'; field: (typeof fields)[number]; index: number }
+												| { kind: 'placeholder'; blockType: HybridBlock; key: string }
+											> = [];
+
+											for (let index = 0; index < fields.length; index++) {
+												const field = fields[index];
+												if (
+													field.type === HybridBlock.introduction ||
+													field.type === HybridBlock.research ||
+													field.type === HybridBlock.action
+												) {
+													const currentIdx = orderedHybridTypes.indexOf(field.type);
+													for (let i = 0; i < currentIdx; i++) {
+														const t = orderedHybridTypes[i];
+														if (
+															missingHybridTypes.includes(t) &&
+															!inserted.has(`ph-${t}`)
+														) {
+															augmented.push({
+																kind: 'placeholder',
+																blockType: t,
+																key: `ph-${t}-${index}`,
+															});
+															inserted.add(`ph-${t}`);
+														}
+													}
+												}
+												augmented.push({ kind: 'field', field, index });
+											}
+
+											for (const t of orderedHybridTypes) {
+												if (missingHybridTypes.includes(t) && !inserted.has(`ph-${t}`)) {
+													augmented.push({
+														kind: 'placeholder',
+														blockType: t,
+														key: `ph-${t}-end`,
+													});
+													inserted.add(`ph-${t}`);
+												}
+											}
+
+											const renderHybridPlaceholder = (type: HybridBlock) => {
+												if (selectedModeKey !== 'hybrid') return null;
+												const label =
+													type === HybridBlock.introduction
+														? 'Intro'
+														: type === HybridBlock.research
+														? 'Research'
+														: 'CTA';
+												const borderColor =
+													type === HybridBlock.introduction
+														? '#6673FF'
+														: type === HybridBlock.research
+														? '#1010E7'
+														: '#0E0E7F';
+												return (
+													<div
+														className={cn(
+															'flex justify-end',
+															showTestPreview ? 'w-[416px]' : 'w-[868px]'
+														)}
+													>
+														<Button
+															type="button"
+															onClick={() => handleAddBlock(getBlock(type))}
+															className="w-[76px] h-[30px] bg-background hover:bg-primary/20 active:bg-primary/20 border rounded-[4px] !font-normal text-[10px] text-gray-600"
+															style={{ borderColor }}
+														>
+															<span className="font-secondary">{label}</span>
+														</Button>
+													</div>
+												);
+											};
+
+											return augmented.map((item) => {
+												if (item.kind === 'placeholder') {
+													return (
+														<Fragment key={item.key}>
+															{renderHybridPlaceholder(item.blockType)}
+														</Fragment>
+													);
+												}
+
+												const field = item.field;
+												const index = item.index;
+												const isHybridBlock =
+													field.type === HybridBlock.introduction ||
+													field.type === HybridBlock.research ||
+													field.type === HybridBlock.action;
+												const hasImmediateTextBlock =
+													fields[index + 1]?.type === HybridBlock.text;
+
+												return (
+													<Fragment key={field.id}>
+														<div className={cn(index === 0 && '-mt-2')}>
+															<SortableAIBlock
+																id={field.id}
+																fieldIndex={index}
+																block={getBlock(field.type)}
+																onRemove={handleRemoveBlock}
+																onCollapse={handleToggleCollapse}
+																onExpand={handleToggleCollapse}
+																isCollapsed={field.isCollapsed}
+																trackFocusedField={trackFocusedField}
+																showTestPreview={showTestPreview}
+																testMessage={testMessage}
+															/>
+														</div>
+														{/* Plus button under hybrid blocks */}
+														{isHybridBlock && !hasImmediateTextBlock && (
+															<div
+																className={cn(
+																	'flex justify-end -mt-1',
+																	showTestPreview ? 'w-[416px]' : 'w-[868px]'
+																)}
+															>
+																<Button
+																	type="button"
+																	onClick={() => handleAddTextBlockAt(index)}
+																	className="w-[76px] h-[20px] bg-background hover:bg-primary/20 active:bg-primary/20 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600"
+																	title="Add text block"
+																>
+																	<TinyPlusIcon
+																		width="5px"
+																		height="5px"
+																		className="!w-[8px] !h-[8px]"
+																	/>
+																	<span className="font-secondary">Add text</span>
+																</Button>
+															</div>
+														)}
+													</Fragment>
+												);
+											});
+										})()}
 									</SortableContext>
 								</div>
 							</div>
