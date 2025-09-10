@@ -145,8 +145,8 @@ const SortableAIBlock = ({
 					'border-2 border-gray-300 bg-background',
 				isTextBlock
 					? showTestPreview
-						? 'w-[416px] h-[44px]'
-						: 'w-[868px] h-[80px]'
+						? 'w-[416px] min-h-[44px]'
+						: 'w-[868px] min-h-[80px]'
 					: isCompactBlock
 					? showTestPreview
 						? `w-[416px] ${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'}`
@@ -221,7 +221,9 @@ const SortableAIBlock = ({
 							className={cn(
 								'absolute z-30',
 								isCompactBlock
-									? isAdvancedEnabled
+									? isTextBlock
+										? 'right-3 top-0'
+										: isAdvancedEnabled
 										? 'right-1 top-[12.5px] -translate-y-1/2'
 										: 'right-1 top-1/2 -translate-y-1/2'
 									: isFullAutomatedBlock || isTextBlock
@@ -261,12 +263,16 @@ const SortableAIBlock = ({
 							<div
 								className={cn(
 									'w-full h-full',
-									isAdvancedEnabled ? 'flex flex-col' : 'flex items-center'
+									isAdvancedEnabled
+										? 'flex flex-col'
+										: isTextBlock
+										? 'flex items-start'
+										: 'flex items-center'
 								)}
 							>
 								{isTextBlock ? (
 									<>
-										<div className="flex flex-col justify-center w-[90px]">
+										<div className="flex flex-col justify-start w-[90px]">
 											<span
 												className={cn(
 													'font-inter font-medium text-[17px] leading-[14px]',
@@ -281,27 +287,29 @@ const SortableAIBlock = ({
 												`hybridBlockPrompts.${fieldIndex}.value`
 											);
 											return (
-												<input
-													type="text"
+												<Textarea
 													placeholder={
 														isIntroductionBlock ? 'Automated Intro' : block.placeholder
 													}
 													onClick={(e) => e.stopPropagation()}
 													className={cn(
-														'flex-1 outline-none text-sm',
-														isIntroductionBlock || isResearchBlock || isActionBlock
-															? '!bg-[#DADAFC] [&]:!bg-[#DADAFC]'
-															: 'bg-white',
+														'flex-1 outline-none focus:outline-none text-sm border-0 ring-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 p-0 resize-none overflow-hidden bg-transparent min-h-0 appearance-none rounded-none',
 														(isIntroductionBlock || isResearchBlock || isActionBlock) &&
 															'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
 														'pl-0',
 														'pr-12'
 													)}
+													rows={1}
 													{...fieldProps}
+													onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+														const target = e.currentTarget;
+														target.style.height = 'auto';
+														target.style.height = target.scrollHeight + 'px';
+													}}
 													onFocus={(e) => {
 														trackFocusedField?.(
 															`hybridBlockPrompts.${fieldIndex}.value`,
-															e.target as HTMLInputElement
+															e.target as HTMLTextAreaElement
 														);
 													}}
 													onBlur={(e) => {
