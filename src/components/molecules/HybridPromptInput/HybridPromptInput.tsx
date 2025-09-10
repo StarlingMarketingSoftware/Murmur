@@ -31,10 +31,18 @@ import { ParagraphSlider } from '@/components/atoms/ParagraphSlider/ParagraphSli
 import { ToneSelector } from '../ToneSelector/ToneSelector';
 import { DraggableHighlight } from '../DragAndDrop/DraggableHighlight';
 interface SortableAIBlockProps {
-	block: { value: HybridBlock; label: string; placeholder?: string };
+	block: {
+		value: HybridBlock;
+		label: string;
+		placeholder?: string;
+		isCollapsed?: boolean;
+	};
 	id: string;
 	fieldIndex: number;
 	onRemove: (id: string) => void;
+	onCollapse?: (id: string) => void;
+	isCollapsed?: boolean;
+	onExpand?: (id: string) => void;
 	trackFocusedField?: (
 		fieldName: string,
 		element: HTMLTextAreaElement | HTMLInputElement | null
@@ -48,6 +56,8 @@ const SortableAIBlock = ({
 	id,
 	fieldIndex,
 	onRemove,
+	isCollapsed = false,
+	onExpand,
 	trackFocusedField,
 	showTestPreview,
 	testMessage,
@@ -59,6 +69,13 @@ const SortableAIBlock = ({
 	const [hasBeenTouched, setHasBeenTouched] = useState(false);
 	// Track if advanced mode is enabled for hybrid blocks
 	const [isAdvancedEnabled, setIsAdvancedEnabled] = useState(false);
+	// When a block is opened (advanced), focus its input once
+	const advancedInputRef = useRef<HTMLInputElement | null>(null);
+	useEffect(() => {
+		if (isAdvancedEnabled) {
+			advancedInputRef.current?.focus();
+		}
+	}, [isAdvancedEnabled]);
 
 	const style = {
 		transform: CSS.Transform.toString(transform),
@@ -72,6 +89,7 @@ const SortableAIBlock = ({
 	const isIntroductionBlock = block.value === HybridBlock.introduction;
 	const isResearchBlock = block.value === HybridBlock.research;
 	const isActionBlock = block.value === HybridBlock.action;
+	const isHybridBlock = isIntroductionBlock || isResearchBlock || isActionBlock;
 	const isCompactBlock =
 		block.value === HybridBlock.introduction ||
 		block.value === HybridBlock.research ||
@@ -84,12 +102,40 @@ const SortableAIBlock = ({
 	// Only show red styling if the field has been touched and is empty
 	const shouldShowRedStyling = isTextBlockEmpty && hasBeenTouched;
 
+	// Get the border color for the block
+	const getBorderColor = () => {
+		if (isIntroductionBlock) return '#6673FF';
+		if (isResearchBlock) return '#1010E7';
+		if (isActionBlock) return '#0E0E7F';
+		return 'gray-300';
+	};
+
+	// If this is a collapsed hybrid block, show a collapsed button
+	if (isCollapsed && isHybridBlock) {
+		return (
+			<div
+				className={cn('flex justify-end', showTestPreview ? 'w-[416px]' : 'w-[868px]')}
+			>
+				<Button
+					type="button"
+					onClick={() => onExpand?.(id)}
+					className="w-[76px] h-[30px] bg-background hover:bg-primary/20 active:bg-primary/20 border-2 rounded-[8px] !font-normal text-[10px] text-gray-600"
+					style={{ borderColor: getBorderColor() }}
+				>
+					<span className="font-secondary">
+						{isIntroductionBlock ? 'Intro' : isResearchBlock ? 'Research' : 'CTA'}
+					</span>
+				</Button>
+			</div>
+		);
+	}
+
 	return (
 		<div
 			ref={setNodeRef}
 			style={style}
 			className={cn(
-				'relative rounded-md',
+				'relative rounded-md overflow-hidden',
 				isIntroductionBlock && 'border-2 border-[#6673FF] bg-background',
 				isResearchBlock && 'border-2 border-[#1010E7] bg-background',
 				isActionBlock && 'border-2 border-[#0E0E7F] bg-background',
@@ -99,12 +145,12 @@ const SortableAIBlock = ({
 					'border-2 border-gray-300 bg-background',
 				isTextBlock
 					? showTestPreview
-						? 'w-[416px] h-[44px]'
-						: 'w-[868px] h-[80px]'
+						? 'w-[416px] min-h-[44px]'
+						: 'w-[868px] min-h-[80px]'
 					: isCompactBlock
 					? showTestPreview
-						? 'w-[416px] h-[31px]'
-						: 'w-[868px] h-[31px]'
+						? `w-[416px] ${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'}`
+						: `w-[868px] ${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'}`
 					: isFullAutomatedBlock
 					? showTestPreview
 						? 'w-[416px]'
@@ -127,7 +173,8 @@ const SortableAIBlock = ({
 			<div
 				className={cn(
 					(isIntroductionBlock || isResearchBlock || isActionBlock) &&
-						'bg-[#DADAFC] rounded-md h-full',
+						!isAdvancedEnabled &&
+						'bg-[#DADAFC] h-full',
 					'relative'
 				)}
 			>
@@ -143,8 +190,8 @@ const SortableAIBlock = ({
 								: 'h-[80px] w-[172px]'
 							: isCompactBlock
 							? showTestPreview
-								? 'h-[31px] w-[80px]'
-								: 'h-[31px] w-[140px]'
+								? `${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'} w-[80px]`
+								: `${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'} w-[90px]`
 							: 'h-12',
 						isFullAutomatedBlock
 							? 'w-[172px]'
@@ -158,7 +205,9 @@ const SortableAIBlock = ({
 					className={cn(
 						'flex items-center w-full',
 						isCompactBlock
-							? 'p-2 h-full'
+							? isAdvancedEnabled
+								? 'p-0 h-full'
+								: 'p-2 h-full'
 							: isFullAutomatedBlock || isTextBlock
 							? 'px-4 pt-2 pb-4'
 							: 'p-4'
@@ -172,7 +221,11 @@ const SortableAIBlock = ({
 							className={cn(
 								'absolute z-30',
 								isCompactBlock
-									? 'right-2 top-1/2 -translate-y-1/2'
+									? isTextBlock
+										? 'right-3 top-0'
+										: isAdvancedEnabled
+										? 'right-1 top-[12.5px] -translate-y-1/2'
+										: 'right-1 top-1/2 -translate-y-1/2'
 									: isFullAutomatedBlock || isTextBlock
 									? 'right-3 top-2'
 									: 'right-3 top-3'
@@ -207,10 +260,19 @@ const SortableAIBlock = ({
 						</div>
 						{isCompactBlock ? (
 							// Compact blocks
-							<div className="flex items-center w-full h-full">
+							<div
+								className={cn(
+									'w-full h-full',
+									isAdvancedEnabled
+										? 'flex flex-col'
+										: isTextBlock
+										? 'flex items-start'
+										: 'flex items-center'
+								)}
+							>
 								{isTextBlock ? (
 									<>
-										<div className="flex flex-col justify-center w-[140px]">
+										<div className="flex flex-col justify-start w-[90px]">
 											<span
 												className={cn(
 													'font-inter font-medium text-[17px] leading-[14px]',
@@ -225,27 +287,29 @@ const SortableAIBlock = ({
 												`hybridBlockPrompts.${fieldIndex}.value`
 											);
 											return (
-												<input
-													type="text"
+												<Textarea
 													placeholder={
 														isIntroductionBlock ? 'Automated Intro' : block.placeholder
 													}
 													onClick={(e) => e.stopPropagation()}
 													className={cn(
-														'flex-1 outline-none text-sm',
-														isIntroductionBlock || isResearchBlock || isActionBlock
-															? '!bg-[#DADAFC] [&]:!bg-[#DADAFC]'
-															: 'bg-white',
+														'flex-1 outline-none focus:outline-none text-sm border-0 ring-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 p-0 resize-none overflow-hidden bg-transparent min-h-0 appearance-none rounded-none',
 														(isIntroductionBlock || isResearchBlock || isActionBlock) &&
 															'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
-														showTestPreview ? 'pl-0 -ml-[72px]' : 'pl-6',
+														'pl-0',
 														'pr-12'
 													)}
+													rows={1}
 													{...fieldProps}
+													onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+														const target = e.currentTarget;
+														target.style.height = 'auto';
+														target.style.height = target.scrollHeight + 'px';
+													}}
 													onFocus={(e) => {
 														trackFocusedField?.(
 															`hybridBlockPrompts.${fieldIndex}.value`,
-															e.target as HTMLInputElement
+															e.target as HTMLTextAreaElement
 														);
 													}}
 													onBlur={(e) => {
@@ -267,115 +331,221 @@ const SortableAIBlock = ({
 								) : (
 									// Compact blocks with "Hybrid"
 									<>
-										<div className="flex flex-col justify-center w-[140px]">
-											<span
-												className={cn(
-													'font-inter font-medium text-[17px] leading-[17px] text-[#000000]',
-													isIntroductionBlock && '',
-													isResearchBlock && '',
-													isActionBlock && ''
-												)}
-											>
-												{isIntroductionBlock
-													? 'Intro'
-													: isResearchBlock
-													? 'Resarch'
-													: isActionBlock
-													? 'CTA'
-													: (block as { label: string }).label}
-											</span>
-										</div>
-										{(() => {
-											const fieldProps = form.register(
-												`hybridBlockPrompts.${fieldIndex}.value`
-											);
-
-											return (
-												<>
-													<input
-														type="text"
-														placeholder={block.placeholder}
-														onClick={(e) => e.stopPropagation()}
-														disabled={
-															(isIntroductionBlock || isResearchBlock || isActionBlock) &&
-															!isAdvancedEnabled
-														}
-														className={cn(
-															'flex-1 outline-none text-sm',
-															isIntroductionBlock || isResearchBlock || isActionBlock
-																? '!bg-[#DADAFC]'
-																: 'bg-white placeholder:text-gray-400',
-															(isIntroductionBlock || isResearchBlock || isActionBlock) &&
-																'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
-															showTestPreview ? 'pl-0 -ml-[72px]' : 'pl-6',
-															isIntroductionBlock || isResearchBlock || isActionBlock
-																? 'pr-24'
-																: 'pr-12',
-															(isIntroductionBlock || isResearchBlock || isActionBlock) &&
-																!isAdvancedEnabled &&
-																'cursor-default'
-														)}
-														style={
-															isIntroductionBlock || isResearchBlock || isActionBlock
-																? { backgroundColor: '#DADAFC' }
-																: undefined
-														}
-														{...fieldProps}
-														ref={(el) => {
-															// Combine react-hook-form ref with our custom ref
-															fieldProps.ref(el);
-															// Auto-focus when advanced is enabled
-															if (
-																el &&
-																isAdvancedEnabled &&
-																(isIntroductionBlock || isResearchBlock || isActionBlock)
-															) {
-																setTimeout(() => el.focus(), 0);
-															}
-														}}
-														onFocus={(e) => {
-															trackFocusedField?.(
-																`hybridBlockPrompts.${fieldIndex}.value`,
-																e.target as HTMLInputElement
-															);
-															// Hide cursor when focused
-															if (
-																isIntroductionBlock ||
-																isResearchBlock ||
-																isActionBlock
-															) {
-																e.target.style.cursor = 'text';
-															}
-														}}
-														onBlur={(e) => {
-															fieldProps.onBlur(e);
-															// Restore cursor when unfocused
-															if (
-																isIntroductionBlock ||
-																isResearchBlock ||
-																isActionBlock
-															) {
-																e.target.style.cursor = '';
-															}
-														}}
-													/>
-													{(isIntroductionBlock || isResearchBlock || isActionBlock) && (
-														<button
-															type="button"
-															onClick={(e) => {
-																e.stopPropagation();
-																setIsAdvancedEnabled(true);
-															}}
-															className="absolute right-10 top-0 bottom-0 w-[75px] flex items-center justify-center text-[12px] font-inter font-normal text-[#000000] cursor-pointer hover:bg-[#C4C4F5] active:bg-[#B0B0E8] transition-colors"
+										{isAdvancedEnabled &&
+										(isIntroductionBlock || isResearchBlock || isActionBlock) ? (
+											// Expanded layout with top section and input below
+											<div className="w-full h-full flex flex-col bg-[#DADAFC]">
+												{/* Top section - maintains original compact layout */}
+												<div className="relative flex items-center h-[25px] px-2 bg-[#DADAFC]">
+													<div className="flex flex-col justify-center w-[90px]">
+														<span
+															className={cn(
+																'font-inter font-medium text-[17px] leading-[17px] text-[#000000]',
+																isIntroductionBlock && '',
+																isResearchBlock && '',
+																isActionBlock && ''
+															)}
 														>
-															<span className="absolute left-0 h-full border-l border-[#000000]"></span>
-															<span>Advanced</span>
-															<span className="absolute right-0 h-full border-r border-[#000000]"></span>
-														</button>
-													)}
-												</>
-											);
-										})()}
+															{isIntroductionBlock
+																? 'Intro'
+																: isResearchBlock
+																? 'Resarch'
+																: isActionBlock
+																? 'CTA'
+																: (block as { label: string }).label}
+														</span>
+													</div>
+													<div className="flex-1 flex items-center pl-0 pr-12">
+														<span className="text-sm font-inter italic text-[#5d5d5d]">
+															{block.placeholder}
+														</span>
+													</div>
+													<button
+														type="button"
+														onClick={(e) => {
+															e.stopPropagation();
+															setIsAdvancedEnabled(false);
+														}}
+														className="absolute right-10 top-0 bottom-0 w-[75px] flex items-center justify-center text-[12px] font-inter font-normal text-white bg-[#5353AF] cursor-pointer hover:bg-[#4a4a9d] active:bg-[#42428c] transition-colors"
+													>
+														<span className="absolute left-0 h-full border-l border-black"></span>
+														<span>Advanced</span>
+														<span className="absolute right-0 h-full border-r border-black"></span>
+													</button>
+												</div>
+												{/* Horizontal divider */}
+												<div
+													className="w-full border-b-2"
+													style={{
+														borderColor: isIntroductionBlock
+															? '#6673FF'
+															: isResearchBlock
+															? '#1010E7'
+															: isActionBlock
+															? '#0E0E7F'
+															: '#000000',
+													}}
+												/>
+												{/* Input section below */}
+												<div className="flex-1 flex items-end pb-2 pt-1 px-2 bg-white">
+													<div className="w-[90px] flex-shrink-0" />
+													<div className="flex-1 flex items-center pl-0 pr-12">
+														{(() => {
+															const fieldProps = form.register(
+																`hybridBlockPrompts.${fieldIndex}.value`
+															);
+															return (
+																<input
+																	type="text"
+																	placeholder=""
+																	onClick={(e) => e.stopPropagation()}
+																	className={cn(
+																		'w-full outline-none text-sm',
+																		'!bg-white',
+																		'font-inter'
+																	)}
+																	style={{ backgroundColor: '#FFFFFF' }}
+																	{...fieldProps}
+																	ref={(el) => {
+																		advancedInputRef.current = el;
+																		fieldProps.ref(el);
+																	}}
+																	onFocus={(e) => {
+																		trackFocusedField?.(
+																			`hybridBlockPrompts.${fieldIndex}.value`,
+																			e.target as HTMLInputElement
+																		);
+																		e.target.style.cursor = 'text';
+																	}}
+																	onBlur={(e) => {
+																		fieldProps.onBlur(e);
+																		e.target.style.cursor = '';
+																	}}
+																/>
+															);
+														})()}
+													</div>
+												</div>
+											</div>
+										) : (
+											// Non-expanded compact layout
+											<>
+												<div className="flex flex-col justify-center w-[90px]">
+													<span
+														className={cn(
+															'font-inter font-medium text-[17px] leading-[17px] text-[#000000]',
+															isIntroductionBlock && '',
+															isResearchBlock && '',
+															isActionBlock && ''
+														)}
+													>
+														{isIntroductionBlock
+															? 'Intro'
+															: isResearchBlock
+															? 'Resarch'
+															: isActionBlock
+															? 'CTA'
+															: (block as { label: string }).label}
+													</span>
+												</div>
+												{(() => {
+													const fieldProps = form.register(
+														`hybridBlockPrompts.${fieldIndex}.value`
+													);
+
+													return (
+														<>
+															<input
+																type="text"
+																placeholder={
+																	isResearchBlock && showTestPreview
+																		? 'Automated Research'
+																		: block.placeholder
+																}
+																onClick={(e) => e.stopPropagation()}
+																disabled={
+																	(isIntroductionBlock ||
+																		isResearchBlock ||
+																		isActionBlock) &&
+																	!isAdvancedEnabled
+																}
+																className={cn(
+																	'flex-1 outline-none text-sm',
+																	isIntroductionBlock || isResearchBlock || isActionBlock
+																		? '!bg-[#DADAFC]'
+																		: 'bg-white placeholder:text-gray-400',
+																	(isIntroductionBlock ||
+																		isResearchBlock ||
+																		isActionBlock) &&
+																		'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
+																	'pl-0',
+																	isIntroductionBlock || isResearchBlock || isActionBlock
+																		? 'pr-24'
+																		: 'pr-12',
+																	(isIntroductionBlock ||
+																		isResearchBlock ||
+																		isActionBlock) &&
+																		!isAdvancedEnabled &&
+																		'cursor-default'
+																)}
+																style={
+																	isIntroductionBlock || isResearchBlock || isActionBlock
+																		? { backgroundColor: '#DADAFC' }
+																		: undefined
+																}
+																{...fieldProps}
+																ref={(el) => {
+																	// Combine react-hook-form ref with our custom ref
+																	fieldProps.ref(el);
+																}}
+																onFocus={(e) => {
+																	trackFocusedField?.(
+																		`hybridBlockPrompts.${fieldIndex}.value`,
+																		e.target as HTMLInputElement
+																	);
+																	// Hide cursor when focused
+																	if (
+																		isIntroductionBlock ||
+																		isResearchBlock ||
+																		isActionBlock
+																	) {
+																		e.target.style.cursor = 'text';
+																	}
+																}}
+																onBlur={(e) => {
+																	fieldProps.onBlur(e);
+																	// Restore cursor when unfocused
+																	if (
+																		isIntroductionBlock ||
+																		isResearchBlock ||
+																		isActionBlock
+																	) {
+																		e.target.style.cursor = '';
+																	}
+																}}
+															/>
+															{(isIntroductionBlock ||
+																isResearchBlock ||
+																isActionBlock) &&
+																!isAdvancedEnabled && (
+																	<button
+																		type="button"
+																		onClick={(e) => {
+																			e.stopPropagation();
+																			setIsAdvancedEnabled(true);
+																		}}
+																		className="absolute right-10 top-0 bottom-0 w-[75px] flex items-center justify-center text-[12px] font-inter font-normal text-[#000000] cursor-pointer hover:bg-[#C4C4F5] active:bg-[#B0B0E8] transition-colors"
+																	>
+																		<span className="absolute left-0 h-full border-l border-[#000000]"></span>
+																		<span>Advanced</span>
+																		<span className="absolute right-0 h-full border-r border-[#000000]"></span>
+																	</button>
+																)}
+														</>
+													);
+												})()}
+											</>
+										)}
 									</>
 								)}
 							</div>
@@ -539,10 +709,6 @@ const SortableAIBlock = ({
 													ref={(el) => {
 														// Combine react-hook-form ref with our custom ref
 														fieldProps.ref(el);
-														// Auto-focus when advanced is enabled
-														if (el && isAdvancedEnabled) {
-															setTimeout(() => el.focus(), 0);
-														}
 													}}
 													onFocus={(e) => {
 														trackFocusedField?.(
@@ -579,7 +745,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		handleDragEnd,
 		handleRemoveBlock,
 		getBlock,
+		handleAddBlock,
 		handleAddTextBlockAt,
+		handleToggleCollapse,
 		showTestPreview,
 		setShowTestPreview,
 		trackFocusedField,
@@ -603,45 +771,51 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		hasSubjectBeenTouched &&
 		(!subjectValue || subjectValue.trim() === '');
 
-	const watchedBlocks = form.watch('hybridBlockPrompts') || [];
 	const isHandwrittenMode =
-		watchedBlocks.length > 0 && watchedBlocks.every((b) => b.type === HybridBlock.text);
-	const hasBlocks = (form.watch('hybridBlockPrompts')?.length || 0) > 0;
+		(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
+		form.getValues('hybridBlockPrompts').every((b) => b.type === HybridBlock.text);
+	const hasBlocks = (form.getValues('hybridBlockPrompts')?.length || 0) > 0;
 
 	// Check for empty text blocks
-	const hasEmptyTextBlocks = watchedBlocks.some(
-		(block) =>
-			block.type === HybridBlock.text && (!block.value || block.value.trim() === '')
-	);
+	const hasEmptyTextBlocks = form
+		.getValues('hybridBlockPrompts')
+		?.some(
+			(block) =>
+				block.type === HybridBlock.text && (!block.value || block.value.trim() === '')
+		);
 
 	// Determine if any empty text block has been touched (blurred) to align with per-block red logic
 	// Access touchedFields to subscribe to touch updates
 	const touchedFields = form.formState.touchedFields as unknown as {
 		hybridBlockPrompts?: Array<{ value?: boolean }>;
 	};
-	const hasTouchedEmptyTextBlocks = watchedBlocks.some(
-		(block: { type: HybridBlock; value: string }, index: number) => {
+	const hasTouchedEmptyTextBlocks = form
+		.getValues('hybridBlockPrompts')
+		?.some((block: { type: HybridBlock; value: string }, index: number) => {
 			if (block.type !== HybridBlock.text) return false;
 			const isTouched = Boolean(touchedFields?.hybridBlockPrompts?.[index]?.value);
 			const isEmpty = !block.value || block.value.trim() === '';
 			return isTouched && isEmpty;
-		}
-	);
+		});
 
 	// Derive selected mode key for stable overlay updates
-	const isFullSelected = watchedBlocks.some((b) => b.type === HybridBlock.full_automated);
+	const isFullSelected = form
+		.getValues('hybridBlockPrompts')
+		?.some((b) => b.type === HybridBlock.full_automated);
 	const isManualSelected =
-		watchedBlocks.length > 0 && watchedBlocks.every((b) => b.type === HybridBlock.text);
+		(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
+		form.getValues('hybridBlockPrompts').every((b) => b.type === HybridBlock.text);
 	const lastModeRef = useRef<'full' | 'hybrid' | 'manual' | null>(null);
 	const [modeOverride, setModeOverride] = useState<'none' | null>(null);
 	useEffect(() => {
+		const blocks = form.getValues('hybridBlockPrompts') || [];
 		if (isFullSelected) {
 			lastModeRef.current = 'full';
 			setModeOverride(null);
 			return;
 		}
 		if (
-			watchedBlocks.length === 0 &&
+			blocks.length === 0 &&
 			(lastModeRef.current === 'full' ||
 				lastModeRef.current === 'manual' ||
 				lastModeRef.current === 'hybrid')
@@ -650,10 +824,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		} else {
 			setModeOverride(null);
 			if (isManualSelected) lastModeRef.current = 'manual';
-			else if (watchedBlocks.length > 0) lastModeRef.current = 'hybrid';
+			else if (blocks.length > 0) lastModeRef.current = 'hybrid';
 			else lastModeRef.current = null;
 		}
-	}, [isFullSelected, isManualSelected, watchedBlocks.length]);
+	}, [isFullSelected, isManualSelected, fields, form]); // depends on fields length now
 	const selectedModeKey = useMemo(
 		() =>
 			modeOverride === 'none'
@@ -963,7 +1137,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											className={cn(
 												'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
 												selectedModeKey !== 'none' &&
-													watchedBlocks.some((b) => b.type === HybridBlock.full_automated)
+													form
+														.getValues('hybridBlockPrompts')
+														?.some((b) => b.type === HybridBlock.full_automated)
 													? 'text-black'
 													: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 											)}
@@ -978,10 +1154,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											className={cn(
 												'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
 												selectedModeKey !== 'none' &&
-													!watchedBlocks.some(
-														(b) => b.type === HybridBlock.full_automated
-													) &&
-													!watchedBlocks.every((b) => b.type === HybridBlock.text)
+													!form
+														.getValues('hybridBlockPrompts')
+														?.some((b) => b.type === HybridBlock.full_automated) &&
+													!form
+														.getValues('hybridBlockPrompts')
+														?.every((b) => b.type === HybridBlock.text)
 													? 'text-black'
 													: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 											)}
@@ -996,8 +1174,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											className={cn(
 												'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
 												selectedModeKey !== 'none' &&
-													watchedBlocks.length > 0 &&
-													watchedBlocks.every((b) => b.type === HybridBlock.text)
+													(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
+													form
+														.getValues('hybridBlockPrompts')
+														?.every((b) => b.type === HybridBlock.text)
 													? 'text-black'
 													: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 											)}
@@ -1107,7 +1287,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							</div>
 							<div className="flex-1 flex flex-col">
 								{/* Content area */}
-								<div className="pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
+								<div className="pt-[16px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
 									{fields.length === 0 && (
 										<span className="text-gray-300 font-primary text-[12px]">
 											Add blocks here to build your prompt...
@@ -1117,53 +1297,174 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										items={fields.map((f) => f.id)}
 										strategy={verticalListSortingStrategy}
 									>
-										{fields.map((field, index) => {
-											const isHybridBlock =
-												field.type === HybridBlock.introduction ||
-												field.type === HybridBlock.research ||
-												field.type === HybridBlock.action;
-											const hasImmediateTextBlock =
-												fields[index + 1]?.type === HybridBlock.text;
-
-											return (
-												<Fragment key={field.id}>
-													<div className={cn(index === 0 && '-mt-6')}>
-														<SortableAIBlock
-															id={field.id}
-															fieldIndex={index}
-															block={getBlock(field.type)}
-															onRemove={handleRemoveBlock}
-															trackFocusedField={trackFocusedField}
-															showTestPreview={showTestPreview}
-															testMessage={testMessage}
-														/>
-													</div>
-													{/* Plus button under hybrid blocks */}
-													{isHybridBlock && !hasImmediateTextBlock && (
-														<div
-															className={cn(
-																'flex justify-end -mt-1',
-																showTestPreview ? 'w-[416px]' : 'w-[868px]'
-															)}
-														>
-															<Button
-																type="button"
-																onClick={() => handleAddTextBlockAt(index)}
-																className="w-[76px] h-[20px] bg-background hover:bg-primary/20 active:bg-primary/20 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600"
-																title="Add text block"
-															>
-																<TinyPlusIcon
-																	width="5px"
-																	height="5px"
-																	className="!w-[8px] !h-[8px]"
-																/>
-																<span className="font-secondary">Add text</span>
-															</Button>
-														</div>
-													)}
-												</Fragment>
+										{(() => {
+											const orderedHybridTypes = [
+												HybridBlock.introduction,
+												HybridBlock.research,
+												HybridBlock.action,
+											];
+											const presentHybridTypes = new Set(
+												fields
+													.filter(
+														(f) =>
+															f.type === HybridBlock.introduction ||
+															f.type === HybridBlock.research ||
+															f.type === HybridBlock.action
+													)
+													.map((f) => f.type)
 											);
-										})}
+
+											const shouldShowPlaceholders = selectedModeKey === 'hybrid';
+											const missingHybridTypes = shouldShowPlaceholders
+												? orderedHybridTypes.filter((t) => !presentHybridTypes.has(t))
+												: [];
+
+											const inserted = new Set<string>();
+											const augmented: Array<
+												| { kind: 'field'; field: (typeof fields)[number]; index: number }
+												| { kind: 'placeholder'; blockType: HybridBlock; key: string }
+											> = [];
+
+											for (let index = 0; index < fields.length; index++) {
+												const field = fields[index];
+												if (
+													field.type === HybridBlock.introduction ||
+													field.type === HybridBlock.research ||
+													field.type === HybridBlock.action
+												) {
+													const currentIdx = orderedHybridTypes.indexOf(field.type);
+													for (let i = 0; i < currentIdx; i++) {
+														const t = orderedHybridTypes[i];
+														if (
+															missingHybridTypes.includes(t) &&
+															!inserted.has(`ph-${t}`)
+														) {
+															augmented.push({
+																kind: 'placeholder',
+																blockType: t,
+																key: `ph-${t}-${index}`,
+															});
+															inserted.add(`ph-${t}`);
+														}
+													}
+												}
+												augmented.push({ kind: 'field', field, index });
+											}
+
+											for (const t of orderedHybridTypes) {
+												if (missingHybridTypes.includes(t) && !inserted.has(`ph-${t}`)) {
+													augmented.push({
+														kind: 'placeholder',
+														blockType: t,
+														key: `ph-${t}-end`,
+													});
+													inserted.add(`ph-${t}`);
+												}
+											}
+
+											const renderHybridPlaceholder = (type: HybridBlock) => {
+												if (selectedModeKey !== 'hybrid') return null;
+												const label =
+													type === HybridBlock.introduction
+														? 'Intro'
+														: type === HybridBlock.research
+														? 'Research'
+														: 'CTA';
+												const borderColor =
+													type === HybridBlock.introduction
+														? '#6673FF'
+														: type === HybridBlock.research
+														? '#1010E7'
+														: '#0E0E7F';
+												return (
+													<div
+														className={cn(
+															'flex justify-end',
+															showTestPreview ? 'w-[416px]' : 'w-[868px]'
+														)}
+													>
+														<Button
+															type="button"
+															onClick={() => handleAddBlock(getBlock(type))}
+															font="secondary"
+															className="w-[76px] h-[30px] bg-background hover:bg-primary/20 active:bg-primary/20 border-2 rounded-[8px] !font-normal text-[10px] text-gray-600 inline-flex items-center justify-start gap-[4px] pl-[4px]"
+															style={{ borderColor }}
+															title={`Add ${label}`}
+														>
+															<TinyPlusIcon
+																width="8px"
+																height="8px"
+																className="!w-[8px] !h-[8px]"
+															/>
+															<span className="font-inter font-medium text-[10px] text-[#0A0A0A]">
+																{label}
+															</span>
+														</Button>
+													</div>
+												);
+											};
+
+											return augmented.map((item) => {
+												if (item.kind === 'placeholder') {
+													return (
+														<Fragment key={item.key}>
+															{renderHybridPlaceholder(item.blockType)}
+														</Fragment>
+													);
+												}
+
+												const field = item.field;
+												const index = item.index;
+												const isHybridBlock =
+													field.type === HybridBlock.introduction ||
+													field.type === HybridBlock.research ||
+													field.type === HybridBlock.action;
+												const hasImmediateTextBlock =
+													fields[index + 1]?.type === HybridBlock.text;
+
+												return (
+													<Fragment key={field.id}>
+														<div className={cn(index === 0 && '-mt-2')}>
+															<SortableAIBlock
+																id={field.id}
+																fieldIndex={index}
+																block={getBlock(field.type)}
+																onRemove={handleRemoveBlock}
+																onCollapse={handleToggleCollapse}
+																onExpand={handleToggleCollapse}
+																isCollapsed={field.isCollapsed}
+																trackFocusedField={trackFocusedField}
+																showTestPreview={showTestPreview}
+																testMessage={testMessage}
+															/>
+														</div>
+														{/* Plus button under hybrid blocks */}
+														{isHybridBlock && !hasImmediateTextBlock && (
+															<div
+																className={cn(
+																	'flex justify-end -mt-1',
+																	showTestPreview ? 'w-[416px]' : 'w-[868px]'
+																)}
+															>
+																<Button
+																	type="button"
+																	onClick={() => handleAddTextBlockAt(index)}
+																	className="w-[76px] h-[20px] bg-background hover:bg-primary/20 active:bg-primary/20 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600"
+																	title="Add text block"
+																>
+																	<TinyPlusIcon
+																		width="5px"
+																		height="5px"
+																		className="!w-[8px] !h-[8px]"
+																	/>
+																	<span className="font-secondary">Add text</span>
+																</Button>
+															</div>
+														)}
+													</Fragment>
+												);
+											});
+										})()}
 									</SortableContext>
 								</div>
 							</div>

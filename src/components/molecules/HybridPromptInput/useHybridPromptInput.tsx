@@ -83,7 +83,7 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 	const [textBlockCount, setTextBlockCount] = useState(0);
 	const [showTestPreview, setShowTestPreview] = useState(false);
 
-	const { fields, append, remove, move, insert } = useFieldArray({
+	const { fields, append, remove, move, insert, update } = useFieldArray({
 		control: form.control,
 		name: 'hybridBlockPrompts',
 	});
@@ -408,12 +408,20 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		});
 	};
 
+	const handleToggleCollapse = (id: string) => {
+		const blockIndex = fields.findIndex((field) => field.id === id);
+		if (blockIndex === -1) return;
+		const field = fields[blockIndex];
+		update(blockIndex, { ...field, isCollapsed: !field.isCollapsed });
+	};
+
 	return {
 		handleDragEnd,
 		handleRemoveBlock,
 		handleAddBlock,
 		handleAddHybridAutomation,
 		handleAddTextBlockAt,
+		handleToggleCollapse,
 		getBlock,
 		ORDERED_BLOCKS,
 		form,
