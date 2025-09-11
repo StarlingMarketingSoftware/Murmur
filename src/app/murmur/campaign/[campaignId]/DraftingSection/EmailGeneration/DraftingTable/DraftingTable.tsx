@@ -30,7 +30,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	onCancel,
 }) => {
 	return (
-		<div style={{ width: '366px', height: '489px', position: 'relative' }}>
+		<div style={{ width: '268px', height: '489px', position: 'relative' }}>
 			{/* Container box with header */}
 			<div
 				data-drafting-table

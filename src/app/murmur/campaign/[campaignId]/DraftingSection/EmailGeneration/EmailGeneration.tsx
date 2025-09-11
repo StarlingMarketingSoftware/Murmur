@@ -1,8 +1,6 @@
 import { FC, ReactNode, useState } from 'react';
 import { EmailGenerationProps, useEmailGeneration } from './useEmailGeneration';
 import { Button } from '@/components/ui/button';
-import { FormLabel } from '@/components/ui/form';
-
 import { Typography } from '@/components/ui/typography';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { cn } from '@/utils';
@@ -20,6 +18,8 @@ import ViewEditEmailDialog from '@/components/organisms/_dialogs/ViewEditEmailDi
 import { Badge } from '@/components/ui/badge';
 import { ContactsSelection } from './ContactsSelection/ContactsSelection';
 import { DraftedEmails } from './DraftedEmails/DraftedEmails';
+import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
 export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	const {
@@ -165,11 +165,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 	const subjectValue = form.watch('subject');
 
-	const isDraftDisabled = () => {
-		const genDisabled = isGenerationDisabled();
-		const noSelection = selectedContactIds.size === 0;
-		return genDisabled || noSelection;
-	};
+	// removed isDraftDisabled here; using isGenerationDisabled() and selection checks inline where needed
 
 	const getAutosaveStatusDisplay = (): ReactNode => {
 		switch (autosaveStatus) {
@@ -208,8 +204,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 	return (
 		<>
-			<div className="mb-[4px] mt-3 flex justify-between items-center">
-				<FormLabel className="font-inter font-medium">Drafting</FormLabel>
+			<div className="mb-[4px] mt-3 flex justify-end items-center">
 				{scrollToEmailStructure && (
 					<Button
 						type="button"
@@ -227,14 +222,14 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 					<div
 						data-drafting-container
 						className={cn(
-							'relative w-[892px] h-[620px] border-[3px] border-black rounded-lg overflow-x-hidden p-[17px] pb-[120px]',
+							'relative w-[892px] h-[620px] rounded-lg overflow-x-hidden p-[17px] pb-[120px]',
 							isWaitingToSend && 'h-[700px] pb-[200px]'
 						)}
 					>
 						{/* Tables container - positioned at bottom */}
 						<div
 							className={cn(
-								'absolute left-[19px] right-[19px] flex flex-row justify-between top-[35px]',
+								'absolute left-[19px] right-[19px] flex flex-row justify-center gap-x-6 top-[35px]',
 								isWaitingToSend ? '' : ''
 							)}
 						>
@@ -257,6 +252,86 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 								);
 							})()}
 
+							{/* Middle interactive Email Structure (compact composer) */}
+							<div style={{ width: '268px', height: '489px', position: 'relative' }}>
+								<div
+									style={{
+										width: '100%',
+										height: '100%',
+										border: '2px solid #ABABAB',
+										borderRadius: '8px',
+										position: 'relative',
+										display: 'flex',
+										flexDirection: 'column',
+										background: 'white',
+									}}
+								>
+									{/* Header */}
+									<div
+										style={{
+											borderTopLeftRadius: '8px',
+											borderTopRightRadius: '8px',
+											borderBottom: '2px solid #ABABAB',
+											padding: '12px 16px',
+											display: 'flex',
+											justifyContent: 'space-between',
+											alignItems: 'center',
+											height: '48px',
+											backgroundColor: 'white',
+										}}
+									>
+										<div style={{ transform: 'translateY(-6px)' }}>
+											<div className="text-sm font-inter font-medium text-black">
+												Email Structure
+											</div>
+										</div>
+									</div>
+
+									{/* Content */}
+									<CustomScrollbar
+										className="flex-1"
+										thumbWidth={2}
+										thumbColor="#000000"
+										trackColor="transparent"
+										offsetRight={-5}
+									>
+										<div className="p-3">
+											<HybridPromptInput
+												compactLeftOnly
+												isPendingGeneration={isPendingGeneration}
+												isGenerationDisabled={isGenerationDisabled}
+												isTest={isTest}
+												contact={contacts[0]}
+											/>
+										</div>
+									</CustomScrollbar>
+
+									{/* Footer Draft button */}
+									<div className="px-3 pb-3">
+										<Button
+											type="button"
+											onClick={handleDraftButtonClick}
+											disabled={isGenerationDisabled()}
+											className={cn(
+												'w-full h-[32px] font-bold flex items-center justify-center transition-all duration-200',
+												isGenerationDisabled()
+													? 'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black opacity-50 cursor-not-allowed'
+													: 'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]'
+											)}
+										>
+											{isPendingGeneration && !isTest ? (
+												<Spinner size="small" />
+											) : (
+												<span className="flex items-center gap-1">
+													Draft
+													<ChevronRight size={16} />
+												</span>
+											)}
+										</Button>
+									</div>
+								</div>
+							</div>
+
 							{/* Right table */}
 							<DraftedEmails
 								draftEmails={draftEmails}
@@ -271,30 +346,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 							/>
 						</div>
 
-						{/* Generate Drafts Button */}
-						<div className="absolute left-1/2 top-[280px] -translate-x-1/2">
-							<Button
-								type="button"
-								onClick={handleDraftButtonClick}
-								disabled={isDraftDisabled()}
-								className={cn(
-									'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black font-inter font-medium rounded-[4px] cursor-pointer transition-all duration-200 hover:bg-[rgba(93,171,104,0.6)] hover:border-[#4a8d56] active:bg-[rgba(93,171,104,0.7)] active:border-[#3d7346] h-[38px] w-[87px] flex items-center justify-center appearance-none text-sm font-inter p-0 m-0 leading-normal box-border text-center',
-									isDraftDisabled()
-										? 'opacity-50 cursor-not-allowed hover:bg-[rgba(93,171,104,0.47)] hover:border-[#5DAB68]'
-										: ''
-								)}
-								noPadding
-							>
-								{isPendingGeneration && !isTest ? (
-									<Spinner size="small" />
-								) : (
-									<span className="flex items-center gap-1">
-										Draft
-										<ChevronRight size={16} />
-									</span>
-								)}
-							</Button>
-						</div>
+						{/* Generate Drafts Button removed in favor of the mini structure's footer button */}
 
 						{/* Bottom fixed send bar inside the drafting box */}
 						{draftEmails.length > 0 && (

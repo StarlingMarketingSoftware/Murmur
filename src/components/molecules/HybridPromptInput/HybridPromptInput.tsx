@@ -762,6 +762,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		contact,
 	} = useHybridPromptInput(props);
 
+	const { compactLeftOnly } = props;
+
 	// Track if the user has attempted to Test to control error styling
 	const [hasAttemptedTest, setHasAttemptedTest] = useState(false);
 
@@ -1072,23 +1074,28 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	};
 
 	return (
-		<div className="flex justify-center">
+		<div className={compactLeftOnly ? '' : 'flex justify-center'}>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
 				<Droppable id="droppable">
 					<div
-						className={`w-[962px] h-[644px] transition mb-4 flex mx-auto ${
+						className={`${
+							compactLeftOnly ? '' : 'w-[962px] h-[644px] transition mb-4 flex mx-auto '
+						} ${
 							showTestPreview
 								? 'flex-row gap-[40px] justify-center items-start'
+								: compactLeftOnly
+								? 'flex-col'
 								: 'flex-col border-[3px] border-black rounded-md bg-gray-50 min-h-[530px]'
-						} relative overflow-visible`}
+						}	relative overflow-visible`}
 					>
-						{/* Left-side blurred backdrop removed in two-box layout */}
 						{/* Left side - Content area */}
 						<div
 							className={cn(
 								`flex flex-col`,
 								showTestPreview
 									? 'w-[457px] shrink-0 h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-gray-50'
+									: compactLeftOnly
+									? 'w-[350px]'
 									: 'w-full min-h-[530px]'
 							)}
 						>
@@ -1175,14 +1182,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										</Button>
 									</div>
 								</div>
-								{showTestPreview && <div className="h-[2px] bg-black -mx-[18px]" />}
-								<div
-									className={cn(
-										'h-[2px] bg-black -mx-[18px]',
-										showTestPreview && 'hidden'
-									)}
-								/>
-								{showTestPreview && <div className="h-2" />}
+								{compactLeftOnly ? null : (
+									<>
+										{showTestPreview && <div className="h-[2px] bg-black -mx-[18px]" />}
+										<div
+											className={cn(
+												'h-[2px] bg-black -mx-[18px]',
+												showTestPreview && 'hidden'
+											)}
+										/>
+										{showTestPreview && <div className="h-2" />}
+									</>
+								)}
 								<div className="flex flex-col items-center">
 									<FormField
 										control={form.control}
@@ -1541,67 +1552,71 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							</div>
 						</div>
 
-						{/* Test Button - Fixed position below signature, centered */}
-						<div
-							className={cn(
-								'flex flex-col items-center px-3',
-								showTestPreview && 'hidden'
-							)}
-						>
-							<div className="flex justify-center mt-1 mb-4 w-full">
-								<Button
-									type="button"
-									onClick={() => {
-										setShowTestPreview?.(true);
-										handleGenerateTestDrafts?.();
-										setHasAttemptedTest(true);
-									}}
-									disabled={isGenerationDisabled?.()}
-									className={cn(
-										'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
-										showTestPreview ? 'w-[426px]' : 'w-[868px]',
-										isGenerationDisabled?.()
-											? 'opacity-50 cursor-not-allowed'
-											: 'opacity-100'
-									)}
-								>
-									{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
-								</Button>
-							</div>
-
-							{/* Error message for empty text blocks */}
-							{hasEmptyTextBlocks && (
-								<div
-									className={cn(
-										hasTouchedEmptyTextBlocks || hasAttemptedTest
-											? 'text-destructive'
-											: 'text-black',
-										'text-sm font-medium -mt-2 mb-2',
-										showTestPreview ? 'w-[426px]' : 'w-[868px]'
-									)}
-								>
-									Fill in all text blocks in order to compose an email.
+						{compactLeftOnly ? null : (
+							<div
+								className={cn(
+									'flex flex-col items-center px-3',
+									showTestPreview && 'hidden'
+								)}
+							>
+								{/* Test button and notices hidden in compact mode */}
+								<div className="flex justify-center mt-1 mb-4 w-full">
+									<Button
+										type="button"
+										onClick={() => {
+											setShowTestPreview?.(true);
+											handleGenerateTestDrafts?.();
+											setHasAttemptedTest(true);
+										}}
+										disabled={isGenerationDisabled?.()}
+										className={cn(
+											'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
+											showTestPreview ? 'w-[426px]' : 'w-[868px]',
+											isGenerationDisabled?.()
+												? 'opacity-50 cursor-not-allowed'
+												: 'opacity-100'
+										)}
+									>
+										{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+									</Button>
 								</div>
-							)}
-						</div>
 
-						{showTestPreview && (
-							<div className="w-[461px] shrink-0">
-								<TestPreviewPanel
-									setShowTestPreview={setShowTestPreview}
-									testMessage={testMessage || ''}
-									isLoading={Boolean(isTest) || Boolean(isPendingGeneration)}
-									onTest={() => {
-										setShowTestPreview?.(true);
-										handleGenerateTestDrafts?.();
-										setHasAttemptedTest(true);
-									}}
-									isDisabled={isGenerationDisabled?.()}
-									isTesting={Boolean(isPendingGeneration) && Boolean(isTest)}
-									contact={contact}
-								/>
+								{/* Error message for empty text blocks */}
+								{hasEmptyTextBlocks && (
+									<div
+										className={cn(
+											hasTouchedEmptyTextBlocks || hasAttemptedTest
+												? 'text-destructive'
+												: 'text-black',
+											'text-sm font-medium -mt-2 mb-2',
+											showTestPreview ? 'w-[426px]' : 'w-[868px]'
+										)}
+									>
+										Fill in all text blocks in order to compose an email.
+									</div>
+								)}
 							</div>
 						)}
+
+						{compactLeftOnly
+							? null
+							: showTestPreview && (
+									<div className="w-[461px] shrink-0">
+										<TestPreviewPanel
+											setShowTestPreview={setShowTestPreview}
+											testMessage={testMessage || ''}
+											isLoading={Boolean(isTest) || Boolean(isPendingGeneration)}
+											onTest={() => {
+												setShowTestPreview?.(true);
+												handleGenerateTestDrafts?.();
+												setHasAttemptedTest(true);
+											}}
+											isDisabled={isGenerationDisabled?.()}
+											isTesting={Boolean(isPendingGeneration) && Boolean(isTest)}
+											contact={contact}
+										/>
+									</div>
+							  )}
 					</div>
 				</Droppable>
 			</DndContext>
