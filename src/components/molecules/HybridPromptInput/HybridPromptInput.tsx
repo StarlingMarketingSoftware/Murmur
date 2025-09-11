@@ -1498,7 +1498,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							</div>
 
 							{/*  Signature Block */}
-							<div className="px-3 pb-0 mt-auto pt-12 flex justify-center">
+							<div
+								className={cn(
+									'px-3 pb-0 pt-12 flex justify-center',
+									showTestPreview && selectedModeKey === 'full' ? 'mt-0 pt-4' : 'mt-auto'
+								)}
+							>
 								<FormField
 									control={form.control}
 									name="signature"
