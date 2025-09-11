@@ -309,129 +309,144 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	}, [typedBody, clipAtHeight]);
 
 	return (
-		<div className="w-1/2 flex flex-col">
-			<div className="flex-1 flex flex-col px-3 pt-[18px] pb-0">
-				<div className="flex-1 border-2 border-black rounded-lg bg-background flex flex-col overflow-visible mb-6 mt-[-4px] relative z-20">
-					<div className="relative px-2">
+		<div className="w-[426px] h-[643px] flex flex-col border-2 border-black rounded-[8px] bg-gray-50">
+			<div className="flex-1 flex flex-col pt-[18px] pb-0">
+				<div className="flex-1 flex flex-col overflow-visible relative z-20">
+					<div className="relative px-5">
 						{contact && (
-							<div className="grid grid-cols-2 grid-rows-[auto_auto] w-full overflow-visible">
-								{fullName ? (
-									<>
-										{/* Top Left - Name */}
-										<div className="p-1 pl-3 pb-[1.5px] flex items-start">
-											<div className="font-inter font-bold text-[15.45px] w-full whitespace-normal break-words leading-4">
-												{fullName}
-											</div>
-										</div>
-										{/* Top Right - Location */}
-										<div className="p-1 pb-[1.5px] flex items-center">
-											{contact.city || stateAbbr ? (
-												<div className="flex items-center gap-2 w-full">
-													{stateAbbr && (
-														<span
-															className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
-															style={{
-																borderColor: 'rgba(0,0,0,0.7)',
-																backgroundColor: isUSState
-																	? stateBadgeColorMap[stateAbbr]
-																	: 'transparent',
-															}}
-														>
-															{stateAbbr}
-														</span>
-													)}
-													{contact.city ? (
-														<span className="text-xs text-black truncate w-full">
-															{contact.city}
-														</span>
+							<div>
+								<div className="relative">
+									<div className="grid grid-cols-2 w-full overflow-visible">
+										{fullName ? (
+											<>
+												{/* Top Left - Name */}
+												<div className="p-1 pl-3 pb-[1.5px] flex items-start">
+													<div className="font-inter font-bold text-[15.45px] w-full whitespace-normal break-words leading-4">
+														{fullName}
+													</div>
+												</div>
+												{/* Top Right - Location */}
+												<div className="p-1 pb-[1.5px] flex items-center">
+													{contact.city || stateAbbr ? (
+														<div className="flex items-center gap-2 w-full">
+															{stateAbbr && (
+																<span
+																	className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
+																	style={{
+																		borderColor: 'rgba(0,0,0,0.7)',
+																		backgroundColor: isUSState
+																			? stateBadgeColorMap[stateAbbr]
+																			: 'transparent',
+																	}}
+																>
+																	{stateAbbr}
+																</span>
+															)}
+															{contact.city ? (
+																<span className="text-xs text-black truncate w-full">
+																	{contact.city}
+																</span>
+															) : (
+																<div className="w-full" />
+															)}
+														</div>
 													) : (
 														<div className="w-full" />
 													)}
 												</div>
-											) : (
-												<div className="w-full" />
-											)}
-										</div>
-										{/* Bottom Left - Company */}
-										<div className="p-1 pl-3 pt-0 flex items-start">
-											<div className="text-xs text-black w-full whitespace-normal break-words leading-4">
-												{contact.company || ''}
-											</div>
-										</div>
-										{/* Bottom Right - Title */}
-										<div className="p-1 pt-0 flex items-center overflow-visible">
-											{contact.headline ? (
-												<div className="h-[20.54px] rounded-[6.64px] px-2 flex items-center w-full max-w-[150px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
-													<span className="text-xs text-black truncate">
-														{contact.headline}
-													</span>
+											</>
+										) : (
+											<>
+												{/* Left Column - Company Name (Vertically Centered) */}
+												<div className="p-1 pl-3 row-span-2 flex items-center">
+													<div className="font-inter font-bold text-[15.45px] w-full whitespace-normal break-words leading-4">
+														{contact.company || ''}
+													</div>
 												</div>
-											) : (
-												<div className="w-full" />
-											)}
-										</div>
-									</>
-								) : (
-									<>
-										{/* Left Column - Company Name (Vertically Centered) */}
-										<div className="p-1 pl-3 row-span-2 flex items-center">
-											<div className="font-inter font-bold text-[15.45px] w-full whitespace-normal break-words leading-4">
-												{contact.company || ''}
-											</div>
-										</div>
-										{/* Top Right - Location */}
-										<div className="p-1 pb-[1.5px] flex items-center">
-											{contact.city || stateAbbr ? (
-												<div className="flex items-center gap-2 w-full">
-													{stateAbbr && (
-														<span
-															className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
-															style={{
-																borderColor: 'rgba(0,0,0,0.7)',
-																backgroundColor: isUSState
-																	? stateBadgeColorMap[stateAbbr]
-																	: 'transparent',
-															}}
-														>
-															{stateAbbr}
-														</span>
-													)}
-													{contact.city ? (
-														<span className="text-xs text-black truncate w-full">
-															{contact.city}
-														</span>
+												{/* Top Right - Location */}
+												<div className="p-1 pb-[1.5px] flex items-center">
+													{contact.city || stateAbbr ? (
+														<div className="flex items-center gap-2 w-full">
+															{stateAbbr && (
+																<span
+																	className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
+																	style={{
+																		borderColor: 'rgba(0,0,0,0.7)',
+																		backgroundColor: isUSState
+																			? stateBadgeColorMap[stateAbbr]
+																			: 'transparent',
+																	}}
+																>
+																	{stateAbbr}
+																</span>
+															)}
+															{contact.city ? (
+																<span className="text-xs text-black truncate w-full">
+																	{contact.city}
+																</span>
+															) : (
+																<div className="w-full" />
+															)}
+														</div>
 													) : (
 														<div className="w-full" />
 													)}
 												</div>
-											) : (
-												<div className="w-full" />
-											)}
-										</div>
-										{/* Bottom Right - Title */}
-										<div className="p-1 pt-0 flex items-center overflow-visible">
-											{contact.headline ? (
-												<div className="h-[20.54px] rounded-[6.64px] px-2 flex items-center w-full max-w-[150px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
-													<span className="text-xs text-black truncate">
-														{contact.headline}
-													</span>
+											</>
+										)}
+									</div>
+									<Button
+										type="button"
+										variant="icon"
+										onClick={() => setShowTestPreview(false)}
+										className="absolute right-0 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded transition-colors"
+									>
+										<X className="h-5 w-5 text-destructive-dark" />
+									</Button>
+								</div>
+								<div className="grid grid-cols-2 w-full overflow-visible">
+									{fullName ? (
+										<>
+											{/* Bottom Left - Company */}
+											<div className="p-1 pl-3 pt-0 flex items-start">
+												<div className="text-xs text-black w-full whitespace-normal break-words leading-4">
+													{contact.company || ''}
 												</div>
-											) : (
-												<div className="w-full" />
-											)}
-										</div>
-									</>
-								)}
+											</div>
+											{/* Bottom Right - Title */}
+											<div className="p-1 pt-0 flex items-center overflow-visible">
+												{contact.headline ? (
+													<div className="h-[20.54px] rounded-[6.64px] px-2 flex items-center w-full max-w-[150px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
+														<span className="text-xs text-black truncate">
+															{contact.headline}
+														</span>
+													</div>
+												) : (
+													<div className="w-full" />
+												)}
+											</div>
+										</>
+									) : (
+										<>
+											{/* Spacing div */}
+											<div></div>
+											{/* Bottom Right - Title */}
+											<div className="p-1 pt-0 flex items-center overflow-visible">
+												{contact.headline ? (
+													<div className="h-[20.54px] rounded-[6.64px] px-2 flex items-center w-full max-w-[150px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
+														<span className="text-xs text-black truncate">
+															{contact.headline}
+														</span>
+													</div>
+												) : (
+													<div className="w-full" />
+												)}
+											</div>
+										</>
+									)}
+								</div>
 							</div>
 						)}
-						<Button
-							type="button"
-							variant="icon"
-							onClick={() => setShowTestPreview(false)}
-							className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded transition-colors"
-						>
-							<X className="h-5 w-5 text-destructive-dark" />
-						</Button>
 					</div>
 					<div className="h-[2px] bg-black" />
 
