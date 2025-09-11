@@ -310,11 +310,11 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 
 	return (
 		<div className="w-[457px] h-[644px] flex flex-col border-2 border-black rounded-[8px] bg-gray-50">
-			<div className="flex-1 flex flex-col pt-[10px] pb-0">
+			<div className="flex-1 flex flex-col pt-1 pb-0">
 				<div className="flex-1 flex flex-col overflow-visible relative z-20">
 					<div className="relative px-5">
 						{contact && (
-							<div>
+							<div className="pb-2">
 								<div className="relative">
 									<div className="grid grid-cols-2 w-full overflow-visible">
 										{fullName ? (

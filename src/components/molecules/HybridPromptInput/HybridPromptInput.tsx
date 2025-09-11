@@ -1076,7 +1076,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
 				<Droppable id="droppable">
 					<div
-						className={`w-[954px] h-[644px] transition mb-4 flex mx-auto ${
+						className={`w-[962px] h-[644px] transition mb-4 flex mx-auto ${
 							showTestPreview
 								? 'flex-row gap-[40px] justify-center items-start'
 								: 'flex-col border-[3px] border-black rounded-md bg-gray-50 min-h-[530px]'
@@ -1088,7 +1088,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							className={cn(
 								`flex flex-col`,
 								showTestPreview
-									? 'w-[457px] h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-gray-50'
+									? 'w-[457px] shrink-0 h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-gray-50'
 									: 'w-full min-h-[530px]'
 							)}
 						>
@@ -1586,7 +1586,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 						</div>
 
 						{showTestPreview && (
-							<div className="flex-1 min-w-0">
+							<div className="w-[461px] shrink-0">
 								<TestPreviewPanel
 									setShowTestPreview={setShowTestPreview}
 									testMessage={testMessage || ''}
