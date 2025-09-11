@@ -1474,7 +1474,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														{isHybridBlock && !hasImmediateTextBlock && (
 															<div
 																className={cn(
-																	'flex justify-end -mt-1 -mr-[26px] relative z-30',
+																	'flex justify-end -mt-1 -mr-[102px] relative z-30',
 																	showTestPreview ? 'w-[416px]' : 'w-[868px]'
 																)}
 															>
