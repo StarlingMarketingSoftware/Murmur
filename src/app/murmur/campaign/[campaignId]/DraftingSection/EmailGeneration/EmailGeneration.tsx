@@ -222,7 +222,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 					<div
 						data-drafting-container
 						className={cn(
-							'relative w-[892px] h-[620px] rounded-lg overflow-x-hidden p-[17px] pb-[120px]',
+							'relative w-[1208px] h-[620px] rounded-lg overflow-x-hidden p-[17px] pb-[120px]',
 							isWaitingToSend && 'h-[700px] pb-[200px]'
 						)}
 					>
@@ -253,7 +253,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 							})()}
 
 							{/* Middle interactive Email Structure (compact composer) */}
-							<div style={{ width: '268px', height: '489px', position: 'relative' }}>
+							<div style={{ width: '374px', height: '474px', position: 'relative' }}>
 								<div
 									style={{
 										width: '100%',

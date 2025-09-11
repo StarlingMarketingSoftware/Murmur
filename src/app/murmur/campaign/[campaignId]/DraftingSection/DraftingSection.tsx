@@ -38,7 +38,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		<div className="mb-30 flex flex-col items-center">
 			<Form {...form}>
 				<form className="flex flex-col items-center">
-					<div className="w-[962px]">
+					<div className="w-fit">
 						<div
 							ref={emailStructureRef}
 							className="mb-[4px] flex justify-between items-center"
