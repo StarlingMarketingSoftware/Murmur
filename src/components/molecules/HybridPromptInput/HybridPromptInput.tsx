@@ -1086,17 +1086,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							className={cn(
 								`flex flex-col`,
 								showTestPreview
-									? 'w-[426px] h-[643px] p-[18px] border-[2px] border-black rounded-[8px] bg-gray-50'
+									? 'w-[426px] h-[643px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-gray-50'
 									: 'w-full min-h-[530px]'
 							)}
 						>
 							{/* Subject header inside the box */}
-							<div className="px-3 pt-0 pb-0">
+							<div className="pt-0 pb-0">
 								<div className="h-[36px] flex items-center relative z-20">
 									<span
 										className={cn(
-											'font-inter font-semibold text-[17px] mr-[56px] text-black',
-											showTestPreview && 'ml-3'
+											'font-inter font-semibold text-[17px] mr-[56px] text-black'
 										)}
 									>
 										Mode
@@ -1174,8 +1173,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										</Button>
 									</div>
 								</div>
+								{showTestPreview && <div className="h-[2px] bg-black -mx-[18px]" />}
 								<div
-									className={cn('-mx-3 h-[2px] bg-black', showTestPreview && 'hidden')}
+									className={cn(
+										'h-[2px] bg-black -mx-[18px]',
+										showTestPreview && 'hidden'
+									)}
 								/>
 								{showTestPreview && <div className="h-2" />}
 								<div className="flex flex-col items-center">
@@ -1456,14 +1459,21 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														{isHybridBlock && !hasImmediateTextBlock && (
 															<div
 																className={cn(
-																	'flex justify-end -mt-1 -mr-[102px] relative z-30',
-																	showTestPreview ? 'w-full' : 'w-[868px]'
+																	'flex relative z-30',
+																	showTestPreview
+																		? 'justify-start w-full'
+																		: 'justify-end -mr-[102px] w-[868px]'
 																)}
+																style={{ transform: 'translateY(-12px)' }}
 															>
 																<Button
 																	type="button"
 																	onClick={() => handleAddTextBlockAt(index)}
-																	className="w-[52px] h-[20px] bg-background hover:bg-stone-100 active:bg-stone-200 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600"
+																	className={cn(
+																		'w-[52px] h-[20px] bg-background hover:bg-stone-100 active:bg-stone-200 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600',
+																		showTestPreview &&
+																			'absolute left-0 -translate-x-[calc(100%+5px)]'
+																	)}
 																	title="Text block"
 																>
 																	<TinyPlusIcon
