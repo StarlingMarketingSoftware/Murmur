@@ -309,7 +309,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	}, [typedBody, clipAtHeight]);
 
 	return (
-		<div className="w-[426px] h-[643px] flex flex-col border-2 border-black rounded-[8px] bg-gray-50">
+		<div className="w-[457px] h-[644px] flex flex-col border-2 border-black rounded-[8px] bg-gray-50">
 			<div className="flex-1 flex flex-col pt-[10px] pb-0">
 				<div className="flex-1 flex flex-col overflow-visible relative z-20">
 					<div className="relative px-5">

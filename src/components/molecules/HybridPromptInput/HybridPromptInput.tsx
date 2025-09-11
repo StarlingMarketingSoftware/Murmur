@@ -112,7 +112,9 @@ const SortableAIBlock = ({
 	// If this is a collapsed hybrid block, show a collapsed button
 	if (isCollapsed && isHybridBlock) {
 		return (
-			<div className={cn('flex justify-end', showTestPreview ? 'w-full' : 'w-[868px]')}>
+			<div
+				className={cn('flex justify-end', showTestPreview ? 'w-[426px]' : 'w-[868px]')}
+			>
 				<Button
 					type="button"
 					onClick={() => onExpand?.(id)}
@@ -142,18 +144,18 @@ const SortableAIBlock = ({
 					'border-2 border-gray-300 bg-background',
 				isTextBlock
 					? showTestPreview
-						? 'w-full min-h-[44px]'
+						? 'w-[426px] min-h-[44px]'
 						: 'w-[868px] min-h-[80px]'
 					: isCompactBlock
 					? showTestPreview
-						? `w-full ${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'}`
+						? `w-[426px] ${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'}`
 						: `w-[868px] ${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'}`
 					: isFullAutomatedBlock
 					? showTestPreview
-						? 'w-full'
+						? 'w-[426px]'
 						: 'w-[868px]'
 					: showTestPreview
-					? 'w-full'
+					? 'w-[426px]'
 					: 'w-[868px]',
 				!isIntroductionBlock &&
 					!isResearchBlock &&
@@ -1070,11 +1072,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	};
 
 	return (
-		<div>
+		<div className="flex justify-center">
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
 				<Droppable id="droppable">
 					<div
-						className={`w-[892px] h-[643px] transition mb-4 flex ${
+						className={`w-[954px] h-[644px] transition mb-4 flex mx-auto ${
 							showTestPreview
 								? 'flex-row gap-[40px] justify-center items-start'
 								: 'flex-col border-[3px] border-black rounded-md bg-gray-50 min-h-[530px]'
@@ -1086,7 +1088,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							className={cn(
 								`flex flex-col`,
 								showTestPreview
-									? 'w-[426px] h-[643px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-gray-50'
+									? 'w-[457px] h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-gray-50'
 									: 'w-full min-h-[530px]'
 							)}
 						>
@@ -1187,7 +1189,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										name="subject"
 										rules={{ required: form.watch('isAiSubject') }}
 										render={({ field }) => (
-											<FormItem className={cn(showTestPreview ? 'w-full' : 'w-[868px]')}>
+											<FormItem
+												className={cn(showTestPreview ? 'w-[426px]' : 'w-[868px]')}
+											>
 												<div
 													className={cn(
 														'flex items-center',
@@ -1397,7 +1401,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<div
 														className={cn(
 															'flex justify-end',
-															showTestPreview ? 'w-full' : 'w-[868px]'
+															showTestPreview ? 'w-[426px]' : 'w-[868px]'
 														)}
 													>
 														<Button
@@ -1503,7 +1507,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											<div
 												className={cn(
 													`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
-													showTestPreview ? 'w-full' : 'w-[868px]'
+													showTestPreview ? 'w-[426px]' : 'w-[868px]'
 												)}
 											>
 												<FormLabel className="text-base font-semibold font-secondary">
@@ -1550,7 +1554,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									disabled={isGenerationDisabled?.()}
 									className={cn(
 										'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
-										showTestPreview ? 'w-full' : 'w-[868px]',
+										showTestPreview ? 'w-[426px]' : 'w-[868px]',
 										isGenerationDisabled?.()
 											? 'opacity-50 cursor-not-allowed'
 											: 'opacity-100'
@@ -1568,7 +1572,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											? 'text-destructive'
 											: 'text-black',
 										'text-sm font-medium -mt-2 mb-2',
-										showTestPreview ? 'w-full' : 'w-[868px]'
+										showTestPreview ? 'w-[426px]' : 'w-[868px]'
 									)}
 								>
 									Fill in all text blocks in order to compose an email.
