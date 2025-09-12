@@ -147,27 +147,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					background: 'white',
 				}}
 			>
-				{/* Header */}
-				<div
-					style={{
-						borderTopLeftRadius: '8px',
-						borderTopRightRadius: '8px',
-						borderBottom: '2px solid #ABABAB',
-						padding: '12px 16px',
-						display: 'flex',
-						justifyContent: 'space-between',
-						alignItems: 'center',
-						height: '48px',
-						backgroundColor: 'white',
-					}}
-				>
-					<div style={{ transform: 'translateY(-6px)' }}>
-						<div className="text-sm font-inter font-medium text-black">
-							Email Structure
-						</div>
-					</div>
-				</div>
-
 				{/* Content area - miniature, but interactive */}
 				<CustomScrollbar
 					className="flex-1"
