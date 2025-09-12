@@ -159,14 +159,14 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						{/* Mode */}
 						<div className="flex items-center gap-4 mb-2">
 							<span className="font-inter font-semibold text-[13px]">Mode</span>
-							<div className="flex items-center gap-2">
+							<div className="flex items-center gap-6">
 								<button
 									type="button"
 									className={cn(
-										'text-[11px] font-inter font-semibold px-2 py-0.5 rounded cursor-pointer',
+										'text-[11px] font-inter font-semibold px-4 py-1 rounded-md cursor-pointer text-center',
 										draftingMode === 'ai'
-											? 'text-black bg-[#EDEDED]'
-											: 'text-[#6B6B6B] hover:text-black hover:bg-[#F3F3F3]'
+											? 'text-white bg-[#4B4B4B]'
+											: 'text-[#6B6B6B] bg-[#F3F3F3] hover:bg-[#E5E5E5]'
 									)}
 									onClick={() => setMode('ai')}
 								>
@@ -175,10 +175,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								<button
 									type="button"
 									className={cn(
-										'text-[11px] font-inter font-semibold px-2 py-0.5 rounded cursor-pointer',
+										'text-[11px] font-inter font-semibold px-4 py-1 rounded-md cursor-pointer text-center',
 										draftingMode === 'hybrid'
-											? 'text-black bg-[#EDEDED]'
-											: 'text-[#6B6B6B] hover:text-black hover:bg-[#F3F3F3]'
+											? 'text-white bg-[#4B4B4B]'
+											: 'text-[#6B6B6B] bg-[#F3F3F3] hover:bg-[#E5E5E5]'
 									)}
 									onClick={() => setMode('hybrid')}
 								>
@@ -187,10 +187,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								<button
 									type="button"
 									className={cn(
-										'text-[11px] font-inter font-semibold px-2 py-0.5 rounded cursor-pointer',
+										'text-[11px] font-inter font-semibold px-4 py-1 rounded-md cursor-pointer text-center',
 										draftingMode === 'handwritten'
-											? 'text-black bg-[#EDEDED]'
-											: 'text-[#6B6B6B] hover:text-black hover:bg-[#F3F3F3]'
+											? 'text-white bg-[#4B4B4B]'
+											: 'text-[#6B6B6B] bg-[#F3F3F3] hover:bg-[#E5E5E5]'
 									)}
 									onClick={() => setMode('handwritten')}
 								>
