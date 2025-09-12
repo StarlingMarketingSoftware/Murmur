@@ -270,7 +270,12 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											>
 												<div className="w-full h-full flex flex-col">
 													{/* Top Row */}
-													<div className="flex flex-row h-[31px] flex-shrink-0">
+													<div
+														className={cn(
+															'flex flex-row flex-shrink-0',
+															isExpanded ? 'h-[21px]' : 'h-[31px]'
+														)}
+													>
 														<div className="flex-1 flex items-center px-3">
 															<span className="font-inter text-[12px] font-semibold text-black">
 																{blockLabel(b.type as HybridBlock)}
@@ -318,10 +323,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													</div>
 													{/* Bottom content */}
 													<div className="flex-1 flex flex-col min-h-0">
-														<div className="h-[1px] bg-black/80" />
-														<div className="flex-1 px-3 py-1 flex items-center">
+														<div className="h-[2px] bg-black w-full" />
+														<div className="flex-1 px-3 py-1 flex items-center bg-white">
 															<textarea
-																className="w-full bg-transparent text-[11px] outline-none placeholder:italic placeholder:text-[#5d5d5d] resize-none leading-tight"
+																className="w-full bg-white text-[11px] outline-none placeholder:italic placeholder:text-[#5d5d5d] resize-none leading-tight"
 																placeholder="Type here to specify further, i.e 'I am ... and I lead ...'"
 																value={b.value || ''}
 																onChange={(e) => updateBlockValue(b.id, e.target.value)}
