@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Typography } from '@/components/ui/typography';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { cn } from '@/utils';
-import { ChevronRight, ChevronUp } from 'lucide-react';
-import { Spinner } from '@/components/atoms/Spinner/Spinner';
+import { ChevronUp } from 'lucide-react';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
@@ -18,8 +17,7 @@ import ViewEditEmailDialog from '@/components/organisms/_dialogs/ViewEditEmailDi
 import { Badge } from '@/components/ui/badge';
 import { ContactsSelection } from './ContactsSelection/ContactsSelection';
 import { DraftedEmails } from './DraftedEmails/DraftedEmails';
-import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
-import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import { MiniEmailStructure } from './MiniEmailStructure';
 
 export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	const {
@@ -29,7 +27,6 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		selectedContactIds,
 		handleContactSelection,
 		isPendingGeneration,
-		isTest,
 		isGenerationDisabled,
 		setSelectedDraftIds,
 		setSelectedDraft,
@@ -252,85 +249,13 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 								);
 							})()}
 
-							{/* Middle interactive Email Structure (compact composer) */}
-							<div style={{ width: '374px', height: '474px', position: 'relative' }}>
-								<div
-									style={{
-										width: '100%',
-										height: '100%',
-										border: '2px solid #ABABAB',
-										borderRadius: '8px',
-										position: 'relative',
-										display: 'flex',
-										flexDirection: 'column',
-										background: 'white',
-									}}
-								>
-									{/* Header */}
-									<div
-										style={{
-											borderTopLeftRadius: '8px',
-											borderTopRightRadius: '8px',
-											borderBottom: '2px solid #ABABAB',
-											padding: '12px 16px',
-											display: 'flex',
-											justifyContent: 'space-between',
-											alignItems: 'center',
-											height: '48px',
-											backgroundColor: 'white',
-										}}
-									>
-										<div style={{ transform: 'translateY(-6px)' }}>
-											<div className="text-sm font-inter font-medium text-black">
-												Email Structure
-											</div>
-										</div>
-									</div>
-
-									{/* Content */}
-									<CustomScrollbar
-										className="flex-1"
-										thumbWidth={2}
-										thumbColor="#000000"
-										trackColor="transparent"
-										offsetRight={-5}
-									>
-										<div className="p-3">
-											<HybridPromptInput
-												compactLeftOnly
-												isPendingGeneration={isPendingGeneration}
-												isGenerationDisabled={isGenerationDisabled}
-												isTest={isTest}
-												contact={contacts[0]}
-											/>
-										</div>
-									</CustomScrollbar>
-
-									{/* Footer Draft button */}
-									<div className="px-3 pb-3">
-										<Button
-											type="button"
-											onClick={handleDraftButtonClick}
-											disabled={isGenerationDisabled()}
-											className={cn(
-												'w-full h-[32px] font-bold flex items-center justify-center transition-all duration-200',
-												isGenerationDisabled()
-													? 'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black opacity-50 cursor-not-allowed'
-													: 'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]'
-											)}
-										>
-											{isPendingGeneration && !isTest ? (
-												<Spinner size="small" />
-											) : (
-												<span className="flex items-center gap-1">
-													Draft
-													<ChevronRight size={16} />
-												</span>
-											)}
-										</Button>
-									</div>
-								</div>
-							</div>
+							{/* Middle Email Structure (mini) */}
+							<MiniEmailStructure
+								form={form}
+								onDraft={handleDraftButtonClick}
+								isDraftDisabled={isGenerationDisabled()}
+								isPendingGeneration={isPendingGeneration}
+							/>
 
 							{/* Right table */}
 							<DraftedEmails

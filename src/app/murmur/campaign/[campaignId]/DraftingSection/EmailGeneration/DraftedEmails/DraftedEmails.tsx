@@ -39,7 +39,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 			: 'Unknown Contact';
 
 		return (
-			<div style={{ width: '374px', height: '474px', position: 'relative' }}>
+			<div style={{ width: '376px', height: '474px', position: 'relative' }}>
 				{/* Container box with header - matching the table view */}
 				<div
 					style={{
