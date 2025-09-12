@@ -264,80 +264,73 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										<div key={b.id} className="flex justify-center">
 											<div
 												className={cn(
-													'w-[359px] rounded-[8px] border-2 border-black bg-[#DADAFC] transition-all duration-200',
+													'w-[359px] rounded-[8px] border-2 border-black bg-[#DADAFC] transition-all duration-200 overflow-hidden',
 													isExpanded ? 'h-[78px]' : 'h-[31px]'
 												)}
 											>
-												{isExpanded ? (
-													// Expanded state
-													<div className="w-full h-full flex flex-col bg-[#DADAFC]">
-														{/* Top section - maintains original compact layout */}
-														<div className="relative flex items-center h-[25px] px-3 bg-[#DADAFC]">
+												<div className="w-full h-full flex flex-col">
+													{/* Top Row */}
+													<div className="flex flex-row h-[31px] flex-shrink-0">
+														<div className="flex-1 flex items-center px-3">
 															<span className="font-inter text-[12px] font-semibold text-black">
 																{blockLabel(b.type as HybridBlock)}
 															</span>
-															<div className="absolute right-3 flex items-center gap-2">
-																{b.type === 'research' && (
-																	<span className="text-[10px] italic text-[#5d5d5d] mr-2">
-																		Automated
-																	</span>
-																)}
-																<button
-																	type="button"
-																	onClick={() => {
-																		setExpandedBlocks((prev) => {
-																			const next = new Set(prev);
-																			next.delete(b.id);
-																			return next;
-																		});
-																	}}
-																	className="text-[11px] text-white bg-[#5353AF] px-2 py-0.5 rounded cursor-pointer hover:bg-[#4a4a9d]"
-																>
-																	Advanced
-																</button>
-															</div>
-														</div>
-														{/* Divider at 21px from top */}
-														<div className="h-[1px] bg-black mx-3" />
-														{/* Input section */}
-														<div className="flex-1 px-3 py-1.5">
-															<input
-																type="text"
-																className="w-full h-full bg-[#DADAFC] text-[11px] outline-none placeholder:italic placeholder:text-[#5d5d5d]"
-																placeholder="Type here to specify further, i.e 'I am ... and I lead ...'"
-																value={b.value || ''}
-																onChange={(e) => updateBlockValue(b.id, e.target.value)}
-															/>
-														</div>
-													</div>
-												) : (
-													// Collapsed state
-													<div className="flex items-center justify-between px-3 h-full">
-														<span className="font-inter text-[12px] font-semibold text-black">
-															{blockLabel(b.type as HybridBlock)}
-														</span>
-														<div className="flex items-center gap-2">
 															{b.type === 'research' && (
-																<span className="text-[10px] italic text-[#5d5d5d]">
+																<span className="text-[10px] italic text-[#5d5d5d] ml-2">
 																	Automated
 																</span>
 															)}
+														</div>
+														<div className="flex flex-row h-full items-stretch">
+															<div className="border-l border-black h-full" />
 															<button
 																type="button"
 																onClick={() => {
 																	setExpandedBlocks((prev) => {
 																		const next = new Set(prev);
-																		next.add(b.id);
+																		if (isExpanded) {
+																			next.delete(b.id);
+																		} else {
+																			next.add(b.id);
+																		}
 																		return next;
 																	});
 																}}
-																className="text-[11px] text-black/60 hover:text-black cursor-pointer"
+																className={cn(
+																	'w-[75px] flex items-center justify-center text-[11px] cursor-pointer',
+																	isExpanded
+																		? 'text-white bg-[#5353AF] hover:bg-[#4a4a9d]'
+																		: 'text-black/80 hover:bg-black/5'
+																)}
 															>
 																Advanced
 															</button>
+															<div className="border-l border-black h-full" />
+															<button
+																type="button"
+																onClick={() => removeBlock(b.id)}
+																className="w-[30px] flex items-center justify-center text-[18px] font-bold text-red-600 hover:bg-black/10"
+																aria-label="Remove block"
+															>
+																×
+															</button>
 														</div>
 													</div>
-												)}
+													{/* Bottom content */}
+													<div className="flex-1 flex flex-col min-h-0">
+														<div className="h-[1px] bg-black/80" />
+														<div className="flex-1 px-3 py-1 flex items-center">
+															<textarea
+																className="w-full bg-transparent text-[11px] outline-none placeholder:italic placeholder:text-[#5d5d5d] resize-none leading-tight"
+																placeholder="Type here to specify further, i.e 'I am ... and I lead ...'"
+																value={b.value || ''}
+																onChange={(e) => updateBlockValue(b.id, e.target.value)}
+																tabIndex={isExpanded ? 0 : -1}
+																rows={2}
+															/>
+														</div>
+													</div>
+												</div>
 											</div>
 										</div>
 									);
