@@ -260,13 +260,20 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 
 								if (draftingMode === 'hybrid' && isHybridCore) {
 									const isExpanded = expandedBlocks.has(b.id);
+									const strokeColor =
+										b.type === 'introduction'
+											? '#6673FF'
+											: b.type === 'research'
+											? '#1010E7'
+											: '#0E0E7F';
 									return (
 										<div key={b.id} className="flex justify-center">
 											<div
 												className={cn(
-													'w-[359px] rounded-[8px] border-2 border-black bg-[#DADAFC] overflow-hidden',
+													'w-[359px] rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden',
 													isExpanded ? 'h-[78px]' : 'h-[31px]'
 												)}
+												style={{ borderColor: strokeColor }}
 											>
 												<div className="w-full h-full flex flex-col">
 													{/* Top Row */}
@@ -323,7 +330,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													</div>
 													{/* Bottom content */}
 													<div className="flex-1 flex flex-col min-h-0">
-														<div className="h-[2px] bg-black w-full" />
+														<div
+															className="h-[2px] w-full"
+															style={{ backgroundColor: strokeColor }}
+														/>
 														<div className="flex-1 px-3 py-1 flex items-center bg-white">
 															<textarea
 																className="w-full bg-white text-[11px] outline-none placeholder:italic placeholder:text-[#5d5d5d] resize-none leading-tight"
