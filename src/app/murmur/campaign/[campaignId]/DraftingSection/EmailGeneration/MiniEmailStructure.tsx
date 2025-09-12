@@ -264,7 +264,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										<div key={b.id} className="flex justify-center">
 											<div
 												className={cn(
-													'w-[359px] rounded-[8px] border-2 border-black bg-[#DADAFC] transition-all duration-200 overflow-hidden',
+													'w-[359px] rounded-[8px] border-2 border-black bg-[#DADAFC] overflow-hidden',
 													isExpanded ? 'h-[78px]' : 'h-[31px]'
 												)}
 											>
@@ -297,7 +297,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																	});
 																}}
 																className={cn(
-																	'w-[75px] flex items-center justify-center text-[11px] cursor-pointer',
+																	'w-[75px] h-full flex items-center justify-center text-[11px] cursor-pointer appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none',
 																	isExpanded
 																		? 'text-white bg-[#5353AF] hover:bg-[#4a4a9d]'
 																		: 'text-black/80 hover:bg-black/5'
@@ -309,7 +309,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															<button
 																type="button"
 																onClick={() => removeBlock(b.id)}
-																className="w-[30px] flex items-center justify-center text-[18px] font-bold text-red-600 hover:bg-black/10"
+																className="w-[30px] h-full flex items-center justify-center text-[18px] font-bold text-red-600 hover:bg-black/10 appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none"
 																aria-label="Remove block"
 															>
 																×
@@ -418,7 +418,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						onClick={onDraft}
 						disabled={isDraftDisabled}
 						className={cn(
-							'w-full h-[32px] font-bold flex items-center justify-center transition-all duration-200',
+							'w-full h-[32px] font-bold flex items-center justify-center',
 							isDraftDisabled
 								? 'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black opacity-50 cursor-not-allowed'
 								: 'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]'
