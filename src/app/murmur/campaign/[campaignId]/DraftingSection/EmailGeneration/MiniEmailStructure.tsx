@@ -342,7 +342,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										<Fragment key={b.id}>
 											<div
 												className={cn(
-													'w-[359px] rounded-[8px] border-2 bg-[#DADAFC] overflow-visible relative',
+													'rounded-[8px] border-2 bg-[#DADAFC] overflow-visible relative',
 													isExpanded ? 'h-[78px]' : 'h-[31px]'
 												)}
 												style={{ borderColor: strokeColor }}
@@ -410,23 +410,25 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															</button>
 														</div>
 													</div>
-													{/* Bottom content */}
-													<div className="flex-1 flex flex-col min-h-0">
-														<div
-															className="h-[2px] w-full"
-															style={{ backgroundColor: strokeColor }}
-														/>
-														<div className="flex-1 px-3 py-1 flex items-center bg-white">
-															<textarea
-																className="w-full bg-white text-[11px] outline-none focus:outline-none placeholder:italic placeholder:text-[#5d5d5d] resize-none leading-tight"
-																placeholder="Type here to specify further, i.e 'I am ... and I lead ...'"
-																value={b.value || ''}
-																onChange={(e) => updateBlockValue(b.id, e.target.value)}
-																tabIndex={isExpanded ? 0 : -1}
-																rows={2}
+													{/* Bottom content - only show when expanded */}
+													{isExpanded && (
+														<div className="flex-1 flex flex-col min-h-0">
+															<div
+																className="h-[2px] w-full"
+																style={{ backgroundColor: strokeColor }}
 															/>
+															<div className="flex-1 px-3 py-1 flex items-center bg-white">
+																<textarea
+																	className="w-full bg-white text-[11px] outline-none focus:outline-none placeholder:italic placeholder:text-[#5d5d5d] resize-none leading-tight"
+																	placeholder="Type here to specify further, i.e 'I am ... and I lead ...'"
+																	value={b.value || ''}
+																	onChange={(e) => updateBlockValue(b.id, e.target.value)}
+																	tabIndex={isExpanded ? 0 : -1}
+																	rows={2}
+																/>
+															</div>
 														</div>
-													</div>
+													)}
 												</div>
 											</div>
 
