@@ -423,10 +423,15 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								return (
 									<div
 										key={b.id}
-										className={cn(
-											'rounded-[8px] border-2 bg-white px-2 py-1',
-											b.type === 'full_automated' ? 'border-[#51A2E4]' : 'border-black'
-										)}
+										className={cn('rounded-[8px] border-2 bg-white px-2 py-1')}
+										style={{
+											borderColor:
+												draftingMode === 'handwritten' && b.type === 'text'
+													? '#53A25D'
+													: b.type === 'full_automated'
+													? '#51A2E4'
+													: '#000000',
+										}}
 									>
 										<div className="flex items-center justify-between">
 											<span className="font-inter text-[12px] font-semibold text-black">
@@ -494,7 +499,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											<textarea
 												className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none"
 												placeholder={
-													b.type === 'text'
+													draftingMode === 'handwritten' && b.type === 'text'
+														? 'Write the exact text you want in your email here. *required'
+														: b.type === 'text'
 														? 'Text block content...'
 														: 'Type here to specify further, e.g., "I am ... and I lead ..."'
 												}
