@@ -300,7 +300,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									<input
 										type="text"
 										className={cn(
-											'w-full text-[12px] leading-tight outline-none',
+											'w-full text-[12px] leading-tight outline-none focus:outline-none',
 											isAiSubject
 												? 'text-[#6B6B6B] italic cursor-not-allowed'
 												: 'text-black'
@@ -404,7 +404,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 														/>
 														<div className="flex-1 px-3 py-1 flex items-center bg-white">
 															<textarea
-																className="w-full bg-white text-[11px] outline-none placeholder:italic placeholder:text-[#5d5d5d] resize-none leading-tight"
+																className="w-full bg-white text-[11px] outline-none focus:outline-none placeholder:italic placeholder:text-[#5d5d5d] resize-none leading-tight"
 																placeholder="Type here to specify further, i.e 'I am ... and I lead ...'"
 																value={b.value || ''}
 																onChange={(e) => updateBlockValue(b.id, e.target.value)}
@@ -449,14 +449,14 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 
 										{b.type === 'full_automated' ? (
 											<textarea
-												className="w-full mt-1 text-[11px] leading-[14px] border border-[#DADADA] rounded-[6px] p-1 resize-none h-[68px]"
+												className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[68px] outline-none focus:outline-none"
 												placeholder="Describe what to compose automatically (goal, tone, details)"
 												value={b.value || ''}
 												onChange={(e) => updateBlockValue(b.id, e.target.value)}
 											/>
 										) : (
 											<textarea
-												className="w-full mt-1 text-[11px] leading-[14px] border border-[#DADADA] rounded-[6px] p-1 resize-none h-[52px]"
+												className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none"
 												placeholder={
 													b.type === 'text'
 														? 'Text block content...'
@@ -486,7 +486,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								Signature
 							</div>
 							<textarea
-								className="w-full text-[12px] border border-[#DADADA] rounded-[6px] p-1 resize-none h-[58px]"
+								className="w-full text-[12px] rounded-[6px] p-1 resize-none h-[58px] outline-none focus:outline-none"
 								value={signature}
 								onChange={(e) => updateSignature(e.target.value)}
 							/>
