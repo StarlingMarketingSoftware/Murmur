@@ -76,27 +76,22 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 
 						<div
 							ref={draftingRef}
-							className={cn(
-								'transition-opacity duration-500 ease-in-out',
-								isDraftingContentReady() ? 'opacity-100' : 'opacity-0 pointer-events-none'
-							)}
+							className={cn('transition-opacity duration-500 ease-in-out')}
 						>
-							{isDraftingContentReady() && (
-								<EmailGeneration
-									campaign={campaign}
-									contacts={contacts || []}
-									isGenerationDisabled={isGenerationDisabled}
-									isPendingGeneration={isPendingGeneration}
-									isTest={isTest}
-									form={form}
-									handleGenerateDrafts={handleGenerateDrafts}
-									generationProgress={generationProgress}
-									setGenerationProgress={setGenerationProgress}
-									cancelGeneration={cancelGeneration}
-									isFirstLoad={isFirstLoad}
-									scrollToEmailStructure={scrollToEmailStructure}
-								/>
-							)}
+							<EmailGeneration
+								campaign={campaign}
+								contacts={contacts || []}
+								isGenerationDisabled={isGenerationDisabled}
+								isPendingGeneration={isPendingGeneration}
+								isTest={isTest}
+								form={form}
+								handleGenerateDrafts={handleGenerateDrafts}
+								generationProgress={generationProgress}
+								setGenerationProgress={setGenerationProgress}
+								cancelGeneration={cancelGeneration}
+								isFirstLoad={isFirstLoad}
+								scrollToEmailStructure={scrollToEmailStructure}
+							/>
 						</div>
 					</div>
 				</form>
