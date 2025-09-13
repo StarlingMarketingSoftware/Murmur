@@ -275,7 +275,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							<div className="flex items-center h-[28px] rounded-[8px] border-2 border-black overflow-hidden">
 								<div className="pl-2 flex items-center h-full shrink-0 w-[90px] bg-white">
 									<span className="font-inter font-semibold text-[13px] text-black">
-										Subject
+										{isAiSubject ? 'Auto Subject' : 'Subject'}
 									</span>
 								</div>
 								<div
@@ -283,11 +283,13 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										'relative h-full flex items-center text-[10px] font-inter font-normal shrink-0',
 										isAiSubject
 											? 'w-auto px-2 justify-center bg-[#5dab68] text-white cursor-pointer'
-											: 'w-[72px] px-2 justify-start text-black bg-[#DADAFC] cursor-pointer'
+											: 'w-[80px] px-2 justify-center text-black bg-[#DADAFC] cursor-pointer -translate-x-[16px]'
 									)}
 									onClick={toggleSubject}
 								>
+									<span className="absolute left-0 h-full border-l border-black"></span>
 									{isAiSubject ? 'on' : 'Auto off'}
+									<span className="absolute right-0 h-full border-r border-black"></span>
 								</div>
 								<div
 									className={cn(
