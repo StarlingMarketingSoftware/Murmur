@@ -1,4 +1,4 @@
-import { FC, useMemo, useState } from 'react';
+import { FC, useMemo, useState, useRef } from 'react';
 import { useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { DraftingFormValues } from '../useDraftingSection';
@@ -120,6 +120,34 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		form.setValue('hybridBlockPrompts', [...blocks, ...texts], { shouldDirty: true });
 	};
 
+	// Selected mode highlight (mirror main selector)
+	const modeContainerRef = useRef<HTMLDivElement>(null);
+	const aiButtonRef = useRef<HTMLButtonElement>(null);
+	const hybridButtonRef = useRef<HTMLButtonElement>(null);
+	const handwrittenButtonRef = useRef<HTMLButtonElement>(null);
+	const [highlightStyle, setHighlightStyle] = useState<{ left: number; opacity: number }>(
+		{ left: 0, opacity: 0 }
+	);
+
+	useEffect(() => {
+		let target: HTMLButtonElement | null = null;
+		if (draftingMode === 'ai') target = aiButtonRef.current;
+		else if (draftingMode === 'hybrid') target = hybridButtonRef.current;
+		else target = handwrittenButtonRef.current;
+		if (target) {
+			const newLeft = target.offsetLeft + target.offsetWidth / 2 - 80.38 / 2;
+			setHighlightStyle({ left: newLeft, opacity: 1 });
+		} else {
+			setHighlightStyle({ left: 0, opacity: 0 });
+		}
+	}, [draftingMode]);
+
+	const getModeBackgroundColor = () => {
+		if (draftingMode === 'hybrid') return 'rgba(74, 74, 217, 0.31)';
+		if (draftingMode === 'handwritten') return 'rgba(109, 171, 104, 0.47)';
+		return '#DAE6FE';
+	};
+
 	const toggleSubject = () => {
 		form.setValue('isAiSubject', !isAiSubject, { shouldDirty: true });
 	};
@@ -179,38 +207,59 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						{/* Mode */}
 						<div className="flex items-center gap-4 mb-2">
 							<span className="font-inter font-semibold text-[13px]">Mode</span>
-							<div className="flex items-center gap-6">
+							<div ref={modeContainerRef} className="relative flex items-center gap-6">
+								<div
+									className="absolute top-1/2 -translate-y-1/2 z-10 pointer-events-none"
+									style={{
+										left: highlightStyle.left,
+										transition: 'left 0.25s ease-in-out, opacity 0.2s ease-in-out',
+										opacity: highlightStyle.opacity,
+									}}
+								>
+									<div
+										style={{
+											width: '80.38px',
+											height: '19px',
+											backgroundColor: getModeBackgroundColor(),
+											border: '1.3px solid #000000',
+											borderRadius: '8px',
+										}}
+									/>
+								</div>
 								<button
+									ref={aiButtonRef}
 									type="button"
 									className={cn(
-										'text-[11px] font-inter font-semibold px-4 py-1 rounded-md cursor-pointer text-center',
+										'text-[11px] font-inter font-semibold px-4 py-1 rounded-md cursor-pointer text-center relative z-20',
 										draftingMode === 'ai'
-											? 'text-white bg-[#4B4B4B]'
-											: 'text-[#6B6B6B] bg-transparent hover:text-black'
+											? 'text-black'
+											: 'text-[#6B6B6B] hover:text-black'
 									)}
 									onClick={() => setMode('ai')}
 								>
 									Full Auto
 								</button>
 								<button
+									ref={hybridButtonRef}
 									type="button"
 									className={cn(
-										'text-[11px] font-inter font-semibold px-4 py-1 rounded-md cursor-pointer text-center',
+										'text-[11px] font-inter font-semibold px-4 py-1 rounded-md cursor-pointer text-center relative z-20',
 										draftingMode === 'hybrid'
-											? 'text-white bg-[#4B4B4B]'
-											: 'text-[#6B6B6B] bg-transparent hover:text-black'
+											? 'text-black'
+											: 'text-[#6B6B6B] hover:text-black'
 									)}
 									onClick={() => setMode('hybrid')}
 								>
 									Hybrid
 								</button>
 								<button
+									ref={handwrittenButtonRef}
 									type="button"
 									className={cn(
-										'text-[11px] font-inter font-semibold px-4 py-1 rounded-md cursor-pointer text-center',
+										'text-[11px] font-inter font-semibold px-4 py-1 rounded-md cursor-pointer text-center relative z-20',
 										draftingMode === 'handwritten'
-											? 'text-white bg-[#4B4B4B]'
-											: 'text-[#6B6B6B] bg-transparent hover:text-black'
+											? 'text-black'
+											: 'text-[#6B6B6B] hover:text-black'
 									)}
 									onClick={() => setMode('handwritten')}
 								>
