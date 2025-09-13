@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { HybridBlock } from '@prisma/client';
 import { cn } from '@/utils';
+import { ParagraphSlider } from '@/components/atoms/ParagraphSlider/ParagraphSlider';
 
 interface MiniEmailStructureProps {
 	form: UseFormReturn<DraftingFormValues>;
@@ -68,7 +69,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 			case 'text':
 				return 'Text';
 			case 'full_automated':
-				return 'Auto Compose';
+				return 'Full Auto';
 			default:
 				return 'Block';
 		}
@@ -422,7 +423,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								return (
 									<div
 										key={b.id}
-										className="rounded-[8px] border-2 border-black bg-white px-2 py-1"
+										className={cn(
+											'rounded-[8px] border-2 bg-white px-2 py-1',
+											b.type === 'full_automated' ? 'border-[#51A2E4]' : 'border-black'
+										)}
 									>
 										<div className="flex items-center justify-between">
 											<span className="font-inter text-[12px] font-semibold text-black">
@@ -448,12 +452,44 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										</div>
 
 										{b.type === 'full_automated' ? (
-											<textarea
-												className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[68px] outline-none focus:outline-none"
-												placeholder="Describe what to compose automatically (goal, tone, details)"
-												value={b.value || ''}
-												onChange={(e) => updateBlockValue(b.id, e.target.value)}
-											/>
+											<div className="relative mt-1">
+												{!b.value && (
+													<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px]">
+														<div className="space-y-2">
+															<div>
+																<p>Prompt Murmur here.</p>
+																<p>
+																	Tell it what you want to say and it will compose emails
+																	based on your instructions.
+																</p>
+															</div>
+															<div>
+																<p>Ex.</p>
+																<p>
+																	“Compose a professional booking pitch email. Include one
+																	or two facts about the venue, introduce my band
+																	honestly, highlight our fit for their space, and end
+																	with a straightforward next-steps question. Keep tone
+																	warm, clear, and brief.”
+																</p>
+															</div>
+														</div>
+													</div>
+												)}
+												<textarea
+													className={cn(
+														'border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 w-full max-w-full min-w-0',
+														'h-[195px] py-2 pr-2 px-0 resize-none',
+														'bg-white text-[12px] leading-[16px]'
+													)}
+													placeholder=""
+													value={b.value || ''}
+													onChange={(e) => updateBlockValue(b.id, e.target.value)}
+												/>
+												<div className="pl-2">
+													<ParagraphSlider />
+												</div>
+											</div>
 										) : (
 											<textarea
 												className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none"
