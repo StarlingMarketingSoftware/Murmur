@@ -100,6 +100,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 			return;
 		}
 
+		// In hybrid mode, we want to have the core blocks with text blocks in between
 		const blocks = [
 			{
 				id: 'introduction',
@@ -182,7 +183,14 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	};
 
 	return (
-		<div style={{ width: '376px', height: '474px', position: 'relative' }}>
+		<div
+			style={{
+				width: '376px',
+				height: '474px',
+				position: 'relative',
+				overflow: 'visible',
+			}}
+		>
 			{/* Container with header to match table sizing */}
 			<div
 				style={{
@@ -194,16 +202,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					display: 'flex',
 					flexDirection: 'column',
 					background: 'white',
+					overflow: 'visible',
 				}}
 			>
 				{/* Content area - miniature, but interactive */}
-				<CustomScrollbar
-					className="flex-1"
-					thumbWidth={2}
-					thumbColor="#000000"
-					trackColor="transparent"
-					offsetRight={-5}
-				>
+				<div className="flex-1 overflow-visible">
 					<div className="p-3">
 						{/* Mode */}
 						<div className="flex items-center gap-4 mb-2">
@@ -319,8 +322,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							</div>
 						</div>
 
-						{/* Blocks list */}
-						<div className="flex flex-col gap-2">
+						{/* Blocks list - overflow visible to show buttons outside */}
+						<div className="flex flex-col gap-4 overflow-visible">
 							{hybridBlocks.map((b) => {
 								const isHybridCore =
 									b.type === 'introduction' ||
@@ -339,7 +342,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										<Fragment key={b.id}>
 											<div
 												className={cn(
-													'w-[359px] rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden',
+													'w-[359px] rounded-[8px] border-2 bg-[#DADAFC] overflow-visible relative',
 													isExpanded ? 'h-[78px]' : 'h-[31px]'
 												)}
 												style={{ borderColor: strokeColor }}
@@ -363,7 +366,12 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															)}
 														</div>
 														<div className="flex flex-row h-full items-stretch">
-															<div className="border-l border-black h-full" />
+															<div
+																className={cn(
+																	'border-l border-black',
+																	isExpanded ? 'h-[21px]' : 'h-[27px]'
+																)}
+															/>
 															<button
 																type="button"
 																onClick={() => {
@@ -386,7 +394,12 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															>
 																Advanced
 															</button>
-															<div className="border-l border-black h-full" />
+															<div
+																className={cn(
+																	'border-l border-black',
+																	isExpanded ? 'h-[21px]' : 'h-[27px]'
+																)}
+															/>
 															<button
 																type="button"
 																onClick={() => removeBlock(b.id)}
@@ -417,134 +430,177 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												</div>
 											</div>
 
-											{/* Plus button under hybrid blocks (match HybridPromptInput) */}
-											{(() => {
-												const currentIndex = hybridBlocks.findIndex((x) => x.id === b.id);
-												const nextIsText =
-													hybridBlocks[currentIndex + 1]?.type === 'text';
-												if (nextIsText) return null;
-												return (
-													<div
-														className="flex justify-end -mr-[50px] w-[359px] relative z-30"
-														style={{ transform: 'translateY(-12px)' }}
+											{/* Plus button for hybrid blocks - positioned outside the box */}
+											{draftingMode !== 'handwritten' && (
+												<div
+													className="flex justify-end"
+													style={{
+														marginTop: '-15px',
+														marginBottom: '-5px',
+														marginRight: '-28px',
+														position: 'relative',
+														zIndex: 50,
+													}}
+												>
+													<Button
+														type="button"
+														onClick={() =>
+															addTextBlockAt(hybridBlocks.findIndex((x) => x.id === b.id))
+														}
+														className={cn(
+															'w-[52px] h-[20px] bg-white hover:bg-stone-100 active:bg-stone-200 border border-black rounded-[4px] !font-normal text-[10px] text-black flex items-center justify-center gap-1'
+														)}
+														title="Text block"
 													>
-														<Button
-															type="button"
-															onClick={() => addTextBlockAt(currentIndex)}
-															className={cn(
-																'w-[52px] h-[20px] bg-background hover:bg-stone-100 active:bg-stone-200 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600'
-															)}
-															title="Text block"
-														>
-															<TinyPlusIcon
-																width="5px"
-																height="5px"
-																className="!w-[8px] !h-[8px]"
-															/>
-															<span className="font-secondary">Text</span>
-														</Button>
-													</div>
-												);
-											})()}
+														<TinyPlusIcon
+															width="5px"
+															height="5px"
+															className="!w-[8px] !h-[8px]"
+														/>
+														<span className="font-secondary">Text</span>
+													</Button>
+												</div>
+											)}
 										</Fragment>
 									);
 								}
 
 								return (
-									<div
-										key={b.id}
-										className={cn('rounded-[8px] border-2 bg-white px-2 py-1')}
-										style={{
-											borderColor:
-												draftingMode === 'handwritten' && b.type === 'text'
-													? '#53A25D'
-													: b.type === 'full_automated'
-													? '#51A2E4'
-													: '#000000',
-										}}
-									>
-										<div className="flex items-center justify-between">
-											<span className="font-inter text-[12px] font-semibold text-black">
-												{blockLabel(b.type as HybridBlock)}
-											</span>
-											<div className="flex items-center gap-2">
-												{b.type === 'research' && (
-													<span className="text-[10px] italic text-[#5d5d5d]">
-														Automated
-													</span>
-												)}
-												{b.type !== 'full_automated' && (
-													<button
-														type="button"
-														className="text-[12px] text-[#b30000] hover:text-red-600"
-														onClick={() => removeBlock(b.id)}
-														aria-label="Remove block"
-													>
-														×
-													</button>
-												)}
+									<Fragment key={b.id}>
+										<div
+											className={cn('rounded-[8px] border-2 bg-white px-2 py-1 relative')}
+											style={{
+												borderColor:
+													draftingMode === 'handwritten' && b.type === 'text'
+														? '#53A25D'
+														: b.type === 'full_automated'
+														? '#51A2E4'
+														: '#000000',
+											}}
+										>
+											<div className="flex items-center justify-between">
+												<span className="font-inter text-[12px] font-semibold text-black">
+													{blockLabel(b.type as HybridBlock)}
+												</span>
+												<div className="flex items-center gap-2">
+													{b.type === 'research' && (
+														<span className="text-[10px] italic text-[#5d5d5d]">
+															Automated
+														</span>
+													)}
+													{b.type !== 'full_automated' && (
+														<button
+															type="button"
+															className="text-[12px] text-[#b30000] hover:text-red-600"
+															onClick={() => removeBlock(b.id)}
+															aria-label="Remove block"
+														>
+															×
+														</button>
+													)}
+												</div>
 											</div>
-										</div>
 
-										{b.type === 'full_automated' ? (
-											<div className="relative mt-1">
-												{!b.value && (
-													<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px]">
-														<div className="space-y-2">
-															<div>
-																<p>Prompt Murmur here.</p>
-																<p>
-																	Tell it what you want to say and it will compose emails
-																	based on your instructions.
-																</p>
-															</div>
-															<div>
-																<p>Ex.</p>
-																<p>
-																	“Compose a professional booking pitch email. Include one
-																	or two facts about the venue, introduce my band
-																	honestly, highlight our fit for their space, and end
-																	with a straightforward next-steps question. Keep tone
-																	warm, clear, and brief.”
-																</p>
+											{b.type === 'full_automated' ? (
+												<div className="relative mt-1">
+													{!b.value && (
+														<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px]">
+															<div className="space-y-2">
+																<div>
+																	<p>Prompt Murmur here.</p>
+																	<p>
+																		Tell it what you want to say and it will compose
+																		emails based on your instructions.
+																	</p>
+																</div>
+																<div>
+																	<p>Ex.</p>
+																	<p>
+																		"Compose a professional booking pitch email. Include
+																		one or two facts about the venue, introduce my band
+																		honestly, highlight our fit for their space, and end
+																		with a straightforward next-steps question. Keep tone
+																		warm, clear, and brief."
+																	</p>
+																</div>
 															</div>
 														</div>
-													</div>
-												)}
-												<textarea
-													className={cn(
-														'border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 w-full max-w-full min-w-0',
-														'h-[195px] py-2 pr-2 px-0 resize-none',
-														'bg-white text-[12px] leading-[16px]'
 													)}
-													placeholder=""
+													<textarea
+														className={cn(
+															'border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 w-full max-w-full min-w-0',
+															'h-[195px] py-2 pr-2 px-0 resize-none',
+															'bg-white text-[12px] leading-[16px]'
+														)}
+														placeholder=""
+														value={b.value || ''}
+														onChange={(e) => updateBlockValue(b.id, e.target.value)}
+													/>
+													<div className="pl-2">
+														<ParagraphSlider />
+													</div>
+												</div>
+											) : (
+												<textarea
+													className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none"
+													placeholder={
+														draftingMode === 'handwritten' && b.type === 'text'
+															? 'Write the exact text you want in your email here. *required'
+															: b.type === 'text'
+															? 'Text block content...'
+															: 'Type here to specify further, e.g., "I am ... and I lead ..."'
+													}
 													value={b.value || ''}
 													onChange={(e) => updateBlockValue(b.id, e.target.value)}
 												/>
-												<div className="pl-2">
-													<ParagraphSlider />
+											)}
+										</div>
+
+										{/* Add Text button after each text block */}
+										{(() => {
+											if (draftingMode === 'handwritten' || b.type !== 'text')
+												return null;
+											const nextBlock =
+												hybridBlocks[hybridBlocks.findIndex((x) => x.id === b.id) + 1];
+											if (nextBlock?.type === 'text') return null;
+
+											return (
+												<div
+													className="flex justify-end"
+													style={{
+														marginTop: '-15px',
+														marginBottom: '-5px',
+														marginRight: '-28px',
+														position: 'relative',
+														zIndex: 50,
+													}}
+												>
+													<Button
+														type="button"
+														onClick={() =>
+															addTextBlockAt(hybridBlocks.findIndex((x) => x.id === b.id))
+														}
+														className={cn(
+															'w-[52px] h-[20px] bg-white hover:bg-stone-100 active:bg-stone-200 border border-black rounded-[4px] !font-normal text-[10px] text-black flex items-center justify-center gap-1'
+														)}
+														title="Text block"
+													>
+														<TinyPlusIcon
+															width="5px"
+															height="5px"
+															className="!w-[8px] !h-[8px]"
+														/>
+														<span className="font-secondary">Text</span>
+													</Button>
 												</div>
-											</div>
-										) : (
-											<textarea
-												className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none"
-												placeholder={
-													draftingMode === 'handwritten' && b.type === 'text'
-														? 'Write the exact text you want in your email here. *required'
-														: b.type === 'text'
-														? 'Text block content...'
-														: 'Type here to specify further, e.g., "I am ... and I lead ..."'
-												}
-												value={b.value || ''}
-												onChange={(e) => updateBlockValue(b.id, e.target.value)}
-											/>
-										)}
-									</div>
+											);
+										})()}
+									</Fragment>
 								);
 							})}
 						</div>
 					</div>
-				</CustomScrollbar>
+				</div>
 
 				{/* Signature - fixed at bottom (outside scroll) */}
 				<div className="px-3 pb-2">

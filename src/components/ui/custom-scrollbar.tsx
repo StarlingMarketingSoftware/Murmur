@@ -11,6 +11,7 @@ interface CustomScrollbarProps {
 	thumbWidth?: number;
 	style?: React.CSSProperties;
 	offsetRight?: number;
+	contentClassName?: string;
 }
 
 export function CustomScrollbar({
@@ -21,6 +22,7 @@ export function CustomScrollbar({
 	thumbWidth = 2,
 	style,
 	offsetRight = -4,
+	contentClassName,
 }: CustomScrollbarProps) {
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const scrollThumbRef = useRef<HTMLDivElement>(null);
@@ -168,12 +170,14 @@ export function CustomScrollbar({
 			{/* Scrollable content container */}
 			<div
 				ref={scrollContainerRef}
-				className="h-full overflow-auto scrollbar-hide"
+				className={cn('h-full overflow-y-auto scrollbar-hide', contentClassName)}
 				style={
 					{
 						// Hide native scrollbar
 						scrollbarWidth: 'none',
 						msOverflowStyle: 'none',
+						// Allow side content to render outside horizontally (e.g., external buttons)
+						overflowX: 'visible',
 					} as React.CSSProperties
 				}
 			>
