@@ -480,19 +480,26 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							</div>
 						</div>
 
-						{/* Signature */}
-						<div className="rounded-[8px] border-2 border-black bg-white px-2 py-2 mt-2">
-							<div className="font-inter text-[12px] font-semibold text-black mb-1">
-								Signature
-							</div>
-							<textarea
-								className="w-full text-[12px] rounded-[6px] p-1 resize-none h-[58px] outline-none focus:outline-none"
-								value={signature}
-								onChange={(e) => updateSignature(e.target.value)}
-							/>
-						</div>
+						{/* Signature moved below scrollable content */}
 					</div>
 				</CustomScrollbar>
+
+				{/* Signature - fixed at bottom (outside scroll) */}
+				<div className="px-3 pb-2">
+					<div
+						className="rounded-[8px] border-2 bg-white px-2 py-2"
+						style={{ borderColor: '#969696' }}
+					>
+						<div className="font-inter text-[12px] font-semibold text-black mb-1">
+							Signature
+						</div>
+						<textarea
+							className="w-full text-[12px] rounded-[6px] p-1 resize-none h-[58px] outline-none focus:outline-none"
+							value={signature}
+							onChange={(e) => updateSignature(e.target.value)}
+						/>
+					</div>
+				</div>
 
 				{/* Footer with Draft button */}
 				<div className="px-3 pb-3">
