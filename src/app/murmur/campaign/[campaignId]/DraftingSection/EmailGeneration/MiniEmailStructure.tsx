@@ -181,12 +181,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	};
 
 	return (
-		<div style={{ width: '376px', height: '474px', position: 'relative' }}>
+		<div style={{ width: '376px', position: 'relative' }}>
 			{/* Container with header to match table sizing */}
 			<div
 				style={{
 					width: '100%',
-					height: '100%',
 					border: '2px solid #ABABAB',
 					borderRadius: '8px',
 					position: 'relative',
@@ -197,7 +196,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 			>
 				{/* Content area - miniature, but interactive */}
 				<CustomScrollbar
-					className="flex-1"
 					thumbWidth={2}
 					thumbColor="#000000"
 					trackColor="transparent"
