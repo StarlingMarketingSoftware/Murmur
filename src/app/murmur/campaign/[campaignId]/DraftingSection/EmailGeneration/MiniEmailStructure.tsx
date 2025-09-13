@@ -117,8 +117,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				value: byType.get('action' as HybridBlock) || '',
 			},
 		];
-		const texts = current.filter((b) => b.type === 'text');
-		form.setValue('hybridBlockPrompts', [...blocks, ...texts], { shouldDirty: true });
+		form.setValue('hybridBlockPrompts', blocks, { shouldDirty: true });
 	};
 
 	// Selected mode highlight (mirror main selector)
@@ -512,15 +511,17 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									</div>
 								);
 							})}
-							<div className="flex justify-end">
-								<button
-									type="button"
-									onClick={addTextBlock}
-									className="text-[11px] text-[#2b6cb0] hover:underline"
-								>
-									+ Text
-								</button>
-							</div>
+							{draftingMode === 'hybrid' && (
+								<div className="flex justify-end">
+									<button
+										type="button"
+										onClick={addTextBlock}
+										className="text-[11px] text-[#2b6cb0] hover:underline"
+									>
+										+ Text
+									</button>
+								</div>
+							)}
 						</div>
 
 						{/* Signature moved below scrollable content */}
