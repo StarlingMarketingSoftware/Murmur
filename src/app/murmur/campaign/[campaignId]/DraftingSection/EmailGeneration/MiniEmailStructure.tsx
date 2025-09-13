@@ -1,4 +1,5 @@
 import { FC, useMemo, useState } from 'react';
+import { useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { DraftingFormValues } from '../useDraftingSection';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,25 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		return 'hybrid';
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [hybridBlocks?.length, hybridBlocks?.map((b) => b.type).join(',')]);
+
+	// Ensure the mini structure never appears empty by keeping at least one block present
+	useEffect(() => {
+		const currentBlocks = form.getValues('hybridBlockPrompts') || [];
+		if (!currentBlocks || currentBlocks.length === 0) {
+			form.setValue(
+				'hybridBlockPrompts',
+				[
+					{
+						id: `text_${Date.now()}`,
+						type: 'text' as HybridBlock,
+						value: '',
+					},
+				],
+				{ shouldDirty: true }
+			);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [hybridBlocks?.length]);
 
 	const blockLabel = (type: HybridBlock) => {
 		switch (type) {
@@ -166,7 +186,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										'text-[11px] font-inter font-semibold px-4 py-1 rounded-md cursor-pointer text-center',
 										draftingMode === 'ai'
 											? 'text-white bg-[#4B4B4B]'
-											: 'text-[#6B6B6B] bg-[#F3F3F3] hover:bg-[#E5E5E5]'
+											: 'text-[#6B6B6B] bg-transparent hover:text-black'
 									)}
 									onClick={() => setMode('ai')}
 								>
@@ -178,7 +198,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										'text-[11px] font-inter font-semibold px-4 py-1 rounded-md cursor-pointer text-center',
 										draftingMode === 'hybrid'
 											? 'text-white bg-[#4B4B4B]'
-											: 'text-[#6B6B6B] bg-[#F3F3F3] hover:bg-[#E5E5E5]'
+											: 'text-[#6B6B6B] bg-transparent hover:text-black'
 									)}
 									onClick={() => setMode('hybrid')}
 								>
@@ -190,7 +210,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										'text-[11px] font-inter font-semibold px-4 py-1 rounded-md cursor-pointer text-center',
 										draftingMode === 'handwritten'
 											? 'text-white bg-[#4B4B4B]'
-											: 'text-[#6B6B6B] bg-[#F3F3F3] hover:bg-[#E5E5E5]'
+											: 'text-[#6B6B6B] bg-transparent hover:text-black'
 									)}
 									onClick={() => setMode('handwritten')}
 								>
@@ -222,10 +242,28 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								</div>
 								<div
 									className={cn(
-										'flex-grow h-full',
+										'flex-grow h-full flex items-center px-2',
 										isAiSubject ? 'bg-transparent' : 'bg-white'
 									)}
-								/>
+								>
+									<input
+										type="text"
+										className={cn(
+											'w-full text-[12px] leading-tight outline-none',
+											isAiSubject
+												? 'text-[#6B6B6B] italic cursor-not-allowed'
+												: 'text-black'
+										)}
+										placeholder={
+											isAiSubject ? 'Automated Subject Line' : 'Type subject...'
+										}
+										disabled={isAiSubject}
+										value={form.watch('subject') || ''}
+										onChange={(e) =>
+											form.setValue('subject', e.target.value, { shouldDirty: true })
+										}
+									/>
+								</div>
 							</div>
 						</div>
 
@@ -258,16 +296,16 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													{/* Top Row */}
 													<div
 														className={cn(
-															'flex flex-row flex-shrink-0',
+															'flex flex-row items-center flex-shrink-0',
 															isExpanded ? 'h-[21px]' : 'h-[31px]'
 														)}
 													>
-														<div className="flex-1 flex items-center px-3">
-															<span className="font-inter text-[12px] font-semibold text-black">
+														<div className="flex-1 flex h-full items-center px-3 pb-0.5">
+															<span className="font-inter text-[12px] leading-none font-semibold text-black">
 																{blockLabel(b.type as HybridBlock)}
 															</span>
 															{b.type === 'research' && (
-																<span className="text-[10px] italic text-[#5d5d5d] ml-2">
+																<span className="text-[10px] leading-none italic text-[#5d5d5d] ml-2">
 																	Automated
 																</span>
 															)}
