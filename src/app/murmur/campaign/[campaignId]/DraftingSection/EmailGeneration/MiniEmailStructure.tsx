@@ -1,5 +1,4 @@
-import { FC, useMemo, useState, useRef } from 'react';
-import { useEffect } from 'react';
+import { FC, useMemo, useState, useRef, Fragment, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { DraftingFormValues } from '../useDraftingSection';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,7 @@ import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { HybridBlock } from '@prisma/client';
 import { cn } from '@/utils';
 import { ParagraphSlider } from '@/components/atoms/ParagraphSlider/ParagraphSlider';
+import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
 
 interface MiniEmailStructureProps {
 	form: UseFormReturn<DraftingFormValues>;
@@ -159,13 +159,14 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		form.setValue('hybridBlockPrompts', blocks, { shouldDirty: true });
 	};
 
-	const addTextBlock = () => {
-		const newBlock = {
-			id: `text_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+	const addTextBlockAt = (index: number) => {
+		const newText = {
+			id: `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
 			type: 'text' as HybridBlock,
 			value: '',
 		};
-		const blocks = [...(form.getValues('hybridBlockPrompts') || []), newBlock];
+		const blocks = [...(form.getValues('hybridBlockPrompts') || [])];
+		blocks.splice(index + 1, 0, newText);
 		form.setValue('hybridBlockPrompts', blocks, { shouldDirty: true });
 	};
 
@@ -187,7 +188,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				style={{
 					width: '100%',
 					minHeight: '100%',
-					border: '2px solid #ABABAB',
+					border: '2px solid #000000',
 					borderRadius: '8px',
 					position: 'relative',
 					display: 'flex',
@@ -335,7 +336,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											? '#1010E7'
 											: '#0E0E7F';
 									return (
-										<div key={b.id} className="flex justify-center">
+										<Fragment key={b.id}>
 											<div
 												className={cn(
 													'w-[359px] rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden',
@@ -415,7 +416,37 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													</div>
 												</div>
 											</div>
-										</div>
+
+											{/* Plus button under hybrid blocks (match HybridPromptInput) */}
+											{(() => {
+												const currentIndex = hybridBlocks.findIndex((x) => x.id === b.id);
+												const nextIsText =
+													hybridBlocks[currentIndex + 1]?.type === 'text';
+												if (nextIsText) return null;
+												return (
+													<div
+														className="flex justify-end -mr-[50px] w-[359px] relative z-30"
+														style={{ transform: 'translateY(-12px)' }}
+													>
+														<Button
+															type="button"
+															onClick={() => addTextBlockAt(currentIndex)}
+															className={cn(
+																'w-[52px] h-[20px] bg-background hover:bg-stone-100 active:bg-stone-200 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600'
+															)}
+															title="Text block"
+														>
+															<TinyPlusIcon
+																width="5px"
+																height="5px"
+																className="!w-[8px] !h-[8px]"
+															/>
+															<span className="font-secondary">Text</span>
+														</Button>
+													</div>
+												);
+											})()}
+										</Fragment>
 									);
 								}
 
@@ -511,20 +542,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									</div>
 								);
 							})}
-							{draftingMode === 'hybrid' && (
-								<div className="flex justify-end">
-									<button
-										type="button"
-										onClick={addTextBlock}
-										className="text-[11px] text-[#2b6cb0] hover:underline"
-									>
-										+ Text
-									</button>
-								</div>
-							)}
 						</div>
-
-						{/* Signature moved below scrollable content */}
 					</div>
 				</CustomScrollbar>
 

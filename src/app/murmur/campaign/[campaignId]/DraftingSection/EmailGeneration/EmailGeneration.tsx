@@ -226,7 +226,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 						{/* Tables container - positioned at bottom */}
 						<div
 							className={cn(
-								'absolute left-[19px] right-[19px] flex flex-row justify-center gap-x-6 top-[35px]',
+								'absolute left-[19px] right-[19px] flex flex-row justify-center gap-x-10 top-[35px]',
 								isWaitingToSend ? '' : ''
 							)}
 						>
