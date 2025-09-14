@@ -255,6 +255,9 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 								onDraft={handleDraftButtonClick}
 								isDraftDisabled={isGenerationDisabled() || selectedContactIds.size === 0}
 								isPendingGeneration={isPendingGeneration}
+								generationProgress={generationProgress}
+								generationTotal={generationTotal}
+								onCancel={cancelGeneration}
 							/>
 
 							{/* Right table */}

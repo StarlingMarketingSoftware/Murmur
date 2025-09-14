@@ -12,9 +12,6 @@ interface DraftingTableProps {
 	noDataDescription: string;
 	isPending: boolean;
 	title: string;
-	generationProgress?: number;
-	totalContacts?: number;
-	onCancel?: () => void;
 }
 export const DraftingTable: FC<DraftingTableProps> = ({
 	title,
@@ -25,9 +22,6 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	noDataMessage,
 	noDataDescription,
 	isPending,
-	generationProgress = -1,
-	totalContacts = 0,
-	onCancel,
 }) => {
 	return (
 		<div style={{ width: '376px', height: '474px', position: 'relative' }}>
@@ -102,47 +96,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					)}
 				</CustomScrollbar>
 
-				{/* Progress bar - positioned at bottom of container */}
-				{title === 'Contacts' && (
-					<div className="px-4 py-2 border-t-2 border-[#ABABAB]">
-						<div className="flex items-center gap-3">
-							<div className="text-xs font-inter text-gray-600 flex-none">
-								{generationProgress >= 0 && totalContacts > 0
-									? generationProgress >= totalContacts
-										? `Drafted ${Math.min(
-												generationProgress,
-												totalContacts
-										  )}/${totalContacts}`
-										: `Drafting ${generationProgress}/${totalContacts}`
-									: 'Ready to draft'}
-							</div>
-
-							<div className="flex-1 h-[7px] bg-[rgba(93,171,104,0.49)] border-0 relative">
-								<div
-									className="h-full bg-[#5DAB68] transition-all duration-300 ease-out absolute top-0 left-0"
-									style={{
-										width: `${
-											generationProgress >= 0 && totalContacts > 0
-												? Math.min((generationProgress / totalContacts) * 100, 100)
-												: 0
-										}%`,
-									}}
-								/>
-							</div>
-
-							{onCancel && generationProgress >= 0 && (
-								<button
-									type="button"
-									onClick={onCancel}
-									className="ml-2 p-0 h-auto w-auto bg-transparent border-0 text-black hover:text-red-600 transition-colors cursor-pointer"
-									aria-label="Cancel drafting"
-								>
-									×
-								</button>
-							)}
-						</div>
-					</div>
-				)}
+				{/* Progress bar removed from Contacts table; now displayed below Draft button in MiniEmailStructure */}
 			</div>
 		</div>
 	);

@@ -20,8 +20,6 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		handleContactSelection,
 		handleClick,
 		areAllSelected,
-		generationProgress,
-		generationTotal,
 	} = useContactsSelection(props);
 
 	return (
@@ -33,9 +31,6 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 			noDataDescription="Select contacts to generate personalized emails"
 			isPending={false}
 			title="Contacts"
-			generationProgress={generationProgress}
-			totalContacts={generationTotal ?? (selectedContactIds.size || contacts.length)}
-			onCancel={props.cancelGeneration}
 		>
 			<div className="overflow-visible w-full flex flex-col gap-2 items-center">
 				{contacts.map((contact) => (

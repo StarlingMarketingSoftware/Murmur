@@ -13,6 +13,9 @@ interface MiniEmailStructureProps {
 	onDraft: () => void;
 	isDraftDisabled: boolean;
 	isPendingGeneration: boolean;
+	generationProgress?: number;
+	generationTotal?: number;
+	onCancel?: () => void;
 }
 
 export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
@@ -20,6 +23,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	onDraft,
 	isDraftDisabled,
 	isPendingGeneration,
+	generationProgress,
+	generationTotal,
+	onCancel,
 }) => {
 	const hybridBlocks = form.watch('hybridBlockPrompts') || [];
 	const isAiSubject = form.watch('isAiSubject');
@@ -662,6 +668,45 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					>
 						{isPendingGeneration ? 'Drafting...' : 'Draft'}
 					</Button>
+					{typeof generationProgress === 'number' &&
+						generationProgress >= 0 &&
+						(generationTotal || 0) > 0 && (
+							<div className="mt-2">
+								<div className="flex items-center gap-3">
+									<div className="text-xs font-inter text-gray-600 flex-none">
+										{generationProgress >= (generationTotal || 0)
+											? `Drafted ${Math.min(
+													generationProgress,
+													generationTotal || 0
+											  )}/${generationTotal}`
+											: `Drafting ${generationProgress}/${generationTotal}`}
+									</div>
+									<div className="flex-1 h-[7px] bg-[rgba(93,171,104,0.49)] border-0 relative">
+										<div
+											className="h-full bg-[#5DAB68] transition-all duration-300 ease-out absolute top-0 left-0"
+											style={{
+												width: `${Math.min(
+													generationTotal && generationTotal > 0
+														? (generationProgress / generationTotal) * 100
+														: 0,
+													100
+												)}%`,
+											}}
+										/>
+									</div>
+									{onCancel && (
+										<button
+											type="button"
+											onClick={onCancel}
+											className="ml-2 p-0 h-auto w-auto bg-transparent border-0 text-black hover:text-red-600 transition-colors cursor-pointer"
+											aria-label="Cancel drafting"
+										>
+											×
+										</button>
+									)}
+								</div>
+							</div>
+						)}
 				</div>
 			</div>
 		</div>
