@@ -2,7 +2,6 @@ import { FC, useMemo, useState, useRef, Fragment, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { DraftingFormValues } from '../useDraftingSection';
 import { Button } from '@/components/ui/button';
-import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { HybridBlock } from '@prisma/client';
 import { cn } from '@/utils';
 import { ParagraphSlider } from '@/components/atoms/ParagraphSlider/ParagraphSlider';
@@ -324,7 +323,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 
 						{/* Blocks list - overflow visible to show buttons outside */}
 						<div className="flex flex-col gap-4 overflow-visible">
-							{hybridBlocks.map((b) => {
+							{hybridBlocks.map((b, i) => {
 								const isHybridCore =
 									b.type === 'introduction' ||
 									b.type === 'research' ||
@@ -433,36 +432,39 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											</div>
 
 											{/* Plus button for hybrid blocks - positioned outside the box */}
-											{draftingMode !== 'handwritten' && (
-												<div
-													className="flex justify-end"
-													style={{
-														marginTop: '-15px',
-														marginBottom: '-5px',
-														marginRight: '-28px',
-														position: 'relative',
-														zIndex: 50,
-													}}
-												>
-													<Button
-														type="button"
-														onClick={() =>
-															addTextBlockAt(hybridBlocks.findIndex((x) => x.id === b.id))
-														}
-														className={cn(
-															'w-[52px] h-[20px] bg-white hover:bg-stone-100 active:bg-stone-200 border border-black rounded-[4px] !font-normal text-[10px] text-black flex items-center justify-center gap-1'
-														)}
-														title="Text block"
+											{(() => {
+												const nextBlock = hybridBlocks[i + 1];
+												if (nextBlock?.type === 'text') return null;
+
+												return (
+													<div
+														className="flex justify-end"
+														style={{
+															marginTop: '-15px',
+															marginBottom: '-5px',
+															marginRight: '-28px',
+															position: 'relative',
+															zIndex: 50,
+														}}
 													>
-														<TinyPlusIcon
-															width="5px"
-															height="5px"
-															className="!w-[8px] !h-[8px]"
-														/>
-														<span className="font-secondary">Text</span>
-													</Button>
-												</div>
-											)}
+														<Button
+															type="button"
+															onClick={() => addTextBlockAt(i)}
+															className={cn(
+																'w-[52px] h-[20px] bg-white hover:bg-stone-100 active:bg-stone-200 border border-black rounded-[4px] !font-normal text-[10px] text-black flex items-center justify-center gap-1'
+															)}
+															title="Text block"
+														>
+															<TinyPlusIcon
+																width="5px"
+																height="5px"
+																className="!w-[8px] !h-[8px]"
+															/>
+															<span className="font-secondary">Text</span>
+														</Button>
+													</div>
+												);
+											})()}
 										</Fragment>
 									);
 								}
@@ -518,11 +520,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																<div>
 																	<p>Ex.</p>
 																	<p>
-																		"Compose a professional booking pitch email. Include
-																		one or two facts about the venue, introduce my band
-																		honestly, highlight our fit for their space, and end
-																		with a straightforward next-steps question. Keep tone
-																		warm, clear, and brief."
+																		&quot;Compose a professional booking pitch email.
+																		Include one or two facts about the venue, introduce my
+																		band honestly, highlight our fit for their space, and
+																		end with a straightforward next-steps question. Keep
+																		tone warm, clear, and brief.&quot;
 																	</p>
 																</div>
 															</div>
@@ -557,46 +559,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												/>
 											)}
 										</div>
-
-										{/* Add Text button after each text block */}
-										{(() => {
-											if (draftingMode === 'handwritten' || b.type !== 'text')
-												return null;
-											const nextBlock =
-												hybridBlocks[hybridBlocks.findIndex((x) => x.id === b.id) + 1];
-											if (nextBlock?.type === 'text') return null;
-
-											return (
-												<div
-													className="flex justify-end"
-													style={{
-														marginTop: '-15px',
-														marginBottom: '-5px',
-														marginRight: '-28px',
-														position: 'relative',
-														zIndex: 50,
-													}}
-												>
-													<Button
-														type="button"
-														onClick={() =>
-															addTextBlockAt(hybridBlocks.findIndex((x) => x.id === b.id))
-														}
-														className={cn(
-															'w-[52px] h-[20px] bg-white hover:bg-stone-100 active:bg-stone-200 border border-black rounded-[4px] !font-normal text-[10px] text-black flex items-center justify-center gap-1'
-														)}
-														title="Text block"
-													>
-														<TinyPlusIcon
-															width="5px"
-															height="5px"
-															className="!w-[8px] !h-[8px]"
-														/>
-														<span className="font-secondary">Text</span>
-													</Button>
-												</div>
-											);
-										})()}
 									</Fragment>
 								);
 							})}
