@@ -75,6 +75,14 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		}
 	};
 
+	// Subtitle hint shown next to hybrid block labels
+	const blockHint = (type: HybridBlock) => {
+		if (type === 'introduction') return 'Automated Intro';
+		if (type === 'research') return 'Automated';
+		if (type === 'action') return 'Automated Call to Action';
+		return null;
+	};
+
 	const setMode = (mode: 'ai' | 'hybrid' | 'handwritten') => {
 		const current = form.getValues('hybridBlockPrompts') || [];
 		const byType = new Map<HybridBlock, string>();
@@ -409,13 +417,13 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															isExpanded ? 'h-[21px]' : 'h-[31px]'
 														)}
 													>
-														<div className="flex-1 flex h-full items-center px-3 pb-0.5">
+														<div className="flex-1 flex h-full items-center px-3">
 															<span className="font-inter text-[12px] leading-none font-semibold text-black">
 																{blockLabel(b.type as HybridBlock)}
 															</span>
-															{b.type === 'research' && (
+															{blockHint(b.type as HybridBlock) && (
 																<span className="text-[10px] leading-none italic text-[#5d5d5d] ml-2">
-																	Automated
+																	{blockHint(b.type as HybridBlock)}
 																</span>
 															)}
 														</div>
@@ -550,9 +558,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													</span>
 												</div>
 												<div className="flex items-center gap-2">
-													{b.type === 'research' && (
+													{blockHint(b.type as HybridBlock) && (
 														<span className="text-[10px] italic text-[#5d5d5d]">
-															Automated
+															{blockHint(b.type as HybridBlock)}
 														</span>
 													)}
 													{b.type !== 'full_automated' && (
