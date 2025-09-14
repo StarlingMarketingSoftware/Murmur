@@ -12,6 +12,7 @@ interface DraftingTableProps {
 	noDataDescription: string;
 	isPending: boolean;
 	title: string;
+	footer?: ReactNode;
 }
 export const DraftingTable: FC<DraftingTableProps> = ({
 	title,
@@ -22,8 +23,12 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	noDataMessage,
 	noDataDescription,
 	isPending,
+	footer,
 }) => {
 	const isContacts = title === 'Contacts';
+	const isCompactHeader = isContacts || title === 'Drafts';
+	const showTitle = !isContacts && title !== 'Drafts';
+	const isDrafts = title === 'Drafts';
 	return (
 		<div style={{ width: '376px', height: '474px', position: 'relative' }}>
 			{/* Container box with header */}
@@ -32,12 +37,16 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				style={{
 					width: '100%',
 					height: '100%',
-					border: isContacts ? '2.3px solid #5D5B5B' : '2px solid #ABABAB',
+					border: isContacts
+						? '2.3px solid #5D5B5B'
+						: isDrafts
+						? '2px solid #A8833A'
+						: '2px solid #ABABAB',
 					borderRadius: '8px',
 					position: 'relative',
 					display: 'flex',
 					flexDirection: 'column',
-					backgroundColor: isContacts ? '#F5DADA' : 'white',
+					backgroundColor: isContacts ? '#F5DADA' : isDrafts ? '#EFDAAF' : 'white',
 				}}
 			>
 				{/* Header section with top rounded corners */}
@@ -46,22 +55,24 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					style={{
 						borderTopLeftRadius: '8px',
 						borderTopRightRadius: '8px',
-						borderBottom: isContacts ? 'none' : '2px solid #ABABAB',
-						padding: isContacts ? '6px 16px' : '12px 16px',
+						borderBottom: isCompactHeader ? 'none' : '2px solid #ABABAB',
+						padding: isCompactHeader ? '6px 16px' : '12px 16px',
 						display: 'flex',
-						justifyContent: isContacts ? 'flex-end' : 'space-between',
+						justifyContent: isCompactHeader ? 'flex-end' : 'space-between',
 						alignItems: 'center',
-						height: isContacts ? '32px' : '48px',
-						backgroundColor: isContacts ? '#F5DADA' : 'white',
+						height: isCompactHeader ? '32px' : '48px',
+						backgroundColor: isContacts ? '#F5DADA' : isDrafts ? '#EFDAAF' : 'white',
 					}}
 				>
-					{!isContacts && (
+					{showTitle && (
 						<div style={{ transform: 'translateY(-6px)' }}>
 							<div className="text-sm font-inter font-medium text-black">{title}</div>
 						</div>
 					)}
 					{hasData && (
-						<div style={{ transform: isContacts ? 'translateY(0)' : 'translateY(6px)' }}>
+						<div
+							style={{ transform: isCompactHeader ? 'translateY(0)' : 'translateY(6px)' }}
+						>
 							<Button
 								type="button"
 								variant="ghost"
@@ -100,7 +111,18 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					)}
 				</CustomScrollbar>
 
-				{/* Progress bar removed from Contacts table; now displayed below Draft button in MiniEmailStructure */}
+				{/* Optional footer area (e.g., Send button for Drafts) */}
+				{footer && (
+					<div
+						data-drafting-table-footer
+						style={{
+							padding: isCompactHeader ? '6px 16px' : '12px 16px',
+							backgroundColor: isContacts ? '#F5DADA' : isDrafts ? '#EFDAAF' : 'white',
+						}}
+					>
+						{footer}
+					</div>
+				)}
 			</div>
 		</div>
 	);

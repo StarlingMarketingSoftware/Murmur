@@ -1,8 +1,7 @@
-import { FC, ReactNode, useState } from 'react';
+import { FC, ReactNode } from 'react';
 import { EmailGenerationProps, useEmailGeneration } from './useEmailGeneration';
 import { Button } from '@/components/ui/button';
-import { Typography } from '@/components/ui/typography';
-import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
+
 import { cn } from '@/utils';
 import { ChevronUp } from 'lucide-react';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
@@ -49,9 +48,6 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		handleDraftButtonClick,
 		scrollToEmailStructure,
 	} = useEmailGeneration(props);
-
-	// Inline send confirmation state
-	const [isWaitingToSend, setIsWaitingToSend] = useState(false);
 
 	// Send email hooks
 	const { user, subscriptionTier } = useMe();
@@ -160,8 +156,6 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		formState: { isDirty },
 	} = form;
 
-	const subjectValue = form.watch('subject');
-
 	// removed isDraftDisabled here; using isGenerationDisabled() and selection checks inline where needed
 
 	const getAutosaveStatusDisplay = (): ReactNode => {
@@ -219,17 +213,11 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 					<div
 						data-drafting-container
 						className={cn(
-							'relative w-[1208px] h-[620px] rounded-lg overflow-x-hidden p-[17px] pb-[120px]',
-							isWaitingToSend && 'h-[700px] pb-[200px]'
+							'relative w-[1208px] h-[620px] rounded-lg overflow-x-hidden p-[17px]'
 						)}
 					>
 						{/* Tables container - positioned at bottom */}
-						<div
-							className={cn(
-								'absolute left-[19px] right-[19px] flex flex-row justify-center gap-x-10 top-[35px]',
-								isWaitingToSend ? '' : ''
-							)}
-						>
+						<div className="absolute left-[19px] right-[19px] flex flex-row justify-center gap-x-10 top-[35px]">
 							{/* Left table container */}
 							{(() => {
 								const draftedContactIds = new Set(draftEmails.map((d) => d.contactId));
@@ -271,110 +259,14 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 								handleDraftSelection={handleDraftSelection}
 								setSelectedDraftIds={setSelectedDraftIds}
 								selectedDraft={selectedDraft}
+								onSend={handleSend}
+								isSendingDisabled={isSendingDisabled}
+								isFreeTrial={isFreeTrial}
+								fromName={campaign?.identity?.name}
+								fromEmail={campaign?.identity?.email}
+								subject={form.watch('subject')}
 							/>
 						</div>
-
-						{/* Generate Drafts Button removed in favor of the mini structure's footer button */}
-
-						{/* Bottom fixed send bar inside the drafting box */}
-						{draftEmails.length > 0 && (
-							<div className="absolute left-[19px] right-[19px] bottom-[17px]">
-								<div className="flex flex-col items-end w-full">
-									<div className={cn('w-full mb-3', !isWaitingToSend && 'hidden')}>
-										<div className="grid grid-cols-3 items-start w-full">
-											<div className="flex flex-col items-start">
-												<Typography
-													variant="h3"
-													className="!text-[14px] font-semibold text-[#000000] font-secondary"
-												>
-													To:
-												</Typography>
-												<Typography className="mt-0.5 !text-[14px] text-[#000000] font-secondary">{`${
-													selectedDraftIds.size > 0
-														? selectedDraftIds.size
-														: draftEmails.length
-												}
-												 emails selected`}</Typography>
-												<Typography className="hidden">{draftEmails.length}</Typography>
-											</div>
-											<div className="flex justify-center">
-												<div className="flex flex-col items-start">
-													<Typography
-														variant="h3"
-														className="!text-[14px] font-semibold text-[#000000] font-secondary"
-													>
-														From:
-													</Typography>
-													<Typography className="mt-0.5 !text-[14px] text-[#000000] font-secondary">
-														{campaign?.identity?.name || ''}
-													</Typography>
-												</div>
-											</div>
-											<div className="flex justify-end">
-												<div className="flex flex-col items-start">
-													<Typography
-														variant="h3"
-														className="!text-[14px] font-semibold text-[#000000] font-secondary"
-													>
-														Return Address:
-													</Typography>
-													<Typography className="mt-0.5 !text-[14px] text-[#000000] font-secondary">
-														{campaign?.identity?.email || ''}
-													</Typography>
-												</div>
-											</div>
-										</div>
-										{subjectValue && (
-											<div className="flex flex-col items-start mt-2">
-												<Typography className="mt-0.5 !text-[14px] text-[#000000] font-secondary">
-													{subjectValue}
-												</Typography>
-											</div>
-										)}
-									</div>
-									{isSendingDisabled ? (
-										<UpgradeSubscriptionDrawer
-											triggerButtonText="Send"
-											buttonVariant="primary"
-											className={cn(
-												`w-full h-[39px] !border-2 !border-[#5DAB68] !text-black !font-bold !flex !items-center !justify-center`,
-												selectedDraftIds.size !== 0
-													? '!opacity-50 !cursor-not-allowed hover:!bg-[rgba(93,171,104,0.47)] hover:!border-[#5DAB68]'
-													: 'hover:!bg-[rgba(93,171,104,0.6)] hover:!border-[#5DAB68] active:!bg-[rgba(93,171,104,0.7)]'
-											)}
-											message={
-												isFreeTrial
-													? `Your free trial subscription does not include the ability to send emails. To send the emails you've drafted, please upgrade your subscription to the paid version.`
-													: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
-											}
-										/>
-									) : (
-										<Button
-											type="button"
-											className={cn(
-												'w-full h-[39px] font-bold flex items-center justify-center transition-all duration-200',
-												draftEmails.length === 0 && 'opacity-50 cursor-not-allowed',
-												isWaitingToSend
-													? 'bg-[#5DAB68] border-0 text-white scale-[1.02] h-[44px]'
-													: 'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]'
-											)}
-											disabled={draftEmails.length === 0}
-											onClick={async () => {
-												if (!isWaitingToSend) {
-													setIsWaitingToSend(true);
-													setTimeout(() => setIsWaitingToSend(false), 30000);
-													return;
-												}
-												setIsWaitingToSend(false);
-												await handleSend();
-											}}
-										>
-											{isWaitingToSend ? 'Click to Confirm and Send' : 'Send'}
-										</Button>
-									)}
-								</div>
-							</div>
-						)}
 					</div>
 				</div>
 			</div>

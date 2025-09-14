@@ -15,6 +15,12 @@ export interface DraftedEmailsProps {
 	draftEmails: EmailWithRelations[];
 	isPendingEmails: boolean;
 	setSelectedDraftIds: Dispatch<SetStateAction<Set<number>>>;
+	onSend: () => void | Promise<void>;
+	isSendingDisabled: boolean;
+	isFreeTrial: boolean;
+	fromName?: string;
+	fromEmail?: string;
+	subject?: string;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {
@@ -27,6 +33,12 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		setSelectedDraftIds,
 		contacts,
 		selectedDraft,
+		onSend,
+		isSendingDisabled,
+		isFreeTrial,
+		fromName,
+		fromEmail,
+		subject,
 	} = props;
 
 	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
@@ -149,5 +161,11 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		setEditedMessage,
 		setEditedSubject,
 		setSelectedDraft,
+		fromName,
+		fromEmail,
+		subject,
+		onSend,
+		isSendingDisabled,
+		isFreeTrial,
 	};
 };

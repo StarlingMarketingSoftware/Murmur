@@ -1,7 +1,8 @@
-import { FC } from 'react';
+import { FC, useMemo, useState } from 'react';
 import { DraftedEmailsProps, useDraftedEmails } from './useDraftedEmails';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { Button } from '@/components/ui/button';
+import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { X } from 'lucide-react';
 import { cn } from '@/utils';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
@@ -36,6 +37,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		selectedDraftIds,
 		handleSelectAllDrafts,
 	} = useDraftedEmails(props);
+
+	const [showConfirm, setShowConfirm] = useState(false);
+	const toCount = selectedDraftIds.size > 0 ? selectedDraftIds.size : draftEmails.length;
+	const subjectPreview = useMemo(() => props.subject || '', [props.subject]);
 
 	if (selectedDraft) {
 		const contact = contacts?.find((c) => c.id === selectedDraft.contactId);
@@ -162,6 +167,111 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				noDataDescription='Click "Generate Drafts" to create emails for the selected contacts'
 				isPending={isPendingEmails}
 				title="Drafts"
+				footer={
+					draftEmails.length > 0 ? (
+						<div className="w-full flex flex-col gap-2">
+							{/* Inline confirmation details */}
+							<div className={cn('w-full', !showConfirm && 'hidden')}>
+								<div className="grid grid-cols-3 items-start w-full">
+									<div className="flex flex-col items-start">
+										<div className="text-[14px] font-semibold text-[#000000] font-secondary">
+											To:
+										</div>
+										<div className="mt-0.5 text-[14px] text-[#000000] font-secondary">
+											{toCount} emails selected
+										</div>
+									</div>
+									<div className="flex justify-center">
+										<div className="flex flex-col items-start">
+											<div className="text-[14px] font-semibold text-[#000000] font-secondary">
+												From:
+											</div>
+											<div className="mt-0.5 text-[14px] text-[#000000] font-secondary">
+												{props.fromName || ''}
+											</div>
+										</div>
+									</div>
+									<div className="flex justify-end">
+										<div className="flex flex-col items-start">
+											<div className="text-[14px] font-semibold text-[#000000] font-secondary">
+												Return Address:
+											</div>
+											<div className="mt-0.5 text-[14px] text-[#000000] font-secondary">
+												{props.fromEmail || ''}
+											</div>
+										</div>
+									</div>
+								</div>
+								{subjectPreview && (
+									<div className="flex flex-col items-start mt-0.5">
+										<div className="text-[14px] text-[#000000] font-secondary">
+											{subjectPreview}
+										</div>
+									</div>
+								)}
+							</div>
+
+							<div className="w-full flex items-center gap-2">
+								{props.isSendingDisabled ? (
+									<UpgradeSubscriptionDrawer
+										triggerButtonText={
+											showConfirm
+												? 'Click to Confirm and Send'
+												: selectedDraftIds.size > 0
+												? `Send ${selectedDraftIds.size} Selected`
+												: `Send All`
+										}
+										buttonVariant="primary"
+										className="flex-1 h-[39px] !border-2 !border-[#5DAB68] !text-black !font-bold !flex !items-center !justify-center hover:!bg-[rgba(93,171,104,0.6)] hover:!border-[#5DAB68] active:!bg-[rgba(93,171,104,0.7)]"
+										message={
+											props.isFreeTrial
+												? `Your free trial subscription does not include the ability to send emails. To send the emails you've drafted, please upgrade your subscription to the paid version.`
+												: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
+										}
+									/>
+								) : (
+									<Button
+										type="button"
+										className={cn(
+											'flex-1 h-[39px] font-bold flex items-center justify-center transition-all duration-200',
+											showConfirm
+												? 'bg-[#5DAB68] border-0 text-white'
+												: 'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]'
+										)}
+										onClick={async () => {
+											if (!showConfirm) {
+												setShowConfirm(true);
+												setTimeout(() => setShowConfirm(false), 10000);
+												return;
+											}
+											setShowConfirm(false);
+											await props.onSend();
+										}}
+										disabled={draftEmails.length === 0}
+									>
+										{showConfirm
+											? 'Click to Confirm and Send'
+											: selectedDraftIds.size > 0
+											? `Send ${selectedDraftIds.size} Selected`
+											: 'Send All'}
+									</Button>
+								)}
+								<Button
+									type="button"
+									variant="ghost"
+									className="w-[56px] h-[39px] border-2 border-[#5DAB68] text-black font-bold bg-[rgba(93,171,104,0.47)] hover:bg-[rgba(93,171,104,0.6)]"
+									onClick={() => {
+										handleSelectAllDrafts();
+										setShowConfirm(true);
+										setTimeout(() => setShowConfirm(false), 10000);
+									}}
+								>
+									All
+								</Button>
+							</div>
+						</div>
+					) : null
+				}
 			>
 				<>
 					<div className="overflow-visible w-full flex flex-col gap-2 items-center">
@@ -196,7 +306,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										type="button"
 										variant="icon"
 										onClick={(e) => handleDeleteDraft(e, draft.id)}
-										className="absolute top-2 right-2 p-1 transition-colors z-10 group"
+										className="absolute top-[2px] right-[2px] p-1 transition-colors z-10 group"
 									>
 										<X size={16} className="text-gray-500 group-hover:text-red-500" />
 									</Button>
@@ -210,7 +320,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											e.stopPropagation();
 											handleDraftDoubleClick(draft);
 										}}
-										className="absolute top-8 right-2 p-1 transition-colors z-10"
+										className="absolute top-[16px] right-[6px] p-1 transition-colors z-20"
 										aria-label="Preview draft"
 									>
 										<PreviewIcon
