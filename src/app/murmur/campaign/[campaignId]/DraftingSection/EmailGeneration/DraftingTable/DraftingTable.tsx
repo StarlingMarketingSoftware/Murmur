@@ -32,11 +32,12 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				style={{
 					width: '100%',
 					height: '100%',
-					border: '2px solid #ABABAB',
+					border: isContacts ? '2.3px solid #5D5B5B' : '2px solid #ABABAB',
 					borderRadius: '8px',
 					position: 'relative',
 					display: 'flex',
 					flexDirection: 'column',
+					backgroundColor: isContacts ? '#F5DADA' : 'white',
 				}}
 			>
 				{/* Header section with top rounded corners */}
@@ -45,13 +46,13 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					style={{
 						borderTopLeftRadius: '8px',
 						borderTopRightRadius: '8px',
-						borderBottom: '2px solid #ABABAB',
+						borderBottom: isContacts ? 'none' : '2px solid #ABABAB',
 						padding: isContacts ? '6px 16px' : '12px 16px',
 						display: 'flex',
 						justifyContent: isContacts ? 'flex-end' : 'space-between',
 						alignItems: 'center',
 						height: isContacts ? '32px' : '48px',
-						backgroundColor: 'white',
+						backgroundColor: isContacts ? '#F5DADA' : 'white',
 					}}
 				>
 					{!isContacts && (

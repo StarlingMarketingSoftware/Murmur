@@ -37,7 +37,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 					<div
 						key={contact.id}
 						className={cn(
-							'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[366px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#ABABAB] bg-white select-none row-hover-scroll',
+							'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[366px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none row-hover-scroll',
 							selectedContactIds.has(contact.id) ? 'bg-[#D6E8D9]' : ''
 						)}
 						onMouseDown={(e) => {
@@ -113,7 +113,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 														return isCanadianProvince ? (
 															<div
 																className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
-																style={{ borderColor: 'rgba(0,0,0,0.7)' }}
+																style={{ borderColor: '#000000' }}
 																title="Canadian province"
 															>
 																<CanadianFlag
@@ -128,7 +128,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																style={{
 																	backgroundColor:
 																		stateBadgeColorMap[stateAbbr] || 'transparent',
-																	borderColor: 'rgba(0,0,0,0.7)',
+																	borderColor: '#000000',
 																}}
 															>
 																{stateAbbr}
@@ -136,7 +136,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 														) : (
 															<span
 																className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
-																style={{ borderColor: 'rgba(0,0,0,0.7)' }}
+																style={{ borderColor: '#000000' }}
 															/>
 														);
 													})()}
@@ -206,7 +206,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																return isCanadianProvince ? (
 																	<div
 																		className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
-																		style={{ borderColor: 'rgba(0,0,0,0.7)' }}
+																		style={{ borderColor: '#000000' }}
 																		title="Canadian province"
 																	>
 																		<CanadianFlag
@@ -221,7 +221,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																		style={{
 																			backgroundColor:
 																				stateBadgeColorMap[stateAbbr] || 'transparent',
-																			borderColor: 'rgba(0,0,0,0.7)',
+																			borderColor: '#000000',
 																		}}
 																	>
 																		{stateAbbr}
@@ -229,7 +229,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																) : (
 																	<span
 																		className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
-																		style={{ borderColor: 'rgba(0,0,0,0.7)' }}
+																		style={{ borderColor: '#000000' }}
 																	/>
 																);
 															})()}
@@ -272,7 +272,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 															return isCanadianProvince ? (
 																<div
 																	className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
-																	style={{ borderColor: 'rgba(0,0,0,0.7)' }}
+																	style={{ borderColor: '#000000' }}
 																	title="Canadian province"
 																>
 																	<CanadianFlag
@@ -287,7 +287,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																	style={{
 																		backgroundColor:
 																			stateBadgeColorMap[stateAbbr] || 'transparent',
-																		borderColor: 'rgba(0,0,0,0.7)',
+																		borderColor: '#000000',
 																	}}
 																>
 																	{stateAbbr}
@@ -295,7 +295,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 															) : (
 																<span
 																	className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
-																	style={{ borderColor: 'rgba(0,0,0,0.7)' }}
+																	style={{ borderColor: '#000000' }}
 																/>
 															);
 														})()}
