@@ -253,7 +253,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 							<MiniEmailStructure
 								form={form}
 								onDraft={handleDraftButtonClick}
-								isDraftDisabled={isGenerationDisabled()}
+								isDraftDisabled={isGenerationDisabled() || selectedContactIds.size === 0}
 								isPendingGeneration={isPendingGeneration}
 							/>
 

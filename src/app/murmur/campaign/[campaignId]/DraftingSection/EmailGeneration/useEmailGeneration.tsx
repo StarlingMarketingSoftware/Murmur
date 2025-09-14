@@ -10,6 +10,7 @@ import {
 	useCallback,
 } from 'react';
 import { DraftingFormValues } from '../useDraftingSection';
+import { toast } from 'sonner';
 import { UseFormReturn } from 'react-hook-form';
 import { debounce } from 'lodash';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
@@ -89,6 +90,10 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 	};
 
 	const handleDraftButtonClick = async () => {
+		if (selectedContactIds.size === 0) {
+			toast.error('Select at least one contact to draft emails.');
+			return;
+		}
 		await executeDraftNow();
 	};
 

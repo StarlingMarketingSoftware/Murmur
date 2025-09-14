@@ -6,6 +6,7 @@ import { HybridBlock } from '@prisma/client';
 import { cn } from '@/utils';
 import { ParagraphSlider } from '@/components/atoms/ParagraphSlider/ParagraphSlider';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
+import { ToneSelector } from '@/components/molecules/ToneSelector/ToneSelector';
 
 interface MiniEmailStructureProps {
 	form: UseFormReturn<DraftingFormValues>;
@@ -80,44 +81,98 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		current.forEach((b) => byType.set(b.type as HybridBlock, b.value || ''));
 
 		if (mode === 'ai') {
-			const value = byType.get('full_automated' as HybridBlock) || '';
+			// Save current blocks for return later
+			if (current.length > 0 && current.every((b) => b.type === 'text')) {
+				form.setValue('savedManualBlocks', current);
+			} else if (
+				current.length > 0 &&
+				!current.some((b) => b.type === 'full_automated')
+			) {
+				form.setValue('savedHybridBlocks', current);
+			}
+
+			// Switch to Full Auto using stored fullAiPrompt if available
+			const fullAiPrompt = (form.getValues('fullAiPrompt') as string) || '';
 			form.setValue(
 				'hybridBlockPrompts',
-				[{ id: 'full_automated', type: 'full_automated' as HybridBlock, value }],
+				[
+					{
+						id: 'full_automated',
+						type: 'full_automated' as HybridBlock,
+						value: fullAiPrompt,
+					},
+				],
 				{ shouldDirty: true }
 			);
+			form.setValue('isAiSubject', true, { shouldDirty: true });
 			return;
 		}
 
 		if (mode === 'handwritten') {
-			const existingTextBlocks = current.filter((b) => b.type === 'text');
-			const blocks =
-				existingTextBlocks.length > 0
-					? existingTextBlocks
-					: [{ id: `text_${Date.now()}`, type: 'text' as HybridBlock, value: '' }];
-			form.setValue('hybridBlockPrompts', blocks, { shouldDirty: true });
+			// Save current content for return later
+			if (current.some((b) => b.type === 'full_automated')) {
+				form.setValue(
+					'fullAiPrompt',
+					(byType.get('full_automated' as HybridBlock) as string) || ''
+				);
+			} else if (current.length > 0 && !current.every((b) => b.type === 'text')) {
+				form.setValue('savedHybridBlocks', current);
+			}
+
+			// Switch to Manual (text-only) using saved manual blocks if any
+			const savedManual =
+				(form.getValues('savedManualBlocks') as Array<{
+					id: string;
+					type: HybridBlock;
+					value: string;
+				}>) || [];
+			form.setValue(
+				'hybridBlockPrompts',
+				savedManual.length > 0
+					? savedManual
+					: [{ id: `text_${Date.now()}`, type: 'text' as HybridBlock, value: '' }],
+				{ shouldDirty: true }
+			);
+			form.setValue('isAiSubject', false, { shouldDirty: true });
 			return;
 		}
 
-		// In hybrid mode, we want to have the core blocks with text blocks in between
-		const blocks = [
-			{
-				id: 'introduction',
-				type: 'introduction' as HybridBlock,
-				value: byType.get('introduction' as HybridBlock) || '',
-			},
-			{
-				id: 'research',
-				type: 'research' as HybridBlock,
-				value: byType.get('research' as HybridBlock) || '',
-			},
-			{
-				id: 'action',
-				type: 'action' as HybridBlock,
-				value: byType.get('action' as HybridBlock) || '',
-			},
-		];
+		// mode === 'hybrid'
+		if (current.some((b) => b.type === 'full_automated')) {
+			form.setValue(
+				'fullAiPrompt',
+				(byType.get('full_automated' as HybridBlock) as string) || ''
+			);
+		} else if (current.length > 0 && current.every((b) => b.type === 'text')) {
+			form.setValue('savedManualBlocks', current);
+		} else if (current.length > 0) {
+			form.setValue('savedHybridBlocks', current);
+		}
+
+		const savedHybrid =
+			(form.getValues('savedHybridBlocks') as Array<{
+				id: string;
+				type: HybridBlock;
+				value: string;
+			}>) || [];
+		const blocks =
+			savedHybrid.length > 0
+				? savedHybrid
+				: [
+						{
+							id: 'introduction',
+							type: 'introduction' as HybridBlock,
+							value: '',
+						},
+						{
+							id: 'research',
+							type: 'research' as HybridBlock,
+							value: '',
+						},
+						{ id: 'action', type: 'action' as HybridBlock, value: '' },
+				  ];
 		form.setValue('hybridBlockPrompts', blocks, { shouldDirty: true });
+		form.setValue('isAiSubject', true, { shouldDirty: true });
 	};
 
 	// Selected mode highlight (mirror main selector)
@@ -484,9 +539,16 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											}}
 										>
 											<div className="flex items-center justify-between">
-												<span className="font-inter text-[12px] font-semibold text-black">
-													{blockLabel(b.type as HybridBlock)}
-												</span>
+												<div className="flex items-center gap-2">
+													<span
+														className={cn(
+															'font-inter text-[12px] font-semibold text-black',
+															b.type === 'full_automated' && 'whitespace-nowrap'
+														)}
+													>
+														{blockLabel(b.type as HybridBlock)}
+													</span>
+												</div>
 												<div className="flex items-center gap-2">
 													{b.type === 'research' && (
 														<span className="text-[10px] italic text-[#5d5d5d]">
@@ -507,40 +569,35 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											</div>
 
 											{b.type === 'full_automated' ? (
-												<div className="relative mt-1">
-													{!b.value && (
-														<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px]">
-															<div className="space-y-2">
-																<div>
-																	<p>Prompt Murmur here.</p>
-																	<p>
-																		Tell it what you want to say and it will compose
-																		emails based on your instructions.
-																	</p>
-																</div>
-																<div>
-																	<p>Ex.</p>
-																	<p>
-																		&quot;Compose a professional booking pitch email.
-																		Include one or two facts about the venue, introduce my
-																		band honestly, highlight our fit for their space, and
-																		end with a straightforward next-steps question. Keep
-																		tone warm, clear, and brief.&quot;
-																	</p>
+												<div className="mt-1">
+													<div className="mb-1">
+														<ToneSelector isCompact />
+													</div>
+													<div className="relative">
+														{!b.value && (
+															<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px]">
+																<div className="space-y-2">
+																	<div>
+																		<p>Prompt Murmur here.</p>
+																		<p>
+																			Tell it what you want to say and it will compose
+																			emails based on your instructions.
+																		</p>
+																	</div>
 																</div>
 															</div>
-														</div>
-													)}
-													<textarea
-														className={cn(
-															'border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 w-full max-w-full min-w-0',
-															'h-[195px] py-2 pr-2 px-0 resize-none',
-															'bg-white text-[12px] leading-[16px]'
 														)}
-														placeholder=""
-														value={b.value || ''}
-														onChange={(e) => updateBlockValue(b.id, e.target.value)}
-													/>
+														<textarea
+															className={cn(
+																'border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 w-full max-w-full min-w-0',
+																'h-[120px] py-2 pr-2 px-0 resize-none',
+																'bg-white text-[12px] leading-[16px]'
+															)}
+															placeholder=""
+															value={b.value || ''}
+															onChange={(e) => updateBlockValue(b.id, e.target.value)}
+														/>
+													</div>
 													<div className="pl-2">
 														<ParagraphSlider />
 													</div>
@@ -571,11 +628,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						className="rounded-[8px] border-2 bg-white px-2 py-2"
 						style={{ borderColor: '#969696' }}
 					>
-						<div className="font-inter text-[12px] font-semibold text-black mb-1">
+						<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
 							Signature
 						</div>
 						<textarea
-							className="w-full text-[12px] rounded-[6px] p-1 resize-none h-[58px] outline-none focus:outline-none"
+							className="w-full text-[12px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none h-[58px] outline-none focus:outline-none"
 							value={signature}
 							onChange={(e) => updateSignature(e.target.value)}
 						/>
