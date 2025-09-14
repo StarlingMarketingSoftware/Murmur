@@ -6,6 +6,14 @@ import { X } from 'lucide-react';
 import { cn } from '@/utils';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
 import PreviewIcon from '@/components/atoms/_svg/PreviewIcon';
+import { getStateAbbreviation } from '@/utils/string';
+import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
+import {
+	canadianProvinceAbbreviations,
+	canadianProvinceNames,
+	stateBadgeColorMap,
+} from '@/constants/ui';
+import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 
 export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	const {
@@ -156,78 +164,163 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				title="Drafts"
 			>
 				<>
-					{draftEmails.map((draft) => {
-						const contact = contacts?.find((c) => c.id === draft.contactId);
-						const contactName = contact
-							? contact.name ||
-							  `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
-							  contact.company ||
-							  'Contact'
-							: 'Unknown Contact';
-						const isSelected = selectedDraftIds.has(draft.id);
+					<div className="overflow-visible w-full flex flex-col gap-2 items-center">
+						{draftEmails.map((draft) => {
+							const contact = contacts?.find((c) => c.id === draft.contactId);
+							const contactName = contact
+								? contact.name ||
+								  `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
+								  contact.company ||
+								  'Contact'
+								: 'Unknown Contact';
+							const isSelected = selectedDraftIds.has(draft.id);
 
-						return (
-							<div
-								key={draft.id}
-								className={cn(
-									'border-b-2 border-[#ABABAB] cursor-pointer transition-colors p-3 relative select-none',
-									isSelected && 'bg-[#D6E8D9] border-2 border-[#ABABAB]'
-								)}
-								onMouseDown={(e) => {
-									// Prevent text selection on shift-click
-									if (e.shiftKey) {
-										e.preventDefault();
-									}
-								}}
-								onClick={(e) => handleDraftSelect(draft, e)}
-								onDoubleClick={() => handleDraftDoubleClick(draft)}
-							>
-								{/* Delete button */}
-								<Button
-									type="button"
-									variant="icon"
-									onClick={(e) => handleDeleteDraft(e, draft.id)}
-									className="absolute top-2 right-2 p-1 transition-colors z-10 group"
-								>
-									<X size={16} className="text-gray-500 group-hover:text-red-500" />
-								</Button>
-
-								{/* Preview button */}
-								<Button
-									type="button"
-									variant="icon"
-									onClick={(e) => {
-										e.preventDefault();
-										e.stopPropagation();
-										handleDraftDoubleClick(draft);
+							return (
+								<div
+									key={draft.id}
+									className={cn(
+										'cursor-pointer transition-colors relative select-none w-[366px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
+										isSelected && 'bg-[#D6E8D9]'
+									)}
+									onMouseDown={(e) => {
+										// Prevent text selection on shift-click
+										if (e.shiftKey) {
+											e.preventDefault();
+										}
 									}}
-									className="absolute top-8 right-2 p-1 transition-colors z-10"
-									aria-label="Preview draft"
+									onClick={(e) => handleDraftSelect(draft, e)}
+									onDoubleClick={() => handleDraftDoubleClick(draft)}
 								>
-									<PreviewIcon
-										width="16px"
-										height="16px"
-										pathClassName="fill-[#4A4A4A]"
-									/>
-								</Button>
+									{/* Delete button */}
+									<Button
+										type="button"
+										variant="icon"
+										onClick={(e) => handleDeleteDraft(e, draft.id)}
+										className="absolute top-2 right-2 p-1 transition-colors z-10 group"
+									>
+										<X size={16} className="text-gray-500 group-hover:text-red-500" />
+									</Button>
 
-								{/* Contact name */}
-								<div className="font-bold text-xs mb-1 pr-8">{contactName}</div>
+									{/* Preview button */}
+									<Button
+										type="button"
+										variant="icon"
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											handleDraftDoubleClick(draft);
+										}}
+										className="absolute top-8 right-2 p-1 transition-colors z-10"
+										aria-label="Preview draft"
+									>
+										<PreviewIcon
+											width="16px"
+											height="16px"
+											pathClassName="fill-[#4A4A4A]"
+										/>
+									</Button>
 
-								{/* Email subject */}
-								<div className="text-xs text-gray-600 mb-1 pr-8">
-									{draft.subject || 'No subject'}
+									{/* Fixed top-right info (Location + Title) */}
+									<div className="absolute top-[6px] right-[28px] flex flex-col items-end gap-[2px] w-[92px] pointer-events-none">
+										<div className="flex items-center justify-start gap-1 h-[11.67px] w-[92px]">
+											{(() => {
+												const fullStateName = (contact?.state as string) || '';
+												const stateAbbr = getStateAbbreviation(fullStateName) || '';
+												const normalizedState = fullStateName.trim();
+												const lowercaseCanadianProvinceNames = canadianProvinceNames.map(
+													(s) => s.toLowerCase()
+												);
+												const isCanadianProvince =
+													lowercaseCanadianProvinceNames.includes(
+														normalizedState.toLowerCase()
+													) ||
+													canadianProvinceAbbreviations.includes(
+														normalizedState.toUpperCase()
+													) ||
+													canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+												const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+												if (!stateAbbr) return null;
+												return isCanadianProvince ? (
+													<div
+														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border overflow-hidden"
+														style={{ borderColor: '#000000' }}
+														title="Canadian province"
+													>
+														<CanadianFlag
+															width="100%"
+															height="100%"
+															className="w-full h-full"
+														/>
+													</div>
+												) : isUSAbbr ? (
+													<span
+														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border text-[8px] leading-none font-bold"
+														style={{
+															backgroundColor:
+																stateBadgeColorMap[stateAbbr] || 'transparent',
+															borderColor: '#000000',
+														}}
+													>
+														{stateAbbr}
+													</span>
+												) : (
+													<span
+														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border"
+														style={{ borderColor: '#000000' }}
+													/>
+												);
+											})()}
+											{contact?.city ? (
+												<ScrollableText
+													text={contact.city}
+													className="text-[10px] text-black leading-none max-w-[70px]"
+												/>
+											) : null}
+										</div>
+
+										{contact?.headline ? (
+											<div className="w-[92px] h-[10px] rounded-[3.71px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
+												<ScrollableText
+													text={contact.headline}
+													className="text-[8px] text-black leading-none px-1"
+												/>
+											</div>
+										) : null}
+									</div>
+
+									{/* Content grid */}
+									<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px]">
+										{/* Row 1: Name + Location */}
+										<div className="row-start-1 col-start-1 flex items-center">
+											<div className="font-bold text-[11px] truncate leading-none">
+												{contactName}
+											</div>
+										</div>
+
+										{/* Row 2: Company + Headline */}
+										<div className="row-start-2 col-start-1 flex items-center pr-2">
+											<div className="text-[11px] text-black truncate leading-none">
+												{contact?.company || ''}
+											</div>
+										</div>
+
+										{/* Row 3: Subject */}
+										<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center">
+											{draft.subject || 'No subject'}
+										</div>
+
+										{/* Row 4: Message preview */}
+										<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center">
+											{draft.message
+												? draft.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
+												: 'No content'}
+										</div>
+									</div>
 								</div>
-
-								{/* Preview of message */}
-								<div className="text-xs text-gray-500 pr-8">
-									{draft.message
-										? draft.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
-										: 'No content'}
-								</div>
-							</div>
-						);
-					})}
+							);
+						})}
+					</div>
 				</>
 
 				{isPendingDeleteEmail && (
