@@ -23,6 +23,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	noDataDescription,
 	isPending,
 }) => {
+	const isContacts = title === 'Contacts';
 	return (
 		<div style={{ width: '376px', height: '474px', position: 'relative' }}>
 			{/* Container box with header */}
@@ -45,19 +46,21 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						borderTopLeftRadius: '8px',
 						borderTopRightRadius: '8px',
 						borderBottom: '2px solid #ABABAB',
-						padding: '12px 16px',
+						padding: isContacts ? '6px 16px' : '12px 16px',
 						display: 'flex',
-						justifyContent: 'space-between',
+						justifyContent: isContacts ? 'flex-end' : 'space-between',
 						alignItems: 'center',
-						height: '48px',
+						height: isContacts ? '32px' : '48px',
 						backgroundColor: 'white',
 					}}
 				>
-					<div style={{ transform: 'translateY(-6px)' }}>
-						<div className="text-sm font-inter font-medium text-black">{title}</div>
-					</div>
+					{!isContacts && (
+						<div style={{ transform: 'translateY(-6px)' }}>
+							<div className="text-sm font-inter font-medium text-black">{title}</div>
+						</div>
+					)}
 					{hasData && (
-						<div style={{ transform: 'translateY(6px)' }}>
+						<div style={{ transform: isContacts ? 'translateY(0)' : 'translateY(6px)' }}>
 							<Button
 								type="button"
 								variant="ghost"
