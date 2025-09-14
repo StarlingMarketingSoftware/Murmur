@@ -39,7 +39,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	} = useDraftedEmails(props);
 
 	const [showConfirm, setShowConfirm] = useState(false);
-	const toCount = selectedDraftIds.size > 0 ? selectedDraftIds.size : draftEmails.length;
+	const selectedCount = selectedDraftIds.size;
+	const hasSelection = selectedCount > 0;
+	const toCount = selectedCount; // used in confirmation details
 	const subjectPreview = useMemo(() => props.subject || '', [props.subject]);
 
 	if (selectedDraft) {
@@ -217,12 +219,17 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										triggerButtonText={
 											showConfirm
 												? 'Click to Confirm and Send'
-												: selectedDraftIds.size > 0
-												? `Send ${selectedDraftIds.size} Selected`
-												: `Send All`
+												: hasSelection
+												? `Send ${selectedCount} Selected`
+												: 'Send'
 										}
 										buttonVariant="primary"
-										className="flex-1 h-[39px] !border-2 !border-[#5DAB68] !text-black !font-bold !flex !items-center !justify-center hover:!bg-[rgba(93,171,104,0.6)] hover:!border-[#5DAB68] active:!bg-[rgba(93,171,104,0.7)]"
+										className={cn(
+											'flex-1 h-[39px] !border-2 !border-[#5DAB68] !text-black !font-bold !flex !items-center !justify-center',
+											hasSelection
+												? 'hover:!bg-[rgba(93,171,104,0.6)] hover:!border-[#5DAB68] active:!bg-[rgba(93,171,104,0.7)]'
+												: '!opacity-50 !cursor-not-allowed pointer-events-none'
+										)}
 										message={
 											props.isFreeTrial
 												? `Your free trial subscription does not include the ability to send emails. To send the emails you've drafted, please upgrade your subscription to the paid version.`
@@ -236,9 +243,13 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											'flex-1 h-[39px] font-bold flex items-center justify-center transition-all duration-200',
 											showConfirm
 												? 'bg-[#5DAB68] border-0 text-white'
-												: 'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]'
+												: 'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black ' +
+														(hasSelection
+															? 'hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]'
+															: 'opacity-50 cursor-not-allowed')
 										)}
 										onClick={async () => {
+											if (!hasSelection) return;
 											if (!showConfirm) {
 												setShowConfirm(true);
 												setTimeout(() => setShowConfirm(false), 10000);
@@ -247,13 +258,13 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											setShowConfirm(false);
 											await props.onSend();
 										}}
-										disabled={draftEmails.length === 0}
+										disabled={!hasSelection}
 									>
 										{showConfirm
 											? 'Click to Confirm and Send'
-											: selectedDraftIds.size > 0
-											? `Send ${selectedDraftIds.size} Selected`
-											: 'Send All'}
+											: hasSelection
+											? `Send ${selectedCount} Selected`
+											: 'Send'}
 									</Button>
 								)}
 								<Button
