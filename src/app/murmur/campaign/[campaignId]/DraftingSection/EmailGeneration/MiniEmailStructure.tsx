@@ -322,7 +322,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						</div>
 
 						{/* Blocks list - overflow visible to show buttons outside */}
-						<div className="flex flex-col gap-4 overflow-visible">
+						<div className="flex flex-col gap-2 overflow-visible">
 							{hybridBlocks.map((b, i) => {
 								const isHybridCore =
 									b.type === 'introduction' ||
@@ -440,8 +440,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													<div
 														className="flex justify-end"
 														style={{
-															marginTop: '-15px',
-															marginBottom: '-5px',
+															marginTop: '3px',
+															marginBottom: '-3px',
 															marginRight: '-28px',
 															position: 'relative',
 															zIndex: 50,
@@ -451,7 +451,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															type="button"
 															onClick={() => addTextBlockAt(i)}
 															className={cn(
-																'w-[52px] h-[20px] bg-white hover:bg-stone-100 active:bg-stone-200 border border-black rounded-[4px] !font-normal text-[10px] text-black flex items-center justify-center gap-1'
+																'w-[52px] h-[20px] bg-white hover:bg-stone-100 active:bg-stone-200 border border-[#5DAB68] rounded-[4px] !font-normal text-[10px] text-black flex items-center justify-center gap-1'
 															)}
 															title="Text block"
 														>
@@ -475,7 +475,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											className={cn('rounded-[8px] border-2 bg-white px-2 py-1 relative')}
 											style={{
 												borderColor:
-													draftingMode === 'handwritten' && b.type === 'text'
+													(draftingMode === 'handwritten' || draftingMode === 'hybrid') &&
+													b.type === 'text'
 														? '#53A25D'
 														: b.type === 'full_automated'
 														? '#51A2E4'
@@ -548,10 +549,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												<textarea
 													className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none"
 													placeholder={
-														draftingMode === 'handwritten' && b.type === 'text'
+														b.type === 'text'
 															? 'Write the exact text you want in your email here. *required'
-															: b.type === 'text'
-															? 'Text block content...'
 															: 'Type here to specify further, e.g., "I am ... and I lead ..."'
 													}
 													value={b.value || ''}
