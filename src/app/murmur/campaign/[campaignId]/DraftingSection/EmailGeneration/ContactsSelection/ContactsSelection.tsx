@@ -37,15 +37,13 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 			totalContacts={generationTotal ?? (selectedContactIds.size || contacts.length)}
 			onCancel={props.cancelGeneration}
 		>
-			<div className="overflow-visible w-full">
+			<div className="overflow-visible w-full flex flex-col gap-2 items-center">
 				{contacts.map((contact) => (
 					<div
 						key={contact.id}
 						className={cn(
-							'border-b-2 border-[#ABABAB] cursor-pointer transition-colors grid grid-cols-2 grid-rows-[auto_auto] w-full overflow-visible py-1 select-none row-hover-scroll',
-							selectedContactIds.has(contact.id)
-								? 'bg-[#D6E8D9] border-2 border-[#ABABAB]'
-								: ''
+							'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[366px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#ABABAB] bg-white select-none row-hover-scroll',
+							selectedContactIds.has(contact.id) ? 'bg-[#D6E8D9]' : ''
 						)}
 						onMouseDown={(e) => {
 							// Prevent text selection on shift-click
@@ -66,19 +64,19 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								return (
 									<>
 										{/* Top Left - Name */}
-										<div className="p-1 pl-3 flex items-start">
-											<div className="font-bold text-xs w-full whitespace-normal break-words leading-4">
+										<div className="pl-3 pr-1 flex items-center h-[23px]">
+											<div className="font-bold text-[11px] w-full truncate leading-tight">
 												{fullName}
 											</div>
 										</div>
 
 										{/* Top Right - Title */}
-										<div className="p-1 flex items-center overflow-visible">
+										<div className="pr-2 pl-1 flex items-center h-[23px]">
 											{contact.headline ? (
-												<div className="h-5 rounded-[6px] px-2 flex items-center w-full max-w-[150px] bg-[#E8EFFF] border-1 border-black overflow-hidden">
+												<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
 													<ScrollableText
 														text={contact.headline}
-														className="text-xs text-black"
+														className="text-[10px] text-black leading-none"
 														scrollPixelsPerSecond={60}
 													/>
 												</div>
@@ -88,16 +86,16 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 										</div>
 
 										{/* Bottom Left - Company */}
-										<div className="p-1 pl-3 flex items-start">
-											<div className="text-xs text-black w-full whitespace-normal break-words leading-4">
+										<div className="pl-3 pr-1 flex items-center h-[22px]">
+											<div className="text-[11px] text-black w-full truncate leading-tight">
 												{contact.company || ''}
 											</div>
 										</div>
 
 										{/* Bottom Right - Location */}
-										<div className="p-1 flex items-center">
+										<div className="pr-2 pl-1 flex items-center h-[22px]">
 											{contact.city || contact.state ? (
-												<div className="flex items-center gap-2 w-full">
+												<div className="flex items-center gap-1 w-full">
 													{(() => {
 														const fullStateName = (contact.state as string) || '';
 														const stateAbbr = getStateAbbreviation(fullStateName) || '';
@@ -150,7 +148,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 													{contact.city ? (
 														<ScrollableText
 															text={contact.city}
-															className="text-xs text-black w-full"
+															className="text-[10px] text-black leading-none"
 														/>
 													) : (
 														<div className="w-full" />
@@ -167,8 +165,8 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								return (
 									<>
 										{/* Left column - Company vertically centered */}
-										<div className="row-span-2 p-1 pl-3 flex items-start">
-											<div className="font-bold text-xs text-black w-full whitespace-normal break-words leading-4">
+										<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
+											<div className="font-bold text-[11px] text-black w-full truncate leading-tight">
 												{contact.company || 'Contact'}
 											</div>
 										</div>
@@ -177,19 +175,19 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 										{contact.headline ? (
 											<>
 												{/* Top Right - Title */}
-												<div className="p-1 flex items-center overflow-visible">
-													<div className="h-[20.54px] rounded-[6.64px] px-2 flex items-center w-full max-w-[150px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
+												<div className="pr-2 pl-1 flex items-center h-[23px]">
+													<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
 														<ScrollableText
 															text={contact.headline}
-															className="text-xs text-black"
+															className="text-[10px] text-black leading-none"
 														/>
 													</div>
 												</div>
 
 												{/* Bottom Right - Location */}
-												<div className="p-1 flex items-center">
+												<div className="pr-2 pl-1 flex items-center h-[22px]">
 													{contact.city || contact.state ? (
-														<div className="flex items-center gap-2 w-full">
+														<div className="flex items-center gap-1 w-full">
 															{(() => {
 																const fullStateName = (contact.state as string) || '';
 																const stateAbbr =
@@ -256,9 +254,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 											</>
 										) : (
 											// No title - vertically center location
-											<div className="row-span-2 p-1 flex items-center">
+											<div className="row-span-2 pr-2 pl-1 flex items-center h-full">
 												{contact.city || contact.state ? (
-													<div className="flex items-center gap-2 w-full">
+													<div className="flex items-center gap-1 w-full">
 														{(() => {
 															const fullStateName = (contact.state as string) || '';
 															const stateAbbr = getStateAbbreviation(fullStateName) || '';
