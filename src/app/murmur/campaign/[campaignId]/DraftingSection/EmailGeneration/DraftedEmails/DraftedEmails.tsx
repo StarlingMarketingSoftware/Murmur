@@ -213,72 +213,82 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								)}
 							</div>
 
-							<div className="w-full flex items-center gap-2">
-								{props.isSendingDisabled ? (
-									<UpgradeSubscriptionDrawer
-										triggerButtonText={
-											showConfirm
+							<div className="w-full flex items-center justify-center">
+								<div
+									className="flex items-stretch rounded-[6px] overflow-hidden"
+									style={{
+										width: '366px',
+										height: '28px',
+										border: '2px solid #5DAB68',
+										backgroundColor: 'rgba(93,171,104,0.47)',
+									}}
+								>
+									{props.isSendingDisabled ? (
+										<UpgradeSubscriptionDrawer
+											triggerButtonText={
+												showConfirm
+													? 'Click to Confirm and Send'
+													: hasSelection
+													? `Send ${selectedCount} Selected`
+													: 'Send'
+											}
+											buttonVariant="primary"
+											className={cn(
+												'flex-1 h-full !rounded-none !border-0 !text-black !font-bold !flex !items-center !justify-center border-r-2 border-[#5DAB68]',
+												hasSelection
+													? 'hover:!bg-[rgba(93,171,104,0.6)] active:!bg-[rgba(93,171,104,0.7)]'
+													: '!opacity-50 !cursor-not-allowed pointer-events-none'
+											)}
+											message={
+												props.isFreeTrial
+													? `Your free trial subscription does not include the ability to send emails. To send the emails\'ve drafted, please upgrade your subscription to the paid version.`
+													: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
+											}
+										/>
+									) : (
+										<Button
+											type="button"
+											className={cn(
+												'flex-1 h-full rounded-none font-bold flex items-center justify-center transition-all duration-200 border-r-2 border-[#5DAB68]',
+												showConfirm
+													? 'bg-[#5DAB68] text-white'
+													: 'text-black ' +
+															(hasSelection
+																? 'hover:bg-[rgba(93,171,104,0.6)] active:bg-[rgba(93,171,104,0.7)]'
+																: 'opacity-50 cursor-not-allowed')
+											)}
+											onClick={async () => {
+												if (!hasSelection) return;
+												if (!showConfirm) {
+													setShowConfirm(true);
+													setTimeout(() => setShowConfirm(false), 10000);
+													return;
+												}
+												setShowConfirm(false);
+												await props.onSend();
+											}}
+											disabled={!hasSelection}
+										>
+											{showConfirm
 												? 'Click to Confirm and Send'
 												: hasSelection
 												? `Send ${selectedCount} Selected`
-												: 'Send'
-										}
-										buttonVariant="primary"
-										className={cn(
-											'flex-1 h-[39px] !border-2 !border-[#5DAB68] !text-black !font-bold !flex !items-center !justify-center',
-											hasSelection
-												? 'hover:!bg-[rgba(93,171,104,0.6)] hover:!border-[#5DAB68] active:!bg-[rgba(93,171,104,0.7)]'
-												: '!opacity-50 !cursor-not-allowed pointer-events-none'
-										)}
-										message={
-											props.isFreeTrial
-												? `Your free trial subscription does not include the ability to send emails. To send the emails you've drafted, please upgrade your subscription to the paid version.`
-												: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
-										}
-									/>
-								) : (
+												: 'Send'}
+										</Button>
+									)}
 									<Button
 										type="button"
-										className={cn(
-											'flex-1 h-[39px] font-bold flex items-center justify-center transition-all duration-200',
-											showConfirm
-												? 'bg-[#5DAB68] border-0 text-white'
-												: 'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black ' +
-														(hasSelection
-															? 'hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]'
-															: 'opacity-50 cursor-not-allowed')
-										)}
-										onClick={async () => {
-											if (!hasSelection) return;
-											if (!showConfirm) {
-												setShowConfirm(true);
-												setTimeout(() => setShowConfirm(false), 10000);
-												return;
-											}
-											setShowConfirm(false);
-											await props.onSend();
+										variant="ghost"
+										className="w-[56px] h-full rounded-none text-black font-bold"
+										onClick={() => {
+											handleSelectAllDrafts();
+											setShowConfirm(true);
+											setTimeout(() => setShowConfirm(false), 10000);
 										}}
-										disabled={!hasSelection}
 									>
-										{showConfirm
-											? 'Click to Confirm and Send'
-											: hasSelection
-											? `Send ${selectedCount} Selected`
-											: 'Send'}
+										All
 									</Button>
-								)}
-								<Button
-									type="button"
-									variant="ghost"
-									className="w-[56px] h-[39px] border-2 border-[#5DAB68] text-black font-bold bg-[rgba(93,171,104,0.47)] hover:bg-[rgba(93,171,104,0.6)]"
-									onClick={() => {
-										handleSelectAllDrafts();
-										setShowConfirm(true);
-										setTimeout(() => setShowConfirm(false), 10000);
-									}}
-								>
-									All
-								</Button>
+								</div>
 							</div>
 						</div>
 					) : null

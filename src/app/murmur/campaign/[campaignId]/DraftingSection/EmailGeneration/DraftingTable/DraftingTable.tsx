@@ -56,11 +56,11 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						borderTopLeftRadius: '8px',
 						borderTopRightRadius: '8px',
 						borderBottom: isCompactHeader ? 'none' : '2px solid #ABABAB',
-						padding: isCompactHeader ? '6px 16px' : '12px 16px',
+						padding: isCompactHeader ? '0 10px' : '12px 16px',
 						display: 'flex',
 						justifyContent: isCompactHeader ? 'flex-end' : 'space-between',
 						alignItems: 'center',
-						height: isCompactHeader ? '32px' : '48px',
+						height: isCompactHeader ? '20px' : '48px',
 						backgroundColor: isContacts ? '#F5DADA' : isDrafts ? '#EFDAAF' : 'white',
 					}}
 				>
@@ -71,12 +71,14 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					)}
 					{hasData && (
 						<div
-							style={{ transform: isCompactHeader ? 'translateY(0)' : 'translateY(6px)' }}
+							style={{
+								transform: isCompactHeader ? 'translateY(-2px)' : 'translateY(6px)',
+							}}
 						>
 							<Button
 								type="button"
 								variant="ghost"
-								className="text-sm font-inter font-medium text-black bg-none border-none cursor-pointer p-0 hover:underline transition-colors"
+								className="!h-[18px] text-xs font-inter font-medium text-black bg-none border-none cursor-pointer p-0 m-0 leading-none hover:underline transition-colors"
 								onClick={handleClick}
 							>
 								{areAllSelected ? 'Deselect All' : 'Select All'}
@@ -116,7 +118,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					<div
 						data-drafting-table-footer
 						style={{
-							padding: isCompactHeader ? '6px 16px' : '12px 16px',
+							padding: isDrafts ? '6px 5px' : isCompactHeader ? '6px 16px' : '12px 16px',
 							backgroundColor: isContacts ? '#F5DADA' : isDrafts ? '#EFDAAF' : 'white',
 						}}
 					>
