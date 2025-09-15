@@ -264,7 +264,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				style={{
 					width: '100%',
 					minHeight: '100%',
-					border: '2px solid #000000',
+					border: '3px solid #000000',
 					borderRadius: '8px',
 					position: 'relative',
 					display: 'flex',

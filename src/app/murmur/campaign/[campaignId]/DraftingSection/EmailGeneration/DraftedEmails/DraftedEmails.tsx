@@ -327,7 +327,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										type="button"
 										variant="icon"
 										onClick={(e) => handleDeleteDraft(e, draft.id)}
-										className="absolute top-[2px] right-[2px] p-1 transition-colors z-10 group"
+										className="absolute top-[6px] right-[2px] p-1 transition-colors z-10 group"
 									>
 										<X size={16} className="text-gray-500 group-hover:text-red-500" />
 									</Button>
@@ -341,7 +341,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											e.stopPropagation();
 											handleDraftDoubleClick(draft);
 										}}
-										className="absolute top-[16px] right-[6px] p-1 transition-colors z-20"
+										className="absolute top-[28px] right-[6px] p-1 transition-colors z-20"
 										aria-label="Preview draft"
 									>
 										<PreviewIcon
