@@ -26,8 +26,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	footer,
 }) => {
 	const isContacts = title === 'Contacts';
-	const isCompactHeader = isContacts || title === 'Drafts';
-	const showTitle = !isContacts && title !== 'Drafts';
+	const isCompactHeader = isContacts || title === 'Drafts' || title === 'Sent';
+	const showTitle = !isContacts && title !== 'Drafts' && title !== 'Sent';
 	const isDrafts = title === 'Drafts';
 	const isSent = title === 'Sent';
 	return (
@@ -42,12 +42,20 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						? '2.3px solid #5D5B5B'
 						: isDrafts
 						? '2px solid #A8833A'
+						: isSent
+						? '2px solid #19670F'
 						: '2px solid #ABABAB',
 					borderRadius: '8px',
 					position: 'relative',
 					display: 'flex',
 					flexDirection: 'column',
-					backgroundColor: isContacts ? '#F5DADA' : isDrafts ? '#EFDAAF' : 'white',
+					backgroundColor: isContacts
+						? '#F5DADA'
+						: isDrafts
+						? '#EFDAAF'
+						: isSent
+						? '#C3E7BF'
+						: 'white',
 				}}
 			>
 				{/* Header section with top rounded corners */}
@@ -56,13 +64,19 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					style={{
 						borderTopLeftRadius: '8px',
 						borderTopRightRadius: '8px',
-						borderBottom: isCompactHeader ? 'none' : '2px solid #ABABAB',
+						borderBottom: isCompactHeader ? 'none !important' : '2px solid #ABABAB',
 						padding: isCompactHeader ? '0 10px' : '12px 16px',
 						display: 'flex',
 						justifyContent: isCompactHeader ? 'flex-end' : 'space-between',
 						alignItems: 'center',
 						height: isCompactHeader ? '20px' : '48px',
-						backgroundColor: isContacts ? '#F5DADA' : isDrafts ? '#EFDAAF' : 'white',
+						backgroundColor: isContacts
+							? '#F5DADA'
+							: isDrafts
+							? '#EFDAAF'
+							: isSent
+							? '#C3E7BF'
+							: 'white',
 					}}
 				>
 					{showTitle && (
@@ -120,7 +134,13 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						data-drafting-table-footer
 						style={{
 							padding: isDrafts ? '6px 5px' : isCompactHeader ? '6px 16px' : '12px 16px',
-							backgroundColor: isContacts ? '#F5DADA' : isDrafts ? '#EFDAAF' : 'white',
+							backgroundColor: isContacts
+								? '#F5DADA'
+								: isDrafts
+								? '#EFDAAF'
+								: isSent
+								? '#DAF5E0'
+								: 'white',
 						}}
 					>
 						{footer}
