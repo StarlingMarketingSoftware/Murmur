@@ -1096,7 +1096,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									? 'w-[457px] shrink-0 h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-gray-50'
 									: compactLeftOnly
 									? 'w-[350px]'
-									: 'w-full min-h-[530px]'
+									: 'w-full min-h-[530px] pt-[10px] px-[18px] pb-[18px]'
 							)}
 						>
 							{/* Subject header inside the box */}

@@ -219,8 +219,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									style={{
 										width: '366px',
 										height: '28px',
-										border: '2px solid #5DAB68',
-										backgroundColor: 'rgba(93,171,104,0.47)',
+										border: '1px solid #000000',
+										backgroundColor: 'transparent',
 									}}
 								>
 									{props.isSendingDisabled ? (
@@ -234,9 +234,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											}
 											buttonVariant="primary"
 											className={cn(
-												'flex-1 h-full !rounded-none !border-0 !text-black !font-inter !font-medium !text-[14px] !flex !items-center !justify-center border-r-2 border-[#5DAB68]',
+												'flex-1 h-full !rounded-none !border-0 !bg-[#68C575] !text-black !font-inter !font-medium !text-[14px] !flex !items-center !justify-center border-r border-[#000000]',
 												hasSelection
-													? 'hover:!bg-[rgba(93,171,104,0.6)] active:!bg-[rgba(93,171,104,0.7)]'
+													? 'hover:!bg-[#5FA968] active:!bg-[#569D60]'
 													: '!opacity-50 !cursor-not-allowed pointer-events-none'
 											)}
 											message={
@@ -249,13 +249,12 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										<Button
 											type="button"
 											className={cn(
-												'flex-1 h-full rounded-none font-inter font-medium text-[14px] flex items-center justify-center transition-all duration-200 border-r-2 border-[#5DAB68]',
+												'flex-1 h-full rounded-none font-inter font-medium text-[14px] flex items-center justify-center transition-all duration-200 border-r border-[#000000]',
 												showConfirm
-													? 'bg-[#5DAB68] text-white'
-													: 'text-black ' +
-															(hasSelection
-																? 'hover:bg-[rgba(93,171,104,0.6)] active:bg-[rgba(93,171,104,0.7)]'
-																: 'opacity-50 cursor-not-allowed')
+													? 'bg-[#68C575] text-black'
+													: hasSelection
+													? 'bg-[#68C575] text-black hover:bg-[#5FA968] active:bg-[#569D60]'
+													: 'bg-[#68C575] text-black opacity-50 cursor-not-allowed'
 											)}
 											onClick={async () => {
 												if (!hasSelection) return;
