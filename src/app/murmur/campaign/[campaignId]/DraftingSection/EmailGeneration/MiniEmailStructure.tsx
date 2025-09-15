@@ -275,9 +275,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 			>
 				{/* Content area - miniature, but interactive */}
 				<div className="flex-1 overflow-visible">
-					<div className="p-3">
+					<div className="pt-2 px-3 pb-3">
 						{/* Mode */}
-						<div className="flex items-center gap-4 mb-2">
+						<div className="flex items-center gap-4 mb-1">
 							<span className="font-inter font-semibold text-[13px]">Mode</span>
 							<div ref={modeContainerRef} className="relative flex items-center gap-6">
 								<div
@@ -291,7 +291,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									<div
 										style={{
 											width: '80.38px',
-											height: '19px',
+											height: '17px',
 											backgroundColor: getModeBackgroundColor(),
 											border: '1.3px solid #000000',
 											borderRadius: '8px',
@@ -302,7 +302,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									ref={aiButtonRef}
 									type="button"
 									className={cn(
-										'text-[11px] font-inter font-semibold px-4 py-1 rounded-md cursor-pointer text-center relative z-20',
+										'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20',
 										draftingMode === 'ai'
 											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
@@ -315,7 +315,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									ref={hybridButtonRef}
 									type="button"
 									className={cn(
-										'text-[11px] font-inter font-semibold px-4 py-1 rounded-md cursor-pointer text-center relative z-20',
+										'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20',
 										draftingMode === 'hybrid'
 											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
@@ -328,7 +328,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									ref={handwrittenButtonRef}
 									type="button"
 									className={cn(
-										'text-[11px] font-inter font-semibold px-4 py-1 rounded-md cursor-pointer text-center relative z-20',
+										'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20',
 										draftingMode === 'handwritten'
 											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
@@ -340,11 +340,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							</div>
 						</div>
 
-						<div className="h-[2px] bg-black -mx-3 mb-2" />
+						<div className="h-[2px] bg-black -mx-3 mb-1" />
 
 						{/* Auto Subject */}
-						<div className="mb-2">
-							<div className="flex items-center h-[28px] rounded-[8px] border-2 border-black overflow-hidden">
+						<div className="mb-1">
+							<div className="flex items-center h-[25px] rounded-[8px] border-2 border-black overflow-hidden">
 								<div className="pl-2 flex items-center h-full shrink-0 w-[90px] bg-white">
 									<span className="font-inter font-semibold text-[13px] text-black">
 										{isAiSubject ? 'Auto Subject' : 'Subject'}
