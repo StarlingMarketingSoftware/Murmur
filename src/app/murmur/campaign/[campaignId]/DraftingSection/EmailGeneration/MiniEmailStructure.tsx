@@ -269,83 +269,89 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					position: 'relative',
 					display: 'flex',
 					flexDirection: 'column',
-					background: 'white',
+					background: '#DEF2E1',
 					overflow: 'visible',
 				}}
 			>
 				{/* Content area - miniature, but interactive */}
 				<div className="flex-1 overflow-visible">
-					<div className="pt-2 px-3 pb-3">
+					<div className="px-0 pb-3">
 						{/* Mode */}
-						<div className="flex items-center gap-4 mb-1">
-							<span className="font-inter font-semibold text-[13px]">Mode</span>
-							<div ref={modeContainerRef} className="relative flex items-center gap-6">
-								<div
-									className="absolute top-1/2 -translate-y-1/2 z-10 pointer-events-none"
-									style={{
-										left: highlightStyle.left,
-										transition: 'left 0.25s ease-in-out, opacity 0.2s ease-in-out',
-										opacity: highlightStyle.opacity,
-									}}
-								>
+						<div className="w-full bg-white pt-2 rounded-t-[5px]">
+							<div className="flex items-center gap-4 mb-1 w-[357px] mx-auto">
+								<span className="font-inter font-semibold text-[13px]">Mode</span>
+								<div ref={modeContainerRef} className="relative flex items-center gap-6">
 									<div
+										className="absolute top-1/2 -translate-y-1/2 z-10 pointer-events-none"
 										style={{
-											width: '80.38px',
-											height: '17px',
-											backgroundColor: getModeBackgroundColor(),
-											border: '1.3px solid #000000',
-											borderRadius: '8px',
+											left: highlightStyle.left,
+											transition: 'left 0.25s ease-in-out, opacity 0.2s ease-in-out',
+											opacity: highlightStyle.opacity,
 										}}
-									/>
+									>
+										<div
+											style={{
+												width: '80.38px',
+												height: '17px',
+												backgroundColor: getModeBackgroundColor(),
+												border: '1.3px solid #000000',
+												borderRadius: '8px',
+											}}
+										/>
+									</div>
+									<button
+										ref={aiButtonRef}
+										type="button"
+										className={cn(
+											'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20',
+											draftingMode === 'ai'
+												? 'text-black'
+												: 'text-[#6B6B6B] hover:text-black'
+										)}
+										onClick={() => setMode('ai')}
+									>
+										Full Auto
+									</button>
+									<button
+										ref={hybridButtonRef}
+										type="button"
+										className={cn(
+											'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20',
+											draftingMode === 'hybrid'
+												? 'text-black'
+												: 'text-[#6B6B6B] hover:text-black'
+										)}
+										onClick={() => setMode('hybrid')}
+									>
+										Hybrid
+									</button>
+									<button
+										ref={handwrittenButtonRef}
+										type="button"
+										className={cn(
+											'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20',
+											draftingMode === 'handwritten'
+												? 'text-black'
+												: 'text-[#6B6B6B] hover:text-black'
+										)}
+										onClick={() => setMode('handwritten')}
+									>
+										Manual
+									</button>
 								</div>
-								<button
-									ref={aiButtonRef}
-									type="button"
-									className={cn(
-										'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20',
-										draftingMode === 'ai'
-											? 'text-black'
-											: 'text-[#6B6B6B] hover:text-black'
-									)}
-									onClick={() => setMode('ai')}
-								>
-									Full Auto
-								</button>
-								<button
-									ref={hybridButtonRef}
-									type="button"
-									className={cn(
-										'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20',
-										draftingMode === 'hybrid'
-											? 'text-black'
-											: 'text-[#6B6B6B] hover:text-black'
-									)}
-									onClick={() => setMode('hybrid')}
-								>
-									Hybrid
-								</button>
-								<button
-									ref={handwrittenButtonRef}
-									type="button"
-									className={cn(
-										'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20',
-										draftingMode === 'handwritten'
-											? 'text-black'
-											: 'text-[#6B6B6B] hover:text-black'
-									)}
-									onClick={() => setMode('handwritten')}
-								>
-									Manual
-								</button>
 							</div>
+							<div className="h-[2px] bg-black w-full mb-1" />
 						</div>
 
-						<div className="h-[2px] bg-black -mx-3 mb-1" />
-
 						{/* Auto Subject */}
-						<div className="mb-1">
-							<div className="flex items-center h-[25px] rounded-[8px] border-2 border-black overflow-hidden">
-								<div className="pl-2 flex items-center h-full shrink-0 w-[90px] bg-white">
+						<div className="mb-3 w-[357px] mx-auto">
+							<div
+								className={cn(
+									'flex items-center h-[25px] rounded-[8px] border-2 border-black overflow-hidden',
+									isAiSubject ? 'bg-[#E0E0E0]' : 'bg-white'
+								)}
+							>
+								<div className="pl-2 flex items-center h-full shrink-0 w-[90px] bg-transparent">
 									<span className="font-inter font-semibold text-[13px] text-black">
 										{isAiSubject ? 'Auto Subject' : 'Subject'}
 									</span>
@@ -366,13 +372,13 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								<div
 									className={cn(
 										'flex-grow h-full flex items-center px-2',
-										isAiSubject ? 'bg-transparent' : 'bg-white'
+										'bg-transparent'
 									)}
 								>
 									<input
 										type="text"
 										className={cn(
-											'w-full text-[12px] leading-tight outline-none focus:outline-none',
+											'w-full text-[12px] leading-tight outline-none focus:outline-none bg-transparent',
 											isAiSubject
 												? 'text-[#6B6B6B] italic cursor-not-allowed'
 												: 'text-black'
@@ -410,7 +416,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										<Fragment key={b.id}>
 											<div
 												className={cn(
-													'rounded-[8px] border-2 bg-[#DADAFC] overflow-visible relative',
+													'rounded-[8px] border-2 bg-[#DADAFC] overflow-visible relative w-[357px] mx-auto',
 													isExpanded ? 'h-[78px]' : 'h-[31px]'
 												)}
 												style={{ borderColor: strokeColor }}
@@ -541,7 +547,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								return (
 									<Fragment key={b.id}>
 										<div
-											className={cn('rounded-[8px] border-2 bg-white px-2 py-1 relative')}
+											className={cn(
+												'rounded-[8px] border-2 bg-white px-2 py-1 relative w-[357px] mx-auto'
+											)}
 											style={{
 												borderColor:
 													(draftingMode === 'handwritten' || draftingMode === 'hybrid') &&
@@ -637,9 +645,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				</div>
 
 				{/* Signature - fixed at bottom (outside scroll) */}
-				<div className="px-3 pb-2">
+				<div className="px-0 pb-2">
 					<div
-						className="rounded-[8px] border-2 bg-white px-2 py-2"
+						className="rounded-[8px] border-2 bg-white px-2 py-2 w-[357px] mx-auto"
 						style={{ borderColor: '#969696' }}
 					>
 						<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
@@ -654,16 +662,13 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				</div>
 
 				{/* Footer with Draft button */}
-				<div className="px-3 pb-3">
+				<div className="px-0 pb-3">
 					<Button
 						type="button"
 						onClick={onDraft}
 						disabled={isDraftDisabled}
 						className={cn(
-							'w-full h-[32px] font-bold flex items-center justify-center',
-							isDraftDisabled
-								? 'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black opacity-50 cursor-not-allowed'
-								: 'bg-[rgba(93,171,104,0.47)] border-2 border-[#5DAB68] text-black hover:bg-[rgba(93,171,104,0.6)] hover:border-[#5DAB68] active:bg-[rgba(93,171,104,0.7)]'
+							'w-[357px] !h-[28px] mx-auto !rounded-[4px] border border-black bg-[#68C575] text-black font-inter font-medium text-[14px] flex items-center justify-center'
 						)}
 					>
 						{isPendingGeneration ? 'Drafting...' : 'Draft'}

@@ -234,7 +234,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											}
 											buttonVariant="primary"
 											className={cn(
-												'flex-1 h-full !rounded-none !border-0 !text-black !font-bold !flex !items-center !justify-center border-r-2 border-[#5DAB68]',
+												'flex-1 h-full !rounded-none !border-0 !text-black !font-inter !font-medium !text-[14px] !flex !items-center !justify-center border-r-2 border-[#5DAB68]',
 												hasSelection
 													? 'hover:!bg-[rgba(93,171,104,0.6)] active:!bg-[rgba(93,171,104,0.7)]'
 													: '!opacity-50 !cursor-not-allowed pointer-events-none'
@@ -249,7 +249,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										<Button
 											type="button"
 											className={cn(
-												'flex-1 h-full rounded-none font-bold flex items-center justify-center transition-all duration-200 border-r-2 border-[#5DAB68]',
+												'flex-1 h-full rounded-none font-inter font-medium text-[14px] flex items-center justify-center transition-all duration-200 border-r-2 border-[#5DAB68]',
 												showConfirm
 													? 'bg-[#5DAB68] text-white'
 													: 'text-black ' +
@@ -279,7 +279,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									<Button
 										type="button"
 										variant="ghost"
-										className="w-[56px] h-full rounded-none text-black font-bold"
+										className="w-[56px] h-full rounded-none text-black font-inter font-medium text-[14px]"
 										onClick={() => {
 											handleSelectAllDrafts();
 											setShowConfirm(true);
