@@ -7,7 +7,6 @@ import { IdentityDialog } from '@/components/organisms/_dialogs/IdentityDialog/I
 import { CampaignName } from '@/components/organisms/CampaignName/CampaignName';
 import { Typography } from '@/components/ui/typography';
 import { DraftingSection } from './DraftingSection/DraftingSection';
-import { SentEmailsTable } from '@/components/organisms/_tables/SentEmailsTable/SentEmailsTable';
 import { useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import Link from 'next/link';
@@ -140,9 +139,6 @@ const Murmur = () => {
 
 					<div className="mt-6 flex justify-center">
 						<DraftingSection campaign={campaign} />
-					</div>
-					<div className="flex justify-center">
-						<SentEmailsTable campaign={campaign} />
 					</div>
 				</div>
 			)}

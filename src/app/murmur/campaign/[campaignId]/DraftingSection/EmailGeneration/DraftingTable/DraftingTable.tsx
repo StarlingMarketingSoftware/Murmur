@@ -29,6 +29,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	const isCompactHeader = isContacts || title === 'Drafts';
 	const showTitle = !isContacts && title !== 'Drafts';
 	const isDrafts = title === 'Drafts';
+	const isSent = title === 'Sent';
 	return (
 		<div style={{ width: '376px', height: '474px', position: 'relative' }}>
 			{/* Container box with header */}
@@ -69,7 +70,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							<div className="text-sm font-inter font-medium text-black">{title}</div>
 						</div>
 					)}
-					{hasData && (
+					{hasData && !isSent && (
 						<div
 							style={{
 								transform: isCompactHeader ? 'translateY(-2px)' : 'translateY(6px)',
