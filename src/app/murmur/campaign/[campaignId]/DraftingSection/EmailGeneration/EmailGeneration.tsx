@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { ContactsSelection } from './ContactsSelection/ContactsSelection';
 import { DraftedEmails } from './DraftedEmails/DraftedEmails';
 import { MiniEmailStructure } from './MiniEmailStructure';
+import { SentEmails } from './SentEmails/SentEmails';
 
 export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	const {
@@ -47,6 +48,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		isPendingEmails,
 		handleDraftButtonClick,
 		scrollToEmailStructure,
+		sentEmails,
 	} = useEmailGeneration(props);
 
 	// Send email hooks
@@ -213,7 +215,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 					<div
 						data-drafting-container
 						className={cn(
-							'relative w-[1208px] h-[620px] rounded-lg overflow-x-hidden p-[17px]'
+							'relative w-[1700px] h-[620px] rounded-lg overflow-x-hidden p-[17px]'
 						)}
 					>
 						{/* Tables container - positioned at bottom */}
@@ -266,6 +268,9 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 								fromEmail={campaign?.identity?.email}
 								subject={form.watch('subject')}
 							/>
+
+							{/* Sent emails */}
+							<SentEmails emails={sentEmails} isPendingEmails={isPendingEmails} />
 						</div>
 					</div>
 				</div>

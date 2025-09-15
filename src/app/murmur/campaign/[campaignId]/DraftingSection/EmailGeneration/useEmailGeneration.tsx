@@ -80,6 +80,10 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		emails?.filter((email: EmailWithRelations) => email.status === EmailStatus.draft) ||
 		[];
 
+	const sentEmails =
+		emails?.filter((email: EmailWithRelations) => email.status === EmailStatus.sent) ||
+		[];
+
 	/* HANDLERS */
 
 	const executeDraftNow = async () => {
@@ -214,5 +218,6 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		isPendingEmails,
 		handleDraftButtonClick,
 		scrollToEmailStructure,
+		sentEmails,
 	};
 };
