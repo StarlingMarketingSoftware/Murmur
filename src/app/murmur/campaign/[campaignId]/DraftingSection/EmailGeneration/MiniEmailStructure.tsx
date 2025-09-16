@@ -71,21 +71,23 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				(b) => b.type === 'introduction' || b.type === 'research' || b.type === 'action'
 			);
 
-			for (const b of hybridCoreBlocks) {
-				const blockEl = blockRefs.current[b.id];
-				if (!blockEl) continue;
-				const blockRect = blockEl.getBoundingClientRect();
-				// Place button a little below the block bottom
-				const buttonTop = blockRect.top - rootRect.top + blockRect.height + 20;
-				positions.push(buttonTop);
-			}
+			// Fixed offset for all buttons below their blocks
+			const buttonOffset = 2; // Consistent distance below each block
 
-			// Ensure buttons never overlap and keep a minimal vertical gap
-			const buttonHeight = 20; // matches .h-[20px]
-			const minGap = 6; // extra breathing room between buttons
-			for (let i = 1; i < positions.length; i++) {
-				const minAllowed = positions[i - 1] + buttonHeight + minGap;
-				if (positions[i] < minAllowed) positions[i] = minAllowed;
+			const container = buttonContainerRef.current;
+			const containerRect = container?.getBoundingClientRect();
+
+			for (const block of hybridCoreBlocks) {
+				const blockEl = blockRefs.current[block.id];
+				if (!blockEl || !containerRect || !container) continue;
+
+				// Compute Y relative to the scroll container to avoid drift
+				// yWithinContainer: block's bottom inside the scroll area, plus fixed offset
+				const yWithinContainer =
+					blockEl.offsetTop + blockEl.offsetHeight + buttonOffset - container.scrollTop;
+				// Convert container-relative Y to root-relative Y for absolute positioning
+				const buttonTop = containerRect.top - rootRect.top + yWithinContainer;
+				positions.push(buttonTop);
 			}
 		}
 		setAddTextButtonsY(positions);
@@ -815,7 +817,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								position: 'absolute',
 								top: `${y}px`,
 								right: 0,
-								transform: 'translateY(-50%)',
 								pointerEvents: 'all',
 							}}
 						>
