@@ -591,12 +591,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															)}
 														</div>
 														<div className="flex flex-row h-full items-stretch">
-															<div
-																className={cn(
-																	'border-l border-black',
-																	isExpanded ? 'h-[21px]' : 'h-[27px]'
-																)}
-															/>
+															<div className={cn('border-l border-black h-full')} />
 															<button
 																type="button"
 																onClick={() => {
@@ -611,7 +606,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																	});
 																}}
 																className={cn(
-																	'w-[75px] h-full flex items-center justify-center text-[11px] cursor-pointer appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none',
+																	'w-[75px] h-full flex items-center justify-center text-[11px] leading-none cursor-pointer appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none',
 																	isExpanded
 																		? 'text-white bg-[#5353AF] hover:bg-[#4a4a9d]'
 																		: 'text-black/80 hover:bg-black/5'
@@ -619,16 +614,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															>
 																Advanced
 															</button>
-															<div
-																className={cn(
-																	'border-l border-black',
-																	isExpanded ? 'h-[21px]' : 'h-[27px]'
-																)}
-															/>
+															<div className={cn('border-l border-black h-full')} />
 															<button
 																type="button"
 																onClick={() => removeBlock(b.id)}
-																className="w-[30px] h-full flex items-center justify-center text-[18px] font-bold text-red-600 hover:bg-black/10 appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none"
+																className="w-[30px] h-full flex items-center justify-center text-[18px] leading-none font-bold text-red-600 hover:bg-black/10 appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none"
 																aria-label="Remove block"
 															>
 																×
