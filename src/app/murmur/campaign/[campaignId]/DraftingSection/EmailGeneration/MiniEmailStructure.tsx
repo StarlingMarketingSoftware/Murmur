@@ -792,13 +792,13 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										? '#1010E7'
 										: '#0E0E7F';
 								return (
-									<div className="w-[357px] mx-auto -mt-2 flex flex-col gap-2">
+									<div className="w-[357px] mx-auto mt-0 flex flex-col gap-2">
 										{missing.map((t) => (
 											<div key={`mini-ph-${t}`} className="flex justify-end">
 												<Button
 													type="button"
 													onClick={() => addHybridBlock(t)}
-													className="w-[76px] h-[30px] bg-white hover:bg-stone-100 active:bg-stone-200 border-2 rounded-[8px] !font-normal text-[10px] text-black inline-flex items-center justify-start gap-[4px] pl-[4px]"
+													className="w-[76px] h-[26px] bg-white hover:bg-stone-100 active:bg-stone-200 border-2 rounded-[6px] !font-normal text-[10px] text-black inline-flex items-center justify-start gap-[4px] pl-[4px]"
 													style={{ borderColor: colorFor(t) }}
 													title={`Add ${labelFor(t)}`}
 												>
