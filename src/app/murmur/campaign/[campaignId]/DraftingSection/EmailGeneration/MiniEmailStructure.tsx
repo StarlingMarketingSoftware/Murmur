@@ -1,4 +1,13 @@
-import { FC, useMemo, useState, useRef, Fragment, useEffect } from 'react';
+import {
+	FC,
+	useMemo,
+	useState,
+	useRef,
+	Fragment,
+	useEffect,
+	useLayoutEffect,
+	useCallback,
+} from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { DraftingFormValues } from '../useDraftingSection';
 import { Button } from '@/components/ui/button';
@@ -27,12 +36,17 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	generationTotal,
 	onCancel,
 }) => {
-	const hybridBlocks = form.watch('hybridBlockPrompts') || [];
+	const watchedHybridBlocks = form.watch('hybridBlockPrompts');
+	const hybridBlocks = useMemo(() => watchedHybridBlocks || [], [watchedHybridBlocks]);
 	const isAiSubject = form.watch('isAiSubject');
 	const signature = form.watch('signature') || '';
 
 	// Track which blocks are expanded
 	const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
+
+	const buttonContainerRef = useRef<HTMLDivElement>(null);
+	const rootRef = useRef<HTMLDivElement>(null);
+	const blockRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
 	const draftingMode = useMemo(() => {
 		const hasFullAutomatedBlock = hybridBlocks?.some(
@@ -45,6 +59,79 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [hybridBlocks?.length, hybridBlocks?.map((b) => b.type).join(',')]);
 
+	const [addTextButtonsY, setAddTextButtonsY] = useState<number[]>([]);
+	const blockIds = useMemo(() => hybridBlocks.map((b) => b.id).join(','), [hybridBlocks]);
+
+	// Calculate absolute Y positions for the +Text buttons relative to root
+	const recomputeAddButtonPositions = useCallback(() => {
+		const positions: number[] = [];
+		if (draftingMode === 'hybrid' && rootRef.current) {
+			const rootRect = rootRef.current.getBoundingClientRect();
+			const hybridCoreBlocks = hybridBlocks.filter(
+				(b) => b.type === 'introduction' || b.type === 'research' || b.type === 'action'
+			);
+
+			for (const b of hybridCoreBlocks) {
+				const blockEl = blockRefs.current[b.id];
+				if (!blockEl) continue;
+				const blockRect = blockEl.getBoundingClientRect();
+				// Place button a little below the block bottom
+				const buttonTop = blockRect.top - rootRect.top + blockRect.height + 20;
+				positions.push(buttonTop);
+			}
+
+			// Ensure buttons never overlap and keep a minimal vertical gap
+			const buttonHeight = 20; // matches .h-[20px]
+			const minGap = 6; // extra breathing room between buttons
+			for (let i = 1; i < positions.length; i++) {
+				const minAllowed = positions[i - 1] + buttonHeight + minGap;
+				if (positions[i] < minAllowed) positions[i] = minAllowed;
+			}
+		}
+		setAddTextButtonsY(positions);
+	}, [draftingMode, hybridBlocks]);
+
+	// Recompute when blocks change/expand/collapse
+	useLayoutEffect(() => {
+		recomputeAddButtonPositions();
+	}, [recomputeAddButtonPositions]);
+
+	// Keep positions in sync on scroll and resize to avoid drift/overlap
+	useEffect(() => {
+		const container = buttonContainerRef.current;
+		if (!container) return;
+		let rafId = 0 as number | 0;
+		const schedule = () => {
+			if (rafId) return;
+			rafId = requestAnimationFrame(() => {
+				rafId = 0;
+				recomputeAddButtonPositions();
+			});
+		};
+
+		container.addEventListener('scroll', schedule, {
+			passive: true,
+		} as AddEventListenerOptions);
+		window.addEventListener('resize', schedule);
+
+		// Observe size changes of container and blocks
+		const ro = new ResizeObserver(() => schedule());
+		ro.observe(container);
+		Object.values(blockRefs.current).forEach((el) => {
+			if (el) ro.observe(el);
+		});
+
+		// Initial run after listeners attach
+		schedule();
+
+		return () => {
+			container.removeEventListener('scroll', schedule as EventListener);
+			window.removeEventListener('resize', schedule);
+			ro.disconnect();
+			if (rafId) cancelAnimationFrame(rafId);
+		};
+	}, [recomputeAddButtonPositions, blockIds, draftingMode]);
+
 	// Ensure the mini structure never appears empty by keeping at least one block present
 	useEffect(() => {
 		const currentBlocks = form.getValues('hybridBlockPrompts') || [];
@@ -53,16 +140,22 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				'hybridBlockPrompts',
 				[
 					{
-						id: `text_${Date.now()}`,
-						type: 'text' as HybridBlock,
+						id: 'introduction',
+						type: 'introduction' as HybridBlock,
 						value: '',
 					},
+					{
+						id: 'research',
+						type: 'research' as HybridBlock,
+						value: '',
+					},
+					{ id: 'action', type: 'action' as HybridBlock, value: '' },
 				],
 				{ shouldDirty: true }
 			);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [hybridBlocks?.length]);
+	}, []);
 
 	const blockLabel = (type: HybridBlock) => {
 		switch (type) {
@@ -252,6 +345,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 
 	return (
 		<div
+			ref={rootRef}
 			style={{
 				width: '376px',
 				height: '474px',
@@ -274,7 +368,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				}}
 			>
 				{/* Content area - miniature, but interactive */}
-				<div className="flex-1 overflow-y-auto overflow-x-visible max-h-[300px]">
+				<div
+					ref={buttonContainerRef}
+					className="flex-1 overflow-y-auto overflow-x-visible max-h-[300px]"
+				>
 					<div className="px-0 pb-3">
 						{/* Mode */}
 						<div className="w-full bg-white pt-2 rounded-t-[5px]">
@@ -397,8 +494,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						</div>
 
 						{/* Blocks list - overflow visible to show buttons outside */}
-						<div className="flex flex-col gap-2 overflow-visible">
-							{hybridBlocks.map((b, i) => {
+						<div className="flex flex-col gap-[25px] overflow-visible">
+							{hybridBlocks.map((b) => {
 								const isHybridCore =
 									b.type === 'introduction' ||
 									b.type === 'research' ||
@@ -415,6 +512,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									return (
 										<Fragment key={b.id}>
 											<div
+												ref={(el) => {
+													blockRefs.current[b.id] = el;
+												}}
 												className={cn(
 													'rounded-[8px] border-2 bg-[#DADAFC] overflow-visible relative w-[357px] mx-auto',
 													isExpanded ? 'h-[78px]' : 'h-[31px]'
@@ -507,39 +607,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											</div>
 
 											{/* Plus button for hybrid blocks - positioned outside the box */}
-											{(() => {
-												const nextBlock = hybridBlocks[i + 1];
-												if (nextBlock?.type === 'text') return null;
-
-												return (
-													<div
-														className="flex justify-end"
-														style={{
-															marginTop: '3px',
-															marginBottom: '-3px',
-															marginRight: '-28px',
-															position: 'relative',
-															zIndex: 50,
-														}}
-													>
-														<Button
-															type="button"
-															onClick={() => addTextBlockAt(i)}
-															className={cn(
-																'w-[52px] h-[20px] bg-white hover:bg-stone-100 active:bg-stone-200 border border-[#5DAB68] rounded-[4px] !font-normal text-[10px] text-black flex items-center justify-center gap-1'
-															)}
-															title="Text block"
-														>
-															<TinyPlusIcon
-																width="5px"
-																height="5px"
-																className="!w-[8px] !h-[8px]"
-															/>
-															<span className="font-secondary">Text</span>
-														</Button>
-													</div>
-												);
-											})()}
+											{/* This is now handled by the absolute positioned container */}
 										</Fragment>
 									);
 								}
@@ -723,6 +791,48 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							</div>
 						)}
 				</div>
+			</div>
+			<div
+				className="absolute top-0 right-[-18px] z-50 flex flex-col"
+				style={{ pointerEvents: 'none' }}
+			>
+				{addTextButtonsY.map((y, index) => {
+					// This logic to find blockIndex is a bit convoluted now
+					// because we are iterating over a filtered list for y positions.
+					// We need to find the original index of the hybridCoreBlock
+					const hybridCoreBlocks = hybridBlocks.filter(
+						(b) =>
+							b.type === 'introduction' || b.type === 'research' || b.type === 'action'
+					);
+					const blockId = hybridCoreBlocks[index]?.id;
+					if (!blockId) return null;
+					const blockIndex = hybridBlocks.findIndex((b) => b.id === blockId);
+
+					return (
+						<div
+							key={`add-btn-${index}`}
+							style={{
+								position: 'absolute',
+								top: `${y}px`,
+								right: 0,
+								transform: 'translateY(-50%)',
+								pointerEvents: 'all',
+							}}
+						>
+							<Button
+								type="button"
+								onClick={() => addTextBlockAt(blockIndex)}
+								className={cn(
+									'w-[52px] h-[20px] bg-white hover:bg-stone-100 active:bg-stone-200 border border-[#5DAB68] rounded-[4px] !font-normal text-[10px] text-black flex items-center justify-center gap-1'
+								)}
+								title="Text block"
+							>
+								<TinyPlusIcon width="5px" height="5px" className="!w-[8px] !h-[8px]" />
+								<span className="font-secondary">Text</span>
+							</Button>
+						</div>
+					);
+				})}
 			</div>
 		</div>
 	);
