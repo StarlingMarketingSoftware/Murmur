@@ -59,12 +59,14 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [hybridBlocks?.length, hybridBlocks?.map((b) => b.type).join(',')]);
 
-	const [addTextButtonsY, setAddTextButtonsY] = useState<number[]>([]);
+	const [addTextButtons, setAddTextButtons] = useState<
+		Array<{ blockId: string; top: number; show: boolean }>
+	>([]);
 	const blockIds = useMemo(() => hybridBlocks.map((b) => b.id).join(','), [hybridBlocks]);
 
-	// Calculate absolute Y positions for the +Text buttons relative to root
+	// Calculate absolute Y positions for the +Text buttons relative to root and whether each should be shown
 	const recomputeAddButtonPositions = useCallback(() => {
-		const positions: number[] = [];
+		const nextButtons: Array<{ blockId: string; top: number; show: boolean }> = [];
 		if (draftingMode === 'hybrid' && rootRef.current) {
 			const rootRect = rootRef.current.getBoundingClientRect();
 			const hybridCoreBlocks = hybridBlocks.filter(
@@ -87,10 +89,16 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					blockEl.offsetTop + blockEl.offsetHeight + buttonOffset - container.scrollTop;
 				// Convert container-relative Y to root-relative Y for absolute positioning
 				const buttonTop = containerRect.top - rootRect.top + yWithinContainer;
-				positions.push(buttonTop);
+				const indexInAll = hybridBlocks.findIndex((b) => b.id === block.id);
+				const hasImmediateTextBlock = hybridBlocks[indexInAll + 1]?.type === 'text';
+				nextButtons.push({
+					blockId: block.id,
+					top: buttonTop,
+					show: !hasImmediateTextBlock,
+				});
 			}
 		}
-		setAddTextButtonsY(positions);
+		setAddTextButtons(nextButtons);
 	}, [draftingMode, hybridBlocks]);
 
 	// Recompute when blocks change/expand/collapse
@@ -795,24 +803,16 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				className="absolute top-0 right-[-18px] z-50 flex flex-col"
 				style={{ pointerEvents: 'none' }}
 			>
-				{addTextButtonsY.map((y, index) => {
-					// This logic to find blockIndex is a bit convoluted now
-					// because we are iterating over a filtered list for y positions.
-					// We need to find the original index of the hybridCoreBlock
-					const hybridCoreBlocks = hybridBlocks.filter(
-						(b) =>
-							b.type === 'introduction' || b.type === 'research' || b.type === 'action'
-					);
-					const blockId = hybridCoreBlocks[index]?.id;
-					if (!blockId) return null;
-					const blockIndex = hybridBlocks.findIndex((b) => b.id === blockId);
-
+				{addTextButtons.map((btn, index) => {
+					if (!btn.show) return null;
+					const blockIndex = hybridBlocks.findIndex((b) => b.id === btn.blockId);
+					if (blockIndex === -1) return null;
 					return (
 						<div
-							key={`add-btn-${index}`}
+							key={`add-btn-${btn.blockId}-${index}`}
 							style={{
 								position: 'absolute',
-								top: `${y}px`,
+								top: `${btn.top}px`,
 								right: 0,
 								pointerEvents: 'all',
 							}}
