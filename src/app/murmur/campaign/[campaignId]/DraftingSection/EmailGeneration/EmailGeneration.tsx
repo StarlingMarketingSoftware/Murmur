@@ -210,7 +210,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 					</Button>
 				)}
 			</div>
-			<div className="flex gap-[47px] items-start">
+			<div className="flex gap-[47px] items-start justify-center">
 				<div className="flex-shrink-0">
 					<div
 						data-drafting-container
