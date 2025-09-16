@@ -591,7 +591,12 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															)}
 														</div>
 														<div className="flex flex-row h-full items-stretch">
-															<div className={cn('border-l border-black h-full')} />
+															<div
+																className={cn(
+																	'border-l border-black',
+																	isExpanded ? 'h-[21px]' : 'h-[27px]'
+																)}
+															/>
 															<button
 																type="button"
 																onClick={() => {
@@ -614,7 +619,12 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															>
 																Advanced
 															</button>
-															<div className={cn('border-l border-black h-full')} />
+															<div
+																className={cn(
+																	'border-l border-black',
+																	isExpanded ? 'h-[21px]' : 'h-[27px]'
+																)}
+															/>
 															<button
 																type="button"
 																onClick={() => removeBlock(b.id)}
