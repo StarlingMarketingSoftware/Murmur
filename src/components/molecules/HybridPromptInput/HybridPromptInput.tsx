@@ -1098,7 +1098,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									? 'w-[457px] shrink-0 h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-gray-50'
 									: compactLeftOnly
 									? 'w-[350px]'
-									: 'w-full min-h-[686px] pt-[10px] px-0 pb-[18px]'
+									: 'w-full min-h-0 pt-[10px] px-0 pb-0 flex-1'
 							)}
 						>
 							{/* Subject header inside the box */}
@@ -1515,17 +1515,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							</div>
 
 							{/*  Signature Block */}
-							<div
-								className={cn(
-									'px-3 pb-0 pt-12 flex justify-center',
-									showTestPreview && selectedModeKey === 'full' ? 'mt-0 pt-4' : 'mt-6'
-								)}
-							>
+							<div className={cn('px-3 pb-0 pt-0 flex justify-center mt-auto')}>
 								<FormField
 									control={form.control}
 									name="signature"
 									render={({ field }) => (
-										<FormItem>
+										<FormItem className="mb-[9px]">
 											<div
 												className={cn(
 													`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
@@ -1561,12 +1556,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 						{compactLeftOnly ? null : (
 							<div
 								className={cn(
-									'flex flex-col items-center px-3',
+									'flex flex-col items-center px-3 mt-auto',
 									showTestPreview && 'hidden'
 								)}
 							>
 								{/* Test button and notices hidden in compact mode */}
-								<div className="flex justify-center mt-4 mb-4 w-full">
+								<div className="flex justify-center mt-[9px] mb-4 w-full">
 									<Button
 										type="button"
 										onClick={() => {
