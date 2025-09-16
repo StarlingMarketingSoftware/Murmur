@@ -1103,7 +1103,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 						>
 							{/* Subject header inside the box */}
 							<div className="pt-0 pb-0">
-								<div className="h-[36px] flex items-center relative z-20">
+								<div
+									className={cn(
+										'h-[36px] flex items-center relative z-20',
+										showTestPreview
+											? 'w-[426px] mx-auto pl-[8px]'
+											: 'w-[868px] mx-auto pl-[8px]'
+									)}
+								>
 									<span
 										className={cn(
 											'font-inter font-semibold text-[17px] mr-[56px] text-black'
