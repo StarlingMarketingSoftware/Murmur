@@ -274,7 +274,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				}}
 			>
 				{/* Content area - miniature, but interactive */}
-				<div className="flex-1 overflow-visible">
+				<div className="flex-1 overflow-y-auto overflow-x-visible max-h-[300px]">
 					<div className="px-0 pb-3">
 						{/* Mode */}
 						<div className="w-full bg-white pt-2 rounded-t-[5px]">
@@ -612,7 +612,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 														<textarea
 															className={cn(
 																'border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 w-full max-w-full min-w-0',
-																'h-[120px] py-2 pr-2 px-0 resize-none',
+																'h-[70px] py-2 pr-2 px-0 resize-none',
 																'bg-white text-[12px] leading-[16px]'
 															)}
 															placeholder=""
@@ -620,7 +620,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															onChange={(e) => updateBlockValue(b.id, e.target.value)}
 														/>
 													</div>
-													<div className="pl-2">
+													<div className="pl-2 mb-2">
 														<ParagraphSlider />
 													</div>
 												</div>
@@ -645,7 +645,12 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				</div>
 
 				{/* Signature - fixed at bottom (outside scroll) */}
-				<div className="px-0 pb-2">
+				<div
+					className={cn(
+						'px-0 pb-2 mt-3',
+						hybridBlocks.some((b) => b.type === 'full_automated') && 'mt-6'
+					)}
+				>
 					<div
 						className="rounded-[8px] border-2 bg-white px-2 py-2 w-[357px] mx-auto"
 						style={{ borderColor: '#969696' }}
@@ -654,7 +659,12 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							Signature
 						</div>
 						<textarea
-							className="w-full text-[12px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none h-[58px] outline-none focus:outline-none"
+							className={cn(
+								'w-full text-[12px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none',
+								hybridBlocks.some((b) => b.type === 'full_automated')
+									? 'h-[40px]'
+									: 'h-[58px]'
+							)}
 							value={signature}
 							onChange={(e) => updateSignature(e.target.value)}
 						/>

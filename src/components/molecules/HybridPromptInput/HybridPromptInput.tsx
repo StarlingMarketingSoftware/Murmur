@@ -1079,7 +1079,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 				<Droppable id="droppable">
 					<div
 						className={`${
-							compactLeftOnly ? '' : 'w-[962px] h-[644px] transition mb-4 flex mx-auto '
+							compactLeftOnly
+								? ''
+								: 'w-[962px] min-h-[644px] transition mb-4 flex mx-auto '
 						} ${
 							showTestPreview
 								? 'flex-row gap-[40px] justify-center items-start'
@@ -1512,7 +1514,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							<div
 								className={cn(
 									'px-3 pb-0 pt-12 flex justify-center',
-									showTestPreview && selectedModeKey === 'full' ? 'mt-0 pt-4' : 'mt-auto'
+									showTestPreview && selectedModeKey === 'full' ? 'mt-0 pt-4' : 'mt-6'
 								)}
 							>
 								<FormField
@@ -1560,7 +1562,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								)}
 							>
 								{/* Test button and notices hidden in compact mode */}
-								<div className="flex justify-center mt-1 mb-4 w-full">
+								<div className="flex justify-center mt-4 mb-4 w-full">
 									<Button
 										type="button"
 										onClick={() => {
