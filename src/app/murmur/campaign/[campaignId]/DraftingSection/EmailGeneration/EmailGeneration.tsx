@@ -1,9 +1,6 @@
 import { FC, ReactNode } from 'react';
 import { EmailGenerationProps, useEmailGeneration } from './useEmailGeneration';
-import { Button } from '@/components/ui/button';
-
 import { cn } from '@/utils';
-import { ChevronUp } from 'lucide-react';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
@@ -47,7 +44,6 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		draftEmails,
 		isPendingEmails,
 		handleDraftButtonClick,
-		scrollToEmailStructure,
 		sentEmails,
 	} = useEmailGeneration(props);
 
@@ -197,19 +193,6 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 	return (
 		<>
-			<div className="mb-[4px] mt-3 flex justify-end items-center">
-				{scrollToEmailStructure && (
-					<Button
-						type="button"
-						onClick={scrollToEmailStructure}
-						variant="ghost"
-						className="flex items-center !p-0 h-fit !m-0 gap-1  text-[#AFAFAF] font-inter font-medium text-[14px] hover:text-[#8F8F8F] transition-colors"
-					>
-						to Email Structure
-						<ChevronUp size={16} />
-					</Button>
-				)}
-			</div>
 			<div className="flex gap-[47px] items-start justify-center">
 				<div className="flex-shrink-0">
 					<div
