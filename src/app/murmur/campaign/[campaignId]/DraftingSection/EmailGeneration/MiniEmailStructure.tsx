@@ -342,6 +342,50 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		form.setValue('hybridBlockPrompts', blocks, { shouldDirty: true });
 	};
 
+	const addHybridBlock = (type: HybridBlock) => {
+		const blocks = [...(form.getValues('hybridBlockPrompts') || [])];
+		// Avoid duplicates
+		if (blocks.some((b) => b.type === type)) return;
+
+		const orderedCore: HybridBlock[] = [
+			'introduction' as HybridBlock,
+			'research' as HybridBlock,
+			'action' as HybridBlock,
+		];
+		const newCoreIndex = orderedCore.findIndex((t) => t === type);
+
+		let insertIndex = -1;
+		for (let i = 0; i < blocks.length; i++) {
+			const existingType = blocks[i].type as HybridBlock;
+			const existingCoreIdx = orderedCore.findIndex((t) => t === existingType);
+			if (existingCoreIdx !== -1 && existingCoreIdx > newCoreIndex) {
+				insertIndex = i;
+				break;
+			}
+		}
+
+		if (insertIndex === -1) {
+			let lastCoreIndex = -1;
+			for (let i = blocks.length - 1; i >= 0; i--) {
+				const existingType = blocks[i].type as HybridBlock;
+				const existingCoreIdx = orderedCore.findIndex((t) => t === existingType);
+				if (existingCoreIdx !== -1) {
+					lastCoreIndex = i;
+					break;
+				}
+			}
+			insertIndex = lastCoreIndex === -1 ? 0 : lastCoreIndex + 1;
+		}
+
+		const newBlock = { id: String(type), type, value: '' } as {
+			id: string;
+			type: HybridBlock;
+			value: string;
+		};
+		blocks.splice(insertIndex, 0, newBlock);
+		form.setValue('hybridBlockPrompts', blocks, { shouldDirty: true });
+	};
+
 	const removeBlock = (id: string) => {
 		const blocks = (form.getValues('hybridBlockPrompts') || []).filter(
 			(b) => b.id !== id
@@ -715,6 +759,63 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									</Fragment>
 								);
 							})}
+							{/* Missing hybrid placeholders */}
+							{(() => {
+								if (draftingMode !== 'hybrid') return null;
+								const ordered: HybridBlock[] = [
+									'introduction' as HybridBlock,
+									'research' as HybridBlock,
+									'action' as HybridBlock,
+								];
+								const present = new Set(
+									hybridBlocks
+										.filter(
+											(b) =>
+												b.type === 'introduction' ||
+												b.type === 'research' ||
+												b.type === 'action'
+										)
+										.map((b) => b.type as HybridBlock)
+								);
+								const missing = ordered.filter((t) => !present.has(t));
+								if (missing.length === 0) return null;
+								const labelFor = (t: HybridBlock) =>
+									t === ('introduction' as HybridBlock)
+										? 'Intro'
+										: t === ('research' as HybridBlock)
+										? 'Research'
+										: 'CTA';
+								const colorFor = (t: HybridBlock) =>
+									t === ('introduction' as HybridBlock)
+										? '#6673FF'
+										: t === ('research' as HybridBlock)
+										? '#1010E7'
+										: '#0E0E7F';
+								return (
+									<div className="w-[357px] mx-auto -mt-2 flex flex-col gap-2">
+										{missing.map((t) => (
+											<div key={`mini-ph-${t}`} className="flex justify-end">
+												<Button
+													type="button"
+													onClick={() => addHybridBlock(t)}
+													className="w-[76px] h-[30px] bg-white hover:bg-stone-100 active:bg-stone-200 border-2 rounded-[8px] !font-normal text-[10px] text-black inline-flex items-center justify-start gap-[4px] pl-[4px]"
+													style={{ borderColor: colorFor(t) }}
+													title={`Add ${labelFor(t)}`}
+												>
+													<TinyPlusIcon
+														width="8px"
+														height="8px"
+														className="!w-[8px] !h-[8px]"
+													/>
+													<span className="font-inter font-medium text-[10px] text-[#0A0A0A]">
+														{labelFor(t)}
+													</span>
+												</Button>
+											</div>
+										))}
+									</div>
+								);
+							})()}
 						</div>
 					</div>
 				</div>
