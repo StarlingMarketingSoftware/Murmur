@@ -1081,13 +1081,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 						className={`${
 							compactLeftOnly
 								? ''
-								: 'w-[962px] min-h-[644px] transition mb-4 flex mx-auto '
-						} ${
+								: 'w-[892px] min-h-[686px] transition mb-4 flex mx-auto '
+						}	${
 							showTestPreview
 								? 'flex-row gap-[40px] justify-center items-start'
 								: compactLeftOnly
 								? 'flex-col'
-								: 'flex-col border-[3px] border-black rounded-md bg-gray-50 min-h-[530px]'
+								: 'flex-col border-[3px] border-black rounded-md bg-gray-50 min-h-[686px]'
 						}	relative overflow-visible`}
 					>
 						{/* Left side - Content area */}
@@ -1098,7 +1098,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									? 'w-[457px] shrink-0 h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-gray-50'
 									: compactLeftOnly
 									? 'w-[350px]'
-									: 'w-full min-h-[530px] pt-[10px] px-[18px] pb-[18px]'
+									: 'w-full min-h-[686px] pt-[10px] px-0 pb-[18px]'
 							)}
 						>
 							{/* Subject header inside the box */}
@@ -1188,10 +1188,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									<>
 										{showTestPreview && <div className="h-[2px] bg-black -mx-[18px]" />}
 										<div
-											className={cn(
-												'h-[2px] bg-black -mx-[18px]',
-												showTestPreview && 'hidden'
-											)}
+											className={cn('h-[2px] bg-black', showTestPreview && 'hidden')}
 										/>
 										{showTestPreview && <div className="h-2" />}
 									</>
