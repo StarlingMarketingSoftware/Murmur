@@ -40,10 +40,8 @@ const Murmur = () => {
 	// ensures a premium, smooth transition with no scale effects.
 	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
 	return (
-		<AppLayout paddingTop="none">
-			<NoMobilePage />
-			{shouldHideContent && <div className="fixed inset-0 bg-background z-40" />}
-			{!isMobile && (
+		<>
+			<div className="max-w-[1250px] w-9/10 mx-auto lg:w-9/10">
 				<div
 					className={cn(
 						'transition-opacity duration-200',
@@ -51,16 +49,12 @@ const Murmur = () => {
 							? 'opacity-0 pointer-events-none select-none'
 							: 'opacity-100'
 					)}
-					style={{
-						WebkitTransition: 'opacity 0.2s',
-						transition: 'opacity 0.2s',
-					}}
 				>
 					<div className="flex justify-center mt-1">
 						<CampaignName campaign={campaign} />
 					</div>
 					<div className="flex justify-center mt-0.5">
-						<div className="flex flex-col gap-2 w-[400px]">
+						<div className="flex items-start gap-6">
 							<div className="flex items-center">
 								<Link href={urls.murmur.dashboard.index} className="block">
 									<div className="w-[52px] h-[20.5px] bg-[#EEEEEE] rounded-[8px] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]">
@@ -124,25 +118,48 @@ const Murmur = () => {
 							</div>
 						</div>
 					</div>
-
-					<IdentityDialog
-						campaign={campaign}
-						title="User Settings"
-						open={isIdentityDialogOpen}
-						onOpenChange={setIsIdentityDialogOpen}
-						backButtonText={
-							identityDialogOrigin === 'search'
-								? 'Back to Search Results'
-								: 'Back to Campaign'
-						}
-					/>
-
-					<div className="mt-6 flex justify-center">
-						<DraftingSection campaign={campaign} />
-					</div>
 				</div>
-			)}
-		</AppLayout>
+			</div>
+
+			<div className="w-full h-[2px] bg-black mt-4" />
+
+			<AppLayout paddingTop="none">
+				<NoMobilePage />
+				{shouldHideContent && <div className="fixed inset-0 bg-background z-40" />}
+				{!isMobile && (
+					<>
+						<div
+							className={cn(
+								'transition-opacity duration-200',
+								shouldHideContent
+									? 'opacity-0 pointer-events-none select-none'
+									: 'opacity-100'
+							)}
+							style={{
+								WebkitTransition: 'opacity 0.2s',
+								transition: 'opacity 0.2s',
+							}}
+						>
+							<IdentityDialog
+								campaign={campaign}
+								title="User Settings"
+								open={isIdentityDialogOpen}
+								onOpenChange={setIsIdentityDialogOpen}
+								backButtonText={
+									identityDialogOrigin === 'search'
+										? 'Back to Search Results'
+										: 'Back to Campaign'
+								}
+							/>
+
+							<div className="mt-6 flex justify-center">
+								<DraftingSection campaign={campaign} />
+							</div>
+						</div>
+					</>
+				)}
+			</AppLayout>
+		</>
 	);
 };
 
