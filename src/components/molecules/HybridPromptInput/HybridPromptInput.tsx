@@ -1087,7 +1087,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								? 'flex-row gap-[40px] justify-center items-start'
 								: compactLeftOnly
 								? 'flex-col'
-								: 'flex-col border-[3px] border-black rounded-md bg-gray-50 min-h-[686px]'
+								: 'flex-col border-[3px] border-black rounded-md bg-[rgba(222,242,225,0.3)] min-h-[686px]'
 						}	relative overflow-visible`}
 					>
 						{/* Left side - Content area */}
@@ -1095,14 +1095,19 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							className={cn(
 								`flex flex-col`,
 								showTestPreview
-									? 'w-[457px] shrink-0 h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-gray-50'
+									? 'w-[457px] shrink-0 h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-[rgba(222,242,225,0.3)]'
 									: compactLeftOnly
 									? 'w-[350px]'
 									: 'w-full min-h-0 pt-[10px] px-0 pb-0 flex-1'
 							)}
 						>
 							{/* Subject header inside the box */}
-							<div className="pt-0 pb-0">
+							<div
+								className={cn(
+									'pt-0 pb-0 bg-white',
+									showTestPreview && '-mx-[18px] px-[18px] rounded-t-[8px]'
+								)}
+							>
 								<div
 									className={cn(
 										'h-[36px] flex items-center relative z-20',
