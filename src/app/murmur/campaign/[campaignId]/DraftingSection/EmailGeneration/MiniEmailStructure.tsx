@@ -350,7 +350,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 			ref={rootRef}
 			style={{
 				width: '376px',
-				height: '474px',
+				minHeight: '474px',
 				position: 'relative',
 				overflow: 'visible',
 			}}
@@ -370,10 +370,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				}}
 			>
 				{/* Content area - miniature, but interactive */}
-				<div
-					ref={buttonContainerRef}
-					className="flex-1 overflow-y-auto overflow-x-visible max-h-[300px]"
-				>
+				<div ref={buttonContainerRef} className="flex-1 overflow-visible">
 					<div className="px-0 pb-3">
 						{/* Mode */}
 						<div className="w-full bg-white pt-2 rounded-t-[5px]">
