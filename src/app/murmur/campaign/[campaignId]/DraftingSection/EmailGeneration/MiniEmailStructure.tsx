@@ -7,6 +7,7 @@ import {
 	useEffect,
 	useLayoutEffect,
 	useCallback,
+	ReactNode,
 } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { DraftingFormValues } from '../useDraftingSection';
@@ -386,10 +387,27 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		form.setValue('hybridBlockPrompts', blocks, { shouldDirty: true });
 	};
 
+	// Only allow removing Intro if both Research and CTA are already removed
+	const canRemoveHybridCore = (id: string): boolean => {
+		const blocks = form.getValues('hybridBlockPrompts') || [];
+		const target = blocks.find((b) => b.id === id);
+		if (!target) return false;
+		if (draftingMode !== 'hybrid') return true;
+		if (target.type !== 'introduction') return true;
+		const hasResearch = blocks.some((b) => b.type === 'research');
+		const hasAction = blocks.some((b) => b.type === 'action');
+		return !hasResearch && !hasAction;
+	};
+
 	const removeBlock = (id: string) => {
-		const blocks = (form.getValues('hybridBlockPrompts') || []).filter(
-			(b) => b.id !== id
-		);
+		const currentBlocks = form.getValues('hybridBlockPrompts') || [];
+		const target = currentBlocks.find((b) => b.id === id);
+		if (!target) return;
+		if (draftingMode === 'hybrid' && target.type === 'introduction') {
+			const allowed = canRemoveHybridCore(id);
+			if (!allowed) return; // keep Intro until other cores are removed
+		}
+		const blocks = currentBlocks.filter((b) => b.id !== id);
 		form.setValue('hybridBlockPrompts', blocks, { shouldDirty: true });
 	};
 
@@ -546,13 +564,13 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 
 						{/* Blocks list - overflow visible to show buttons outside */}
 						<div className="flex flex-col gap-[25px] overflow-visible">
-							{hybridBlocks.map((b) => {
-								const isHybridCore =
-									b.type === 'introduction' ||
-									b.type === 'research' ||
-									b.type === 'action';
-
-								if (draftingMode === 'hybrid' && isHybridCore) {
+							{(() => {
+								// Renderers reused below
+								const renderHybridCore = (b: {
+									id: string;
+									type: HybridBlock;
+									value: string | null;
+								}) => {
 									const isExpanded = expandedBlocks.has(b.id);
 									const strokeColor =
 										b.type === 'introduction'
@@ -573,7 +591,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												style={{ borderColor: strokeColor }}
 											>
 												<div className="w-full h-full flex flex-col">
-													{/* Top Row */}
 													<div
 														className={cn(
 															'flex flex-row items-center flex-shrink-0',
@@ -602,11 +619,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																onClick={() => {
 																	setExpandedBlocks((prev) => {
 																		const next = new Set(prev);
-																		if (isExpanded) {
-																			next.delete(b.id);
-																		} else {
-																			next.add(b.id);
-																		}
+																		if (isExpanded) next.delete(b.id);
+																		else next.add(b.id);
 																		return next;
 																	});
 																}}
@@ -635,7 +649,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															</button>
 														</div>
 													</div>
-													{/* Bottom content - only show when expanded */}
 													{isExpanded && (
 														<div className="flex-1 flex flex-col min-h-0">
 															<div
@@ -656,14 +669,15 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													)}
 												</div>
 											</div>
-
-											{/* Plus button for hybrid blocks - positioned outside the box */}
-											{/* This is now handled by the absolute positioned container */}
 										</Fragment>
 									);
-								}
+								};
 
-								return (
+								const renderGeneric = (b: {
+									id: string;
+									type: HybridBlock;
+									value: string | null;
+								}) => (
 									<Fragment key={b.id}>
 										<div
 											className={cn(
@@ -708,7 +722,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													)}
 												</div>
 											</div>
-
 											{b.type === 'full_automated' ? (
 												<div className="mt-1">
 													<div className="mb-1">
@@ -758,49 +771,82 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										</div>
 									</Fragment>
 								);
-							})}
-							{/* Missing hybrid placeholders */}
-							{(() => {
-								if (draftingMode !== 'hybrid') return null;
-								const ordered: HybridBlock[] = [
-									'introduction' as HybridBlock,
-									'research' as HybridBlock,
-									'action' as HybridBlock,
+
+								if (draftingMode !== 'hybrid') {
+									return hybridBlocks.map((b) =>
+										b.type === 'introduction' ||
+										b.type === 'research' ||
+										b.type === 'action'
+											? renderHybridCore(
+													b as { id: string; type: HybridBlock; value: string | null }
+											  )
+											: renderGeneric(
+													b as { id: string; type: HybridBlock; value: string | null }
+											  )
+									);
+								}
+
+								// Hybrid mode: keep three fixed core slots; render placeholder if missing.
+								const slots: Array<'introduction' | 'research' | 'action'> = [
+									'introduction',
+									'research',
+									'action',
 								];
-								const present = new Set(
-									hybridBlocks
-										.filter(
-											(b) =>
-												b.type === 'introduction' ||
-												b.type === 'research' ||
-												b.type === 'action'
-										)
-										.map((b) => b.type as HybridBlock)
-								);
-								const missing = ordered.filter((t) => !present.has(t));
-								if (missing.length === 0) return null;
+								type Block = { id: string; type: HybridBlock; value: string | null };
+								const slotCore: Record<
+									'introduction' | 'research' | 'action',
+									Block | null
+								> = { introduction: null, research: null, action: null };
+								const slotExtras: Record<
+									'introduction' | 'research' | 'action',
+									Block[]
+								> = { introduction: [], research: [], action: [] };
+
+								let current: 'introduction' | 'research' | 'action' = 'introduction';
+								for (const b of hybridBlocks) {
+									if (
+										b.type === 'introduction' ||
+										b.type === 'research' ||
+										b.type === 'action'
+									) {
+										slotCore[b.type] = b as Block;
+										current =
+											b.type === 'introduction'
+												? 'research'
+												: b.type === 'research'
+												? 'action'
+												: 'action';
+										continue;
+									}
+									// Treat everything else as extra content tied to the current slot (mostly text)
+									slotExtras[current].push(b as Block);
+								}
+
 								const labelFor = (t: HybridBlock) =>
-									t === ('introduction' as HybridBlock)
-										? 'Intro'
-										: t === ('research' as HybridBlock)
-										? 'Research'
-										: 'CTA';
+									t === 'introduction' ? 'Intro' : t === 'research' ? 'Research' : 'CTA';
 								const colorFor = (t: HybridBlock) =>
-									t === ('introduction' as HybridBlock)
+									t === 'introduction'
 										? '#6673FF'
-										: t === ('research' as HybridBlock)
+										: t === 'research'
 										? '#1010E7'
 										: '#0E0E7F';
-								return (
-									<div className="w-[357px] mx-auto mt-0 flex flex-col gap-2">
-										{missing.map((t) => (
-											<div key={`mini-ph-${t}`} className="flex justify-end">
+
+								const out: ReactNode[] = [];
+								for (const slot of slots) {
+									const core = slotCore[slot];
+									if (core) out.push(renderHybridCore(core));
+									else {
+										out.push(
+											<div
+												key={`mini-ph-${slot}`}
+												className="w-[357px] mx-auto h-[31px] flex items-center justify-end"
+											>
 												<Button
 													type="button"
-													onClick={() => addHybridBlock(t)}
+													onClick={() => addHybridBlock(slot)}
 													className="w-[76px] h-[26px] bg-white hover:bg-stone-100 active:bg-stone-200 border-2 rounded-[6px] !font-normal text-[10px] text-black inline-flex items-center justify-start gap-[4px] pl-[4px]"
-													style={{ borderColor: colorFor(t) }}
-													title={`Add ${labelFor(t)}`}
+													style={{ borderColor: colorFor(slot) }}
+													title={`Add ${labelFor(slot)}`}
 												>
 													<TinyPlusIcon
 														width="8px"
@@ -808,13 +854,16 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 														className="!w-[8px] !h-[8px]"
 													/>
 													<span className="font-inter font-medium text-[10px] text-[#0A0A0A]">
-														{labelFor(t)}
+														{labelFor(slot)}
 													</span>
 												</Button>
 											</div>
-										))}
-									</div>
-								);
+										);
+									}
+									for (const extra of slotExtras[slot]) out.push(renderGeneric(extra));
+								}
+
+								return out;
 							})()}
 						</div>
 					</div>
