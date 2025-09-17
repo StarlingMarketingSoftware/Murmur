@@ -310,7 +310,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									key={draft.id}
 									className={cn(
 										'cursor-pointer transition-colors relative select-none w-[366px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
-										isSelected && 'bg-[#D6E8D9]'
+										isSelected && 'bg-[#FFDF9F]'
 									)}
 									onMouseDown={(e) => {
 										// Prevent text selection on shift-click

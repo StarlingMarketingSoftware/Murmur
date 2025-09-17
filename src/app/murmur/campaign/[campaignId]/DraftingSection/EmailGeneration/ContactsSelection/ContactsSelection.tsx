@@ -38,7 +38,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						key={contact.id}
 						className={cn(
 							'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[366px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none row-hover-scroll',
-							selectedContactIds.has(contact.id) ? 'bg-[#D6E8D9]' : ''
+							selectedContactIds.has(contact.id) ? 'bg-[#EAAEAE]' : ''
 						)}
 						onMouseDown={(e) => {
 							// Prevent text selection on shift-click
