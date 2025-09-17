@@ -810,12 +810,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										b.type === 'action'
 									) {
 										slotCore[b.type] = b as Block;
-										current =
-											b.type === 'introduction'
-												? 'research'
-												: b.type === 'research'
-												? 'action'
-												: 'action';
+										// Keep extras under the most recently seen core block
+										current = b.type;
 										continue;
 									}
 									// Treat everything else as extra content tied to the current slot (mostly text)
