@@ -5,6 +5,7 @@ import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/Hybr
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { EmailGeneration } from './EmailGeneration/EmailGeneration';
 import { cn } from '@/utils';
+import DraggableBox from './EmailGeneration/DraggableBox';
 // removed unused DraftingMode/HybridBlock imports after moving mode toggles inside
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
@@ -38,17 +39,19 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 						ref={emailStructureRef}
 						className="mb-[4px] flex justify-between items-center"
 					></div>
-					<div className="flex gap-[47px] items-start justify-center">
+					<div className="flex gap-[47px] items-start justify-center overflow-visible">
 						<div className="flex-shrink-0">
-							<HybridPromptInput
-								trackFocusedField={trackFocusedField}
-								testMessage={campaign?.testMessage}
-								handleGenerateTestDrafts={handleGenerateTestDrafts}
-								isGenerationDisabled={isGenerationDisabled}
-								isPendingGeneration={isPendingGeneration}
-								isTest={isTest}
-								contact={contacts?.[0]}
-							/>
+							<DraggableBox id="test-prompt">
+								<HybridPromptInput
+									trackFocusedField={trackFocusedField}
+									testMessage={campaign?.testMessage}
+									handleGenerateTestDrafts={handleGenerateTestDrafts}
+									isGenerationDisabled={isGenerationDisabled}
+									isPendingGeneration={isPendingGeneration}
+									isTest={isTest}
+									contact={contacts?.[0]}
+								/>
+							</DraggableBox>
 						</div>
 					</div>
 

@@ -15,6 +15,7 @@ import { ContactsSelection } from './ContactsSelection/ContactsSelection';
 import { DraftedEmails } from './DraftedEmails/DraftedEmails';
 import { MiniEmailStructure } from './MiniEmailStructure';
 import { SentEmails } from './SentEmails/SentEmails';
+import DraggableBox from './DraggableBox';
 
 export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	const {
@@ -198,11 +199,11 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 					<div
 						data-drafting-container
 						className={cn(
-							'relative w-[1700px] h-[620px] rounded-lg overflow-x-hidden p-[17px]'
+							'relative w-[1700px] h-[620px] rounded-lg p-[17px] overflow-visible'
 						)}
 					>
 						{/* Tables container - positioned at bottom */}
-						<div className="absolute left-[19px] right-[19px] flex flex-row justify-center gap-x-10 top-[35px]">
+						<div className="absolute left-[19px] right-[19px] flex flex-row justify-center gap-x-10 top-[35px] overflow-visible">
 							{/* Left table container */}
 							{(() => {
 								const draftedContactIds = new Set(draftEmails.map((d) => d.contactId));
@@ -210,50 +211,63 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 									(c) => !draftedContactIds.has(c.id)
 								);
 								return (
-									<ContactsSelection
-										contacts={availableContacts}
-										selectedContactIds={selectedContactIds}
-										setSelectedContactIds={setSelectedContactIds}
-										handleContactSelection={handleContactSelection}
-										generationProgress={generationProgress}
-										generationTotal={generationTotal}
-										cancelGeneration={cancelGeneration}
-									/>
+									<DraggableBox
+										id="contacts"
+										dragHandleSelector="[data-drafting-table-header]"
+									>
+										<ContactsSelection
+											contacts={availableContacts}
+											selectedContactIds={selectedContactIds}
+											setSelectedContactIds={setSelectedContactIds}
+											handleContactSelection={handleContactSelection}
+											generationProgress={generationProgress}
+											generationTotal={generationTotal}
+											cancelGeneration={cancelGeneration}
+										/>
+									</DraggableBox>
 								);
 							})()}
 
 							{/* Middle Email Structure (mini) */}
-							<MiniEmailStructure
-								form={form}
-								onDraft={handleDraftButtonClick}
-								isDraftDisabled={isGenerationDisabled() || selectedContactIds.size === 0}
-								isPendingGeneration={isPendingGeneration}
-								generationProgress={generationProgress}
-								generationTotal={generationTotal}
-								onCancel={cancelGeneration}
-							/>
+							<DraggableBox id="mini-email-structure">
+								<MiniEmailStructure
+									form={form}
+									onDraft={handleDraftButtonClick}
+									isDraftDisabled={
+										isGenerationDisabled() || selectedContactIds.size === 0
+									}
+									isPendingGeneration={isPendingGeneration}
+									generationProgress={generationProgress}
+									generationTotal={generationTotal}
+									onCancel={cancelGeneration}
+								/>
+							</DraggableBox>
 
 							{/* Right table */}
-							<DraftedEmails
-								draftEmails={draftEmails}
-								isPendingEmails={isPendingEmails}
-								contacts={contacts}
-								selectedDraftIds={selectedDraftIds}
-								setSelectedDraft={setSelectedDraft}
-								setIsDraftDialogOpen={setIsDraftDialogOpen}
-								handleDraftSelection={handleDraftSelection}
-								setSelectedDraftIds={setSelectedDraftIds}
-								selectedDraft={selectedDraft}
-								onSend={handleSend}
-								isSendingDisabled={isSendingDisabled}
-								isFreeTrial={isFreeTrial}
-								fromName={campaign?.identity?.name}
-								fromEmail={campaign?.identity?.email}
-								subject={form.watch('subject')}
-							/>
+							<DraggableBox id="drafts" dragHandleSelector="[data-drafting-table-header]">
+								<DraftedEmails
+									draftEmails={draftEmails}
+									isPendingEmails={isPendingEmails}
+									contacts={contacts}
+									selectedDraftIds={selectedDraftIds}
+									setSelectedDraft={setSelectedDraft}
+									setIsDraftDialogOpen={setIsDraftDialogOpen}
+									handleDraftSelection={handleDraftSelection}
+									setSelectedDraftIds={setSelectedDraftIds}
+									selectedDraft={selectedDraft}
+									onSend={handleSend}
+									isSendingDisabled={isSendingDisabled}
+									isFreeTrial={isFreeTrial}
+									fromName={campaign?.identity?.name}
+									fromEmail={campaign?.identity?.email}
+									subject={form.watch('subject')}
+								/>
+							</DraggableBox>
 
 							{/* Sent emails */}
-							<SentEmails emails={sentEmails} isPendingEmails={isPendingEmails} />
+							<DraggableBox id="sent" dragHandleSelector="[data-drafting-table-header]">
+								<SentEmails emails={sentEmails} isPendingEmails={isPendingEmails} />
+							</DraggableBox>
 						</div>
 					</div>
 				</div>
