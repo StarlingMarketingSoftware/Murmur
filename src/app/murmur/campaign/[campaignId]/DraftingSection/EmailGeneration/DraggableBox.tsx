@@ -9,7 +9,10 @@ interface DraggableBoxProps {
 	/** Initial offset in pixels (relative to natural layout position) */
 	defaultPosition?: { x: number; y: number };
 	/** CSS selector for an internal drag handle; if omitted and showHandle=true, a small top bar is rendered as the handle */
+	/** CSS selector for an internal drag handle; if omitted and showHandle=true, a small top bar is rendered as the handle */
 	dragHandleSelector?: string;
+	/** When false, dragging is disabled and transform is cleared */
+	enabled?: boolean;
 }
 
 /**
@@ -22,6 +25,7 @@ export const DraggableBox: FC<DraggableBoxProps> = ({
 	children,
 	defaultPosition = { x: 0, y: 0 },
 	dragHandleSelector,
+	enabled = true,
 }) => {
 	const wrapperRef = useRef<HTMLDivElement | null>(null);
 	const positionRef = useRef<{ x: number; y: number }>({ ...defaultPosition });
@@ -58,6 +62,7 @@ export const DraggableBox: FC<DraggableBoxProps> = ({
 
 	const tryStartDrag = useCallback(
 		(e: PointerEvent | MouseEvent) => {
+			if (!enabled) return;
 			if (!(e instanceof PointerEvent)) return;
 			if (e.button !== 0) return; // left click only
 			const target = e.target as HTMLElement | null;
@@ -93,30 +98,41 @@ export const DraggableBox: FC<DraggableBoxProps> = ({
 			window.addEventListener('pointerup', endDragging);
 			e.preventDefault();
 		},
-		[dragHandleSelector, endDragging, onPointerMove]
+		[dragHandleSelector, enabled, endDragging, onPointerMove]
 	);
 
 	useEffect(() => {
 		const el = wrapperRef.current;
 		if (!el) return;
-		// Always delegate pointerdown and let tryStartDrag decide whether to begin dragging
+		if (!enabled) return;
+		// Delegate pointerdown and let tryStartDrag decide whether to begin dragging
 		const onPointerDown = (e: PointerEvent) => tryStartDrag(e);
 		el.addEventListener('pointerdown', onPointerDown);
 		return () => {
 			el.removeEventListener('pointerdown', onPointerDown);
 		};
-	}, [tryStartDrag]);
+	}, [enabled, tryStartDrag]);
+
+	// When disabled, clear transform and reset position
+	useEffect(() => {
+		if (!enabled) {
+			positionRef.current = { ...defaultPosition };
+			setPosition({ ...defaultPosition });
+			setIsDragging(false);
+		}
+		// include full object for correctness (eslint satisfies)
+	}, [enabled, defaultPosition]);
 
 	// Inline styles
 	const style = useMemo<React.CSSProperties>(
 		() => ({
-			transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
-			willChange: isDragging ? 'transform' : undefined,
+			transform: enabled ? `translate3d(${position.x}px, ${position.y}px, 0)` : undefined,
+			willChange: enabled && isDragging ? 'transform' : undefined,
 			position: 'relative',
 			zIndex: isDragging ? 10 : undefined,
 			userSelect: isDragging ? 'none' : undefined,
 		}),
-		[isDragging, position.x, position.y]
+		[enabled, isDragging, position.x, position.y]
 	);
 
 	return (

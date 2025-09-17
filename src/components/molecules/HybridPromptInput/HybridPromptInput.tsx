@@ -29,6 +29,7 @@ import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
 import { ParagraphSlider } from '@/components/atoms/ParagraphSlider/ParagraphSlider';
 import { ToneSelector } from '../ToneSelector/ToneSelector';
 import { DraggableHighlight } from '../DragAndDrop/DraggableHighlight';
+import DraggableBox from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraggableBox';
 interface SortableAIBlockProps {
 	block: {
 		value: HybridBlock;
@@ -1077,307 +1078,351 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		<div className={compactLeftOnly ? '' : 'flex justify-center'}>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
 				<Droppable id="droppable">
-					<div
-						className={`${
-							compactLeftOnly
-								? ''
-								: 'w-[892px] min-h-[686px] transition mb-4 flex mx-auto '
-						}	${
-							showTestPreview
-								? 'flex-row gap-[40px] justify-center items-start'
-								: compactLeftOnly
-								? 'flex-col'
-								: 'flex-col border-[3px] border-black rounded-md bg-white min-h-[686px]'
-						}	relative overflow-visible`}
+					<DraggableBox
+						id="main-drafting"
+						dragHandleSelector="[data-root-drag-handle]"
+						enabled={!showTestPreview}
 					>
-						{/* Left side - Content area */}
 						<div
-							className={cn(
-								`flex flex-col`,
+							className={`${
+								compactLeftOnly
+									? ''
+									: 'w-[892px] min-h-[686px] transition mb-4 flex mx-auto '
+							}	${
 								showTestPreview
-									? 'w-[457px] shrink-0 h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-white'
+									? 'flex-row gap-[40px] justify-center items-start'
 									: compactLeftOnly
-									? 'w-[350px]'
-									: 'w-full min-h-0 pt-[10px] px-0 pb-0 flex-1'
-							)}
+									? 'flex-col'
+									: 'flex-col border-[3px] border-black rounded-md bg-white min-h-[686px]'
+							}	relative overflow-visible`}
 						>
-							{/* Subject header inside the box */}
-							<div
-								className={cn(
-									'pt-0 pb-0 bg-white',
-									showTestPreview && '-mx-[18px] px-[18px] rounded-t-[8px]'
-								)}
+							{/* Left side - Content area (draggable when testing) */}
+							<DraggableBox
+								id="test-left-panel"
+								dragHandleSelector="[data-left-drag-handle]"
+								enabled={Boolean(showTestPreview)}
 							>
 								<div
 									className={cn(
-										'h-[36px] flex items-center relative z-20',
+										`flex flex-col`,
 										showTestPreview
-											? 'w-[426px] mx-auto pl-[8px]'
-											: 'w-[868px] mx-auto pl-[8px]'
+											? 'w-[457px] shrink-0 h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-white'
+											: compactLeftOnly
+											? 'w-[350px]'
+											: 'w-full min-h-0 pt-[10px] px-0 pb-0 flex-1'
 									)}
 								>
-									<span
+									{/* Removed explicit drag bar; header below acts as the drag handle */}
+									{/* Subject header inside the box */}
+									<div
 										className={cn(
-											'font-inter font-semibold text-[17px] mr-[56px] text-black'
+											'pt-0 pb-0 bg-white',
+											showTestPreview && '-mx-[18px] px-[18px] rounded-t-[8px]'
 										)}
 									>
-										Mode
-									</span>
-									<div
-										ref={modeContainerRef}
-										className="relative flex items-center gap-[67px]"
-									>
-										<DndContext
-											onDragEnd={handleHighlightDragEnd}
-											modifiers={[restrictToHorizontalAxisAndBounds]}
-										>
-											{selectedModeKey !== 'none' && (
-												<DraggableHighlight
-													style={highlightStyle}
-													isInitialRender={isInitialRender}
-													mode={selectedModeKey as 'full' | 'hybrid' | 'manual'}
-												/>
-											)}
-										</DndContext>
-										<Button
-											ref={fullModeButtonRef}
-											variant="ghost"
-											type="button"
-											className={cn(
-												'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
-												selectedModeKey !== 'none' &&
-													form
-														.getValues('hybridBlockPrompts')
-														?.some((b) => b.type === HybridBlock.full_automated)
-													? 'text-black'
-													: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
-											)}
-											onClick={switchToFull}
-										>
-											Full Auto
-										</Button>
-										<Button
-											ref={hybridModeButtonRef}
-											variant="ghost"
-											type="button"
-											className={cn(
-												'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
-												selectedModeKey !== 'none' &&
-													!form
-														.getValues('hybridBlockPrompts')
-														?.some((b) => b.type === HybridBlock.full_automated) &&
-													!form
-														.getValues('hybridBlockPrompts')
-														?.every((b) => b.type === HybridBlock.text)
-													? 'text-black'
-													: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
-											)}
-											onClick={switchToHybrid}
-										>
-											Hybrid
-										</Button>
-										<Button
-											ref={manualModeButtonRef}
-											variant="ghost"
-											type="button"
-											className={cn(
-												'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
-												selectedModeKey !== 'none' &&
-													(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
-													form
-														.getValues('hybridBlockPrompts')
-														?.every((b) => b.type === HybridBlock.text)
-													? 'text-black'
-													: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
-											)}
-											onClick={switchToManual}
-										>
-											Manual
-										</Button>
-									</div>
-								</div>
-								{compactLeftOnly ? null : (
-									<>
-										{showTestPreview && <div className="h-[2px] bg-black -mx-[18px]" />}
 										<div
-											className={cn('h-[2px] bg-black', showTestPreview && 'hidden')}
-										/>
-										{showTestPreview && <div className="h-2" />}
-									</>
-								)}
-								<div className="flex flex-col items-center">
-									<FormField
-										control={form.control}
-										name="subject"
-										rules={{ required: form.watch('isAiSubject') }}
-										render={({ field }) => (
-											<FormItem
-												className={cn(showTestPreview ? 'w-[426px]' : 'w-[868px]')}
+											className={cn(
+												'h-[36px] flex items-center relative z-20',
+												showTestPreview
+													? 'w-[426px] mx-auto pl-[8px]'
+													: 'w-[868px] mx-auto pl-[8px]'
+											)}
+											data-left-drag-handle
+											data-root-drag-handle
+										>
+											<span
+												className={cn(
+													'font-inter font-semibold text-[17px] mr-[56px] text-black'
+												)}
 											>
-												<div
-													className={cn(
-														'flex items-center',
-														showTestPreview
-															? 'justify-end pr-[24px] mt-1 mb-1'
-															: 'justify-end mb-2 pr-5'
-													)}
+												Mode
+											</span>
+											<div
+												ref={modeContainerRef}
+												className="relative flex items-center gap-[67px]"
+											>
+												<DndContext
+													onDragEnd={handleHighlightDragEnd}
+													modifiers={[restrictToHorizontalAxisAndBounds]}
 												>
-													<div className="flex items-center gap-2"></div>
-													{hasBlocks && (
-														<button
-															type="button"
-															onClick={handleClearAllInside}
-															className={cn(
-																showTestPreview ? 'text-xs' : 'text-sm',
-																'font-inter font-medium text-[#AFAFAF] hover:underline',
-																showTestPreview ? 'mr-[12px]' : 'relative top-[4px]'
-															)}
-														>
-															Clear All
-														</button>
+													{selectedModeKey !== 'none' && (
+														<DraggableHighlight
+															style={highlightStyle}
+															isInitialRender={isInitialRender}
+															mode={selectedModeKey as 'full' | 'hybrid' | 'manual'}
+														/>
 													)}
-												</div>
-												<FormControl>
-													<div
-														className={cn(
-															'flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden',
-															form.watch('isAiSubject') && 'bg-[#F1F1F1]'
-														)}
+												</DndContext>
+												<Button
+													ref={fullModeButtonRef}
+													variant="ghost"
+													type="button"
+													className={cn(
+														'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
+														selectedModeKey !== 'none' &&
+															form
+																.getValues('hybridBlockPrompts')
+																?.some((b) => b.type === HybridBlock.full_automated)
+															? 'text-black'
+															: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
+													)}
+													onClick={switchToFull}
+												>
+													Full Auto
+												</Button>
+												<Button
+													ref={hybridModeButtonRef}
+													variant="ghost"
+													type="button"
+													className={cn(
+														'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
+														selectedModeKey !== 'none' &&
+															!form
+																.getValues('hybridBlockPrompts')
+																?.some((b) => b.type === HybridBlock.full_automated) &&
+															!form
+																.getValues('hybridBlockPrompts')
+																?.every((b) => b.type === HybridBlock.text)
+															? 'text-black'
+															: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
+													)}
+													onClick={switchToHybrid}
+												>
+													Hybrid
+												</Button>
+												<Button
+													ref={manualModeButtonRef}
+													variant="ghost"
+													type="button"
+													className={cn(
+														'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
+														selectedModeKey !== 'none' &&
+															(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
+															form
+																.getValues('hybridBlockPrompts')
+																?.every((b) => b.type === HybridBlock.text)
+															? 'text-black'
+															: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
+													)}
+													onClick={switchToManual}
+												>
+													Manual
+												</Button>
+											</div>
+										</div>
+										{compactLeftOnly ? null : (
+											<>
+												{showTestPreview && (
+													<div className="h-[2px] bg-black -mx-[18px]" />
+												)}
+												<div
+													className={cn('h-[2px] bg-black', showTestPreview && 'hidden')}
+												/>
+												{showTestPreview && <div className="h-2" />}
+											</>
+										)}
+										<div className="flex flex-col items-center">
+											<FormField
+												control={form.control}
+												name="subject"
+												rules={{ required: form.watch('isAiSubject') }}
+												render={({ field }) => (
+													<FormItem
+														className={cn(showTestPreview ? 'w-[426px]' : 'w-[868px]')}
 													>
 														<div
 															className={cn(
-																'pl-2 flex items-center h-full shrink-0 w-[120px]',
-																form.watch('isAiSubject') ? 'bg-transparent' : 'bg-white'
+																'flex items-center',
+																showTestPreview
+																	? 'justify-end pr-[24px] mt-1 mb-1'
+																	: 'justify-end mb-2 pr-5'
 															)}
 														>
-															<span className="font-inter font-semibold text-[17px] text-black">
-																{form.watch('isAiSubject') ? 'Auto Subject' : 'Subject'}
-															</span>
+															<div className="flex items-center gap-2"></div>
+															{hasBlocks && (
+																<button
+																	type="button"
+																	onClick={handleClearAllInside}
+																	className={cn(
+																		showTestPreview ? 'text-xs' : 'text-sm',
+																		'font-inter font-medium text-[#AFAFAF] hover:underline',
+																		showTestPreview ? 'mr-[12px]' : 'relative top-[4px]'
+																	)}
+																>
+																	Clear All
+																</button>
+															)}
 														</div>
-
-														<button
-															type="button"
-															onClick={() => {
-																if (!isHandwrittenMode) {
-																	const newValue = !form.watch('isAiSubject');
-																	form.setValue('isAiSubject', newValue);
-																	if (newValue) {
-																		form.setValue('subject', '');
-																	}
-																}
-															}}
-															disabled={isHandwrittenMode}
-															className={cn(
-																'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0',
-																form.watch('isAiSubject')
-																	? 'w-auto px-3 justify-center bg-[#5dab68] text-white'
-																	: 'w-[100px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8] -translate-x-[30px]',
-																isHandwrittenMode && 'opacity-50 cursor-not-allowed'
-															)}
-														>
-															<span className="absolute left-0 h-full border-l border-black"></span>
-															<span>{form.watch('isAiSubject') ? 'on' : 'Auto off'}</span>
-															<span className="absolute right-0 h-full border-r border-black"></span>
-														</button>
-
-														<div
-															className={cn(
-																'flex-grow h-full',
-																form.watch('isAiSubject') ? 'bg-transparent' : 'bg-white'
-															)}
-														>
-															<Input
-																{...field}
+														<FormControl>
+															<div
 																className={cn(
-																	'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0',
-																	form.watch('isAiSubject')
-																		? '!text-[#969696] placeholder:!text-[#969696]'
-																		: shouldShowSubjectRedStyling
-																		? '!text-[#A20000] placeholder:!text-[#A20000]'
-																		: '!text-black placeholder:!text-black'
+																	'flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden',
+																	form.watch('isAiSubject') && 'bg-[#F1F1F1]'
 																)}
-																placeholder={
-																	form.watch('isAiSubject')
-																		? 'Automated Subject Line'
-																		: 'Write your subject here. *required'
+															>
+																<div
+																	className={cn(
+																		'pl-2 flex items-center h-full shrink-0 w-[120px]',
+																		form.watch('isAiSubject')
+																			? 'bg-transparent'
+																			: 'bg-white'
+																	)}
+																>
+																	<span className="font-inter font-semibold text-[17px] text-black">
+																		{form.watch('isAiSubject')
+																			? 'Auto Subject'
+																			: 'Subject'}
+																	</span>
+																</div>
+
+																<button
+																	type="button"
+																	onClick={() => {
+																		if (!isHandwrittenMode) {
+																			const newValue = !form.watch('isAiSubject');
+																			form.setValue('isAiSubject', newValue);
+																			if (newValue) {
+																				form.setValue('subject', '');
+																			}
+																		}
+																	}}
+																	disabled={isHandwrittenMode}
+																	className={cn(
+																		'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0',
+																		form.watch('isAiSubject')
+																			? 'w-auto px-3 justify-center bg-[#5dab68] text-white'
+																			: 'w-[100px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8] -translate-x-[30px]',
+																		isHandwrittenMode && 'opacity-50 cursor-not-allowed'
+																	)}
+																>
+																	<span className="absolute left-0 h-full border-l border-black"></span>
+																	<span>
+																		{form.watch('isAiSubject') ? 'on' : 'Auto off'}
+																	</span>
+																	<span className="absolute right-0 h-full border-r border-black"></span>
+																</button>
+
+																<div
+																	className={cn(
+																		'flex-grow h-full',
+																		form.watch('isAiSubject')
+																			? 'bg-transparent'
+																			: 'bg-white'
+																	)}
+																>
+																	<Input
+																		{...field}
+																		className={cn(
+																			'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0',
+																			form.watch('isAiSubject')
+																				? '!text-[#969696] placeholder:!text-[#969696]'
+																				: shouldShowSubjectRedStyling
+																				? '!text-[#A20000] placeholder:!text-[#A20000]'
+																				: '!text-black placeholder:!text-black'
+																		)}
+																		placeholder={
+																			form.watch('isAiSubject')
+																				? 'Automated Subject Line'
+																				: 'Write your subject here. *required'
+																		}
+																		disabled={form.watch('isAiSubject')}
+																		onFocus={(e) =>
+																			!form.watch('isAiSubject') &&
+																			trackFocusedField?.('subject', e.target)
+																		}
+																		onBlur={() => {
+																			if (!form.watch('isAiSubject')) {
+																				setHasSubjectBeenTouched(true);
+																			}
+																			field.onBlur();
+																		}}
+																		onChange={(e) => {
+																			if (!form.watch('isAiSubject') && e.target.value) {
+																				setHasSubjectBeenTouched(true);
+																			}
+																			field.onChange(e);
+																		}}
+																	/>
+																</div>
+															</div>
+														</FormControl>
+														<FormMessage />
+													</FormItem>
+												)}
+											/>
+										</div>
+									</div>
+									<div className="flex-1 flex flex-col">
+										{/* Content area */}
+										<div className="pt-[16px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
+											{fields.length === 0 && (
+												<span className="text-gray-300 font-primary text-[12px]">
+													Add blocks here to build your prompt...
+												</span>
+											)}
+											<SortableContext
+												items={fields.map((f) => f.id)}
+												strategy={verticalListSortingStrategy}
+											>
+												{(() => {
+													const orderedHybridTypes = [
+														HybridBlock.introduction,
+														HybridBlock.research,
+														HybridBlock.action,
+													];
+													const presentHybridTypes = new Set(
+														fields
+															.filter(
+																(f) =>
+																	f.type === HybridBlock.introduction ||
+																	f.type === HybridBlock.research ||
+																	f.type === HybridBlock.action
+															)
+															.map((f) => f.type)
+													);
+
+													const shouldShowPlaceholders = selectedModeKey === 'hybrid';
+													const missingHybridTypes = shouldShowPlaceholders
+														? orderedHybridTypes.filter((t) => !presentHybridTypes.has(t))
+														: [];
+
+													const inserted = new Set<string>();
+													const augmented: Array<
+														| {
+																kind: 'field';
+																field: (typeof fields)[number];
+																index: number;
+														  }
+														| { kind: 'placeholder'; blockType: HybridBlock; key: string }
+													> = [];
+
+													for (let index = 0; index < fields.length; index++) {
+														const field = fields[index];
+														if (
+															field.type === HybridBlock.introduction ||
+															field.type === HybridBlock.research ||
+															field.type === HybridBlock.action
+														) {
+															const currentIdx = orderedHybridTypes.indexOf(field.type);
+															for (let i = 0; i < currentIdx; i++) {
+																const t = orderedHybridTypes[i];
+																if (
+																	missingHybridTypes.includes(t) &&
+																	!inserted.has(`ph-${t}`)
+																) {
+																	augmented.push({
+																		kind: 'placeholder',
+																		blockType: t,
+																		key: `ph-${t}-${index}`,
+																	});
+																	inserted.add(`ph-${t}`);
 																}
-																disabled={form.watch('isAiSubject')}
-																onFocus={(e) =>
-																	!form.watch('isAiSubject') &&
-																	trackFocusedField?.('subject', e.target)
-																}
-																onBlur={() => {
-																	if (!form.watch('isAiSubject')) {
-																		setHasSubjectBeenTouched(true);
-																	}
-																	field.onBlur();
-																}}
-																onChange={(e) => {
-																	if (!form.watch('isAiSubject') && e.target.value) {
-																		setHasSubjectBeenTouched(true);
-																	}
-																	field.onChange(e);
-																}}
-															/>
-														</div>
-													</div>
-												</FormControl>
-												<FormMessage />
-											</FormItem>
-										)}
-									/>
-								</div>
-							</div>
-							<div className="flex-1 flex flex-col">
-								{/* Content area */}
-								<div className="pt-[16px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
-									{fields.length === 0 && (
-										<span className="text-gray-300 font-primary text-[12px]">
-											Add blocks here to build your prompt...
-										</span>
-									)}
-									<SortableContext
-										items={fields.map((f) => f.id)}
-										strategy={verticalListSortingStrategy}
-									>
-										{(() => {
-											const orderedHybridTypes = [
-												HybridBlock.introduction,
-												HybridBlock.research,
-												HybridBlock.action,
-											];
-											const presentHybridTypes = new Set(
-												fields
-													.filter(
-														(f) =>
-															f.type === HybridBlock.introduction ||
-															f.type === HybridBlock.research ||
-															f.type === HybridBlock.action
-													)
-													.map((f) => f.type)
-											);
+															}
+														}
+														augmented.push({ kind: 'field', field, index });
+													}
 
-											const shouldShowPlaceholders = selectedModeKey === 'hybrid';
-											const missingHybridTypes = shouldShowPlaceholders
-												? orderedHybridTypes.filter((t) => !presentHybridTypes.has(t))
-												: [];
-
-											const inserted = new Set<string>();
-											const augmented: Array<
-												| { kind: 'field'; field: (typeof fields)[number]; index: number }
-												| { kind: 'placeholder'; blockType: HybridBlock; key: string }
-											> = [];
-
-											for (let index = 0; index < fields.length; index++) {
-												const field = fields[index];
-												if (
-													field.type === HybridBlock.introduction ||
-													field.type === HybridBlock.research ||
-													field.type === HybridBlock.action
-												) {
-													const currentIdx = orderedHybridTypes.indexOf(field.type);
-													for (let i = 0; i < currentIdx; i++) {
-														const t = orderedHybridTypes[i];
+													for (const t of orderedHybridTypes) {
 														if (
 															missingHybridTypes.includes(t) &&
 															!inserted.has(`ph-${t}`)
@@ -1385,245 +1430,239 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															augmented.push({
 																kind: 'placeholder',
 																blockType: t,
-																key: `ph-${t}-${index}`,
+																key: `ph-${t}-end`,
 															});
 															inserted.add(`ph-${t}`);
 														}
 													}
-												}
-												augmented.push({ kind: 'field', field, index });
-											}
 
-											for (const t of orderedHybridTypes) {
-												if (missingHybridTypes.includes(t) && !inserted.has(`ph-${t}`)) {
-													augmented.push({
-														kind: 'placeholder',
-														blockType: t,
-														key: `ph-${t}-end`,
-													});
-													inserted.add(`ph-${t}`);
-												}
-											}
-
-											const renderHybridPlaceholder = (type: HybridBlock) => {
-												if (selectedModeKey !== 'hybrid') return null;
-												const label =
-													type === HybridBlock.introduction
-														? 'Intro'
-														: type === HybridBlock.research
-														? 'Research'
-														: 'CTA';
-												const borderColor =
-													type === HybridBlock.introduction
-														? '#6673FF'
-														: type === HybridBlock.research
-														? '#1010E7'
-														: '#0E0E7F';
-												return (
-													<div
-														className={cn(
-															'flex justify-end',
-															showTestPreview ? 'w-[426px]' : 'w-[868px]'
-														)}
-													>
-														<Button
-															type="button"
-															onClick={() => handleAddBlock(getBlock(type))}
-															font="secondary"
-															className="w-[76px] h-[30px] bg-background hover:bg-primary/20 active:bg-primary/20 border-2 rounded-[8px] !font-normal text-[10px] text-gray-600 inline-flex items-center justify-start gap-[4px] pl-[4px]"
-															style={{ borderColor }}
-															title={`Add ${label}`}
-														>
-															<TinyPlusIcon
-																width="8px"
-																height="8px"
-																className="!w-[8px] !h-[8px]"
-															/>
-															<span className="font-inter font-medium text-[10px] text-[#0A0A0A]">
-																{label}
-															</span>
-														</Button>
-													</div>
-												);
-											};
-
-											return augmented.map((item) => {
-												if (item.kind === 'placeholder') {
-													return (
-														<Fragment key={item.key}>
-															{renderHybridPlaceholder(item.blockType)}
-														</Fragment>
-													);
-												}
-
-												const field = item.field;
-												const index = item.index;
-												const isHybridBlock =
-													field.type === HybridBlock.introduction ||
-													field.type === HybridBlock.research ||
-													field.type === HybridBlock.action;
-												const hasImmediateTextBlock =
-													fields[index + 1]?.type === HybridBlock.text;
-
-												return (
-													<Fragment key={field.id}>
-														<div className={cn(index === 0 && '-mt-2')}>
-															<SortableAIBlock
-																id={field.id}
-																fieldIndex={index}
-																block={getBlock(field.type)}
-																onRemove={handleRemoveBlock}
-																onCollapse={handleToggleCollapse}
-																onExpand={handleToggleCollapse}
-																isCollapsed={field.isCollapsed}
-																trackFocusedField={trackFocusedField}
-																showTestPreview={showTestPreview}
-																testMessage={testMessage}
-															/>
-														</div>
-														{/* Plus button under hybrid blocks */}
-														{isHybridBlock && !hasImmediateTextBlock && (
+													const renderHybridPlaceholder = (type: HybridBlock) => {
+														if (selectedModeKey !== 'hybrid') return null;
+														const label =
+															type === HybridBlock.introduction
+																? 'Intro'
+																: type === HybridBlock.research
+																? 'Research'
+																: 'CTA';
+														const borderColor =
+															type === HybridBlock.introduction
+																? '#6673FF'
+																: type === HybridBlock.research
+																? '#1010E7'
+																: '#0E0E7F';
+														return (
 															<div
 																className={cn(
-																	'flex relative z-30',
-																	showTestPreview
-																		? 'justify-start w-full'
-																		: 'justify-end -mr-[102px] w-[868px]'
+																	'flex justify-end',
+																	showTestPreview ? 'w-[426px]' : 'w-[868px]'
 																)}
-																style={{ transform: 'translateY(-12px)' }}
 															>
 																<Button
 																	type="button"
-																	onClick={() => handleAddTextBlockAt(index)}
-																	className={cn(
-																		'w-[52px] h-[20px] bg-background hover:bg-stone-100 active:bg-stone-200 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600',
-																		showTestPreview &&
-																			'absolute left-0 -translate-x-[calc(100%+5px)]'
-																	)}
-																	title="Text block"
+																	onClick={() => handleAddBlock(getBlock(type))}
+																	font="secondary"
+																	className="w-[76px] h-[30px] bg-background hover:bg-primary/20 active:bg-primary/20 border-2 rounded-[8px] !font-normal text-[10px] text-gray-600 inline-flex items-center justify-start gap-[4px] pl-[4px]"
+																	style={{ borderColor }}
+																	title={`Add ${label}`}
 																>
 																	<TinyPlusIcon
-																		width="5px"
-																		height="5px"
+																		width="8px"
+																		height="8px"
 																		className="!w-[8px] !h-[8px]"
 																	/>
-																	<span className="font-secondary">Text</span>
+																	<span className="font-inter font-medium text-[10px] text-[#0A0A0A]">
+																		{label}
+																	</span>
 																</Button>
 															</div>
-														)}
-													</Fragment>
-												);
-											});
-										})()}
-									</SortableContext>
-								</div>
-							</div>
+														);
+													};
 
-							{/*  Signature Block */}
-							<div className={cn('px-3 pb-0 pt-0 flex justify-center mt-auto')}>
-								<FormField
-									control={form.control}
-									name="signature"
-									render={({ field }) => (
-										<FormItem className="mb-[9px]">
-											<div
-												className={cn(
-													`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
-													showTestPreview ? 'w-[426px]' : 'w-[868px]'
-												)}
-											>
-												<FormLabel className="text-base font-semibold font-secondary">
-													Signature
-												</FormLabel>
-												<FormControl>
-													<Textarea
-														placeholder="Enter your signature..."
-														className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white"
-														style={{
-															fontFamily: form.watch('font') || 'Arial',
-														}}
-														onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
-															const target = e.currentTarget;
-															target.style.height = 'auto';
-															target.style.height = target.scrollHeight + 'px';
-														}}
-														{...field}
-													/>
-												</FormControl>
-											</div>
-											<FormMessage />
-										</FormItem>
-									)}
-								/>
-							</div>
-						</div>
+													return augmented.map((item) => {
+														if (item.kind === 'placeholder') {
+															return (
+																<Fragment key={item.key}>
+																	{renderHybridPlaceholder(item.blockType)}
+																</Fragment>
+															);
+														}
 
-						{compactLeftOnly ? null : (
-							<div
-								className={cn(
-									'flex flex-col items-center px-3 mt-auto',
-									showTestPreview && 'hidden'
-								)}
-							>
-								{/* Test button and notices hidden in compact mode */}
-								<div className="flex justify-center mt-[9px] mb-4 w-full">
-									<Button
-										type="button"
-										onClick={() => {
-											setShowTestPreview?.(true);
-											handleGenerateTestDrafts?.();
-											setHasAttemptedTest(true);
-										}}
-										disabled={isGenerationDisabled?.()}
-										className={cn(
-											'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
-											showTestPreview ? 'w-[426px]' : 'w-[868px]',
-											isGenerationDisabled?.()
-												? 'opacity-50 cursor-not-allowed'
-												: 'opacity-100'
-										)}
-									>
-										{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
-									</Button>
-								</div>
+														const field = item.field;
+														const index = item.index;
+														const isHybridBlock =
+															field.type === HybridBlock.introduction ||
+															field.type === HybridBlock.research ||
+															field.type === HybridBlock.action;
+														const hasImmediateTextBlock =
+															fields[index + 1]?.type === HybridBlock.text;
 
-								{/* Error message for empty text blocks */}
-								{hasEmptyTextBlocks && (
-									<div
-										className={cn(
-											hasTouchedEmptyTextBlocks || hasAttemptedTest
-												? 'text-destructive'
-												: 'text-black',
-											'text-sm font-medium -mt-2 mb-2',
-											showTestPreview ? 'w-[426px]' : 'w-[868px]'
-										)}
-									>
-										Fill in all text blocks in order to compose an email.
+														return (
+															<Fragment key={field.id}>
+																<div className={cn(index === 0 && '-mt-2')}>
+																	<SortableAIBlock
+																		id={field.id}
+																		fieldIndex={index}
+																		block={getBlock(field.type)}
+																		onRemove={handleRemoveBlock}
+																		onCollapse={handleToggleCollapse}
+																		onExpand={handleToggleCollapse}
+																		isCollapsed={field.isCollapsed}
+																		trackFocusedField={trackFocusedField}
+																		showTestPreview={showTestPreview}
+																		testMessage={testMessage}
+																	/>
+																</div>
+																{/* Plus button under hybrid blocks */}
+																{isHybridBlock && !hasImmediateTextBlock && (
+																	<div
+																		className={cn(
+																			'flex relative z-30',
+																			showTestPreview
+																				? 'justify-start w-full'
+																				: 'justify-end -mr-[102px] w-[868px]'
+																		)}
+																		style={{ transform: 'translateY(-12px)' }}
+																	>
+																		<Button
+																			type="button"
+																			onClick={() => handleAddTextBlockAt(index)}
+																			className={cn(
+																				'w-[52px] h-[20px] bg-background hover:bg-stone-100 active:bg-stone-200 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600',
+																				showTestPreview &&
+																					'absolute left-0 -translate-x-[calc(100%+5px)]'
+																			)}
+																			title="Text block"
+																		>
+																			<TinyPlusIcon
+																				width="5px"
+																				height="5px"
+																				className="!w-[8px] !h-[8px]"
+																			/>
+																			<span className="font-secondary">Text</span>
+																		</Button>
+																	</div>
+																)}
+															</Fragment>
+														);
+													});
+												})()}
+											</SortableContext>
+										</div>
 									</div>
-								)}
-							</div>
-						)}
 
-						{compactLeftOnly
-							? null
-							: showTestPreview && (
-									<div className="w-[461px] shrink-0">
-										<TestPreviewPanel
-											setShowTestPreview={setShowTestPreview}
-											testMessage={testMessage || ''}
-											isLoading={Boolean(isTest) || Boolean(isPendingGeneration)}
-											onTest={() => {
+									{/*  Signature Block */}
+									<div className={cn('px-3 pb-0 pt-0 flex justify-center mt-auto')}>
+										<FormField
+											control={form.control}
+											name="signature"
+											render={({ field }) => (
+												<FormItem className="mb-[9px]">
+													<div
+														className={cn(
+															`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
+															showTestPreview ? 'w-[426px]' : 'w-[868px]'
+														)}
+													>
+														<FormLabel className="text-base font-semibold font-secondary">
+															Signature
+														</FormLabel>
+														<FormControl>
+															<Textarea
+																placeholder="Enter your signature..."
+																className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white"
+																style={{
+																	fontFamily: form.watch('font') || 'Arial',
+																}}
+																onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+																	const target = e.currentTarget;
+																	target.style.height = 'auto';
+																	target.style.height = target.scrollHeight + 'px';
+																}}
+																{...field}
+															/>
+														</FormControl>
+													</div>
+													<FormMessage />
+												</FormItem>
+											)}
+										/>
+									</div>
+								</div>
+							</DraggableBox>
+
+							{compactLeftOnly ? null : (
+								<div
+									className={cn(
+										'flex flex-col items-center px-3 mt-auto',
+										showTestPreview && 'hidden'
+									)}
+								>
+									{/* Test button and notices hidden in compact mode */}
+									<div className="flex justify-center mt-[9px] mb-4 w-full">
+										<Button
+											type="button"
+											onClick={() => {
 												setShowTestPreview?.(true);
 												handleGenerateTestDrafts?.();
 												setHasAttemptedTest(true);
 											}}
-											isDisabled={isGenerationDisabled?.()}
-											isTesting={Boolean(isPendingGeneration) && Boolean(isTest)}
-											contact={contact}
-										/>
+											disabled={isGenerationDisabled?.()}
+											className={cn(
+												'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
+												showTestPreview ? 'w-[426px]' : 'w-[868px]',
+												isGenerationDisabled?.()
+													? 'opacity-50 cursor-not-allowed'
+													: 'opacity-100'
+											)}
+										>
+											{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+										</Button>
 									</div>
-							  )}
-					</div>
+
+									{/* Error message for empty text blocks */}
+									{hasEmptyTextBlocks && (
+										<div
+											className={cn(
+												hasTouchedEmptyTextBlocks || hasAttemptedTest
+													? 'text-destructive'
+													: 'text-black',
+												'text-sm font-medium -mt-2 mb-2',
+												showTestPreview ? 'w-[426px]' : 'w-[868px]'
+											)}
+										>
+											Fill in all text blocks in order to compose an email.
+										</div>
+									)}
+								</div>
+							)}
+
+							{compactLeftOnly
+								? null
+								: showTestPreview && (
+										<div className="w-[461px] shrink-0">
+											<DraggableBox
+												id="test-preview-panel"
+												dragHandleSelector="[data-test-preview-header]"
+												enabled={Boolean(showTestPreview)}
+											>
+												<TestPreviewPanel
+													setShowTestPreview={setShowTestPreview}
+													testMessage={testMessage || ''}
+													isLoading={Boolean(isTest) || Boolean(isPendingGeneration)}
+													onTest={() => {
+														setShowTestPreview?.(true);
+														handleGenerateTestDrafts?.();
+														setHasAttemptedTest(true);
+													}}
+													isDisabled={isGenerationDisabled?.()}
+													isTesting={Boolean(isPendingGeneration) && Boolean(isTest)}
+													contact={contact}
+												/>
+											</DraggableBox>
+										</div>
+								  )}
+						</div>
+					</DraggableBox>
 				</Droppable>
 			</DndContext>
 		</div>
