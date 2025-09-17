@@ -2,6 +2,9 @@
 
 import { FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+// Maintain a simple global counter so the most recently dragged box stays on top
+let globalDraggableBoxZIndex = 1;
+
 interface DraggableBoxProps {
 	/** Stable id for debugging or future persistence */
 	id: string;
@@ -31,6 +34,7 @@ export const DraggableBox: FC<DraggableBoxProps> = ({
 	const positionRef = useRef<{ x: number; y: number }>({ ...defaultPosition });
 	const [position, setPosition] = useState<{ x: number; y: number }>(defaultPosition);
 	const [isDragging, setIsDragging] = useState(false);
+	const [stackZIndex, setStackZIndex] = useState<number>(0);
 	const startRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
 
 	const isInteractive = (el: HTMLElement | null): boolean => {
@@ -84,6 +88,8 @@ export const DraggableBox: FC<DraggableBoxProps> = ({
 			}
 
 			// Start dragging
+			// Bring this box to the front and persist that order
+			setStackZIndex(++globalDraggableBoxZIndex);
 			setIsDragging(true);
 			startRef.current = {
 				x: positionRef.current.x,
@@ -129,10 +135,10 @@ export const DraggableBox: FC<DraggableBoxProps> = ({
 			transform: enabled ? `translate3d(${position.x}px, ${position.y}px, 0)` : undefined,
 			willChange: enabled && isDragging ? 'transform' : undefined,
 			position: 'relative',
-			zIndex: isDragging ? 10 : undefined,
+			zIndex: stackZIndex || undefined,
 			userSelect: isDragging ? 'none' : undefined,
 		}),
-		[enabled, isDragging, position.x, position.y]
+		[enabled, isDragging, position.x, position.y, stackZIndex]
 	);
 
 	return (
