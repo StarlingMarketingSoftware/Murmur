@@ -585,7 +585,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													blockRefs.current[b.id] = el;
 												}}
 												className={cn(
-													'rounded-[8px] border-2 bg-[#DADAFC] overflow-visible relative w-[357px] mx-auto',
+													'rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden relative w-[357px] mx-auto',
 													isExpanded ? 'h-[78px]' : 'h-[31px]'
 												)}
 												style={{ borderColor: strokeColor }}
