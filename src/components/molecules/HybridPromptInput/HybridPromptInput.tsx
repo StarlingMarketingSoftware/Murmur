@@ -1084,6 +1084,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 						id="main-drafting"
 						dragHandleSelector="[data-root-drag-handle]"
 						enabled={!showTestPreview}
+						onDropOver={() => {}}
 					>
 						<div
 							className={`${
