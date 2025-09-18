@@ -1558,87 +1558,127 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										</div>
 									</div>
 
-									{/*  Signature Block */}
-									<div className={cn('px-3 pb-0 pt-0 flex justify-center mt-auto')}>
-										<FormField
-											control={form.control}
-											name="signature"
-											render={({ field }) => (
-												<FormItem className="mb-[9px]">
-													<div
-														className={cn(
-															`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
-															showTestPreview ? 'w-[426px]' : 'w-[868px]'
-														)}
-													>
-														<FormLabel className="text-base font-semibold font-secondary">
-															Signature
-														</FormLabel>
-														<FormControl>
-															<Textarea
-																placeholder="Enter your signature..."
-																className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white"
-																style={{
-																	fontFamily: form.watch('font') || 'Arial',
-																}}
-																onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
-																	const target = e.currentTarget;
-																	target.style.height = 'auto';
-																	target.style.height = target.scrollHeight + 'px';
-																}}
-																{...field}
-															/>
-														</FormControl>
-													</div>
-													<FormMessage />
-												</FormItem>
-											)}
-										/>
-									</div>
+									{/* In Test Preview, keep Signature inside the left panel so it doesn't float */}
+									{showTestPreview && (
+										<div className={cn('px-3 pb-0 pt-0 flex justify-center mt-auto')}>
+											<FormField
+												control={form.control}
+												name="signature"
+												render={({ field }) => (
+													<FormItem className="mb-[9px]">
+														<div
+															className={cn(
+																`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
+																showTestPreview ? 'w-[426px]' : 'w-[868px]'
+															)}
+														>
+															<FormLabel className="text-base font-semibold font-secondary">
+																Signature
+															</FormLabel>
+															<FormControl>
+																<Textarea
+																	placeholder="Enter your signature..."
+																	className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white"
+																	style={{
+																		fontFamily: form.watch('font') || 'Arial',
+																	}}
+																	onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+																		const target = e.currentTarget;
+																		target.style.height = 'auto';
+																		target.style.height = target.scrollHeight + 'px';
+																	}}
+																	{...field}
+																/>
+															</FormControl>
+														</div>
+														<FormMessage />
+													</FormItem>
+												)}
+											/>
+										</div>
+									)}
 								</div>
 							</DraggableBox>
 
-							{compactLeftOnly ? null : (
-								<div
-									className={cn(
-										'flex flex-col items-center px-3 mt-auto',
-										showTestPreview && 'hidden'
-									)}
-								>
-									{/* Test button and notices hidden in compact mode */}
-									<div className="flex justify-center mt-[9px] mb-4 w-full">
-										<Button
-											type="button"
-											onClick={() => {
-												setShowTestPreview?.(true);
-												handleGenerateTestDrafts?.();
-												setHasAttemptedTest(true);
-											}}
-											disabled={isGenerationDisabled?.()}
-											className={cn(
-												'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
-												showTestPreview ? 'w-[426px]' : 'w-[868px]',
-												isGenerationDisabled?.()
-													? 'opacity-50 cursor-not-allowed'
-													: 'opacity-100'
-											)}
-										>
-											{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
-										</Button>
-									</div>
+							{/* Bottom-anchored footer with Signature and Test */}
+							{!showTestPreview && (
+								<div className="flex flex-col items-center px-3 mt-auto">
+									{/* Signature Block - always visible; positioned above Test with fixed gap */}
+									<FormField
+										control={form.control}
+										name="signature"
+										render={({ field }) => (
+											<FormItem
+												className={cn(
+													!showTestPreview && !compactLeftOnly ? 'mb-[23px]' : 'mb-[9px]'
+												)}
+											>
+												<div
+													className={cn(
+														`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
+														showTestPreview ? 'w-[426px]' : 'w-[868px]'
+													)}
+												>
+													<FormLabel className="text-base font-semibold font-secondary">
+														Signature
+													</FormLabel>
+													<FormControl>
+														<Textarea
+															placeholder="Enter your signature..."
+															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white"
+															style={{
+																fontFamily: form.watch('font') || 'Arial',
+															}}
+															onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+																const target = e.currentTarget;
+																target.style.height = 'auto';
+																target.style.height = target.scrollHeight + 'px';
+															}}
+															{...field}
+														/>
+													</FormControl>
+												</div>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
 
-									{/* Error message for empty text blocks */}
-									{hasEmptyTextBlocks && (
-										<div
-											className={cn(
-												hasTouchedEmptyTextBlocks || hasAttemptedTest
-													? 'text-destructive'
-													: 'text-black',
-												'text-sm font-medium -mt-2 mb-2',
-												showTestPreview ? 'w-[426px]' : 'w-[868px]'
+									{/* Test button and notices (hidden in compact mode) */}
+									{compactLeftOnly ? null : (
+										<div className={cn('w-full', showTestPreview && 'hidden')}>
+											<div className="flex justify-center mb-4 w-full">
+												<Button
+													type="button"
+													onClick={() => {
+														setShowTestPreview?.(true);
+														handleGenerateTestDrafts?.();
+														setHasAttemptedTest(true);
+													}}
+													disabled={isGenerationDisabled?.()}
+													className={cn(
+														'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
+														showTestPreview ? 'w-[426px]' : 'w-[868px]',
+														isGenerationDisabled?.()
+															? 'opacity-50 cursor-not-allowed'
+															: 'opacity-100'
+													)}
+												>
+													{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+												</Button>
+											</div>
+											{hasEmptyTextBlocks && (
+												<div
+													className={cn(
+														hasTouchedEmptyTextBlocks || hasAttemptedTest
+															? 'text-destructive'
+															: 'text-black',
+														'text-sm font-medium -mt-2 mb-2',
+														showTestPreview ? 'w-[426px]' : 'w-[868px]'
+													)}
+												>
+													Fill in all text blocks in order to compose an email.
+												</div>
 											)}
-										>
-											Fill in all text blocks in order to compose an email.
 										</div>
 									)}
 								</div>
