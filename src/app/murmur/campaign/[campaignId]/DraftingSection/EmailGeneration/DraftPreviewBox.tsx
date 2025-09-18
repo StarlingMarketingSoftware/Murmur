@@ -73,7 +73,7 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 						}}
 						className="overflow-hidden"
 					>
-						<div className="grid grid-cols-2 gap-2 h-full px-2 py-[6px] items-center">
+						<div className="grid grid-cols-[1fr_auto] gap-2 h-full px-2 py-[2px] items-center">
 							<div className="flex flex-col justify-center">
 								<div className="font-inter font-bold text-[14px] leading-4 truncate">
 									{contactName}
@@ -82,7 +82,7 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 									{contact?.company || ''}
 								</div>
 							</div>
-							<div className="flex flex-col items-start gap-1 overflow-hidden">
+							<div className="flex flex-col items-start gap-0.5 overflow-hidden">
 								<div className="flex items-center gap-2 w-full">
 									{stateAbbr ? (
 										<span
@@ -138,17 +138,11 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 						}}
 						className="overflow-hidden"
 					>
-						<CustomScrollbar
-							className="h-full"
-							thumbWidth={2}
-							thumbColor="#000000"
-							trackColor="transparent"
-							offsetRight={-5}
-						>
+						<div className="h-full overflow-hidden">
 							<div className="p-3 whitespace-pre-wrap text-[12px] leading-[1.5]">
 								{plainMessage || 'No content'}
 							</div>
-						</CustomScrollbar>
+						</div>
 					</div>
 				</div>
 			</div>
