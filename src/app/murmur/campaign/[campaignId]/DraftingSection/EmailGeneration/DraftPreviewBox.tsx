@@ -1,28 +1,36 @@
 'use client';
 
 import { FC, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
-import { EmailWithRelations } from '@/types';
+// removed unused imports
+// import removed: accept minimal draft shape to support ephemeral previews
 import { ContactWithName } from '@/types/contact';
 import { convertHtmlToPlainText } from '@/utils';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 
 interface DraftPreviewBoxProps {
-	draft: EmailWithRelations;
+	draft: { contactId: number; message?: string; subject?: string };
 	contacts: ContactWithName[];
 	onClose: () => void;
+	// When provided, overrides the computed plain text message for streaming UI
+	overridePlainMessage?: string;
+	// When provided, overrides the contact lookup id (useful for ephemeral previews)
+	overrideContactId?: number;
 }
 
 export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 	draft,
 	contacts,
 	onClose,
+	overridePlainMessage,
+	overrideContactId,
 }) => {
+	// keep prop referenced to satisfy linter; close control handled by parent
+	void onClose;
+	const effectiveContactId = overrideContactId ?? draft.contactId;
 	const contact = useMemo(
-		() => contacts.find((c) => c.id === draft.contactId) || null,
-		[contacts, draft.contactId]
+		() => contacts.find((c) => c.id === effectiveContactId) || null,
+		[contacts, effectiveContactId]
 	);
 
 	const contactName = useMemo(() => {
@@ -47,8 +55,8 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 	}, [contact]);
 
 	const plainMessage = useMemo(
-		() => convertHtmlToPlainText(draft.message || ''),
-		[draft.message]
+		() => overridePlainMessage ?? convertHtmlToPlainText(draft.message || ''),
+		[overridePlainMessage, draft.message]
 	);
 
 	const stateAbbr = useMemo(() => {

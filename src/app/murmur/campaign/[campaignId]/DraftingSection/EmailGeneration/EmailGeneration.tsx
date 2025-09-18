@@ -51,6 +51,9 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		setPreviewDraft,
 	} = useEmailGeneration(props);
 
+	// Live preview props passed from parent
+	const { isLivePreviewVisible, livePreviewContactId, livePreviewMessage } = props;
+
 	// Position the contacts overlay behind the mini email structure when previewing
 	const [contactsOverlayPos, setContactsOverlayPos] = useState<{
 		left: number;
@@ -58,7 +61,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	}>({ left: 0, top: 0 });
 
 	useEffect(() => {
-		if (!previewDraft) return;
+		if (!previewDraft && !isLivePreviewVisible) return;
 		const compute = () => {
 			const container = document.querySelector(
 				'[data-drafting-container]'
@@ -80,7 +83,14 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 			cancelAnimationFrame(raf);
 			window.removeEventListener('resize', compute);
 		};
-	}, [previewDraft]);
+	}, [previewDraft, isLivePreviewVisible]);
+
+	// When generation progresses and live preview is on, the Drafts list will refresh.
+	// Keep preview visible only when message is still streaming; otherwise rely on the
+	// drafts panel to display the new draft.
+	useEffect(() => {
+		// no-op hook for now; behavior controlled in useDraftingSection by hideLivePreview()
+	}, [generationProgress, isLivePreviewVisible]);
 
 	// Swap-on-drop: maintain the visual order of boxes. Defaults to the current layout order.
 	const [boxOrder, setBoxOrder] = useState<string[]>([
@@ -286,7 +296,9 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 										<DraggableBox
 											id="mini-email-structure"
 											onDropOver={(overId) => swapBoxes('mini-email-structure', overId)}
-											className={previewDraft ? 'z-10' : undefined}
+											className={
+												previewDraft || isLivePreviewVisible ? 'z-10' : undefined
+											}
 										>
 											<MiniEmailStructure
 												form={form}
@@ -302,14 +314,32 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 										</DraggableBox>
 									),
 									'draft-preview': (
-										<DraggableBox id="draft-preview">
-											{previewDraft && (
+										<DraggableBox
+											id="draft-preview"
+											enabled={false}
+											resetToken={
+												previewDraft
+													? `preview-${previewDraft.id}`
+													: isLivePreviewVisible
+													? 'live'
+													: 'hidden'
+											}
+										>
+											{previewDraft ? (
 												<DraftPreviewBox
 													contacts={contacts}
 													draft={previewDraft}
 													onClose={() => setPreviewDraft(null)}
 												/>
-											)}
+											) : isLivePreviewVisible ? (
+												<DraftPreviewBox
+													contacts={contacts}
+													draft={{ contactId: livePreviewContactId || 0 }}
+													onClose={() => setPreviewDraft(null)}
+													overridePlainMessage={livePreviewMessage || 'Drafting...'}
+													overrideContactId={livePreviewContactId || undefined}
+												/>
+											) : null}
 										</DraggableBox>
 									),
 									drafts: (
@@ -349,9 +379,15 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 									),
 								} as const;
 
-								const order = previewDraft
-									? (['mini-email-structure', 'draft-preview', 'drafts', 'sent'] as const)
-									: (boxOrder as readonly string[]);
+								const order =
+									previewDraft || isLivePreviewVisible
+										? ([
+												'mini-email-structure',
+												'draft-preview',
+												'drafts',
+												'sent',
+										  ] as const)
+										: (boxOrder as readonly string[]);
 
 								const boxes = order.map((boxId) => (
 									<div key={boxId}>
@@ -359,8 +395,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 									</div>
 								));
 
-								// When previewing, render the contacts box as an overlay tucked behind the mini structure.
-								if (previewDraft) {
+								// When previewing (static or live), render the contacts box as an overlay tucked behind the mini structure.
+								if (previewDraft || isLivePreviewVisible) {
 									boxes.push(
 										<div
 											key="contacts-overlay"

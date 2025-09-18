@@ -154,6 +154,58 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		element: HTMLTextAreaElement | HTMLInputElement | null;
 	}>({ name: '', element: null });
 
+	// Live preview state for visual drafting
+	const [isLivePreviewVisible, setIsLivePreviewVisible] = useState(false);
+	const [livePreviewContactId, setLivePreviewContactId] = useState<number | null>(null);
+	const [livePreviewMessage, setLivePreviewMessage] = useState('');
+	const livePreviewTimerRef = useRef<number | null>(null);
+	const livePreviewWordsRef = useRef<string[]>([]);
+	const livePreviewIndexRef = useRef<number>(0);
+
+	const hideLivePreview = useCallback(() => {
+		if (livePreviewTimerRef.current) {
+			clearInterval(livePreviewTimerRef.current);
+			livePreviewTimerRef.current = null;
+		}
+		setIsLivePreviewVisible(false);
+		setLivePreviewContactId(null);
+		setLivePreviewMessage('');
+		livePreviewWordsRef.current = [];
+		livePreviewIndexRef.current = 0;
+	}, []);
+
+	const startLivePreviewStreaming = useCallback(
+		(contactId: number, fullMessage: string) => {
+			if (livePreviewTimerRef.current) {
+				clearInterval(livePreviewTimerRef.current);
+				livePreviewTimerRef.current = null;
+			}
+			setIsLivePreviewVisible(true);
+			setLivePreviewContactId(contactId);
+			setLivePreviewMessage('');
+			const words = (fullMessage || '').split(/\s+/);
+			livePreviewWordsRef.current = words;
+			livePreviewIndexRef.current = 0;
+			const stepMs = Math.max(
+				20,
+				Math.min(120, Math.floor(3000 / Math.max(words.length, 1)))
+			);
+			livePreviewTimerRef.current = window.setInterval(() => {
+				const i = livePreviewIndexRef.current;
+				if (i >= livePreviewWordsRef.current.length) {
+					if (livePreviewTimerRef.current) {
+						clearInterval(livePreviewTimerRef.current);
+						livePreviewTimerRef.current = null;
+					}
+					return;
+				}
+				livePreviewIndexRef.current = i + 1;
+				setLivePreviewMessage(livePreviewWordsRef.current.slice(0, i + 1).join(' '));
+			}, stepMs);
+		},
+		[]
+	);
+
 	const { data: signatures } = useGetSignatures();
 
 	const form = useForm<DraftingFormValues>({
@@ -749,6 +801,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			abortController.abort();
 			setAbortController(null);
 		}
+		hideLivePreview();
 	};
 
 	const generateHandWrittenDraftTest = async () => {
@@ -978,6 +1031,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					}
 
 					if (parsedDraft) {
+						// Start live preview streaming for this recipient
+						startLivePreviewStreaming(recipient.id, parsedDraft.message);
 						if (!isAiSubject) {
 							parsedDraft.subject = values.subject || parsedDraft.subject;
 						}
@@ -993,7 +1048,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 							status: 'draft' as EmailStatus,
 							contactId: recipient.id,
 						});
+						// Immediately reflect in UI
 						setGenerationProgress((prev) => prev + 1);
+						queryClient.invalidateQueries({
+							queryKey: ['emails', { campaignId: campaign.id }],
+						});
+						// Hide preview after each saved draft so it "moves" to Drafts list
+						hideLivePreview();
 
 						return {
 							success: true,
@@ -1079,6 +1140,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				: contacts;
 
 		try {
+			// show preview surface while generation is running
+			setIsLivePreviewVisible(true);
+			setLivePreviewMessage('Drafting...');
+			setLivePreviewContactId(null);
 			for (
 				let i = 0;
 				i < targets.length && !isGenerationCancelledRef.current;
@@ -1167,6 +1232,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		} finally {
 			setAbortController(null);
 			setGenerationProgress(-1);
+			hideLivePreview();
 		}
 	};
 
@@ -1326,6 +1392,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			if (abortController) {
 				abortController.abort();
 			}
+			if (livePreviewTimerRef.current) {
+				clearInterval(livePreviewTimerRef.current);
+				livePreviewTimerRef.current = null;
+			}
 		};
 		/* eslint-disable-next-line react-hooks/exhaustive-deps */
 	}, []);
@@ -1381,5 +1451,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		scrollToEmailStructure,
 		draftingRef,
 		emailStructureRef,
+		isLivePreviewVisible,
+		livePreviewContactId,
+		livePreviewMessage,
 	};
 };

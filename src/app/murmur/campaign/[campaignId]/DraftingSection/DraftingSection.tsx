@@ -29,6 +29,9 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		emailStructureRef,
 		scrollToEmailStructure,
 		// draftingMode,
+		isLivePreviewVisible,
+		livePreviewContactId,
+		livePreviewMessage,
 	} = useDraftingSection(props);
 
 	return (
@@ -73,6 +76,9 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 								cancelGeneration={cancelGeneration}
 								isFirstLoad={isFirstLoad}
 								scrollToEmailStructure={scrollToEmailStructure}
+								isLivePreviewVisible={isLivePreviewVisible}
+								livePreviewContactId={livePreviewContactId}
+								livePreviewMessage={livePreviewMessage}
 							/>
 						)}
 					</div>

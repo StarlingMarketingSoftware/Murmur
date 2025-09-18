@@ -30,6 +30,10 @@ export interface EmailGenerationProps {
 	cancelGeneration: () => void;
 	isFirstLoad: boolean;
 	scrollToEmailStructure?: () => void;
+	// Live drafting preview props
+	isLivePreviewVisible?: boolean;
+	livePreviewContactId?: number | null;
+	livePreviewMessage?: string;
 }
 
 export const useEmailGeneration = (props: EmailGenerationProps) => {
