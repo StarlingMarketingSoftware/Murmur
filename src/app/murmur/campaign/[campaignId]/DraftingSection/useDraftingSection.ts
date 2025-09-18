@@ -159,7 +159,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [livePreviewContactId, setLivePreviewContactId] = useState<number | null>(null);
 	const [livePreviewMessage, setLivePreviewMessage] = useState('');
 	const livePreviewTimerRef = useRef<number | null>(null);
-	const livePreviewWordsRef = useRef<string[]>([]);
+	// Store full text and an index to preserve original whitespace and paragraph breaks
+	const livePreviewFullTextRef = useRef<string>('');
 	const livePreviewIndexRef = useRef<number>(0);
 
 	const hideLivePreview = useCallback(() => {
@@ -170,7 +171,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		setIsLivePreviewVisible(false);
 		setLivePreviewContactId(null);
 		setLivePreviewMessage('');
-		livePreviewWordsRef.current = [];
+		livePreviewFullTextRef.current = '';
 		livePreviewIndexRef.current = 0;
 	}, []);
 
@@ -183,24 +184,25 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			setIsLivePreviewVisible(true);
 			setLivePreviewContactId(contactId);
 			setLivePreviewMessage('');
-			const words = (fullMessage || '').split(/\s+/);
-			livePreviewWordsRef.current = words;
+			const text = fullMessage || '';
+			livePreviewFullTextRef.current = text;
 			livePreviewIndexRef.current = 0;
-			const stepMs = Math.max(
-				20,
-				Math.min(120, Math.floor(3000 / Math.max(words.length, 1)))
-			);
+			// Target ~3s reveal regardless of message length; preserve newlines
+			const length = Math.max(text.length, 1);
+			const stepChars = Math.max(1, Math.floor(length / 150));
+			const stepMs = 20; // smooth updates, lightweight
 			livePreviewTimerRef.current = window.setInterval(() => {
 				const i = livePreviewIndexRef.current;
-				if (i >= livePreviewWordsRef.current.length) {
+				if (i >= livePreviewFullTextRef.current.length) {
 					if (livePreviewTimerRef.current) {
 						clearInterval(livePreviewTimerRef.current);
 						livePreviewTimerRef.current = null;
 					}
 					return;
 				}
-				livePreviewIndexRef.current = i + 1;
-				setLivePreviewMessage(livePreviewWordsRef.current.slice(0, i + 1).join(' '));
+				const nextIndex = Math.min(i + stepChars, livePreviewFullTextRef.current.length);
+				livePreviewIndexRef.current = nextIndex;
+				setLivePreviewMessage(livePreviewFullTextRef.current.slice(0, nextIndex));
 			}, stepMs);
 		},
 		[]
@@ -1053,8 +1055,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 						queryClient.invalidateQueries({
 							queryKey: ['emails', { campaignId: campaign.id }],
 						});
-						// Hide preview after each saved draft so it "moves" to Drafts list
-						hideLivePreview();
+						// Keep live preview open between drafts for smoother UX
 
 						return {
 							success: true,
@@ -1232,6 +1233,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		} finally {
 			setAbortController(null);
 			setGenerationProgress(-1);
+			// Hide live preview after completion so the DraftPreviewBox disappears promptly
 			hideLivePreview();
 		}
 	};

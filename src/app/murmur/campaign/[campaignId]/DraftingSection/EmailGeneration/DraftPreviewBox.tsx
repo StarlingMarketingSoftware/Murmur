@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useMemo } from 'react';
+import { FC, useMemo, memo } from 'react';
 // removed unused imports
 // import removed: accept minimal draft shape to support ephemeral previews
 import { ContactWithName } from '@/types/contact';
@@ -158,7 +158,7 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 						className="overflow-hidden"
 					>
 						<div className="h-full overflow-hidden">
-							<div className="p-3 whitespace-pre-wrap text-[12px] leading-[1.5]">
+							<div className="p-3 whitespace-pre-wrap text-[12px] leading-[1.5] overflow-y-auto">
 								{plainMessage || 'No content'}
 							</div>
 						</div>
@@ -169,4 +169,4 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 	);
 };
 
-export default DraftPreviewBox;
+export default memo(DraftPreviewBox);
