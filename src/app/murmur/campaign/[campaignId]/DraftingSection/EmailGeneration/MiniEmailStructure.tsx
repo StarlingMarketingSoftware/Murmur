@@ -425,6 +425,28 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				overflow: 'visible',
 			}}
 		>
+			{/* Centered number above block */}
+			<div
+				data-drafting-top-number
+				style={{
+					position: 'absolute',
+					top: '-26px',
+					left: '50%',
+					transform: 'translateX(-50%)',
+					pointerEvents: 'none',
+				}}
+				className="text-[12px] font-inter font-medium text-black"
+			>
+				2
+			</div>
+			{/* Top-left text label */}
+			<div
+				data-drafting-top-label
+				style={{ position: 'absolute', top: '-20px', left: '2px', pointerEvents: 'none' }}
+				className="text-[12px] font-inter font-medium text-black"
+			>
+				Email Structure
+			</div>
 			{/* Container with header to match table sizing */}
 			<div
 				style={{

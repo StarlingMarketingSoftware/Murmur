@@ -32,6 +32,28 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	const isSent = title === 'Sent';
 	return (
 		<div style={{ width: '376px', height: '474px', position: 'relative' }}>
+			{/* Centered number above block */}
+			<div
+				data-drafting-top-number
+				style={{
+					position: 'absolute',
+					top: '-26px',
+					left: '50%',
+					transform: 'translateX(-50%)',
+					pointerEvents: 'none',
+				}}
+				className="text-[12px] font-inter font-medium text-black"
+			>
+				{isContacts ? '1' : isDrafts ? '3' : isSent ? '4' : ''}
+			</div>
+			{/* Top-left text label */}
+			<div
+				data-drafting-top-label
+				style={{ position: 'absolute', top: '-20px', left: '2px', pointerEvents: 'none' }}
+				className="text-[12px] font-inter font-medium text-black"
+			>
+				{isContacts ? 'Contacts' : isDrafts ? 'Drafts' : isSent ? 'Sent' : title}
+			</div>
 			{/* Container box with header */}
 			<div
 				data-drafting-table

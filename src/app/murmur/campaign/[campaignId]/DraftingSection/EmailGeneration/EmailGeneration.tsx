@@ -323,7 +323,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 						)}
 					>
 						{/* Tables container - positioned at bottom; order-controlled swapping */}
-						<div className="absolute left-[19px] right-[19px] flex flex-row justify-center gap-x-10 top-[35px] overflow-visible">
+						<div className="absolute left-[19px] right-[19px] flex flex-row justify-center gap-x-10 top-[50px] overflow-visible">
 							{(() => {
 								const draftedContactIds = new Set(draftEmails.map((d) => d.contactId));
 								const availableContacts = contacts.filter(
