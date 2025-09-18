@@ -86,13 +86,14 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 								<div className="flex items-center gap-2 w-full">
 									{stateAbbr ? (
 										<span
-											className="inline-flex items-center justify-center text-[10px] leading-none font-bold"
+											className="inline-flex items-center justify-center font-inter font-normal leading-none"
 											style={{
 												width: '25px',
 												height: '14px',
 												borderRadius: '3.98px',
 												border: '0.5px solid #000000',
 												backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
+												fontSize: '11.22px',
 											}}
 										>
 											{stateAbbr}
@@ -114,7 +115,10 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 											border: '0.63px solid #000000',
 										}}
 									>
-										<span className="text-[9px] leading-none truncate">
+										<span
+											className="font-inter font-normal leading-none truncate"
+											style={{ fontSize: '9.49px' }}
+										>
 											{contact.headline}
 										</span>
 									</div>
