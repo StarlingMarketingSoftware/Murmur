@@ -35,6 +35,17 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 		);
 	}, [contact]);
 
+	// Show company on the second line only when there is a separate name
+	const showCompanyLine = useMemo(() => {
+		if (!contact) return false;
+		const hasName = Boolean(
+			(contact.name && contact.name.trim()) ||
+				(contact.firstName && contact.firstName.trim()) ||
+				(contact.lastName && contact.lastName.trim())
+		);
+		return Boolean(contact.company && hasName);
+	}, [contact]);
+
 	const plainMessage = useMemo(
 		() => convertHtmlToPlainText(draft.message || ''),
 		[draft.message]
@@ -79,7 +90,7 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 									{contactName}
 								</div>
 								<div className="text-[12px] leading-4 truncate">
-									{contact?.company || ''}
+									{showCompanyLine ? contact?.company : ''}
 								</div>
 							</div>
 							<div className="flex flex-col items-start gap-0.5 overflow-hidden">

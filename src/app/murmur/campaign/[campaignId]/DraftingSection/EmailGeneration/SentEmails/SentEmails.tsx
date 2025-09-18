@@ -120,12 +120,20 @@ export const SentEmails: FC<SentEmailsProps> = ({ emails, isPendingEmails }) => 
 									</div>
 								</div>
 
-								{/* Row 2: Company */}
-								<div className="row-start-2 col-start-1 flex items-center pr-2">
-									<div className="text-[11px] text-black truncate leading-none">
-										{contact?.company || ''}
-									</div>
-								</div>
+								{/* Row 2: Company (only when there is a separate name) */}
+								{(() => {
+									const hasSeparateName = Boolean(
+										(contact?.firstName && contact.firstName.trim()) ||
+											(contact?.lastName && contact.lastName.trim())
+									);
+									return (
+										<div className="row-start-2 col-start-1 flex items-center pr-2">
+											<div className="text-[11px] text-black truncate leading-none">
+												{hasSeparateName ? contact?.company || '' : ''}
+											</div>
+										</div>
+									);
+								})()}
 
 								{/* Row 3: Subject */}
 								<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center">
