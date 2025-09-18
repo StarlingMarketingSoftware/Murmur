@@ -51,29 +51,21 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 				style={{
 					width: '100%',
 					height: '100%',
-					border: '2px solid #ABABAB',
+					border: '3px solid #000000',
 					borderRadius: '8px',
 					position: 'relative',
 					display: 'flex',
 					flexDirection: 'column',
-					backgroundColor: 'white',
+					backgroundColor: '#BFD4FA',
 				}}
 			>
-				{/* Close button (floating) */}
-				<Button
-					type="button"
-					variant="ghost"
-					onClick={onClose}
-					className="absolute top-2 right-2 p-1 h-auto w-auto hover:bg-gray-100 rounded"
-				>
-					×
-				</Button>
+				{/* Removed close button per request */}
 
-				<div className="flex-1 flex flex-col items-center gap-3 p-3 pt-12">
+				<div className="flex-1 flex flex-col items-center gap-3 p-3 pt-2">
 					{/* Contact info box: adjusted width for close button clearance */}
 					<div
 						style={{
-							width: '350px',
+							width: '366px',
 							height: '41px',
 							border: '2px solid #000000',
 							borderRadius: '8px',
@@ -81,7 +73,7 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 						}}
 						className="overflow-hidden"
 					>
-						<div className="grid grid-cols-2 gap-2 h-full px-2 py-1 items-center">
+						<div className="grid grid-cols-2 gap-2 h-full px-2 py-[6px] items-center">
 							<div className="flex flex-col justify-center">
 								<div className="font-inter font-bold text-[14px] leading-4 truncate">
 									{contactName}
@@ -90,28 +82,39 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 									{contact?.company || ''}
 								</div>
 							</div>
-							<div className="flex flex-col items-end gap-1 overflow-hidden">
-								<div className="flex items-center gap-1 w-full justify-end">
+							<div className="flex flex-col items-start gap-1 overflow-hidden">
+								<div className="flex items-center gap-2 w-full">
 									{stateAbbr ? (
 										<span
-											className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
+											className="inline-flex items-center justify-center text-[10px] leading-none font-bold"
 											style={{
+												width: '25px',
+												height: '14px',
+												borderRadius: '3.98px',
+												border: '0.5px solid #000000',
 												backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
-												borderColor: '#000000',
 											}}
 										>
 											{stateAbbr}
 										</span>
 									) : null}
 									{contact?.city ? (
-										<span className="text-[11px] leading-none truncate max-w-[100px]">
+										<span className="text-[10px] leading-none truncate max-w-[72px]">
 											{contact.city}
 										</span>
 									) : null}
 								</div>
 								{contact?.headline ? (
-									<div className="rounded-[6px] px-2 h-[17px] flex items-center border border-black bg-[#E8EFFF] max-w-[160px] overflow-hidden">
-										<span className="text-[10px] leading-none truncate">
+									<div
+										className="px-2 flex items-center bg-[#E8EFFF] overflow-hidden"
+										style={{
+											width: '133px',
+											height: '17px',
+											borderRadius: '5.06px',
+											border: '0.63px solid #000000',
+										}}
+									>
+										<span className="text-[9px] leading-none truncate">
 											{contact.headline}
 										</span>
 									</div>
@@ -120,10 +123,10 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 						</div>
 					</div>
 
-					{/* Draft body box: adjusted width for close button clearance */}
+					{/* Draft body box */}
 					<div
 						style={{
-							width: '350px',
+							width: '366px',
 							height: '390px',
 							border: '2px solid #000000',
 							borderRadius: '8px',
