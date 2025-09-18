@@ -198,7 +198,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		setSendingPreview(null);
 		let successfulSends = 0;
 
-		for (const email of emailsToProcess) {
+		for (let i = 0; i < emailsToProcess.length; i++) {
+			const email = emailsToProcess[i];
 			// Show current email in the sending preview box
 			setSendingPreview({
 				contactId: email.contactId,
@@ -232,10 +233,15 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 				}
 			} catch (error) {
 				console.error('Failed to send email:', error);
+			} finally {
+				// If this was the last email processed (success or fail), hide the preview immediately
+				if (i === emailsToProcess.length - 1) {
+					setSendingPreview(null);
+				}
 			}
 		}
 
-		// Clear sending preview when done
+		// Safety: ensure cleared (no-op if already cleared in finally)
 		setSendingPreview(null);
 
 		// Update user credits

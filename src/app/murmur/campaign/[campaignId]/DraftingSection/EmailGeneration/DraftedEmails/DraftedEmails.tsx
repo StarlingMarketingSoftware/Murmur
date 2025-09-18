@@ -174,43 +174,42 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						<div className="w-full flex flex-col gap-2">
 							{/* Inline confirmation details */}
 							<div className={cn('w-full', !showConfirm && 'hidden')}>
-								<div className="grid grid-cols-3 items-start w-full">
-									<div className="flex flex-col items-start">
-										<div className="text-[14px] font-semibold text-[#000000] font-secondary">
-											To:
-										</div>
-										<div className="mt-0.5 text-[14px] text-[#000000] font-secondary">
-											{toCount} emails selected
-										</div>
+								<div
+									className="grid w-full gap-x-3 gap-y-1 items-start"
+									style={{ gridTemplateColumns: '120px 1fr' }}
+								>
+									<div className="text-[12px] leading-tight font-semibold text-[#000000] font-secondary whitespace-nowrap">
+										To:
 									</div>
-									<div className="flex justify-center">
-										<div className="flex flex-col items-start">
-											<div className="text-[14px] font-semibold text-[#000000] font-secondary">
-												From:
-											</div>
-											<div className="mt-0.5 text-[14px] text-[#000000] font-secondary">
-												{props.fromName || ''}
-											</div>
-										</div>
+									<div className="text-[12px] leading-tight text-[#000000] font-secondary min-w-0 break-words pl-1">
+										{toCount} emails selected
 									</div>
-									<div className="flex justify-end">
-										<div className="flex flex-col items-start">
-											<div className="text-[14px] font-semibold text-[#000000] font-secondary">
-												Return Address:
-											</div>
-											<div className="mt-0.5 text-[14px] text-[#000000] font-secondary">
-												{props.fromEmail || ''}
-											</div>
-										</div>
+
+									<div className="text-[12px] leading-tight font-semibold text-[#000000] font-secondary whitespace-nowrap">
+										From:
 									</div>
+									<div className="text-[12px] leading-tight text-[#000000] font-secondary min-w-0 break-words pl-1">
+										{props.fromName || ''}
+									</div>
+
+									<div className="text-[12px] leading-tight font-semibold text-[#000000] font-secondary whitespace-nowrap">
+										Return Address:
+									</div>
+									<div className="text-[12px] leading-tight text-[#000000] font-secondary min-w-0 break-all pl-1">
+										{props.fromEmail || ''}
+									</div>
+
+									{subjectPreview && (
+										<>
+											<div className="text-[12px] leading-tight font-semibold text-[#000000] font-secondary whitespace-nowrap">
+												Subject:
+											</div>
+											<div className="text-[12px] leading-tight text-[#000000] font-secondary min-w-0 break-words pl-1">
+												{subjectPreview}
+											</div>
+										</>
+									)}
 								</div>
-								{subjectPreview && (
-									<div className="flex flex-col items-start mt-0.5">
-										<div className="text-[14px] text-[#000000] font-secondary">
-											{subjectPreview}
-										</div>
-									</div>
-								)}
 							</div>
 
 							<div className="w-full flex items-center justify-center">
