@@ -54,8 +54,22 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	// Live preview props passed from parent
 	const { isLivePreviewVisible, livePreviewContactId, livePreviewMessage } = props;
 
+	// Sending preview: shows the email currently being sent
+	const [sendingPreview, setSendingPreview] = useState<{
+		contactId: number;
+		message?: string;
+		subject?: string;
+	} | null>(null);
+	const isSendingPreviewVisible = Boolean(sendingPreview);
+
 	// Position the contacts overlay behind the mini email structure when previewing
 	const [contactsOverlayPos, setContactsOverlayPos] = useState<{
+		left: number;
+		top: number;
+	}>({ left: 0, top: 0 });
+
+	// Position the sent table behind the sending preview when sending
+	const [sentOverlayPos, setSentOverlayPos] = useState<{
 		left: number;
 		top: number;
 	}>({ left: 0, top: 0 });
@@ -84,6 +98,31 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 			window.removeEventListener('resize', compute);
 		};
 	}, [previewDraft, isLivePreviewVisible]);
+
+	useEffect(() => {
+		if (!isSendingPreviewVisible) return;
+		const compute = () => {
+			const container = document.querySelector(
+				'[data-drafting-container]'
+			) as HTMLElement | null;
+			const sending = document.querySelector(
+				"[data-draggable-box-id='sending-preview']"
+			) as HTMLElement | null;
+			if (!container || !sending) return;
+			const cRect = container.getBoundingClientRect();
+			const sRect = sending.getBoundingClientRect();
+			// Offset: sent should sit 112px higher and 184px to the right of sending-preview
+			const left = sRect.left - cRect.left + 184;
+			const top = sRect.top - cRect.top - 112;
+			setSentOverlayPos({ left, top });
+		};
+		const raf = requestAnimationFrame(compute);
+		window.addEventListener('resize', compute);
+		return () => {
+			cancelAnimationFrame(raf);
+			window.removeEventListener('resize', compute);
+		};
+	}, [isSendingPreviewVisible, sendingPreview]);
 
 	// When generation progresses and live preview is on, the Drafts list will refresh.
 	// Keep preview visible only when message is still streaming; otherwise rely on the
@@ -155,9 +194,17 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		const emailsToProcess = selectedDrafts.slice(0, emailsWeCanSend);
 
 		setSendingProgress(0);
+		// Initialize sending preview with first email when loop starts
+		setSendingPreview(null);
 		let successfulSends = 0;
 
 		for (const email of emailsToProcess) {
+			// Show current email in the sending preview box
+			setSendingPreview({
+				contactId: email.contactId,
+				message: email.message,
+				subject: email.subject,
+			});
 			try {
 				const res = await sendMailgunMessage({
 					subject: email.subject,
@@ -187,6 +234,9 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 				console.error('Failed to send email:', error);
 			}
 		}
+
+		// Clear sending preview when done
+		setSendingPreview(null);
 
 		// Update user credits
 		if (user && successfulSends > 0) {
@@ -342,6 +392,24 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 											) : null}
 										</DraggableBox>
 									),
+									'sending-preview': (
+										<DraggableBox
+											id="sending-preview"
+											enabled={false}
+											className="z-10"
+											resetToken={
+												sendingPreview ? `sending-${sendingPreview.contactId}` : 'hidden'
+											}
+										>
+											{sendingPreview ? (
+												<DraftPreviewBox
+													contacts={contacts}
+													draft={sendingPreview}
+													onClose={() => setSendingPreview(null)}
+												/>
+											) : null}
+										</DraggableBox>
+									),
 									drafts: (
 										<DraggableBox
 											id="drafts"
@@ -386,6 +454,13 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												'drafts',
 												'sent',
 										  ] as const)
+										: isSendingPreviewVisible
+										? ([
+												'contacts',
+												'mini-email-structure',
+												'drafts',
+												'sending-preview',
+										  ] as const)
 										: (boxOrder as readonly string[]);
 
 								const boxes = order.map((boxId) => (
@@ -415,6 +490,28 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 													generationProgress={generationProgress}
 													generationTotal={generationTotal}
 													cancelGeneration={cancelGeneration}
+												/>
+											</DraggableBox>
+										</div>
+									);
+								}
+
+								// When sending, render the Sent table as an overlay behind the Sending Preview
+								if (isSendingPreviewVisible) {
+									boxes.push(
+										<div
+											key="sent-overlay"
+											className="absolute z-0 pointer-events-none"
+											style={{
+												left: `${sentOverlayPos.left}px`,
+												top: `${sentOverlayPos.top}px`,
+												opacity: 0.7,
+											}}
+										>
+											<DraggableBox id="sent-overlay" enabled={false}>
+												<SentEmails
+													emails={sentEmails}
+													isPendingEmails={isPendingEmails}
 												/>
 											</DraggableBox>
 										</div>
