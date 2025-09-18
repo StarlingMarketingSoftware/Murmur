@@ -421,6 +421,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 											id="drafts"
 											dragHandleSelector="[data-drafting-table-header]"
 											onDropOver={(overId) => swapBoxes('drafts', overId)}
+											className={draftEmails.length === 0 ? 'opacity-50' : undefined}
 										>
 											<DraftedEmails
 												draftEmails={draftEmails}
@@ -446,6 +447,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 											id="sent"
 											dragHandleSelector="[data-drafting-table-header]"
 											onDropOver={(overId) => swapBoxes('sent', overId)}
+											className={sentEmails.length === 0 ? 'opacity-50' : undefined}
 										>
 											<SentEmails emails={sentEmails} isPendingEmails={isPendingEmails} />
 										</DraggableBox>

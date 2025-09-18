@@ -39,7 +39,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					width: '100%',
 					height: '100%',
 					border: isContacts
-						? '2.3px solid #5D5B5B'
+						? '2px solid #5D5B5B'
 						: isDrafts
 						? '2px solid #A8833A'
 						: isSent
@@ -114,17 +114,22 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						<div className="flex items-center justify-center h-full">
 							<Spinner size="small" />
 						</div>
+					) : hasData ? (
+						children
+					) : isDrafts || isSent ? (
+						<div className="overflow-visible w-full flex flex-col gap-2 items-center py-2">
+							{Array.from({ length: 5 }).map((_, idx) => (
+								<div
+									key={idx}
+									className="select-none w-[366px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
+								/>
+							))}
+						</div>
 					) : (
-						<>
-							{hasData ? (
-								children
-							) : (
-								<div className="flex flex-col items-center justify-center h-full text-gray-500 px-4">
-									<div className="text-sm font-semibold mb-2">{noDataMessage}</div>
-									<div className="text-xs text-center">{noDataDescription}</div>
-								</div>
-							)}
-						</>
+						<div className="flex flex-col items-center justify-center h-full text-gray-500 px-4">
+							<div className="text-sm font-semibold mb-2">{noDataMessage}</div>
+							<div className="text-xs text-center">{noDataDescription}</div>
+						</div>
 					)}
 				</CustomScrollbar>
 
