@@ -48,12 +48,14 @@ export const DraggableBox: FC<DraggableBoxProps> = ({
 
 	const isInteractive = (el: HTMLElement | null): boolean => {
 		if (!el) return false;
+		// Explicit opt-out marker anywhere up the tree
+		if (el.closest('[data-drag-ignore="true"], [data-drag-ignore]')) return true;
 		const interactiveTags = ['BUTTON', 'A', 'INPUT', 'TEXTAREA', 'SELECT', 'LABEL'];
 		if (interactiveTags.includes(el.tagName)) return true;
 		const role = el.getAttribute('role');
-		if (role && ['button', 'link', 'textbox'].includes(role)) return true;
+		if (role && ['button', 'link', 'textbox', 'slider'].includes(role)) return true;
 		return !!el.closest(
-			"button, a, input, textarea, select, [role='button'], [role='link']"
+			"button, a, input, textarea, select, [role='button'], [role='link'], [role='slider']"
 		);
 	};
 
