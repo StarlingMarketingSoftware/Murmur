@@ -344,7 +344,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 												handleDraftDoubleClick(draft);
 											}
 										}}
-										className="absolute top-[28px] right-[6px] p-1 transition-colors z-20"
+										className="absolute top-[28px] right-[2px] p-1 transition-colors z-20"
 										aria-label="Preview draft"
 									>
 										<PreviewIcon
