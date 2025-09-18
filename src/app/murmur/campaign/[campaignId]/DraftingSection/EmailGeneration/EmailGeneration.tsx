@@ -364,7 +364,6 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												fromName={campaign?.identity?.name}
 												fromEmail={campaign?.identity?.email}
 												subject={form.watch('subject')}
-												onPreview={(draft) => setPreviewDraft(draft)}
 											/>
 										</DraggableBox>
 									),
