@@ -767,6 +767,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	// Track if the user has attempted to Test to control error styling
 	const [hasAttemptedTest, setHasAttemptedTest] = useState(false);
+	// Controls swap order between compressed drafting panel and test preview panel
+	const [isPanelsReversed, setIsPanelsReversed] = useState(false);
 
 	// Subject field red styling (manual mode): mirror text block behavior
 	const subjectValue = form.watch('subject');
@@ -1101,6 +1103,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								id="test-left-panel"
 								dragHandleSelector="[data-left-drag-handle]"
 								enabled={Boolean(showTestPreview)}
+								onDropOver={(overId) => {
+									if (overId === 'test-preview-panel') setIsPanelsReversed((p) => !p);
+								}}
+								className={cn(
+									showTestPreview ? (isPanelsReversed ? 'order-2' : 'order-1') : ''
+								)}
 							>
 								<div
 									className={cn(
@@ -1639,11 +1647,20 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							{compactLeftOnly
 								? null
 								: showTestPreview && (
-										<div className="w-[461px] shrink-0">
+										<div
+											className={cn(
+												'w-[461px] shrink-0',
+												isPanelsReversed ? 'order-1' : 'order-2'
+											)}
+										>
 											<DraggableBox
 												id="test-preview-panel"
 												dragHandleSelector="[data-test-preview-header]"
 												enabled={Boolean(showTestPreview)}
+												onDropOver={(overId) => {
+													if (overId === 'test-left-panel')
+														setIsPanelsReversed((p) => !p);
+												}}
 											>
 												<TestPreviewPanel
 													setShowTestPreview={setShowTestPreview}

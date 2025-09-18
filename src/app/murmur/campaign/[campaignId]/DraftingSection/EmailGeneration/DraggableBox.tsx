@@ -9,13 +9,19 @@ interface DraggableBoxProps {
 	/** Stable id for debugging or future persistence */
 	id: string;
 	children: ReactNode;
+	/** Optional className for the outer wrapper */
+	className?: string;
 	/** Initial offset in pixels (relative to natural layout position) */
 	defaultPosition?: { x: number; y: number };
 	/** CSS selector for an internal drag handle; if omitted and showHandle=true, a small top bar is rendered as the handle */
 	/** CSS selector for an internal drag handle; if omitted and showHandle=true, a small top bar is rendered as the handle */
 	dragHandleSelector?: string;
+	/** When the drag ends, report which other draggable box (if any) was under the pointer */
+	onDropOver?: (overId: string | null) => void;
 	/** When false, dragging is disabled and transform is cleared */
 	enabled?: boolean;
+	/** Bump this token to force the box to reset to its default position */
+	resetToken?: number | string;
 }
 
 /**
@@ -26,9 +32,12 @@ interface DraggableBoxProps {
 export const DraggableBox: FC<DraggableBoxProps> = ({
 	id,
 	children,
+	className,
 	defaultPosition = { x: 0, y: 0 },
 	dragHandleSelector,
+	onDropOver,
 	enabled = true,
+	resetToken,
 }) => {
 	const wrapperRef = useRef<HTMLDivElement | null>(null);
 	const positionRef = useRef<{ x: number; y: number }>({ ...defaultPosition });
@@ -57,12 +66,41 @@ export const DraggableBox: FC<DraggableBoxProps> = ({
 		setPosition(next);
 	}, []);
 
-	const endDragging = useCallback(() => {
-		setIsDragging(false);
-		startRef.current = null;
-		window.removeEventListener('pointermove', onPointerMove);
-		window.removeEventListener('pointerup', endDragging);
-	}, [onPointerMove]);
+	const endDragging = useCallback(
+		(e: PointerEvent) => {
+			setIsDragging(false);
+			startRef.current = null;
+			window.removeEventListener('pointermove', onPointerMove);
+			window.removeEventListener('pointerup', endDragging);
+
+			// Determine what draggable box (if any) is under the pointer at drop time
+			if (
+				onDropOver &&
+				e &&
+				typeof e.clientX === 'number' &&
+				typeof e.clientY === 'number'
+			) {
+				const elements = document.elementsFromPoint(
+					e.clientX,
+					e.clientY
+				) as HTMLElement[];
+				let overId: string | null = null;
+				for (const el of elements) {
+					const wrapper = el.closest?.('[data-draggable-box-id]') as HTMLElement | null;
+					const attr = wrapper?.getAttribute?.('data-draggable-box-id') || null;
+					if (attr && attr !== id) {
+						overId = attr;
+						break;
+					}
+				}
+				onDropOver(overId);
+				// Snap back to default position when using swap-on-drop behavior
+				positionRef.current = { ...defaultPosition };
+				setPosition({ ...defaultPosition });
+			}
+		},
+		[defaultPosition, id, onPointerMove, onDropOver]
+	);
 
 	const tryStartDrag = useCallback(
 		(e: PointerEvent | MouseEvent) => {
@@ -129,6 +167,13 @@ export const DraggableBox: FC<DraggableBoxProps> = ({
 		// include full object for correctness (eslint satisfies)
 	}, [enabled, defaultPosition]);
 
+	// External reset trigger
+	useEffect(() => {
+		if (resetToken === undefined) return;
+		positionRef.current = { ...defaultPosition };
+		setPosition({ ...defaultPosition });
+	}, [resetToken, defaultPosition]);
+
 	// Inline styles
 	const style = useMemo<React.CSSProperties>(
 		() => ({
@@ -142,7 +187,7 @@ export const DraggableBox: FC<DraggableBoxProps> = ({
 	);
 
 	return (
-		<div ref={wrapperRef} style={style} data-draggable-box-id={id}>
+		<div ref={wrapperRef} style={style} data-draggable-box-id={id} className={className}>
 			{/* No visual handle by default; dragging is activated from header selector (if provided) or non-interactive areas of the wrapper */}
 			{children}
 		</div>
