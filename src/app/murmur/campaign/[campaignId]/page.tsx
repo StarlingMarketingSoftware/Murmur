@@ -52,6 +52,7 @@ const Murmur = () => {
 		silentLoad ? 'search' : 'campaign'
 	);
 	const [isIdentityInfoOpen, setIsIdentityInfoOpen] = useState(false);
+	const [activeView, setActiveView] = useState<'testing' | 'drafting'>('testing');
 
 	// Header counts
 	const contactListIds = campaign?.userContactLists?.map((l) => l.id) || [];
@@ -257,8 +258,40 @@ const Murmur = () => {
 								}
 							/>
 
+							{/* View tabs - text-only Inter font */}
+							<div className="mt-4 flex justify-center">
+								<div className="w-full max-w-[1250px] px-6">
+									<div className="flex gap-6 justify-center">
+										<button
+											type="button"
+											className={cn(
+												'font-inter text-[20px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+												activeView === 'testing'
+													? 'text-black font-semibold'
+													: 'text-[#6B6B6B] hover:text-black'
+											)}
+											onClick={() => setActiveView('testing')}
+										>
+											Testing
+										</button>
+										<button
+											type="button"
+											className={cn(
+												'font-inter text-[20px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+												activeView === 'drafting'
+													? 'text-black font-semibold'
+													: 'text-[#6B6B6B] hover:text-black'
+											)}
+											onClick={() => setActiveView('drafting')}
+										>
+											Drafting
+										</button>
+									</div>
+								</div>
+							</div>
+
 							<div className="mt-6 flex justify-center">
-								<DraftingSection campaign={campaign} />
+								<DraftingSection campaign={campaign} view={activeView} />
 							</div>
 						</div>
 					</>

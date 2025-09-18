@@ -8,6 +8,7 @@ import { cn } from '@/utils';
 // removed unused DraftingMode/HybridBlock imports after moving mode toggles inside
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
+	const { view = 'testing' } = props;
 	const {
 		campaign,
 		contacts,
@@ -38,38 +39,42 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 						ref={emailStructureRef}
 						className="mb-[4px] flex justify-between items-center"
 					></div>
-					<div className="flex gap-[47px] items-start justify-center overflow-visible">
-						<div className="flex-shrink-0">
-							<HybridPromptInput
-								trackFocusedField={trackFocusedField}
-								testMessage={campaign?.testMessage}
-								handleGenerateTestDrafts={handleGenerateTestDrafts}
-								isGenerationDisabled={isGenerationDisabled}
-								isPendingGeneration={isPendingGeneration}
-								isTest={isTest}
-								contact={contacts?.[0]}
-							/>
+					{view !== 'drafting' && (
+						<div className="flex gap-[47px] items-start justify-center overflow-visible">
+							<div className="flex-shrink-0">
+								<HybridPromptInput
+									trackFocusedField={trackFocusedField}
+									testMessage={campaign?.testMessage}
+									handleGenerateTestDrafts={handleGenerateTestDrafts}
+									isGenerationDisabled={isGenerationDisabled}
+									isPendingGeneration={isPendingGeneration}
+									isTest={isTest}
+									contact={contacts?.[0]}
+								/>
+							</div>
 						</div>
-					</div>
+					)}
 
 					<div
 						ref={draftingRef}
 						className={cn('transition-opacity duration-500 ease-in-out')}
 					>
-						<EmailGeneration
-							campaign={campaign}
-							contacts={contacts || []}
-							isGenerationDisabled={isGenerationDisabled}
-							isPendingGeneration={isPendingGeneration}
-							isTest={isTest}
-							form={form}
-							handleGenerateDrafts={handleGenerateDrafts}
-							generationProgress={generationProgress}
-							setGenerationProgress={setGenerationProgress}
-							cancelGeneration={cancelGeneration}
-							isFirstLoad={isFirstLoad}
-							scrollToEmailStructure={scrollToEmailStructure}
-						/>
+						{view !== 'testing' && (
+							<EmailGeneration
+								campaign={campaign}
+								contacts={contacts || []}
+								isGenerationDisabled={isGenerationDisabled}
+								isPendingGeneration={isPendingGeneration}
+								isTest={isTest}
+								form={form}
+								handleGenerateDrafts={handleGenerateDrafts}
+								generationProgress={generationProgress}
+								setGenerationProgress={setGenerationProgress}
+								cancelGeneration={cancelGeneration}
+								isFirstLoad={isFirstLoad}
+								scrollToEmailStructure={scrollToEmailStructure}
+							/>
+						)}
 					</div>
 				</form>
 			</Form>
