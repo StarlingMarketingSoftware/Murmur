@@ -53,6 +53,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
+	const [previewDraft, setPreviewDraft] = useState<EmailWithRelations | null>(null);
 	const [isJustSaved, setIsJustSaved] = useState(false);
 	const [autosaveStatus, setAutosaveStatus] = useState<
 		'idle' | 'saving' | 'saved' | 'error'
@@ -219,5 +220,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		handleDraftButtonClick,
 		scrollToEmailStructure,
 		sentEmails,
+		previewDraft,
+		setPreviewDraft,
 	};
 };

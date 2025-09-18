@@ -1,4 +1,4 @@
-import { FC, ReactNode, useCallback, useState } from 'react';
+import { FC, ReactNode, useCallback, useEffect, useState } from 'react';
 import { EmailGenerationProps, useEmailGeneration } from './useEmailGeneration';
 import { cn } from '@/utils';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
@@ -15,6 +15,7 @@ import { ContactsSelection } from './ContactsSelection/ContactsSelection';
 import { DraftedEmails } from './DraftedEmails/DraftedEmails';
 import { MiniEmailStructure } from './MiniEmailStructure';
 import { SentEmails } from './SentEmails/SentEmails';
+import DraftPreviewBox from './DraftPreviewBox';
 import DraggableBox from './DraggableBox';
 
 export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
@@ -46,7 +47,40 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 		isPendingEmails,
 		handleDraftButtonClick,
 		sentEmails,
+		previewDraft,
+		setPreviewDraft,
 	} = useEmailGeneration(props);
+
+	// Position the contacts overlay behind the mini email structure when previewing
+	const [contactsOverlayPos, setContactsOverlayPos] = useState<{
+		left: number;
+		top: number;
+	}>({ left: 0, top: 0 });
+
+	useEffect(() => {
+		if (!previewDraft) return;
+		const compute = () => {
+			const container = document.querySelector(
+				'[data-drafting-container]'
+			) as HTMLElement | null;
+			const mini = document.querySelector(
+				"[data-draggable-box-id='mini-email-structure']"
+			) as HTMLElement | null;
+			if (!container || !mini) return;
+			const cRect = container.getBoundingClientRect();
+			const mRect = mini.getBoundingClientRect();
+			// Offset: contacts should sit slightly to the right and higher than mini by ~112px
+			const left = mRect.left - cRect.left - 112;
+			const top = mRect.top - cRect.top - 112;
+			setContactsOverlayPos({ left, top });
+		};
+		const raf = requestAnimationFrame(compute);
+		window.addEventListener('resize', compute);
+		return () => {
+			cancelAnimationFrame(raf);
+			window.removeEventListener('resize', compute);
+		};
+	}, [previewDraft]);
 
 	// Swap-on-drop: maintain the visual order of boxes. Defaults to the current layout order.
 	const [boxOrder, setBoxOrder] = useState<string[]>([
@@ -252,6 +286,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 										<DraggableBox
 											id="mini-email-structure"
 											onDropOver={(overId) => swapBoxes('mini-email-structure', overId)}
+											className={previewDraft ? 'z-10' : undefined}
 										>
 											<MiniEmailStructure
 												form={form}
@@ -264,6 +299,17 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												generationTotal={generationTotal}
 												onCancel={cancelGeneration}
 											/>
+										</DraggableBox>
+									),
+									'draft-preview': (
+										<DraggableBox id="draft-preview">
+											{previewDraft && (
+												<DraftPreviewBox
+													contacts={contacts}
+													draft={previewDraft}
+													onClose={() => setPreviewDraft(null)}
+												/>
+											)}
 										</DraggableBox>
 									),
 									drafts: (
@@ -288,6 +334,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												fromName={campaign?.identity?.name}
 												fromEmail={campaign?.identity?.email}
 												subject={form.watch('subject')}
+												onPreview={(draft) => setPreviewDraft(draft)}
 											/>
 										</DraggableBox>
 									),
@@ -300,13 +347,46 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 											<SentEmails emails={sentEmails} isPendingEmails={isPendingEmails} />
 										</DraggableBox>
 									),
-								};
+								} as const;
 
-								return boxOrder.map((boxId) => (
+								const order = previewDraft
+									? (['mini-email-structure', 'draft-preview', 'drafts', 'sent'] as const)
+									: (boxOrder as readonly string[]);
+
+								const boxes = order.map((boxId) => (
 									<div key={boxId}>
 										{boxContentById[boxId as keyof typeof boxContentById]}
 									</div>
 								));
+
+								// When previewing, render the contacts box as an overlay tucked behind the mini structure.
+								if (previewDraft) {
+									boxes.push(
+										<div
+											key="contacts-overlay"
+											className="absolute z-0 pointer-events-none"
+											style={{
+												left: `${contactsOverlayPos.left}px`,
+												top: `${contactsOverlayPos.top}px`,
+												opacity: 0.7,
+											}}
+										>
+											<DraggableBox id="contacts-overlay" enabled={false}>
+												<ContactsSelection
+													contacts={availableContacts}
+													selectedContactIds={selectedContactIds}
+													setSelectedContactIds={setSelectedContactIds}
+													handleContactSelection={handleContactSelection}
+													generationProgress={generationProgress}
+													generationTotal={generationTotal}
+													cancelGeneration={cancelGeneration}
+												/>
+											</DraggableBox>
+										</div>
+									);
+								}
+
+								return boxes;
 							})()}
 						</div>
 					</div>

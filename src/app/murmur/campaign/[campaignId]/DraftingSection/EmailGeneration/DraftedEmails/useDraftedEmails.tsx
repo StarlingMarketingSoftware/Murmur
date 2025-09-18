@@ -21,6 +21,8 @@ export interface DraftedEmailsProps {
 	fromName?: string;
 	fromEmail?: string;
 	subject?: string;
+	/** Optional: called when the inline preview icon is clicked */
+	onPreview?: (draft: EmailWithRelations) => void;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {
@@ -79,7 +81,7 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 	};
 
 	const handleDraftDoubleClick = (draft: EmailWithRelations) => {
-		// Double click - open editor
+		// Double click - open editor (legacy behavior)
 		setSelectedDraft(draft);
 		setEditedSubject(draft.subject || '');
 		const plainMessage = convertHtmlToPlainText(draft.message);

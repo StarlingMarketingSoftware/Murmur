@@ -338,7 +338,11 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										onClick={(e) => {
 											e.preventDefault();
 											e.stopPropagation();
-											handleDraftDoubleClick(draft);
+											if (props.onPreview) {
+												props.onPreview(draft);
+											} else {
+												handleDraftDoubleClick(draft);
+											}
 										}}
 										className="absolute top-[28px] right-[6px] p-1 transition-colors z-20"
 										aria-label="Preview draft"
