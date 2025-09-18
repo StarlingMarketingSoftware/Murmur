@@ -420,7 +420,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 			ref={rootRef}
 			style={{
 				width: '376px',
-				minHeight: '474px',
+				height: '474px',
 				position: 'relative',
 				overflow: 'visible',
 			}}
@@ -429,7 +429,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 			<div
 				style={{
 					width: '100%',
-					minHeight: '100%',
+					height: '100%',
 					border: '3px solid #000000',
 					borderRadius: '8px',
 					position: 'relative',
@@ -522,7 +522,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										{isAiSubject ? 'Auto Subject' : 'Subject'}
 									</span>
 								</div>
-								<div
+								<button
+									type="button"
+									aria-pressed={isAiSubject}
 									className={cn(
 										'relative h-full flex items-center text-[10px] font-inter font-normal shrink-0',
 										isAiSubject
@@ -534,7 +536,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									<span className="absolute left-0 h-full border-l border-black"></span>
 									{isAiSubject ? 'on' : 'Auto off'}
 									<span className="absolute right-0 h-full border-r border-black"></span>
-								</div>
+								</button>
 								<div
 									className={cn(
 										'flex-grow h-full flex items-center px-2',
