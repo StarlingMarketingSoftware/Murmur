@@ -29,7 +29,7 @@ const Row: FC<{
 	return (
 		<div
 			className={cn(
-				'box-border w-[300px] h-[28px] mx-auto rounded-[8px] border-2 border-black px-2 py-0 bg-white flex items-center justify-between',
+				'box-border w-full max-w-[300px] h-[28px] mx-auto rounded-[8px] border-2 border-black px-2 py-0 bg-white flex items-center justify-between',
 				className,
 				onClick ? 'cursor-pointer' : ''
 			)}
@@ -99,7 +99,7 @@ export const TestingSummaryBox: FC<TestingSummaryBoxProps> = ({
 					<div className="font-inter text-[18px] font-semibold">Drafting</div>
 					<div className="font-inter text-[12px] text-[#6B6B6B]">Open</div>
 				</div>
-				<div className="px-3 pb-3 flex flex-col gap-2">
+				<div className="px-3 pb-3 flex flex-col items-center gap-2">
 					<Row
 						label="Contacts"
 						right={`${contactsCount} ${contactsCount === 1 ? 'person' : 'people'}`}
