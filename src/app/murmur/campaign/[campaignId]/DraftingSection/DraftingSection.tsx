@@ -36,7 +36,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 	} = useDraftingSection(props);
 
 	return (
-		<div className="mb-30 flex flex-col items-center">
+		<div className="mb-30 flex flex-col items-center w-full">
 			<Form {...form}>
 				<form className="flex flex-col items-center">
 					<div
@@ -44,7 +44,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 						className="mb-[4px] flex justify-between items-center"
 					></div>
 					{view !== 'drafting' && (
-						<div className="flex gap-[47px] items-start justify-center overflow-visible">
+						<div className="relative w-full flex items-start justify-center overflow-visible">
 							<div className="flex-shrink-0">
 								<HybridPromptInput
 									trackFocusedField={trackFocusedField}
@@ -56,7 +56,10 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									contact={contacts?.[0]}
 								/>
 							</div>
-							<div className="flex-shrink-0">
+							<div
+								className="absolute top-0 mt-[4px] z-10"
+								style={{ left: 'calc(50% + 470px)' }}
+							>
 								<TestingSummaryBox
 									campaign={campaign}
 									contactsCount={contacts?.length || 0}

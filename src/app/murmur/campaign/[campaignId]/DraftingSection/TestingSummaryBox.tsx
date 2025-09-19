@@ -29,7 +29,7 @@ const Row: FC<{
 	return (
 		<div
 			className={cn(
-				'box-border w-[378px] h-[28px] mx-auto rounded-[8px] border-2 border-black px-2 py-0 bg-white flex items-center justify-between',
+				'box-border w-[300px] h-[28px] mx-auto rounded-[8px] border-2 border-black px-2 py-0 bg-white flex items-center justify-between',
 				className,
 				onClick ? 'cursor-pointer' : ''
 			)}
@@ -93,7 +93,7 @@ export const TestingSummaryBox: FC<TestingSummaryBoxProps> = ({
 	}, [hybridBlocks]);
 
 	return (
-		<div className="w-[420px] flex-shrink-0">
+		<div className={cn('flex-shrink-0', openPanel ? 'w-[420px]' : 'w-[320px]')}>
 			<div className="rounded-[10px] border-[3px] border-black bg-white overflow-hidden">
 				<div className="px-4 py-2 flex items-center justify-between">
 					<div className="font-inter text-[18px] font-semibold">Drafting</div>
