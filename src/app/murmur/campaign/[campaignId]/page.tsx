@@ -119,11 +119,9 @@ const Murmur = () => {
 									: 'opacity-100'
 							)}
 						>
-							<div className="flex justify-center">
+							<div className="flex flex-col items-center" style={{ paddingTop: '18px' }}>
 								<CampaignName campaign={campaign} />
-							</div>
-							<div className="flex justify-center">
-								<div className="flex flex-col items-center">
+								<div className="flex flex-col items-center" style={{ marginTop: '14px' }}>
 									<div className="flex items-start gap-6">
 										<div className="flex items-center">
 											<Link href={urls.murmur.dashboard.index} className="block">
@@ -209,7 +207,7 @@ const Murmur = () => {
 										</div>
 									</div>
 									{/* Metric boxes below To/From */}
-									<div className="mt-2 flex items-center gap-5">
+									<div className="flex items-center gap-5" style={{ marginTop: '13px' }}>
 										<div
 											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
 											style={{

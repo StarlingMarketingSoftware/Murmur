@@ -23,7 +23,7 @@ export const CampaignName: FC<CampaignNameProps> = (props) => {
 										<FormItem className="">
 											<FormControl>
 												<Input
-													className="!text-[46px] !h-fit mt-1 mb-2 text-center !w-fit !min-w-0 !bg-transparent !border-0 !px-0 !py-0 !shadow-none focus:!ring-0 focus-visible:!ring-0 focus:!shadow-none focus:!border-0"
+													className="!text-[46px] leading-none !h-fit mt-0 mb-0 text-center !w-fit !min-w-0 !bg-transparent !border-0 !px-0 !py-0 !shadow-none focus:!ring-0 focus-visible:!ring-0 focus:!shadow-none focus:!border-0"
 													style={{ fontFamily: 'Times New Roman' }}
 													variant="light"
 													rounded={false}
@@ -54,7 +54,7 @@ export const CampaignName: FC<CampaignNameProps> = (props) => {
 						) : (
 							<>
 								<Typography
-									className="!text-[46px] text-center h-fit w-fit mt-0 mb-2 cursor-text select-text"
+									className="!text-[46px] leading-none text-center h-fit w-fit mt-0 mb-0 cursor-text select-text"
 									style={{ fontFamily: 'Times New Roman' }}
 									onClick={() => setIsEdit(true)}
 									title="Click to edit"
