@@ -5,6 +5,7 @@ import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/Hybr
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { EmailGeneration } from './EmailGeneration/EmailGeneration';
 import { cn } from '@/utils';
+import { TestingSummaryBox } from './TestingSummaryBox';
 // removed unused DraftingMode/HybridBlock imports after moving mode toggles inside
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
@@ -53,6 +54,13 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									isPendingGeneration={isPendingGeneration}
 									isTest={isTest}
 									contact={contacts?.[0]}
+								/>
+							</div>
+							<div className="flex-shrink-0">
+								<TestingSummaryBox
+									campaign={campaign}
+									contactsCount={contacts?.length || 0}
+									form={form}
 								/>
 							</div>
 						</div>
