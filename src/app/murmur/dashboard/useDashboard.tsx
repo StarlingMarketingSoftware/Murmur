@@ -3,7 +3,8 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { EmailVerificationStatus, UserContactList } from '@prisma/client';
+import { EmailVerificationStatus } from '@/constants/prismaEnums';
+import type { UserContactList } from '@prisma/client';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { urls } from '@/constants/urls';

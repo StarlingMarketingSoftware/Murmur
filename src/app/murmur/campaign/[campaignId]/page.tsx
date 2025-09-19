@@ -14,7 +14,7 @@ import { cn } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
-import { EmailStatus } from '@prisma/client';
+import { EmailStatus } from '@/constants/prismaEnums';
 import { useState } from 'react';
 
 // Reuse dashboard metric colors for consistency
@@ -85,7 +85,7 @@ const Murmur = () => {
 	// ensures a premium, smooth transition with no scale effects.
 	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
 	return (
-		<>
+		<div style={{ zoom: '0.8', transformOrigin: 'top center' }}>
 			{/* Header section with white background */}
 			<div className="bg-white">
 				<div className="relative">
@@ -297,7 +297,7 @@ const Murmur = () => {
 					</>
 				)}
 			</div>
-		</>
+		</div>
 	);
 };
 

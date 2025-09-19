@@ -5,7 +5,7 @@ import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { useMe } from '@/hooks/useMe';
-import { EmailStatus } from '@prisma/client';
+import { EmailStatus } from '@/constants/prismaEnums';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { StripeSubscriptionStatus } from '@/types';

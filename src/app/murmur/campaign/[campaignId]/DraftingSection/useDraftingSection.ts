@@ -33,15 +33,8 @@ import {
 	removeEmDashes,
 } from '@/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
-import {
-	Contact,
-	DraftingMode,
-	DraftingTone,
-	EmailStatus,
-	HybridBlock,
-	Identity,
-	Signature,
-} from '@prisma/client';
+import { Contact, HybridBlock, Identity, Signature } from '@prisma/client';
+import { DraftingMode, DraftingTone, EmailStatus } from '@/constants/prismaEnums';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';

@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { UseFormReturn } from 'react-hook-form';
 import { debounce } from 'lodash';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
-import { EmailStatus } from '@prisma/client';
+import { EmailStatus } from '@/constants/prismaEnums';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 
 export interface EmailGenerationProps {
