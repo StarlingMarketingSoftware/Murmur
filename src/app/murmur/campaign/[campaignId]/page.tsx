@@ -127,13 +127,23 @@ const Murmur = () => {
 									<div className="flex items-start gap-6">
 										<div className="flex items-center">
 											<Link href={urls.murmur.dashboard.index} className="block">
-												<div className="w-[52px] h-[20.5px] bg-[#EEEEEE] rounded-[8px] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]">
-													<span className="font-inter font-normal text-[17px] leading-none text-black transition-colors group-hover:text-white">
+												<div
+													className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]"
+													style={{
+														width: '36.06px',
+														height: '14.21px',
+														borderRadius: '5.55px',
+													}}
+												>
+													<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
 														To
 													</span>
 												</div>
 											</Link>
-											<Typography className="ml-2 !text-[15px] text-gray-600 font-secondary">
+											<Typography
+												className="ml-2 text-gray-600 font-inter font-extralight"
+												style={{ fontSize: '11.79px' }}
+											>
 												{campaign?.userContactLists
 													?.map((list) => list.name)
 													.join(', ') || 'No recipients selected'}
@@ -147,16 +157,22 @@ const Murmur = () => {
 													setIdentityDialogOrigin('campaign');
 													setIsIdentityDialogOpen(true);
 												}}
-												className="w-[52px] h-[20.5px] bg-[#EEEEEE] rounded-[8px] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969]"
+												className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969]"
+												style={{
+													width: '36.06px',
+													height: '14.21px',
+													borderRadius: '5.55px',
+												}}
 											>
-												<span className="font-inter font-normal text-[17px] leading-none text-black transition-colors group-hover:text-white">
+												<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
 													From
 												</span>
 											</button>
 											<div className="ml-2 flex flex-col items-start">
 												<button
 													type="button"
-													className="!text-[15px] text-gray-600 font-secondary hover:underline cursor-pointer text-left"
+													className="text-gray-600 font-inter font-extralight hover:underline cursor-pointer text-left"
+													style={{ fontSize: '11.79px' }}
 													onClick={() => setIsIdentityInfoOpen((open) => !open)}
 													aria-expanded={isIdentityInfoOpen}
 												>
@@ -165,7 +181,10 @@ const Murmur = () => {
 												{isIdentityInfoOpen && (
 													<div className="mt-1 text-left">
 														{campaign?.identity?.email && (
-															<div className="!text-[15px] text-gray-600 font-secondary">
+															<div
+																className="text-gray-600 font-inter font-extralight"
+																style={{ fontSize: '11.79px' }}
+															>
 																{campaign.identity.email}
 															</div>
 														)}
@@ -178,7 +197,8 @@ const Murmur = () => {
 																}
 																target="_blank"
 																rel="noopener noreferrer"
-																className="!text-[15px] text-gray-600 font-secondary hover:underline break-all"
+																className="text-gray-600 font-inter font-extralight hover:underline break-all"
+																style={{ fontSize: '11.79px' }}
 															>
 																{campaign.identity.website}
 															</a>
@@ -191,28 +211,37 @@ const Murmur = () => {
 									{/* Metric boxes below To/From */}
 									<div className="mt-2 flex items-center gap-5">
 										<div
-											className="metric-box inline-flex items-center justify-start w-auto h-[1.33em] rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
 											style={{
 												backgroundColor: getContactsFillColor(contactsCount),
 												borderWidth: '1.3px',
+												minWidth: '80.38px',
+												height: '19px',
+												fontSize: '11.7px',
 											}}
 										>
 											{`${String(contactsCount).padStart(2, '0')} contacts`}
 										</div>
 										<div
-											className="metric-box inline-flex items-center justify-start w-auto h-[1.33em] rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
 											style={{
 												backgroundColor: getDraftFillColor(draftCount),
 												borderWidth: '1.3px',
+												minWidth: '80.38px',
+												height: '19px',
+												fontSize: '11.7px',
 											}}
 										>
 											{`${String(draftCount).padStart(2, '0')} drafts`}
 										</div>
 										<div
-											className="metric-box inline-flex items-center justify-start w-auto h-[1.33em] rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
 											style={{
 												backgroundColor: getSentFillColor(sentCount),
 												borderWidth: '1.3px',
+												minWidth: '80.38px',
+												height: '19px',
+												fontSize: '11.7px',
 											}}
 										>
 											{`${String(sentCount).padStart(2, '0')} sent`}
