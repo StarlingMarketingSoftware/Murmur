@@ -3165,6 +3165,18 @@ body,
 	scrollbar-width: none !important;
 	-ms-overflow-style: none !important;
 }
+
+/* Fix for TestPreviewPanel border rendering */
+[data-test-preview-panel] {
+	/* Force proper rendering with hardware acceleration */
+	will-change: transform;
+}
+
+/* Ensure corners render properly */
+[data-test-preview-panel] * {
+	backface-visibility: hidden;
+	-webkit-backface-visibility: hidden;
+}
 /* -------------------------------------- */
 
 /* Remove any background dividers from metrics column */
