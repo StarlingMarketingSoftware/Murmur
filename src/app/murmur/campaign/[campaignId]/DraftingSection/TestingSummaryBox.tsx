@@ -1,12 +1,17 @@
 'use client';
 
-import { FC, useMemo } from 'react';
+import { FC, useMemo, useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { DraftingFormValues } from './useDraftingSection';
 import { CampaignWithRelations } from '@/types';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { cn } from '@/utils';
+import { useGetContacts } from '@/hooks/queryHooks/useContacts';
+import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
+import { ContactsSelection } from './EmailGeneration/ContactsSelection/ContactsSelection';
+import { DraftedEmails } from './EmailGeneration/DraftedEmails/DraftedEmails';
+import { SentEmails } from './EmailGeneration/SentEmails/SentEmails';
 
 interface TestingSummaryBoxProps {
 	campaign: CampaignWithRelations;
@@ -19,13 +24,16 @@ const Row: FC<{
 	right?: string;
 	className?: string;
 	children?: React.ReactNode;
-}> = ({ label, right, className, children }) => {
+	onClick?: () => void;
+}> = ({ label, right, className, children, onClick }) => {
 	return (
 		<div
 			className={cn(
 				'w-full rounded-[8px] border-2 border-black px-3 py-[6px] bg-white flex items-center justify-between',
-				className
+				className,
+				onClick ? 'cursor-pointer' : ''
 			)}
+			onClick={onClick}
 		>
 			<div className="flex items-center gap-3 min-w-0">
 				<div className="font-inter font-semibold text-[14px] text-black whitespace-nowrap">
@@ -47,16 +55,29 @@ export const TestingSummaryBox: FC<TestingSummaryBoxProps> = ({
 	contactsCount,
 	form,
 }) => {
-	const { data: emails } = useGetEmails({ filters: { campaignId: campaign.id } });
+	const [openPanel, setOpenPanel] = useState<
+		'contacts' | 'structure' | 'drafts' | 'sent' | null
+	>(null);
 
-	const draftCount = useMemo(
-		() => (emails || []).filter((e) => e.status === EmailStatus.draft).length,
+	const { data: emails } = useGetEmails({ filters: { campaignId: campaign.id } });
+	const { data: contacts = [] } = useGetContacts({
+		filters: { contactListIds: campaign.userContactLists.map((l) => l.id) },
+	});
+
+	const draftEmails = useMemo(
+		() => (emails || []).filter((e) => e.status === EmailStatus.draft),
 		[emails]
 	);
-	const sentCount = useMemo(
-		() => (emails || []).filter((e) => e.status === EmailStatus.sent).length,
+	const sentEmails = useMemo(
+		() => (emails || []).filter((e) => e.status === EmailStatus.sent),
 		[emails]
 	);
+	const draftCount = draftEmails.length;
+	const sentCount = sentEmails.length;
+	const availableContacts = useMemo(() => {
+		const draftedIds = new Set(draftEmails.map((d) => d.contactId));
+		return contacts.filter((c) => !draftedIds.has(c.id));
+	}, [contacts, draftEmails]);
 
 	const hybridBlocks = form.watch('hybridBlockPrompts');
 	const isAiSubject = form.watch('isAiSubject');
@@ -83,9 +104,25 @@ export const TestingSummaryBox: FC<TestingSummaryBoxProps> = ({
 						label="Contacts"
 						right={`${contactsCount} ${contactsCount === 1 ? 'person' : 'people'}`}
 						className="bg-[#FCE2E2]"
+						onClick={() => setOpenPanel(openPanel === 'contacts' ? null : 'contacts')}
 					/>
 
-					<Row label="Email Structure" className="bg-[#E4EEFF]">
+					{openPanel === 'contacts' && (
+						<div className="pt-1 pb-2 flex justify-center">
+							<ContactsSelection
+								contacts={availableContacts}
+								selectedContactIds={new Set()}
+								setSelectedContactIds={() => {}}
+								handleContactSelection={() => {}}
+							/>
+						</div>
+					)}
+
+					<Row
+						label="Email Structure"
+						className="bg-[#E4EEFF] cursor-pointer"
+						onClick={() => setOpenPanel(openPanel === 'structure' ? null : 'structure')}
+					>
 						<div className="flex items-center gap-2 text-[11px] font-inter">
 							<span className="px-2 py-[2px] rounded-[6px] border border-black bg-white">
 								{modeLabel}
@@ -99,9 +136,58 @@ export const TestingSummaryBox: FC<TestingSummaryBoxProps> = ({
 						</div>
 					</Row>
 
-					<Row label="Drafts" right={`${draftCount} drafts`} className="bg-[#FFECC6]" />
+					{openPanel === 'structure' && (
+						<div className="pt-1 pb-2 flex justify-center">
+							<MiniEmailStructure
+								form={form}
+								onDraft={() => {}}
+								isDraftDisabled={true}
+								isPendingGeneration={false}
+							/>
+						</div>
+					)}
 
-					<Row label="Sent" right={`${sentCount} sent`} className="bg-[#DFF6E3]" />
+					<Row
+						label="Drafts"
+						right={`${draftCount} drafts`}
+						className="bg-[#FFECC6] cursor-pointer"
+						onClick={() => setOpenPanel(openPanel === 'drafts' ? null : 'drafts')}
+					/>
+
+					{openPanel === 'drafts' && (
+						<div className="pt-1 pb-2 flex justify-center">
+							<DraftedEmails
+								draftEmails={draftEmails}
+								isPendingEmails={false}
+								contacts={contacts}
+								selectedDraftIds={new Set()}
+								setSelectedDraft={() => {}}
+								setIsDraftDialogOpen={() => {}}
+								handleDraftSelection={() => {}}
+								setSelectedDraftIds={() => {}}
+								onSend={() => {}}
+								isSendingDisabled={true}
+								isFreeTrial={false}
+								fromName={campaign?.identity?.name}
+								fromEmail={campaign?.identity?.email}
+								subject={form.watch('subject')}
+								selectedDraft={null}
+							/>
+						</div>
+					)}
+
+					<Row
+						label="Sent"
+						right={`${sentCount} sent`}
+						className="bg-[#DFF6E3] cursor-pointer"
+						onClick={() => setOpenPanel(openPanel === 'sent' ? null : 'sent')}
+					/>
+
+					{openPanel === 'sent' && (
+						<div className="pt-1 pb-2 flex justify-center">
+							<SentEmails emails={sentEmails} isPendingEmails={false} />
+						</div>
+					)}
 				</div>
 			</div>
 		</div>
