@@ -15,6 +15,14 @@ export interface DraftedEmailsProps {
 	draftEmails: EmailWithRelations[];
 	isPendingEmails: boolean;
 	setSelectedDraftIds: Dispatch<SetStateAction<Set<number>>>;
+	onSend: () => void | Promise<void>;
+	isSendingDisabled: boolean;
+	isFreeTrial: boolean;
+	fromName?: string;
+	fromEmail?: string;
+	subject?: string;
+	/** Optional: called when the inline preview icon is clicked */
+	onPreview?: (draft: EmailWithRelations) => void;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {
@@ -27,6 +35,12 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		setSelectedDraftIds,
 		contacts,
 		selectedDraft,
+		onSend,
+		isSendingDisabled,
+		isFreeTrial,
+		fromName,
+		fromEmail,
+		subject,
 	} = props;
 
 	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
@@ -67,7 +81,7 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 	};
 
 	const handleDraftDoubleClick = (draft: EmailWithRelations) => {
-		// Double click - open editor
+		// Double click - open editor (legacy behavior)
 		setSelectedDraft(draft);
 		setEditedSubject(draft.subject || '');
 		const plainMessage = convertHtmlToPlainText(draft.message);
@@ -149,5 +163,11 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		setEditedMessage,
 		setEditedSubject,
 		setSelectedDraft,
+		fromName,
+		fromEmail,
+		subject,
+		onSend,
+		isSendingDisabled,
+		isFreeTrial,
 	};
 };

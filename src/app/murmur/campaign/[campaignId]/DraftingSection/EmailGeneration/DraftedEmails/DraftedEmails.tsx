@@ -1,11 +1,20 @@
-import { FC } from 'react';
+import { FC, useMemo, useState } from 'react';
 import { DraftedEmailsProps, useDraftedEmails } from './useDraftedEmails';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { Button } from '@/components/ui/button';
+import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { X } from 'lucide-react';
 import { cn } from '@/utils';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
 import PreviewIcon from '@/components/atoms/_svg/PreviewIcon';
+import { getStateAbbreviation } from '@/utils/string';
+import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
+import {
+	canadianProvinceAbbreviations,
+	canadianProvinceNames,
+	stateBadgeColorMap,
+} from '@/constants/ui';
+import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 
 export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	const {
@@ -29,6 +38,12 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		handleSelectAllDrafts,
 	} = useDraftedEmails(props);
 
+	const [showConfirm, setShowConfirm] = useState(false);
+	const selectedCount = selectedDraftIds.size;
+	const hasSelection = selectedCount > 0;
+	const toCount = selectedCount; // used in confirmation details
+	const subjectPreview = useMemo(() => props.subject || '', [props.subject]);
+
 	if (selectedDraft) {
 		const contact = contacts?.find((c) => c.id === selectedDraft.contactId);
 		const contactName = contact
@@ -39,7 +54,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 			: 'Unknown Contact';
 
 		return (
-			<div style={{ width: '366px', height: '489px', position: 'relative' }}>
+			<div style={{ width: '376px', height: '474px', position: 'relative' }}>
 				{/* Container box with header - matching the table view */}
 				<div
 					style={{
@@ -154,80 +169,300 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				noDataDescription='Click "Generate Drafts" to create emails for the selected contacts'
 				isPending={isPendingEmails}
 				title="Drafts"
-			>
-				<>
-					{draftEmails.map((draft) => {
-						const contact = contacts?.find((c) => c.id === draft.contactId);
-						const contactName = contact
-							? contact.name ||
-							  `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
-							  contact.company ||
-							  'Contact'
-							: 'Unknown Contact';
-						const isSelected = selectedDraftIds.has(draft.id);
-
-						return (
-							<div
-								key={draft.id}
-								className={cn(
-									'border-b-2 border-[#ABABAB] cursor-pointer transition-colors p-3 relative select-none',
-									isSelected && 'bg-[#D6E8D9] border-2 border-[#ABABAB]'
-								)}
-								onMouseDown={(e) => {
-									// Prevent text selection on shift-click
-									if (e.shiftKey) {
-										e.preventDefault();
-									}
-								}}
-								onClick={(e) => handleDraftSelect(draft, e)}
-								onDoubleClick={() => handleDraftDoubleClick(draft)}
-							>
-								{/* Delete button */}
-								<Button
-									type="button"
-									variant="icon"
-									onClick={(e) => handleDeleteDraft(e, draft.id)}
-									className="absolute top-2 right-2 p-1 transition-colors z-10 group"
+				footer={
+					draftEmails.length > 0 ? (
+						<div className="w-full flex flex-col gap-2">
+							{/* Inline confirmation details */}
+							<div className={cn('w-full', !showConfirm && 'hidden')}>
+								<div
+									className="grid w-full gap-x-3 gap-y-1 items-start"
+									style={{ gridTemplateColumns: '120px 1fr' }}
 								>
-									<X size={16} className="text-gray-500 group-hover:text-red-500" />
-								</Button>
+									<div className="text-[12px] leading-tight font-semibold text-[#000000] font-secondary whitespace-nowrap">
+										To:
+									</div>
+									<div className="text-[12px] leading-tight text-[#000000] font-secondary min-w-0 break-words pl-1">
+										{toCount} emails selected
+									</div>
 
-								{/* Preview button */}
-								<Button
-									type="button"
-									variant="icon"
-									onClick={(e) => {
-										e.preventDefault();
-										e.stopPropagation();
-										handleDraftDoubleClick(draft);
-									}}
-									className="absolute top-8 right-2 p-1 transition-colors z-10"
-									aria-label="Preview draft"
-								>
-									<PreviewIcon
-										width="16px"
-										height="16px"
-										pathClassName="fill-[#4A4A4A]"
-									/>
-								</Button>
+									<div className="text-[12px] leading-tight font-semibold text-[#000000] font-secondary whitespace-nowrap">
+										From:
+									</div>
+									<div className="text-[12px] leading-tight text-[#000000] font-secondary min-w-0 break-words pl-1">
+										{props.fromName || ''}
+									</div>
 
-								{/* Contact name */}
-								<div className="font-bold text-xs mb-1 pr-8">{contactName}</div>
+									<div className="text-[12px] leading-tight font-semibold text-[#000000] font-secondary whitespace-nowrap">
+										Return Address:
+									</div>
+									<div className="text-[12px] leading-tight text-[#000000] font-secondary min-w-0 break-all pl-1">
+										{props.fromEmail || ''}
+									</div>
 
-								{/* Email subject */}
-								<div className="text-xs text-gray-600 mb-1 pr-8">
-									{draft.subject || 'No subject'}
-								</div>
-
-								{/* Preview of message */}
-								<div className="text-xs text-gray-500 pr-8">
-									{draft.message
-										? draft.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
-										: 'No content'}
+									{subjectPreview && (
+										<>
+											<div className="text-[12px] leading-tight font-semibold text-[#000000] font-secondary whitespace-nowrap">
+												Subject:
+											</div>
+											<div className="text-[12px] leading-tight text-[#000000] font-secondary min-w-0 break-words pl-1">
+												{subjectPreview}
+											</div>
+										</>
+									)}
 								</div>
 							</div>
-						);
-					})}
+
+							<div className="w-full flex items-center justify-center">
+								<div
+									className="flex items-stretch rounded-[6px] overflow-hidden"
+									style={{
+										width: '366px',
+										height: '28px',
+										border: '1px solid #000000',
+										backgroundColor: 'transparent',
+									}}
+								>
+									{props.isSendingDisabled ? (
+										<UpgradeSubscriptionDrawer
+											triggerButtonText={
+												showConfirm
+													? 'Click to Confirm and Send'
+													: hasSelection
+													? `Send ${selectedCount} Selected`
+													: 'Send'
+											}
+											buttonVariant="primary"
+											className={cn(
+												'flex-1 h-full !rounded-none !border-0 !bg-[#68C575] !text-black !font-inter !font-medium !text-[14px] !flex !items-center !justify-center border-r border-[#000000]',
+												hasSelection
+													? 'hover:!bg-[#5FA968] active:!bg-[#569D60]'
+													: '!opacity-50 !cursor-not-allowed pointer-events-none'
+											)}
+											message={
+												props.isFreeTrial
+													? `Your free trial subscription does not include the ability to send emails. To send the emails\'ve drafted, please upgrade your subscription to the paid version.`
+													: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
+											}
+										/>
+									) : (
+										<Button
+											type="button"
+											className={cn(
+												'flex-1 h-full rounded-none font-inter font-medium text-[14px] flex items-center justify-center transition-all duration-200 border-r border-[#000000]',
+												showConfirm
+													? 'bg-[#68C575] text-black'
+													: hasSelection
+													? 'bg-[#68C575] text-black hover:bg-[#5FA968] active:bg-[#569D60]'
+													: 'bg-[#68C575] text-black opacity-50 cursor-not-allowed'
+											)}
+											onClick={async () => {
+												if (!hasSelection) return;
+												if (!showConfirm) {
+													setShowConfirm(true);
+													setTimeout(() => setShowConfirm(false), 10000);
+													return;
+												}
+												setShowConfirm(false);
+												await props.onSend();
+											}}
+											disabled={!hasSelection}
+										>
+											{showConfirm
+												? 'Click to Confirm and Send'
+												: hasSelection
+												? `Send ${selectedCount} Selected`
+												: 'Send'}
+										</Button>
+									)}
+									<Button
+										type="button"
+										variant="ghost"
+										className="w-[56px] h-full rounded-none text-black font-inter font-medium text-[14px]"
+										onClick={() => {
+											handleSelectAllDrafts();
+											setShowConfirm(true);
+											setTimeout(() => setShowConfirm(false), 10000);
+										}}
+									>
+										All
+									</Button>
+								</div>
+							</div>
+						</div>
+					) : null
+				}
+			>
+				<>
+					<div className="overflow-visible w-full flex flex-col gap-2 items-center">
+						{draftEmails.map((draft) => {
+							const contact = contacts?.find((c) => c.id === draft.contactId);
+							const contactName = contact
+								? contact.name ||
+								  `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
+								  contact.company ||
+								  'Contact'
+								: 'Unknown Contact';
+							const isSelected = selectedDraftIds.has(draft.id);
+
+							return (
+								<div
+									key={draft.id}
+									className={cn(
+										'cursor-pointer transition-colors relative select-none w-[366px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
+										isSelected && 'bg-[#FFDF9F]'
+									)}
+									onMouseDown={(e) => {
+										// Prevent text selection on shift-click
+										if (e.shiftKey) {
+											e.preventDefault();
+										}
+									}}
+									onClick={(e) => handleDraftSelect(draft, e)}
+									onDoubleClick={() => handleDraftDoubleClick(draft)}
+								>
+									{/* Delete button */}
+									<Button
+										type="button"
+										variant="icon"
+										onClick={(e) => handleDeleteDraft(e, draft.id)}
+										className="absolute top-[6px] right-[2px] p-1 transition-colors z-10 group"
+									>
+										<X size={16} className="text-gray-500 group-hover:text-red-500" />
+									</Button>
+
+									{/* Preview button */}
+									<Button
+										type="button"
+										variant="icon"
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											if (props.onPreview) {
+												props.onPreview(draft);
+											} else {
+												handleDraftDoubleClick(draft);
+											}
+										}}
+										className="absolute top-[28px] right-[2px] p-1 transition-colors z-20"
+										aria-label="Preview draft"
+									>
+										<PreviewIcon
+											width="16px"
+											height="16px"
+											pathClassName="fill-[#4A4A4A]"
+										/>
+									</Button>
+
+									{/* Fixed top-right info (Location + Title) */}
+									<div className="absolute top-[6px] right-[28px] flex flex-col items-end gap-[2px] w-[92px] pointer-events-none">
+										<div className="flex items-center justify-start gap-1 h-[11.67px] w-[92px]">
+											{(() => {
+												const fullStateName = (contact?.state as string) || '';
+												const stateAbbr = getStateAbbreviation(fullStateName) || '';
+												const normalizedState = fullStateName.trim();
+												const lowercaseCanadianProvinceNames = canadianProvinceNames.map(
+													(s) => s.toLowerCase()
+												);
+												const isCanadianProvince =
+													lowercaseCanadianProvinceNames.includes(
+														normalizedState.toLowerCase()
+													) ||
+													canadianProvinceAbbreviations.includes(
+														normalizedState.toUpperCase()
+													) ||
+													canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+												const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+												if (!stateAbbr) return null;
+												return isCanadianProvince ? (
+													<div
+														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border overflow-hidden"
+														style={{ borderColor: '#000000' }}
+														title="Canadian province"
+													>
+														<CanadianFlag
+															width="100%"
+															height="100%"
+															className="w-full h-full"
+														/>
+													</div>
+												) : isUSAbbr ? (
+													<span
+														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border text-[8px] leading-none font-bold"
+														style={{
+															backgroundColor:
+																stateBadgeColorMap[stateAbbr] || 'transparent',
+															borderColor: '#000000',
+														}}
+													>
+														{stateAbbr}
+													</span>
+												) : (
+													<span
+														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border"
+														style={{ borderColor: '#000000' }}
+													/>
+												);
+											})()}
+											{contact?.city ? (
+												<ScrollableText
+													text={contact.city}
+													className="text-[10px] text-black leading-none max-w-[70px]"
+												/>
+											) : null}
+										</div>
+
+										{contact?.headline ? (
+											<div className="w-[92px] h-[10px] rounded-[3.71px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
+												<ScrollableText
+													text={contact.headline}
+													className="text-[8px] text-black leading-none px-1"
+												/>
+											</div>
+										) : null}
+									</div>
+
+									{/* Content grid */}
+									<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px]">
+										{/* Row 1: Name + Location */}
+										<div className="row-start-1 col-start-1 flex items-center">
+											<div className="font-bold text-[11px] truncate leading-none">
+												{contactName}
+											</div>
+										</div>
+
+										{/* Row 2: Company + Headline (only when there is a separate name) */}
+										{(() => {
+											const hasSeparateName = Boolean(
+												(contact?.name && contact.name.trim()) ||
+													(contact?.firstName && contact.firstName.trim()) ||
+													(contact?.lastName && contact.lastName.trim())
+											);
+											return (
+												<div className="row-start-2 col-start-1 flex items-center pr-2">
+													<div className="text-[11px] text-black truncate leading-none">
+														{hasSeparateName ? contact?.company || '' : ''}
+													</div>
+												</div>
+											);
+										})()}
+
+										{/* Row 3: Subject */}
+										<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center">
+											{draft.subject || 'No subject'}
+										</div>
+
+										{/* Row 4: Message preview */}
+										<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center">
+											{draft.message
+												? draft.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
+												: 'No content'}
+										</div>
+									</div>
+								</div>
+							);
+						})}
+					</div>
 				</>
 
 				{isPendingDeleteEmail && (

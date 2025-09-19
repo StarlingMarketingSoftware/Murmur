@@ -46,6 +46,7 @@ export const StepSlider = ({
 		<div className={cn('relative w-full', disabled && 'opacity-50 pointer-events-none')}>
 			<SliderPrimitive.Root
 				data-slot="slider"
+				data-drag-ignore
 				defaultValue={defaultValue}
 				value={value}
 				min={min}

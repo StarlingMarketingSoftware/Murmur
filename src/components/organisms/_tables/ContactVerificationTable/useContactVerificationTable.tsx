@@ -7,10 +7,8 @@ import {
 	useCreateContactVerificationRequest,
 } from '@/hooks/queryHooks/useContactVerificationRequests';
 import { MMddyyyyHHmm } from '@/utils';
-import {
-	ContactVerificationRequest,
-	ContactVerificationRequestStatus,
-} from '@prisma/client';
+import { ContactVerificationRequestStatus } from '@/constants/prismaEnums';
+import type { ContactVerificationRequest } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';

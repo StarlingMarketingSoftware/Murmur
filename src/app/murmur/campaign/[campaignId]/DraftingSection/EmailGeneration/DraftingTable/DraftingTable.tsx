@@ -12,9 +12,7 @@ interface DraftingTableProps {
 	noDataDescription: string;
 	isPending: boolean;
 	title: string;
-	generationProgress?: number;
-	totalContacts?: number;
-	onCancel?: () => void;
+	footer?: ReactNode;
 }
 export const DraftingTable: FC<DraftingTableProps> = ({
 	title,
@@ -25,23 +23,61 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	noDataMessage,
 	noDataDescription,
 	isPending,
-	generationProgress = -1,
-	totalContacts = 0,
-	onCancel,
+	footer,
 }) => {
+	const isContacts = title === 'Contacts';
+	const isCompactHeader = isContacts || title === 'Drafts' || title === 'Sent';
+	const showTitle = !isContacts && title !== 'Drafts' && title !== 'Sent';
+	const isDrafts = title === 'Drafts';
+	const isSent = title === 'Sent';
 	return (
-		<div style={{ width: '366px', height: '489px', position: 'relative' }}>
+		<div style={{ width: '376px', height: '474px', position: 'relative' }}>
+			{/* Centered number above block */}
+			<div
+				data-drafting-top-number
+				style={{
+					position: 'absolute',
+					top: '-26px',
+					left: '50%',
+					transform: 'translateX(-50%)',
+					pointerEvents: 'none',
+				}}
+				className="text-[12px] font-inter font-medium text-black"
+			>
+				{isContacts ? '1' : isDrafts ? '3' : isSent ? '4' : ''}
+			</div>
+			{/* Top-left text label */}
+			<div
+				data-drafting-top-label
+				style={{ position: 'absolute', top: '-20px', left: '2px', pointerEvents: 'none' }}
+				className="text-[12px] font-inter font-medium text-black"
+			>
+				{isContacts ? 'Contacts' : isDrafts ? 'Drafts' : isSent ? 'Sent' : title}
+			</div>
 			{/* Container box with header */}
 			<div
 				data-drafting-table
 				style={{
 					width: '100%',
 					height: '100%',
-					border: '2px solid #ABABAB',
+					border: isContacts
+						? '2px solid #5D5B5B'
+						: isDrafts
+						? '2px solid #A8833A'
+						: isSent
+						? '2px solid #19670F'
+						: '2px solid #ABABAB',
 					borderRadius: '8px',
 					position: 'relative',
 					display: 'flex',
 					flexDirection: 'column',
+					backgroundColor: isContacts
+						? '#F5DADA'
+						: isDrafts
+						? '#EFDAAF'
+						: isSent
+						? '#C3E7BF'
+						: 'white',
 				}}
 			>
 				{/* Header section with top rounded corners */}
@@ -50,24 +86,36 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					style={{
 						borderTopLeftRadius: '8px',
 						borderTopRightRadius: '8px',
-						borderBottom: '2px solid #ABABAB',
-						padding: '12px 16px',
+						borderBottom: isCompactHeader ? 'none !important' : '2px solid #ABABAB',
+						padding: isCompactHeader ? '0 10px' : '12px 16px',
 						display: 'flex',
-						justifyContent: 'space-between',
+						justifyContent: isCompactHeader ? 'flex-end' : 'space-between',
 						alignItems: 'center',
-						height: '48px',
-						backgroundColor: 'white',
+						height: isCompactHeader ? '20px' : '48px',
+						backgroundColor: isContacts
+							? '#F5DADA'
+							: isDrafts
+							? '#EFDAAF'
+							: isSent
+							? '#C3E7BF'
+							: 'white',
 					}}
 				>
-					<div style={{ transform: 'translateY(-6px)' }}>
-						<div className="text-sm font-inter font-medium text-black">{title}</div>
-					</div>
-					{hasData && (
-						<div style={{ transform: 'translateY(6px)' }}>
+					{showTitle && (
+						<div style={{ transform: 'translateY(-6px)' }}>
+							<div className="text-sm font-inter font-medium text-black">{title}</div>
+						</div>
+					)}
+					{hasData && !isSent && (
+						<div
+							style={{
+								transform: isCompactHeader ? 'translateY(-2px)' : 'translateY(6px)',
+							}}
+						>
 							<Button
 								type="button"
 								variant="ghost"
-								className="text-sm font-inter font-medium text-black bg-none border-none cursor-pointer p-0 hover:underline transition-colors"
+								className="!h-[18px] text-xs font-inter font-medium text-black bg-none border-none cursor-pointer p-0 m-0 leading-none hover:underline transition-colors"
 								onClick={handleClick}
 							>
 								{areAllSelected ? 'Deselect All' : 'Select All'}
@@ -88,59 +136,41 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						<div className="flex items-center justify-center h-full">
 							<Spinner size="small" />
 						</div>
+					) : hasData ? (
+						children
+					) : isDrafts || isSent ? (
+						<div className="overflow-visible w-full flex flex-col gap-2 items-center py-2">
+							{Array.from({ length: 5 }).map((_, idx) => (
+								<div
+									key={idx}
+									className="select-none w-[366px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
+								/>
+							))}
+						</div>
 					) : (
-						<>
-							{hasData ? (
-								children
-							) : (
-								<div className="flex flex-col items-center justify-center h-full text-gray-500 px-4">
-									<div className="text-sm font-semibold mb-2">{noDataMessage}</div>
-									<div className="text-xs text-center">{noDataDescription}</div>
-								</div>
-							)}
-						</>
+						<div className="flex flex-col items-center justify-center h-full text-gray-500 px-4">
+							<div className="text-sm font-semibold mb-2">{noDataMessage}</div>
+							<div className="text-xs text-center">{noDataDescription}</div>
+						</div>
 					)}
 				</CustomScrollbar>
 
-				{/* Progress bar - positioned at bottom of container */}
-				{title === 'Contacts' && (
-					<div className="px-4 py-2 border-t-2 border-[#ABABAB]">
-						<div className="flex items-center gap-3">
-							<div className="text-xs font-inter text-gray-600 flex-none">
-								{generationProgress >= 0 && totalContacts > 0
-									? generationProgress >= totalContacts
-										? `Drafted ${Math.min(
-												generationProgress,
-												totalContacts
-										  )}/${totalContacts}`
-										: `Drafting ${generationProgress}/${totalContacts}`
-									: 'Ready to draft'}
-							</div>
-
-							<div className="flex-1 h-[7px] bg-[rgba(93,171,104,0.49)] border-0 relative">
-								<div
-									className="h-full bg-[#5DAB68] transition-all duration-300 ease-out absolute top-0 left-0"
-									style={{
-										width: `${
-											generationProgress >= 0 && totalContacts > 0
-												? Math.min((generationProgress / totalContacts) * 100, 100)
-												: 0
-										}%`,
-									}}
-								/>
-							</div>
-
-							{onCancel && generationProgress >= 0 && (
-								<button
-									type="button"
-									onClick={onCancel}
-									className="ml-2 p-0 h-auto w-auto bg-transparent border-0 text-black hover:text-red-600 transition-colors cursor-pointer"
-									aria-label="Cancel drafting"
-								>
-									×
-								</button>
-							)}
-						</div>
+				{/* Optional footer area (e.g., Send button for Drafts) */}
+				{footer && (
+					<div
+						data-drafting-table-footer
+						style={{
+							padding: isDrafts ? '6px 5px' : isCompactHeader ? '6px 16px' : '12px 16px',
+							backgroundColor: isContacts
+								? '#F5DADA'
+								: isDrafts
+								? '#EFDAAF'
+								: isSent
+								? '#DAF5E0'
+								: 'white',
+						}}
+					>
+						{footer}
 					</div>
 				)}
 			</div>

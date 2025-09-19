@@ -64,6 +64,8 @@ export interface HybridPromptInputProps {
 	isPendingGeneration?: boolean;
 	isTest?: boolean;
 	contact?: ContactWithName | null;
+	forceShowTestPreview?: boolean;
+	compactLeftOnly?: boolean;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {
@@ -75,13 +77,21 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		isPendingGeneration,
 		isTest,
 		contact,
+		forceShowTestPreview,
 	} = props;
 
 	/* HOOKS */
 
 	const form = useFormContext<DraftingFormValues>();
 	const [textBlockCount, setTextBlockCount] = useState(0);
-	const [showTestPreview, setShowTestPreview] = useState(false);
+	const [showTestPreview, setShowTestPreview] = useState(Boolean(forceShowTestPreview));
+
+	// Keep external flag in sync
+	useEffect(() => {
+		if (forceShowTestPreview !== undefined) {
+			setShowTestPreview(Boolean(forceShowTestPreview));
+		}
+	}, [forceShowTestPreview]);
 
 	const { fields, append, remove, move, insert, update } = useFieldArray({
 		control: form.control,

@@ -10,10 +10,11 @@ import {
 	useCallback,
 } from 'react';
 import { DraftingFormValues } from '../useDraftingSection';
+import { toast } from 'sonner';
 import { UseFormReturn } from 'react-hook-form';
 import { debounce } from 'lodash';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
-import { EmailStatus } from '@prisma/client';
+import { EmailStatus } from '@/constants/prismaEnums';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 
 export interface EmailGenerationProps {
@@ -29,6 +30,10 @@ export interface EmailGenerationProps {
 	cancelGeneration: () => void;
 	isFirstLoad: boolean;
 	scrollToEmailStructure?: () => void;
+	// Live drafting preview props
+	isLivePreviewVisible?: boolean;
+	livePreviewContactId?: number | null;
+	livePreviewMessage?: string;
 }
 
 export const useEmailGeneration = (props: EmailGenerationProps) => {
@@ -52,6 +57,7 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false);
+	const [previewDraft, setPreviewDraft] = useState<EmailWithRelations | null>(null);
 	const [isJustSaved, setIsJustSaved] = useState(false);
 	const [autosaveStatus, setAutosaveStatus] = useState<
 		'idle' | 'saving' | 'saved' | 'error'
@@ -79,6 +85,10 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		emails?.filter((email: EmailWithRelations) => email.status === EmailStatus.draft) ||
 		[];
 
+	const sentEmails =
+		emails?.filter((email: EmailWithRelations) => email.status === EmailStatus.sent) ||
+		[];
+
 	/* HANDLERS */
 
 	const executeDraftNow = async () => {
@@ -89,6 +99,10 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 	};
 
 	const handleDraftButtonClick = async () => {
+		if (selectedContactIds.size === 0) {
+			toast.error('Select at least one contact to draft emails.');
+			return;
+		}
 		await executeDraftNow();
 	};
 
@@ -209,5 +223,8 @@ export const useEmailGeneration = (props: EmailGenerationProps) => {
 		isPendingEmails,
 		handleDraftButtonClick,
 		scrollToEmailStructure,
+		sentEmails,
+		previewDraft,
+		setPreviewDraft,
 	};
 };
