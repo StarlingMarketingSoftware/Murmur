@@ -91,17 +91,22 @@ const Murmur = () => {
 				<div className="relative">
 					<Link
 						href={urls.murmur.dashboard.index}
-						className="absolute top-0 left-8 flex items-center gap-1 text-[15px] font-inter font-normal no-underline hover:no-underline z-10 group text-black hover:text-gray-500"
+						className="absolute left-8 flex items-center text-[15px] font-inter font-normal no-underline hover:no-underline z-10 group text-[#060606] hover:text-gray-500"
 						title="Back to Home"
-						style={{ paddingTop: '5px' }}
+						style={{
+							top: '41px',
+							transform: 'translateY(-50%)',
+							gap: '20px',
+							fontWeight: 400,
+						}}
 					>
 						<svg
-							width="18"
-							height="11"
+							width="16"
+							height="10"
 							viewBox="0 0 27 16"
 							fill="none"
 							xmlns="http://www.w3.org/2000/svg"
-							className="inline-block"
+							className="inline-block align-middle"
 						>
 							<path
 								d="M0.292892 7.29289C-0.0976315 7.68342 -0.0976315 8.31658 0.292892 8.70711L6.65685 15.0711C7.04738 15.4616 7.68054 15.4616 8.07107 15.0711C8.46159 14.6805 8.46159 14.0474 8.07107 13.6569L2.41421 8L8.07107 2.34315C8.46159 1.95262 8.46159 1.31946 8.07107 0.928932C7.68054 0.538408 7.04738 0.538408 6.65685 0.928932L0.292892 7.29289ZM27 8V7L1 7V8V9L27 9V8Z"
