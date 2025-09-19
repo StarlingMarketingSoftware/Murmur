@@ -29,7 +29,7 @@ const Row: FC<{
 	return (
 		<div
 			className={cn(
-				'w-full rounded-[8px] border-2 border-black px-3 py-[6px] bg-white flex items-center justify-between',
+				'box-border w-[378px] h-[28px] mx-auto rounded-[8px] border-2 border-black px-2 py-0 bg-white flex items-center justify-between',
 				className,
 				onClick ? 'cursor-pointer' : ''
 			)}

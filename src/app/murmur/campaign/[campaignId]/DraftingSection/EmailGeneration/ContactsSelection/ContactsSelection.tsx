@@ -319,6 +319,14 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						})()}
 					</div>
 				))}
+
+				{/* Filler rows to reach 7 total when there are fewer contacts */}
+				{Array.from({ length: Math.max(0, 7 - contacts.length) }).map((_, idx) => (
+					<div
+						key={`filler-${idx}`}
+						className="select-none w-[366px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
+					/>
+				))}
 			</div>
 		</DraftingTable>
 	);
