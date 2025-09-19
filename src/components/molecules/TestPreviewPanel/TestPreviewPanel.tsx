@@ -309,7 +309,18 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	}, [typedBody, clipAtHeight]);
 
 	return (
-		<div className="w-[457px] h-[644px] flex flex-col border-2 border-black rounded-[8px] bg-gray-50 relative">
+		<div
+			data-test-preview-panel
+			className="w-[457px] h-[644px] flex flex-col bg-gray-50 relative"
+			style={{
+				boxSizing: 'border-box',
+				border: '2px solid black',
+				borderRadius: '8px',
+				overflow: 'hidden',
+				outline: '2px solid black',
+				outlineOffset: '-2px',
+			}}
+		>
 			<div className="flex-1 flex flex-col pt-1 pb-0">
 				<div className="flex-1 flex flex-col overflow-visible relative z-20">
 					<div className="relative px-5" data-test-preview-header>
@@ -452,11 +463,11 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 
 					<div
 						ref={boxRef}
-						className="relative flex-1 bg-white flex flex-col rounded-b-lg"
+						className="relative flex-1 bg-white flex flex-col"
 						style={{
 							minHeight: '400px',
-							borderBottomLeftRadius: 'calc(var(--radius) - 2px)',
-							borderBottomRightRadius: 'calc(var(--radius) - 2px)',
+							borderBottomLeftRadius: '6px',
+							borderBottomRightRadius: '6px',
 						}}
 					>
 						{/* Typing content with custom 2px scrollbar */}
@@ -580,13 +591,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 					</div>
 
 					{/* Footer with Test button */}
-					<div
-						className="p-4 border-t bg-background rounded-b-md"
-						style={{
-							borderBottomLeftRadius: 'calc(0.625rem - 2px)',
-							borderBottomRightRadius: 'calc(0.625rem - 2px)',
-						}}
-					>
+					<div className="p-4 bg-background rounded-b-md">
 						<Button
 							type="button"
 							onClick={onTest}
