@@ -85,7 +85,7 @@ const Murmur = () => {
 	// ensures a premium, smooth transition with no scale effects.
 	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
 	return (
-		<div style={{ zoom: '0.8', transformOrigin: 'top center' }}>
+		<>
 			{/* Header section with white background */}
 			<div className="bg-white">
 				<div className="relative">
@@ -297,7 +297,7 @@ const Murmur = () => {
 					</>
 				)}
 			</div>
-		</div>
+		</>
 	);
 };
 
