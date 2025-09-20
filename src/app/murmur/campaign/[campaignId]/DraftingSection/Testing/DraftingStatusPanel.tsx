@@ -6,7 +6,7 @@ import { UseFormReturn } from 'react-hook-form';
 import { DraftingFormValues } from '../useDraftingSection';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus } from '@/constants/prismaEnums';
-import { ArrowUpRight, ChevronsRight, Expand } from 'lucide-react';
+import { ChevronsRight, Expand } from 'lucide-react';
 
 export type DraftingPreviewKind =
 	| 'none'
@@ -35,7 +35,7 @@ export interface DraftingStatusPanelProps {
 	renderers?: DraftingStatusPanelRenderers; // Custom UI hooks for previews
 }
 
-const Divider = () => <div className="w-px h-4 bg-black/40" />;
+const Divider = () => <div className="w-px h-7 bg-black/40 -my-1.5" />;
 
 export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	const {
@@ -107,6 +107,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	}, [draftingMode]);
 
 	const isAiSubject = form.watch('isAiSubject');
+	const subjectStyle = useMemo(() => {
+		return {
+			backgroundColor: isAiSubject ? '#B3D8B8' : '#F1F1F1',
+		};
+	}, [isAiSubject]);
 	const subject = form.watch('subject');
 	const fromName = campaign.identity?.name || '';
 
@@ -247,12 +252,12 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 							onClick={() => setActivePreview('contacts')}
 						>
 							<span className="font-bold text-black text-sm">Contacts</span>
-							<div className="ml-auto flex items-center gap-2 text-xs text-black/70 font-semibold">
+							<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full">
 								<span>{`${contactsCount} people`}</span>
 								<Divider />
 								<button
 									type="button"
-									className="bg-transparent border-none p-0 hover:text-black"
+									className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
 									onClick={(e) => {
 										e.stopPropagation();
 										setActivePreview('contacts');
@@ -263,7 +268,7 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 								<Divider />
 								<button
 									type="button"
-									className="bg-transparent border-none p-0 hover:text-black"
+									className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
 									onClick={(e) => {
 										e.stopPropagation();
 										setActivePreview('draftPreview');
@@ -271,6 +276,7 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 								>
 									Draft
 								</button>
+								<Divider />
 							</div>
 							<div className="flex items-center justify-center text-xs font-bold text-black/60 w-5 ml-2">
 								<div className="flex items-center">
@@ -302,46 +308,24 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 							<span className="whitespace-nowrap">Email Structure</span>
 						</div>
 						<div
-							className="px-3 flex items-center border-r border-black font-semibold text-black/80"
+							className="px-3 flex items-center border-r border-black font-medium text-black/80 text-[11px]"
 							style={draftingModeStyle}
 						>
 							<span className="whitespace-nowrap">{draftingMode}</span>
 						</div>
-						<div className="px-3 bg-[#DBFFDB] flex items-center border-r border-black font-semibold text-black/80">
+						<div
+							className="px-3 flex items-center border-r border-black font-medium text-black/80 text-[11px]"
+							style={subjectStyle}
+						>
 							<span className="whitespace-nowrap">
 								{isAiSubject ? 'Auto Subject' : 'Subject'}
 							</span>
 						</div>
-						<div className="px-3 bg-[#E6E6E6] flex items-center flex-grow font-semibold text-black/80">
-							<span className="whitespace-nowrap">{fromName || 'From'}</span>
+						<div className="px-3 bg-[#E0E0E0] flex items-center flex-grow font-medium text-black/80 text-[11px] min-w-0">
+							<span className="truncate">{fromName || 'From'}</span>
 						</div>
-						<div className="px-3 bg-white flex items-center justify-center text-sm font-bold text-black/80 w-10 border-l border-black">
+						<div className="bg-white flex items-center justify-center text-sm font-bold text-black/80 w-[30px] flex-shrink-0 border-l border-black">
 							2
-						</div>
-					</div>
-
-					{/* Draft Preview */}
-					<div
-						className={cn(
-							'rounded-md border-2 border-black/30 mb-2 font-sans',
-							'bg-[#D1DAFF] backdrop-blur-sm select-none transition-all cursor-pointer hover:bg-black/5'
-						)}
-						style={{ width: '376px' }}
-						onClick={() => setActivePreview('draftPreview')}
-					>
-						<div className="flex items-center px-3" style={{ height: '28px' }}>
-							<span className="font-bold text-black text-sm">Draft Preview</span>
-							<div className="ml-auto flex items-center gap-2 text-xs text-black/70 font-semibold truncate">
-								<span className="truncate max-w-[80px]">
-									{contacts?.[0]?.firstName || 'Contact'}
-								</span>
-								<span className="truncate max-w-[120px]">
-									{subject || 'Subject preview'}
-								</span>
-							</div>
-							<div className="flex items-center justify-center text-xs font-bold text-black/60 w-5 ml-2">
-								<ChevronsRight size={14} />
-							</div>
 						</div>
 					</div>
 
@@ -356,12 +340,12 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					>
 						<div className="flex items-center px-3" style={{ height: '28px' }}>
 							<span className="font-bold text-black text-sm">Drafts</span>
-							<div className="ml-auto flex items-center gap-2 text-xs text-black/70 font-semibold">
+							<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full">
 								<span>{`${draftsCount} drafts`}</span>
 								<Divider />
 								<button
 									type="button"
-									className="bg-transparent border-none p-0 hover:text-black"
+									className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
 									onClick={(e) => {
 										e.stopPropagation();
 										setActivePreview('drafts');
@@ -372,7 +356,7 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 								<Divider />
 								<button
 									type="button"
-									className="bg-transparent border-none p-0 hover:text-black"
+									className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
 									onClick={(e) => {
 										e.stopPropagation();
 										setActivePreview('sendPreview');
@@ -380,38 +364,12 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 								>
 									Send
 								</button>
+								<Divider />
 							</div>
 							<div className="flex items-center justify-center text-xs font-bold text-black/60 w-5 ml-2">
 								<div className="flex items-center">
 									3 <ChevronsRight size={12} className="ml-0.5" />
 								</div>
-							</div>
-						</div>
-					</div>
-
-					{/* Send Preview */}
-					<div
-						className={cn(
-							'rounded-md border-2 border-black/30 mb-2 font-sans',
-							'bg-[#D1DAFF] backdrop-blur-sm select-none transition-all cursor-pointer hover:bg-black/5'
-						)}
-						style={{ width: '376px' }}
-						onClick={() => setActivePreview('sendPreview')}
-					>
-						<div className="flex items-center px-3" style={{ height: '28px' }}>
-							<span className="font-bold text-black text-sm">Send Preview</span>
-							<div className="ml-auto flex items-center gap-2 text-xs text-black/70 font-semibold truncate">
-								<span className="truncate max-w-[80px]">
-									{draftedEmails?.[0]?.contact?.firstName ||
-										contacts?.[0]?.firstName ||
-										'Contact'}
-								</span>
-								<span className="truncate max-w-[120px]">
-									{draftedEmails?.[0]?.subject || subject || 'Subject preview'}
-								</span>
-							</div>
-							<div className="flex items-center justify-center text-xs font-bold text-black/60 w-5 ml-2">
-								<ChevronsRight size={14} />
 							</div>
 						</div>
 					</div>
@@ -427,7 +385,7 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					>
 						<div className="flex items-center px-3" style={{ height: '28px' }}>
 							<span className="font-bold text-black text-sm">Sent</span>
-							<div className="ml-auto flex items-center gap-2 text-xs text-black/70 font-semibold">
+							<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full">
 								<span>{`${sentCount.toString().padStart(2, '0')} sent`}</span>
 							</div>
 							<div className="flex items-center justify-center text-xs font-bold text-black/60 w-5 ml-2">
