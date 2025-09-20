@@ -281,25 +281,25 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 
 					{/* Email Structure */}
 					<div
-						className={cn(
-							'rounded-md border-2 border-black/30 mb-2 font-sans',
-							'bg-[#E6E6E6] backdrop-blur-sm select-none transition-all cursor-pointer hover:bg-black/5'
-						)}
-						style={{ width: '376px' }}
+						className="flex items-stretch rounded-lg border-2 border-black w-[376px] h-[32px] font-sans text-xs cursor-pointer overflow-hidden mb-2"
 						onClick={() => setActivePreview('emailStructure')}
 					>
-						<div className="flex items-center px-3" style={{ height: '28px' }}>
-							<span className="font-bold text-black text-sm">Email Structure</span>
-							<div className="ml-auto flex items-center gap-2 text-xs text-black/70 font-semibold">
-								<span>{draftingMode}</span>
-								<Divider />
-								<span>{isAiSubject ? 'Auto Subject' : 'Subject'}</span>
-								<Divider />
-								<span>{fromName || 'From'}</span>
-							</div>
-							<div className="flex items-center justify-center text-xs font-bold text-black/60 w-5 ml-2">
-								2
-							</div>
+						<div className="px-3 text-sm font-bold text-black bg-white flex items-center border-r border-black">
+							<span className="whitespace-nowrap">Email Structure</span>
+						</div>
+						<div className="px-3 bg-[#DBDBFF] flex items-center border-r border-black font-semibold text-black/80">
+							<span className="whitespace-nowrap">{draftingMode}</span>
+						</div>
+						<div className="px-3 bg-[#DBFFDB] flex items-center border-r border-black font-semibold text-black/80">
+							<span className="whitespace-nowrap">
+								{isAiSubject ? 'Auto Subject' : 'Subject'}
+							</span>
+						</div>
+						<div className="px-3 bg-[#E6E6E6] flex items-center flex-grow font-semibold text-black/80">
+							<span className="whitespace-nowrap">{fromName || 'From'}</span>
+						</div>
+						<div className="px-3 bg-white flex items-center justify-center text-sm font-bold text-black/80 w-10 border-l border-black">
+							2
 						</div>
 					</div>
 
