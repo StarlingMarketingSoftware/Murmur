@@ -35,7 +35,7 @@ export interface DraftingStatusPanelProps {
 	renderers?: DraftingStatusPanelRenderers; // Custom UI hooks for previews
 }
 
-const Divider = () => <div className="w-px h-7 bg-black/40 -my-1.5" />;
+const Divider = () => <div className="w-px self-stretch border-l border-black/40" />;
 
 export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	const {
@@ -304,17 +304,17 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 						className="flex items-stretch rounded-lg border-2 border-black w-[376px] h-[32px] font-sans text-xs cursor-pointer overflow-hidden mb-2"
 						onClick={() => setActivePreview('emailStructure')}
 					>
-						<div className="px-3 text-sm font-bold text-black bg-white flex items-center border-r border-black">
+						<div className="px-3 text-sm font-bold text-black bg-white flex items-center border-r border-black/40">
 							<span className="whitespace-nowrap">Email Structure</span>
 						</div>
 						<div
-							className="px-3 flex items-center border-r border-black font-medium text-black/80 text-[11px]"
+							className="px-3 flex items-center border-r border-black/40 font-medium text-black/80 text-[11px]"
 							style={draftingModeStyle}
 						>
 							<span className="whitespace-nowrap">{draftingMode}</span>
 						</div>
 						<div
-							className="px-3 flex items-center border-r border-black font-medium text-black/80 text-[11px]"
+							className="px-3 flex items-center border-r border-black/40 font-medium text-black/80 text-[11px]"
 							style={subjectStyle}
 						>
 							<span className="whitespace-nowrap">
@@ -324,7 +324,7 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 						<div className="px-3 bg-[#E0E0E0] flex items-center flex-grow font-medium text-black/80 text-[11px] min-w-0">
 							<span className="truncate">{fromName || 'From'}</span>
 						</div>
-						<div className="bg-white flex items-center justify-center text-sm font-bold text-black/80 w-[30px] flex-shrink-0 border-l border-black">
+						<div className="bg-white flex items-center justify-center text-sm font-bold text-black/80 w-[30px] flex-shrink-0 border-l border-black/40">
 							2
 						</div>
 					</div>
