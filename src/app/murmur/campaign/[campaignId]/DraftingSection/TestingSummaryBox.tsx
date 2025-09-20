@@ -10,7 +10,7 @@ import { cn } from '@/utils';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
 import { ContactsSelection } from './EmailGeneration/ContactsSelection/ContactsSelection';
-import { DraftedEmails } from './EmailGeneration/DraftedEmails/DraftedEmails';
+import TestingDrafts from './TestingDrafts/TestingDrafts';
 import { SentEmails } from './EmailGeneration/SentEmails/SentEmails';
 
 interface TestingSummaryBoxProps {
@@ -93,30 +93,48 @@ export const TestingSummaryBox: FC<TestingSummaryBoxProps> = ({
 	}, [hybridBlocks]);
 
 	return (
-		<div className={cn('flex-shrink-0', openPanel ? 'w-[420px]' : 'w-[320px]')}>
-			<div className="rounded-[10px] border-[3px] border-black bg-white overflow-hidden">
+		<div className={cn('flex-shrink-0 w-[320px]')}>
+			<div
+				className="rounded-[10px] border-[3px] border-black bg-white overflow-visible"
+				style={{ marginTop: openPanel === 'contacts' ? 320 : 0 }}
+			>
 				<div className="px-4 py-2 flex items-center justify-between">
 					<div className="font-inter text-[18px] font-semibold">Drafting</div>
 					<div className="font-inter text-[12px] text-[#6B6B6B]">Open</div>
 				</div>
 				<div className="px-3 pb-3 flex flex-col items-center gap-2">
-					<Row
-						label="Contacts"
-						right={`${contactsCount} ${contactsCount === 1 ? 'person' : 'people'}`}
-						className="bg-[#FCE2E2]"
-						onClick={() => setOpenPanel(openPanel === 'contacts' ? null : 'contacts')}
-					/>
+					{/* Contacts row with upward expanding panel */}
+					<div className="relative w-full flex flex-col items-center">
+						{openPanel === 'contacts' && (
+							<div
+								className="absolute left-1/2 -translate-x-1/2 z-20"
+								style={{ bottom: 'calc(100% - 2px)' }}
+							>
+								<div className="box-border w-[300px] border-2 border-black border-b-0 rounded-t-[8px] bg-[#FCE2E2]">
+									<div className="max-h-[300px] overflow-y-auto p-2">
+										<ContactsSelection
+											contacts={availableContacts}
+											selectedContactIds={new Set()}
+											setSelectedContactIds={() => {}}
+											handleContactSelection={() => {}}
+											isCompact
+											isEmbedded
+										/>
+									</div>
+								</div>
+							</div>
+						)}
 
-					{openPanel === 'contacts' && (
-						<div className="pt-1 pb-2 flex justify-center">
-							<ContactsSelection
-								contacts={availableContacts}
-								selectedContactIds={new Set()}
-								setSelectedContactIds={() => {}}
-								handleContactSelection={() => {}}
-							/>
-						</div>
-					)}
+						<Row
+							label="Contacts"
+							right={`${contactsCount} ${contactsCount === 1 ? 'person' : 'people'}`}
+							className={cn(
+								'bg-[#FCE2E2]',
+								openPanel === 'contacts' && 'rounded-t-none border-t-0'
+							)}
+							onClick={() => setOpenPanel(openPanel === 'contacts' ? null : 'contacts')}
+						/>
+					</div>
 
 					<Row
 						label="Email Structure"
@@ -156,23 +174,7 @@ export const TestingSummaryBox: FC<TestingSummaryBoxProps> = ({
 
 					{openPanel === 'drafts' && (
 						<div className="pt-1 pb-2 flex justify-center">
-							<DraftedEmails
-								draftEmails={draftEmails}
-								isPendingEmails={false}
-								contacts={contacts}
-								selectedDraftIds={new Set()}
-								setSelectedDraft={() => {}}
-								setIsDraftDialogOpen={() => {}}
-								handleDraftSelection={() => {}}
-								setSelectedDraftIds={() => {}}
-								onSend={() => {}}
-								isSendingDisabled={true}
-								isFreeTrial={false}
-								fromName={campaign?.identity?.name}
-								fromEmail={campaign?.identity?.email}
-								subject={form.watch('subject')}
-								selectedDraft={null}
-							/>
+							<TestingDrafts draftEmails={draftEmails} contacts={contacts} />
 						</div>
 					)}
 

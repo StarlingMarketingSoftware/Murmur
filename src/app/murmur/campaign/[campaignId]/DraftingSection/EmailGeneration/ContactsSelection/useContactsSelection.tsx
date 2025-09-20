@@ -9,6 +9,10 @@ export interface ContactsSelectionProps {
 	generationProgress?: number;
 	cancelGeneration?: () => void;
 	generationTotal?: number;
+	/** Optional compact variant for Testing preview UI */
+	isCompact?: boolean;
+	/** When embedded in another UI, render list only (no DraftingTable wrapper) */
+	isEmbedded?: boolean;
 }
 
 export const useContactsSelection = (props: ContactsSelectionProps) => {
