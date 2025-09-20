@@ -5,6 +5,7 @@ import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/Hybr
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { EmailGeneration } from './EmailGeneration/EmailGeneration';
 import { cn } from '@/utils';
+import DraftingStatusPanel from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftingStatusPanel';
 // removed unused DraftingMode/HybridBlock imports after moving mode toggles inside
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
@@ -55,6 +56,13 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									contact={contacts?.[0]}
 								/>
 							</div>
+							{/* Floating status panel for Testing view; fixed so it won't displace content */}
+							<DraftingStatusPanel
+								campaign={campaign}
+								contacts={contacts || []}
+								form={form}
+								generationProgress={generationProgress}
+							/>
 						</div>
 					)}
 
