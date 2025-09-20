@@ -92,6 +92,20 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 		: isOnlyTextBlocks
 		? 'Handwritten'
 		: 'Hybrid';
+
+	const draftingModeStyle = useMemo(() => {
+		switch (draftingMode) {
+			case 'Full Auto':
+				return { backgroundColor: '#DAE6FE' };
+			case 'Hybrid':
+				return { backgroundColor: 'rgba(74, 74, 217, 0.31)' };
+			case 'Handwritten':
+				return { backgroundColor: 'rgba(93, 171, 104, 0.47)' };
+			default:
+				return {};
+		}
+	}, [draftingMode]);
+
 	const isAiSubject = form.watch('isAiSubject');
 	const subject = form.watch('subject');
 	const fromName = campaign.identity?.name || '';
@@ -287,7 +301,10 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 						<div className="px-3 text-sm font-bold text-black bg-white flex items-center border-r border-black">
 							<span className="whitespace-nowrap">Email Structure</span>
 						</div>
-						<div className="px-3 bg-[#DBDBFF] flex items-center border-r border-black font-semibold text-black/80">
+						<div
+							className="px-3 flex items-center border-r border-black font-semibold text-black/80"
+							style={draftingModeStyle}
+						>
 							<span className="whitespace-nowrap">{draftingMode}</span>
 						</div>
 						<div className="px-3 bg-[#DBFFDB] flex items-center border-r border-black font-semibold text-black/80">
