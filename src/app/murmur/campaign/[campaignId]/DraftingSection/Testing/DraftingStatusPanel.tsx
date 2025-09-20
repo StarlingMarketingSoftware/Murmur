@@ -35,62 +35,7 @@ export interface DraftingStatusPanelProps {
 	renderers?: DraftingStatusPanelRenderers; // Custom UI hooks for previews
 }
 
-const SectionShell: FC<{
-	label: string;
-	accentClass: string;
-	rightNode?: ReactNode;
-	onClick?: () => void;
-	children?: ReactNode;
-	number?: ReactNode;
-}> = ({ label, accentClass, rightNode, onClick, children, number }) => {
-	return (
-		<div
-			className={cn(
-				'rounded-md border-b-2 border-l border-r border-t border-black/30 shadow-[0_2px_0_#000] mb-2',
-				'bg-white/70 backdrop-blur-sm select-none transition-all',
-				onClick && 'cursor-pointer hover:bg-white/90'
-			)}
-			onClick={onClick}
-			style={{ width: '376px' }}
-		>
-			<div className="flex items-center gap-2 px-2" style={{ height: '28px' }}>
-				<div
-					className={cn(
-						'h-5 w-28 rounded-sm text-center text-xs leading-5 font-bold text-black/90',
-						accentClass
-					)}
-				>
-					{label}
-				</div>
-				<div className="ml-auto flex items-center gap-2 text-xs">{rightNode}</div>
-				{number && (
-					<div className="flex items-center justify-center text-xs font-bold text-black/60 w-5">
-						{number}
-					</div>
-				)}
-			</div>
-			{children && <div className="px-2 pb-2">{children}</div>}
-		</div>
-	);
-};
-
-const Pill: FC<{ children: ReactNode; className?: string }> = ({
-	children,
-	className,
-}) => (
-	<div
-		className={cn(
-			'px-1.5 h-5 rounded-sm border border-black/20 shadow-[0_1px_0_#000] text-[11px] leading-5 bg-white/70',
-			className
-		)}
-	>
-		{children}
-	</div>
-);
-
-const CountPill: FC<{ label: string }> = ({ label }) => (
-	<Pill className="min-w-[70px] text-center font-medium">{label}</Pill>
-);
+const Divider = () => <div className="w-px h-4 bg-black/40" />;
 
 export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	const {
@@ -167,7 +112,7 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	const renderActivePreview = (): ReactNode => {
 		if (activePreview === 'none') return null;
 		const container = (content: ReactNode) => (
-			<div className="mt-2 rounded-md border border-black/20 bg-white/80 shadow-[0_2px_0_#000] p-3">
+			<div className="mt-2 rounded-md border border-black/20 bg-white/80 shadow-[0_2px_0_#000] p-3 font-sans">
 				{content}
 			</div>
 		);
@@ -185,9 +130,7 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 									<div className="text-[13px] font-medium">
 										{c.firstName} {c.lastName}
 									</div>
-									<div className="ml-auto">
-										<Pill>Music Venue</Pill>
-									</div>
+									<div className="ml-auto text-xs text-black/60">Music Venue</div>
 								</div>
 							))}
 						</div>
@@ -198,12 +141,12 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					renderers?.emailStructure ? (
 						renderers.emailStructure()
 					) : (
-						<div className="flex items-center gap-2 flex-wrap">
-							<Pill className="bg-[#DBDBFF] font-semibold">{draftingMode}</Pill>
-							<Pill className="bg-[#DBFFDB] font-semibold">
-								{isAiSubject ? 'Auto Subject' : 'Subject'}
-							</Pill>
-							<Pill className="font-semibold">{fromName || 'From'}</Pill>
+						<div className="flex items-center gap-2 flex-wrap text-sm">
+							<span>{draftingMode}</span>
+							<Divider />
+							<span>{isAiSubject ? 'Auto Subject' : 'Custom Subject'}</span>
+							<Divider />
+							<span>{fromName || 'From Name'}</span>
 						</div>
 					)
 				);
@@ -212,13 +155,13 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					renderers?.draftPreview ? (
 						renderers.draftPreview()
 					) : (
-						<div className="flex items-center gap-2 overflow-hidden">
-							<Pill className="truncate max-w-[160px] font-semibold">
+						<div className="flex items-center gap-2 overflow-hidden text-sm">
+							<span className="truncate max-w-[160px]">
 								{contacts?.[0]?.firstName || 'Contact'}
-							</Pill>
-							<Pill className="truncate max-w-[270px] font-semibold">
+							</span>
+							<span className="truncate max-w-[270px]">
 								{subject || 'Subject preview'}
-							</Pill>
+							</span>
 						</div>
 					)
 				);
@@ -235,15 +178,15 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					renderers?.sendPreview ? (
 						renderers.sendPreview()
 					) : (
-						<div className="flex items-center gap-2 overflow-hidden">
-							<Pill className="truncate max-w-[160px] font-semibold">
+						<div className="flex items-center gap-2 overflow-hidden text-sm">
+							<span className="truncate max-w-[160px]">
 								{draftedEmails?.[0]?.contact?.firstName ||
 									contacts?.[0]?.firstName ||
 									'Contact'}
-							</Pill>
-							<Pill className="truncate max-w-[270px] font-semibold">
+							</span>
+							<span className="truncate max-w-[270px]">
 								{draftedEmails?.[0]?.subject || subject || 'Subject preview'}
-							</Pill>
+							</span>
 						</div>
 					)
 				);
@@ -277,146 +220,206 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 			{isOpen && (
 				<div className="p-3">
 					{/* Contacts */}
-					<SectionShell
-						label="Contacts"
-						accentClass="bg-[#F6D3D3]"
-						number={
-							<div className="flex items-center">
-								1 <ChevronsRight size={12} className="ml-0.5" />
-							</div>
-						}
-						rightNode={
-							<div className="flex items-center gap-2">
-								<CountPill label={`${contactsCount} people`} />
+					<div
+						className={cn(
+							'rounded-md border-2 border-black/30 mb-2 font-sans',
+							'bg-[#F5DADA] backdrop-blur-sm select-none transition-all'
+						)}
+						style={{ width: '376px' }}
+					>
+						<div
+							className="flex items-center px-3 cursor-pointer hover:bg-black/5"
+							style={{ height: '28px' }}
+							onClick={() => setActivePreview('contacts')}
+						>
+							<span className="font-bold text-black text-sm">Contacts</span>
+							<div className="ml-auto flex items-center gap-2 text-xs text-black/70 font-semibold">
+								<span>{`${contactsCount} people`}</span>
+								<Divider />
 								<button
 									type="button"
-									className="text-[11px] px-2 h-5 rounded-sm border border-black/20 shadow-[0_1px_0_#000] bg-white/80 font-semibold leading-none"
-									onClick={() => setActivePreview('contacts')}
+									className="bg-transparent border-none p-0 hover:text-black"
+									onClick={(e) => {
+										e.stopPropagation();
+										setActivePreview('contacts');
+									}}
 								>
 									Select
 								</button>
+								<Divider />
 								<button
 									type="button"
-									className="text-[11px] px-2 h-5 rounded-sm border border-black/20 shadow-[0_1px_0_#000] bg-white/80 font-semibold leading-none"
-									onClick={() => setActivePreview('draftPreview')}
+									className="bg-transparent border-none p-0 hover:text-black"
+									onClick={(e) => {
+										e.stopPropagation();
+										setActivePreview('draftPreview');
+									}}
 								>
 									Draft
 								</button>
 							</div>
-						}
-					>
+							<div className="flex items-center justify-center text-xs font-bold text-black/60 w-5 ml-2">
+								<div className="flex items-center">
+									1 <ChevronsRight size={12} className="ml-0.5" />
+								</div>
+							</div>
+						</div>
 						{isDrafting && (
-							<div className="mt-1">
-								<div className="text-[10px] mb-0.5">Drafting</div>
-								<div className="h-1.5 w-full rounded-sm border border-black/20 bg-white">
-									<div
-										className="h-full bg-[#B5E2B5]"
-										style={{ width: `${draftingPct}%` }}
-									/>
+							<div className="px-2 pb-2">
+								<div className="mt-1">
+									<div className="text-[10px] mb-0.5">Drafting</div>
+									<div className="h-1.5 w-full rounded-sm border border-black/20 bg-white">
+										<div
+											className="h-full bg-[#B5E2B5]"
+											style={{ width: `${draftingPct}%` }}
+										/>
+									</div>
 								</div>
 							</div>
 						)}
-					</SectionShell>
+					</div>
 
 					{/* Email Structure */}
-					<SectionShell
-						label="Email Structure"
-						accentClass="bg-[#E6E6E6]"
-						number={2}
-						rightNode={
-							<div className="flex items-center gap-2">
-								<Pill className="bg-[#DBDBFF] font-semibold">{draftingMode}</Pill>
-								<Pill className="bg-[#DBFFDB] font-semibold">
-									{isAiSubject ? 'Auto Subject' : 'Subject'}
-								</Pill>
-								<Pill className="font-semibold">{fromName || 'From'}</Pill>
-							</div>
-						}
+					<div
+						className={cn(
+							'rounded-md border-2 border-black/30 mb-2 font-sans',
+							'bg-[#E6E6E6] backdrop-blur-sm select-none transition-all cursor-pointer hover:bg-black/5'
+						)}
+						style={{ width: '376px' }}
 						onClick={() => setActivePreview('emailStructure')}
-					/>
+					>
+						<div className="flex items-center px-3" style={{ height: '28px' }}>
+							<span className="font-bold text-black text-sm">Email Structure</span>
+							<div className="ml-auto flex items-center gap-2 text-xs text-black/70 font-semibold">
+								<span>{draftingMode}</span>
+								<Divider />
+								<span>{isAiSubject ? 'Auto Subject' : 'Subject'}</span>
+								<Divider />
+								<span>{fromName || 'From'}</span>
+							</div>
+							<div className="flex items-center justify-center text-xs font-bold text-black/60 w-5 ml-2">
+								2
+							</div>
+						</div>
+					</div>
 
 					{/* Draft Preview */}
-					<SectionShell
-						label="Draft Preview"
-						accentClass="bg-[#D1DAFF]"
-						number={<ChevronsRight size={14} />}
-						rightNode={
-							<div className="flex items-center gap-2">
-								<Pill className="truncate max-w-[160px] font-semibold">
-									{contacts?.[0]?.firstName || 'Contact'}
-								</Pill>
-								<Pill className="truncate max-w-[220px] font-semibold">
-									{subject || 'Subject preview'}
-								</Pill>
-							</div>
-						}
+					<div
+						className={cn(
+							'rounded-md border-2 border-black/30 mb-2 font-sans',
+							'bg-[#D1DAFF] backdrop-blur-sm select-none transition-all cursor-pointer hover:bg-black/5'
+						)}
+						style={{ width: '376px' }}
 						onClick={() => setActivePreview('draftPreview')}
-					/>
+					>
+						<div className="flex items-center px-3" style={{ height: '28px' }}>
+							<span className="font-bold text-black text-sm">Draft Preview</span>
+							<div className="ml-auto flex items-center gap-2 text-xs text-black/70 font-semibold truncate">
+								<span className="truncate max-w-[80px]">
+									{contacts?.[0]?.firstName || 'Contact'}
+								</span>
+								<span className="truncate max-w-[120px]">
+									{subject || 'Subject preview'}
+								</span>
+							</div>
+							<div className="flex items-center justify-center text-xs font-bold text-black/60 w-5 ml-2">
+								<ChevronsRight size={14} />
+							</div>
+						</div>
+					</div>
 
 					{/* Drafts */}
-					<SectionShell
-						label="Drafts"
-						accentClass="bg-[#F4E5BC]"
-						number={
-							<div className="flex items-center">
-								3 <ChevronsRight size={12} className="ml-0.5" />
-							</div>
-						}
-						rightNode={
-							<div className="flex items-center gap-2">
-								<CountPill label={`${draftsCount} drafts`} />
+					<div
+						className={cn(
+							'rounded-md border-2 border-black/30 mb-2 font-sans',
+							'bg-[#F4E5BC] backdrop-blur-sm select-none transition-all cursor-pointer hover:bg-black/5'
+						)}
+						style={{ width: '376px' }}
+						onClick={() => setActivePreview('drafts')}
+					>
+						<div className="flex items-center px-3" style={{ height: '28px' }}>
+							<span className="font-bold text-black text-sm">Drafts</span>
+							<div className="ml-auto flex items-center gap-2 text-xs text-black/70 font-semibold">
+								<span>{`${draftsCount} drafts`}</span>
+								<Divider />
 								<button
 									type="button"
-									className="text-[11px] px-2 h-5 rounded-sm border border-black/20 shadow-[0_1px_0_#000] bg-white/80 font-semibold leading-none"
-									onClick={() => setActivePreview('drafts')}
+									className="bg-transparent border-none p-0 hover:text-black"
+									onClick={(e) => {
+										e.stopPropagation();
+										setActivePreview('drafts');
+									}}
 								>
 									Select
 								</button>
+								<Divider />
 								<button
 									type="button"
-									className="text-[11px] px-2 h-5 rounded-sm border border-black/20 shadow-[0_1px_0_#000] bg-white/80 font-semibold leading-none"
-									onClick={() => setActivePreview('sendPreview')}
+									className="bg-transparent border-none p-0 hover:text-black"
+									onClick={(e) => {
+										e.stopPropagation();
+										setActivePreview('sendPreview');
+									}}
 								>
 									Send
 								</button>
 							</div>
-						}
-					/>
+							<div className="flex items-center justify-center text-xs font-bold text-black/60 w-5 ml-2">
+								<div className="flex items-center">
+									3 <ChevronsRight size={12} className="ml-0.5" />
+								</div>
+							</div>
+						</div>
+					</div>
 
 					{/* Send Preview */}
-					<SectionShell
-						label="Send Preview"
-						accentClass="bg-[#D1DAFF]"
-						number={<ChevronsRight size={14} />}
-						rightNode={
-							<div className="flex items-center gap-2">
-								<Pill className="truncate max-w-[160px] font-semibold">
+					<div
+						className={cn(
+							'rounded-md border-2 border-black/30 mb-2 font-sans',
+							'bg-[#D1DAFF] backdrop-blur-sm select-none transition-all cursor-pointer hover:bg-black/5'
+						)}
+						style={{ width: '376px' }}
+						onClick={() => setActivePreview('sendPreview')}
+					>
+						<div className="flex items-center px-3" style={{ height: '28px' }}>
+							<span className="font-bold text-black text-sm">Send Preview</span>
+							<div className="ml-auto flex items-center gap-2 text-xs text-black/70 font-semibold truncate">
+								<span className="truncate max-w-[80px]">
 									{draftedEmails?.[0]?.contact?.firstName ||
 										contacts?.[0]?.firstName ||
 										'Contact'}
-								</Pill>
-								<Pill className="truncate max-w-[220px] font-semibold">
+								</span>
+								<span className="truncate max-w-[120px]">
 									{draftedEmails?.[0]?.subject || subject || 'Subject preview'}
-								</Pill>
+								</span>
 							</div>
-						}
-						onClick={() => setActivePreview('sendPreview')}
-					/>
+							<div className="flex items-center justify-center text-xs font-bold text-black/60 w-5 ml-2">
+								<ChevronsRight size={14} />
+							</div>
+						</div>
+					</div>
 
 					{/* Sent */}
-					<SectionShell
-						label="Sent"
-						accentClass="bg-[#CFEBCF]"
-						number={
-							<div className="flex items-center">
-								4 <ChevronsRight size={12} className="ml-0.5" />
-							</div>
-						}
-						rightNode={
-							<CountPill label={`${sentCount.toString().padStart(2, '0')} sent`} />
-						}
+					<div
+						className={cn(
+							'rounded-md border-2 border-black/30 mb-2 font-sans',
+							'bg-[#CFEBCF] backdrop-blur-sm select-none transition-all cursor-pointer hover:bg-black/5'
+						)}
+						style={{ width: '376px' }}
 						onClick={() => setActivePreview('sent')}
-					/>
+					>
+						<div className="flex items-center px-3" style={{ height: '28px' }}>
+							<span className="font-bold text-black text-sm">Sent</span>
+							<div className="ml-auto flex items-center gap-2 text-xs text-black/70 font-semibold">
+								<span>{`${sentCount.toString().padStart(2, '0')} sent`}</span>
+							</div>
+							<div className="flex items-center justify-center text-xs font-bold text-black/60 w-5 ml-2">
+								<div className="flex items-center">
+									4 <ChevronsRight size={12} className="ml-0.5" />
+								</div>
+							</div>
+						</div>
+					</div>
 
 					{renderActivePreview()}
 				</div>
