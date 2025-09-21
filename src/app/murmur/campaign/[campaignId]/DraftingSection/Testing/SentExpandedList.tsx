@@ -213,11 +213,6 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 					))}
 				</div>
 			</CustomScrollbar>
-
-			{/* Footer bar (informational) */}
-			<div className="mt-2 w-full max-w-[356px] h-[26px] rounded-[6px] bg-white/60 border border-black flex items-center justify-center text-[12px] font-medium">
-				{String(sent.length).padStart(2, '0')} total sent
-			</div>
 		</div>
 	);
 };
