@@ -12,6 +12,8 @@ interface CustomScrollbarProps {
 	style?: React.CSSProperties;
 	offsetRight?: number;
 	contentClassName?: string;
+	/** When true, show a full-height thumb even if there is no overflow. */
+	alwaysShow?: boolean;
 }
 
 export function CustomScrollbar({
@@ -23,6 +25,7 @@ export function CustomScrollbar({
 	style,
 	offsetRight = -4,
 	contentClassName,
+	alwaysShow = false,
 }: CustomScrollbarProps) {
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const scrollThumbRef = useRef<HTMLDivElement>(null);
@@ -41,7 +44,12 @@ export function CustomScrollbar({
 
 		// Hide scrollbar if content doesn't overflow
 		if (scrollRatio >= 1) {
-			setThumbHeight(0);
+			if (alwaysShow) {
+				setThumbHeight(clientHeight);
+				setThumbTop(0);
+			} else {
+				setThumbHeight(0);
+			}
 			return;
 		}
 
@@ -53,7 +61,7 @@ export function CustomScrollbar({
 
 		setThumbHeight(calculatedThumbHeight);
 		setThumbTop(thumbPosition);
-	}, []);
+	}, [alwaysShow]);
 
 	const handleScroll = useCallback(() => {
 		updateScrollbar();
@@ -192,7 +200,7 @@ export function CustomScrollbar({
 						width: `${thumbWidth}px`,
 						backgroundColor: trackColor,
 						right: `${offsetRight}px`,
-						zIndex: 10,
+						zIndex: 50,
 					}}
 					onClick={handleTrackClick}
 				>
