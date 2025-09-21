@@ -23,7 +23,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 }) => {
 	return (
 		<div
-			className="w-[376px] h-[424px] rounded-md border-2 border-black/30 bg-[#F5DADA] p-2 overflow-hidden"
+			className="w-[376px] h-[424px] rounded-md border-2 border-black/30 bg-[#F5DADA] p-2 overflow-hidden flex flex-col"
 			role="region"
 			aria-label="Expanded contacts preview"
 		>
@@ -85,7 +85,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			</div>
 
 			{/* Scrollable list */}
-			<div className="mt-1 h-[384px] overflow-y-auto pr-1 space-y-2">
+			<div className="mt-1 flex-1 overflow-y-auto overflow-x-hidden space-y-2">
 				{contacts.map((contact) => {
 					const fullName =
 						contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
@@ -93,7 +93,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						<div
 							key={contact.id}
 							className={cn(
-								'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[366px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none row-hover-scroll'
+								'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full max-w-[356px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none'
 							)}
 							onMouseDown={(e) => {
 								if (e.shiftKey) e.preventDefault();
@@ -354,10 +354,16 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						</div>
 					);
 				})}
+				{Array.from({ length: Math.max(0, 7 - contacts.length) }).map((_, idx) => (
+					<div
+						key={`placeholder-${idx}`}
+						className="select-none w-full max-w-[356px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
+					/>
+				))}
 			</div>
 
 			{/* Footer bar */}
-			<div className="mt-2 w-[356px] h-[26px] rounded-[6px] bg-[#B5E2B5] border border-black flex items-center justify-center text-[12px] font-medium">
+			<div className="mt-2 w-full max-w-[356px] h-[26px] rounded-[6px] bg-[#B5E2B5] border border-black flex items-center justify-center text-[12px] font-medium">
 				Draft
 			</div>
 		</div>
