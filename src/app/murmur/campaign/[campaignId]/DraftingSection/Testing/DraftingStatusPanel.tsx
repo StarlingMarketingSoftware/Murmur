@@ -37,6 +37,22 @@ export interface DraftingStatusPanelProps {
 
 const Divider = () => <div className="w-px self-stretch border-l border-black/40" />;
 
+const ArrowIcon = () => (
+	<svg
+		width="7"
+		height="12"
+		viewBox="0 0 7 12"
+		fill="none"
+		xmlns="http://www.w3.org/2000/svg"
+	>
+		<path
+			d="M6.53033 6.53033C6.82322 6.23744 6.82322 5.76256 6.53033 5.46967L1.75736 0.696699C1.46447 0.403806 0.989593 0.403806 0.696699 0.696699C0.403806 0.989593 0.403806 1.46447 0.696699 1.75736L4.93934 6L0.696699 10.2426C0.403806 10.5355 0.403806 11.0104 0.696699 11.3033C0.989593 11.5962 1.46447 11.5962 1.75736 11.3033L6.53033 6.53033ZM5 6V6.75H6V6V5.25H5V6Z"
+			fill="#636363"
+			fillOpacity="0.46"
+		/>
+	</svg>
+);
+
 export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	const {
 		campaign,
@@ -228,11 +244,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 		<div
 			className={cn(
 				'fixed right-6 top-[160px] z-50 w-[400px] rounded-lg border border-black bg-[#EEF2F6] backdrop-blur-md',
-				'overflow-visible font-serif'
+				'overflow-visible font-inter'
 			)}
 		>
 			<div className="h-[31px] bg-white rounded-t-lg px-3 flex items-center">
-				<div className="text-xl font-bold">Drafting</div>
+				<div className="text-[14px] font-inter font-medium">Drafting</div>
 				<div className="ml-auto">{headerRight}</div>
 			</div>
 
@@ -253,7 +269,9 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 						>
 							<span className="font-bold text-black text-sm">Contacts</span>
 							<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
-								<span>{`${contactsCount} people`}</span>
+								<span>{`${String(contactsCount).padStart(2, '0')} ${
+									contactsCount === 1 ? 'person' : 'people'
+								}`}</span>
 								<Divider />
 								<button
 									type="button"
@@ -277,8 +295,9 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 									Draft
 								</button>
 							</div>
-							<div className="self-stretch flex items-center justify-center text-sm font-bold text-black/80 w-[30px] flex-shrink-0 border-l border-black/40">
-								1
+							<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
+								<span className="w-[20px] text-center">1</span>
+								<ArrowIcon />
 							</div>
 						</div>
 						{isDrafting && (
@@ -321,8 +340,8 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 						<div className="px-3 bg-[#E0E0E0] flex items-center flex-grow font-medium text-black/80 text-[11px] min-w-0">
 							<span className="truncate">{fromName || 'From'}</span>
 						</div>
-						<div className="bg-white flex items-center justify-center text-sm font-bold text-black/80 w-[30px] flex-shrink-0 border-l border-black/40">
-							2
+						<div className="bg-white flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
+							<span className="w-[20px] text-center">2</span>
 						</div>
 					</div>
 
@@ -365,8 +384,9 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 									Send
 								</button>
 							</div>
-							<div className="self-stretch flex items-center justify-center text-sm font-bold text-black/80 w-[30px] flex-shrink-0 border-l border-black/40">
-								3
+							<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
+								<span className="w-[20px] text-center">3</span>
+								<ArrowIcon />
 							</div>
 						</div>
 					</div>
@@ -385,11 +405,12 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 							onClick={() => setActivePreview('sent')}
 						>
 							<span className="font-bold text-black text-sm">Sent</span>
-							<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
+							<div className="flex-1 flex items-center justify-center text-[11px] text-black/70 font-medium h-full">
 								<span>{`${sentCount.toString().padStart(2, '0')} sent`}</span>
 							</div>
-							<div className="self-stretch flex items-center justify-center text-sm font-bold text-black/80 w-[30px] flex-shrink-0 border-l border-black/40">
-								4
+							<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
+								<span className="w-[20px] text-center">4</span>
+								<ArrowIcon />
 							</div>
 						</div>
 					</div>
