@@ -6,6 +6,7 @@ import { UseFormReturn } from 'react-hook-form';
 import { DraftingFormValues } from '../useDraftingSection';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus } from '@/constants/prismaEnums';
+import ContactsExpandedList from './ContactsExpandedList';
 
 export type DraftingPreviewKind =
 	| 'none'
@@ -188,23 +189,8 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 
 		switch (activePreview) {
 			case 'contacts':
-				return container(
-					renderers?.contacts ? (
-						renderers.contacts()
-					) : (
-						<div className="space-y-2">
-							{contacts.slice(0, 8).map((c) => (
-								<div key={c.id} className="flex items-center gap-3">
-									<div className="h-4 w-4 rounded-full border border-black/30" />
-									<div className="text-[13px] font-medium">
-										{c.firstName} {c.lastName}
-									</div>
-									<div className="ml-auto text-xs text-black/60">Music Venue</div>
-								</div>
-							))}
-						</div>
-					)
-				);
+				// Expanded contacts are rendered inline inside the Contacts box itself
+				return null;
 			case 'emailStructure':
 				return container(
 					renderers?.emailStructure ? (
@@ -289,62 +275,71 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 			{isOpen && (
 				<div className="p-3">
 					{/* Contacts */}
-					<div
-						className={cn(
-							'rounded-md border-2 border-black/30 mb-2 font-sans',
-							'bg-[#F5DADA] backdrop-blur-sm select-none transition-all'
-						)}
-						style={{ width: '376px' }}
-					>
-						<div
-							className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
-							style={{ height: '28px' }}
-							onClick={() => setActivePreview('contacts')}
-						>
-							<span className="font-bold text-black text-sm">Contacts</span>
-							<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
-								<span>{`${String(contactsCount).padStart(2, '0')} ${
-									contactsCount === 1 ? 'person' : 'people'
-								}`}</span>
-								<Divider />
-								<button
-									type="button"
-									className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-									onClick={(e) => {
-										e.stopPropagation();
-										setActivePreview('contacts');
-									}}
+					<div className="mb-2">
+						{activePreview === 'contacts' ? (
+							<ContactsExpandedList
+								contacts={contacts}
+								onHeaderClick={() => setActivePreview('none')}
+							/>
+						) : (
+							<div
+								className={cn(
+									'rounded-md border-2 border-black/30 font-sans',
+									'bg-[#F5DADA] backdrop-blur-sm select-none transition-all'
+								)}
+								style={{ width: '376px' }}
+							>
+								<div
+									className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+									style={{ height: '28px' }}
+									onClick={() => setActivePreview('contacts')}
 								>
-									Select
-								</button>
-								<Divider />
-								<button
-									type="button"
-									className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-									onClick={(e) => {
-										e.stopPropagation();
-										setActivePreview('draftPreview');
-									}}
-								>
-									Draft
-								</button>
-							</div>
-							<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
-								<span className="w-[20px] text-center">1</span>
-								<ArrowIcon />
-							</div>
-						</div>
-						{isDrafting && (
-							<div className="px-2 pb-2">
-								<div className="mt-1">
-									<div className="text-[10px] mb-0.5">Drafting</div>
-									<div className="h-1.5 w-full rounded-sm border border-black/20 bg-white">
-										<div
-											className="h-full bg-[#B5E2B5]"
-											style={{ width: `${draftingPct}%` }}
-										/>
+									<span className="font-bold text-black text-sm">Contacts</span>
+									<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
+										<span>{`${String(contactsCount).padStart(2, '0')} ${
+											contactsCount === 1 ? 'person' : 'people'
+										}`}</span>
+										<Divider />
+										<button
+											type="button"
+											className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
+											onClick={(e) => {
+												e.stopPropagation();
+												setActivePreview('contacts');
+											}}
+										>
+											Select
+										</button>
+										<Divider />
+										<button
+											type="button"
+											className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
+											onClick={(e) => {
+												e.stopPropagation();
+												setActivePreview('draftPreview');
+											}}
+										>
+											Draft
+										</button>
+									</div>
+									<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
+										<span className="w-[20px] text-center">1</span>
+										<ArrowIcon />
 									</div>
 								</div>
+								{isDrafting && (
+									<div className="px-2 pb-2">
+										<div className="mt-1">
+											<div className="text-[10px] mb-0.5">Drafting</div>
+											<div className="h-1.5 w-full rounded-sm border border-black/20 bg-white">
+												<div
+													className="h-full bg-[#B5E2B5]"
+													style={{ width: `${draftingPct}%` }}
+												/>
+											</div>
+										</div>
+									</div>
+								)}
 							</div>
 						)}
 					</div>
