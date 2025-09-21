@@ -376,7 +376,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			</CustomScrollbar>
 
 			{/* Footer bar */}
-			<div className="mt-2 w-full max-w-[356px] h-[26px] rounded-[6px] bg-[#B5E2B5] border border-black flex items-center justify-center text-[12px] font-medium">
+			<div className="w-full max-w-[356px] h-[26px] rounded-[6px] bg-[#B5E2B5] border border-black flex items-center justify-center text-[12px] font-medium">
 				Draft
 			</div>
 		</div>
