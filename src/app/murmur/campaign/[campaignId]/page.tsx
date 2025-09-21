@@ -323,7 +323,11 @@ const Murmur = () => {
 							</div>
 
 							<div className="mt-6 flex justify-center">
-								<DraftingSection campaign={campaign} view={activeView} />
+								<DraftingSection
+									campaign={campaign}
+									view={activeView}
+									goToDrafting={() => setActiveView('drafting')}
+								/>
 							</div>
 						</div>
 					</>

@@ -9,7 +9,7 @@ import DraftingStatusPanel from '@/app/murmur/campaign/[campaignId]/DraftingSect
 // removed unused DraftingMode/HybridBlock imports after moving mode toggles inside
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
-	const { view = 'testing' } = props;
+	const { view = 'testing', goToDrafting } = props;
 	const {
 		campaign,
 		contacts,
@@ -62,6 +62,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 								contacts={contacts || []}
 								form={form}
 								generationProgress={generationProgress}
+								onOpenDrafting={goToDrafting}
 							/>
 						</div>
 					)}

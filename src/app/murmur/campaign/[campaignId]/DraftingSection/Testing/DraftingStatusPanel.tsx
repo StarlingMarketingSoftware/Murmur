@@ -32,6 +32,7 @@ export interface DraftingStatusPanelProps {
 	generationProgress: number; // -1 when idle
 	generationTotal?: number; // 0 when unknown
 	renderers?: DraftingStatusPanelRenderers; // Custom UI hooks for previews
+	onOpenDrafting?: () => void;
 }
 
 const Divider = () => <div className="w-px self-stretch border-l border-black/40" />;
@@ -163,7 +164,13 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 			<button
 				type="button"
 				className="text-sm font-semibold text-black/70 hover:text-black flex items-center gap-1"
-				onClick={() => setIsOpen((v) => !v)}
+				onClick={() => {
+					if (props?.onOpenDrafting) {
+						props.onOpenDrafting();
+						return;
+					}
+					setIsOpen((v) => !v);
+				}}
 			>
 				{isOpen ? 'Open' : 'Closed'}
 				<ExpandIcon />
