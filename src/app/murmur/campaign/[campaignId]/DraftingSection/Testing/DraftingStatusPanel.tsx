@@ -6,7 +6,7 @@ import { UseFormReturn } from 'react-hook-form';
 import { DraftingFormValues } from '../useDraftingSection';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus } from '@/constants/prismaEnums';
-import { ChevronsRight, Expand } from 'lucide-react';
+import { Expand } from 'lucide-react';
 
 export type DraftingPreviewKind =
 	| 'none'
@@ -247,12 +247,12 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 						style={{ width: '376px' }}
 					>
 						<div
-							className="flex items-center px-3 cursor-pointer hover:bg-black/5"
+							className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
 							style={{ height: '28px' }}
 							onClick={() => setActivePreview('contacts')}
 						>
 							<span className="font-bold text-black text-sm">Contacts</span>
-							<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full">
+							<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
 								<span>{`${contactsCount} people`}</span>
 								<Divider />
 								<button
@@ -276,12 +276,9 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 								>
 									Draft
 								</button>
-								<Divider />
 							</div>
-							<div className="flex items-center justify-center text-xs font-bold text-black/60 w-5 ml-2">
-								<div className="flex items-center">
-									1 <ChevronsRight size={12} className="ml-0.5" />
-								</div>
+							<div className="self-stretch flex items-center justify-center text-sm font-bold text-black/80 w-[30px] flex-shrink-0 border-l border-black/40">
+								1
 							</div>
 						</div>
 						{isDrafting && (
@@ -333,14 +330,17 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					<div
 						className={cn(
 							'rounded-md border-2 border-black/30 mb-2 font-sans',
-							'bg-[#F4E5BC] backdrop-blur-sm select-none transition-all cursor-pointer hover:bg-black/5'
+							'bg-[#F4E5BC] backdrop-blur-sm select-none transition-all'
 						)}
 						style={{ width: '376px' }}
-						onClick={() => setActivePreview('drafts')}
 					>
-						<div className="flex items-center px-3" style={{ height: '28px' }}>
+						<div
+							className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+							style={{ height: '28px' }}
+							onClick={() => setActivePreview('drafts')}
+						>
 							<span className="font-bold text-black text-sm">Drafts</span>
-							<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full">
+							<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
 								<span>{`${draftsCount} drafts`}</span>
 								<Divider />
 								<button
@@ -364,12 +364,9 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 								>
 									Send
 								</button>
-								<Divider />
 							</div>
-							<div className="flex items-center justify-center text-xs font-bold text-black/60 w-5 ml-2">
-								<div className="flex items-center">
-									3 <ChevronsRight size={12} className="ml-0.5" />
-								</div>
+							<div className="self-stretch flex items-center justify-center text-sm font-bold text-black/80 w-[30px] flex-shrink-0 border-l border-black/40">
+								3
 							</div>
 						</div>
 					</div>
@@ -378,20 +375,21 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					<div
 						className={cn(
 							'rounded-md border-2 border-black/30 mb-2 font-sans',
-							'bg-[#CFEBCF] backdrop-blur-sm select-none transition-all cursor-pointer hover:bg-black/5'
+							'bg-[#CFEBCF] backdrop-blur-sm select-none transition-all'
 						)}
 						style={{ width: '376px' }}
-						onClick={() => setActivePreview('sent')}
 					>
-						<div className="flex items-center px-3" style={{ height: '28px' }}>
+						<div
+							className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+							style={{ height: '28px' }}
+							onClick={() => setActivePreview('sent')}
+						>
 							<span className="font-bold text-black text-sm">Sent</span>
-							<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full">
+							<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
 								<span>{`${sentCount.toString().padStart(2, '0')} sent`}</span>
 							</div>
-							<div className="flex items-center justify-center text-xs font-bold text-black/60 w-5 ml-2">
-								<div className="flex items-center">
-									4 <ChevronsRight size={12} className="ml-0.5" />
-								</div>
+							<div className="self-stretch flex items-center justify-center text-sm font-bold text-black/80 w-[30px] flex-shrink-0 border-l border-black/40">
+								4
 							</div>
 						</div>
 					</div>
