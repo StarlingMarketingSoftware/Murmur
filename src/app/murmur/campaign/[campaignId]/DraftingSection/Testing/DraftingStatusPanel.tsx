@@ -6,7 +6,9 @@ import { UseFormReturn } from 'react-hook-form';
 import { DraftingFormValues } from '../useDraftingSection';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus } from '@/constants/prismaEnums';
-import ContactsExpandedList from './ContactsExpandedList';
+import ContactsExpandedList from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
+import { DraftsExpandedList } from './DraftsExpandedList';
+import { SentExpandedList } from './SentExpandedList';
 
 export type DraftingPreviewKind =
 	| 'none'
@@ -221,13 +223,8 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					)
 				);
 			case 'drafts':
-				return container(
-					renderers?.drafts ? (
-						renderers.drafts()
-					) : (
-						<div className="text-[13px]">{draftsCount} drafts ready</div>
-					)
-				);
+				// Expanded drafts are rendered inline inside the Drafts box itself
+				return null;
 			case 'sendPreview':
 				return container(
 					renderers?.sendPreview ? (
@@ -246,15 +243,8 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					)
 				);
 			case 'sent':
-				return container(
-					renderers?.sent ? (
-						renderers.sent()
-					) : (
-						<div className="text-[13px]">
-							{sentCount.toString().padStart(2, '0')} sent
-						</div>
-					)
-				);
+				// Expanded sent are rendered inline inside the Sent box itself
+				return null;
 			default:
 				return null;
 		}
@@ -375,74 +365,90 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					</div>
 
 					{/* Drafts */}
-					<div
-						className={cn(
-							'rounded-md border-2 border-black/30 mb-2 font-sans',
-							'bg-[#F4E5BC] backdrop-blur-sm select-none transition-all'
-						)}
-						style={{ width: '376px' }}
-					>
+					{activePreview === 'drafts' ? (
+						<DraftsExpandedList
+							drafts={draftedEmails}
+							contacts={contacts}
+							onHeaderClick={() => setActivePreview('none')}
+						/>
+					) : (
 						<div
-							className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
-							style={{ height: '28px' }}
-							onClick={() => setActivePreview('drafts')}
+							className={cn(
+								'rounded-md border-2 border-black/30 mb-2 font-sans',
+								'bg-[#F4E5BC] backdrop-blur-sm select-none transition-all'
+							)}
+							style={{ width: '376px' }}
 						>
-							<span className="font-bold text-black text-sm">Drafts</span>
-							<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
-								<span>{`${draftsCount} drafts`}</span>
-								<Divider />
-								<button
-									type="button"
-									className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-									onClick={(e) => {
-										e.stopPropagation();
-										setActivePreview('drafts');
-									}}
-								>
-									Select
-								</button>
-								<Divider />
-								<button
-									type="button"
-									className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-									onClick={(e) => {
-										e.stopPropagation();
-										setActivePreview('sendPreview');
-									}}
-								>
-									Send
-								</button>
-							</div>
-							<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
-								<span className="w-[20px] text-center">3</span>
-								<ArrowIcon />
+							<div
+								className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+								style={{ height: '28px' }}
+								onClick={() => setActivePreview('drafts')}
+							>
+								<span className="font-bold text-black text-sm">Drafts</span>
+								<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
+									<span>{`${draftsCount} drafts`}</span>
+									<Divider />
+									<button
+										type="button"
+										className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
+										onClick={(e) => {
+											e.stopPropagation();
+											setActivePreview('drafts');
+										}}
+									>
+										Select
+									</button>
+									<Divider />
+									<button
+										type="button"
+										className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
+										onClick={(e) => {
+											e.stopPropagation();
+											setActivePreview('sendPreview');
+										}}
+									>
+										Send
+									</button>
+								</div>
+								<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
+									<span className="w-[20px] text-center">3</span>
+									<ArrowIcon />
+								</div>
 							</div>
 						</div>
-					</div>
+					)}
 
 					{/* Sent */}
-					<div
-						className={cn(
-							'rounded-md border-2 border-black/30 mb-2 font-sans',
-							'bg-[#CFEBCF] backdrop-blur-sm select-none transition-all'
-						)}
-						style={{ width: '376px' }}
-					>
+					{activePreview === 'sent' ? (
+						<SentExpandedList
+							sent={sentEmails}
+							contacts={contacts}
+							onHeaderClick={() => setActivePreview('none')}
+						/>
+					) : (
 						<div
-							className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
-							style={{ height: '28px' }}
-							onClick={() => setActivePreview('sent')}
+							className={cn(
+								'rounded-md border-2 border-black/30 mb-2 font-sans',
+								'bg-[#CFEBCF] backdrop-blur-sm select-none transition-all'
+							)}
+							style={{ width: '376px' }}
 						>
-							<span className="font-bold text-black text-sm">Sent</span>
-							<div className="flex-1 flex items-center justify-center text-[11px] text-black/70 font-medium h-full">
-								<span>{`${sentCount.toString().padStart(2, '0')} sent`}</span>
-							</div>
-							<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
-								<span className="w-[20px] text-center">4</span>
-								<ArrowIcon />
+							<div
+								className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+								style={{ height: '28px' }}
+								onClick={() => setActivePreview('sent')}
+							>
+								<span className="font-bold text-black text-sm">Sent</span>
+								<div className="flex-1 flex items-center justify-center text-[11px] text-black/70 font-medium h-full">
+									<span>{`${sentCount.toString().padStart(2, '0')} sent`}</span>
+								</div>
+								<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
+									<span className="w-[20px] text-center">4</span>
+									<ArrowIcon />
+								</div>
 							</div>
 						</div>
-					</div>
+					)}
 
 					{renderActivePreview()}
 				</div>

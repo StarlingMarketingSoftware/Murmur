@@ -31,7 +31,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			<div
 				className={cn(
 					'flex items-center gap-2 h-[21px] px-1',
-					onHeaderClick ? 'cursor-pointer hover:bg-black/5 rounded-sm' : ''
+					onHeaderClick ? 'cursor-pointer' : ''
 				)}
 				role={onHeaderClick ? 'button' : undefined}
 				tabIndex={onHeaderClick ? 0 : undefined}
