@@ -95,7 +95,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				contentClassName="overflow-x-hidden"
 				alwaysShow
 			>
-				<div className="space-y-2 py-2 flex flex-col items-center">
+				<div className="space-y-2 pb-2 flex flex-col items-center">
 					{contacts.map((contact) => {
 						const fullName =
 							contact.name ||

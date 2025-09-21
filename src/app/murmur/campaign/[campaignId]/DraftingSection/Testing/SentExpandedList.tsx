@@ -5,6 +5,7 @@ import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
 import { cn } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import {
@@ -42,7 +43,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 }) => {
 	return (
 		<div
-			className="w-[376px] h-[426px] rounded-md border-2 border-black/30 bg-[#CFEBCF] px-2 pb-2 overflow-hidden flex flex-col"
+			className="w-[376px] h-[426px] rounded-md border-2 border-black/30 bg-[#CFEBCF] px-2 pb-2 flex flex-col"
 			role="region"
 			aria-label="Expanded sent preview"
 		>
@@ -74,133 +75,144 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 			</div>
 
 			{/* Scrollable list */}
-			<div className="flex-1 overflow-y-auto overflow-x-hidden space-y-2">
-				{sent.map((email) => {
-					const contact = contacts?.find((c) => c.id === email.contactId);
-					const contactName = contact
-						? contact.name ||
-						  `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
-						  contact.company ||
-						  'Contact'
-						: 'Unknown Contact';
-					return (
-						<div
-							key={email.id}
-							className={cn(
-								'cursor-default grid grid-cols-1 grid-rows-4 w-full max-w-[356px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2 select-none relative'
-							)}
-						>
-							{/* Fixed top-right info (Location + Title) */}
-							<div className="absolute top-[6px] right-[6px] flex flex-col items-end gap-[2px] w-[110px] pointer-events-none">
-								<div className="flex items-center justify-start gap-1 h-[12px] w-full">
-									{(() => {
-										const fullStateName = (contact?.state as string) || '';
-										const stateAbbr = getStateAbbreviation(fullStateName) || '';
-										const normalizedState = fullStateName.trim();
-										const lowercaseCanadianProvinceNames = canadianProvinceNames.map(
-											(s) => s.toLowerCase()
-										);
-										const isCanadianProvince =
-											lowercaseCanadianProvinceNames.includes(
-												normalizedState.toLowerCase()
-											) ||
-											canadianProvinceAbbreviations.includes(
-												normalizedState.toUpperCase()
-											) ||
-											canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
-										const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+			<CustomScrollbar
+				className="flex-1 drafting-table-content"
+				thumbWidth={2}
+				thumbColor="#000000"
+				trackColor="transparent"
+				offsetRight={-5}
+				contentClassName="overflow-x-hidden"
+				alwaysShow
+			>
+				<div className="space-y-2 pb-2 flex flex-col items-center">
+					{sent.map((email) => {
+						const contact = contacts?.find((c) => c.id === email.contactId);
+						const contactName = contact
+							? contact.name ||
+							  `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
+							  contact.company ||
+							  'Contact'
+							: 'Unknown Contact';
+						return (
+							<div
+								key={email.id}
+								className={cn(
+									'cursor-default grid grid-cols-1 grid-rows-4 w-full max-w-[356px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2 select-none relative'
+								)}
+							>
+								{/* Fixed top-right info (Location + Title) */}
+								<div className="absolute top-[6px] right-[6px] flex flex-col items-end gap-[2px] w-[110px] pointer-events-none">
+									<div className="flex items-center justify-start gap-1 h-[12px] w-full">
+										{(() => {
+											const fullStateName = (contact?.state as string) || '';
+											const stateAbbr = getStateAbbreviation(fullStateName) || '';
+											const normalizedState = fullStateName.trim();
+											const lowercaseCanadianProvinceNames = canadianProvinceNames.map(
+												(s) => s.toLowerCase()
+											);
+											const isCanadianProvince =
+												lowercaseCanadianProvinceNames.includes(
+													normalizedState.toLowerCase()
+												) ||
+												canadianProvinceAbbreviations.includes(
+													normalizedState.toUpperCase()
+												) ||
+												canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+											const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
 
-										if (!stateAbbr) return null;
-										return isCanadianProvince ? (
-											<div
-												className="inline-flex items-center justify-center w-[18px] h-[12px] rounded-[3.5px] border overflow-hidden"
-												style={{ borderColor: '#000000' }}
-											>
-												<CanadianFlag
-													width="100%"
-													height="100%"
-													className="w-full h-full"
+											if (!stateAbbr) return null;
+											return isCanadianProvince ? (
+												<div
+													className="inline-flex items-center justify-center w-[18px] h-[12px] rounded-[3.5px] border overflow-hidden"
+													style={{ borderColor: '#000000' }}
+												>
+													<CanadianFlag
+														width="100%"
+														height="100%"
+														className="w-full h-full"
+													/>
+												</div>
+											) : isUSAbbr ? (
+												<span
+													className="inline-flex items-center justify-center w-[18px] h-[12px] rounded-[3.5px] border text-[8px] leading-none font-bold"
+													style={{
+														backgroundColor:
+															stateBadgeColorMap[stateAbbr] || 'transparent',
+														borderColor: '#000000',
+													}}
+												>
+													{stateAbbr}
+												</span>
+											) : (
+												<span
+													className="inline-flex items-center justify-center w-[18px] h-[12px] rounded-[3.5px] border"
+													style={{ borderColor: '#000000' }}
 												/>
-											</div>
-										) : isUSAbbr ? (
-											<span
-												className="inline-flex items-center justify-center w-[18px] h-[12px] rounded-[3.5px] border text-[8px] leading-none font-bold"
-												style={{
-													backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
-													borderColor: '#000000',
-												}}
-											>
-												{stateAbbr}
-											</span>
-										) : (
-											<span
-												className="inline-flex items-center justify-center w-[18px] h-[12px] rounded-[3.5px] border"
-												style={{ borderColor: '#000000' }}
+											);
+										})()}
+										{contact?.city ? (
+											<ScrollableText
+												text={contact.city}
+												className="text-[10px] text-black leading-none max-w-[80px]"
 											/>
-										);
-									})()}
-									{contact?.city ? (
-										<ScrollableText
-											text={contact.city}
-											className="text-[10px] text-black leading-none max-w-[80px]"
-										/>
+										) : null}
+									</div>
+
+									{contact?.headline ? (
+										<div className="absolute top-[24px] right-[6px] w-[110px] h-[12px] rounded-[3.7px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
+											<ScrollableText
+												text={contact.headline}
+												className="text-[8px] text-black leading-none px-1"
+											/>
+										</div>
 									) : null}
 								</div>
 
-								{contact?.headline ? (
-									<div className="absolute top-[24px] right-[6px] w-[110px] h-[12px] rounded-[3.7px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
-										<ScrollableText
-											text={contact.headline}
-											className="text-[8px] text-black leading-none px-1"
-										/>
-									</div>
-								) : null}
-							</div>
-
-							{/* Content grid */}
-							<div className="grid grid-cols-1 grid-rows-4 h-full pr-[120px]">
-								{/* Row 1: Name */}
-								<div className="row-start-1 col-start-1 flex items-center">
-									<div className="font-bold text-[11px] truncate leading-none">
-										{contactName}
-									</div>
-								</div>
-								{/* Row 2: Company (when separate name exists) */}
-								{(() => {
-									const hasSeparateName = Boolean(
-										(contact?.name && contact.name.trim()) ||
-											(contact?.firstName && contact.firstName.trim()) ||
-											(contact?.lastName && contact.lastName.trim())
-									);
-									return (
-										<div className="row-start-2 col-start-1 flex items-center pr-2">
-											<div className="text-[11px] text-black truncate leading-none">
-												{hasSeparateName ? contact?.company || '' : ''}
-											</div>
+								{/* Content grid */}
+								<div className="grid grid-cols-1 grid-rows-4 h-full pr-[120px]">
+									{/* Row 1: Name */}
+									<div className="row-start-1 col-start-1 flex items-center">
+										<div className="font-bold text-[11px] truncate leading-none">
+											{contactName}
 										</div>
-									);
-								})()}
-								{/* Row 3: Subject */}
-								<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center">
-									{email.subject || 'No subject'}
-								</div>
-								{/* Row 4: Message preview */}
-								<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center">
-									{email.message
-										? email.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
-										: 'No content'}
+									</div>
+									{/* Row 2: Company (when separate name exists) */}
+									{(() => {
+										const hasSeparateName = Boolean(
+											(contact?.name && contact.name.trim()) ||
+												(contact?.firstName && contact.firstName.trim()) ||
+												(contact?.lastName && contact.lastName.trim())
+										);
+										return (
+											<div className="row-start-2 col-start-1 flex items-center pr-2">
+												<div className="text-[11px] text-black truncate leading-none">
+													{hasSeparateName ? contact?.company || '' : ''}
+												</div>
+											</div>
+										);
+									})()}
+									{/* Row 3: Subject */}
+									<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center">
+										{email.subject || 'No subject'}
+									</div>
+									{/* Row 4: Message preview */}
+									<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center">
+										{email.message
+											? email.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
+											: 'No content'}
+									</div>
 								</div>
 							</div>
-						</div>
-					);
-				})}
-				{Array.from({ length: Math.max(0, 6 - sent.length) }).map((_, idx) => (
-					<div
-						key={`sent-placeholder-${idx}`}
-						className="select-none w-full max-w-[356px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
-					/>
-				))}
-			</div>
+						);
+					})}
+					{Array.from({ length: Math.max(0, 6 - sent.length) }).map((_, idx) => (
+						<div
+							key={`sent-placeholder-${idx}`}
+							className="select-none w-full max-w-[356px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
+						/>
+					))}
+				</div>
+			</CustomScrollbar>
 
 			{/* Footer bar (informational) */}
 			<div className="mt-2 w-full max-w-[356px] h-[26px] rounded-[6px] bg-white/60 border border-black flex items-center justify-center text-[12px] font-medium">
