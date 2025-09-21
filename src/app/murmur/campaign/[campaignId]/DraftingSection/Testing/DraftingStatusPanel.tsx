@@ -194,19 +194,8 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 				// Expanded contacts are rendered inline inside the Contacts box itself
 				return null;
 			case 'emailStructure':
-				return container(
-					renderers?.emailStructure ? (
-						renderers.emailStructure()
-					) : (
-						<div className="flex items-center gap-2 flex-wrap text-sm">
-							<span>{draftingMode}</span>
-							<Divider />
-							<span>{isAiSubject ? 'Auto Subject' : 'Custom Subject'}</span>
-							<Divider />
-							<span>{fromName || 'From Name'}</span>
-						</div>
-					)
-				);
+				// No bottom popover for Email Structure
+				return null;
 			case 'draftPreview':
 				return container(
 					renderers?.draftPreview ? (
