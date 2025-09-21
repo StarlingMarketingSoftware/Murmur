@@ -23,14 +23,14 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 }) => {
 	return (
 		<div
-			className="w-[376px] h-[424px] rounded-md border-2 border-black/30 bg-[#F5DADA] p-2 overflow-hidden flex flex-col"
+			className="w-[376px] h-[424px] rounded-md border-2 border-black/30 bg-[#F5DADA] px-2 pb-2 overflow-hidden flex flex-col"
 			role="region"
 			aria-label="Expanded contacts preview"
 		>
 			{/* Header row */}
 			<div
 				className={cn(
-					'flex items-center gap-2 h-[28px] px-1',
+					'flex items-center gap-2 h-[21px] px-1',
 					onHeaderClick ? 'cursor-pointer hover:bg-black/5 rounded-sm' : ''
 				)}
 				role={onHeaderClick ? 'button' : undefined}
@@ -85,7 +85,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			</div>
 
 			{/* Scrollable list */}
-			<div className="mt-1 flex-1 overflow-y-auto overflow-x-hidden space-y-2">
+			<div className="flex-1 overflow-y-auto overflow-x-hidden space-y-2">
 				{contacts.map((contact) => {
 					const fullName =
 						contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
