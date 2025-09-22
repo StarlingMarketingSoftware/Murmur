@@ -10,6 +10,7 @@ import ContactsExpandedList from '@/app/murmur/campaign/[campaignId]/DraftingSec
 import { DraftsExpandedList } from './DraftsExpandedList';
 import { SentExpandedList } from './SentExpandedList';
 import { DraftPreviewExpandedList } from './DraftPreviewExpandedList';
+import { SendPreviewExpandedList } from './SendPreviewExpandedList';
 
 export type DraftingPreviewKind =
 	| 'none'
@@ -96,14 +97,7 @@ const ExpandIcon = () => (
 );
 
 export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
-	const {
-		campaign,
-		contacts,
-		form,
-		generationProgress,
-		generationTotal = 0,
-		renderers,
-	} = props;
+	const { campaign, contacts, form, generationProgress, generationTotal = 0 } = props;
 
 	const [isOpen, setIsOpen] = useState(true);
 	const [activePreview, setActivePreview] = useState<DraftingPreviewKind>('none');
@@ -188,7 +182,6 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 			backgroundColor: isAiSubject ? '#B3D8B8' : '#F1F1F1',
 		};
 	}, [isAiSubject]);
-	const subject = form.watch('subject');
 	const fromName = campaign.identity?.name || '';
 
 	// Live inline preview data for Draft Preview row
@@ -242,11 +235,6 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 
 	const renderActivePreview = (): ReactNode => {
 		if (activePreview === 'none') return null;
-		const container = (content: ReactNode) => (
-			<div className="mt-2 rounded-md border-2 border-black/20 bg-white/80 shadow-[0_2px_0_#000] p-3 font-sans">
-				{content}
-			</div>
-		);
 
 		switch (activePreview) {
 			case 'contacts':
@@ -262,22 +250,8 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 				// Expanded drafts are rendered inline inside the Drafts box itself
 				return null;
 			case 'sendPreview':
-				return container(
-					renderers?.sendPreview ? (
-						renderers.sendPreview()
-					) : (
-						<div className="flex items-center gap-2 overflow-hidden text-sm">
-							<span className="truncate max-w-[160px]">
-								{draftedEmails?.[0]?.contact?.firstName ||
-									contacts?.[0]?.firstName ||
-									'Contact'}
-							</span>
-							<span className="truncate max-w-[270px]">
-								{draftedEmails?.[0]?.subject || subject || 'Subject preview'}
-							</span>
-						</div>
-					)
-				);
+				// Expanded send preview is rendered inline inside the Send Preview box itself
+				return null;
 			case 'sent':
 				// Expanded sent are rendered inline inside the Sent box itself
 				return null;
@@ -545,53 +519,76 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					)}
 
 					{/* Send Preview */}
-					{showSendPreviewBox && (
-						<div
-							className={cn(
-								'rounded-md border-2 border-[#295094] mb-2 font-sans',
-								'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all'
-							)}
-							style={{ width: '376px' }}
-						>
+					{showSendPreviewBox &&
+						(activePreview === 'sendPreview' ? (
+							<SendPreviewExpandedList
+								contacts={contacts}
+								onHeaderClick={() => setActivePreview('none')}
+								livePreview={{
+									visible: Boolean(sendingPreviewContactId && sendingInlineSubject),
+									contactId: sendingPreviewContactId,
+									subject: sendingInlineSubject,
+								}}
+								fallbackDraft={(() => {
+									const match = sendingPreviewContactId
+										? draftedEmails.find((e) => e.contactId === sendingPreviewContactId)
+										: draftedEmails?.[0];
+									return match
+										? {
+												contactId: match.contactId,
+												subject: match.subject,
+												message: match.message,
+										  }
+										: null;
+								})()}
+							/>
+						) : (
 							<div
-								className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
-								style={{ height: '28px' }}
-								onClick={() => setActivePreview('sendPreview')}
+								className={cn(
+									'rounded-md border-2 border-[#295094] mb-2 font-sans',
+									'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all'
+								)}
+								style={{ width: '376px' }}
 							>
-								<span className="font-bold text-black text-sm">Send Preview</span>
-								<div className="ml-2 flex-1 min-w-0 self-stretch flex items-stretch">
-									<div className="w-px self-stretch border-l border-black" />
-									<div
-										className="flex items-center bg-white w-full px-2"
-										style={{ backgroundColor: '#FFFFFF' }}
-									>
-										{sendingPreviewContactName && (
-											<>
-												<div
-													className="text-[12px] font-bold text-black truncate"
-													title={sendingPreviewContactName}
-												>
-													{sendingPreviewContactName}
-												</div>
-												<div className="w-px self-stretch border-l border-black/40 mx-2" />
-											</>
-										)}
+								<div
+									className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+									style={{ height: '28px' }}
+									onClick={() => setActivePreview('sendPreview')}
+								>
+									<span className="font-bold text-black text-sm">Send Preview</span>
+									<div className="ml-2 flex-1 min-w-0 self-stretch flex items-stretch">
+										<div className="w-px self-stretch border-l border-black" />
 										<div
-											className="text-[12px] text-black/80 truncate flex-1"
-											title={sendingInlineSubject}
+											className="flex items-center bg-white w-full px-2"
+											style={{ backgroundColor: '#FFFFFF' }}
 										>
-											{sendingInlineSubject || <>&nbsp;</>}
+											{sendingPreviewContactName && (
+												<>
+													<div
+														className="text-[12px] font-bold text-black truncate"
+														title={sendingPreviewContactName}
+													>
+														{sendingPreviewContactName}
+													</div>
+													<div className="w-px self-stretch border-l border-black/40 mx-2" />
+												</>
+											)}
+											<div
+												className="text-[12px] text-black/80 truncate flex-1"
+												title={sendingInlineSubject}
+											>
+												{sendingInlineSubject || <>&nbsp;</>}
+											</div>
 										</div>
+										<div className="w-px self-stretch border-l border-black" />
 									</div>
-									<div className="w-px self-stretch border-l border-black" />
-								</div>
-								<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
-									<span className="w-[20px] text-center"></span>
-									<ArrowIcon />
+									<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
+										<span className="w-[20px] text-center"></span>
+										<ArrowIcon />
+									</div>
 								</div>
 							</div>
-						</div>
-					)}
+						))}
 
 					{/* Sent */}
 					{activePreview === 'sent' ? (
