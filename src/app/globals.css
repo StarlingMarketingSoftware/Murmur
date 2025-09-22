@@ -3109,8 +3109,8 @@ body,
 
 /* --- Search Results Table Custom Scrollbar --- */
 .search-results-table {
-	/* Clip row backgrounds and cell fills to the rounded border box */
-	overflow: hidden !important;
+	/* Allow the custom 2px scrollbar to render outside the border */
+	overflow: visible !important;
 	border-radius: 8px !important;
 }
 
@@ -3296,23 +3296,32 @@ body,
 /* --- Search Results Table Card UI --- */
 .search-results-table table[data-slot='table'] {
 	border-collapse: separate !important;
-	border-spacing: 0 8px !important;
+	border-spacing: 0 8px !important; /* vertical gap between rows only */
 	padding: 0 8px !important;
 }
 
 .search-results-table thead[data-slot='table-header'] {
 	display: block !important;
 	padding: 0 8px !important;
+	/* Collapse header vertical footprint for in-box sticky header layout */
+	height: 0 !important;
+	margin: 0 !important;
+	margin-bottom: -8px !important; /* cancel table border-spacing below header */
 }
 
 .search-results-table thead tr[data-slot='table-row'] {
 	display: table !important;
 	width: 100% !important;
 	table-layout: fixed !important;
+	height: 0 !important;
 }
 
 .search-results-table th[data-slot='table-head'] {
 	border: none !important;
+	height: 0 !important;
+	padding-top: 0 !important;
+	padding-bottom: 0 !important;
+	line-height: 0 !important;
 }
 
 .search-results-table tbody[data-slot='table-body'] {
