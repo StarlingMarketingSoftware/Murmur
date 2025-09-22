@@ -88,21 +88,21 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 					{sent.map((email) => {
 						const contact = contacts?.find((c) => c.id === email.contactId);
 						const contactName = contact
-							? contact.name ||
-							  `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
+							? `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
 							  contact.company ||
 							  'Contact'
 							: 'Unknown Contact';
+
 						return (
 							<div
 								key={email.id}
 								className={cn(
-									'cursor-default grid grid-cols-1 grid-rows-4 w-full max-w-[356px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2 select-none relative'
+									'transition-colors relative select-none w-full max-w-[356px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2'
 								)}
 							>
 								{/* Fixed top-right info (Location + Title) */}
 								<div className="absolute top-[6px] right-[6px] flex flex-col items-end gap-[2px] w-[110px] pointer-events-none">
-									<div className="flex items-center justify-start gap-1 h-[12px] w-full">
+									<div className="flex items-center justify-start gap-1 h-[11.67px] w-full">
 										{(() => {
 											const fullStateName = (contact?.state as string) || '';
 											const stateAbbr = getStateAbbreviation(fullStateName) || '';
@@ -123,8 +123,9 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 											if (!stateAbbr) return null;
 											return isCanadianProvince ? (
 												<div
-													className="inline-flex items-center justify-center w-[18px] h-[12px] rounded-[3.5px] border overflow-hidden"
+													className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border overflow-hidden"
 													style={{ borderColor: '#000000' }}
+													title="Canadian province"
 												>
 													<CanadianFlag
 														width="100%"
@@ -134,7 +135,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 												</div>
 											) : isUSAbbr ? (
 												<span
-													className="inline-flex items-center justify-center w-[18px] h-[12px] rounded-[3.5px] border text-[8px] leading-none font-bold"
+													className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border text-[8px] leading-none font-bold"
 													style={{
 														backgroundColor:
 															stateBadgeColorMap[stateAbbr] || 'transparent',
@@ -145,7 +146,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 												</span>
 											) : (
 												<span
-													className="inline-flex items-center justify-center w-[18px] h-[12px] rounded-[3.5px] border"
+													className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border"
 													style={{ borderColor: '#000000' }}
 												/>
 											);
@@ -159,7 +160,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 									</div>
 
 									{contact?.headline ? (
-										<div className="absolute top-[24px] right-[6px] w-[110px] h-[12px] rounded-[3.7px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
+										<div className="w-[110px] h-[10px] rounded-[3.71px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
 											<ScrollableText
 												text={contact.headline}
 												className="text-[8px] text-black leading-none px-1"
@@ -176,11 +177,11 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 											{contactName}
 										</div>
 									</div>
-									{/* Row 2: Company (when separate name exists) */}
+
+									{/* Row 2: Company (only when there is a separate name) */}
 									{(() => {
 										const hasSeparateName = Boolean(
-											(contact?.name && contact.name.trim()) ||
-												(contact?.firstName && contact.firstName.trim()) ||
+											(contact?.firstName && contact.firstName.trim()) ||
 												(contact?.lastName && contact.lastName.trim())
 										);
 										return (
@@ -191,10 +192,12 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 											</div>
 										);
 									})()}
+
 									{/* Row 3: Subject */}
 									<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center">
 										{email.subject || 'No subject'}
 									</div>
+
 									{/* Row 4: Message preview */}
 									<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center">
 										{email.message
@@ -208,7 +211,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 					{Array.from({ length: Math.max(0, 6 - sent.length) }).map((_, idx) => (
 						<div
 							key={`sent-placeholder-${idx}`}
-							className="select-none w-full max-w-[356px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
+							className="select-none w-full max-w-[356px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
 						/>
 					))}
 				</div>
