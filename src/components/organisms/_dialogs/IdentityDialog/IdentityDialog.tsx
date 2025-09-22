@@ -11,8 +11,7 @@ import { CreateIdentityPanel } from './CreateIdentityPanel/CreateIdentityPanel';
 import { ExistingProfilesSection } from './ExistingProfilesSection';
 
 import { Typography } from '@/components/ui/typography';
-import PlusIcon from '@/components/atoms/_svg/PlusIcon';
-import CloseIcon from '@/components/atoms/_svg/CloseIcon';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 	const router = useRouter();
@@ -58,6 +57,13 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 			document.removeEventListener('keydown', handleEsc);
 		};
 	}, [showCreatePanel, setShowCreatePanel]);
+
+	// Default to the Create tab when there are no identities
+	useEffect(() => {
+		if (!isPendingIdentities && (!identities || identities.length === 0)) {
+			setShowCreatePanel(true);
+		}
+	}, [isPendingIdentities, identities, setShowCreatePanel]);
 
 	return (
 		<Dialog
@@ -149,112 +155,48 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 						<div className="flex justify-center py-6">
 							<div className="w-full max-w-[1444px] px-0 mx-auto">
 								{isPendingIdentities ? (
-									<div className="h-full flex items-center justify-center">
-										{/* Empty space during load - fade transition handles the visual feedback */}
-									</div>
+									<div className="h-full flex items-center justify-center" />
 								) : (
-									<div className="flex flex-col items-stretch justify-start">
-										{/* Show create form centered when no profiles exist */}
-										{!identities || identities.length === 0 ? (
-											<div className="w-full max-w-md">
-												<Typography
-													variant="h3"
-													className="text-xl font-semibold text-gray-900 mb-6 text-center"
-												>
-													Create Your First Profile
-												</Typography>
-												<CreateIdentityPanel
-													setShowCreatePanel={setShowCreatePanel}
-													isEdit={isEdit}
-													selectedIdentity={isEdit ? selectedIdentity : undefined}
-													showCreatePanel={true}
-													setValue={setValue}
-													onContinueWithIdentity={(id) => handleAssignIdentityById(id)}
-												/>
+									<div className="flex flex-col items-center">
+										<Tabs
+											value={showCreatePanel ? 'create' : 'select'}
+											onValueChange={(val) => setShowCreatePanel(val === 'create')}
+											className="w-full max-w-[1444px]"
+										>
+											<div className="flex justify-center mb-4">
+												<TabsList>
+													<TabsTrigger value="select">Select User Profile</TabsTrigger>
+													<TabsTrigger value="create">Create New Profile</TabsTrigger>
+												</TabsList>
 											</div>
-										) : (
-											/* Show grid layout when profiles exist */
-											<div className="grid grid-cols-1 w-full lg:grid-cols-[652px_650px] lg:gap-[141px] lg:w-[1444px] lg:mx-auto">
-												{/* Existing Profiles Section */}
-												<ExistingProfilesSection
-													identities={identities}
-													form={form}
-													showCreatePanel={showCreatePanel}
-													setShowCreatePanel={setShowCreatePanel}
-													handleAssignIdentity={handleAssignIdentity}
-													isPendingAssignIdentity={isPendingAssignIdentity}
-													selectedIdentity={selectedIdentity}
-												/>
 
-												{/* Create New Profile Section */}
-												<div>
-													<div className="bg-background rounded-lg transition-all">
-														<div
-															className="flex items-center gap-4 p-0 cursor-pointer mb-2"
-															onClick={() => setShowCreatePanel((prev) => !prev)}
-														>
-															<div className="flex items-center gap-2">
-																<Typography
-																	variant="h3"
-																	className="!text-[18.77px] !leading-[22.1px] font-medium text-[#000000] font-secondary"
-																>
-																	Create New Profile
-																</Typography>
-															</div>
-														</div>
-														{!showCreatePanel && (
-															<div
-																className="w-[650.5px] h-[326.75px] bg-[#F8F8F8] rounded-none flex items-center justify-center mb-2 cursor-pointer"
-																onClick={() => setShowCreatePanel(true)}
-															>
-																<button
-																	type="button"
-																	onClick={() => setShowCreatePanel(true)}
-																	aria-label="Open create profile"
-																	className="w-[28.7px] h-[28.7px] flex items-center justify-center cursor-pointer rounded-none"
-																>
-																	<PlusIcon
-																		width="28"
-																		height="28"
-																		className="text-black"
-																	/>
-																</button>
-															</div>
-														)}
-														{showCreatePanel && (
-															<div
-																onClick={(e) => e.stopPropagation()}
-																className="relative w-[651px]"
-															>
-																<button
-																	type="button"
-																	onClick={() => setShowCreatePanel(false)}
-																	aria-label="Close create profile"
-																	className="absolute -top-5 right-[8px] w-[13.05px] h-[13.05px] flex items-center justify-center rounded-none cursor-pointer bg-transparent"
-																>
-																	<CloseIcon
-																		width="13.05"
-																		height="13.05"
-																		className="text-black"
-																	/>
-																</button>
-																<div className="p-0">
-																	<CreateIdentityPanel
-																		setShowCreatePanel={setShowCreatePanel}
-																		isEdit={isEdit}
-																		selectedIdentity={
-																			isEdit ? selectedIdentity : undefined
-																		}
-																		showCreatePanel={true}
-																		setValue={setValue}
-																	/>
-																</div>
-															</div>
-														)}
-													</div>
+											<TabsContent value="select">
+												<div className="flex justify-center">
+													<ExistingProfilesSection
+														identities={identities || []}
+														form={form}
+														showCreatePanel={false}
+														setShowCreatePanel={setShowCreatePanel}
+														handleAssignIdentity={handleAssignIdentity}
+														isPendingAssignIdentity={isPendingAssignIdentity}
+														selectedIdentity={selectedIdentity}
+													/>
 												</div>
-											</div>
-										)}
+											</TabsContent>
+
+											<TabsContent value="create">
+												<div className="flex justify-center">
+													<CreateIdentityPanel
+														setShowCreatePanel={setShowCreatePanel}
+														isEdit={isEdit}
+														selectedIdentity={isEdit ? selectedIdentity : undefined}
+														showCreatePanel={true}
+														setValue={setValue}
+														onContinueWithIdentity={(id) => handleAssignIdentityById(id)}
+													/>
+												</div>
+											</TabsContent>
+										</Tabs>
 									</div>
 								)}
 							</div>
