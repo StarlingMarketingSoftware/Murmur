@@ -113,12 +113,12 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							<div
 								key={draft.id}
 								className={cn(
-									'cursor-default grid grid-cols-1 grid-rows-4 w-full max-w-[356px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2 select-none relative'
+									'cursor-default relative select-none w-full max-w-[356px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2'
 								)}
 							>
-								{/* Fixed top-right info (Location + Title) */}
-								<div className="absolute top-[6px] right-[6px] flex flex-col items-end gap-[2px] w-[110px] pointer-events-none">
-									<div className="flex items-center justify-start gap-1 h-[12px] w-full">
+								{/* Fixed top-right info (Location + Title) - match Drafting tab */}
+								<div className="absolute top-[6px] right-[28px] flex flex-col items-end gap-[2px] w-[92px] pointer-events-none">
+									<div className="flex items-center justify-start gap-1 h-[11.67px] w-[92px]">
 										{(() => {
 											const fullStateName = (contact?.state as string) || '';
 											const stateAbbr = getStateAbbreviation(fullStateName) || '';
@@ -139,7 +139,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											if (!stateAbbr) return null;
 											return isCanadianProvince ? (
 												<div
-													className="inline-flex items-center justify-center w-[18px] h-[12px] rounded-[3.5px] border overflow-hidden"
+													className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border overflow-hidden"
 													style={{ borderColor: '#000000' }}
 												>
 													<CanadianFlag
@@ -150,7 +150,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 												</div>
 											) : isUSAbbr ? (
 												<span
-													className="inline-flex items-center justify-center w-[18px] h-[12px] rounded-[3.5px] border text-[8px] leading-none font-bold"
+													className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border text-[8px] leading-none font-bold"
 													style={{
 														backgroundColor:
 															stateBadgeColorMap[stateAbbr] || 'transparent',
@@ -161,7 +161,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 												</span>
 											) : (
 												<span
-													className="inline-flex items-center justify-center w-[18px] h-[12px] rounded-[3.5px] border"
+													className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border"
 													style={{ borderColor: '#000000' }}
 												/>
 											);
@@ -169,13 +169,13 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 										{contact?.city ? (
 											<ScrollableText
 												text={contact.city}
-												className="text-[10px] text-black leading-none max-w-[80px]"
+												className="text-[10px] text-black leading-none max-w-[70px]"
 											/>
 										) : null}
 									</div>
 
 									{contact?.headline ? (
-										<div className="absolute top-[24px] right-[6px] w-[110px] h-[12px] rounded-[3.7px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
+										<div className="w-[92px] h-[10px] rounded-[3.71px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
 											<ScrollableText
 												text={contact.headline}
 												className="text-[8px] text-black leading-none px-1"
@@ -185,7 +185,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								</div>
 
 								{/* Content grid */}
-								<div className="grid grid-cols-1 grid-rows-4 h-full pr-[120px]">
+								<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px]">
 									{/* Row 1: Name */}
 									<div className="row-start-1 col-start-1 flex items-center">
 										<div className="font-bold text-[11px] truncate leading-none">
@@ -224,7 +224,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 					{Array.from({ length: Math.max(0, 6 - drafts.length) }).map((_, idx) => (
 						<div
 							key={`draft-placeholder-${idx}`}
-							className="select-none w-full max-w-[356px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
+							className="select-none w-full max-w-[356px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
 						/>
 					))}
 				</div>
