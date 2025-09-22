@@ -188,6 +188,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							data: { status: EmailStatus.sent, sentAt: new Date() },
 						});
 						successfulSends++;
+						// Hide Send Preview immediately after this email is sent
+						if (onSendingPreviewReset) onSendingPreviewReset();
 					}
 				} catch (err) {
 					console.error('Failed to send email:', err);

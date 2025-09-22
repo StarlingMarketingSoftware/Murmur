@@ -230,6 +230,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 					successfulSends++;
 					setSendingProgress((prev) => prev + 1);
 					queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id] });
+					// Hide send preview immediately after this email is sent
+					setSendingPreview(null);
 				}
 			} catch (error) {
 				console.error('Failed to send email:', error);

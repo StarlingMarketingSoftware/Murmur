@@ -110,7 +110,9 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 
 	// Only show Draft Preview while live preview is explicitly visible
 	const showDraftPreviewBox = Boolean(props.isLivePreviewVisible);
-	const showSendPreviewBox = true;
+	// Only show Send Preview while a send is actively previewing
+	// Note: depends only on state declared above
+	const showSendPreviewBox = Boolean(sendingPreviewContactId && sendingPreviewSubject);
 
 	// Ensure expanded Draft Preview collapses when hidden
 	useEffect(() => {
@@ -118,6 +120,13 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 			setActivePreview('none');
 		}
 	}, [showDraftPreviewBox, activePreview]);
+
+	// Ensure expanded Send Preview collapses when hidden
+	useEffect(() => {
+		if (!showSendPreviewBox && activePreview === 'sendPreview') {
+			setActivePreview('none');
+		}
+	}, [showSendPreviewBox, activePreview]);
 
 	const { data: emails } = useGetEmails({
 		filters: { campaignId: campaign.id },
