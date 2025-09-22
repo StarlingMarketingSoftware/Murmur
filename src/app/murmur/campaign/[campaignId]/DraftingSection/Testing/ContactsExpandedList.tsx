@@ -64,6 +64,16 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		}
 	};
 
+	const areAllSelected =
+		selectedContactIds.size === contacts.length && contacts.length > 0;
+	const handleSelectAllToggle = () => {
+		if (areAllSelected) {
+			setSelectedContactIds(new Set());
+		} else {
+			setSelectedContactIds(new Set(contacts.map((c) => c.id)));
+		}
+	};
+
 	const computedIsDraftDisabled =
 		Boolean(isDraftDisabled) || selectedContactIds.size === 0;
 
@@ -99,9 +109,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					<button
 						type="button"
 						className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-						onClick={(e) => e.stopPropagation()}
+						onClick={(e) => {
+							e.stopPropagation();
+							handleSelectAllToggle();
+						}}
 					>
-						Select All
+						{areAllSelected ? 'Deselect All' : 'Select All'}
 					</button>
 					<div className="w-px self-stretch border-l border-black/40" />
 					<button
