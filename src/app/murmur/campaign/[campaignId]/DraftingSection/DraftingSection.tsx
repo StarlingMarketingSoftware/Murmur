@@ -74,6 +74,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									isLivePreviewVisible={isLivePreviewVisible}
 									livePreviewContactId={livePreviewContactId || undefined}
 									livePreviewSubject={livePreviewSubject}
+									livePreviewMessage={livePreviewMessage}
 									onDraftSelectedContacts={async (ids) => {
 										await handleGenerateDrafts(ids);
 									}}

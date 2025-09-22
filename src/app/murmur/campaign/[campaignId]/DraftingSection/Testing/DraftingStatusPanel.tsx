@@ -9,6 +9,7 @@ import { EmailStatus } from '@/constants/prismaEnums';
 import ContactsExpandedList from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
 import { DraftsExpandedList } from './DraftsExpandedList';
 import { SentExpandedList } from './SentExpandedList';
+import { DraftPreviewExpandedList } from './DraftPreviewExpandedList';
 
 export type DraftingPreviewKind =
 	| 'none'
@@ -44,6 +45,8 @@ export interface DraftingStatusPanelProps {
 	isLivePreviewVisible?: boolean;
 	livePreviewContactId?: number;
 	livePreviewSubject?: string;
+	// New: full message for the expanded Draft Preview
+	livePreviewMessage?: string;
 }
 
 const Divider = () => <div className="w-px self-stretch border-l border-black/40" />;
@@ -253,20 +256,8 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 				// No bottom popover for Email Structure
 				return null;
 			case 'draftPreview':
-				return container(
-					renderers?.draftPreview ? (
-						renderers.draftPreview()
-					) : (
-						<div className="flex items-center gap-2 overflow-hidden text-sm">
-							<span className="truncate max-w-[160px]">
-								{contacts?.[0]?.firstName || 'Contact'}
-							</span>
-							<span className="truncate max-w-[270px]">
-								{subject || 'Subject preview'}
-							</span>
-						</div>
-					)
-				);
+				// No bottom popover; uses inline expanded box like Contacts/Drafts
+				return null;
 			case 'drafts':
 				// Expanded drafts are rendered inline inside the Drafts box itself
 				return null;
@@ -422,53 +413,74 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					</div>
 
 					{/* Draft Preview */}
-					{showDraftPreviewBox && (
-						<div
-							className={cn(
-								'rounded-md border-2 border-[#295094] mb-2 font-sans',
-								'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all'
-							)}
-							style={{ width: '376px' }}
-						>
+					{showDraftPreviewBox &&
+						(activePreview === 'draftPreview' ? (
+							<DraftPreviewExpandedList
+								contacts={contacts}
+								onHeaderClick={() => setActivePreview('none')}
+								livePreview={{
+									visible: props.isLivePreviewVisible,
+									contactId: props.livePreviewContactId || null,
+									subject: livePreviewSubject,
+									message: props.livePreviewMessage || '',
+								}}
+								fallbackDraft={
+									draftedEmails?.[0]
+										? {
+												contactId: draftedEmails[0].contactId,
+												subject: draftedEmails[0].subject,
+												message: draftedEmails[0].message,
+										  }
+										: null
+								}
+							/>
+						) : (
 							<div
-								className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
-								style={{ height: '28px' }}
-								onClick={() => setActivePreview('draftPreview')}
+								className={cn(
+									'rounded-md border-2 border-[#295094] mb-2 font-sans',
+									'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all'
+								)}
+								style={{ width: '376px' }}
 							>
-								<span className="font-bold text-black text-sm">Draft Preview</span>
-								<div className="ml-2 flex-1 min-w-0 self-stretch flex items-stretch">
-									<div className="w-px self-stretch border-l border-black" />
-									<div
-										className="flex items-center bg-white w-full px-2"
-										style={{ backgroundColor: '#FFFFFF' }}
-									>
-										{livePreviewContactName && (
-											<>
-												<div
-													className="text-[12px] font-bold text-black truncate"
-													title={livePreviewContactName}
-												>
-													{livePreviewContactName}
-												</div>
-												<div className="w-px self-stretch border-l border-black/40 mx-2" />
-											</>
-										)}
+								<div
+									className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+									style={{ height: '28px' }}
+									onClick={() => setActivePreview('draftPreview')}
+								>
+									<span className="font-bold text-black text-sm">Draft Preview</span>
+									<div className="ml-2 flex-1 min-w-0 self-stretch flex items-stretch">
+										<div className="w-px self-stretch border-l border-black" />
 										<div
-											className="text-[12px] text-black/80 truncate flex-1"
-											title={livePreviewSubject}
+											className="flex items-center bg-white w-full px-2"
+											style={{ backgroundColor: '#FFFFFF' }}
 										>
-											{livePreviewSubject || <>&nbsp;</>}
+											{livePreviewContactName && (
+												<>
+													<div
+														className="text-[12px] font-bold text-black truncate"
+														title={livePreviewContactName}
+													>
+														{livePreviewContactName}
+													</div>
+													<div className="w-px self-stretch border-l border-black/40 mx-2" />
+												</>
+											)}
+											<div
+												className="text-[12px] text-black/80 truncate flex-1"
+												title={livePreviewSubject}
+											>
+												{livePreviewSubject || <>&nbsp;</>}
+											</div>
 										</div>
+										<div className="w-px self-stretch border-l border-black" />
 									</div>
-									<div className="w-px self-stretch border-l border-black" />
-								</div>
-								<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
-									<span className="w-[20px] text-center"></span>
-									<ArrowIcon />
+									<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
+										<span className="w-[20px] text-center"></span>
+										<ArrowIcon />
+									</div>
 								</div>
 							</div>
-						</div>
-					)}
+						))}
 
 					{/* Drafts */}
 					{activePreview === 'drafts' ? (
