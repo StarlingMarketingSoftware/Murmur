@@ -105,6 +105,12 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	const [isOpen, setIsOpen] = useState(true);
 	const [activePreview, setActivePreview] = useState<DraftingPreviewKind>('none');
 
+	// Live inline preview state for Send Preview row (updated by DraftsExpandedList)
+	const [sendingPreviewContactId, setSendingPreviewContactId] = useState<number | null>(
+		null
+	);
+	const [sendingPreviewSubject, setSendingPreviewSubject] = useState<string>('');
+
 	// Temporary: will become conditional when rules are provided
 	const showDraftPreviewBox = true;
 	const showSendPreviewBox = true;
@@ -197,6 +203,20 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 			? props.livePreviewSubject
 			: 'Drafting...';
 	}, [props.isLivePreviewVisible, props.livePreviewSubject]);
+
+	// Live inline preview data for Send Preview row
+	const sendingPreviewContactName = useMemo(() => {
+		if (!sendingPreviewContactId) return '';
+		const c = contacts?.find((x) => x.id === sendingPreviewContactId);
+		if (!c) return '';
+		return c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim() || '';
+	}, [sendingPreviewContactId, contacts]);
+
+	const sendingInlineSubject = useMemo(() => {
+		return sendingPreviewSubject && sendingPreviewSubject.trim() !== ''
+			? sendingPreviewSubject
+			: '';
+	}, [sendingPreviewSubject]);
 
 	const headerRight = (
 		<div className="flex items-center gap-2">
@@ -456,6 +476,14 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 							drafts={draftedEmails}
 							contacts={contacts}
 							onHeaderClick={() => setActivePreview('none')}
+							onSendingPreviewUpdate={({ contactId, subject }) => {
+								setSendingPreviewContactId(contactId || null);
+								setSendingPreviewSubject(subject || '');
+							}}
+							onSendingPreviewReset={() => {
+								setSendingPreviewContactId(null);
+								setSendingPreviewSubject('');
+							}}
 						/>
 					) : (
 						<div
@@ -519,6 +547,32 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 								onClick={() => setActivePreview('sendPreview')}
 							>
 								<span className="font-bold text-black text-sm">Send Preview</span>
+								<div className="ml-2 flex-1 min-w-0 self-stretch flex items-stretch">
+									<div className="w-px self-stretch border-l border-black" />
+									<div
+										className="flex items-center bg-white w-full px-2"
+										style={{ backgroundColor: '#FFFFFF' }}
+									>
+										{sendingPreviewContactName && (
+											<>
+												<div
+													className="text-[12px] font-bold text-black truncate"
+													title={sendingPreviewContactName}
+												>
+													{sendingPreviewContactName}
+												</div>
+												<div className="w-px self-stretch border-l border-black/40 mx-2" />
+											</>
+										)}
+										<div
+											className="text-[12px] text-black/80 truncate flex-1"
+											title={sendingInlineSubject}
+										>
+											{sendingInlineSubject || <>&nbsp;</>}
+										</div>
+									</div>
+									<div className="w-px self-stretch border-l border-black" />
+								</div>
 								<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
 									<span className="w-[20px] text-center"></span>
 									<ArrowIcon />

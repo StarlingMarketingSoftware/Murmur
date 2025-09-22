@@ -28,6 +28,9 @@ export interface DraftsExpandedListProps {
 	drafts: EmailWithRelations[];
 	contacts: ContactWithName[];
 	onHeaderClick?: () => void;
+	// Live Send Preview callbacks for status panel
+	onSendingPreviewUpdate?: (args: { contactId: number; subject?: string }) => void;
+	onSendingPreviewReset?: () => void;
 }
 
 const ArrowIcon = () => (
@@ -50,6 +53,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	drafts,
 	contacts,
 	onHeaderClick,
+	onSendingPreviewUpdate,
+	onSendingPreviewReset,
 }) => {
 	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
 	const lastClickedRef = useRef<number | null>(null);
@@ -143,10 +148,19 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 		const emailsToProcess = selectedDrafts.slice(0, emailsWeCanSend);
 
 		setIsSending(true);
+		// Initialize status panel Send Preview
+		if (onSendingPreviewReset) onSendingPreviewReset();
 		let successfulSends = 0;
 		try {
 			for (let i = 0; i < emailsToProcess.length; i++) {
 				const email = emailsToProcess[i];
+				// Update Send Preview row live with current email
+				if (onSendingPreviewUpdate) {
+					onSendingPreviewUpdate({
+						contactId: email.contactId,
+						subject: email.subject || undefined,
+					});
+				}
 				try {
 					// Find the contact email from the contacts array
 					const contact = contacts.find((c) => c.id === email.contactId);
@@ -210,6 +224,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 			}
 		} finally {
 			setIsSending(false);
+			// Clear live Send Preview in status panel
+			if (onSendingPreviewReset) onSendingPreviewReset();
 		}
 	};
 	return (
