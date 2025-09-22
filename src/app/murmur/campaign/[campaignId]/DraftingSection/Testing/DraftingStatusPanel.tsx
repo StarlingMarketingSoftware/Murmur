@@ -242,9 +242,13 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	return (
 		<div
 			className={cn(
-				'fixed right-6 top-[160px] z-50 w-[400px] rounded-lg border border-black bg-[#EEF2F6] backdrop-blur-md',
-				'overflow-visible font-inter'
+				'w-[400px] rounded-lg border border-black bg-[#EEF2F6]',
+				'overflow-visible font-inter',
+				'origin-top-left'
 			)}
+			style={{
+				transform: 'scale(0.85)',
+			}}
 		>
 			<div className="h-[31px] bg-white rounded-t-lg px-3 flex items-center">
 				<div className="text-[14px] font-inter font-medium">Drafting</div>
