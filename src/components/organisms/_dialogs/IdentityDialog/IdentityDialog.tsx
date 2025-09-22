@@ -1,4 +1,4 @@
-import { FC, useEffect, useState } from 'react';
+import { FC, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IdentityDialogProps, useIdentityDialog } from './useIdentityDialog';
 import {
@@ -64,6 +64,9 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 			setShowCreatePanel(true);
 		}
 	}, [isPendingIdentities, identities, setShowCreatePanel]);
+
+	// Left position of highlight box inside 652px container
+	const highlightLeftPx = useMemo(() => (showCreatePanel ? 70 : 396), [showCreatePanel]);
 
 	return (
 		<Dialog
@@ -164,9 +167,47 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 											className="w-full max-w-[1444px]"
 										>
 											<div className="flex justify-center mb-4">
-												<TabsList>
-													<TabsTrigger value="select">Select User Profile</TabsTrigger>
-													<TabsTrigger value="create">Create New Profile</TabsTrigger>
+												<TabsList
+													className="relative !bg-transparent border border-black !shadow-none !p-0"
+													style={{
+														width: '652px',
+														height: '50px',
+														borderWidth: 2.45,
+														borderRadius: '9.8px',
+														borderStyle: 'solid',
+														boxShadow: 'none',
+													}}
+												>
+													{/* Moving highlight box */}
+													<div
+														className="absolute z-10 pointer-events-none"
+														style={{
+															left: `${highlightLeftPx}px`,
+															top: '50%',
+															transform: 'translateY(-50%)',
+															width: '186px',
+															height: '24px',
+															borderRadius: '9.8px',
+															border: '1.3px solid #000000',
+															background: '#DADAFC',
+															transition: 'left 0.25s ease-in-out',
+															boxShadow: 'none',
+														}}
+													/>
+													<TabsTrigger
+														className="relative z-20 flex-1 !h-full font-secondary !text-[14px] sm:!text-[14px] font-medium !bg-transparent !border-0 hover:!bg-transparent focus-visible:!ring-0 focus-visible:!outline-0 !outline-none !ring-0 data-[state=active]:!bg-transparent data-[state=active]:!shadow-none data-[state=active]:!border-transparent text-black"
+														style={{ boxShadow: 'none' }}
+														value="create"
+													>
+														Create New Profile
+													</TabsTrigger>
+													<TabsTrigger
+														className="relative z-20 flex-1 !h-full font-secondary !text-[14px] sm:!text-[14px] font-medium !bg-transparent !border-0 hover:!bg-transparent focus-visible:!ring-0 focus-visible:!outline-0 !outline-none !ring-0 data-[state=active]:!bg-transparent data-[state=active]:!shadow-none data-[state=active]:!border-transparent text-black"
+														style={{ boxShadow: 'none' }}
+														value="select"
+													>
+														Select Existing Profile
+													</TabsTrigger>
 												</TabsList>
 											</div>
 

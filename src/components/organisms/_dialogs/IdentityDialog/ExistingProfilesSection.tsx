@@ -32,7 +32,7 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 				variant="h3"
 				className="!text-[18.77px] !leading-[22px] font-medium text-[#000000] mb-2 font-secondary"
 			>
-				Select User Profile
+				Select Existing Profile
 			</Typography>
 			<Form {...form}>
 				<FormField
