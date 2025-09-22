@@ -91,8 +91,15 @@ const Murmur = () => {
 				<div className="relative">
 					<Link
 						href={urls.murmur.dashboard.index}
-						className="absolute left-8 flex items-center text-[15px] font-inter font-normal no-underline hover:no-underline z-10 group text-[#060606] hover:text-gray-500"
+						prefetch
+						className="absolute left-8 flex items-center text-[15px] font-inter font-normal no-underline hover:no-underline z-[100] group text-[#060606] hover:text-gray-500"
 						title="Back to Home"
+						onClick={(e) => {
+							e.preventDefault();
+							if (typeof window !== 'undefined') {
+								window.location.assign(urls.murmur.dashboard.index);
+							}
+						}}
 						style={{
 							top: '41px',
 							transform: 'translateY(-50%)',
@@ -129,7 +136,17 @@ const Murmur = () => {
 								<div className="flex flex-col items-center" style={{ marginTop: '14px' }}>
 									<div className="flex items-start gap-6">
 										<div className="flex items-center">
-											<Link href={urls.murmur.dashboard.index} className="block">
+											<Link
+												href={urls.murmur.dashboard.index}
+												prefetch
+												onClick={(e) => {
+													e.preventDefault();
+													if (typeof window !== 'undefined') {
+														window.location.assign(urls.murmur.dashboard.index);
+													}
+												}}
+												className="block relative z-[100]"
+											>
 												<div
 													className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]"
 													style={{
@@ -263,7 +280,9 @@ const Murmur = () => {
 				style={{ backgroundColor: 'rgba(222, 242, 225, 0.65)' }}
 			>
 				<NoMobilePage />
-				{shouldHideContent && <div className="fixed inset-0 bg-background z-40" />}
+				{shouldHideContent && (
+					<div className="fixed inset-0 bg-background z-40 pointer-events-none" />
+				)}
 				{!isMobile && (
 					<>
 						<div
