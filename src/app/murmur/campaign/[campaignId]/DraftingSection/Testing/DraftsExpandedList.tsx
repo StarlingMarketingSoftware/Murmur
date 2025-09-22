@@ -1,6 +1,16 @@
 'use client';
 
 import { FC, MouseEvent, useRef, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
+import { useEditEmail } from '@/hooks/queryHooks/useEmails';
+import { useEditUser } from '@/hooks/queryHooks/useUsers';
+import { useMe } from '@/hooks/useMe';
+import { StripeSubscriptionStatus } from '@/types';
+import { EmailStatus } from '@/constants/prismaEnums';
+import { useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
 import { cn } from '@/utils';
@@ -43,6 +53,18 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 }) => {
 	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
 	const lastClickedRef = useRef<number | null>(null);
+	const [isSending, setIsSending] = useState(false);
+
+	// Data/context for sending
+	const { campaignId } = useParams() as { campaignId: string };
+	const { data: campaign } = useGetCampaign(campaignId);
+	const { user, subscriptionTier } = useMe();
+	const queryClient = useQueryClient();
+	const { mutateAsync: sendMailgunMessage } = useSendMailgunMessage({
+		suppressToasts: true,
+	});
+	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
+	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 
 	const handleDraftClick = (draftId: number, e: MouseEvent) => {
 		if (e.shiftKey && lastClickedRef.current !== null) {
@@ -86,7 +108,110 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	};
 
 	// Keep footer button disabled state in sync if used later
-	const isSendDisabled = selectedDraftIds.size === 0;
+	const isSendDisabled = selectedDraftIds.size === 0 || isSending;
+
+	const handleSendSelected = async () => {
+		console.log('handleSendSelected called', { isSendDisabled, selectedDraftIds });
+		if (isSendDisabled) return;
+		const selectedDrafts = drafts.filter((d) => selectedDraftIds.has(d.id as number));
+		console.log('Selected drafts:', selectedDrafts);
+		if (selectedDrafts.length === 0) return;
+
+		console.log('Campaign identity:', campaign?.identity);
+		if (!campaign?.identity?.email || !campaign?.identity?.name) {
+			toast.error('Please create an Identity before sending emails.');
+			return;
+		}
+
+		if (
+			!subscriptionTier &&
+			user?.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING
+		) {
+			toast.error('Please upgrade to a paid plan to send emails.');
+			return;
+		}
+
+		const sendingCredits = user?.sendingCredits || 0;
+		if (sendingCredits === 0) {
+			toast.error(
+				'You have run out of sending credits. Please upgrade your subscription.'
+			);
+			return;
+		}
+
+		const emailsWeCanSend = Math.min(selectedDrafts.length, sendingCredits);
+		const emailsToProcess = selectedDrafts.slice(0, emailsWeCanSend);
+
+		setIsSending(true);
+		let successfulSends = 0;
+		try {
+			for (let i = 0; i < emailsToProcess.length; i++) {
+				const email = emailsToProcess[i];
+				try {
+					// Find the contact email from the contacts array
+					const contact = contacts.find((c) => c.id === email.contactId);
+					const recipientEmail = email.contact?.email || contact?.email;
+
+					if (!recipientEmail) {
+						console.error('No recipient email found for draft:', email.id);
+						continue;
+					}
+
+					const res = await sendMailgunMessage({
+						subject: email.subject,
+						message: email.message,
+						recipientEmail: recipientEmail,
+						senderEmail: campaign.identity?.email,
+						senderName: campaign.identity?.name,
+						originEmail:
+							user?.customDomain && user?.customDomain !== ''
+								? user?.customDomain
+								: user?.murmurEmail,
+					});
+					if (res.success) {
+						await updateEmail({
+							id: email.id.toString(),
+							data: { status: EmailStatus.sent, sentAt: new Date() },
+						});
+						successfulSends++;
+					}
+				} catch (err) {
+					console.error('Failed to send email:', err);
+				}
+			}
+
+			// Update user credits
+			if (user && successfulSends > 0) {
+				const newCreditBalance = Math.max(0, sendingCredits - successfulSends);
+				await editUser({
+					clerkId: user.clerkId,
+					data: { sendingCredits: newCreditBalance },
+				});
+			}
+
+			// Invalidate campaign and email queries
+			await queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+			await queryClient.invalidateQueries({ queryKey: ['emails'] });
+
+			// Clear selection and notify
+			setSelectedDraftIds(new Set());
+			if (successfulSends === selectedDrafts.length) {
+				toast.success(`All ${successfulSends} emails sent successfully!`);
+			} else if (successfulSends > 0) {
+				if (emailsWeCanSend < selectedDrafts.length) {
+					toast.warning(`Sent ${successfulSends} emails before running out of credits.`);
+				} else {
+					toast.warning(
+						`${successfulSends} of ${selectedDrafts.length} emails sent successfully.`
+					);
+				}
+			} else {
+				toast.error('Failed to send emails. Please try again.');
+			}
+		} finally {
+			setIsSending(false);
+		}
+	};
 	return (
 		<div
 			className="w-[376px] h-[426px] rounded-md border-2 border-black/30 bg-[#F4E5BC] px-2 pb-2 flex flex-col"
@@ -293,8 +418,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 					'mt-2 w-full max-w-[356px] h-[26px] rounded-[6px] bg-[#B5E2B5] border border-black flex items-center justify-center text-[12px] font-medium',
 					isSendDisabled && 'opacity-50 cursor-not-allowed'
 				)}
+				onClick={handleSendSelected}
 			>
-				Send Selected
+				{isSending ? 'Sending...' : 'Send Selected'}
 			</button>
 		</div>
 	);
