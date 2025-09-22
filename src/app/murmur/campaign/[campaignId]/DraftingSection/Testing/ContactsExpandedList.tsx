@@ -1,6 +1,6 @@
 'use client';
 
-import { FC } from 'react';
+import { FC, MouseEvent, useRef, useState } from 'react';
 import { ContactWithName } from '@/types/contact';
 import { cn } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
@@ -16,12 +16,57 @@ import {
 export interface ContactsExpandedListProps {
 	contacts: ContactWithName[];
 	onHeaderClick?: () => void;
+	onDraftSelected?: (contactIds: number[]) => void;
+	isDraftDisabled?: boolean;
+	isPendingGeneration?: boolean;
 }
 
 export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	contacts,
 	onHeaderClick,
+	onDraftSelected,
+	isDraftDisabled,
+	isPendingGeneration,
 }) => {
+	const [selectedContactIds, setSelectedContactIds] = useState<Set<number>>(new Set());
+	const lastClickedRef = useRef<number | null>(null);
+
+	const handleContactClick = (contact: ContactWithName, e: MouseEvent) => {
+		if (e.shiftKey && lastClickedRef.current !== null) {
+			// Prevent text selection on shift-click
+			e.preventDefault();
+			window.getSelection()?.removeAllRanges();
+
+			const currentIndex = contacts.findIndex((c) => c.id === contact.id);
+			const lastIndex = contacts.findIndex((c) => c.id === lastClickedRef.current);
+
+			if (currentIndex !== -1 && lastIndex !== -1) {
+				const start = Math.min(currentIndex, lastIndex);
+				const end = Math.max(currentIndex, lastIndex);
+				const newSelected = new Set<number>();
+				for (let i = start; i <= end; i++) {
+					newSelected.add(contacts[i].id);
+				}
+				setSelectedContactIds(newSelected);
+			}
+		} else {
+			// Toggle single selection
+			setSelectedContactIds((prev) => {
+				const next = new Set(prev);
+				if (next.has(contact.id)) {
+					next.delete(contact.id);
+				} else {
+					next.add(contact.id);
+				}
+				return next;
+			});
+			lastClickedRef.current = contact.id ?? null;
+		}
+	};
+
+	const computedIsDraftDisabled =
+		Boolean(isDraftDisabled) || selectedContactIds.size === 0;
+
 	return (
 		<div
 			className="w-[376px] h-[424px] rounded-md border-2 border-black/30 bg-[#F5DADA] px-2 pb-2 flex flex-col"
@@ -100,15 +145,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						const fullName =
 							contact.name ||
 							`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+						const isSelected = selectedContactIds.has(contact.id);
 						return (
 							<div
 								key={contact.id}
 								className={cn(
-									'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full max-w-[356px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none'
+									'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full max-w-[356px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none',
+									isSelected && 'bg-[#EAAEAE]'
 								)}
 								onMouseDown={(e) => {
 									if (e.shiftKey) e.preventDefault();
 								}}
+								onClick={(e) => handleContactClick(contact, e)}
 							>
 								{fullName ? (
 									<>
@@ -376,9 +424,21 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			</CustomScrollbar>
 
 			{/* Footer bar */}
-			<div className="w-full max-w-[356px] h-[26px] rounded-[6px] bg-[#B5E2B5] border border-black flex items-center justify-center text-[12px] font-medium">
-				Draft
-			</div>
+			<button
+				type="button"
+				onClick={() => {
+					if (computedIsDraftDisabled) return;
+					if (onDraftSelected) onDraftSelected(Array.from(selectedContactIds));
+				}}
+				disabled={computedIsDraftDisabled}
+				className={cn(
+					'w-full max-w-[356px] h-[26px] rounded-[6px] bg-[#B5E2B5] border border-black flex items-center justify-center text-[12px] font-medium',
+					computedIsDraftDisabled && 'opacity-50 cursor-not-allowed'
+				)}
+				aria-disabled={computedIsDraftDisabled}
+			>
+				{isPendingGeneration ? 'Drafting...' : 'Draft'}
+			</button>
 		</div>
 	);
 };

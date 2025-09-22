@@ -68,6 +68,11 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									form={form}
 									generationProgress={generationProgress}
 									onOpenDrafting={goToDrafting}
+									isGenerationDisabled={isGenerationDisabled}
+									isPendingGeneration={isPendingGeneration}
+									onDraftSelectedContacts={async (ids) => {
+										await handleGenerateDrafts(ids);
+									}}
 								/>
 							</div>
 						</div>

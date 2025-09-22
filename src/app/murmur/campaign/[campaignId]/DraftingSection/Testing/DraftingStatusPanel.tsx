@@ -36,6 +36,10 @@ export interface DraftingStatusPanelProps {
 	generationTotal?: number; // 0 when unknown
 	renderers?: DraftingStatusPanelRenderers; // Custom UI hooks for previews
 	onOpenDrafting?: () => void;
+	// New: wire drafting action/disabled/pending to match main drafting tab
+	isGenerationDisabled?: () => boolean;
+	isPendingGeneration?: boolean;
+	onDraftSelectedContacts?: (contactIds: number[]) => void | Promise<void>;
 }
 
 const Divider = () => <div className="w-px self-stretch border-l border-black/40" />;
@@ -110,7 +114,15 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 		[emails]
 	);
 
-	const contactsCount = contacts?.length || 0;
+	const draftedContactIds = useMemo(
+		() => new Set(draftedEmails.map((e) => e.contactId)),
+		[draftedEmails]
+	);
+	const availableContacts = useMemo(
+		() => (contacts || []).filter((c) => !draftedContactIds.has(c.id)),
+		[contacts, draftedContactIds]
+	);
+	const contactsCount = availableContacts.length;
 	const draftsCount = draftedEmails.length;
 	const sentCount = sentEmails.length;
 
@@ -261,8 +273,16 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					<div className="mb-2">
 						{activePreview === 'contacts' ? (
 							<ContactsExpandedList
-								contacts={contacts}
+								contacts={availableContacts}
 								onHeaderClick={() => setActivePreview('none')}
+								onDraftSelected={async (ids) => {
+									if (props.onDraftSelectedContacts)
+										await props.onDraftSelectedContacts(ids);
+								}}
+								isDraftDisabled={
+									props.isGenerationDisabled ? props.isGenerationDisabled() : false
+								}
+								isPendingGeneration={props.isPendingGeneration}
 							/>
 						) : (
 							<div
