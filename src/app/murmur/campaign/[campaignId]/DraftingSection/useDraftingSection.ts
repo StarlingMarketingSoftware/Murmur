@@ -46,6 +46,7 @@ import { ContactWithName } from '@/types/contact';
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
 	view?: 'testing' | 'drafting';
+	goToDrafting?: () => void;
 }
 
 type GeneratedEmail = {
@@ -151,6 +152,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [isLivePreviewVisible, setIsLivePreviewVisible] = useState(false);
 	const [livePreviewContactId, setLivePreviewContactId] = useState<number | null>(null);
 	const [livePreviewMessage, setLivePreviewMessage] = useState('');
+	const [livePreviewSubject, setLivePreviewSubject] = useState('');
 	const livePreviewTimerRef = useRef<number | null>(null);
 	// Store full text and an index to preserve original whitespace and paragraph breaks
 	const livePreviewFullTextRef = useRef<string>('');
@@ -164,12 +166,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		setIsLivePreviewVisible(false);
 		setLivePreviewContactId(null);
 		setLivePreviewMessage('');
+		setLivePreviewSubject('');
 		livePreviewFullTextRef.current = '';
 		livePreviewIndexRef.current = 0;
 	}, []);
 
 	const startLivePreviewStreaming = useCallback(
-		(contactId: number, fullMessage: string) => {
+		(contactId: number, fullMessage: string, subject?: string) => {
 			if (livePreviewTimerRef.current) {
 				clearInterval(livePreviewTimerRef.current);
 				livePreviewTimerRef.current = null;
@@ -177,6 +180,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			setIsLivePreviewVisible(true);
 			setLivePreviewContactId(contactId);
 			setLivePreviewMessage('');
+			if (typeof subject === 'string') {
+				setLivePreviewSubject(subject);
+			}
 			const text = fullMessage || '';
 			livePreviewFullTextRef.current = text;
 			livePreviewIndexRef.current = 0;
@@ -1027,7 +1033,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 					if (parsedDraft) {
 						// Start live preview streaming for this recipient
-						startLivePreviewStreaming(recipient.id, parsedDraft.message);
+						startLivePreviewStreaming(
+							recipient.id,
+							parsedDraft.message,
+							parsedDraft.subject
+						);
 						if (!isAiSubject) {
 							parsedDraft.subject = values.subject || parsedDraft.subject;
 						}
@@ -1043,12 +1053,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 							status: 'draft' as EmailStatus,
 							contactId: recipient.id,
 						});
+						// Hide live preview as soon as this draft is written
+						hideLivePreview();
 						// Immediately reflect in UI
 						setGenerationProgress((prev) => prev + 1);
 						queryClient.invalidateQueries({
 							queryKey: ['emails', { campaignId: campaign.id }],
 						});
-						// Keep live preview open between drafts for smoother UX
+						// Live preview will be re-enabled for the next recipient when streaming starts
 
 						return {
 							success: true,
@@ -1449,5 +1461,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		isLivePreviewVisible,
 		livePreviewContactId,
 		livePreviewMessage,
+		livePreviewSubject,
 	};
 };

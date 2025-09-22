@@ -150,6 +150,12 @@ export const SentEmails: FC<SentEmailsProps> = ({ emails, isPendingEmails }) => 
 						</div>
 					);
 				})}
+				{Array.from({ length: Math.max(0, 6 - emails.length) }).map((_, idx) => (
+					<div
+						key={`sent-placeholder-${idx}`}
+						className="select-none w-[366px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
+					/>
+				))}
 			</div>
 		</DraftingTable>
 	);

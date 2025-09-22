@@ -1706,14 +1706,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												<TestPreviewPanel
 													setShowTestPreview={setShowTestPreview}
 													testMessage={testMessage || ''}
-													isLoading={Boolean(isTest) || Boolean(isPendingGeneration)}
+													isLoading={Boolean(isTest)}
 													onTest={() => {
 														setShowTestPreview?.(true);
 														handleGenerateTestDrafts?.();
 														setHasAttemptedTest(true);
 													}}
 													isDisabled={isGenerationDisabled?.()}
-													isTesting={Boolean(isPendingGeneration) && Boolean(isTest)}
+													isTesting={Boolean(isTest)}
 													contact={contact}
 												/>
 											</DraggableBox>

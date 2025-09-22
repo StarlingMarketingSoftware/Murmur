@@ -140,10 +140,19 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						children
 					) : isDrafts || isSent ? (
 						<div className="overflow-visible w-full flex flex-col gap-2 items-center py-2">
-							{Array.from({ length: 5 }).map((_, idx) => (
+							{Array.from({ length: 6 }).map((_, idx) => (
 								<div
 									key={idx}
 									className="select-none w-[366px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
+								/>
+							))}
+						</div>
+					) : isContacts ? (
+						<div className="overflow-visible w-full flex flex-col gap-2 items-center py-2">
+							{Array.from({ length: 7 }).map((_, idx) => (
+								<div
+									key={idx}
+									className="select-none w-[366px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
 								/>
 							))}
 						</div>

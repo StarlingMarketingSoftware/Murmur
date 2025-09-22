@@ -5,10 +5,11 @@ import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/Hybr
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { EmailGeneration } from './EmailGeneration/EmailGeneration';
 import { cn } from '@/utils';
+import DraftingStatusPanel from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftingStatusPanel';
 // removed unused DraftingMode/HybridBlock imports after moving mode toggles inside
 
 export const DraftingSection: FC<DraftingSectionProps> = (props) => {
-	const { view = 'testing' } = props;
+	const { view = 'testing', goToDrafting } = props;
 	const {
 		campaign,
 		contacts,
@@ -32,6 +33,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		isLivePreviewVisible,
 		livePreviewContactId,
 		livePreviewMessage,
+		livePreviewSubject,
 	} = useDraftingSection(props);
 
 	return (
@@ -43,16 +45,39 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 						className="mb-[4px] flex justify-between items-center"
 					></div>
 					{view !== 'drafting' && (
-						<div className="flex gap-[47px] items-start justify-center overflow-visible">
-							<div className="flex-shrink-0">
-								<HybridPromptInput
-									trackFocusedField={trackFocusedField}
-									testMessage={campaign?.testMessage}
-									handleGenerateTestDrafts={handleGenerateTestDrafts}
+						<div className="relative">
+							<HybridPromptInput
+								trackFocusedField={trackFocusedField}
+								testMessage={campaign?.testMessage}
+								handleGenerateTestDrafts={handleGenerateTestDrafts}
+								isGenerationDisabled={isGenerationDisabled}
+								isPendingGeneration={isPendingGeneration}
+								isTest={isTest}
+								contact={contacts?.[0]}
+							/>
+							{/* Right panel for Testing view - positioned absolutely */}
+							<div
+								className="absolute"
+								style={{
+									left: 'calc(50% + 446px + 50px)',
+									top: '0',
+								}}
+							>
+								<DraftingStatusPanel
+									campaign={campaign}
+									contacts={contacts || []}
+									form={form}
+									generationProgress={generationProgress}
+									onOpenDrafting={goToDrafting}
 									isGenerationDisabled={isGenerationDisabled}
 									isPendingGeneration={isPendingGeneration}
-									isTest={isTest}
-									contact={contacts?.[0]}
+									isLivePreviewVisible={isLivePreviewVisible}
+									livePreviewContactId={livePreviewContactId || undefined}
+									livePreviewSubject={livePreviewSubject}
+									livePreviewMessage={livePreviewMessage}
+									onDraftSelectedContacts={async (ids) => {
+										await handleGenerateDrafts(ids);
+									}}
 								/>
 							</div>
 						</div>

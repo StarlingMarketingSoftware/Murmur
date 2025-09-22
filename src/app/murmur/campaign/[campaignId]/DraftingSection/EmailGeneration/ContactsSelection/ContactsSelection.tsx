@@ -319,6 +319,12 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						})()}
 					</div>
 				))}
+				{Array.from({ length: Math.max(0, 7 - contacts.length) }).map((_, idx) => (
+					<div
+						key={`placeholder-${idx}`}
+						className="select-none w-[366px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
+					/>
+				))}
 			</div>
 		</DraftingTable>
 	);
