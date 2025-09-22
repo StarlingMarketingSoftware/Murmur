@@ -1,4 +1,4 @@
-import { FC, ReactNode, useMemo, useState } from 'react';
+import { FC, ReactNode, useEffect, useMemo, useState } from 'react';
 import { cn } from '@/utils';
 import { CampaignWithRelations } from '@/types/campaign';
 import { ContactWithName } from '@/types/contact';
@@ -108,9 +108,16 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	);
 	const [sendingPreviewSubject, setSendingPreviewSubject] = useState<string>('');
 
-	// Temporary: will become conditional when rules are provided
-	const showDraftPreviewBox = true;
+	// Only show Draft Preview while live preview is explicitly visible
+	const showDraftPreviewBox = Boolean(props.isLivePreviewVisible);
 	const showSendPreviewBox = true;
+
+	// Ensure expanded Draft Preview collapses when hidden
+	useEffect(() => {
+		if (!showDraftPreviewBox && activePreview === 'draftPreview') {
+			setActivePreview('none');
+		}
+	}, [showDraftPreviewBox, activePreview]);
 
 	const { data: emails } = useGetEmails({
 		filters: { campaignId: campaign.id },

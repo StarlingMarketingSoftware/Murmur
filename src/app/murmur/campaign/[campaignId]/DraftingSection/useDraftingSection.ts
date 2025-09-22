@@ -1053,12 +1053,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 							status: 'draft' as EmailStatus,
 							contactId: recipient.id,
 						});
+						// Hide live preview as soon as this draft is written
+						hideLivePreview();
 						// Immediately reflect in UI
 						setGenerationProgress((prev) => prev + 1);
 						queryClient.invalidateQueries({
 							queryKey: ['emails', { campaignId: campaign.id }],
 						});
-						// Keep live preview open between drafts for smoother UX
+						// Live preview will be re-enabled for the next recipient when streaming starts
 
 						return {
 							success: true,
