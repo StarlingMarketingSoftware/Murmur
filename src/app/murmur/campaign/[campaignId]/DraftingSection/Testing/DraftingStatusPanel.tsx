@@ -101,6 +101,10 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	const [isOpen, setIsOpen] = useState(true);
 	const [activePreview, setActivePreview] = useState<DraftingPreviewKind>('none');
 
+	// Temporary: will become conditional when rules are provided
+	const showDraftPreviewBox = true;
+	const showSendPreviewBox = true;
+
 	const { data: emails } = useGetEmails({
 		filters: { campaignId: campaign.id },
 	});
@@ -377,6 +381,29 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 						</div>
 					</div>
 
+					{/* Draft Preview */}
+					{showDraftPreviewBox && (
+						<div
+							className={cn(
+								'rounded-md border-2 border-black/30 mb-2 font-sans',
+								'bg-[#D6E1FF] backdrop-blur-sm select-none transition-all'
+							)}
+							style={{ width: '376px' }}
+						>
+							<div
+								className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+								style={{ height: '28px' }}
+								onClick={() => setActivePreview('draftPreview')}
+							>
+								<span className="font-bold text-black text-sm">Draft Preview</span>
+								<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
+									<span className="w-[20px] text-center"></span>
+									<ArrowIcon />
+								</div>
+							</div>
+						</div>
+					)}
+
 					{/* Drafts */}
 					{activePreview === 'drafts' ? (
 						<DraftsExpandedList
@@ -425,6 +452,29 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 								</div>
 								<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
 									<span className="w-[20px] text-center">3</span>
+									<ArrowIcon />
+								</div>
+							</div>
+						</div>
+					)}
+
+					{/* Send Preview */}
+					{showSendPreviewBox && (
+						<div
+							className={cn(
+								'rounded-md border-2 border-black/30 mb-2 font-sans',
+								'bg-[#D6E1FF] backdrop-blur-sm select-none transition-all'
+							)}
+							style={{ width: '376px' }}
+						>
+							<div
+								className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+								style={{ height: '28px' }}
+								onClick={() => setActivePreview('sendPreview')}
+							>
+								<span className="font-bold text-black text-sm">Send Preview</span>
+								<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
+									<span className="w-[20px] text-center"></span>
 									<ArrowIcon />
 								</div>
 							</div>
