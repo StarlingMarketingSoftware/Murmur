@@ -1,6 +1,6 @@
 'use client';
 
-import { FC } from 'react';
+import { FC, MouseEvent, useRef, useState } from 'react';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
 import { cn } from '@/utils';
@@ -41,6 +41,52 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	contacts,
 	onHeaderClick,
 }) => {
+	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
+	const lastClickedRef = useRef<number | null>(null);
+
+	const handleDraftClick = (draftId: number, e: MouseEvent) => {
+		if (e.shiftKey && lastClickedRef.current !== null) {
+			// Prevent text selection on shift-click
+			e.preventDefault();
+			window.getSelection()?.removeAllRanges();
+
+			const currentIndex = drafts.findIndex((d) => d.id === draftId);
+			const lastIndex = drafts.findIndex((d) => d.id === lastClickedRef.current);
+			if (currentIndex !== -1 && lastIndex !== -1) {
+				const start = Math.min(currentIndex, lastIndex);
+				const end = Math.max(currentIndex, lastIndex);
+				const newSelected = new Set<number>();
+				for (let i = start; i <= end; i++) {
+					const id = drafts[i].id as number;
+					newSelected.add(id);
+				}
+				setSelectedDraftIds(newSelected);
+			}
+		} else {
+			setSelectedDraftIds((prev) => {
+				const next = new Set(prev);
+				if (next.has(draftId)) {
+					next.delete(draftId);
+				} else {
+					next.add(draftId);
+				}
+				return next;
+			});
+			lastClickedRef.current = draftId ?? null;
+		}
+	};
+
+	const areAllSelected = selectedDraftIds.size === drafts.length && drafts.length > 0;
+	const handleSelectAllToggle = () => {
+		if (areAllSelected) {
+			setSelectedDraftIds(new Set());
+		} else {
+			setSelectedDraftIds(new Set(drafts.map((d) => d.id as number)));
+		}
+	};
+
+	// Keep footer button disabled state in sync if used later
+	const isSendDisabled = selectedDraftIds.size === 0;
 	return (
 		<div
 			className="w-[376px] h-[426px] rounded-md border-2 border-black/30 bg-[#F4E5BC] px-2 pb-2 flex flex-col"
@@ -71,9 +117,12 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 					<button
 						type="button"
 						className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-						onClick={(e) => e.stopPropagation()}
+						onClick={(e) => {
+							e.stopPropagation();
+							handleSelectAllToggle();
+						}}
 					>
-						Select All
+						{areAllSelected ? 'Deselect All' : 'Select All'}
 					</button>
 					<div className="w-px self-stretch border-l border-black/40" />
 					<button
@@ -109,12 +158,18 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							  contact.company ||
 							  'Contact'
 							: 'Unknown Contact';
+						const isSelected = selectedDraftIds.has(draft.id as number);
 						return (
 							<div
 								key={draft.id}
 								className={cn(
-									'cursor-default relative select-none w-full max-w-[356px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2'
+									'cursor-pointer relative select-none w-full max-w-[356px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
+									isSelected && 'bg-[#FFDF9F]'
 								)}
+								onMouseDown={(e) => {
+									if (e.shiftKey) e.preventDefault();
+								}}
+								onClick={(e) => handleDraftClick(draft.id as number, e)}
 							>
 								{/* Fixed top-right info (Location + Title) - match Drafting tab */}
 								<div className="absolute top-[6px] right-[28px] flex flex-col items-end gap-[2px] w-[92px] pointer-events-none">
@@ -231,9 +286,16 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 			</CustomScrollbar>
 
 			{/* Footer bar */}
-			<div className="mt-2 w-full max-w-[356px] h-[26px] rounded-[6px] bg-[#B5E2B5] border border-black flex items-center justify-center text-[12px] font-medium">
+			<button
+				type="button"
+				disabled={isSendDisabled}
+				className={cn(
+					'mt-2 w-full max-w-[356px] h-[26px] rounded-[6px] bg-[#B5E2B5] border border-black flex items-center justify-center text-[12px] font-medium',
+					isSendDisabled && 'opacity-50 cursor-not-allowed'
+				)}
+			>
 				Send Selected
-			</div>
+			</button>
 		</div>
 	);
 };
