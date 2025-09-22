@@ -33,6 +33,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		isLivePreviewVisible,
 		livePreviewContactId,
 		livePreviewMessage,
+		livePreviewSubject,
 	} = useDraftingSection(props);
 
 	return (
@@ -70,6 +71,9 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 									onOpenDrafting={goToDrafting}
 									isGenerationDisabled={isGenerationDisabled}
 									isPendingGeneration={isPendingGeneration}
+									isLivePreviewVisible={isLivePreviewVisible}
+									livePreviewContactId={livePreviewContactId || undefined}
+									livePreviewSubject={livePreviewSubject}
 									onDraftSelectedContacts={async (ids) => {
 										await handleGenerateDrafts(ids);
 									}}

@@ -40,6 +40,10 @@ export interface DraftingStatusPanelProps {
 	isGenerationDisabled?: () => boolean;
 	isPendingGeneration?: boolean;
 	onDraftSelectedContacts?: (contactIds: number[]) => void | Promise<void>;
+	// Live drafting preview summary shown inline in Draft Preview row
+	isLivePreviewVisible?: boolean;
+	livePreviewContactId?: number;
+	livePreviewSubject?: string;
 }
 
 const Divider = () => <div className="w-px self-stretch border-l border-black/40" />;
@@ -178,6 +182,22 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	const subject = form.watch('subject');
 	const fromName = campaign.identity?.name || '';
 
+	// Live inline preview data for Draft Preview row
+	const livePreviewContactName = useMemo(() => {
+		if (!props.isLivePreviewVisible || !props.livePreviewContactId) return '';
+		const c = contacts?.find((x) => x.id === props.livePreviewContactId);
+		if (!c) return '';
+		// Show only a real person name; avoid falling back to company or generic labels
+		return c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim() || '';
+	}, [props.isLivePreviewVisible, props.livePreviewContactId, contacts]);
+
+	const livePreviewSubject = useMemo(() => {
+		if (!props.isLivePreviewVisible) return '';
+		return props.livePreviewSubject && props.livePreviewSubject.trim() !== ''
+			? props.livePreviewSubject
+			: 'Drafting...';
+	}, [props.isLivePreviewVisible, props.livePreviewSubject]);
+
 	const headerRight = (
 		<div className="flex items-center gap-2">
 			<button
@@ -200,7 +220,7 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	const renderActivePreview = (): ReactNode => {
 		if (activePreview === 'none') return null;
 		const container = (content: ReactNode) => (
-			<div className="mt-2 rounded-md border border-black/20 bg-white/80 shadow-[0_2px_0_#000] p-3 font-sans">
+			<div className="mt-2 rounded-md border-2 border-black/20 bg-white/80 shadow-[0_2px_0_#000] p-3 font-sans">
 				{content}
 			</div>
 		);
@@ -258,7 +278,7 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	return (
 		<div
 			className={cn(
-				'w-[400px] rounded-lg border border-black bg-[#EEF2F6]',
+				'w-[400px] rounded-lg border-2 border-black bg-[#EEF2F6]',
 				'overflow-visible font-inter',
 				'origin-top-left'
 			)}
@@ -338,7 +358,7 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 									<div className="px-2 pb-2">
 										<div className="mt-1">
 											<div className="text-[10px] mb-0.5">Drafting</div>
-											<div className="h-1.5 w-full rounded-sm border border-black/20 bg-white">
+											<div className="h-1.5 w-full rounded-sm border-2 border-black/20 bg-white">
 												<div
 													className="h-full bg-[#B5E2B5]"
 													style={{ width: `${draftingPct}%` }}
@@ -385,8 +405,8 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					{showDraftPreviewBox && (
 						<div
 							className={cn(
-								'rounded-md border-2 border-black/30 mb-2 font-sans',
-								'bg-[#D6E1FF] backdrop-blur-sm select-none transition-all'
+								'rounded-md border-2 border-[#295094] mb-2 font-sans',
+								'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all'
 							)}
 							style={{ width: '376px' }}
 						>
@@ -396,6 +416,32 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 								onClick={() => setActivePreview('draftPreview')}
 							>
 								<span className="font-bold text-black text-sm">Draft Preview</span>
+								<div className="ml-2 flex-1 min-w-0 self-stretch flex items-stretch">
+									<div className="w-px self-stretch border-l border-black" />
+									<div
+										className="flex items-center bg-white w-full px-2"
+										style={{ backgroundColor: '#FFFFFF' }}
+									>
+										{livePreviewContactName && (
+											<>
+												<div
+													className="text-[12px] font-bold text-black truncate"
+													title={livePreviewContactName}
+												>
+													{livePreviewContactName}
+												</div>
+												<div className="w-px self-stretch border-l border-black/40 mx-2" />
+											</>
+										)}
+										<div
+											className="text-[12px] text-black/80 truncate flex-1"
+											title={livePreviewSubject}
+										>
+											{livePreviewSubject || <>&nbsp;</>}
+										</div>
+									</div>
+									<div className="w-px self-stretch border-l border-black" />
+								</div>
 								<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
 									<span className="w-[20px] text-center"></span>
 									<ArrowIcon />
@@ -462,8 +508,8 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					{showSendPreviewBox && (
 						<div
 							className={cn(
-								'rounded-md border-2 border-black/30 mb-2 font-sans',
-								'bg-[#D6E1FF] backdrop-blur-sm select-none transition-all'
+								'rounded-md border-2 border-[#295094] mb-2 font-sans',
+								'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all'
 							)}
 							style={{ width: '376px' }}
 						>
