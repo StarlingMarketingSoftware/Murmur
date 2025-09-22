@@ -59,7 +59,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 								className="absolute"
 								style={{
 									left: 'calc(50% + 446px + 40px)',
-									top: '10px',
+									top: '0',
 								}}
 							>
 								<DraftingStatusPanel
