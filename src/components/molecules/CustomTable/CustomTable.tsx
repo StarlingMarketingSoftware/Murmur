@@ -330,8 +330,8 @@ export function CustomTable<TData, TValue>({
 				>
 					<div className="min-w-full">
 						{showInContainerHeader && (
-							<div className="sticky top-0 z-10 bg-[#EBF5FB] px-3 py-0.5">
-								<div className="relative h-[22px] flex items-center">
+							<div className="sticky top-0 z-10 bg-[#EBF5FB] px-4 py-2 rounded-t-[8px]">
+								<div className="relative h-[32px] flex items-center">
 									{/* Left: Select all / Deselect All */}
 									{headerAction ? (
 										<div className="absolute left-0 top-0 bottom-0 flex items-center">
