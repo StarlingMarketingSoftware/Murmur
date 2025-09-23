@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, MouseEvent, useRef, useState } from 'react';
+import { FC, MouseEvent, useMemo, useRef, useState } from 'react';
 import { ContactWithName } from '@/types/contact';
 import { cn } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
@@ -12,6 +12,7 @@ import {
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
+import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 
 export interface ContactsExpandedListProps {
 	contacts: ContactWithName[];
@@ -30,6 +31,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 }) => {
 	const [selectedContactIds, setSelectedContactIds] = useState<Set<number>>(new Set());
 	const lastClickedRef = useRef<number | null>(null);
+
+	// Used contacts indicator data (IDs for current user)
+	const { data: usedContactIds } = useGetUsedContactIds();
+	const usedContactIdsSet = useMemo(
+		() => new Set(usedContactIds || []),
+		[usedContactIds]
+	);
 
 	const handleContactClick = (contact: ContactWithName, e: MouseEvent) => {
 		if (e.shiftKey && lastClickedRef.current !== null) {
@@ -159,6 +167,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							contact.name ||
 							`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
 						const isSelected = selectedContactIds.has(contact.id);
+						const isUsed = usedContactIdsSet.has(contact.id);
 						return (
 							<div
 								key={contact.id}
@@ -175,6 +184,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									<>
 										{/* Top Left - Name */}
 										<div className="pl-3 pr-1 flex items-center h-[23px]">
+											{isUsed && (
+												<span
+													className="inline-block shrink-0 mr-2"
+													title="Used in a previous campaign"
+													style={{
+														width: '16px',
+														height: '16px',
+														borderRadius: '50%',
+														border: '1px solid #000000',
+														backgroundColor: '#DAE6FE',
+													}}
+												/>
+											)}
 											<div className="font-bold text-[11px] w-full truncate leading-tight">
 												{fullName}
 											</div>
@@ -195,6 +217,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 										</div>
 										{/* Bottom Left - Company */}
 										<div className="pl-3 pr-1 flex items-center h-[22px]">
+											{!fullName && isUsed && (
+												<span
+													className="inline-block shrink-0 mr-2"
+													title="Used in a previous campaign"
+													style={{
+														width: '16px',
+														height: '16px',
+														borderRadius: '50%',
+														border: '1px solid #000000',
+														backgroundColor: '#DAE6FE',
+													}}
+												/>
+											)}
 											<div className="text-[11px] text-black w-full truncate leading-tight">
 												{contact.company || ''}
 											</div>
@@ -271,6 +306,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									<>
 										{/* Left column - Company vertically centered */}
 										<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
+											{isUsed && (
+												<span
+													className="inline-block shrink-0 mr-2"
+													title="Used in a previous campaign"
+													style={{
+														width: '16px',
+														height: '16px',
+														borderRadius: '50%',
+														border: '1px solid #000000',
+														backgroundColor: '#DAE6FE',
+													}}
+												/>
+											)}
 											<div className="font-bold text-[11px] text-black w-full truncate leading-tight">
 												{contact.company || 'Contact'}
 											</div>

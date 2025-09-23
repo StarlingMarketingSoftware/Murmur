@@ -9,6 +9,8 @@ import FeatureLockedButton from '@/components/atoms/FeatureLockedButton/FeatureL
 import { RESTRICTED_FEATURE_MESSAGES } from '@/constants';
 import { TableSortingButton } from '@/components/molecules/CustomTable/CustomTable';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
+import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
+import { useMemo } from 'react';
 
 export interface RecipientsTableProps {
 	contacts: Contact[];
@@ -19,6 +21,12 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 	const campaignId = params.campaignId as string;
 	const { contacts } = props;
 	const { subscriptionTier } = useMe();
+
+	const { data: usedContactIds } = useGetUsedContactIds();
+	const usedContactIdsSet = useMemo(
+		() => new Set(usedContactIds || []),
+		[usedContactIds]
+	);
 
 	const { isPending: isPendingRemoveContacts, mutate: removeRecipients } =
 		useEditCampaign({
@@ -34,12 +42,30 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 			},
 			cell: ({ row }) => {
 				const name: string = row.getValue('name');
-				return name ? (
-					<div>{name}</div>
-				) : (
-					<Typography variant="muted" className="text-sm">
-						No Data
-					</Typography>
+				const isUsed = usedContactIdsSet.has(row.original.id);
+				return (
+					<div className="flex items-center gap-2">
+						{isUsed && (
+							<span
+								className="inline-block shrink-0"
+								title="Used in a previous campaign"
+								style={{
+									width: '16px',
+									height: '16px',
+									borderRadius: '50%',
+									border: '1px solid #000000',
+									backgroundColor: '#DAE6FE',
+								}}
+							/>
+						)}
+						{name ? (
+							<div>{name}</div>
+						) : (
+							<Typography variant="muted" className="text-sm">
+								No Data
+							</Typography>
+						)}
+					</div>
 				);
 			},
 		},

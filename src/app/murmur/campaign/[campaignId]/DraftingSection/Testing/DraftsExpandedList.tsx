@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, MouseEvent, useRef, useState } from 'react';
+import { FC, MouseEvent, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -18,6 +18,7 @@ import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
+import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import {
 	canadianProvinceAbbreviations,
 	canadianProvinceNames,
@@ -70,6 +71,13 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	});
 	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
+
+	// Used contacts indicator
+	const { data: usedContactIds } = useGetUsedContactIds();
+	const usedContactIdsSet = useMemo(
+		() => new Set(usedContactIds || []),
+		[usedContactIds]
+	);
 
 	const handleDraftClick = (draftId: number, e: MouseEvent) => {
 		if (e.shiftKey && lastClickedRef.current !== null) {
@@ -314,6 +322,22 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								}}
 								onClick={(e) => handleDraftClick(draft.id as number, e)}
 							>
+								{/* Used-contact indicator - vertically centered */}
+								{usedContactIdsSet.has(draft.contactId) && (
+									<span
+										className="absolute left-[8px]"
+										title="Used in a previous campaign"
+										style={{
+											top: '50%',
+											transform: 'translateY(-50%)',
+											width: '16px',
+											height: '16px',
+											borderRadius: '50%',
+											border: '1px solid #000000',
+											backgroundColor: '#DAE6FE',
+										}}
+									/>
+								)}
 								{/* Fixed top-right info (Location + Title) - match Drafting tab */}
 								<div className="absolute top-[6px] right-[28px] flex flex-col items-end gap-[2px] w-[92px] pointer-events-none">
 									<div className="flex items-center justify-start gap-1 h-[11.67px] w-[92px]">
@@ -383,7 +407,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								</div>
 
 								{/* Content grid */}
-								<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px]">
+								<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px] pl-[22px]">
 									{/* Row 1: Name */}
 									<div className="row-start-1 col-start-1 flex items-center">
 										<div className="font-bold text-[11px] truncate leading-none">
