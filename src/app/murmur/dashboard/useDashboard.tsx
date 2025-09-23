@@ -315,6 +315,21 @@ export const useDashboard = () => {
 				header: () => <span className="sr-only">Name</span>,
 				cell: ({ row }) => {
 					const contact = row.original as ContactWithName;
+					const isUsed = usedContactIdsSet.has(contact.id);
+					const renderUsedIndicator = () =>
+						!isUsed ? null : (
+							<span
+								className="inline-block shrink-0 mr-2"
+								title="Used in a previous campaign"
+								style={{
+									width: '16px',
+									height: '16px',
+									borderRadius: '50%',
+									border: '1px solid #000000',
+									backgroundColor: '#DAE6FE',
+								}}
+							/>
+						);
 					// Compute name from firstName and lastName fields
 					const hasName = contactHasName(contact);
 					const nameValue = hasName ? computeName(contact) : '';
@@ -337,12 +352,17 @@ export const useDashboard = () => {
 					// If neither name nor company, show a dash
 					if (!hasName && !hasCompany) {
 						return (
-							<div className="flex flex-col gap-0.5 py-1">
-								<div className="truncate">
-									<span className="select-none text-gray-300 dark:text-gray-700">—</span>
-								</div>
-								<div className="truncate text-sm text-gray-500 dark:text-gray-400">
-									&nbsp;
+							<div className="flex items-start gap-2">
+								{renderUsedIndicator()}
+								<div className="flex flex-col gap-0.5 py-1">
+									<div className="truncate">
+										<span className="select-none text-gray-300 dark:text-gray-700">
+											—
+										</span>
+									</div>
+									<div className="truncate text-sm text-gray-500 dark:text-gray-400">
+										&nbsp;
+									</div>
 								</div>
 							</div>
 						);
@@ -352,7 +372,25 @@ export const useDashboard = () => {
 						const textToShow = hasName ? nameValue : companyValue;
 						if (!hasName && hasCompany) {
 							return (
-								<div className="flex flex-col justify-center py-1 h-[2.75rem]">
+								<div className="flex items-center gap-2">
+									{renderUsedIndicator()}
+									<div className="flex flex-col justify-center py-1 h-[2.75rem]">
+										<div className="truncate font-bold font-primary text-[16px]">
+											<TableCellTooltip
+												text={textToShow}
+												maxLength={MAX_CELL_LENGTH}
+												positioning="below-right"
+												onHover={handleCellHover}
+											/>
+										</div>
+									</div>
+								</div>
+							);
+						}
+						return (
+							<div className="flex items-start gap-2">
+								{renderUsedIndicator()}
+								<div className="flex flex-col gap-0.5 py-1">
 									<div className="truncate font-bold font-primary text-[16px]">
 										<TableCellTooltip
 											text={textToShow}
@@ -361,43 +399,34 @@ export const useDashboard = () => {
 											onHover={handleCellHover}
 										/>
 									</div>
-								</div>
-							);
-						}
-						return (
-							<div className="flex flex-col gap-0.5 py-1">
-								<div className="truncate font-bold font-primary text-[16px]">
-									<TableCellTooltip
-										text={textToShow}
-										maxLength={MAX_CELL_LENGTH}
-										positioning="below-right"
-										onHover={handleCellHover}
-									/>
-								</div>
-								<div className="truncate text-sm text-gray-500 dark:text-gray-400">
-									&nbsp;
+									<div className="truncate text-sm text-gray-500 dark:text-gray-400">
+										&nbsp;
+									</div>
 								</div>
 							</div>
 						);
 					}
 
 					return (
-						<div className="flex flex-col gap-0.5 py-1">
-							<div className="truncate font-bold font-primary text-[16px]">
-								<TableCellTooltip
-									text={nameValue}
-									maxLength={MAX_CELL_LENGTH}
-									positioning="below-right"
-									onHover={handleCellHover}
-								/>
-							</div>
-							<div className="truncate text-sm text-gray-500 dark:text-gray-400">
-								<TableCellTooltip
-									text={companyValue}
-									maxLength={MAX_CELL_LENGTH}
-									positioning="below-right"
-									onHover={handleCellHover}
-								/>
+						<div className="flex items-center gap-2">
+							{renderUsedIndicator()}
+							<div className="flex flex-col gap-0.5 py-1">
+								<div className="truncate font-bold font-primary text-[16px]">
+									<TableCellTooltip
+										text={nameValue}
+										maxLength={MAX_CELL_LENGTH}
+										positioning="below-right"
+										onHover={handleCellHover}
+									/>
+								</div>
+								<div className="truncate text-sm text-gray-500 dark:text-gray-400">
+									<TableCellTooltip
+										text={companyValue}
+										maxLength={MAX_CELL_LENGTH}
+										positioning="below-right"
+										onHover={handleCellHover}
+									/>
+								</div>
 							</div>
 						</div>
 					);
@@ -512,14 +541,7 @@ export const useDashboard = () => {
 		];
 
 		return allColumns;
-	}, [
-		contactHasName,
-		computeName,
-		handleCellHover,
-		stateBadgeColorMap,
-		canadianProvinceNames,
-		canadianProvinceAbbreviations,
-	]);
+	}, [contactHasName, computeName, handleCellHover, usedContactIdsSet]);
 
 	return {
 		form,
