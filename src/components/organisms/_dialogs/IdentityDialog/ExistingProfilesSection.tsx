@@ -36,7 +36,7 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 						<FormItem>
 							<div
 								className={cn(
-									'box-border shrink-0 w-[652px] h-[326px] rounded-[8px] border-[2px] border-[#000000]',
+									'box-border shrink-0 w-[652px] h-[326px] rounded-[8px] border-[2px] border-[#000000] bg-[#EAF1FF]',
 									showCreatePanel ? 'cursor-pointer' : 'cursor-default'
 								)}
 								onClick={() => {
@@ -70,7 +70,7 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 															<div
 																className={cn(
 																	'box-border mx-auto w-[636px] min-w-[636px] max-w-[636px] h-[91px] min-h-[91px] max-h-[91px] shrink-0 rounded-[8px] border-[2px] border-[#000000] flex flex-col justify-center gap-0 px-4',
-																	isSelected ? 'bg-[#A6CFB0]' : 'bg-transparent'
+																	isSelected ? 'bg-[#A6CFB0]' : 'bg-white'
 																)}
 															>
 																<div
