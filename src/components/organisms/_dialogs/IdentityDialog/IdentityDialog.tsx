@@ -10,14 +10,14 @@ import {
 import { CreateIdentityPanel } from './CreateIdentityPanel/CreateIdentityPanel';
 import { ExistingProfilesSection } from './ExistingProfilesSection';
 
-import { Typography } from '@/components/ui/typography';
+// removed Typography usage for simplified header
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 	const router = useRouter();
 	const [isContentReady, setIsContentReady] = useState(false);
 	const {
-		title,
+		// title removed from header
 		open,
 		onOpenChange,
 		triggerButton,
@@ -144,13 +144,17 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 						)}
 
 						<div className="text-center">
-							<Typography variant="h2" className="text-2xl font-semibold">
-								{title}
-							</Typography>
-							<p className="mt-1 text-sm text-gray-500">
-								{identities?.length === 0
-									? 'Create your first profile to get started'
-									: 'Create a new profile or select an existing one'}
+							<p
+								className="mt-1"
+								style={{
+									fontFamily: 'Times New Roman, Times, serif',
+									fontSize: '21px',
+									color: '#000000',
+								}}
+							>
+								create a new{' '}
+								<span style={{ fontWeight: 700, color: '#5DAB68' }}>profile</span> or
+								select an existing one
 							</p>
 						</div>
 					</div>
