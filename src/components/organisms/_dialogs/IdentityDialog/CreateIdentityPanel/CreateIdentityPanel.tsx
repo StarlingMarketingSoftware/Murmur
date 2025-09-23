@@ -155,12 +155,31 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 					</div>
 
 					{/* Verify button */}
+					<div className="-mt-[24px]">
+						<Button
+							disabled={!isCodeVerified}
+							isLoading={isPendingSubmit}
+							type="submit"
+							className="relative -top-[10px] z-10 w-full h-[43.05px] rounded-[8.83px] border-[2px] text-white font-bold text-[18.77px] transition-colors hover:!bg-[#4C9E5C] active:!bg-[#428A51] active:translate-y-[1px] disabled:!opacity-100"
+							style={{
+								backgroundColor: '#5DAB68',
+								borderColor: '#050505',
+								color: '#FFFFFF',
+								fontWeight: 700,
+								fontSize: '18.77px',
+								fontFamily: 'Times New Roman, Times, serif',
+							}}
+						>
+							Save and continue
+						</Button>
+					</div>
+
 					{isEmailVerificationCodeSent && !isCodeVerified && (
 						<FormField
 							control={form.control}
 							name="verificationCode"
 							render={({ field }) => (
-								<FormItem>
+								<FormItem className="mt-3">
 									<FormLabel className="font-secondary text-[14px]">
 										Verification Code
 									</FormLabel>
@@ -186,31 +205,22 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 										</InputOTP>
 									</FormControl>
 									<FormMessage />
-									{countdownDisplay && !isCodeVerified && (
-										<Typography
-											font="secondary"
-											className={`text-xs mt-2 ${
-												isCodeExpired ? 'text-destructive' : 'text-muted-foreground'
-											}`}
-										>
-											{isCodeExpired
-												? 'Code has expired. Please request a new code.'
-												: `Code expires in: ${countdownDisplay}`}
-										</Typography>
-									)}
 								</FormItem>
 							)}
 						/>
 					)}
-					<Button
-						disabled={!isCodeVerified}
-						isLoading={isPendingSubmit}
-						type="submit"
-						className="w-full mt-3 rounded-[8.81px] border-[1.1px] text-black"
-						style={{ backgroundColor: 'rgba(93,171,104,0.49)', borderColor: '#5DAB68' }}
-					>
-						Save and continue
-					</Button>
+					{countdownDisplay && !isCodeVerified && (
+						<Typography
+							font="secondary"
+							className={`text-xs mt-2 ${
+								isCodeExpired ? 'text-destructive' : 'text-muted-foreground'
+							}`}
+						>
+							{isCodeExpired
+								? 'Code has expired. Please request a new code.'
+								: `Code expires in: ${countdownDisplay}`}
+						</Typography>
+					)}
 				</div>
 			</form>
 		</FormProvider>
