@@ -312,9 +312,7 @@ export const useDashboard = () => {
 			{
 				accessorKey: 'company',
 				id: 'nameAndCompany',
-				header: () => (
-					<span className="font-medium font-secondary text-[14px]">Name</span>
-				),
+				header: () => <span className="sr-only">Name</span>,
 				cell: ({ row }) => {
 					const contact = row.original as ContactWithName;
 					// Compute name from firstName and lastName fields
@@ -408,9 +406,7 @@ export const useDashboard = () => {
 			{
 				accessorKey: 'title',
 				size: 250, // Even width distribution
-				header: () => (
-					<span className="font-medium font-secondary text-[14px] ml-2">Title</span>
-				),
+				header: () => <span className="sr-only">Title</span>,
 				cell: ({ row }) => {
 					const text = (row.getValue('title') as string) || '';
 					return (
@@ -437,9 +433,7 @@ export const useDashboard = () => {
 			{
 				id: 'place',
 				size: 180, // Even width distribution
-				header: () => (
-					<span className="font-medium font-secondary text-[14px]">Place</span>
-				),
+				header: () => <span className="sr-only">Place</span>,
 				cell: ({ row }) => {
 					const contact = row.original as ContactWithName;
 					const fullStateName = (contact.state as string) || '';
@@ -505,9 +499,7 @@ export const useDashboard = () => {
 			{
 				accessorKey: 'email',
 				size: 280, // Even width distribution
-				header: () => (
-					<span className="font-medium font-secondary text-[14px]">Email</span>
-				),
+				header: () => <span className="sr-only">Email</span>,
 				cell: ({ row }) => {
 					const email = (row.getValue('email') as string) || '';
 					return (

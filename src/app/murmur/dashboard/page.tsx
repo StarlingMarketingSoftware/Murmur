@@ -643,21 +643,25 @@ const Dashboard = () => {
 														disabled={selectedContacts.length === 0}
 														className="font-secondary"
 														style={{
-															width: '149px',
-															height: '31px',
+															width: 'auto',
+															height: '28px',
 															background:
 																selectedContacts.length === 0
 																	? 'rgba(93, 171, 104, 0.1)'
 																	: 'rgba(93, 171, 104, 0.22)',
-															border: 'none',
+															border: '2px solid #000000',
 															color:
 																selectedContacts.length === 0
 																	? 'rgba(0, 0, 0, 0.4)'
 																	: '#000000',
-															fontSize: '14px',
+															fontSize: '13px',
 															fontWeight: 500,
-															borderRadius: '6px',
-															lineHeight: '31px',
+															borderRadius: '8px',
+															lineHeight: 'normal',
+															display: 'flex',
+															alignItems: 'center',
+															justifyContent: 'center',
+															padding: '0 12px',
 															textAlign: 'center',
 															cursor:
 																selectedContacts.length === 0 ? 'default' : 'pointer',

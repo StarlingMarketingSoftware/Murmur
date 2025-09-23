@@ -261,58 +261,62 @@ export function CustomTable<TData, TValue>({
 		}
 	}, [pagination.pageIndex, pagination.pageSize, data]);
 
+	const showInContainerHeader = isSelectable && useCustomScrollbar;
+
 	return (
 		<div className="w-full">
-			<div
-				className={cn(
-					'relative z-[70] flex items-end justify-between pt-2 pb-1 gap-4 w-full max-w-full mx-auto',
-					tableClassName
-				)}
-			>
-				<div className="flex items-center gap-4 flex-wrap">
-					{searchable && (
-						<Input
-							placeholder="Search all columns..."
-							value={globalFilter ?? ''}
-							onChange={(event) => setGlobalFilter(event.target.value)}
-							className="min-w-[200px]"
-						/>
+			{!showInContainerHeader && (
+				<div
+					className={cn(
+						'relative z-[70] flex items-end justify-between pt-2 pb-1 gap-4 w-full max-w-full mx-auto',
+						tableClassName
 					)}
-					{displayRowsPerPage && (
-						<div className="flex items-center gap-2">
-							<span className="text-sm text-muted-foreground text-nowrap">
-								Rows per page:
-							</span>
-							<Select
-								value={pagination.pageSize.toString()}
-								onValueChange={(value) =>
-									setPagination((prev) => ({ ...prev, pageSize: parseInt(value, 10) }))
-								}
-							>
-								<SelectTrigger className="w-[100px]">
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									{[10, 20, 30, 50, 100, 200, 500, 1000].map((size) => (
-										<SelectItem key={size} value={size.toString()}>
-											{size}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>
-					)}
-				</div>
-				{isSelectable && headerAction ? (
-					<div className="flex flex-col items-end gap-0">
-						<div className="text-[14px] font-secondary font-normal text-black">
-							{table.getFilteredSelectedRowModel().rows.length} of{' '}
-							{table.getFilteredRowModel().rows.length} rows selected
-						</div>
-						{headerAction}
+				>
+					<div className="flex items-center gap-4 flex-wrap">
+						{searchable && (
+							<Input
+								placeholder="Search all columns..."
+								value={globalFilter ?? ''}
+								onChange={(event) => setGlobalFilter(event.target.value)}
+								className="min-w-[200px]"
+							/>
+						)}
+						{displayRowsPerPage && (
+							<div className="flex items-center gap-2">
+								<span className="text-sm text-muted-foreground text-nowrap">
+									Rows per page:
+								</span>
+								<Select
+									value={pagination.pageSize.toString()}
+									onValueChange={(value) =>
+										setPagination((prev) => ({ ...prev, pageSize: parseInt(value, 10) }))
+									}
+								>
+									<SelectTrigger className="w-[100px]">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{[10, 20, 30, 50, 100, 200, 500, 1000].map((size) => (
+											<SelectItem key={size} value={size.toString()}>
+												{size}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
+						)}
 					</div>
-				) : null}
-			</div>
+					{isSelectable && headerAction ? (
+						<div className="flex flex-col items-end gap-0">
+							<div className="text-[14px] font-secondary font-normal text-black">
+								{table.getFilteredSelectedRowModel().rows.length} of{' '}
+								{table.getFilteredRowModel().rows.length} rows selected
+							</div>
+							{headerAction}
+						</div>
+					) : null}
+				</div>
+			)}
 			{useCustomScrollbar ? (
 				<CustomScrollbar
 					className={cn(
@@ -325,6 +329,30 @@ export function CustomTable<TData, TValue>({
 					offsetRight={scrollbarOffsetRight}
 				>
 					<div className="min-w-full">
+						{showInContainerHeader && (
+							<div className="sticky top-0 z-10 bg-[#EBF5FB] px-4 py-2 rounded-t-[8px]">
+								<div className="relative h-[32px] flex items-center">
+									{/* Left: Select all / Deselect All */}
+									{headerAction ? (
+										<div className="absolute left-0 top-0 bottom-0 flex items-center">
+											{headerAction}
+										</div>
+									) : null}
+
+									{/* Centered selected count */}
+									<div className="w-full text-center text-[14px] font-secondary text-black">
+										{table.getFilteredSelectedRowModel().rows.length} selected
+									</div>
+
+									{/* Right: Create Campaign (inline action) */}
+									{headerInlineAction ? (
+										<div className="absolute right-0 top-0 bottom-0 flex items-center gap-3">
+											{headerInlineAction}
+										</div>
+									) : null}
+								</div>
+							</div>
+						)}
 						<Table
 							className={cn(
 								'relative',
@@ -335,7 +363,11 @@ export function CustomTable<TData, TValue>({
 							)}
 							variant={variant}
 						>
-							<TableHeader variant={variant} sticky className={cn(headerClassName)}>
+							<TableHeader
+								variant={variant}
+								sticky={!showInContainerHeader}
+								className={cn(headerClassName)}
+							>
 								{table.getHeaderGroups().map((headerGroup) => (
 									<TableRow
 										className="sticky top-0 border-0"
@@ -387,7 +419,8 @@ export function CustomTable<TData, TValue>({
 															)}
 															{isSelectable &&
 															headerInlineAction &&
-															headerIndex === headerGroup.headers.length - 1 ? (
+															headerIndex === headerGroup.headers.length - 1 &&
+															!showInContainerHeader ? (
 																<div className="absolute right-2 top-1/2 -translate-y-1/2 z-10 pointer-events-auto">
 																	{headerInlineAction}
 																</div>

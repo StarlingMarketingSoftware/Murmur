@@ -1,4 +1,4 @@
-import { FC, useEffect, useState } from 'react';
+import { FC, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IdentityDialogProps, useIdentityDialog } from './useIdentityDialog';
 import {
@@ -10,15 +10,14 @@ import {
 import { CreateIdentityPanel } from './CreateIdentityPanel/CreateIdentityPanel';
 import { ExistingProfilesSection } from './ExistingProfilesSection';
 
-import { Typography } from '@/components/ui/typography';
-import PlusIcon from '@/components/atoms/_svg/PlusIcon';
-import CloseIcon from '@/components/atoms/_svg/CloseIcon';
+// removed Typography usage for simplified header
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 	const router = useRouter();
 	const [isContentReady, setIsContentReady] = useState(false);
 	const {
-		title,
+		// title removed from header
 		open,
 		onOpenChange,
 		triggerButton,
@@ -59,6 +58,16 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 		};
 	}, [showCreatePanel, setShowCreatePanel]);
 
+	// Default to the Create tab when there are no identities
+	useEffect(() => {
+		if (!isPendingIdentities && (!identities || identities.length === 0)) {
+			setShowCreatePanel(true);
+		}
+	}, [isPendingIdentities, identities, setShowCreatePanel]);
+
+	// Left position of highlight box inside 652px container
+	const highlightLeftPx = useMemo(() => (showCreatePanel ? 70 : 396), [showCreatePanel]);
+
 	return (
 		<Dialog
 			open={open}
@@ -68,10 +77,11 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 		>
 			{triggerButton && <DialogTrigger asChild>{triggerButton}</DialogTrigger>}
 			<DialogContent
+				fullScreen
 				disableEscapeKeyDown
 				disableOutsideClick
 				onOpenAutoFocus={(e) => e.preventDefault()}
-				className="!fixed !inset-0 !translate-x-0 !translate-y-0 !top-0 !left-0 !max-w-none !max-h-screen !h-screen !w-full !rounded-none !border-0 !p-0 !overflow-hidden data-[state=open]:!animate-none data-[state=closed]:!animate-none"
+				className="!fixed !inset-0 !translate-x-0 !translate-y-0 !top-0 !left-0 !max-w-none !max-h-screen !h-screen !w-full !rounded-none !border-0 !p-0 !overflow-hidden !z-[100000] data-[state=open]:!animate-none data-[state=closed]:!animate-none scrollbar-hide"
 				hideCloseButton={true}
 			>
 				<DialogTitle />
@@ -89,6 +99,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 							? 'dialog-smooth-in 0.3s ease-out forwards'
 							: 'none',
 						opacity: isContentReady ? 1 : 0,
+						paddingBottom: 0,
 					}}
 				>
 					{/* Full screen header with back button - fixed position */}
@@ -133,128 +144,113 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 						)}
 
 						<div className="text-center">
-							<Typography variant="h2" className="text-2xl font-semibold">
-								{title}
-							</Typography>
-							<p className="mt-1 text-sm text-gray-500">
-								{identities?.length === 0
-									? 'Create your first profile to get started'
-									: 'Create a new profile or select an existing one'}
+							<p
+								className="mt-1"
+								style={{
+									fontFamily: 'Times New Roman, Times, serif',
+									fontSize: '21px',
+									color: '#000000',
+								}}
+							>
+								create a new{' '}
+								<span style={{ fontWeight: 700, color: '#5DAB68' }}>profile</span> or
+								select an existing one
 							</p>
 						</div>
 					</div>
 
 					{/* Main content area - scrollable */}
-					<div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-gray-50/30">
-						<div className="flex justify-center py-6">
+					<div
+						className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-gray-50/30 scrollbar-hide identity-dialog-scroll-container"
+						style={{
+							scrollbarWidth: 'none',
+							msOverflowStyle: 'none',
+							WebkitOverflowScrolling: 'touch',
+						}}
+					>
+						<div className="flex justify-center pt-6">
 							<div className="w-full max-w-[1444px] px-0 mx-auto">
 								{isPendingIdentities ? (
-									<div className="h-full flex items-center justify-center">
-										{/* Empty space during load - fade transition handles the visual feedback */}
-									</div>
+									<div className="h-full flex items-center justify-center" />
 								) : (
-									<div className="flex flex-col items-stretch justify-start">
-										{/* Show create form centered when no profiles exist */}
-										{!identities || identities.length === 0 ? (
-											<div className="w-full max-w-md">
-												<Typography
-													variant="h3"
-													className="text-xl font-semibold text-gray-900 mb-6 text-center"
+									<div className="flex flex-col items-center">
+										<Tabs
+											value={showCreatePanel ? 'create' : 'select'}
+											onValueChange={(val) => setShowCreatePanel(val === 'create')}
+											className="w-full max-w-[1444px]"
+										>
+											<div className="flex justify-center mb-4">
+												<TabsList
+													className="relative !bg-transparent border border-black !shadow-none !p-0"
+													style={{
+														width: '652px',
+														height: '50px',
+														borderWidth: 2.45,
+														borderRadius: '9.8px',
+														borderStyle: 'solid',
+														boxShadow: 'none',
+													}}
 												>
-													Create Your First Profile
-												</Typography>
-												<CreateIdentityPanel
-													setShowCreatePanel={setShowCreatePanel}
-													isEdit={isEdit}
-													selectedIdentity={isEdit ? selectedIdentity : undefined}
-													showCreatePanel={true}
-													setValue={setValue}
-													onContinueWithIdentity={(id) => handleAssignIdentityById(id)}
-												/>
+													{/* Moving highlight box */}
+													<div
+														className="absolute z-10 pointer-events-none"
+														style={{
+															left: `${highlightLeftPx}px`,
+															top: '50%',
+															transform: 'translateY(-50%)',
+															width: '186px',
+															height: '24px',
+															borderRadius: '9.8px',
+															border: '1.3px solid #000000',
+															background: '#DADAFC',
+															transition: 'left 0.25s ease-in-out',
+															boxShadow: 'none',
+														}}
+													/>
+													<TabsTrigger
+														className="relative z-20 flex-1 !h-full font-secondary !text-[14px] sm:!text-[14px] font-medium !bg-transparent !border-0 hover:!bg-transparent focus-visible:!ring-0 focus-visible:!outline-0 !outline-none !ring-0 data-[state=active]:!bg-transparent data-[state=active]:!shadow-none data-[state=active]:!border-transparent text-black"
+														style={{ boxShadow: 'none' }}
+														value="create"
+													>
+														Create New Profile
+													</TabsTrigger>
+													<TabsTrigger
+														className="relative z-20 flex-1 !h-full font-secondary !text-[14px] sm:!text-[14px] font-medium !bg-transparent !border-0 hover:!bg-transparent focus-visible:!ring-0 focus-visible:!outline-0 !outline-none !ring-0 data-[state=active]:!bg-transparent data-[state=active]:!shadow-none data-[state=active]:!border-transparent text-black"
+														style={{ boxShadow: 'none' }}
+														value="select"
+													>
+														Select Existing Profile
+													</TabsTrigger>
+												</TabsList>
 											</div>
-										) : (
-											/* Show grid layout when profiles exist */
-											<div className="grid grid-cols-1 w-full lg:grid-cols-[652px_650px] lg:gap-[141px] lg:w-[1444px] lg:mx-auto">
-												{/* Existing Profiles Section */}
-												<ExistingProfilesSection
-													identities={identities}
-													form={form}
-													showCreatePanel={showCreatePanel}
-													setShowCreatePanel={setShowCreatePanel}
-													handleAssignIdentity={handleAssignIdentity}
-													isPendingAssignIdentity={isPendingAssignIdentity}
-													selectedIdentity={selectedIdentity}
-												/>
 
-												{/* Create New Profile Section */}
-												<div>
-													<div className="bg-background rounded-lg transition-all">
-														<div
-															className="flex items-center gap-4 p-0 cursor-pointer mb-2"
-															onClick={() => setShowCreatePanel((prev) => !prev)}
-														>
-															<div className="flex items-center gap-2">
-																<Typography
-																	variant="h3"
-																	className="!text-[18.77px] !leading-[22.1px] font-medium text-[#000000] font-secondary"
-																>
-																	Create New Profile
-																</Typography>
-															</div>
-														</div>
-														{!showCreatePanel && (
-															<div
-																className="w-[650.5px] h-[326.75px] bg-[#F8F8F8] rounded-none flex items-center justify-center mb-2 cursor-pointer"
-																onClick={() => setShowCreatePanel(true)}
-															>
-																<button
-																	type="button"
-																	onClick={() => setShowCreatePanel(true)}
-																	aria-label="Open create profile"
-																	className="w-[28.7px] h-[28.7px] flex items-center justify-center cursor-pointer rounded-none"
-																>
-																	<PlusIcon
-																		width="28"
-																		height="28"
-																		className="text-black"
-																	/>
-																</button>
-															</div>
-														)}
-														{showCreatePanel && (
-															<div
-																onClick={(e) => e.stopPropagation()}
-																className="relative w-[651px]"
-															>
-																<button
-																	type="button"
-																	onClick={() => setShowCreatePanel(false)}
-																	aria-label="Close create profile"
-																	className="absolute -top-5 right-[8px] w-[13.05px] h-[13.05px] flex items-center justify-center rounded-none cursor-pointer bg-transparent"
-																>
-																	<CloseIcon
-																		width="13.05"
-																		height="13.05"
-																		className="text-black"
-																	/>
-																</button>
-																<div className="p-0">
-																	<CreateIdentityPanel
-																		setShowCreatePanel={setShowCreatePanel}
-																		isEdit={isEdit}
-																		selectedIdentity={
-																			isEdit ? selectedIdentity : undefined
-																		}
-																		showCreatePanel={true}
-																		setValue={setValue}
-																	/>
-																</div>
-															</div>
-														)}
-													</div>
+											<TabsContent value="select">
+												<div className="flex justify-center">
+													<ExistingProfilesSection
+														identities={identities || []}
+														form={form}
+														showCreatePanel={false}
+														setShowCreatePanel={setShowCreatePanel}
+														handleAssignIdentity={handleAssignIdentity}
+														isPendingAssignIdentity={isPendingAssignIdentity}
+														selectedIdentity={selectedIdentity}
+													/>
 												</div>
-											</div>
-										)}
+											</TabsContent>
+
+											<TabsContent value="create">
+												<div className="flex justify-center">
+													<CreateIdentityPanel
+														setShowCreatePanel={setShowCreatePanel}
+														isEdit={isEdit}
+														selectedIdentity={isEdit ? selectedIdentity : undefined}
+														showCreatePanel={true}
+														setValue={setValue}
+														onContinueWithIdentity={(id) => handleAssignIdentityById(id)}
+													/>
+												</div>
+											</TabsContent>
+										</Tabs>
 									</div>
 								)}
 							</div>

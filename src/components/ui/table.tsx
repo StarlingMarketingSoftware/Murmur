@@ -130,7 +130,7 @@ const tableRowVariants = cva(
 		variants: {
 			variant: {
 				primary:
-					'text-[15px] odd:bg-gray-50 even:bg-background border-black data-[state=selected]:!bg-primary/30 data-[state=selected]:shadow-inner data-[state=selected]:font-medium data-[state=selected]:scale-[1.005]',
+					'text-[15px] odd:bg-gray-50 even:bg-background border-black data-[state=selected]:shadow-inner data-[state=selected]:font-medium',
 				secondary: 'text-[15px] font-secondary bg-background border-gray-200 py-2',
 			},
 		},

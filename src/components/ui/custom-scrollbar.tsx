@@ -14,6 +14,8 @@ interface CustomScrollbarProps {
 	contentClassName?: string;
 	/** When true, show a full-height thumb even if there is no overflow. */
 	alwaysShow?: boolean;
+	/** When true, do not apply the Tailwind overflow-y-auto class to the inner container. */
+	disableOverflowClass?: boolean;
 }
 
 export function CustomScrollbar({
@@ -26,6 +28,7 @@ export function CustomScrollbar({
 	offsetRight = -4,
 	contentClassName,
 	alwaysShow = false,
+	disableOverflowClass = false,
 }: CustomScrollbarProps) {
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const scrollThumbRef = useRef<HTMLDivElement>(null);
@@ -178,7 +181,11 @@ export function CustomScrollbar({
 			{/* Scrollable content container */}
 			<div
 				ref={scrollContainerRef}
-				className={cn('h-full overflow-y-auto scrollbar-hide', contentClassName)}
+				className={cn(
+					'h-full scrollbar-hide',
+					!disableOverflowClass && 'overflow-y-auto',
+					contentClassName
+				)}
 				style={
 					{
 						// Hide native scrollbar
@@ -186,6 +193,7 @@ export function CustomScrollbar({
 						msOverflowStyle: 'none',
 						// Allow side content to render outside horizontally (e.g., external buttons)
 						overflowX: 'visible',
+						overflowY: 'auto',
 					} as React.CSSProperties
 				}
 			>
