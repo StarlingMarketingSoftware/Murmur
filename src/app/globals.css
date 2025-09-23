@@ -671,7 +671,7 @@ body {
 	position: absolute;
 	top: 50%;
 	left: 1rem; /* match input padding-left */
-	right: 1rem; /* match input padding-right */
+	right: 1rem; /* desktop default; mobile overridden below */
 	transform: translateY(-50%);
 	display: inline-flex;
 	align-items: baseline;
@@ -3478,6 +3478,14 @@ body.murmur-mobile .search-bar-wrapper {
 	.search-bar-wrapper {
 		margin-top: 60px;
 	}
+	/* Make room for the right icon in the initial input */
+	.search-wave-input:not(.results-search-input) {
+		padding-right: 44px !important;
+	}
+	/* Prevent placeholder text from overlapping the icon */
+	.search-input-group .custom-placeholder {
+		right: 44px !important;
+	}
 }
 
 /* Real mobile only: shrink the 'Exclude Used Contacts' toggle footprint */
@@ -3629,5 +3637,42 @@ body.murmur-mobile .search-bar-wrapper .flex-wrap > .h-\[39px\] {
 	.search-bar-wrapper [data-slot='form-item'] + .flex-wrap {
 		margin-top: 3px !important;
 		padding-top: 0 !important;
+	}
+}
+
+/* Mobile-only button inside the initial search input */
+.search-input-icon-btn {
+	display: none;
+}
+
+body.murmur-mobile .search-input-icon-btn {
+	display: inline-flex;
+	position: absolute;
+	right: 12px;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 22px;
+	height: 22px;
+	align-items: center;
+	justify-content: center;
+	background: transparent;
+	border: none;
+	padding: 0;
+	margin: 0;
+	z-index: 4; /* above gradient overlay */
+	cursor: pointer;
+}
+
+/* Width-based fallback so it appears in responsive mode too */
+@media (max-width: 640px) {
+	.search-input-icon-btn {
+		display: inline-flex;
+		position: absolute;
+		right: 12px;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 22px;
+		height: 22px;
+		z-index: 4;
 	}
 }
