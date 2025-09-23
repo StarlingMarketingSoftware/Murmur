@@ -203,13 +203,31 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 													handleVerifyCode(value);
 												}}
 											>
-												<InputOTPGroup>
-													<InputOTPSlot index={0} />
-													<InputOTPSlot index={1} />
-													<InputOTPSlot index={2} />
-													<InputOTPSlot index={3} />
-													<InputOTPSlot index={4} />
-													<InputOTPSlot index={5} />
+												<InputOTPGroup className="gap-1.5">
+													<InputOTPSlot
+														index={0}
+														className="!w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
+													/>
+													<InputOTPSlot
+														index={1}
+														className="!w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
+													/>
+													<InputOTPSlot
+														index={2}
+														className="!w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
+													/>
+													<InputOTPSlot
+														index={3}
+														className="!w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
+													/>
+													<InputOTPSlot
+														index={4}
+														className="!w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
+													/>
+													<InputOTPSlot
+														index={5}
+														className="!w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
+													/>
 												</InputOTPGroup>
 											</InputOTP>
 										</FormControl>
