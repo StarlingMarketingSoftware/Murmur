@@ -403,43 +403,45 @@ const Dashboard = () => {
 															/>
 														</div>
 													</div>
-													<div className="flex items-center justify-end flex-shrink-0 ml-auto">
-														{isFreeTrial ? (
-															<UpgradeSubscriptionDrawer
-																message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
-																triggerButtonText="Import"
-																buttonVariant="light"
-																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-															/>
-														) : (
-															<ContactTSVUploadDialog
-																isAdmin={false}
-																triggerText="Import"
-																buttonVariant="light"
-																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-																fullScreen
-															/>
-														)}
-														<div className="w-[19px]"></div>
-														{!canSearch ? (
-															<UpgradeSubscriptionDrawer
-																message="Searching for contacts requires an active subscription or free trial. Please upgrade your plan to proceed."
-																triggerButtonText="Generate"
-																buttonVariant="primary-light"
-																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
-															/>
-														) : (
-															<Button
-																variant="primary-light"
-																type="submit"
-																bold
-																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
-																isLoading={isLoadingContacts || isRefetchingContacts}
-															>
-																Generate
-															</Button>
-														)}
-													</div>
+													{!isMobile && (
+														<div className="flex items-center justify-end flex-shrink-0 ml-auto">
+															{isFreeTrial ? (
+																<UpgradeSubscriptionDrawer
+																	message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
+																	triggerButtonText="Import"
+																	buttonVariant="light"
+																	className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
+																/>
+															) : (
+																<ContactTSVUploadDialog
+																	isAdmin={false}
+																	triggerText="Import"
+																	buttonVariant="light"
+																	className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
+																	fullScreen
+																/>
+															)}
+															<div className="w-[19px]"></div>
+															{!canSearch ? (
+																<UpgradeSubscriptionDrawer
+																	message="Searching for contacts requires an active subscription or free trial. Please upgrade your plan to proceed."
+																	triggerButtonText="Generate"
+																	buttonVariant="primary-light"
+																	className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
+																/>
+															) : (
+																<Button
+																	variant="primary-light"
+																	type="submit"
+																	bold
+																	className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
+																	isLoading={isLoadingContacts || isRefetchingContacts}
+																>
+																	Generate
+																</Button>
+															)}
+														</div>
+													)}
 												</div>
 											)}
 										</form>
