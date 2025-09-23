@@ -234,7 +234,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 											</InputOTP>
 										</FormControl>
 										{countdownSeconds !== null && !isCodeVerified && (
-											<div className="mt-2 flex flex-col items-center">
+											<div className="mt-5 flex flex-col items-center">
 												{/* Red base bar with gray overlay that grows from right to left */}
 												<div className="relative w-[199px] h-[6px] bg-[#8F0A0A] rounded-full overflow-hidden">
 													<div
