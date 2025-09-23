@@ -184,11 +184,14 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 							control={form.control}
 							name="verificationCode"
 							render={({ field }) => (
-								<FormItem className="mt-1 mb-0">
+								<FormItem className="mt-1 mb-4">
 									<FormLabel className="font-secondary text-[14px]">
 										Verification Code
 									</FormLabel>
-									<div className="box-border w-[650px] h-[120px] rounded-[8px] flex flex-col items-center justify-center overflow-hidden">
+									<div
+										className="box-border w-[651px] h-[120px] rounded-[8px] border-[2px] border-[#000000] flex flex-col items-center justify-center"
+										style={{ borderStyle: 'solid' }}
+									>
 										<FormControl>
 											<InputOTP
 												maxLength={6}
