@@ -26,11 +26,14 @@ import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUp
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { useClerk } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { MobileAppComingSoon } from '@/components/molecules/MobileAppComingSoon/MobileAppComingSoon';
 
 const Dashboard = () => {
 	const { isSignedIn, openSignIn } = useClerk();
 	const isMobile = useIsMobile();
+	// Mobile-friendly sizing for hero logo and subtitle; desktop remains unchanged
+	const logoWidth = isMobile ? '190px' : '300px';
+	const logoHeight = isMobile ? '50px' : '79px';
+	const subtitleFontSize = isMobile ? '11px' : '15px';
 	const hasProblematicBrowser = isProblematicBrowser();
 	const searchContainerRef = useRef<HTMLDivElement>(null);
 	const {
@@ -135,10 +138,6 @@ const Dashboard = () => {
 		return null;
 	}
 
-	if (isMobile) {
-		return <MobileAppComingSoon />;
-	}
-
 	return (
 		<AppLayout>
 			<div
@@ -150,19 +149,19 @@ const Dashboard = () => {
 					<div className="w-full">
 						<div
 							className="flex justify-center items-center w-full px-4"
-							style={{ marginBottom: '0.75rem' }}
+							style={{ marginBottom: '0.75rem', marginTop: isMobile ? '10px' : '0' }}
 						>
 							<div className="premium-hero-section flex flex-col items-center justify-center w-full max-w-[600px]">
 								<div
 									className="premium-logo-container flex items-center justify-center"
-									style={{ width: '300px', height: '79px' }}
+									style={{ width: logoWidth, height: logoHeight }}
 								>
-									<MurmurLogoNew width="300px" height="79px" />
+									<MurmurLogoNew width={logoWidth} height={logoHeight} />
 								</div>
 								<Typography
 									font="secondary"
 									className="mt-3 text-center premium-subtitle-gradient w-full"
-									style={{ fontSize: '15px', lineHeight: '1.3' }}
+									style={{ fontSize: subtitleFontSize, lineHeight: '1.3' }}
 									color="light"
 								>
 									Let&apos;s <strong style={{ color: '#248531' }}>start</strong> by
