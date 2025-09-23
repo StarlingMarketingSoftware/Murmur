@@ -1,6 +1,6 @@
 'use client';
 
-import { FC } from 'react';
+import { FC, useMemo } from 'react';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
 import { cn } from '@/utils';
@@ -13,6 +13,7 @@ import {
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
+import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 
 export interface SentExpandedListProps {
 	sent: EmailWithRelations[];
@@ -41,6 +42,11 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 	contacts,
 	onHeaderClick,
 }) => {
+	const { data: usedContactIds } = useGetUsedContactIds();
+	const usedContactIdsSet = useMemo(
+		() => new Set(usedContactIds || []),
+		[usedContactIds]
+	);
 	return (
 		<div
 			className="w-[376px] h-[426px] rounded-md border-2 border-black/30 bg-[#CFEBCF] px-2 pb-2 flex flex-col"
@@ -170,7 +176,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 								</div>
 
 								{/* Content grid */}
-								<div className="grid grid-cols-1 grid-rows-4 h-full pr-[120px]">
+								<div className="grid grid-cols-1 grid-rows-4 h-full pr-[120px] pl-[22px]">
 									{/* Row 1: Name */}
 									<div className="row-start-1 col-start-1 flex items-center">
 										<div className="font-bold text-[11px] truncate leading-none">
@@ -189,6 +195,23 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 												<div className="text-[11px] text-black truncate leading-none">
 													{hasSeparateName ? contact?.company || '' : ''}
 												</div>
+
+												{/* Used-contact indicator - vertically centered */}
+												{usedContactIdsSet.has(email.contactId) && (
+													<span
+														className="absolute left-[8px]"
+														title="Used in a previous campaign"
+														style={{
+															top: '50%',
+															transform: 'translateY(-50%)',
+															width: '16px',
+															height: '16px',
+															borderRadius: '50%',
+															border: '1px solid #000000',
+															backgroundColor: '#DAE6FE',
+														}}
+													/>
+												)}
 											</div>
 										);
 									})()}
