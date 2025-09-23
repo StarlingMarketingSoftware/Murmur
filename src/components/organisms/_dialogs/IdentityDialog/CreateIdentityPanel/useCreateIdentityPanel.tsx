@@ -41,6 +41,8 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 		onContinueWithIdentity,
 	} = props;
 
+	// Total countdown time (10 minutes)
+	const COUNTDOWN_TOTAL = 600;
 	const [countdown, setCountdown] = useState<number | null>(null);
 	const [isCodeVerified, setIsCodeVerified] = useState(false);
 	const countdownInterval = useRef<NodeJS.Timeout | null>(null);
@@ -115,6 +117,8 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 	};
 
 	const countdownDisplay = countdown !== null ? formatCountdown(countdown) : null;
+	const minutesRemaining =
+		countdown !== null ? Math.max(0, Math.floor(countdown / 60)) : null;
 
 	const handleSendEmailVerificationCode = () => {
 		if (!isCodeVerified) {
@@ -181,7 +185,7 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 	// Start countdown when email verification code is sent
 	useEffect(() => {
 		if (isEmailVerificationCodeSent && !isCodeVerified) {
-			setCountdown(600);
+			setCountdown(COUNTDOWN_TOTAL);
 
 			countdownInterval.current = setInterval(() => {
 				setCountdown((prev) => {
@@ -247,6 +251,9 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 		isPendingVerifyCode,
 		isCodeVerified,
 		countdownDisplay,
+		countdownSeconds: countdown,
+		countdownTotal: COUNTDOWN_TOTAL,
+		minutesRemaining,
 		isCodeExpired,
 		isEdit,
 		isPendingSubmit,

@@ -61,7 +61,9 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 		handleVerifyCode,
 		isPendingVerifyCode,
 		isCodeVerified,
-		countdownDisplay,
+		countdownSeconds,
+		countdownTotal,
+		minutesRemaining,
 		isCodeExpired,
 		isPendingSubmit,
 	} = useCreateIdentityPanel(props);
@@ -132,7 +134,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 													)}
 												</div>
 												<Button
-													className="whitespace-nowrap w-[100.24px] h-[44.06px] rounded-[7.28px] border-[0.91px] border-[#000000] !bg-[rgba(93,171,104,0.47)] text-black flex items-center justify-center font-secondary"
+													className="whitespace-nowrap w-[100.24px] h-[44.06px] rounded-[7.28px] border-[0.91px] border-[#000000] !bg-[rgba(93,171,104,0.47)] text-black flex items-center justify-center font-secondary focus-visible:!ring-0 focus:!ring-0 !ring-0 focus-visible:!ring-transparent !ring-transparent focus-visible:!outline-none focus:!outline-none !outline-none focus-visible:!border-[#000000] focus:!border-[#000000] !shadow-none focus:!shadow-none active:!shadow-none"
 													variant={isCodeVerified ? 'light' : 'light'}
 													type="button"
 													onClick={(e) => {
@@ -206,42 +208,58 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 												<InputOTPGroup className="gap-1.5">
 													<InputOTPSlot
 														index={0}
-														className="!w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
+														className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
 													/>
 													<InputOTPSlot
 														index={1}
-														className="!w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
+														className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
 													/>
 													<InputOTPSlot
 														index={2}
-														className="!w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
+														className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
 													/>
 													<InputOTPSlot
 														index={3}
-														className="!w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
+														className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
 													/>
 													<InputOTPSlot
 														index={4}
-														className="!w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
+														className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
 													/>
 													<InputOTPSlot
 														index={5}
-														className="!w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
+														className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
 													/>
 												</InputOTPGroup>
 											</InputOTP>
 										</FormControl>
-										{countdownDisplay && !isCodeVerified && (
-											<Typography
-												font="secondary"
-												className={`text-xs mt-2 ${
-													isCodeExpired ? 'text-destructive' : 'text-muted-foreground'
-												}`}
-											>
-												{isCodeExpired
-													? 'Code has expired. Please request a new code.'
-													: `Code expires in: ${countdownDisplay}`}
-											</Typography>
+										{countdownSeconds !== null && !isCodeVerified && (
+											<div className="mt-2 flex flex-col items-center">
+												{/* Red base bar with gray overlay that grows from right to left */}
+												<div className="relative w-[199px] h-[6px] bg-[#8F0A0A] rounded-full overflow-hidden">
+													<div
+														className="absolute right-0 top-0 h-full bg-[#EDD8D8]"
+														style={{
+															width: `${Math.max(
+																0,
+																Math.min(
+																	100,
+																	((countdownTotal - countdownSeconds) / countdownTotal) *
+																		100
+																)
+															)}%`,
+															transition: 'width 1s linear',
+														}}
+													/>
+												</div>
+												<Typography
+													font="secondary"
+													className="mt-1 text-black"
+													style={{ fontSize: '16.12px', fontWeight: 400 }}
+												>
+													{minutesRemaining ?? 0}m
+												</Typography>
+											</div>
 										)}
 									</div>
 									<FormMessage />
