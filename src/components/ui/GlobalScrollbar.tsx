@@ -10,6 +10,7 @@ export function GlobalScrollbar() {
 	const [dragStartY, setDragStartY] = useState(0);
 	const [scrollStartY, setScrollStartY] = useState(0);
 	const [isVisible, setIsVisible] = useState(true);
+	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const visibilityTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
 		undefined
 	);
@@ -67,6 +68,27 @@ export function GlobalScrollbar() {
 			}, 1000);
 		});
 	}, [updateScrollbar]);
+
+	// Detect when any app dialog is open (e.g. IdentityDialog) and hide the global scrollbar
+	useEffect(() => {
+		const checkDialogOpen = () => {
+			try {
+				const el = document.querySelector(
+					'[data-slot="dialog-content"][data-state="open"]'
+				);
+				setIsDialogOpen(!!el);
+			} catch {
+				setIsDialogOpen(false);
+			}
+		};
+
+		checkDialogOpen();
+		const observer = new MutationObserver(() => {
+			checkDialogOpen();
+		});
+		observer.observe(document.body, { childList: true, subtree: true });
+		return () => observer.disconnect();
+	}, []);
 
 	const handleMouseDown = useCallback((e: React.MouseEvent) => {
 		e.preventDefault();
@@ -171,6 +193,11 @@ export function GlobalScrollbar() {
 	useEffect(() => {
 		updateScrollbar();
 	}, [updateScrollbar]);
+
+	// Do not render the global scrollbar while a dialog is open
+	if (isDialogOpen) {
+		return null;
+	}
 
 	return (
 		<div

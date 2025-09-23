@@ -3105,6 +3105,82 @@ body,
 	-ms-overflow-style: none !important;
 }
 
+/* Dialog-specific scrollbar hide */
+[data-slot='dialog-content']::-webkit-scrollbar,
+[data-slot='dialog-content'] *::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+[data-slot='dialog-content'],
+[data-slot='dialog-content'] * {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+/* Explicitly hide native scrollbar within IdentityDialog scroll container */
+[data-slot='dialog-content'] .scrollbar-hide,
+[data-slot='dialog-content'] .scrollbar-hide * {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+[data-slot='dialog-content'] .scrollbar-hide::-webkit-scrollbar,
+[data-slot='dialog-content'] .scrollbar-hide *::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+/* Identity Dialog specific scrollbar hiding */
+.identity-dialog-scroll-container {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+.identity-dialog-scroll-container::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+	background: transparent !important;
+}
+
+.identity-dialog-scroll-container::-webkit-scrollbar-track {
+	display: none !important;
+	background: transparent !important;
+}
+
+.identity-dialog-scroll-container::-webkit-scrollbar-thumb {
+	display: none !important;
+	background: transparent !important;
+}
+
+/* Force hide scrollbar for all child elements */
+.identity-dialog-scroll-container *::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+/* Additional rules for open dialog state */
+[data-slot='dialog-content'][data-state='open'] .identity-dialog-scroll-container {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+	overflow: -moz-scrollbars-none !important;
+}
+
+[data-slot='dialog-content'][data-state='open']
+	.identity-dialog-scroll-container::-webkit-scrollbar,
+[data-slot='dialog-content'][data-state='open']
+	.identity-dialog-scroll-container::-webkit-scrollbar-track,
+[data-slot='dialog-content'][data-state='open']
+	.identity-dialog-scroll-container::-webkit-scrollbar-thumb {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+	visibility: hidden !important;
+}
+
 /* -------------------------------------- */
 
 /* --- Search Results Table Custom Scrollbar --- */

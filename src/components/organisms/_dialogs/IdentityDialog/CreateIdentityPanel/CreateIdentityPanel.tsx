@@ -184,47 +184,49 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 							control={form.control}
 							name="verificationCode"
 							render={({ field }) => (
-								<FormItem className="mt-3">
+								<FormItem className="mt-1 mb-0">
 									<FormLabel className="font-secondary text-[14px]">
 										Verification Code
 									</FormLabel>
-									<FormControl>
-										<InputOTP
-											maxLength={6}
-											pattern="[0-9]*"
-											{...field}
-											disabled={isCodeExpired}
-											onChange={(value) => {
-												field.onChange(value);
-												handleVerifyCode(value);
-											}}
-										>
-											<InputOTPGroup>
-												<InputOTPSlot index={0} />
-												<InputOTPSlot index={1} />
-												<InputOTPSlot index={2} />
-												<InputOTPSlot index={3} />
-												<InputOTPSlot index={4} />
-												<InputOTPSlot index={5} />
-											</InputOTPGroup>
-										</InputOTP>
-									</FormControl>
+									<div className="box-border w-[650px] h-[120px] rounded-[8px] flex flex-col items-center justify-center overflow-hidden">
+										<FormControl>
+											<InputOTP
+												maxLength={6}
+												pattern="[0-9]*"
+												{...field}
+												disabled={isCodeExpired}
+												onChange={(value) => {
+													field.onChange(value);
+													handleVerifyCode(value);
+												}}
+											>
+												<InputOTPGroup>
+													<InputOTPSlot index={0} />
+													<InputOTPSlot index={1} />
+													<InputOTPSlot index={2} />
+													<InputOTPSlot index={3} />
+													<InputOTPSlot index={4} />
+													<InputOTPSlot index={5} />
+												</InputOTPGroup>
+											</InputOTP>
+										</FormControl>
+										{countdownDisplay && !isCodeVerified && (
+											<Typography
+												font="secondary"
+												className={`text-xs mt-2 ${
+													isCodeExpired ? 'text-destructive' : 'text-muted-foreground'
+												}`}
+											>
+												{isCodeExpired
+													? 'Code has expired. Please request a new code.'
+													: `Code expires in: ${countdownDisplay}`}
+											</Typography>
+										)}
+									</div>
 									<FormMessage />
 								</FormItem>
 							)}
 						/>
-					)}
-					{countdownDisplay && !isCodeVerified && (
-						<Typography
-							font="secondary"
-							className={`text-xs mt-2 ${
-								isCodeExpired ? 'text-destructive' : 'text-muted-foreground'
-							}`}
-						>
-							{isCodeExpired
-								? 'Code has expired. Please request a new code.'
-								: `Code expires in: ${countdownDisplay}`}
-						</Typography>
 					)}
 				</div>
 			</form>

@@ -77,10 +77,11 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 		>
 			{triggerButton && <DialogTrigger asChild>{triggerButton}</DialogTrigger>}
 			<DialogContent
+				fullScreen
 				disableEscapeKeyDown
 				disableOutsideClick
 				onOpenAutoFocus={(e) => e.preventDefault()}
-				className="!fixed !inset-0 !translate-x-0 !translate-y-0 !top-0 !left-0 !max-w-none !max-h-screen !h-screen !w-full !rounded-none !border-0 !p-0 !overflow-hidden data-[state=open]:!animate-none data-[state=closed]:!animate-none"
+				className="!fixed !inset-0 !translate-x-0 !translate-y-0 !top-0 !left-0 !max-w-none !max-h-screen !h-screen !w-full !rounded-none !border-0 !p-0 !overflow-hidden !z-[100000] data-[state=open]:!animate-none data-[state=closed]:!animate-none scrollbar-hide"
 				hideCloseButton={true}
 			>
 				<DialogTitle />
@@ -98,6 +99,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 							? 'dialog-smooth-in 0.3s ease-out forwards'
 							: 'none',
 						opacity: isContentReady ? 1 : 0,
+						paddingBottom: 0,
 					}}
 				>
 					{/* Full screen header with back button - fixed position */}
@@ -154,8 +156,15 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 					</div>
 
 					{/* Main content area - scrollable */}
-					<div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-gray-50/30">
-						<div className="flex justify-center py-6">
+					<div
+						className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-gray-50/30 scrollbar-hide identity-dialog-scroll-container"
+						style={{
+							scrollbarWidth: 'none',
+							msOverflowStyle: 'none',
+							WebkitOverflowScrolling: 'touch',
+						}}
+					>
+						<div className="flex justify-center pt-6">
 							<div className="w-full max-w-[1444px] px-0 mx-auto">
 								{isPendingIdentities ? (
 									<div className="h-full flex items-center justify-center" />
