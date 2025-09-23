@@ -69,8 +69,10 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 														<TableCell className="p-0">
 															<div
 																className={cn(
-																	'box-border mx-auto w-[636px] min-w-[636px] max-w-[636px] h-[91px] min-h-[91px] max-h-[91px] shrink-0 rounded-[8px] border-[2px] border-[#000000] flex flex-col justify-center gap-0 px-4',
-																	isSelected ? 'bg-[#A6CFB0]' : 'bg-white'
+																	'box-border mx-auto w-[636px] min-w-[636px] max-w-[636px] h-[91px] min-h-[91px] max-h-[91px] shrink-0 rounded-[8px] border-[2px] border-[#000000] flex flex-col justify-center gap-0 px-4 transition-colors cursor-pointer',
+																	isSelected
+																		? 'bg-[#A6CFB0] hover:bg-[#94BF9E]'
+																		: 'bg-white hover:bg-[#F5F5F5]'
 																)}
 															>
 																<div
@@ -117,7 +119,7 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 					<Button
 						onClick={handleAssignIdentity}
 						isLoading={isPendingAssignIdentity}
-						className="relative -top-[16px] z-10 w-[652.4px] h-[43.05px] rounded-[8.83px] border-[2px] text-white font-bold text-[18.77px]"
+						className="relative -top-[16px] z-10 w-[652.4px] h-[43.05px] rounded-[8.83px] border-[2px] text-white font-bold text-[18.77px] transition-colors hover:!bg-[#4C9E5C] active:!bg-[#428A51]"
 						style={{
 							backgroundColor: '#5DAB68',
 							borderColor: '#050505',
