@@ -45,7 +45,7 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 							>
 								<CustomScrollbar
 									className="w-full h-full"
-									contentClassName="scrollbar-hide"
+									contentClassName="scrollbar-hide pb-[24px]"
 									disableOverflowClass
 									thumbWidth={2}
 									thumbColor="#000000"
@@ -113,14 +113,18 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 				/>
 			</Form>
 			{!showCreatePanel && (
-				<div className="mt-[17px]">
+				<div className="-mt-[36px]">
 					<Button
 						onClick={handleAssignIdentity}
 						isLoading={isPendingAssignIdentity}
-						className="w-[652.4px] h-[43.05px] rounded-[8.83px] border-[1.1px] text-black"
+						className="relative -top-[16px] z-10 w-[652.4px] h-[43.05px] rounded-[8.83px] border-[2px] text-white font-bold text-[18.77px]"
 						style={{
-							backgroundColor: 'rgba(93,171,104,0.49)',
-							borderColor: '#5DAB68',
+							backgroundColor: '#5DAB68',
+							borderColor: '#050505',
+							color: '#FFFFFF',
+							fontWeight: 700,
+							fontSize: '18.77px',
+							fontFamily: 'Times New Roman, Times, serif',
 						}}
 						disabled={!selectedIdentity}
 					>
