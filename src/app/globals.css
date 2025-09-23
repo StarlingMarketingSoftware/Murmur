@@ -1,3 +1,8 @@
+/* The globals.css file is used to define variables used across the application, as well as animations. 
+* It should not contain any styles that are specific to a component or page.
+* Do not create any custom classes or media queries here.
+*/
+
 @import 'tailwindcss';
 @plugin "tailwindcss-animate";
 
@@ -19,6 +24,8 @@
 	--color-secondary-foreground: var(--secondary-foreground);
 	--color-secondary: var(--secondary);
 
+	--color-tertiary: var(--tertiary);
+
 	--color-secondary-light: var(--secondary-light);
 	--color-secondary-light-foreground: var(--secondary-light-foreground);
 
@@ -39,6 +46,7 @@
 	--color-input: var(--input);
 	--color-border: var(--border);
 	--color-destructive: var(--destructive);
+	--color-destructive-dark: var(--destructive-dark);
 	--color-warning: var(--warning);
 	--color-success: var(--success);
 	--color-dark: var(--dark);
@@ -66,20 +74,22 @@
 
 	--font-primary: var(--font-times);
 	--font-secondary: var(--font-inter);
-	--font-tertiary: var(--font-zen-antique);
+	--font-zen: var(--font-zen-antique);
 }
 
 :root {
 	--radius: 0.625rem;
-	--foreground: rgb(48, 50, 64); /* oklch(0.25 0.03 270) */
-	--background: rgb(250, 250, 251); /* oklch(0.98 0.005 270) */
+	--foreground: rgb(37, 37, 38); /* oklch(0.147 0.004 49.25) */
+	--background: rgb(255, 255, 255); /* oklch(1 0 0) */
 	--card: rgb(255, 255, 255); /* oklch(1 0 0) */
 	--card-foreground: rgb(37, 37, 37); /* oklch(0.145 0 0) */
 	--popover: rgb(255, 255, 255); /* oklch(1 0 0) */
 	--popover-foreground: rgb(37, 37, 37); /* oklch(0.145 0 0) */
 	--primary: rgb(93, 192, 104); /* oklch(0.6795 0.1263 147.14) */
+	--primary-dark: rgb(78, 153, 83);
 	--primary-foreground: rgb(255, 255, 255); /* oklch(1 0 147.14) */
 	--secondary: rgb(134, 134, 229); /* oklch(0.6231 0.188 259.81) */
+	--tertiary: rgb(81, 162, 228);
 	--secondary-foreground: rgb(255, 255, 255); /* oklch(1 0 0) */
 	--secondary-light: rgb(178, 187, 243); /* oklch(0.7906 0.1089 252.45) */
 	--secondary-light-foreground: rgb(0, 0, 0); /* oklch(0 0 0) */
@@ -89,7 +99,8 @@
 	--muted: rgb(82, 82, 82); /* oklch(0.3211 0 0) */
 	--accent: rgb(235, 235, 233); /* oklch(0.923 0.003 48.717) */
 	--accent-foreground: rgb(52, 52, 52); /* oklch(0.205 0 0) */
-	--destructive: rgb(223, 62, 62); /* oklch(59.157% 0.24065 26.32) */
+	--destructive: rgb(220, 38, 38); /* oklch(59.157% 0.24065 26.32) */
+	--destructive-dark: rgb(185, 28, 28);
 	--warning: rgb(228, 177, 0); /* oklch(0.77 0.16 70) */
 	--success: rgb(60, 136, 60); /* oklch(0.4953 0.1037 140.3) */
 	--navy: rgb(95, 83, 182); /* oklch(0.4865 0.17 266.18) */
@@ -108,10 +119,13 @@
 	--sidebar-primary-foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
 	--sidebar-accent: rgb(247, 247, 247); /* oklch(0.97 0 0) */
 	--sidebar-accent-foreground: rgb(52, 52, 52); /* oklch(0.205 0 0) */
-	--sidebar-border: rgb(235, 235, 235); /* oklch(0.922 0 0) */
-	--sidebar-ring: rgb(180, 180, 180); /* oklch(0.708 0 0) */
+	--sidebar-border: rgba(255, 255, 255, 0.1); /* oklch(1 0 0 / 10%) */
+	--sidebar-ring: rgb(142, 142, 142); /* oklch(0.556 0 0) */
 	--background: rgb(255, 255, 255); /* oklch(1 0 0) */
 	--foreground: rgb(37, 37, 38); /* oklch(0.147 0.004 49.25) */
+
+	--tw-scrollbar-track: #f3f4f6; /* gray-100 */
+	--tw-scrollbar-thumb: #d1d5db; /* gray-300 */
 }
 
 .dark {
@@ -130,6 +144,7 @@
 	--accent: rgb(69, 69, 69); /* oklch(0.269 0 0) */
 	--accent-foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
 	--destructive: rgb(239, 68, 68); /* oklch(0.704 0.191 22.216) */
+	--destructive-dark: rgb(162, 0, 0);
 	--border: rgba(255, 255, 255, 0.1); /* oklch(1 0 0 / 10%) */
 	--input: rgba(255, 255, 255, 0.15); /* oklch(1 0 0 / 15%) */
 	--ring: rgb(142, 142, 142); /* oklch(0.556 0 0) */
@@ -146,6 +161,59 @@
 	--sidebar-accent-foreground: rgb(251, 251, 251); /* oklch(0.985 0 0) */
 	--sidebar-border: rgba(255, 255, 255, 0.1); /* oklch(1 0 0 / 10%) */
 	--sidebar-ring: rgb(142, 142, 142); /* oklch(0.556 0 0) */
+
+	--tw-scrollbar-track: #404040; /* neutral-700 */
+	--tw-scrollbar-thumb: #737373; /* neutral-500 */
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+	body {
+		@apply bg-background text-foreground;
+		overflow-x: hidden;
+		position: relative;
+	}
+}
+
+/* CUSTOM SCROLLBAR SYSTEM - Hide ALL native scrollbars globally */
+/* Maximum specificity to override all other rules */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+div::-webkit-scrollbar,
+*::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+/* Firefox and IE/Edge */
+html {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+body {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+* {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+/* Hide scrollbar for custom scrollbar component */
+.scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+.scrollbar-hide {
+	-ms-overflow-style: none !important; /* IE and Edge */
+	scrollbar-width: none !important; /* Firefox */
 }
 
 @keyframes scroll {
@@ -189,6 +257,8 @@
 	}
 }
 
+/* Scrolling reviews */
+
 .animate-scroll {
 	-webkit-animation: scroll 50s linear infinite;
 	animation: scroll 50s linear infinite;
@@ -196,6 +266,34 @@
 
 /* Safari-specific fixes */
 @supports (-webkit-appearance: none) {
+	/* Fix for RichTextEditor paragraph spacing in Safari */
+	.ProseMirror p {
+		margin-bottom: 1rem;
+		-webkit-margin-after: 1rem;
+	}
+
+	.ProseMirror p:last-of-type,
+	.ProseMirror p:last-child {
+		margin-bottom: 0;
+		-webkit-margin-after: 0;
+	}
+
+	.ProseMirror .br-spacing {
+		display: block;
+		height: 1rem;
+		content: '';
+	}
+
+	.ProseMirror div[style*='margin-top'] {
+		-webkit-margin-before: 1.5rem;
+	}
+
+	/* Fix for button appearance in Safari */
+	button {
+		-webkit-appearance: none;
+		appearance: none;
+	}
+
 	/* Fix for aspect-ratio in Safari < 15 */
 	.aspect-video {
 		padding-bottom: 56.25%; /* 16:9 aspect ratio fallback */
@@ -284,16 +382,6 @@
 	}
 }
 
-.animate-fade-in {
-	-webkit-animation: fade-in 0.6s ease-out forwards;
-	animation: fade-in 0.6s ease-out forwards;
-}
-
-.animate-pulse-once {
-	-webkit-animation: pulse-once 0.4s ease-out;
-	animation: pulse-once 0.4s ease-out;
-}
-
 /* Console loader animations */
 
 @keyframes blink {
@@ -343,34 +431,6 @@
 	}
 }
 
-/* Simple dialog fade animations */
-@keyframes dialog-fade-in {
-	0% {
-		opacity: 0;
-	}
-	100% {
-		opacity: 1;
-	}
-}
-
-@keyframes dialog-fade-out {
-	0% {
-		opacity: 1;
-	}
-	100% {
-		opacity: 0;
-	}
-}
-
-/* Dialog smooth fade class */
-.dialog-smooth-fade {
-	animation: dialog-fade-in 0.4s ease-out;
-}
-
-.dialog-smooth-fade[data-state='closed'] {
-	animation: dialog-fade-out 0.3s ease-in;
-}
-
 /* Smooth dialog entrance animation */
 
 @keyframes dialog-smooth-in {
@@ -382,130 +442,6 @@
 		opacity: 1;
 		background-color: rgba(255, 255, 255, 1);
 	}
-}
-
-/* White overlay fade animations */
-@keyframes white-fade-out {
-	0% {
-		opacity: 1;
-	}
-	100% {
-		opacity: 0;
-	}
-}
-
-@keyframes white-fade-in {
-	0% {
-		opacity: 0;
-	}
-	100% {
-		opacity: 1;
-	}
-}
-
-.animate-white-fade-out {
-	animation: white-fade-out 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-	animation-delay: 0.1s;
-}
-
-.animate-white-fade-in {
-	animation: white-fade-in 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
-}
-
-/* Gentle content fade animations */
-@keyframes gentle-fade-in {
-	0% {
-		opacity: 0;
-	}
-	100% {
-		opacity: 1;
-	}
-}
-
-@keyframes gentle-fade-out {
-	0% {
-		opacity: 1;
-	}
-	100% {
-		opacity: 0;
-	}
-}
-
-.animate-gentle-fade-in {
-	animation: gentle-fade-in 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.animate-gentle-fade-out {
-	animation: gentle-fade-out 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
-}
-
-/* Apple-style overlay animation */
-.dialog-overlay-apple {
-	background: rgba(0, 0, 0, 0.3);
-	backdrop-filter: blur(10px);
-	-webkit-backdrop-filter: blur(10px);
-}
-
-.dialog-overlay-apple[data-state='open'] {
-	animation: apple-overlay-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-.dialog-overlay-apple[data-state='closed'] {
-	animation: apple-overlay-out 0.35s cubic-bezier(0.55, 0, 1, 0.45) forwards;
-}
-
-@keyframes apple-overlay-in {
-	0% {
-		opacity: 0;
-		backdrop-filter: blur(0);
-		-webkit-backdrop-filter: blur(0);
-	}
-	100% {
-		opacity: 1;
-		backdrop-filter: blur(10px);
-		-webkit-backdrop-filter: blur(10px);
-	}
-}
-
-@keyframes apple-overlay-out {
-	0% {
-		opacity: 1;
-		backdrop-filter: blur(10px);
-		-webkit-backdrop-filter: blur(10px);
-	}
-	100% {
-		opacity: 0;
-		backdrop-filter: blur(0);
-		-webkit-backdrop-filter: blur(0);
-	}
-}
-
-@layer base {
-	* {
-		@apply border-border outline-ring/50;
-	}
-	body {
-		@apply bg-background text-foreground;
-		overflow-x: hidden;
-		position: relative;
-	}
-	h1 {
-		@apply text-2xl font-bold;
-	}
-	h2 {
-		@apply text-xl font-bold;
-	}
-	h3 {
-		@apply text-lg font-bold;
-	}
-}
-
-mux-player {
-	--seek-backward-button: none;
-	--seek-forward-button: none;
-	--cast-button: none;
-	--pip-button: none;
-	--playback-rate-button: none;
 }
 
 /* TipTap Placeholder Styles */
@@ -560,7 +496,7 @@ mux-player {
 	width: 100% !important;
 	min-width: 100% !important;
 	max-width: 100% !important;
-	background: linear-gradient(135deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.04));
+	background: #ffffff;
 	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 	box-shadow: none;
 	transform: none !important;
@@ -594,17 +530,7 @@ mux-player {
 	height: 48px;
 	padding: 0 1rem;
 	font-size: 1rem;
-	background: linear-gradient(
-		90deg,
-		rgba(249, 250, 251, 1),
-		rgba(243, 244, 246, 0.95),
-		rgba(249, 250, 251, 1),
-		rgba(243, 244, 246, 0.95)
-	);
-	background-size: 200% 100%;
-	-webkit-animation: gradient-shift 10s ease-in-out infinite;
-	animation: gradient-shift 10s ease-in-out infinite;
-	transition: all 0.3s ease;
+	background: transparent;
 	/* CLEAR BLACK BORDER - RESTING STATE */
 	border: 2px solid #000000 !important;
 	box-sizing: border-box;
@@ -621,8 +547,6 @@ mux-player {
 }
 
 .search-wave-input:hover {
-	-webkit-animation: gradient-shift 6s ease-in-out infinite;
-	animation: gradient-shift 6s ease-in-out infinite;
 	/* CLEAR BLACK BORDER - HOVER STATE */
 	border: 2px solid #000000 !important;
 	box-shadow: none !important;
@@ -630,7 +554,6 @@ mux-player {
 
 .search-wave-input:focus {
 	background: rgba(255, 255, 255, 1);
-	animation: none;
 	/* CLEAR BLACK BORDER - FOCUS/CLICKED STATE */
 	border: 2px solid #000000 !important;
 	box-shadow: none !important;
@@ -721,101 +644,95 @@ mux-player {
 	border-radius: calc(0.75rem - 1px); /* Safari supports calc for border-radius */
 	background: linear-gradient(
 		90deg,
-		transparent,
-		rgba(107, 114, 128, 0.08),
-		rgba(156, 163, 175, 0.12),
-		rgba(107, 114, 128, 0.08),
-		transparent
+		transparent 0%,
+		rgba(230, 230, 230, 0.3) 20%,
+		rgba(220, 220, 220, 0.4) 40%,
+		rgba(230, 230, 230, 0.3) 60%,
+		transparent 80%,
+		transparent 100%
 	);
-	background-size: 250% 100%;
-	-webkit-animation: gradient-shift 8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-	animation: gradient-shift 8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	background-size: 200% 100%;
+	background-position: 100% 0;
 	pointer-events: none;
-	z-index: 3;
+	z-index: 1;
+	opacity: 1;
+	visibility: visible;
 	mix-blend-mode: normal;
 	isolation: isolate; /* Safari fix for mix-blend-mode */
 	-webkit-transform: translate3d(0, 0, 0); /* Enhanced hardware acceleration */
 	transform: translate3d(0, 0, 0);
 	-webkit-backface-visibility: hidden; /* Safari performance fix */
 	backface-visibility: hidden;
-	will-change: auto; /* Changed from 'transform, opacity' for Safari performance */
-	transition: opacity 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+	will-change: background-position; /* Optimize for what we're animating */
 }
 
-/* Apple-style shimmer effect with spring bounce */
-.search-wave-overlay::before {
-	content: '';
+/* Custom rich placeholder for dashboard search input */
+.custom-placeholder {
 	position: absolute;
-	top: 0;
-	right: 0;
-	bottom: 0;
-	left: 0;
-	border-radius: inherit;
-	background: linear-gradient(
-		105deg,
-		transparent 30%,
-		rgba(255, 255, 255, 0.5) 50%,
-		transparent 70%
-	);
-	background-size: 200% 100%;
-	-webkit-animation: shimmerFlow 12s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
-	animation: shimmerFlow 12s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
-	pointer-events: none;
-	opacity: 0.7;
-	transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-	transform: translate3d(0, 0, 0);
-	will-change: auto; /* Changed from 'transform, opacity' for Safari performance */
+	top: 50%;
+	left: 1rem; /* match input padding-left */
+	right: 1rem; /* match input padding-right */
+	transform: translateY(-50%);
+	display: inline-flex;
+	align-items: baseline;
+	gap: 0.25rem;
+	font-family: var(--font-secondary), 'Inter', system-ui, -apple-system, Segoe UI, Roboto,
+		sans-serif;
+	font-size: 1rem;
+	line-height: 1.4;
+	color: #000000;
+	pointer-events: none; /* let clicks focus the input */
+	z-index: 3; /* above gradient overlay and input box */
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
 }
 
-@keyframes shimmerFlow {
-	0% {
-		transform: translateX(-100%);
-		opacity: 0;
-	}
-	20% {
-		opacity: 0.7;
-	}
-	50% {
-		transform: translateX(0%);
-		opacity: 0.9;
-	}
-	80% {
-		opacity: 0.7;
-	}
-	100% {
-		transform: translateX(100%);
-		opacity: 0;
-	}
+.custom-placeholder-bold {
+	font-weight: 700;
+	font-family: var(--font-secondary), 'Inter', system-ui, -apple-system, Segoe UI, Roboto,
+		sans-serif;
 }
 
-/* Speed up shimmer on hover */
-.search-wave-container:hover .search-wave-overlay::before {
-	-webkit-animation: shimmerFlow 6s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
-	animation: shimmerFlow 6s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
-	transform: none;
+.custom-placeholder-regular {
+	font-weight: 400;
+	font-family: var(--font-secondary), 'Inter', system-ui, -apple-system, Segoe UI, Roboto,
+		sans-serif;
 }
 
-.search-wave-container:hover .search-wave-overlay {
-	-webkit-animation: gradient-shift 5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-	animation: gradient-shift 5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+.custom-placeholder-italic {
+	font-style: italic;
+	font-family: var(--font-secondary), 'Inter', system-ui, -apple-system, Segoe UI, Roboto,
+		sans-serif;
 }
 
-/* Subtle overlay on focus with Apple-style fade - no width change */
+/* Optionally soften visibility when focused, disappears once typing begins via inline style */
+.search-wave-container:focus-within .custom-placeholder {
+	opacity: 0.9;
+}
+
+.dark .custom-placeholder {
+	color: #ffffff;
+}
+
 .search-wave-container:focus-within .search-wave-overlay {
-	opacity: 0.15;
-	-webkit-animation: focusBreath 2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
-	animation: focusBreath 2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
 	transform: none;
 }
 
 /* Modern browsers with :has() support */
 @supports selector(:has(*)) {
 	.search-wave-container:has(.search-wave-input:focus) .search-wave-overlay {
-		opacity: 0.15;
-		-webkit-animation: focusBreath 2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
-		animation: focusBreath 2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
 		transform: none;
 	}
+}
+
+.search-wave-container:focus-within .search-wave-overlay::before {
+	opacity: 0;
+	transform: none;
 }
 
 @keyframes focusBreath {
@@ -830,18 +747,14 @@ mux-player {
 
 .search-wave-container:focus-within .search-wave-overlay::before {
 	opacity: 0;
-	animation: none;
 	transform: none;
-	transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Modern browsers with :has() support */
 @supports selector(:has(*)) {
 	.search-wave-container:has(.search-wave-input:focus) .search-wave-overlay::before {
 		opacity: 0;
-		animation: none;
 		transform: none;
-		transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 	}
 }
 
@@ -879,9 +792,7 @@ mux-player {
 }
 
 .search-wave-loading .search-wave-overlay {
-	background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.03), transparent);
-	background-size: 200% 100%;
-	animation: gradient-shift 3s ease-in-out infinite !important;
+	background: transparent;
 	opacity: 1 !important;
 }
 
@@ -898,7 +809,6 @@ mux-player {
 		rgba(0, 0, 0, 0.05) 50%,
 		transparent 70%
 	);
-	animation: loading-slide 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 	opacity: 1 !important;
 }
 
@@ -910,7 +820,6 @@ mux-player {
 	bottom: 0;
 	left: 0;
 	background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.02) 0%, transparent 70%);
-	animation: loading-breathe 2s ease-in-out infinite;
 	opacity: 1;
 }
 
@@ -934,16 +843,7 @@ mux-player {
 
 .dark .search-wave-input {
 	/* Inherits sizing from base .search-wave-input */
-	background: linear-gradient(
-		90deg,
-		rgba(31, 41, 55, 1),
-		rgba(17, 24, 39, 0.95),
-		rgba(31, 41, 55, 1),
-		rgba(17, 24, 39, 0.95)
-	);
-	background-size: 200% 100%;
-	-webkit-animation: gradient-shift 10s ease-in-out infinite;
-	animation: gradient-shift 10s ease-in-out infinite;
+	background: #1f2937;
 	/* CLEAR BLACK BORDER - DARK MODE RESTING STATE */
 	border: 2px solid #000000 !important;
 	box-sizing: border-box;
@@ -953,8 +853,6 @@ mux-player {
 }
 
 .dark .search-wave-input:hover {
-	-webkit-animation: gradient-shift 6s ease-in-out infinite;
-	animation: gradient-shift 6s ease-in-out infinite;
 	transition: all 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
 	/* CLEAR BLACK BORDER - DARK MODE HOVER STATE */
 	border: 2px solid #000000 !important;
@@ -963,7 +861,6 @@ mux-player {
 
 .dark .search-wave-input:focus {
 	background: rgba(17, 24, 39, 1);
-	animation: none;
 	/* CLEAR BLACK BORDER - DARK MODE FOCUS/CLICKED STATE */
 	border: 2px solid #000000 !important;
 	outline: none;
@@ -1183,60 +1080,27 @@ mux-player {
 
 /* Modern browsers with :has() support */
 @supports selector(:has(*)) {
-	.dark
-		.search-wave-container:has(.search-wave-input:focus)
-		.search-wave-overlay::before {
+	.dark .search-wave-container:has(.search-wave-input:focus)::before {
 		opacity: 0;
 	}
 }
 
-@keyframes premium-gradient-move {
-	0%,
-	100% {
-		background-position: 0% 50%;
-	}
-	50% {
-		background-position: 100% 50%;
-	}
-}
+/* Removed dead animations: premium-gradient-move, premium-shimmer, premium-float */
+/* These animations were not being used in the dashboard */
 
-@keyframes premium-shimmer {
-	0% {
-		transform: translateX(-50%);
-		opacity: 0;
-	}
-	50% {
-		opacity: 1;
-	}
-	100% {
-		transform: translateX(50%);
-		opacity: 0;
-	}
-}
-
-@keyframes premium-float {
-	0%,
-	100% {
-		transform: translateY(0px);
-	}
-	50% {
-		transform: translateY(-2px);
-	}
-}
-
-/* Hero section - continuous ambient animation */
+/* Hero section - clean without animations */
 .premium-hero-section {
 	position: relative;
 	z-index: 1;
-	overflow: hidden;
 }
 
-/* Logo container - subtle float only */
+/* Logo container - static display */
 .premium-logo-container {
 	position: relative;
-	display: inline-block;
-	animation: premium-float 12s ease-in-out infinite;
-	opacity: 0.9;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 1;
 }
 
 /* Main title gradient - Murmur */
@@ -1252,7 +1116,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	/* Animation removed - not used on dashboard */
 	will-change: auto; /* Changed from background-position for Safari performance */
 	-webkit-transform: translateZ(0); /* Safari GPU acceleration */
 	transform: translateZ(0);
@@ -1280,7 +1144,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	/* Animation removed - not used on dashboard */
 	filter: blur(25px);
 	opacity: 0.15;
 	pointer-events: none;
@@ -1303,7 +1167,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite reverse;
+	/* Animation removed - not used on dashboard */
 	filter: blur(12px);
 	opacity: 0.2;
 	pointer-events: none;
@@ -1314,7 +1178,7 @@ mux-player {
 	position: relative;
 	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 	color: rgb(107, 114, 128);
-	opacity: 0.9;
+	opacity: 1;
 }
 
 /* Accent word - "start" */
@@ -1353,7 +1217,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	/* Animation removed - not used on dashboard */
 }
 
 /* Dark mode NYC high society gradient outline - Layer 1 */
@@ -1370,7 +1234,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	/* Animation removed - not used on dashboard */
 	filter: blur(25px);
 	opacity: 0.15;
 }
@@ -1387,7 +1251,7 @@ mux-player {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	animation: premium-gradient-move 60s cubic-bezier(0.4, 0, 0.6, 1) infinite reverse;
+	/* Animation removed - not used on dashboard */
 	filter: blur(12px);
 	opacity: 0.25;
 }
@@ -1419,9 +1283,7 @@ mux-player {
 }
 
 .dark .search-wave-loading .search-wave-overlay {
-	background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
-	background-size: 200% 100%;
-	animation: gradient-shift 3s ease-in-out infinite !important;
+	background: transparent;
 	opacity: 1 !important;
 }
 
@@ -1432,7 +1294,6 @@ mux-player {
 		rgba(255, 255, 255, 0.06) 50%,
 		transparent 70%
 	);
-	animation: loading-slide 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 	opacity: 1 !important;
 }
 
@@ -1442,22 +1303,10 @@ mux-player {
 		rgba(255, 255, 255, 0.03) 0%,
 		transparent 70%
 	);
-	animation: loading-breathe 2s ease-in-out infinite;
 	opacity: 1;
 }
 
-/* ========================================
-   Elegant Search Animation - Simple & Beautiful
-   ======================================== */
-
-/* Dashboard container - holds the entire search experience */
-.dashboard-container {
-	position: relative;
-	min-height: 100vh;
-	transition: all 0.6s ease;
-}
-
-/* Hero wrapper - contains logo and text that will fade out */
+/* Hero wrapper - vertically centered container */
 .hero-wrapper {
 	opacity: 1;
 	-webkit-transform: translateY(0);
@@ -1467,8 +1316,6 @@ mux-player {
 		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 	position: relative;
 	z-index: 1;
-	height: 320px;
-	--hero-height: 320px;
 }
 
 /* When search is active - hero elegantly fades away */
@@ -1478,12 +1325,15 @@ mux-player {
 	transform: translateY(-20px);
 	pointer-events: none;
 	height: 0;
+	min-height: 0;
 	overflow: hidden;
 	margin-bottom: 0;
 	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		-webkit-transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-		height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
+		height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s,
+		min-height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
+	display: none;
 }
 
 /* Search bar wrapper - default state */
@@ -1496,8 +1346,10 @@ mux-player {
 		transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
 		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 	z-index: 20;
-	margin-top: clamp(3rem, calc((100vh - var(--hero-height, 320px)) * 0.35), 26vh);
+	margin-top: 96px;
 	width: 100%;
+	/* Keep consistent spacing below the search area regardless of zoom */
+	margin-bottom: 40px;
 }
 
 /* Search bar when active - elegantly disappears */
@@ -1513,6 +1365,7 @@ mux-player {
 		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		-webkit-transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
 		height 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
+	display: none;
 }
 
 /* Inner container - centered and clean */
@@ -1563,34 +1416,181 @@ mux-player {
 	animation: elegantFadeIn 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 	animation-delay: 0.8s;
 	opacity: 0;
+	margin-top: 2.5rem !important; /* Reduce margin when searching */
 }
 
-/* Campaigns table fade out when search is triggered */
-.campaigns-table-wrapper {
-	transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-		transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-	opacity: 1;
-	transform: translateY(0);
-	/* Ensure minimum spacing from search bar */
-	min-height: 400px;
+/* Fix positioning when search is active */
+.search-active {
+	margin-top: 0 !important; /* Override the -mt-[135px] */
+	padding-top: 40px !important; /* Add some top padding instead */
+	padding-bottom: 40px !important; /* Reduce bottom padding */
 }
 
-.search-active ~ .campaigns-table-wrapper {
-	opacity: 0;
-	transform: translateY(20px);
-	pointer-events: none;
+/* Reduce spacing for search results */
+.search-active .flex.justify-center.w-full.px-4 {
+	margin-top: 1rem !important;
 }
 
 /* Campaigns table container with fixed height */
 .campaigns-table-container {
-	max-height: 382px;
-	overflow: hidden;
+	max-height: none;
+	overflow: visible;
+	position: relative;
+	z-index: 40; /* Ensure container is clickable */
 }
 
-/* Override the default constrainHeight of 429px */
-.campaigns-table-container > div > div:last-child {
-	height: 382px !important;
-	max-height: 382px !important;
+/* Set a compact, scrollable height for the My Campaigns table */
+.campaigns-table-container .my-campaigns-table {
+	height: 260px !important;
+	max-height: 260px !important;
+	min-height: 260px !important; /* Force exact height */
+	position: relative !important;
+	display: block !important; /* Ensure it's a block element */
+}
+
+/* Ensure the scrollable content respects rounded corners */
+.campaigns-table-container .my-campaigns-table .scrollbar-hide {
+	border-radius: 8px !important;
+}
+
+/* Override default h-[429px] class when campaigns table uses constrainHeight */
+.campaigns-table-container .my-campaigns-table.h-\[429px\] {
+	height: 260px !important;
+	max-height: 260px !important;
+	min-height: 260px !important;
+}
+
+/* Force hide ALL native scrollbars in campaigns table and its children */
+.campaigns-table-container::-webkit-scrollbar,
+.campaigns-table-container *::-webkit-scrollbar,
+.campaigns-table-container .my-campaigns-table::-webkit-scrollbar,
+.campaigns-table-container .my-campaigns-table *::-webkit-scrollbar,
+.custom-table-wrapper::-webkit-scrollbar,
+.custom-table-wrapper *::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+.campaigns-table-container,
+.campaigns-table-container *,
+.campaigns-table-container .my-campaigns-table,
+.campaigns-table-container .my-campaigns-table *,
+.custom-table-wrapper,
+.custom-table-wrapper * {
+	-ms-overflow-style: none !important;
+	scrollbar-width: none !important;
+}
+
+/* Ensure the CustomScrollbar component wrapper has proper dimensions */
+.campaigns-table-container .custom-table-wrapper {
+	height: 100% !important;
+	position: relative !important;
+}
+
+/* Ensure custom scrollbar track is visible and interactive */
+.campaigns-table-container .my-campaigns-table .custom-table-wrapper > div:last-child {
+	z-index: 100 !important; /* Make sure the custom scrollbar track is on top */
+	pointer-events: auto !important;
+	position: absolute !important;
+	top: 0 !important;
+	right: 0 !important;
+	height: 100% !important;
+}
+
+/* Ensure all elements in the scroll chain are interactive */
+.campaigns-table-container,
+.campaigns-table-container *,
+.campaigns-table-container .my-campaigns-table,
+.campaigns-table-container .my-campaigns-table *,
+.campaigns-table-container .scrollbar-hide,
+.campaigns-table-container .scrollbar-hide * {
+	pointer-events: auto !important;
+}
+
+/* Ensure proper z-index layering */
+.campaigns-table-container .scrollbar-hide {
+	z-index: 1 !important;
+}
+
+.campaigns-table-container table {
+	z-index: 2 !important;
+	position: relative !important;
+}
+
+/* Additional rules to hide scrollbars on overflow elements in campaigns table */
+.campaigns-table-container .overflow-y-auto::-webkit-scrollbar,
+.campaigns-table-container .overflow-auto::-webkit-scrollbar,
+.campaigns-table-container .overflow-x-auto::-webkit-scrollbar,
+.campaigns-table-container .overflow-scroll::-webkit-scrollbar,
+.campaigns-table-container .h-full::-webkit-scrollbar,
+.campaigns-table-container .scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+.campaigns-table-container .overflow-y-auto,
+.campaigns-table-container .overflow-auto,
+.campaigns-table-container .overflow-x-auto,
+.campaigns-table-container .overflow-scroll,
+.campaigns-table-container .h-full,
+.campaigns-table-container .scrollbar-hide {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+/* Debug: Make sure the wrapper div also hides scrollbars */
+.campaigns-table-container > div::-webkit-scrollbar {
+	display: none !important;
+}
+
+/* Ensure proper scrolling behavior for campaigns table with custom scrollbar */
+.campaigns-table-container .my-campaigns-table {
+	position: relative !important;
+	height: 260px !important;
+}
+
+/* Ensure the scrollbar components have proper dimensions and scrolling */
+.campaigns-table-container .my-campaigns-table > div {
+	height: 100% !important;
+}
+
+/* This is the actual scrollable container - target the correct DOM path */
+.campaigns-table-container .my-campaigns-table .custom-table-wrapper .scrollbar-hide {
+	height: 100% !important;
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	-webkit-overflow-scrolling: touch !important;
+	position: relative !important;
+}
+
+/* Ensure the custom scrollbar works properly */
+.campaigns-table-container .scrollbar-hide {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+.campaigns-table-container .scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+}
+
+/* Maximum specificity using ID selector to hide ALL scrollbars in campaigns table */
+#campaigns-table-container::-webkit-scrollbar,
+#campaigns-table-container *::-webkit-scrollbar,
+#campaigns-table-container .my-campaigns-table::-webkit-scrollbar,
+#campaigns-table-container .my-campaigns-table *::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+#campaigns-table-container,
+#campaigns-table-container *,
+#campaigns-table-container .my-campaigns-table,
+#campaigns-table-container .my-campaigns-table * {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
 }
 
 /* Hide rows per page and search in campaigns table header */
@@ -1608,21 +1608,8 @@ mux-player {
 	display: none !important;
 }
 
-/* Target the specific pagination structure */
-.campaigns-table-wrapper .flex.items-center.justify-center.gap-2:has(button) {
-	display: none !important;
-}
-
-/* Fallback for Safari versions that don't support :has() */
-@supports not (selector(:has(*))) {
-	.campaigns-table-wrapper nav,
-	.campaigns-table-wrapper [role='navigation'] {
-		display: none !important;
-	}
-}
-
 /* Handle text overflow in campaigns table cells */
-.campaigns-table-container td:not(:nth-child(4)) {
+.campaigns-table-container td:not(:nth-child(3)) {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -1630,7 +1617,7 @@ mux-player {
 }
 
 /* Also apply text clipping to table headers */
-.campaigns-table-container th:not(:nth-child(4)) {
+.campaigns-table-container th:not(:nth-child(3)) {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -1638,7 +1625,7 @@ mux-player {
 }
 
 /* Ensure the delete column header is centered */
-.campaigns-table-container th:nth-child(4) {
+.campaigns-table-container th:nth-child(3) {
 	text-align: center;
 }
 
@@ -1656,23 +1643,27 @@ mux-player {
 	}
 }
 
-/* First three columns share the space evenly */
+/* Name column fixed width */
 .campaigns-table-container th:nth-child(1),
-.campaigns-table-container td:nth-child(1),
-.campaigns-table-container th:nth-child(2),
-.campaigns-table-container td:nth-child(2),
-.campaigns-table-container th:nth-child(3),
-.campaigns-table-container td:nth-child(3) {
-	width: calc((100% - 60px) / 3) !important;
-	width: -webkit-calc((100% - 60px) / 3) !important;
-	min-width: 0 !important;
-	max-width: calc((100% - 60px) / 3) !important;
-	max-width: -webkit-calc((100% - 60px) / 3) !important;
+.campaigns-table-container td:nth-child(1) {
+	width: 350px !important;
+	min-width: 350px !important;
+	max-width: 350px !important;
 }
 
-/* Delete button column - small fixed width at far right */
-.campaigns-table-container th:nth-child(4),
-.campaigns-table-container td:nth-child(4) {
+/* Metrics column stretches to fill remaining space between name and delete */
+.campaigns-table-container th:nth-child(2),
+.campaigns-table-container td:nth-child(2) {
+	width: calc(100% - 410px) !important; /* 350 (name) + 60 (delete) */
+	width: -webkit-calc(100% - 410px) !important;
+	min-width: 0 !important;
+	max-width: calc(100% - 410px) !important;
+	max-width: -webkit-calc(100% - 410px) !important;
+}
+
+/* Delete button column - fixed width at far right */
+.campaigns-table-container th:nth-child(3),
+.campaigns-table-container td:nth-child(3) {
 	width: 60px !important;
 	min-width: 60px !important;
 	max-width: 60px !important;
@@ -1682,24 +1673,47 @@ mux-player {
 }
 
 /* Hide the header text for delete column */
-.campaigns-table-container th:nth-child(4) button {
+.campaigns-table-container th:nth-child(3) button {
 	visibility: hidden;
-}
-
-/* Override any generic selectors for the specific columns */
-.campaigns-table-container [role='columnheader']:not(:nth-child(4)),
-.campaigns-table-container [role='cell']:not(:nth-child(4)) {
-	width: calc((100% - 60px) / 3) !important;
-	width: -webkit-calc((100% - 60px) / 3) !important;
-	min-width: 0 !important;
-	max-width: calc((100% - 60px) / 3) !important;
-	max-width: -webkit-calc((100% - 60px) / 3) !important;
 }
 
 /* Ensure buttons in the last column are not clipped */
 .campaigns-table-container td:last-child button {
 	position: relative;
 	z-index: 1;
+}
+
+/* Removed gradient-based dividers - using absolute positioned elements instead */
+
+/* Ensure all table rows are clickable */
+.campaigns-table-container tbody tr {
+	position: relative;
+	z-index: 45; /* Higher than container to ensure clickability */
+}
+
+/* Ensure table body is interactive */
+.campaigns-table-container tbody {
+	position: relative;
+	z-index: 42;
+}
+
+/* Make table header non-interactive */
+.campaigns-table-container thead,
+.campaigns-table-container thead tr,
+.campaigns-table-container thead th {
+	pointer-events: none !important;
+	cursor: default !important;
+	user-select: none !important;
+}
+
+/* Ensure only table body rows are clickable */
+.campaigns-table-container tbody tr {
+	cursor: pointer;
+}
+
+/* Override any hover effects on header */
+.campaigns-table-container thead tr:hover {
+	background-color: transparent !important;
 }
 
 /* Exclude contacts box styling */
@@ -1711,8 +1725,18 @@ mux-player {
 }
 
 .exclude-contacts-box:hover {
-	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-	-webkit-box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	box-shadow: none;
+	-webkit-box-shadow: none;
+}
+
+/* Ensure contents are vertically centered within the box */
+.exclude-contacts-box [data-slot='form-item'],
+.exclude-contacts-box [data-slot='form-control'],
+.exclude-contacts-box [data-slot='form-label'] {
+	display: flex;
+	align-items: center;
+	height: 100%;
+	margin: 0 !important;
 }
 
 /* Ensure consistent layout during horizontal compression */
@@ -1735,14 +1759,37 @@ mux-player {
 	align-items: center;
 }
 
-/* Custom toggle switch styles */
-.exclude-contacts-box input[type='checkbox']:checked + div {
-	background-color: #e5e5e5 !important;
+/* Toggle switch styles - using data attributes for maximum specificity */
+.toggle-switch-track[data-checked='true'] {
+	background-color: #5dab68 !important;
+	background: #5dab68 !important;
 }
 
-.exclude-contacts-box input[type='checkbox']:checked + div::after {
-	transform: translateX(10px);
-	-webkit-transform: translateX(10px);
+.toggle-switch-track[data-checked='false'] {
+	background-color: #e5e5e5 !important;
+	background: #e5e5e5 !important;
+}
+
+/* Fallback with class names */
+.toggle-switch-track.toggle-on {
+	background-color: #5dab68 !important;
+	background: #5dab68 !important;
+}
+
+.toggle-switch-track.toggle-off {
+	background-color: #e5e5e5 !important;
+	background: #e5e5e5 !important;
+}
+
+/* Even more specific rules to override any parent background */
+.exclude-contacts-box .toggle-switch-track[data-checked='true'] {
+	background-color: #5dab68 !important;
+	background: #5dab68 !important;
+}
+
+.exclude-contacts-box .toggle-switch-track[data-checked='false'] {
+	background-color: #e5e5e5 !important;
+	background: #e5e5e5 !important;
 }
 
 /* Safari-specific fixes for toggle */
@@ -1912,6 +1959,7 @@ mux-player {
 .search-active .search-query-display {
 	position: relative;
 	z-index: 50;
+	margin-top: 20px !important; /* Reduce top margin */
 	background: linear-gradient(
 		to bottom,
 		rgba(255, 255, 255, 0.98) 0%,
@@ -1925,6 +1973,150 @@ mux-player {
 	animation: elegantSlideDown 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 	animation-delay: 0.6s;
 	opacity: 0;
+}
+
+/* Results page persistent search bar */
+.results-search-bar-wrapper {
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	padding-top: 0.75rem;
+	padding-bottom: 0.75rem;
+	background: transparent;
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+}
+
+.results-search-bar-inner {
+	max-width: 1132px;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.results-search-form {
+	display: grid;
+	grid-template-columns: auto auto;
+	gap: 0.75rem;
+	align-items: center;
+	justify-content: center;
+}
+
+.results-search-input-group {
+	display: flex;
+	align-items: center;
+	width: auto;
+	min-width: 0;
+}
+
+.results-search-input {
+	height: 35px;
+	width: 597px !important;
+	border: 2px solid #cfcfcf !important;
+	color: #7f7f7f !important;
+	padding-left: 48px; /* reserve more space for left icon */
+	padding-right: 48px; /* balance to keep centered text truly centered */
+}
+
+.results-search-input:hover,
+.results-search-input:focus {
+	border: 2px solid #cfcfcf !important;
+}
+
+/* Results input placeholder color */
+.results-search-input::placeholder {
+	color: #7f7f7f !important;
+}
+.results-search-input::-webkit-input-placeholder {
+	color: #7f7f7f !important;
+}
+
+.results-search-button {
+	height: 48px !important;
+}
+
+/* Fix container width for results-only input */
+.results-search-input-group .search-wave-container {
+	width: 597px !important;
+	min-width: 597px !important;
+	max-width: 597px !important;
+	position: relative;
+}
+
+.results-search-icon-btn {
+	position: absolute;
+	left: 18px;
+	top: 50%;
+	transform: translateY(-50%);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	background: transparent;
+	border: none;
+	cursor: pointer;
+}
+
+.results-search-icon-btn:focus-visible {
+	outline: 2px solid #000;
+	outline-offset: 2px;
+}
+
+/* Results search bar specific styles */
+.results-search-input {
+	/* Keep input styles but allow animations on overlay */
+}
+
+/* Prevent focus micro-animations in results view */
+.results-search-input-group .search-wave-input:focus ~ .search-wave-overlay {
+	animation: none !important;
+	opacity: 1 !important;
+}
+
+.results-search-input-group .search-wave-container:focus-within {
+	animation: none !important;
+	transition: none !important;
+}
+
+@supports selector(:has(*)) {
+	.results-search-input-group .search-wave-container:has(.search-wave-input:focus) {
+		animation: none !important;
+		transition: none !important;
+	}
+	.results-search-input-group
+		.search-wave-container:has(.search-wave-input:focus)
+		.search-wave-overlay {
+		animation: none !important;
+		transition: none !important;
+		opacity: 1 !important;
+	}
+}
+
+/* Remove loading shimmer/spinner in results view */
+.results-search-input-group .search-wave-container.search-wave-loading {
+	animation: none !important;
+	transition: none !important;
+}
+.results-search-input-group
+	.search-wave-container.search-wave-loading
+	.search-wave-overlay,
+.results-search-input-group
+	.search-wave-container.search-wave-loading
+	.search-wave-overlay::before,
+.results-search-input-group
+	.search-wave-container.search-wave-loading
+	.search-wave-overlay::after {
+	animation: none !important;
+	transition: none !important;
+	opacity: 1 !important;
+}
+.results-search-input-group .search-wave-container.search-wave-loading::after {
+	animation: none !important;
+	display: none !important;
+}
+
+.dark .results-search-bar-wrapper {
+	background: transparent;
 }
 
 @keyframes elegantSlideDown {
@@ -2238,7 +2430,7 @@ mux-player {
 }
 
 .search-wave-input:focus ~ .search-wave-overlay {
-	animation: focusFade 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+	animation: none;
 }
 
 @keyframes focusFade {
@@ -2308,88 +2500,6 @@ mux-player {
 	}
 }
 
-.name-header-fade-in {
-	-webkit-animation: fadeIn 0.5s ease-in-out forwards;
-	animation: fadeIn 0.5s ease-in-out forwards;
-}
-
-.name-header-fade-out {
-	-webkit-animation: fadeOut 0.5s ease-in-out forwards;
-	animation: fadeOut 0.5s ease-in-out forwards;
-}
-
-@keyframes appleSlideIn {
-	0% {
-		opacity: 0;
-		transform: translateY(20px) scale(0.95);
-		filter: blur(10px);
-	}
-	50% {
-		opacity: 0.5;
-		filter: blur(5px);
-	}
-	100% {
-		opacity: 1;
-		transform: translateY(0) scale(1);
-		filter: blur(0);
-	}
-}
-
-@keyframes appleFadeGlow {
-	0%,
-	100% {
-		opacity: 1;
-	}
-	50% {
-		opacity: 0.85;
-	}
-}
-
-.select-prompt-container {
-	display: -webkit-flex;
-	display: -moz-box;
-	display: flex;
-	-webkit-flex-direction: column;
-	-moz-box-orient: vertical;
-	-moz-box-direction: normal;
-	flex-direction: column;
-	-webkit-align-items: center;
-	-moz-box-align: center;
-	align-items: center;
-	margin-bottom: 1rem; /* Adjust as needed */
-}
-
-.select-prompt-text {
-	font-family: 'Times New Roman', Times, serif;
-	font-size: 1.25rem; /* 20px */
-	color: #333; /* Dark gray for readability */
-}
-
-.static-tooltip-container {
-	height: 2.5rem; /* Allocate space for the text */
-	display: -webkit-flex;
-	display: -moz-box;
-	display: flex;
-	-webkit-align-items: center;
-	-moz-box-align: center;
-	align-items: center;
-	-webkit-justify-content: center;
-	-moz-box-pack: center;
-	justify-content: center;
-	margin-top: 0.5rem; /* Lower the text vertically */
-}
-
-.static-tooltip-text {
-	font-family: 'Times New Roman', Times, serif;
-	font-size: 1rem; /* 16px - Smaller font size */
-	color: #888888; /* A nice gray color */
-	padding: 0.5rem 0;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	max-width: 100%;
-}
-
 /* Responsive table layout */
 .results-appear {
 	width: 100%;
@@ -2432,15 +2542,11 @@ mux-player {
 	text-overflow: ellipsis;
 }
 
-/* Dashboard responsive improvements */
-.dashboard-container {
-	width: 100%;
-	max-width: 100%;
-}
-
 .hero-wrapper {
 	width: 100%;
 	max-width: 100%;
+	min-height: 720px !important; /* Fixed height that approximates viewport at 100% zoom */
+	height: 720px !important; /* Prevent expansion with zoom */
 }
 
 .search-bar-wrapper {
@@ -2514,55 +2620,57 @@ mux-player {
 	}
 }
 
-/* Campaigns table responsive spacing */
-@media (max-width: 640px) {
-	.campaigns-table-wrapper {
-		margin-top: 6rem !important; /* Override Tailwind mt-32 */
+/* Keep table in normal flow with consistent spacing */
+.campaigns-table-wrapper {
+	margin-top: -200px; /* Pull table up for better positioning */
+	position: relative;
+	z-index: 30; /* Ensure table is above other elements */
+}
+
+/* Dashboard main offset: default for landscape (unchanged visual) */
+.dashboard-main-offset {
+	margin-top: -164px;
+}
+
+/* Keep search results view at previous position */
+.dashboard-main-offset.search-active {
+	margin-top: -176px;
+}
+
+/* Portrait monitors: lower the dashboard to avoid top clipping */
+@media (orientation: portrait) {
+	.dashboard-main-offset {
+		margin-top: -84px;
+	}
+
+	/* Keep search results view at previous position on portrait */
+	.dashboard-main-offset.search-active {
+		margin-top: -96px;
 	}
 }
 
-@media (min-width: 641px) and (max-width: 768px) {
+/* Adjust table position for portrait orientation screens to prevent overlap */
+@media (orientation: portrait) {
 	.campaigns-table-wrapper {
-		margin-top: 8rem !important; /* Override Tailwind mt-36 */
+		margin-top: -100px; /* Less aggressive pull-up on portrait screens */
+	}
+
+	/* Add extra spacing between search area and table on portrait */
+	.hero-wrapper {
+		min-height: 600px !important; /* Reduce min-height on portrait */
+		height: auto !important; /* Allow flexible height */
+	}
+
+	/* Ensure search bar area has enough bottom spacing */
+	.search-bar-wrapper {
+		margin-bottom: 40px;
 	}
 }
 
-@media (min-width: 769px) and (max-width: 1024px) {
+/* Additional fix for tall portrait monitors (aspect ratio taller than 3:4) */
+@media (orientation: portrait) and (min-aspect-ratio: 3/4) {
 	.campaigns-table-wrapper {
-		margin-top: 10rem !important; /* Override Tailwind mt-40 */
-	}
-}
-
-@media (min-width: 1025px) and (max-width: 1280px) {
-	.campaigns-table-wrapper {
-		margin-top: 12rem !important; /* Override Tailwind mt-44 */
-	}
-}
-
-@media (min-width: 1281px) and (max-width: 1536px) {
-	.campaigns-table-wrapper {
-		margin-top: 14rem !important; /* Override Tailwind mt-48 */
-	}
-}
-
-@media (min-width: 1537px) {
-	.campaigns-table-wrapper {
-		margin-top: 16rem !important; /* Override Tailwind mt-56 */
-	}
-}
-
-/* Maintain consistent spacing ratio on zoom */
-@media (min-width: 1920px) {
-	.campaigns-table-wrapper {
-		margin-top: -webkit-calc(16rem + 2vw) !important; /* Safari prefix */
-		margin-top: calc(16rem + 2vw) !important;
-	}
-}
-
-@media (min-width: 2560px) {
-	.campaigns-table-wrapper {
-		margin-top: -webkit-calc(18rem + 2vw) !important; /* Safari prefix */
-		margin-top: calc(18rem + 2vw) !important;
+		margin-top: -50px; /* Even less pull-up for very tall portrait screens */
 	}
 }
 
@@ -2588,10 +2696,14 @@ mux-player {
 /* Default: show full text on desktop */
 .nav-text-full {
 	display: inline;
+	pointer-events: auto !important;
+	cursor: pointer !important;
 }
 
 .nav-text-short {
 	display: none;
+	pointer-events: auto !important;
+	cursor: pointer !important;
 }
 
 /* Mobile: show short text */
@@ -2599,9 +2711,31 @@ mux-player {
 	.nav-text-full {
 		display: none;
 	}
-	
+
 	.nav-text-short {
 		display: inline;
+	}
+}
+
+/* Portrait/Vertical monitor fix: ensure nav links are fully clickable */
+@media (orientation: portrait) {
+	.safari-nav-fix {
+		overflow: visible !important;
+		max-width: none !important;
+	}
+
+	.safari-nav-fix span {
+		pointer-events: auto !important;
+		cursor: pointer !important;
+		position: relative;
+		z-index: 10;
+	}
+
+	/* Ensure the entire link area is clickable */
+	nav a {
+		pointer-events: auto !important;
+		position: relative;
+		z-index: 10;
 	}
 }
 
@@ -2615,7 +2749,7 @@ mux-player {
 			background-color: white;
 			contain: layout;
 		}
-		
+
 		.safari-nav-fix {
 			display: flex !important;
 			align-items: center !important;
@@ -2624,18 +2758,18 @@ mux-player {
 			text-overflow: ellipsis !important;
 			max-width: 150px;
 		}
-		
+
 		.nav-text-full,
 		.nav-text-short {
 			position: relative;
 			z-index: 1;
 		}
-		
+
 		/* Ensure text doesn't overflow in landscape */
 		nav .flex {
 			flex-wrap: nowrap !important;
 		}
-		
+
 		/* Fix potential text bleed issues */
 		nav span {
 			-webkit-backface-visibility: hidden;
@@ -2643,7 +2777,7 @@ mux-player {
 			transform: translateZ(0);
 		}
 	}
-	
+
 	/* Additional fix for regular mobile Safari */
 	@media (max-width: 768px) {
 		.safari-nav-fix span {
@@ -2651,14 +2785,6 @@ mux-player {
 			-moz-osx-font-smoothing: grayscale;
 			text-rendering: optimizeLegibility;
 		}
-	}
-}
-
-/* Safari-specific mobile app coming soon page styles */
-@supports (-webkit-touch-callout: none) {
-	/* iOS Safari specific styles */
-	.fixed.inset-0 {
-		min-height: -webkit-fill-available;
 	}
 }
 
@@ -2685,21 +2811,6 @@ mux-player {
 	background-clip: text;
 	-webkit-background-clip: text;
 	mask-image: linear-gradient(
-		90deg,
-		transparent 0%,
-		rgba(0, 0, 0, 0.1) 5%,
-		rgba(0, 0, 0, 0.3) 10%,
-		rgba(0, 0, 0, 0.6) 15%,
-		rgba(0, 0, 0, 0.8) 20%,
-		rgba(0, 0, 0, 1) 30%,
-		rgba(0, 0, 0, 1) 70%,
-		rgba(0, 0, 0, 0.8) 80%,
-		rgba(0, 0, 0, 0.6) 85%,
-		rgba(0, 0, 0, 0.3) 90%,
-		rgba(0, 0, 0, 0.1) 95%,
-		transparent 100%
-	);
-	-webkit-mask-image: linear-gradient(
 		90deg,
 		transparent 0%,
 		rgba(0, 0, 0, 0.1) 5%,
@@ -2753,26 +2864,594 @@ body.murmur-page footer {
 	display: none !important;
 }
 
-/* Ensure campaigns block never overlaps the search bar on extreme zoom */
-/* When zoomed out, the search bar's margin-top grows due to vh units, 
-   so we need to ensure the campaigns table is positioned far enough below */
-@media (min-height: 800px) {
-	.dashboard-container:not(.search-active) .campaigns-table-wrapper {
-		/* Add minimal extra margin that scales with viewport height to prevent overlap */
-		margin-top: calc(8rem + 2vh) !important;
-	}
-}
-
-@media (min-height: 1200px) {
-	.dashboard-container:not(.search-active) .campaigns-table-wrapper {
-		/* Slightly more margin for extreme zoom levels */
-		margin-top: calc(8rem + 3vh) !important;
-	}
-}
-
 /* Also ensure the hero wrapper can contain the growing search bar */
 .dashboard-container:not(.search-active) .hero-wrapper {
 	/* Allow hero to grow with viewport height to contain search bar */
 	min-height: calc(320px + max(0px, 10vh - 80px));
 	height: auto;
+}
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+.custom-scroll:not(.my-campaigns-table),
+.overflow-auto:not(.my-campaigns-table),
+.overflow-y-auto:not(.my-campaigns-table),
+.overflow-x-auto:not(.my-campaigns-table),
+.overflow-scroll:not(.my-campaigns-table) {
+	scrollbar-width: thin !important;
+	scrollbar-color: #000000 transparent !important;
+}
+
+/* Scrolling text on hover */
+@keyframes scrollText {
+	0% {
+		transform: translateX(0);
+	}
+	100% {
+		transform: translateX(-50%);
+	}
+}
+
+/* Scrolling text on hover */
+.hover-scroll-container {
+	position: relative;
+	overflow: hidden;
+}
+
+.hover-scroll-container:hover .hover-scroll-text {
+	animation: scrollText var(--scroll-duration, 8s) linear infinite;
+	text-overflow: initial !important;
+	width: max-content !important;
+}
+
+/* Also trigger scrolling when hovering the entire table row (dashboard results) */
+.row-hover-scroll:hover .hover-scroll-text {
+	animation: scrollText var(--scroll-duration, 8s) linear infinite;
+	text-overflow: initial !important;
+	width: max-content !important;
+}
+
+/* Lenis smooth scrolling styles */
+html.lenis {
+	height: auto;
+}
+
+.lenis.lenis-smooth {
+	scroll-behavior: auto;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+	overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+	overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+	pointer-events: none;
+}
+
+/* Global performance optimizations for scroll animations */
+[data-scroll-animation] {
+	will-change: transform, opacity;
+	-webkit-transform: translateZ(0);
+	backface-visibility: hidden;
+}
+
+/* Prevent layout shifts during animations */
+main {
+	isolation: isolate;
+}
+
+/* Add at the end of the file, after existing scrollbar rules */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Firefox scrollbar styles */
+.campaigns-table-container .my-campaigns-table,
+.my-campaigns-table,
+.my-campaigns-table * {
+	scrollbar-width: thin !important;
+	scrollbar-color: #000000 transparent !important;
+}
+
+/* Ensure no scrollbar gutter spacing */
+.campaigns-table-container .my-campaigns-table {
+	scrollbar-gutter: stable !important;
+}
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Specific styles for My Campaigns table header */
+.my-campaigns-table thead th {
+	background-color: #f8f8f8 !important;
+}
+
+/* Specific styles for My Campaigns table scrollbars - DEBUGGING */
+/* Remove debug My Campaigns specific scrollbar visuals; use global 2px style */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+/* === ALLOW GSAP ANIMATIONS FOR SEARCH BAR === */
+/* Commented out to allow GSAP animations to work
+.results-search-input-group,
+.results-search-input-group * {
+	-webkit-animation: none !important;
+	animation: none !important;
+	-webkit-transition: none !important;
+	transition: none !important;
+	transform: none !important;
+	will-change: auto !important;
+}
+*/
+
+/* Murmur route compact scaling (90%) */
+html.murmur-compact {
+	zoom: 0.9;
+}
+
+@supports not (zoom: 0.9) {
+	html.murmur-compact body {
+		transform: scale(0.9);
+		transform-origin: top center;
+		width: calc(100% / 0.9);
+	}
+}
+
+/* Re-enable necessary transform and ensure stacking for the left icon */
+.results-search-icon-btn {
+	transform: translateY(-50%) !important;
+	z-index: 4 !important;
+}
+
+/* Removed - Using custom GlobalScrollbar component instead */
+
+.table-header-secondary {
+	border-bottom: 2px solid #8c8c8c;
+}
+
+/* --- Campaigns Table Custom Scrollbar --- */
+.my-campaigns-table {
+	height: 260px !important;
+	max-height: 260px !important;
+}
+
+.my-campaigns-table .scrollbar-hide {
+	height: 100% !important;
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+.my-campaigns-table .scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+/* -------------------------------------- */
+
+/* --- Drafting Table Custom Scrollbar --- */
+.drafting-table-content {
+	height: 100% !important;
+	min-height: 0 !important;
+}
+
+.drafting-table-content .scrollbar-hide {
+	height: 100% !important;
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+/* Remove debug child borders */
+/* .drafting-table-content .scrollbar-hide > * { }
+*/
+
+.drafting-table-content .scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+/* Ensure flex calculation works properly */
+[data-drafting-table] {
+	display: flex !important;
+	flex-direction: column !important;
+	height: 100% !important;
+}
+
+[data-drafting-table-header] {
+	flex-shrink: 0 !important;
+}
+
+/* Make sure content area can scroll */
+.drafting-table-content > div:first-child {
+	height: 100% !important;
+}
+/* -------------------------------------- */
+
+/* Body, html, root global scrollbar hide */
+html,
+body,
+#root {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+/* Dialog-specific scrollbar hide */
+[data-slot='dialog-content']::-webkit-scrollbar,
+[data-slot='dialog-content'] *::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+[data-slot='dialog-content'],
+[data-slot='dialog-content'] * {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+/* Explicitly hide native scrollbar within IdentityDialog scroll container */
+[data-slot='dialog-content'] .scrollbar-hide,
+[data-slot='dialog-content'] .scrollbar-hide * {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+[data-slot='dialog-content'] .scrollbar-hide::-webkit-scrollbar,
+[data-slot='dialog-content'] .scrollbar-hide *::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+/* Identity Dialog specific scrollbar hiding */
+.identity-dialog-scroll-container {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+.identity-dialog-scroll-container::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+	background: transparent !important;
+}
+
+.identity-dialog-scroll-container::-webkit-scrollbar-track {
+	display: none !important;
+	background: transparent !important;
+}
+
+.identity-dialog-scroll-container::-webkit-scrollbar-thumb {
+	display: none !important;
+	background: transparent !important;
+}
+
+/* Force hide scrollbar for all child elements */
+.identity-dialog-scroll-container *::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+/* Additional rules for open dialog state */
+[data-slot='dialog-content'][data-state='open'] .identity-dialog-scroll-container {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+	overflow: -moz-scrollbars-none !important;
+}
+
+[data-slot='dialog-content'][data-state='open']
+	.identity-dialog-scroll-container::-webkit-scrollbar,
+[data-slot='dialog-content'][data-state='open']
+	.identity-dialog-scroll-container::-webkit-scrollbar-track,
+[data-slot='dialog-content'][data-state='open']
+	.identity-dialog-scroll-container::-webkit-scrollbar-thumb {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+	visibility: hidden !important;
+}
+
+/* -------------------------------------- */
+
+/* --- Search Results Table Custom Scrollbar --- */
+.search-results-table {
+	/* Allow the custom 2px scrollbar to render outside the border */
+	overflow: visible !important;
+	border-radius: 8px !important;
+	background-color: transparent !important; /* Body tint applied to inner scroller for uniform color */
+}
+
+.search-results-table .scrollbar-hide {
+	height: 100% !important;
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+	/* Visible composite of #AFD6EF at 25% over white */
+	background-color: #ebf5fb !important;
+}
+
+.search-results-table .scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+/* -------------------------------------- */
+
+/* Ensure search results content respects rounded corners when scrollbar is outside */
+.search-results-table .scrollbar-hide {
+	border-radius: 8px !important;
+}
+
+/* --- Test Preview Panel Custom Scrollbar --- */
+.test-preview-panel-content {
+	overflow: visible !important;
+}
+
+.test-preview-panel-content .scrollbar-hide {
+	height: 100% !important;
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+.test-preview-panel-content .scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+/* Force hide webkit scrollbar */
+.test-preview-panel-content::-webkit-scrollbar,
+.test-preview-panel-content *::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+.test-preview-panel-content,
+.test-preview-panel-content * {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+/* Fix for TestPreviewPanel border rendering */
+[data-test-preview-panel] {
+	/* Force proper rendering with hardware acceleration */
+	will-change: transform;
+}
+
+/* Ensure corners render properly */
+[data-test-preview-panel] * {
+	backface-visibility: hidden;
+	-webkit-backface-visibility: hidden;
+}
+/* -------------------------------------- */
+
+/* Remove any background dividers from metrics column */
+.campaigns-table-container thead th:nth-child(2),
+.campaigns-table-container tbody td:nth-child(2) {
+	background: none !important;
+}
+
+/* Center the metric dividers in the gaps (accounting for 2px divider width) */
+.campaigns-table-container td:nth-child(2) .absolute[style*='right'] {
+	/* Default: gap-8 (32px) - divider centered at 16px - 1px = 15px */
+	right: calc(-1rem - 1px) !important;
+}
+
+/* Medium screens: gap-10 (40px) - divider centered at 20px - 1px = 19px */
+@media (min-width: 768px) {
+	.campaigns-table-container td:nth-child(2) .absolute[style*='right'] {
+		right: calc(-1.25rem - 1px) !important;
+	}
+}
+
+/* Large screens: gap-12 (48px) - divider centered at 24px - 1px = 23px */
+@media (min-width: 1024px) {
+	.campaigns-table-container td:nth-child(2) .absolute[style*='right'] {
+		right: calc(-1.5rem - 1px) !important;
+	}
+}
+
+/* Ensure dividers maintain consistent 2px width in portrait orientation */
+@media (orientation: portrait) {
+	.campaigns-table-container td:nth-child(2) .absolute.top-1\/2 {
+		width: 2px !important;
+		min-width: 2px !important;
+		max-width: 2px !important;
+		/* Prevent any distortion */
+		box-sizing: border-box !important;
+		border: none !important;
+		outline: none !important;
+	}
+}
+
+/* Force divider dimensions to be consistent */
+.campaigns-table-container td:nth-child(2) .h-\[17px\].w-\[2px\] {
+	height: 17px !important;
+	width: 2px !important;
+	min-width: 2px !important;
+	max-width: 2px !important;
+	/* Prevent any scaling or transform issues */
+	transform-origin: center center;
+	backface-visibility: hidden;
+	-webkit-backface-visibility: hidden;
+}
+
+/* Additional specificity for portrait mode height changes */
+@media (orientation: portrait) and (max-height: 1000px) {
+	.campaigns-table-container td:nth-child(2) .absolute {
+		width: 2px !important;
+		transform: translateY(-50%) scaleX(1) !important;
+		-webkit-transform: translateY(-50%) scaleX(1) !important;
+	}
+}
+
+/* Prevent sub-pixel rendering issues on all dividers */
+.campaigns-table-container td:nth-child(2) .absolute.h-\[17px\].w-\[2px\] {
+	/* Force pixel-perfect rendering */
+	image-rendering: -webkit-optimize-contrast;
+	image-rendering: crisp-edges;
+	-webkit-font-smoothing: none;
+	/* Ensure consistent rendering */
+	will-change: auto;
+	contain: strict;
+}
+
+/* Fix for high DPI displays and zoom levels */
+@media (-webkit-min-device-pixel-ratio: 1.5), (min-resolution: 144dpi) {
+	.campaigns-table-container td:nth-child(2) .absolute {
+		width: 2px !important;
+		transform: translateY(-50%) translateZ(0) !important;
+		-webkit-transform: translateY(-50%) translateZ(0) !important;
+	}
+}
+
+/* Removed gradient-based dividers - using absolute positioned elements instead */
+
+/* Make entire row light up on hover in My Campaigns table but keep metric boxes' original colors */
+
+/* Search results: selected row fill without white column dividers */
+.search-results-table [data-slot='table-row'][data-state='selected'] {
+	transform: none !important;
+	-webkit-transform: none !important; /* Safari/macOS */
+	/* Prevent row-level background from overflowing rounded cell borders */
+	background-color: transparent !important;
+}
+
+.search-results-table
+	[data-slot='table-row'][data-state='selected']
+	[data-slot='table-cell'] {
+	/* Use an inset shadow fill so color never paints outside rounded borders */
+	background-color: transparent !important;
+	box-shadow: inset 0 0 0 100vmax #d6e8d9 !important;
+}
+
+/* macOS/Safari: eliminate hairline gaps by using separate borders and no spacing */
+.search-results-table table[data-slot='table'] {
+	border-collapse: separate !important;
+	border-spacing: 0 !important;
+}
+
+/* Keep borders visible so fill stays inside the stroke */
+.search-results-table
+	[data-slot='table-row'][data-state='selected']
+	[data-slot='table-cell'] {
+	outline: 0;
+}
+
+/* --- Search Results Table Card UI --- */
+.search-results-table table[data-slot='table'] {
+	border-collapse: separate !important;
+	border-spacing: 0 8px !important; /* vertical gap between rows only */
+	padding: 0 8px !important;
+}
+
+.search-results-table thead[data-slot='table-header'] {
+	display: block !important;
+	padding: 0 8px !important;
+	/* Collapse header vertical footprint for in-box sticky header layout */
+	height: 0 !important;
+	margin: 0 !important;
+	margin-bottom: -8px !important; /* cancel table border-spacing below header */
+}
+
+.search-results-table thead tr[data-slot='table-row'] {
+	display: table !important;
+	width: 100% !important;
+	table-layout: fixed !important;
+	height: 0 !important;
+}
+
+.search-results-table th[data-slot='table-head'] {
+	border: none !important;
+	height: 0 !important;
+	padding-top: 0 !important;
+	padding-bottom: 0 !important;
+	line-height: 0 !important;
+}
+
+.search-results-table tbody[data-slot='table-body'] {
+	display: block !important;
+	padding: 0 8px !important;
+}
+
+.search-results-table tr[data-slot='table-row'],
+.search-results-table tr[data-slot='table-row'][data-state='selected'] {
+	border: none !important;
+	background-color: transparent !important;
+	box-shadow: none !important;
+	display: table !important;
+	width: 100% !important;
+	table-layout: fixed !important;
+}
+
+/* Also suppress row-level hover background so only cells colorize */
+.search-results-table tr[data-slot='table-row']:hover {
+	background-color: transparent !important;
+}
+
+.search-results-table td[data-slot='table-cell'] {
+	background-color: white;
+	border-top: 1px solid #000;
+	border-bottom: 1px solid #000;
+	padding-top: 4px !important;
+	padding-bottom: 4px !important;
+	/* Create a clipping context so selection fill never bleeds outside */
+	position: relative !important;
+	overflow: hidden !important;
+	z-index: 0 !important;
+}
+
+.search-results-table td[data-slot='table-cell']:first-child {
+	border-left: 1px solid #000;
+	border-top-left-radius: 8px;
+	border-bottom-left-radius: 8px;
+}
+
+.search-results-table td[data-slot='table-cell']:last-child {
+	border-right: 1px solid #000;
+	border-top-right-radius: 8px;
+	border-bottom-right-radius: 8px;
+}
+
+.search-results-table tr[data-slot='table-row']:hover td[data-slot='table-cell'] {
+	background-color: #edf5ee !important;
+}
+.search-results-table
+	tr[data-slot='table-row'][data-state='selected']
+	td[data-slot='table-cell'] {
+	background-color: #d6e8d9 !important;
 }

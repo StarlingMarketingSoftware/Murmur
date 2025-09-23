@@ -2,10 +2,7 @@ import { useState, useRef } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import { Contact } from '@prisma/client';
 import { TableDeleteRowButton } from '@/components/molecules/TableDeleteRowButton/TableDeleteRowButton';
-import {
-	NoDataCell,
-	TableSortingButton,
-} from '@/components/molecules/CustomTable/CustomTable';
+import { NoDataCell } from '@/components/molecules/CustomTable/CustomTable';
 import { useBatchCreateContacts } from '@/hooks/queryHooks/useContacts';
 import { toast } from 'sonner';
 import Papa from 'papaparse';
@@ -20,6 +17,7 @@ export interface ContactTSVUploadDialogProps {
 	triggerText: string;
 	buttonVariant?: ButtonVariants['variant'];
 	className?: string;
+	fullScreen?: boolean;
 }
 
 type ContactInput = PostBatchContactData['contacts'][number];
@@ -36,9 +34,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 	const publicColumns: ColumnDef<ContactInput>[] = [
 		{
 			accessorKey: 'firstName',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="First Name" />;
-			},
+			header: 'First Name',
 			cell: ({ row }) => {
 				const name: string = row.getValue('firstName');
 				if (!name) return <NoDataCell />;
@@ -47,9 +43,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'lastName',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Last Name" />;
-			},
+			header: 'Last Name',
 			cell: ({ row }) => {
 				const name: string = row.getValue('lastName');
 				if (!name) return <NoDataCell />;
@@ -58,9 +52,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'email',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Email" />;
-			},
+			header: 'Email',
 			cell: ({ row }) => {
 				const email: string = row.getValue('email');
 				if (!email) return <NoDataCell />;
@@ -69,9 +61,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'company',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Company" />;
-			},
+			header: 'Company',
 			cell: ({ row }) => {
 				const company: string = row.getValue('company');
 				if (!company) return <NoDataCell />;
@@ -80,9 +70,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'title',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Title" />;
-			},
+			header: 'Title',
 			cell: ({ row }) => {
 				const title: string = row.getValue('title');
 				if (!title) return <NoDataCell />;
@@ -91,9 +79,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'headline',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Headline" />;
-			},
+			header: 'Headline',
 			cell: ({ row }) => {
 				const headline: string = row.getValue('headline');
 				if (!headline) return <NoDataCell />;
@@ -102,9 +88,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'address',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Address" />;
-			},
+			header: 'Address',
 			cell: ({ row }) => {
 				const address: string = row.getValue('address');
 				if (!address) return <NoDataCell />;
@@ -113,9 +97,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'city',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="City" />;
-			},
+			header: 'City',
 			cell: ({ row }) => {
 				const city: string = row.getValue('city');
 				if (!city) return <NoDataCell />;
@@ -124,9 +106,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'state',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="State" />;
-			},
+			header: 'State',
 			cell: ({ row }) => {
 				const state: string = row.getValue('state');
 				if (!state) return <NoDataCell />;
@@ -135,9 +115,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'country',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Country" />;
-			},
+			header: 'Country',
 			cell: ({ row }) => {
 				const country: string = row.getValue('country');
 				if (!country) return <NoDataCell />;
@@ -146,9 +124,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'phone',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Phone" />;
-			},
+			header: 'Phone',
 			cell: ({ row }) => {
 				const phone: string = row.getValue('phone');
 				if (!phone) return <NoDataCell />;
@@ -157,9 +133,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'website',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Website" />;
-			},
+			header: 'Website',
 			cell: ({ row }) => {
 				const website: string = row.getValue('website');
 				if (!website) return <NoDataCell />;
@@ -168,9 +142,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'linkedInUrl',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="LinkedIn URL" />;
-			},
+			header: 'LinkedIn URL',
 			cell: ({ row }) => {
 				const linkedInUrl: string = row.getValue('linkedInUrl');
 				if (!linkedInUrl) return <NoDataCell />;
@@ -179,9 +151,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'photoUrl',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Photo URL" />;
-			},
+			header: 'Photo URL',
 			cell: ({ row }) => {
 				const photoUrl: string = row.getValue('photoUrl');
 				if (!photoUrl) return <NoDataCell />;
@@ -190,9 +160,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'metadata',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Metadata" />;
-			},
+			header: 'Metadata',
 			cell: ({ row }) => {
 				const metadata: string = row.getValue('metadata');
 				if (!metadata) return <NoDataCell />;
@@ -204,9 +172,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 	const adminColumns: ColumnDef<ContactInput>[] = [
 		{
 			accessorKey: 'companyLinkedInUrl',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Company LinkedIn URL" />;
-			},
+			header: 'Company LinkedIn URL',
 			cell: ({ row }) => {
 				const companyLinkedInUrl: string = row.getValue('companyLinkedInUrl');
 				if (!companyLinkedInUrl) return <NoDataCell />;
@@ -215,9 +181,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'companyFoundedYear',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Company Founded Year" />;
-			},
+			header: 'Company Founded Year',
 			cell: ({ row }) => {
 				const companyFoundedYear: string = row.getValue('companyFoundedYear');
 				if (!companyFoundedYear) return <NoDataCell />;
@@ -226,9 +190,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'companyType',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Company Type" />;
-			},
+			header: 'Company Type',
 			cell: ({ row }) => {
 				const companyType: string = row.getValue('companyType');
 				if (!companyType) return <NoDataCell />;
@@ -237,9 +199,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'companyTechStack',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Company Tech Stack" />;
-			},
+			header: 'Company Tech Stack',
 			cell: ({ row }) => {
 				const companyTechStack: string[] = row.getValue('companyTechStack');
 				if (!companyTechStack || companyTechStack.length === 0) return <NoDataCell />;
@@ -248,9 +208,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'companyPostalCode',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Company Postal Code" />;
-			},
+			header: 'Company Postal Code',
 			cell: ({ row }) => {
 				const companyPostalCode: string = row.getValue('companyPostalCode');
 				if (!companyPostalCode) return <NoDataCell />;
@@ -259,9 +217,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'companyKeywords',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Company Keywords" />;
-			},
+			header: 'Company Keywords',
 			cell: ({ row }) => {
 				const companyKeywords: string[] = row.getValue('companyKeywords');
 				if (!companyKeywords || companyKeywords.length === 0) return <NoDataCell />;
@@ -270,9 +226,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		},
 		{
 			accessorKey: 'companyIndustry',
-			header: ({ column }) => {
-				return <TableSortingButton column={column} label="Company Industry" />;
-			},
+			header: 'Company Industry',
 			cell: ({ row }) => {
 				const companyIndustry: string = row.getValue('companyIndustry');
 				if (!companyIndustry) return <NoDataCell />;
@@ -293,7 +247,7 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 
 	const columns: ColumnDef<ContactInput>[] = publicColumns;
 
-	const { isAdmin, triggerText, buttonVariant, className } = props;
+	const { isAdmin, triggerText, buttonVariant, className, fullScreen } = props;
 
 	if (isAdmin) {
 		columns.push(...adminColumns);
@@ -439,5 +393,6 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		buttonVariant,
 		isAdmin,
 		className,
+		fullScreen,
 	};
 };

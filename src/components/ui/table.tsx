@@ -31,20 +31,18 @@ function Table({
 	);
 }
 
-const tableHeaderVariants = cva(
-	'[&_tr]:border-b-2 [&_tr]:border-black',
-	{
-		variants: {
-			variant: {
-				primary: 'text-[15px] font-primary',
-				secondary: 'text-[15px] font-secondary bg-primary',
-			},
+const tableHeaderVariants = cva('', {
+	variants: {
+		variant: {
+			primary: 'text-[15px] font-primary [&_tr]:border-b-2 [&_tr]:border-black',
+			secondary:
+				'text-[15px] font-secondary bg-[#F8F8F8] [&_tr]:bg-[#F8F8F8] [&_th]:bg-[#F8F8F8]',
 		},
-		defaultVariants: {
-			variant: 'primary',
-		},
-	}
-);
+	},
+	defaultVariants: {
+		variant: 'primary',
+	},
+});
 
 interface TableHeaderProps extends React.ComponentProps<'thead'> {
 	variant?: 'primary' | 'secondary';
@@ -131,8 +129,9 @@ const tableRowVariants = cva(
 	{
 		variants: {
 			variant: {
-				primary: 'text-[15px] odd:bg-gray-50 even:bg-white border-black data-[state=selected]:!bg-primary/30 data-[state=selected]:shadow-inner data-[state=selected]:font-medium data-[state=selected]:scale-[1.005]',
-				secondary: 'text-[15px] font-secondary bg-background border-gray-200',
+				primary:
+					'text-[15px] odd:bg-gray-50 even:bg-background border-black data-[state=selected]:shadow-inner data-[state=selected]:font-medium',
+				secondary: 'text-[15px] font-secondary bg-background border-gray-200 py-2',
 			},
 		},
 		defaultVariants: {
@@ -156,12 +155,12 @@ function TableRow({
 }
 
 const tableHeadVariants = cva(
-	'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap overflow-hidden text-ellipsis [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] bg-background border-b-2 border-black',
+	'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap overflow-hidden text-ellipsis [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] bg-background',
 	{
 		variants: {
 			variant: {
-				primary: '',
-				secondary: 'font-secondary',
+				primary: 'border-b-2 border-black',
+				secondary: 'font-secondary border-b border-[#8C8C8C]',
 			},
 		},
 		defaultVariants: {
@@ -190,7 +189,7 @@ const tableCellVariants = cva(
 		variants: {
 			variant: {
 				primary: 'text-sm font-secondary',
-				secondary: 'text-[15px] font-secondary bg-background',
+				secondary: 'text-[15px] font-secondary py-3',
 			},
 		},
 		defaultVariants: {

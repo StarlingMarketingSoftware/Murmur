@@ -16,6 +16,11 @@ const nextConfig: NextConfig = {
 		ignoreDuringBuilds: process.env.VERCEL ? true : false, // ignore build errors in production
 	},
 	productionBrowserSourceMaps: false,
+	transpilePackages: ['gsap', 'lenis'],
+	// Optimize for Vercel deployment
+	compiler: {
+		removeConsole: process.env.NODE_ENV === 'production',
+	},
 };
 
 export default nextConfig;

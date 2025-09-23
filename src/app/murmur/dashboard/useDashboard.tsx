@@ -3,7 +3,8 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { EmailVerificationStatus, UserContactList } from '@prisma/client';
+import { EmailVerificationStatus } from '@/constants/prismaEnums';
+import type { UserContactList } from '@prisma/client';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { urls } from '@/constants/urls';
@@ -12,17 +13,24 @@ import {
 	useGetContacts,
 	useGetUsedContactIds,
 } from '@/hooks/queryHooks/useContacts';
-import { CellContext, ColumnDef, Table } from '@tanstack/react-table';
+import { ColumnDef, Table } from '@tanstack/react-table';
 import { ContactWithName } from '@/types/contact';
 import { useCreateApolloContacts } from '@/hooks/queryHooks/useApollo';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { toast } from 'sonner';
 
-import { capitalize } from '@/utils/string';
+import { capitalize, getStateAbbreviation } from '@/utils/string';
 import { TableCellTooltip } from '@/components/molecules/TableCellTooltip/TableCellTooltip';
+import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
+import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import { useMe } from '@/hooks/useMe';
 import { StripeSubscriptionStatus } from '@/types';
 import { usePageTransition } from '@/contexts/PageTransitionContext';
+import {
+	canadianProvinceNames,
+	canadianProvinceAbbreviations,
+	stateBadgeColorMap,
+} from '@/constants/ui';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -84,6 +92,7 @@ export const useDashboard = () => {
 	const [tableInstance, setTableInstance] = useState<Table<ContactWithName>>();
 	const [usedContactIdsSet, setUsedContactIdsSet] = useState<Set<number>>(new Set());
 	const [hoveredText, setHoveredText] = useState('');
+	const [hoveredContact, setHoveredContact] = useState<ContactWithName | null>(null);
 
 	const {
 		data: contacts,
@@ -129,6 +138,19 @@ export const useDashboard = () => {
 			console.log('Search triggered with query:', activeSearchQuery);
 		}
 	}, [hasSearched, activeSearchQuery, activeExcludeUsedContacts, limit]);
+
+	// Keep the form input in sync with the active query on results view
+	useEffect(() => {
+		if (hasSearched) {
+			const current = form.getValues('searchText');
+			if (activeSearchQuery !== current) {
+				form.setValue('searchText', activeSearchQuery, {
+					shouldValidate: false,
+					shouldDirty: false,
+				});
+			}
+		}
+	}, [hasSearched, activeSearchQuery, form]);
 
 	useEffect(() => {
 		if (isError && error && hasSearched && activeSearchQuery) {
@@ -259,9 +281,9 @@ export const useDashboard = () => {
 		setTableInstance(table);
 	};
 
-	const handleCellHover = (text: string | null) => {
+	const handleCellHover = useCallback((text: string | null) => {
 		setHoveredText(text || '');
-	};
+	}, []);
 
 	/* EFFECTS */
 	useEffect(() => {
@@ -284,49 +306,202 @@ export const useDashboard = () => {
 		return firstName.length > 0 || lastName.length > 0;
 	}, []);
 
-	// Since pagination is disabled, check if majority of contacts have names
-	const visibleRowsHaveNames = useMemo(() => {
-		if (!contacts || contacts.length === 0) return false;
-
-		// Check what percentage of contacts have names
-		const contactsWithNames = contacts.filter((contact) => contactHasName(contact));
-		const ratio = contactsWithNames.length / contacts.length;
-		const threshold = 0.7; // 70% threshold for header to be fully visible
-
-		return ratio > threshold; // Header is visible if more than 70% have names
-	}, [contacts, contactHasName]);
-
-	// Dynamically build columns based on whether names exist in contacts
+	// Build columns for the table
 	const columns = useMemo(() => {
-		// Check if any contact has a firstName or lastName
-		const hasNames =
-			contacts &&
-			contacts.length > 0 &&
-			contacts.some((contact) => contactHasName(contact));
-
 		const allColumns: ColumnDef<ContactWithName>[] = [
 			{
 				accessorKey: 'company',
-				size: 150,
-				header: () => <span className="font-bold">Company</span>,
+				id: 'nameAndCompany',
+				header: () => <span className="sr-only">Name</span>,
 				cell: ({ row }) => {
+					const contact = row.original as ContactWithName;
+					// Compute name from firstName and lastName fields
+					const hasName = contactHasName(contact);
+					const nameValue = hasName ? computeName(contact) : '';
+					const companyValue = contact.company || '';
+					const hasCompany = !!companyValue;
+
+					// Debug log to see actual data
+					if (row.index === 0) {
+						console.log('First contact data:', {
+							contact,
+							firstName: contact.firstName,
+							lastName: contact.lastName,
+							hasName,
+							nameValue,
+							company: contact.company,
+							hasCompany,
+						});
+					}
+
+					// If neither name nor company, show a dash
+					if (!hasName && !hasCompany) {
+						return (
+							<div className="flex flex-col gap-0.5 py-1">
+								<div className="truncate">
+									<span className="select-none text-gray-300 dark:text-gray-700">—</span>
+								</div>
+								<div className="truncate text-sm text-gray-500 dark:text-gray-400">
+									&nbsp;
+								</div>
+							</div>
+						);
+					}
+
+					if (!hasName || !hasCompany) {
+						const textToShow = hasName ? nameValue : companyValue;
+						if (!hasName && hasCompany) {
+							return (
+								<div className="flex flex-col justify-center py-1 h-[2.75rem]">
+									<div className="truncate font-bold font-primary text-[16px]">
+										<TableCellTooltip
+											text={textToShow}
+											maxLength={MAX_CELL_LENGTH}
+											positioning="below-right"
+											onHover={handleCellHover}
+										/>
+									</div>
+								</div>
+							);
+						}
+						return (
+							<div className="flex flex-col gap-0.5 py-1">
+								<div className="truncate font-bold font-primary text-[16px]">
+									<TableCellTooltip
+										text={textToShow}
+										maxLength={MAX_CELL_LENGTH}
+										positioning="below-right"
+										onHover={handleCellHover}
+									/>
+								</div>
+								<div className="truncate text-sm text-gray-500 dark:text-gray-400">
+									&nbsp;
+								</div>
+							</div>
+						);
+					}
+
 					return (
-						<TableCellTooltip
-							text={row.getValue('company')}
-							maxLength={MAX_CELL_LENGTH}
-							positioning="below-right"
-							onHover={handleCellHover}
-						/>
+						<div className="flex flex-col gap-0.5 py-1">
+							<div className="truncate font-bold font-primary text-[16px]">
+								<TableCellTooltip
+									text={nameValue}
+									maxLength={MAX_CELL_LENGTH}
+									positioning="below-right"
+									onHover={handleCellHover}
+								/>
+							</div>
+							<div className="truncate text-sm text-gray-500 dark:text-gray-400">
+								<TableCellTooltip
+									text={companyValue}
+									maxLength={MAX_CELL_LENGTH}
+									positioning="below-right"
+									onHover={handleCellHover}
+								/>
+							</div>
+						</div>
+					);
+				},
+			},
+			{
+				accessorKey: 'title',
+				size: 250, // Even width distribution
+				header: () => <span className="sr-only">Title</span>,
+				cell: ({ row }) => {
+					const text = (row.getValue('title') as string) || '';
+					return (
+						<div
+							className="relative ml-2 title-cell-container overflow-hidden"
+							style={{
+								width: '230px',
+								height: '19px',
+								backgroundColor: '#E8EFFF',
+								border: '0.7px solid #000000',
+								borderRadius: '8px',
+							}}
+						>
+							<div className="h-full w-full flex items-center px-2">
+								<ScrollableText
+									text={text}
+									className="text-[14px] leading-none text-black"
+								/>
+							</div>
+						</div>
+					);
+				},
+			},
+			{
+				id: 'place',
+				size: 180, // Even width distribution
+				header: () => <span className="sr-only">Place</span>,
+				cell: ({ row }) => {
+					const contact = row.original as ContactWithName;
+					const fullStateName = (contact.state as string) || '';
+					const stateAbbr = getStateAbbreviation(fullStateName) || '';
+					const city = (contact.city as string) || '';
+
+					const normalizedState = fullStateName.trim();
+					const lowercaseCanadianProvinceNames = canadianProvinceNames.map((s) =>
+						s.toLowerCase()
+					);
+					const isCanadianProvince =
+						lowercaseCanadianProvinceNames.includes(normalizedState.toLowerCase()) ||
+						canadianProvinceAbbreviations.includes(normalizedState.toUpperCase()) ||
+						canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+
+					if (!stateAbbr && !city) {
+						return (
+							<div className="flex items-center gap-2">
+								<span className="select-none text-gray-300 dark:text-gray-700">—</span>
+							</div>
+						);
+					}
+
+					return (
+						<div className="flex items-center gap-2">
+							{stateAbbr &&
+								(isCanadianProvince ? (
+									<div
+										className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
+										style={{ borderColor: 'rgba(0,0,0,0.7)' }}
+										title="Canadian province"
+									>
+										<CanadianFlag width="100%" height="100%" className="w-full h-full" />
+									</div>
+								) : /\b[A-Z]{2}\b/.test(stateAbbr) ? (
+									<span
+										className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
+										style={{
+											backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
+											borderColor: 'rgba(0,0,0,0.7)',
+										}}
+									>
+										{stateAbbr}
+									</span>
+								) : (
+									<span
+										className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
+										style={{ borderColor: 'rgba(0,0,0,0.7)' }}
+									/>
+								))}
+							{city && (
+								<TableCellTooltip
+									text={city}
+									maxLength={MAX_CELL_LENGTH}
+									positioning="below-right"
+									onHover={handleCellHover}
+								/>
+							)}
+						</div>
 					);
 				},
 			},
 			{
 				accessorKey: 'email',
-				size: 150,
-				header: () => <span className="font-bold">Email</span>,
+				size: 280, // Even width distribution
+				header: () => <span className="sr-only">Email</span>,
 				cell: ({ row }) => {
 					const email = (row.getValue('email') as string) || '';
-					// Always blur all emails
 					return (
 						<div className="text-left whitespace-nowrap overflow-visible relative">
 							<span className="email-obfuscated-local inline-block">{email}</span>
@@ -334,125 +509,16 @@ export const useDashboard = () => {
 					);
 				},
 			},
-			// Name column - conditionally included (always show if ANY contact has names)
-			...(hasNames
-				? [
-						{
-							accessorKey: 'firstName' as const, // Use firstName as key but display computed name
-							id: 'name', // Custom id for the column
-							size: 150,
-							header: () => {
-								return (
-									<span
-										className={`font-bold transition-all duration-700 ease-in-out ${
-											visibleRowsHaveNames
-												? 'text-black dark:text-white'
-												: 'text-gray-300 dark:text-gray-600'
-										}`}
-										style={{
-											opacity: visibleRowsHaveNames ? 1 : 0.25,
-											transform: visibleRowsHaveNames
-												? 'scale(1) translateY(0)'
-												: 'scale(0.9) translateY(2px)',
-											filter: visibleRowsHaveNames ? 'blur(0px)' : 'blur(0.5px)',
-										}}
-										title={
-											visibleRowsHaveNames
-												? 'Most contacts have names'
-												: 'Most contacts lack names - column faded'
-										}
-									>
-										Name
-									</span>
-								);
-							},
-							cell: ({ row }: CellContext<ContactWithName, unknown>) => {
-								const contact = row.original as ContactWithName;
-								const hasName = contactHasName(contact);
-								const nameValue = hasName ? computeName(contact) : '';
-								return (
-									<div
-										className={`truncate transition-all duration-500 ease-in-out hover:scale-105 ${
-											hasName
-												? 'text-black dark:text-white'
-												: 'text-gray-300 dark:text-gray-700'
-										}`}
-										style={{
-											opacity: hasName ? 1 : 0.2,
-											transform: hasName ? 'scale(1)' : 'scale(0.85)',
-										}}
-									>
-										{hasName ? (
-											<TableCellTooltip
-												text={nameValue}
-												maxLength={MAX_CELL_LENGTH}
-												positioning="below-right"
-												onHover={handleCellHover}
-											/>
-										) : (
-											<span className="select-none">—</span>
-										)}
-									</div>
-								);
-							},
-						},
-				  ]
-				: []),
-			{
-				accessorKey: 'city',
-				size: 150,
-				header: () => <span className="font-bold">City</span>,
-				cell: ({ row }) => {
-					return (
-						<TableCellTooltip
-							text={row.getValue('city')}
-							maxLength={MAX_CELL_LENGTH}
-							positioning="below-right"
-							onHover={handleCellHover}
-						/>
-					);
-				},
-			},
-			{
-				accessorKey: 'state',
-				size: 150,
-				header: () => <span className="font-bold">State</span>,
-				cell: ({ row }) => {
-					return (
-						<TableCellTooltip
-							text={row.getValue('state')}
-							maxLength={MAX_CELL_LENGTH}
-							positioning="below-right"
-							onHover={handleCellHover}
-						/>
-					);
-				},
-			},
-			{
-				accessorKey: 'title',
-				size: 150,
-				header: () => <span className="font-bold">Description</span>,
-				cell: ({ row }) => {
-					return (
-						<TableCellTooltip
-							text={row.getValue('title')}
-							maxLength={MAX_CELL_LENGTH}
-							positioning="below-left"
-							onHover={handleCellHover}
-						/>
-					);
-				},
-			},
 		];
 
 		return allColumns;
 	}, [
-		contacts,
-		usedContactIdsSet,
-		visibleRowsHaveNames,
 		contactHasName,
 		computeName,
-		MAX_CELL_LENGTH,
+		handleCellHover,
+		stateBadgeColorMap,
+		canadianProvinceNames,
+		canadianProvinceAbbreviations,
 	]);
 
 	return {
@@ -491,5 +557,7 @@ export const useDashboard = () => {
 		hasSearched,
 		handleResetSearch,
 		hoveredText,
+		hoveredContact,
+		setHoveredContact,
 	};
 };

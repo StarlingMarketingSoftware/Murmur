@@ -4,7 +4,7 @@ import { Button } from '../../ui/button';
 import { toast } from 'sonner';
 import { User } from '@prisma/client';
 import { useCreateCustomerPortal } from '@/hooks/queryHooks/useStripeCheckouts';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/utils';
 import { urls } from '@/constants/urls';
 import { BASE_URL } from '@/constants';
 
@@ -43,7 +43,7 @@ const UpdateSubscriptionButton: FC<UpdateSubscriptionButtonProps> = ({
 
 	return (
 		<Button
-			className={twMerge('', className)}
+			className={cn('', className)}
 			onClick={handleClick}
 			disabled={isPending}
 			isLoading={isPending}

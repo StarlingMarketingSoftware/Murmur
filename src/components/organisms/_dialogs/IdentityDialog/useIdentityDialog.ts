@@ -15,6 +15,8 @@ export interface IdentityDialogProps {
 	triggerButton?: ReactNode;
 	onOpenChange: (open: boolean) => void;
 	campaign: Campaign;
+	backButtonText?: string;
+	backButtonMode?: 'close' | 'historyBack';
 }
 
 export const identityFormSchema = z.object({
@@ -83,6 +85,15 @@ export const useIdentityDialog = (props: IdentityDialogProps) => {
 		}
 	};
 
+	const handleAssignIdentityById = (identityId: number) => {
+		assignIdentity({
+			id: campaign.id,
+			data: {
+				identityId,
+			},
+		});
+	};
+
 	return {
 		title,
 		form,
@@ -102,5 +113,6 @@ export const useIdentityDialog = (props: IdentityDialogProps) => {
 		handleAssignIdentity,
 		isPendingAssignIdentity,
 		setValue,
+		handleAssignIdentityById,
 	};
 };

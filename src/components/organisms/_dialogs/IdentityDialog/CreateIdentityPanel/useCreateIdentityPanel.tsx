@@ -20,25 +20,36 @@ const upsertIdentityFormSchema = z.object({
 	verificationCode: z.string().optional(),
 });
 
+export type UpsertIdentityFormValues = z.infer<typeof upsertIdentityFormSchema>;
+
 export interface CreateIdentityPanelProps {
 	isEdit: boolean;
 	selectedIdentity?: Identity;
 	setShowCreatePanel: Dispatch<SetStateAction<boolean>>;
 	showCreatePanel: boolean;
 	setValue: UseFormSetValue<z.infer<typeof identityFormSchema>>;
+	onContinueWithIdentity?: (identityId: number) => void;
 }
 
 export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
-	const { isEdit, selectedIdentity, setShowCreatePanel, showCreatePanel, setValue } =
-		props;
+	const {
+		isEdit,
+		selectedIdentity,
+		setShowCreatePanel,
+		showCreatePanel,
+		setValue,
+		onContinueWithIdentity,
+	} = props;
 
+	// Total countdown time (10 minutes)
+	const COUNTDOWN_TOTAL = 600;
 	const [countdown, setCountdown] = useState<number | null>(null);
 	const [isCodeVerified, setIsCodeVerified] = useState(false);
 	const countdownInterval = useRef<NodeJS.Timeout | null>(null);
 
 	const isCodeExpired = countdown === 0;
 
-	const form = useForm<z.infer<typeof upsertIdentityFormSchema>>({
+	const form = useForm<UpsertIdentityFormValues>({
 		mode: 'onTouched',
 		resolver: zodResolver(upsertIdentityFormSchema),
 		defaultValues: {
@@ -106,6 +117,8 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 	};
 
 	const countdownDisplay = countdown !== null ? formatCountdown(countdown) : null;
+	const minutesRemaining =
+		countdown !== null ? Math.max(0, Math.floor(countdown / 60)) : null;
 
 	const handleSendEmailVerificationCode = () => {
 		if (!isCodeVerified) {
@@ -163,13 +176,16 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 					content: `<p><span style="font-family: ${DEFAULT_FONT}">Sincerely,</span></p><p></p><p><span style="font-family: ${DEFAULT_FONT}">${values.name}</span></p>`,
 				});
 			}
+			if (onContinueWithIdentity) {
+				onContinueWithIdentity(newIdentity.id);
+			}
 		}
 	};
 
 	// Start countdown when email verification code is sent
 	useEffect(() => {
 		if (isEmailVerificationCodeSent && !isCodeVerified) {
-			setCountdown(600);
+			setCountdown(COUNTDOWN_TOTAL);
 
 			countdownInterval.current = setInterval(() => {
 				setCountdown((prev) => {
@@ -235,6 +251,9 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 		isPendingVerifyCode,
 		isCodeVerified,
 		countdownDisplay,
+		countdownSeconds: countdown,
+		countdownTotal: COUNTDOWN_TOTAL,
+		minutesRemaining,
 		isCodeExpired,
 		isEdit,
 		isPendingSubmit,

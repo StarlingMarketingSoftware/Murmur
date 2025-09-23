@@ -1,5 +1,5 @@
 import { Typography } from '@/components/ui/typography';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/utils';
 
 export interface TabOption<T = string> {
 	value: T;
@@ -27,19 +27,19 @@ export function BlockTabs<T = string>({
 	inactiveTabClassName,
 }: TabsCustomProps<T>) {
 	return (
-		<div className={twMerge('flex gap-2', className)}>
+		<div className={cn('flex gap-2', className)}>
 			{options.map((option) => (
 				<div
 					key={String(option.value)}
-					className={twMerge(
+					className={cn(
 						'h-8 transition border-2',
 						option.disabled && 'opacity-50 pointer-events-none',
 						activeValue === option.value
-							? twMerge(
+							? cn(
 									'border-primary bg-gradient-to-br from-background to-primary/20',
 									activeTabClassName
 							  )
-							: twMerge(
+							: cn(
 									'cursor-pointer outline-1 outline-border bg-transparent hover:bg-primary/10 border-transparent',
 									inactiveTabClassName
 							  ),

@@ -1,15 +1,13 @@
 import * as React from 'react';
 import { Slot as SlotPrimitive } from 'radix-ui';
 import { cva, type VariantProps } from 'class-variance-authority';
-
-import { cn } from '@/utils/index';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/utils';
 import { Spinner } from '../atoms/Spinner/Spinner';
 
 export type ButtonVariants = VariantProps<typeof buttonVariants>;
 
 const buttonVariants = cva(
-	"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-[17px] font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:cursor-pointer font-primary",
+	"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-[17px] font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none hover:cursor-pointer font-primary",
 	{
 		variants: {
 			variant: {
@@ -32,6 +30,7 @@ const buttonVariants = cva(
 					'bg-secondary/10 text-secondary hover:bg-secondary/0 border-secondary border-solid border-1',
 
 				ghost: '',
+				icon: '!h-fit',
 				link: 'text-primary underline-offset-4 hover:underline',
 				product:
 					'bg-medium hover:bg-medium/80 rounded-none !h-19 p-8 text-[30px] !w-full',
@@ -144,7 +143,7 @@ function Button({
 				</div>
 			)}
 			<div
-				className={twMerge(
+				className={cn(
 					isLoading ? 'invisible' : 'visible',
 					'flex gap-2 items-center justify-center',
 					noPadding ? '!p-0' : ''

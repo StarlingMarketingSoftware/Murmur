@@ -1,1 +1,0 @@
-export { MobileAppComingSoon } from './MobileAppComingSoon';

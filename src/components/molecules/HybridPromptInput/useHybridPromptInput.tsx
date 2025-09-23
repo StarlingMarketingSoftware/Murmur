@@ -1,9 +1,10 @@
 import { useFormContext, useFieldArray } from 'react-hook-form';
 import { DragEndEvent } from '@dnd-kit/core';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/emailAutomation/draft/useDraftingSection';
+import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
 import { HybridBlock } from '@prisma/client';
+import { ContactWithName } from '@/types/contact';
 
 export const ORDERED_BLOCKS = [
 	HybridBlock.introduction,
@@ -11,50 +12,107 @@ export const ORDERED_BLOCKS = [
 	HybridBlock.action,
 ] as const;
 
+export type BlockItem = {
+	value: HybridBlock | 'hybrid_automation';
+	label: string;
+	disabled: boolean;
+	showUsed: boolean;
+	position: 'top' | 'bottom';
+};
 export const BLOCKS = [
 	{
 		label: 'Introduction',
 		value: HybridBlock.introduction,
 		help: 'Optional. Write a brief prompt for the AI about how to introduce you. This will include the greeting line and the first paragraph of the email.',
-		placeholder: 'Prompt the AI about how to introduce you...',
+		placeholder: 'Automated Intro',
 	},
 	{
 		label: 'Research Contact',
 		value: HybridBlock.research,
 		help: 'Optional. Write a brief prompt for the AI about how to write about the recipient.',
-		placeholder: 'Prompt the AI about how to write about the recipient...',
+		placeholder: 'Automated Research on who you’re sending to',
 	},
 	{
 		label: 'Call to Action',
 		value: HybridBlock.action,
 		help: 'Optional. Write a brief prompt for the AI about how you want the recipient to respond (email, phone call, etc.)',
-		placeholder: 'Prompt the AI about how you want the recipient to respond...',
+		placeholder: 'Automated Call to Action',
 	},
 	{
 		label: 'Full Automated',
 		value: HybridBlock.full_automated,
 		help: 'Let AI generate the entire email based on your prompt. This will override all other blocks.',
 		placeholder:
-			'Write your prompt for the AI here. For example:\n"Draft an email to schedule a meeting with the marketing team to discuss our Q2 strategy."\nBased on this prompt, the AI will generate a custom email for each recipient.',
+			'Prompt Murmur here. \nTell it what you want to say and it will compose emails based on your instructions. \n\nEx. \n"Compose a professional booking pitch email. Include one or two facts about the venue, introduce my band honestly, highlight our fit for their space, and end with a straightforward next-steps question. Keep tone warm, clear, and brief."',
 	},
 	{
 		label: 'Custom Text',
 		value: HybridBlock.text,
 		help: 'This is a custom text block. Here you should write exact text that you want included in your email.',
-		placeholder: 'Write the exact text you want included in your email...',
+		placeholder: 'Write the exact text you want in your email here. *required',
 	},
 ];
 
-export const useHybridPromptInput = () => {
+export interface HybridPromptInputProps {
+	trackFocusedField?: (
+		fieldName: string,
+		element: HTMLTextAreaElement | HTMLInputElement | null
+	) => void;
+	testMessage?: string | null;
+	handleGenerateTestDrafts?: () => void;
+	isGenerationDisabled?: () => boolean;
+	isPendingGeneration?: boolean;
+	isTest?: boolean;
+	contact?: ContactWithName | null;
+	forceShowTestPreview?: boolean;
+	compactLeftOnly?: boolean;
+}
+
+export const useHybridPromptInput = (props: HybridPromptInputProps) => {
+	const {
+		testMessage,
+		trackFocusedField,
+		handleGenerateTestDrafts,
+		isGenerationDisabled,
+		isPendingGeneration,
+		isTest,
+		contact,
+		forceShowTestPreview,
+	} = props;
+
+	/* HOOKS */
+
 	const form = useFormContext<DraftingFormValues>();
 	const [textBlockCount, setTextBlockCount] = useState(0);
+	const [showTestPreview, setShowTestPreview] = useState(Boolean(forceShowTestPreview));
 
-	const { fields, append, remove, move, insert } = useFieldArray({
+	// Keep external flag in sync
+	useEffect(() => {
+		if (forceShowTestPreview !== undefined) {
+			setShowTestPreview(Boolean(forceShowTestPreview));
+		}
+	}, [forceShowTestPreview]);
+
+	const { fields, append, remove, move, insert, update } = useFieldArray({
 		control: form.control,
 		name: 'hybridBlockPrompts',
 	});
 
+	/* VARIABLES */
+
 	const watchedAvailableBlocks = form.watch('hybridAvailableBlocks');
+
+	const BLOCK_ITEMS: BlockItem[] = [
+		{
+			value: HybridBlock.text,
+			label: 'Text',
+			disabled: false,
+			showUsed: false,
+			position: 'top',
+		},
+	];
+
+	/* FUNCTIONS */
 
 	const findCorrectPosition = (newBlock: string, contents: { type: HybridBlock }[]) => {
 		if (newBlock === HybridBlock.text) return contents.length;
@@ -160,6 +218,34 @@ export const useHybridPromptInput = () => {
 		form.setValue(
 			'hybridAvailableBlocks',
 			watchedAvailableBlocks.filter((b) => b !== block.value)
+		);
+	};
+
+	const handleAddHybridAutomation = () => {
+		if (fields.length > 0) {
+			toast.error('Hybrid Automation requires clearing all existing blocks first.');
+			return;
+		}
+
+		const blocksToAdd = [
+			{ id: HybridBlock.introduction, type: HybridBlock.introduction, value: '' },
+			{ id: HybridBlock.research, type: HybridBlock.research, value: '' },
+			{ id: HybridBlock.action, type: HybridBlock.action, value: '' },
+		];
+
+		blocksToAdd.forEach((block) => {
+			append(block);
+		});
+
+		// Remove these blocks from available blocks
+		form.setValue(
+			'hybridAvailableBlocks',
+			watchedAvailableBlocks.filter(
+				(b) =>
+					b !== HybridBlock.introduction &&
+					b !== HybridBlock.research &&
+					b !== HybridBlock.action
+			)
 		);
 	};
 
@@ -269,17 +355,6 @@ export const useHybridPromptInput = () => {
 		}
 
 		if (blockToBeRemoved.type === HybridBlock.text) {
-			if (
-				(previousBlock?.type !== HybridBlock.text &&
-					previousBlock?.type !== HybridBlock.introduction &&
-					nextBlock?.type === HybridBlock.research) ||
-				nextBlock?.type === HybridBlock.action
-			) {
-				return {
-					canBeRemoved: false,
-					blockWithIssue: HybridBlock.text,
-				};
-			}
 		}
 		return {
 			canBeRemoved: true,
@@ -310,35 +385,6 @@ export const useHybridPromptInput = () => {
 			return;
 		}
 
-		const nextBlock = blockIndex + 1 < fields.length ? fields[blockIndex + 1] : null;
-		const previousBlock = blockIndex > 0 ? fields[blockIndex - 1] : null;
-
-		if (blockToBeRemoved.type === HybridBlock.introduction) {
-			if (
-				(previousBlock?.type !== HybridBlock.text &&
-					nextBlock?.type === HybridBlock.research) ||
-				nextBlock?.type === HybridBlock.action
-			) {
-				toast.error(
-					'Introduction cannot be removed if there is Research or Call to Action after it.'
-				);
-				return;
-			}
-		}
-
-		if (blockToBeRemoved.type === HybridBlock.text) {
-			if (
-				(previousBlock?.type !== HybridBlock.text &&
-					nextBlock?.type === HybridBlock.research) ||
-				nextBlock?.type === HybridBlock.action
-			) {
-				toast.error(
-					'Text block cannot be removed from the beginning if there is Research or Call to Action after it.'
-				);
-				return;
-			}
-		}
-
 		const blockType = fields[blockIndex].type;
 
 		if (blockType !== HybridBlock.text) {
@@ -355,14 +401,51 @@ export const useHybridPromptInput = () => {
 		return block;
 	};
 
+	/* EFFECTS */
+
+	useEffect(() => {
+		if (testMessage) {
+			setShowTestPreview(true);
+		}
+	}, [testMessage]);
+
+	const handleAddTextBlockAt = (index: number) => {
+		const newTextId = `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+		insert(index + 1, {
+			id: newTextId,
+			type: HybridBlock.text,
+			value: '',
+		});
+	};
+
+	const handleToggleCollapse = (id: string) => {
+		const blockIndex = fields.findIndex((field) => field.id === id);
+		if (blockIndex === -1) return;
+		const field = fields[blockIndex];
+		update(blockIndex, { ...field, isCollapsed: !field.isCollapsed });
+	};
+
 	return {
 		handleDragEnd,
 		handleRemoveBlock,
 		handleAddBlock,
+		handleAddHybridAutomation,
+		handleAddTextBlockAt,
+		handleToggleCollapse,
 		getBlock,
 		ORDERED_BLOCKS,
 		form,
 		fields,
 		watchedAvailableBlocks,
+		BLOCK_ITEMS,
+		showTestPreview,
+		setShowTestPreview,
+		trackFocusedField,
+		testMessage,
+		handleGenerateTestDrafts,
+		isGenerationDisabled,
+		isPendingGeneration,
+		isTest,
+		contact,
 	};
 };

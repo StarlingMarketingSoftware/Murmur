@@ -2,7 +2,6 @@
 
 import * as SliderPrimitive from '@radix-ui/react-slider';
 import { cn } from '@/utils/index';
-import { Typography } from '@/components/ui/typography';
 import { useMemo } from 'react';
 
 interface StepSliderProps extends React.ComponentProps<typeof SliderPrimitive.Root> {
@@ -47,6 +46,7 @@ export const StepSlider = ({
 		<div className={cn('relative w-full', disabled && 'opacity-50 pointer-events-none')}>
 			<SliderPrimitive.Root
 				data-slot="slider"
+				data-drag-ignore
 				defaultValue={defaultValue}
 				value={value}
 				min={min}
@@ -56,18 +56,16 @@ export const StepSlider = ({
 					'relative flex w-full touch-none items-center select-none data-[disabled]:opacity-50 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-44 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col',
 					className
 				)}
+				style={{
+					padding: '0 8px',
+				}}
 				{...props}
 			>
 				<SliderPrimitive.Track
 					data-slot="slider-track"
 					className={cn(
-						'bg-gray-400 cursor-pointer relative grow overflow-visible data-[orientation=horizontal]:h-[2px] data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-[1px] data-[disabled]:opacity-50'
+						'bg-black cursor-pointer relative grow overflow-visible data-[orientation=horizontal]:h-[2px] data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-[1px] data-[disabled]:opacity-50'
 					)}
-					style={{
-						marginLeft: '8px',
-						marginRight: '8px',
-						width: 'calc(100% - 16px)',
-					}}
 				>
 					{/* Invisible clickable area overlay */}
 					<div className="absolute inset-0 cursor-pointer -top-[8px] -bottom-[8px] left-0 right-0" />
@@ -78,53 +76,54 @@ export const StepSlider = ({
 						)}
 					/>
 				</SliderPrimitive.Track>
-				{Array.from({ length: _values.length }, (_, index) => (
-					<SliderPrimitive.Thumb
-						data-slot="slider-thumb"
-						key={index}
-						className="bg-transparent ring-ring/50 cursor-pointer block size-4 shrink-0 rounded-full transition-[color] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50 z-10 relative"
-					>
-						{/* Inner dot for visual size reduction */}
-						<div className="absolute inset-0 flex items-center justify-center">
-							<div className="w-3 aspect-square bg-foreground rounded-full"></div>
-						</div>
-					</SliderPrimitive.Thumb>
-				))}
+				{Array.from({ length: _values.length }, (_, index) => {
+					// At 0%, thumb center is at 6px, tick is at 8px. Diff = +2px.
+					// At 100%, thumb center is at (width - 6px), tick is at (width - 8px). Diff = -2px.
+					// We need to apply an offset that interpolates from +2px to -2px.
+					const currentValue = _values[index];
+					const normalizedPosition =
+						max - min === 0 ? 0 : (currentValue - min) / (max - min);
+					const offsetX = 2 - 4 * normalizedPosition;
+
+					return (
+						<SliderPrimitive.Thumb
+							data-slot="slider-thumb"
+							key={index}
+							className="bg-transparent cursor-pointer block size-[12px] shrink-0 rounded-full transition-[color] ring-0 hover:ring-0 focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 z-10 relative"
+							style={{
+								transform: `translateX(${offsetX}px)`,
+							}}
+						>
+							{/* Inner dot for visual size reduction */}
+							<div className="absolute inset-0 flex items-center justify-center">
+								<div className="w-[8px] aspect-square bg-foreground rounded-full"></div>
+							</div>
+						</SliderPrimitive.Thumb>
+					);
+				})}
 			</SliderPrimitive.Root>
-			{/* Step indicators */}
+			{/* Step indicators with pipe symbols */}
 			{showStepIndicators && (
 				<div
-					className={cn('absolute top-0 w-full h-[2px] pointer-events-none transition')}
-					style={{ left: '8px', right: '8px', width: 'calc(100% - 16px)' }}
+					className={cn('absolute top-0 h-full pointer-events-none flex items-center')}
+					style={{
+						left: '8px',
+						right: '8px',
+						width: 'calc(100% - 16px)',
+					}}
 				>
 					{stepPositions.map((position, index) => (
-						<div
+						<span
 							key={index}
-							className="absolute w-[2px] h-8 !bg-foreground -z-10"
+							className="absolute text-foreground text-xs"
 							style={{
 								left: `${position}%`,
-								transform: 'translateX(-50%) translateY(-14px)',
+								transform: 'translateX(-50%)',
 							}}
-						/>
+						>
+							|
+						</span>
 					))}
-				</div>
-			)}{' '}
-			{/* Step labels */}
-			{showStepIndicators && (
-				<div className={cn('flex justify-between w-full mt-2 px-0.5 transition')}>
-					{Array.from({ length: max - min + 1 }, (_, index) => {
-						const value = min + index;
-						return (
-							<div key={index} className="flex justify-center w-2">
-								<Typography
-									className="!text-[10px] mt-3 text-muted-foreground text-center"
-									font="secondary"
-								>
-									{value === 0 ? 'Auto' : value}
-								</Typography>
-							</div>
-						);
-					})}
 				</div>
 			)}
 		</div>

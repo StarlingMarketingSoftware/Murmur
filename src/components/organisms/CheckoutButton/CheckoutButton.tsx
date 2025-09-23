@@ -1,6 +1,7 @@
 'use client';
 import { Button } from '@/components/ui/button';
 import { useCreateCheckoutSession } from '@/hooks/queryHooks/useStripeCheckouts';
+import { BillingCycle } from '@/types';
 import { useClerk } from '@clerk/nextjs';
 import { User } from '@prisma/client';
 
@@ -10,6 +11,7 @@ interface CheckoutButtonProps {
 	onButtonClick?: () => void;
 	user: User | null | undefined;
 	className?: string;
+	billingCycle: BillingCycle;
 }
 
 export function CheckoutButton({
@@ -17,6 +19,7 @@ export function CheckoutButton({
 	buttonText,
 	onButtonClick,
 	className,
+	billingCycle,
 }: CheckoutButtonProps) {
 	const { isSignedIn, redirectToSignIn } = useClerk();
 	const { mutateAsync: checkout, isPending } = useCreateCheckoutSession();
@@ -30,7 +33,7 @@ export function CheckoutButton({
 		if (onButtonClick) {
 			onButtonClick();
 		} else {
-			const res = await checkout({ priceId });
+			const res = await checkout({ priceId, isYearly: billingCycle === 'year' });
 			if (res.url) {
 				window.location.href = res.url;
 			} else {

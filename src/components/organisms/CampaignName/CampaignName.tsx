@@ -3,14 +3,11 @@
 import { FC } from 'react';
 import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { CampaignNameProps, useCampaignName } from './useCampaignName';
 import { Typography } from '@/components/ui/typography';
-import { cn } from '@/utils';
 
 export const CampaignName: FC<CampaignNameProps> = (props) => {
-	const { campaign, isPendingEditCampaign, isEdit, form, onSubmit } =
-		useCampaignName(props);
+	const { campaign, isEdit, form, onSubmit, setIsEdit } = useCampaignName(props);
 
 	return (
 		<>
@@ -26,10 +23,28 @@ export const CampaignName: FC<CampaignNameProps> = (props) => {
 										<FormItem className="">
 											<FormControl>
 												<Input
-													className="!text-[36px] !h-fit mt-1 mb-4 font-primary text-center !w-fit !min-w-0"
+													className="!text-[46px] leading-none !h-fit mt-0 mb-0 text-center !w-fit !min-w-0 !bg-transparent !border-0 !px-0 !py-0 !shadow-none focus:!ring-0 focus-visible:!ring-0 focus:!shadow-none focus:!border-0"
+													style={{ fontFamily: 'Times New Roman' }}
 													variant="light"
 													rounded={false}
-													{...field}
+													autoFocus
+													name={field.name}
+													value={field.value}
+													onChange={field.onChange}
+													ref={field.ref}
+													onBlur={() => {
+														field.onBlur();
+														form.handleSubmit(onSubmit)();
+													}}
+													onKeyDown={(e) => {
+														if (e.key === 'Enter') {
+															e.preventDefault();
+															form.handleSubmit(onSubmit)();
+														} else if (e.key === 'Escape') {
+															form.reset({ name: campaign.name });
+															setIsEdit(false);
+														}
+													}}
 												/>
 											</FormControl>
 										</FormItem>
@@ -38,22 +53,16 @@ export const CampaignName: FC<CampaignNameProps> = (props) => {
 							</div>
 						) : (
 							<>
-								<Typography className="!text-[36px] text-center h-fit w-fit mt-0 mb-4">
+								<Typography
+									className="!text-[46px] leading-none text-center h-fit w-fit mt-0 mb-0 cursor-text select-text"
+									style={{ fontFamily: 'Times New Roman' }}
+									onClick={() => setIsEdit(true)}
+									title="Click to edit"
+								>
 									{campaign.name}
 								</Typography>
 							</>
 						)}
-						<Button
-							type="submit"
-							className={cn(
-								'absolute translate-x-full -right-3 ',
-								isEdit ? 'bottom-0' : 'bottom-1'
-							)}
-							isLoading={isPendingEditCampaign}
-							variant="action-link"
-						>
-							{isEdit ? 'Save' : 'Edit'}
-						</Button>
 					</div>
 				</form>
 			</Form>

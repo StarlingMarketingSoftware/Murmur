@@ -156,8 +156,8 @@ model Campaign {
   hybridPrompt          String?
   isAiSubject           Boolean           @default(true)
   paragraphs            Int?              @default(0)
-  hybridBlockPrompts    Json?             @default("[{\"id\": \"introduction\", \"type\": \"introduction\", \"value\": \"\"}, {\"id\": \"research\", \"type\": \"research\", \"value\": \"\"}, {\"id\": \"action\", \"type\": \"action\", \"value\": \"\"}]")
-  hybridAvailableBlocks HybridBlock[]     @default([text])
+  hybridBlockPrompts    Json?             @default("[{\"id\": \"full_automated\", \"type\": \"full_automated\", \"value\": \"\"}]")
+  hybridAvailableBlocks HybridBlock[]     @default([full_automated, introduction, research, action, text])
   identity              Identity?         @relation(fields: [identityId], references: [id])
   signature             Signature?        @relation(fields: [signatureId], references: [id])
   user                  User              @relation(fields: [userId], references: [clerkId], onDelete: Cascade)

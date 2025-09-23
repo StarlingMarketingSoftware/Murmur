@@ -24,7 +24,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Signature } from '@prisma/client';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/utils';
 import { Input } from '@/components/ui/input';
 import { SaveIcon, TrashIcon } from 'lucide-react';
 import {
@@ -89,7 +89,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 												<SelectItem
 													value={signature.id.toString()}
 													onClick={() => setCurrentSignature(signature)}
-													className={twMerge(
+													className={cn(
 														'w-full max-w-[100%]',
 														isSelected && 'pointer-events-none'
 													)}
@@ -125,7 +125,7 @@ export const ManageSignaturesDialog: FC<ManageSignaturesDialogProps> = (props) =
 												<Button
 													onClick={() => setCurrentSignature(signature)}
 													variant={isSelected ? 'light' : 'ghost'}
-													className={twMerge(
+													className={cn(
 														'w-full max-w-[100%]',
 														isSelected && 'pointer-events-none'
 													)}

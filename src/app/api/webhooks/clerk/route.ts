@@ -54,16 +54,15 @@ export async function POST(req: Request) {
 
 	if (evt.type === 'user.created') {
 		const { id, email_addresses, last_name, first_name } = evt.data;
-		console.log(id, email_addresses, last_name, first_name);
-		// if (
-		// 	!id ||
-		// 	!email_addresses ||
-		// 	email_addresses.length === 0 ||
-		// 	!last_name ||
-		// 	!first_name
-		// ) {
-		// 	return apiBadRequest('Error: Missing required fields');
-		// }
+		if (
+			!id ||
+			!email_addresses ||
+			email_addresses.length === 0 ||
+			!last_name ||
+			!first_name
+		) {
+			return apiBadRequest('Error: Missing required fields');
+		}
 		const email = evt.data.email_addresses[0].email_address;
 		const stripeCustomer = await stripe.customers.create({
 			email: email,

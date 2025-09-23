@@ -1,34 +1,34 @@
 import { FC } from 'react';
 import { AppLayoutProps, useAppLayout } from './useAppLayout';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/utils';
 
 export const AppLayout: FC<AppLayoutProps> = (props) => {
 	const { paddingTop } = props;
 
-	const cn = [];
+	const cnPadding = [];
 
 	switch (paddingTop) {
 		case 'none':
-			cn.push('pt-0');
+			cnPadding.push('pt-0');
 			break;
 		case 'small':
-			cn.push('pt-2');
+			cnPadding.push('pt-2');
 			break;
 		case 'medium':
-			cn.push('pt-4');
+			cnPadding.push('pt-4');
 			break;
 		case 'large':
-			cn.push('pt-8');
+			cnPadding.push('pt-8');
 			break;
 		default:
-			cn.push('pt-4');
+			cnPadding.push('pt-4');
 	}
 	const { children } = useAppLayout(props);
 	return (
 		<div
-			className={twMerge(
+			className={cn(
 				'max-w-[1250px] min-h-[115vh] w-9/10 mx-auto lg:w-9/10 mb-10',
-				cn
+				cnPadding
 			)}
 		>
 			{children}

@@ -1,0 +1,77 @@
+import { ContactWithName } from '@/types/contact';
+import { Dispatch, MouseEvent, SetStateAction, useRef } from 'react';
+
+export interface ContactsSelectionProps {
+	contacts: ContactWithName[];
+	selectedContactIds: Set<number>;
+	setSelectedContactIds: Dispatch<SetStateAction<Set<number>>>;
+	handleContactSelection: (contactId: number, event?: React.MouseEvent) => void;
+	generationProgress?: number;
+	cancelGeneration?: () => void;
+	generationTotal?: number;
+}
+
+export const useContactsSelection = (props: ContactsSelectionProps) => {
+	const {
+		contacts,
+		selectedContactIds,
+		setSelectedContactIds,
+		handleContactSelection: originalHandleContactSelection,
+		generationProgress,
+		generationTotal,
+	} = props;
+
+	const lastClickedRef = useRef<number | null>(null);
+
+	const handleContactSelection = (contactId: number, event?: MouseEvent) => {
+		if (event?.shiftKey && lastClickedRef.current !== null) {
+			event.preventDefault();
+			window.getSelection()?.removeAllRanges();
+
+			const currentIndex = contacts.findIndex((c) => c.id === contactId);
+			const lastIndex = contacts.findIndex((c) => c.id === lastClickedRef.current);
+
+			if (currentIndex !== -1 && lastIndex !== -1) {
+				const start = Math.min(currentIndex, lastIndex);
+				const end = Math.max(currentIndex, lastIndex);
+
+				const newSelectedIds = new Set<number>();
+
+				for (let i = start; i <= end; i++) {
+					newSelectedIds.add(contacts[i].id);
+				}
+
+				setSelectedContactIds(newSelectedIds);
+			}
+		} else {
+			originalHandleContactSelection(contactId);
+			lastClickedRef.current = contactId;
+		}
+	};
+
+	const handleClick = () => {
+		if (selectedContactIds.size === contacts?.length && contacts?.length > 0) {
+			setSelectedContactIds(new Set());
+			lastClickedRef.current = null;
+		} else {
+			setSelectedContactIds(new Set(contacts?.map((c) => c.id) || []));
+			if (contacts.length > 0) {
+				lastClickedRef.current = contacts[contacts.length - 1].id;
+			}
+		}
+	};
+
+	const areAllSelected =
+		selectedContactIds.size === contacts?.length && contacts?.length > 0;
+
+	return {
+		contacts,
+		selectedContactIds,
+		setSelectedContactIds,
+		handleContactSelection,
+		handleClick,
+		areAllSelected,
+		generationProgress,
+		generationTotal,
+	};
+};

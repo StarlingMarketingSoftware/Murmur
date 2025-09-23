@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { urls } from '@/constants/urls';
 import { PostOpenAiData } from '@/app/api/openai/route';
-import { removeMarkdownCodeBlocks } from '@/utils';
+import { removeMarkdownCodeBlocks, removeEmDashes } from '@/utils';
 
 export interface PostOpenAiDataWithSignal extends PostOpenAiData {
 	signal?: AbortSignal;
@@ -34,7 +34,7 @@ export const useOpenAi = (options: CustomMutationOptions = {}) => {
 			}
 			const res = await response.json();
 
-			return removeMarkdownCodeBlocks(res);
+			return removeEmDashes(removeMarkdownCodeBlocks(res));
 		},
 		onSuccess: () => {
 			if (!suppressToasts) {

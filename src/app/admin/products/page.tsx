@@ -4,7 +4,8 @@ import { ProductCard } from '@/components/organisms/ProductCard/ProductCard';
 import { useStripeProducts } from '@/hooks/queryHooks/useStripeProducts';
 import { useMe } from '@/hooks/useMe';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@/constants/prismaEnums';
+import { Typography } from '@/components/ui/typography';
 
 export default function Products() {
 	const { data: products, isLoading, error } = useStripeProducts();
@@ -17,7 +18,9 @@ export default function Products() {
 	if (user?.role !== UserRole.admin) {
 		return (
 			<div className="flex flex-col items-center justify-center p-8">
-				<h2 className="text-2xl font-bold mb-4">Access Denied</h2>
+				<Typography variant="h2" className="mb-4">
+					Access Denied
+				</Typography>
 				<p>You do not have permission to view this page.</p>
 			</div>
 		);
@@ -26,7 +29,9 @@ export default function Products() {
 	if (error || !products || products.length === 0) {
 		return (
 			<div className="flex flex-col items-center justify-center p-8">
-				<h2 className="text-2xl font-bold mb-4">No subscription plans available</h2>
+				<Typography variant="h2" className="mb-4">
+					No subscription plans available
+				</Typography>
 				<p>Please check back later or contact support for assistance.</p>
 			</div>
 		);

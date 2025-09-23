@@ -13,7 +13,7 @@ import { ComparisonTable } from '@/components/molecules/ComparisonTable/Comparis
 import { ScrollingReviews } from '@/components/molecules/ScrollingReviews/ScrollingReviews';
 import { LeadSender } from '@/components/organisms/LeadSender/LeadSender';
 import { LaunchButton } from '@/components/atoms/LaunchButton/LaunchButton';
-import { useScrollAnimations } from '@/hooks/useScrollAnimations';
+import { useAdvancedScrollAnimations } from '@/hooks/useAdvancedScrollAnimations';
 import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 import './landing-animations.css';
@@ -39,14 +39,47 @@ const FAQS: FAQ[] = [
 ];
 
 export default function HomePage() {
-	const { addTextSlide, addFadeIn } = useScrollAnimations();
+	const {
+		addFadeIn,
+		addParallax,
+		addReveal,
+		addSlideUp,
+		addStagger,
+		addTextReveal,
+		addScaleIn,
+	} = useAdvancedScrollAnimations();
 	const heroRef = useRef<HTMLDivElement>(null);
-	
+
 	useEffect(() => {
+		// Check if browser is Chrome before running GSAP animations
+		const isChrome =
+			/Chrome/.test(navigator.userAgent) &&
+			/Google Inc/.test(navigator.vendor) &&
+			!/Edg/.test(navigator.userAgent);
+
+		if (!isChrome) {
+			const browserInfo = {
+				isSafari:
+					/Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent),
+				isEdge: navigator.userAgent.includes('Edg'),
+				vendor: navigator.vendor,
+				userAgent: navigator.userAgent,
+			};
+			console.log(
+				'[HomePage] Non-Chrome browser detected, skipping GSAP animations',
+				browserInfo
+			);
+			if (heroRef.current) {
+				heroRef.current.style.opacity = '1';
+			}
+			return;
+		}
+
 		// Simple hero fade in
 		if (heroRef.current) {
-			gsap.fromTo(heroRef.current, 
-				{ 
+			gsap.fromTo(
+				heroRef.current,
+				{
 					opacity: 0,
 				},
 				{
@@ -56,19 +89,27 @@ export default function HomePage() {
 				}
 			);
 		}
-		
+
 		// No animations for hero text and subtitle - they appear immediately
 	}, []);
-	
+
 	return (
 		<main className="overflow-hidden">
-			<div className="relative w-screen bg-white py-12 sm:py-16 md:py-20 lg:py-24" ref={heroRef}>
+			<div
+				className="relative w-screen bg-background py-12 sm:py-16 md:py-20 lg:py-24 parallax-container"
+				ref={heroRef}
+				data-parallax-speed="0.3"
+			>
 				{/* Content layer */}
 				<div className="relative justify-items-center gap-0 flex flex-col items-center justify-start">
 					{/* Exact dashboard structure */}
 					<div className="flex justify-center w-full px-4">
 						<div className="text-center w-full max-w-[900px]">
-							<div className="inline-block" data-transition-element="logo-start" data-hero-element>
+							<div
+								className="inline-block"
+								data-transition-element="logo-start"
+								data-hero-element
+							>
 								<LogoIcon width="106px" height="84px" />
 							</div>
 							<Typography
@@ -79,25 +120,28 @@ export default function HomePage() {
 							>
 								Murmur
 							</Typography>
-							<h2 
-								className="text-center !text-[24px] sm:!text-[28px] md:!text-[34px] leading-[1] mt-8 sm:mt-12 md:mt-16 lg:mt-[72px] whitespace-normal sm:whitespace-nowrap font-tertiary"
-								style={{ fontWeight: 400 }}
+							<h2
+								className="text-center !text-[24px] sm:!text-[28px] md:!text-[34px] leading-[1] mt-8 sm:mt-12 md:mt-16 lg:mt-[72px] whitespace-normal sm:whitespace-nowrap !font-zen font-normal"
 								data-hero-element
 							>
 								Get Contacts. Get Work. Email Anyone.
 							</h2>
-							<div className="w-full max-w-[764px] mx-auto mt-2 flex items-center justify-center px-4" data-hero-element>
-								<p 
-									className="text-center text-black font-inter !text-[14px] sm:!text-[22px] md:!text-[26px] whitespace-nowrap"
-									style={{ fontWeight: 300 }}
-								>
+							<div
+								className="w-full max-w-[764px] mx-auto mt-2 flex items-center justify-center px-4"
+								data-hero-element
+							>
+								<p className="text-center text-black font-inter !text-[14px] sm:!text-[22px] md:!text-[26px] whitespace-nowrap font-light">
 									The Ultimate Database + Email Tool for Musicians
 								</p>
 							</div>
 						</div>
 					</div>
 
-					<div className="mt-8 sm:mt-10 md:mt-12 flex flex-col items-center" data-hero-element>
+					<div
+						className="mt-8 sm:mt-10 md:mt-12 flex flex-col items-center"
+						data-hero-element
+						ref={(el) => addFadeIn(el)}
+					>
 						<LeadSender />
 						<div className="mt-0 mx-auto w-full max-w-[490px] px-4 luxury-cta">
 							<LaunchButton />
@@ -109,15 +153,15 @@ export default function HomePage() {
 				</div>
 				<div className="h-16 sm:h-20 md:h-24"></div>
 			</div>
-						{/* Explanation */}
+			{/* Explanation */}
 			<div className="w-full bg-gray-200 pt-16 pb-4">
 				{/* Video Section */}
 				<div className="pt-0 pb-6 px-4">
 					<div className="mx-auto max-w-[943px] flex items-center justify-center flex-col">
-						<div ref={(el) => addTextSlide(el)}>
+						<div ref={(el) => addReveal(el)}>
 							<Typography
 								variant="h2"
-								className="text-center sm:text-left text-[30px] sm:text-[42px] w-full mb-8 font-tertiary"
+								className="text-center sm:text-left text-[30px] sm:text-[42px] w-full mb-8 !font-zen"
 							>
 								Not Another Email Tool.
 							</Typography>
@@ -132,7 +176,7 @@ export default function HomePage() {
 								}}
 							/>
 						</div>
-						<div ref={(el) => addTextSlide(el)}>
+						<div ref={(el) => addTextReveal(el)}>
 							<Typography
 								className="mt-8 mx-auto max-w-[943px] !text-justify"
 								variant="promoP"
@@ -157,15 +201,19 @@ export default function HomePage() {
 			<div className="w-full bg-[#1C1C1C]">
 				<div className="pt-14 sm:pt-28 pb-2 sm:pb-4 px-4">
 					<div className="mx-auto max-w-[943px] flex items-center justify-center flex-col">
-						<div ref={(el) => addTextSlide(el)}>
+						<div ref={(el) => addTextReveal(el)}>
 							<Typography
 								variant="h2"
-								className="text-center sm:text-left w-full text-background text-[30px] sm:text-[42px] font-tertiary"
+								className="text-center sm:text-left w-full text-background text-[30px] sm:text-[42px] !font-zen"
 							>
 								Send without Limits.<br></br> Dream without Boundaries.
 							</Typography>
 						</div>
-						<div className="relative max-w-[943px] w-full h-full aspect-video mt-8 sm:mt-12" ref={(el) => addFadeIn(el)}>
+						<div
+							className="relative max-w-[943px] w-full h-full aspect-video mt-8 sm:mt-12"
+							ref={(el) => addReveal(el)}
+							data-parallax-speed="0.5"
+						>
 							<VideoPlayer
 								playbackId="z015rWLTn4mlDbMX0021ale02ieVwttxqtZvzc2Z02nVotA"
 								className="h-full w-full"
@@ -177,7 +225,7 @@ export default function HomePage() {
 							/>
 						</div>
 					</div>
-					<div ref={(el) => addTextSlide(el)} data-persistent-content>
+					<div ref={(el) => addSlideUp(el)} data-persistent-content>
 						<Typography
 							variant="promoP"
 							className="w-full max-w-[943px] mx-auto !mt-16 sm:!mt-32 text-background px-4"
@@ -191,19 +239,22 @@ export default function HomePage() {
 						</Typography>
 					</div>
 				</div>
-				<div className="pb-8 sm:pb-12 overflow-hidden" ref={(el) => addFadeIn(el)}>
+				<div className="pb-8 sm:pb-12 overflow-hidden" ref={(el) => addReveal(el)}>
 					<ComparisonTable />
 				</div>
 			</div>
 
 			<div className="w-full bg-background">
 				<div className="max-w-[1608px] mx-auto pt-18 sm:pt-24">
-					<div ref={(el) => addTextSlide(el)}>
+					<div ref={(el) => addTextReveal(el)}>
 						<Typography variant="h3" className="text-center text-[27px] font-inter">
 							Trusted by countless professionals
 						</Typography>
 					</div>
-					<div className="pt-16 pb-16 sm:pb-48 w-full mt-8 sm:mt-14 h-fit flex justify-center" ref={(el) => addFadeIn(el)}>
+					<div
+						className="pt-16 pb-16 sm:pb-48 w-full mt-8 sm:mt-14 h-fit flex justify-center"
+						ref={(el) => addStagger(el)}
+					>
 						<div
 							className="w-full max-w-[1000px]"
 							style={{
@@ -218,23 +269,25 @@ export default function HomePage() {
 					</div>
 				</div>
 
-				<div ref={(el) => addFadeIn(el)}>
-					<ScrollingReviews />
+				<div ref={(el) => addReveal(el)} className="parallax-container">
+					<div ref={(el) => addParallax(el)} data-parallax-speed="0.2">
+						<ScrollingReviews />
+					</div>
 				</div>
 			</div>
 
-			<div className="w-full bg-gradient-to-b from-gray-200 to-white py-14 sm:py-25 px-4">
+			<div className="w-full bg-gradient-to-b from-gray-200 to-background py-14 sm:py-25 px-4">
 				<div className="mx-auto max-w-[943px]">
-					<div ref={(el) => addTextSlide(el)} data-persistent-content>
+					<div ref={(el) => addSlideUp(el)} data-persistent-content>
 						<Typography
 							variant="h2"
-							className="text-center sm:text-left text-[30px] sm:text-[42px] font-tertiary"
+							className="text-center sm:text-left text-[30px] sm:text-[42px] !font-zen"
 						>
 							Murmur helps you draft.<br></br> No ChatGPT. We built our own.
 						</Typography>
 					</div>
 				</div>
-				<div ref={(el) => addTextSlide(el)} data-persistent-content>
+				<div ref={(el) => addSlideUp(el)} data-persistent-content>
 					<Typography
 						variant="promoP"
 						className="w-full max-w-[943px] mx-auto !mt-10"
@@ -250,10 +303,10 @@ export default function HomePage() {
 			</div>
 
 			<div className="mt-24">
-				<div ref={(el) => addTextSlide(el)}>
+				<div ref={(el) => addTextReveal(el)}>
 					<Typography
 						variant="h2"
-						className="text-center mx-auto py-8 text-[30px] sm:text-[42px] font-tertiary"
+						className="text-center mx-auto py-8 text-[30px] sm:text-[42px] !font-zen"
 					>
 						{`Find the plan that's right for`} <span className="italic">you</span>
 					</Typography>
@@ -269,14 +322,14 @@ export default function HomePage() {
 			</div>
 
 			<div className="mt-6 hidden lg:block">
-				<div ref={(el) => addFadeIn(el)} data-product-list>
+				<div ref={(el) => addStagger(el)} data-product-list>
 					<ProductList billingCycle="year" />
 				</div>
-				<div className="mt-16 flex justify-center">
+				<div className="mt-16 flex justify-center" ref={(el) => addScaleIn(el)}>
 					<Link href={urls.pricing.index}>
 						<Button
 							size="lg"
-							className="bg-[#000000] text-white hover:bg-[#000000]/90 px-12 font-tertiary rounded-[5.59px] luxury-hover luxury-shadow"
+							className="bg-[#000000] text-background hover:bg-[#000000]/90 px-12 font-tertiary rounded-[5.59px] luxury-hover luxury-shadow"
 						>
 							Learn More
 						</Button>
@@ -285,13 +338,13 @@ export default function HomePage() {
 			</div>
 
 			<div className="w-full bg-[#2B2B2B]">
-				<div ref={(el) => addFadeIn(el)} data-faq-section>
+				<div ref={(el) => addReveal(el)} data-faq-section>
 					<FaqSection
 						faqs={FAQS}
 						header=""
 						title="FAQs"
 						description="Everything you need to know about Murmur!"
-						showMoreLink="/contact"
+						showMoreLink={urls.contact.index}
 					/>
 				</div>
 				<div className="h-24" />

@@ -38,7 +38,7 @@ export const useDotLoader = (props: DotLoaderProps) => {
 	const getColorClass = () => {
 		switch (color) {
 			case 'background':
-				return 'bg-white';
+				return 'bg-background';
 			case 'light':
 				return 'bg-gray-800';
 			case 'foreground':
@@ -84,7 +84,7 @@ export const useDotMorph = (props: DotLoaderProps) => {
 	const getColorClass = () => {
 		switch (color) {
 			case 'background':
-				return 'bg-white';
+				return 'bg-background';
 			case 'foreground':
 				return 'bg-gray-700';
 			case 'light':

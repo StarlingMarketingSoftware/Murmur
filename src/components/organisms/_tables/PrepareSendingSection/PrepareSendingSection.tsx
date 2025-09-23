@@ -30,7 +30,7 @@ export const PrepareSendingSection: FC<PrepareSendingSectionProps> = (props) => 
 	}
 
 	return (
-		<div className="w-full">
+		<div className="flex flex-col items-center">
 			<EmailsTable
 				emails={draftEmails}
 				isPending={isPendingEmails}

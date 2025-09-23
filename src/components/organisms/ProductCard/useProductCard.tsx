@@ -6,7 +6,7 @@ import ManageSubscriptionButton from '@/components/organisms/ManageSubscriptionB
 import { ReactNode } from 'react';
 import UpdateSubscriptionButton from '@/components/organisms/UpdateSubscriptionButton/UpdateSubscriptionButton';
 import { BillingCycle, StripeProduct, StripeSubscriptionStatus } from '@/types';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/utils';
 import { getSubscriptionTierWithPriceId } from '@/utils';
 
 export interface ProductCardProps {
@@ -63,10 +63,11 @@ export const useProductCard = (props: ProductCardProps) => {
 	const getButton = (): ReactNode => {
 		const checkoutButton = (
 			<CheckoutButton
-				className={twMerge(isHighlighted && HIGHLIGHTED_CLASS)}
+				className={cn(isHighlighted && HIGHLIGHTED_CLASS)}
 				user={user}
 				priceId={price.id}
 				buttonText="Buy Now"
+				billingCycle={billingCycle}
 			/>
 		);
 		if (!user) {
@@ -85,7 +86,7 @@ export const useProductCard = (props: ProductCardProps) => {
 					priceId={price.id}
 					user={user}
 					productId={product.id}
-					className={twMerge(isHighlighted && HIGHLIGHTED_CLASS)}
+					className={cn(isHighlighted && HIGHLIGHTED_CLASS)}
 				/>
 			);
 		} else {

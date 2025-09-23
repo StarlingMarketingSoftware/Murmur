@@ -14,7 +14,7 @@ const MaintenanceScreen: FC<MaintenanceScreenProps> = ({ children }) => {
 	if (displayDowntime) {
 		return (
 			<div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
-				<div className="max-w-md w-full bg-white rounded-lg shadow-xl p-8 text-center">
+				<div className="max-w-md w-full bg-background rounded-lg shadow-xl p-8 text-center">
 					<div className="mb-6">
 						<div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
 							<svg

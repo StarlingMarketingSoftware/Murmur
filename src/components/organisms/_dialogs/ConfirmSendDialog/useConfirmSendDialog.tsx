@@ -21,6 +21,7 @@ export interface ConfirmSendDialogProps {
 	draftEmails: EmailWithRelations[];
 	campaign: CampaignWithRelations;
 	setSendingProgress: Dispatch<SetStateAction<number>>;
+	disabled?: boolean;
 }
 
 const addSenderInfoSchema = z.object({
@@ -32,7 +33,7 @@ const addSenderInfoSchema = z.object({
 });
 
 export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
-	const { draftEmails } = props;
+	const { draftEmails, disabled } = props;
 	const { campaignId } = useParams() as { campaignId: string };
 	const { data: campaign } = useGetCampaign(campaignId);
 
@@ -176,5 +177,6 @@ export const useConfirmSendDialog = (props: ConfirmSendDialogProps) => {
 		setIsOpen,
 		user,
 		campaign,
+		disabled,
 	};
 };

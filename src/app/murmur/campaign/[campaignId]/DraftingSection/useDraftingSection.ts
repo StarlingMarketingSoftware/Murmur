@@ -30,28 +30,23 @@ import {
 	generateEmailTemplateFromBlocks,
 	generatePromptsFromBlocks,
 	stringifyJsonSubset,
+	removeEmDashes,
 } from '@/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
-import {
-	Contact,
-	DraftingMode,
-	DraftingTone,
-	EmailStatus,
-	HybridBlock,
-	Identity,
-	Signature,
-} from '@prisma/client';
+import { Contact, HybridBlock, Identity, Signature } from '@prisma/client';
+import { DraftingMode, DraftingTone, EmailStatus } from '@/constants/prismaEnums';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { debounce } from 'lodash';
 import { HANDWRITTEN_PLACEHOLDER_OPTIONS } from '@/components/molecules/HandwrittenPromptInput/HandwrittenPromptInput';
 import { ContactWithName } from '@/types/contact';
 
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
+	view?: 'testing' | 'drafting';
+	goToDrafting?: () => void;
 }
 
 type GeneratedEmail = {
@@ -75,6 +70,7 @@ export type HybridBlockPrompt = {
 	id: string;
 	type: HybridBlock;
 	value: string;
+	isCollapsed?: boolean;
 };
 
 export type HybridBlockPrompts = {
@@ -93,11 +89,32 @@ export const draftingFormSchema = z.object({
 			id: z.string(),
 			type: z.nativeEnum(HybridBlock),
 			value: z.string(),
+			isCollapsed: z.boolean().optional(),
 		})
 	),
+	// Preserve user-written content when switching modes
+	savedHybridBlocks: z
+		.array(
+			z.object({
+				id: z.string(),
+				type: z.nativeEnum(HybridBlock),
+				value: z.string(),
+			})
+		)
+		.default([]),
+	savedManualBlocks: z
+		.array(
+			z.object({
+				id: z.string(),
+				type: z.nativeEnum(HybridBlock),
+				value: z.string(),
+			})
+		)
+		.default([]),
 	handwrittenPrompt: z.string().default(''),
 	font: z.enum(FONT_VALUES),
 	signatureId: z.number().optional(),
+	signature: z.string().optional(),
 	draftingTone: z.nativeEnum(DraftingTone).default(DraftingTone.normal),
 	paragraphs: z.number().min(0).max(5).default(3),
 });
@@ -107,32 +124,88 @@ export type DraftingFormValues = z.infer<typeof draftingFormSchema>;
 export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { campaign } = props;
 
-	// HOOKS
+	/* HOOKS */
 
 	const { user } = useMe();
 	const queryClient = useQueryClient();
 
-	const [isFirstLoad, setIsFirstLoad] = useState(true);
-	const [isOpenSignaturesDialog, setIsOpenSignaturesDialog] = useState(false);
 	const [isOpenUpgradeSubscriptionDrawer, setIsOpenUpgradeSubscriptionDrawer] =
 		useState(false);
 	const [generationProgress, setGenerationProgress] = useState(-1);
-	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 	const [isTest, setIsTest] = useState<boolean>(false);
 	const [abortController, setAbortController] = useState<AbortController | null>(null);
-	const [isJustSaved, setIsJustSaved] = useState(false);
-	const [autosaveStatus, setAutosaveStatus] = useState<
-		'idle' | 'saving' | 'saved' | 'error'
-	>('idle');
+	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	const [activeTab, setActiveTab] = useState<'settings' | 'test' | 'placeholders'>(
 		'settings'
 	);
+
+	const draftingRef = useRef<HTMLDivElement>(null);
+	const emailStructureRef = useRef<HTMLDivElement>(null);
 
 	const isGenerationCancelledRef = useRef(false);
 	const lastFocusedFieldRef = useRef<{
 		name: string;
 		element: HTMLTextAreaElement | HTMLInputElement | null;
 	}>({ name: '', element: null });
+
+	// Live preview state for visual drafting
+	const [isLivePreviewVisible, setIsLivePreviewVisible] = useState(false);
+	const [livePreviewContactId, setLivePreviewContactId] = useState<number | null>(null);
+	const [livePreviewMessage, setLivePreviewMessage] = useState('');
+	const [livePreviewSubject, setLivePreviewSubject] = useState('');
+	const livePreviewTimerRef = useRef<number | null>(null);
+	// Store full text and an index to preserve original whitespace and paragraph breaks
+	const livePreviewFullTextRef = useRef<string>('');
+	const livePreviewIndexRef = useRef<number>(0);
+
+	const hideLivePreview = useCallback(() => {
+		if (livePreviewTimerRef.current) {
+			clearInterval(livePreviewTimerRef.current);
+			livePreviewTimerRef.current = null;
+		}
+		setIsLivePreviewVisible(false);
+		setLivePreviewContactId(null);
+		setLivePreviewMessage('');
+		setLivePreviewSubject('');
+		livePreviewFullTextRef.current = '';
+		livePreviewIndexRef.current = 0;
+	}, []);
+
+	const startLivePreviewStreaming = useCallback(
+		(contactId: number, fullMessage: string, subject?: string) => {
+			if (livePreviewTimerRef.current) {
+				clearInterval(livePreviewTimerRef.current);
+				livePreviewTimerRef.current = null;
+			}
+			setIsLivePreviewVisible(true);
+			setLivePreviewContactId(contactId);
+			setLivePreviewMessage('');
+			if (typeof subject === 'string') {
+				setLivePreviewSubject(subject);
+			}
+			const text = fullMessage || '';
+			livePreviewFullTextRef.current = text;
+			livePreviewIndexRef.current = 0;
+			// Target ~3s reveal regardless of message length; preserve newlines
+			const length = Math.max(text.length, 1);
+			const stepChars = Math.max(1, Math.floor(length / 150));
+			const stepMs = 20; // smooth updates, lightweight
+			livePreviewTimerRef.current = window.setInterval(() => {
+				const i = livePreviewIndexRef.current;
+				if (i >= livePreviewFullTextRef.current.length) {
+					if (livePreviewTimerRef.current) {
+						clearInterval(livePreviewTimerRef.current);
+						livePreviewTimerRef.current = null;
+					}
+					return;
+				}
+				const nextIndex = Math.min(i + stepChars, livePreviewFullTextRef.current.length);
+				livePreviewIndexRef.current = nextIndex;
+				setLivePreviewMessage(livePreviewFullTextRef.current.slice(0, nextIndex));
+			}, stepMs);
+		},
+		[]
+	);
 
 	const { data: signatures } = useGetSignatures();
 
@@ -144,15 +217,21 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			fullAiPrompt: '',
 			hybridPrompt: 'Generate a professional email based on the template below.',
 			hybridAvailableBlocks: [
+				HybridBlock.full_automated,
 				HybridBlock.introduction,
 				HybridBlock.research,
 				HybridBlock.action,
 				HybridBlock.text,
 			],
-			hybridBlockPrompts: [],
+			hybridBlockPrompts: [
+				{ id: 'full_automated', type: HybridBlock.full_automated, value: '' },
+			],
+			savedHybridBlocks: [],
+			savedManualBlocks: [],
 			handwrittenPrompt: '',
 			font: (campaign.font as Font) ?? DEFAULT_FONT,
 			signatureId: campaign.signatureId ?? signatures?.[0]?.id,
+			signature: `Thank you,\n${campaign.identity?.name || ''}`,
 			draftingTone: DraftingTone.normal,
 			paragraphs: 0,
 		},
@@ -195,10 +274,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	// VARIABLES
 
 	const draftCredits = user?.draftCredits;
-	const signatureId = form.watch('signatureId');
-	const selectedSignature: Signature = signatures?.find(
-		(sig: Signature) => sig.id === signatureId
-	);
+	const signatureText =
+		form.watch('signature') || `Thank you,\n${campaign.identity?.name || ''}`;
 
 	const getDraftingModeBasedOnBlocks = useCallback(() => {
 		const hasFullAutomatedBlock = form
@@ -258,6 +335,25 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const hasNoBlocks =
 			!values.hybridBlockPrompts || values.hybridBlockPrompts.length === 0;
 
+		// Check if we're in handwritten mode (only text blocks)
+		const isOnlyTextBlocks = values.hybridBlockPrompts?.every(
+			(block) => block.type === HybridBlock.text
+		);
+
+		// For handwritten mode, check both text content and subject
+		if (isOnlyTextBlocks && values.hybridBlockPrompts?.length > 0) {
+			const hasTextContent = values.hybridBlockPrompts.some(
+				(block) => block.value && block.value.trim() !== ''
+			);
+			const hasSubject =
+				values.isAiSubject || (values.subject && values.subject.trim() !== '');
+
+			// Disable if either text content or subject is missing
+			if (!hasTextContent || !hasSubject) {
+				return true;
+			}
+		}
+
 		const hasAIBlocks = values.hybridBlockPrompts?.some((block) => {
 			if (block.type === 'full_automated') {
 				return block.value && block.value.trim() !== '';
@@ -278,9 +374,74 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		);
 	}, [form, generationProgress, contacts?.length, isPendingGeneration]);
 
+	const isDraftingContentReady = useCallback(() => {
+		const values = form.getValues();
+		const hasFullAutomatedBlock = values.hybridBlockPrompts?.some(
+			(block) => block.type === 'full_automated'
+		);
+		const fullAutomatedBlock = values.hybridBlockPrompts?.find(
+			(block) => block.type === 'full_automated'
+		);
+
+		const isFullAutomatedEmpty =
+			hasFullAutomatedBlock &&
+			(!fullAutomatedBlock?.value || fullAutomatedBlock.value === '');
+
+		const hasNoBlocks =
+			!values.hybridBlockPrompts || values.hybridBlockPrompts.length === 0;
+
+		// Check if we're in handwritten mode (only text blocks)
+		const isOnlyTextBlocks = values.hybridBlockPrompts?.every(
+			(block) => block.type === HybridBlock.text
+		);
+
+		// For handwritten mode, check both text content and subject
+		if (isOnlyTextBlocks && values.hybridBlockPrompts?.length > 0) {
+			const hasTextContent = values.hybridBlockPrompts.some(
+				(block) => block.value && block.value.trim() !== ''
+			);
+			const hasSubject =
+				values.isAiSubject || (values.subject && values.subject.trim() !== '');
+
+			// In handwritten mode, both text content AND subject must be present
+			return hasTextContent && hasSubject;
+		}
+
+		const hasAIBlocks = values.hybridBlockPrompts?.some((block) => {
+			if (block.type === 'full_automated') {
+				return block.value && block.value.trim() !== '';
+			}
+			if (block.type !== HybridBlock.text) {
+				return true;
+			}
+			return block.value && block.value.trim() !== '';
+		});
+
+		// Content is ready if we have blocks with content
+		return !isFullAutomatedEmpty && !hasNoBlocks && hasAIBlocks;
+	}, [form]);
+
 	// FUNCTIONS
 
-	const batchGenerateHandWrittenDrafts = () => {
+	const scrollToDrafting = () => {
+		if (draftingRef.current) {
+			const yOffset = -20; // Small offset from top
+			const element = draftingRef.current;
+			const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+			window.scrollTo({ top: y, behavior: 'smooth' });
+		}
+	};
+
+	const scrollToEmailStructure = () => {
+		if (emailStructureRef.current) {
+			const yOffset = -20; // Small offset from top
+			const element = emailStructureRef.current;
+			const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+			window.scrollTo({ top: y, behavior: 'smooth' });
+		}
+	};
+
+	const batchGenerateHandWrittenDrafts = async (selectedIds?: number[]) => {
 		const generatedEmails: GeneratedEmail[] = [];
 
 		if (!contacts || contacts.length === 0) {
@@ -288,11 +449,23 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			return generatedEmails;
 		}
 
-		contacts.forEach((contact: ContactWithName) => {
+		const targets =
+			selectedIds && selectedIds.length > 0
+				? contacts.filter((c: ContactWithName) => selectedIds.includes(c.id))
+				: contacts;
+
+		targets.forEach((contact: ContactWithName) => {
 			generatedEmails.push(generateHandwrittenDraft(contact));
 		});
 
-		createEmail(generatedEmails);
+		await createEmail(generatedEmails);
+
+		// Invalidate emails query to refresh the drafts list
+		queryClient.invalidateQueries({
+			queryKey: ['emails', { campaignId: campaign.id }],
+		});
+
+		toast.success('All handwritten drafts generated successfully!');
 	};
 
 	const generateHandwrittenDraft = (contact: ContactWithName): GeneratedEmail => {
@@ -325,7 +498,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			message: convertAiResponseToRichTextEmail(
 				combinedTextBlocks,
 				values.font,
-				selectedSignature
+				signatureText || null
 			),
 			campaignId: campaign.id,
 			status: EmailStatus.draft,
@@ -365,7 +538,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			'website',
 			'phone',
 		])}\n\nUser Goal: ${prompt}`;
-		console.log('🚀 ~ draftAiEmail ~ userPrompt:', userPrompt);
 
 		// Debug logging for Full AI path
 		console.log(
@@ -488,12 +660,15 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			console.log(
 				'[Full AI] No paragraph formatting requested, returning parsed response'
 			);
-			return mistralResponse1Parsed;
+			return {
+				subject: removeEmDashes(mistralResponse1Parsed.subject),
+				message: removeEmDashes(mistralResponse1Parsed.message),
+			};
 		}
 
 		return {
-			subject: mistralResponse1Parsed.subject,
-			message: mistralResponse2,
+			subject: removeEmDashes(mistralResponse1Parsed.subject),
+			message: removeEmDashes(mistralResponse2),
 		};
 	};
 
@@ -595,9 +770,28 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			throw new Error('No message or subject generated by Mistral Agent');
 		}
 
+		// POST-PROCESS: If CTA block is not present, remove the CTA paragraph from the message.
+		// We assume the generated email typically has: [Greeting?], Introduction, Research, CTA.
+		// If greeting is present as its own short line (e.g., "Hi John,"), CTA is likely the 4th segment; otherwise 3rd.
+		const hasActionBlock = hybridBlocks.some((b) => b.type === HybridBlock.action);
+		let cleanedMessage = removeEmDashes(mistralResponseParsed.message);
+		if (!hasActionBlock) {
+			const paragraphs = cleanedMessage.split(/\n{2,}/);
+			if (paragraphs.length >= 3) {
+				const firstIsGreetingOnly = /^\s*hi[^\n,]*,?\s*$/i.test(paragraphs[0]);
+				const ctaIndex = firstIsGreetingOnly ? 3 : 2; // 0-based
+				if (paragraphs.length > ctaIndex) {
+					paragraphs.splice(ctaIndex, 1);
+					cleanedMessage = paragraphs.join('\n\n');
+				}
+			}
+		}
+
 		return {
-			subject: isAiSubject ? mistralResponseParsed.subject : form.getValues('subject'),
-			message: mistralResponseParsed.message,
+			subject: isAiSubject
+				? removeEmDashes(mistralResponseParsed.subject)
+				: form.getValues('subject'),
+			message: cleanedMessage,
 		};
 	};
 
@@ -608,6 +802,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			abortController.abort();
 			setAbortController(null);
 		}
+		hideLivePreview();
 	};
 
 	const generateHandWrittenDraftTest = async () => {
@@ -689,7 +884,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 					// Filter out any full_automated blocks for hybrid processing
 					const hybridBlocks = values.hybridBlockPrompts.filter(
-						(block) => block.type !== 'full_automated'
+						(block) => block.type !== 'full_automated' && !block.isCollapsed
 					);
 
 					if (hybridBlocks.length === 0) {
@@ -712,14 +907,20 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				}
 
 				if (parsedRes.message && parsedRes.subject) {
+					// Determine final subject: manual when AI subject is disabled
+					const finalSubject = values.isAiSubject
+						? parsedRes.subject
+						: values.subject || parsedRes.subject;
+					// Prepend subject line in Inter bold to the message
+					const messageWithSubject = `<span style="font-family: Inter; font-weight: bold;">${finalSubject}</span><br><br>${parsedRes.message}`;
 					await saveTestEmail({
 						id: campaign.id,
 						data: {
-							testSubject: parsedRes.subject,
+							testSubject: finalSubject,
 							testMessage: convertAiResponseToRichTextEmail(
-								parsedRes.message,
+								messageWithSubject,
 								values.font,
-								signatures?.find((sig: Signature) => sig.id === values.signatureId)
+								signatureText || null
 							),
 						},
 					});
@@ -734,6 +935,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					});
 					queryClient.invalidateQueries({
 						queryKey: ['user'],
+					});
+					queryClient.invalidateQueries({
+						queryKey: ['emails', { campaignId: campaign.id }],
 					});
 					toast.success('Test email generated successfully!');
 					isSuccess = true;
@@ -811,7 +1015,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 						// Filter out any full_automated blocks for hybrid processing
 						const hybridBlocks =
 							values.hybridBlockPrompts?.filter(
-								(block) => block.type !== 'full_automated'
+								(block) => block.type !== 'full_automated' && !block.isCollapsed
 							) || [];
 
 						if (hybridBlocks.length === 0) {
@@ -828,6 +1032,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					}
 
 					if (parsedDraft) {
+						// Start live preview streaming for this recipient
+						startLivePreviewStreaming(
+							recipient.id,
+							parsedDraft.message,
+							parsedDraft.subject
+						);
 						if (!isAiSubject) {
 							parsedDraft.subject = values.subject || parsedDraft.subject;
 						}
@@ -837,13 +1047,20 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 							message: convertAiResponseToRichTextEmail(
 								parsedDraft.message,
 								values.font,
-								selectedSignature
+								signatureText || null
 							),
 							campaignId: campaign.id,
 							status: 'draft' as EmailStatus,
 							contactId: recipient.id,
 						});
+						// Hide live preview as soon as this draft is written
+						hideLivePreview();
+						// Immediately reflect in UI
 						setGenerationProgress((prev) => prev + 1);
+						queryClient.invalidateQueries({
+							queryKey: ['emails', { campaignId: campaign.id }],
+						});
+						// Live preview will be re-enabled for the next recipient when streaming starts
 
 						return {
 							success: true,
@@ -898,7 +1115,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		});
 	};
 
-	const batchGenerateFullAiDrafts = async () => {
+	const batchGenerateFullAiDrafts = async (selectedIds?: number[]) => {
 		let remainingCredits = draftCredits || 0;
 
 		const controller = new AbortController();
@@ -923,10 +1140,19 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 		isGenerationCancelledRef.current = false;
 		setGenerationProgress(0);
+		const targets =
+			selectedIds && selectedIds.length > 0
+				? contacts.filter((c: ContactWithName) => selectedIds.includes(c.id))
+				: contacts;
+
 		try {
+			// show preview surface while generation is running
+			setIsLivePreviewVisible(true);
+			setLivePreviewMessage('Drafting...');
+			setLivePreviewContactId(null);
 			for (
 				let i = 0;
-				i < contacts.length && !isGenerationCancelledRef.current;
+				i < targets.length && !isGenerationCancelledRef.current;
 				i += BATCH_SIZE
 			) {
 				const maxEmails = Math.floor(remainingCredits / creditCost);
@@ -938,9 +1164,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					break;
 				}
 
-				const batch: Contact[] = contacts.slice(
+				const batch: Contact[] = targets.slice(
 					i,
-					Math.min(i + adjustedBatchSize, contacts.length)
+					Math.min(i + adjustedBatchSize, targets.length)
 				);
 
 				const currentBatchPromises: Promise<BatchGenerationResult>[] =
@@ -979,12 +1205,19 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				});
 			}
 
+			// Invalidate emails query to refresh the drafts list
+			if (successfulEmails > 0) {
+				queryClient.invalidateQueries({
+					queryKey: ['emails', { campaignId: campaign.id }],
+				});
+			}
+
 			if (!isGenerationCancelledRef.current && !stoppedDueToCredits) {
-				if (successfulEmails === contacts.length) {
+				if (successfulEmails === targets.length) {
 					toast.success('All emails generated successfully!');
 				} else if (successfulEmails > 0) {
 					toast.success(
-						`Email generation completed! ${successfulEmails}/${contacts.length} emails generated successfully.`
+						`Email generation completed! ${successfulEmails}/${targets.length} emails generated successfully.`
 					);
 				} else {
 					toast.error('Email generation failed. Please try again.');
@@ -1004,45 +1237,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			}
 		} finally {
 			setAbortController(null);
+			setGenerationProgress(-1);
+			// Hide live preview after completion so the DraftPreviewBox disappears promptly
+			hideLivePreview();
 		}
 	};
 
 	// HANDLERS
-
-	const handleAutoSave = useCallback(
-		async (values: DraftingFormValues) => {
-			try {
-				setAutosaveStatus('saving');
-
-				await saveCampaign({
-					id: campaign.id,
-					data: values,
-				});
-				setAutosaveStatus('saved');
-				setIsJustSaved(true);
-
-				setTimeout(() => {
-					setAutosaveStatus('idle');
-				}, 2000);
-			} catch (error) {
-				setAutosaveStatus('error');
-				console.error('Autosave failed:', error);
-
-				setTimeout(() => {
-					setAutosaveStatus('idle');
-				}, 3000);
-			}
-		},
-		[campaign.id, saveCampaign]
-	);
-
-	const debouncedAutosave = useMemo(
-		() =>
-			debounce((values: DraftingFormValues) => {
-				handleAutoSave(values);
-			}, 1500),
-		[handleAutoSave]
-	);
 
 	const handleGenerateTestDrafts = async () => {
 		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
@@ -1052,11 +1253,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	};
 
-	const handleGenerateDrafts = async () => {
+	const handleGenerateDrafts = async (contactIds?: number[]) => {
 		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
-			batchGenerateFullAiDrafts();
+			batchGenerateFullAiDrafts(contactIds);
 		} else if (draftingMode === DraftingMode.handwritten) {
-			batchGenerateHandWrittenDrafts();
+			batchGenerateHandWrittenDrafts(contactIds);
 		}
 	};
 
@@ -1114,6 +1315,38 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	useEffect(() => {
 		if (campaign && form && signatures?.length > 0 && isFirstLoad) {
+			// Check if campaign has the old default blocks (introduction, research, action)
+			const campaignBlocks = campaign.hybridBlockPrompts as HybridBlockPrompt[];
+			const hasOldDefaults =
+				campaignBlocks &&
+				campaignBlocks.length === 3 &&
+				campaignBlocks.some((b) => b.type === 'introduction' && b.value === '') &&
+				campaignBlocks.some((b) => b.type === 'research' && b.value === '') &&
+				campaignBlocks.some((b) => b.type === 'action' && b.value === '');
+
+			// If it has the old empty defaults, replace with new full_automated default
+			const hybridBlockPromptsToUse = hasOldDefaults
+				? [{ id: 'full_automated', type: HybridBlock.full_automated, value: '' }]
+				: campaignBlocks ?? [
+						{ id: 'full_automated', type: HybridBlock.full_automated, value: '' },
+				  ];
+
+			const hybridAvailableBlocksToUse = hasOldDefaults
+				? [
+						HybridBlock.full_automated,
+						HybridBlock.introduction,
+						HybridBlock.research,
+						HybridBlock.action,
+						HybridBlock.text,
+				  ]
+				: campaign.hybridAvailableBlocks ?? [
+						HybridBlock.full_automated,
+						HybridBlock.introduction,
+						HybridBlock.research,
+						HybridBlock.action,
+						HybridBlock.text,
+				  ];
+
 			form.reset({
 				isAiSubject: campaign.isAiSubject ?? true,
 				subject: campaign.subject ?? '',
@@ -1121,54 +1354,58 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				hybridPrompt:
 					campaign.hybridPrompt ??
 					'Generate a professional email based on the template below.',
-				hybridAvailableBlocks: campaign.hybridAvailableBlocks ?? [HybridBlock.text],
-				hybridBlockPrompts: (campaign.hybridBlockPrompts as HybridBlockPrompt[]) ?? [
-					{ id: 'introduction', type: 'introduction', value: '' },
-					{ id: 'research', type: 'research', value: '' },
-					{ id: 'action', type: 'action', value: '' },
-				],
+				hybridAvailableBlocks: hybridAvailableBlocksToUse,
+				hybridBlockPrompts: hybridBlockPromptsToUse,
+				savedHybridBlocks: [],
+				savedManualBlocks: [],
 				handwrittenPrompt: campaign.handwrittenPrompt ?? '',
 				font: (campaign.font as Font) ?? DEFAULT_FONT,
 				signatureId: campaign.signatureId ?? signatures?.[0]?.id,
+				signature: `Thank you,\n${campaign.identity?.name || ''}`,
 				draftingTone: campaign.draftingTone ?? DraftingTone.normal,
 				paragraphs: campaign.paragraphs ?? 0,
 			});
+
+			// If we migrated from old defaults, save the new blocks to the campaign
+			if (hasOldDefaults) {
+				saveCampaign({
+					id: campaign.id,
+					data: {
+						hybridBlockPrompts: hybridBlockPromptsToUse,
+						hybridAvailableBlocks: hybridAvailableBlocksToUse,
+					},
+				});
+			}
+
 			setIsFirstLoad(false);
 		}
 	}, [campaign, form, signatures, isFirstLoad, saveCampaign]);
+
+	// Update signature when identity changes
+	useEffect(() => {
+		const currentSignature = form.getValues('signature');
+		// Only update if signature is empty or is the default template
+		if (
+			!currentSignature ||
+			currentSignature === 'Thank you,' ||
+			currentSignature.startsWith('Thank you,\n')
+		) {
+			form.setValue('signature', `Thank you,\n${campaign.identity?.name || ''}`);
+		}
+	}, [campaign.identity?.name, form]);
 
 	useEffect(() => {
 		return () => {
 			if (abortController) {
 				abortController.abort();
 			}
+			if (livePreviewTimerRef.current) {
+				clearInterval(livePreviewTimerRef.current);
+				livePreviewTimerRef.current = null;
+			}
 		};
 		/* eslint-disable-next-line react-hooks/exhaustive-deps */
 	}, []);
-
-	useEffect(() => {
-		if (isFirstLoad) return;
-
-		const subscription = form.watch((value, { name }) => {
-			if (name) {
-				const formValues = form.getValues();
-
-				setIsJustSaved(false);
-				if (Object.keys(form.formState.errors).length === 0) {
-					debouncedAutosave(formValues);
-				}
-			}
-		});
-
-		return () => subscription.unsubscribe();
-	}, [form, debouncedAutosave, isFirstLoad]);
-
-	// Cleanup debounced function on unmount
-	useEffect(() => {
-		return () => {
-			debouncedAutosave.cancel();
-		};
-	}, [debouncedAutosave]);
 
 	const trackFocusedField = useCallback(
 		(fieldName: string, element: HTMLTextAreaElement | HTMLInputElement | null) => {
@@ -1196,7 +1433,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	return {
 		activeTab,
-		autosaveStatus,
 		campaign,
 		cancelGeneration,
 		contacts,
@@ -1208,20 +1444,23 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		hasFullAutomatedBlock,
 		insertPlaceholder,
 		isAiSubject,
-		isConfirmDialogOpen,
+		isDraftingContentReady,
 		isGenerationDisabled,
-		isJustSaved,
-		isOpenSignaturesDialog,
 		isOpenUpgradeSubscriptionDrawer,
 		isPendingGeneration,
 		isTest,
-		selectedSignature,
 		setActiveTab,
 		setGenerationProgress,
-		setIsConfirmDialogOpen,
-		setIsOpenSignaturesDialog,
 		setIsOpenUpgradeSubscriptionDrawer,
-		signatures,
 		trackFocusedField,
+		isFirstLoad,
+		scrollToDrafting,
+		scrollToEmailStructure,
+		draftingRef,
+		emailStructureRef,
+		isLivePreviewVisible,
+		livePreviewContactId,
+		livePreviewMessage,
+		livePreviewSubject,
 	};
 };
