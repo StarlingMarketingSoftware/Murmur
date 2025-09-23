@@ -11,14 +11,7 @@ import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import {
-	Form,
-	FormControl,
-	FormField,
-	FormItem,
-	FormLabel,
-	FormMessage,
-} from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import ConsoleLoader from '@/components/atoms/ConsoleLoader/ConsoleLoader';
 import { Card, CardContent } from '@/components/ui/card';
@@ -149,7 +142,7 @@ const Dashboard = () => {
 					<div className="w-full">
 						<div
 							className="flex justify-center items-center w-full px-4"
-							style={{ marginBottom: '0.75rem', marginTop: isMobile ? '10px' : '0' }}
+							style={{ marginBottom: '0.75rem', marginTop: isMobile ? '20px' : '0' }}
 						>
 							<div className="premium-hero-section flex flex-col items-center justify-center w-full max-w-[600px]">
 								<div
@@ -263,14 +256,25 @@ const Dashboard = () => {
 																</div>
 															</div>
 														</FormControl>
-														<FormMessage />
 													</FormItem>
 												)}
 											/>
 											{!hasSearched && (
 												<div className="flex flex-row gap-4 items-center justify-between w-full flex-wrap">
 													<div className="flex flex-row gap-4 items-center h-[39px] justify-start flex-shrink-0">
-														<div className="exclude-contacts-box bg-[#EFEFEF] w-[227px] h-[32px] rounded-[8px] flex items-center px-4 my-auto">
+														<div
+															className="exclude-contacts-box bg-[#EFEFEF] w-[227px] h-[32px] rounded-[8px] flex items-center px-4 my-auto"
+															style={
+																isMobile
+																	? ({
+																			width: '124px',
+																			height: '16px',
+																			padding: '0 6px',
+																			borderRadius: '6px',
+																	  } as React.CSSProperties)
+																	: undefined
+															}
+														>
 															<FormField
 																control={form.control}
 																name="excludeUsedContacts"
@@ -279,7 +283,22 @@ const Dashboard = () => {
 																		<div className="leading-none flex items-center">
 																			<FormLabel
 																				className="font-bold cursor-pointer select-none whitespace-nowrap"
-																				style={{ fontSize: '14px', lineHeight: '16px' }}
+																				style={
+																					isMobile
+																						? ({
+																								fontSize: '8px',
+																								lineHeight: '10px',
+																								fontFamily:
+																									'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																								fontWeight: 700,
+																								letterSpacing: '0',
+																								whiteSpace: 'nowrap',
+																						  } as React.CSSProperties)
+																						: ({
+																								fontSize: '14px',
+																								lineHeight: '16px',
+																						  } as React.CSSProperties)
+																				}
 																			>
 																				Exclude Used Contacts
 																			</FormLabel>
@@ -305,6 +324,14 @@ const Dashboard = () => {
 																								: '#E5E5E5',
 																							backgroundColor: 'var(--toggle-bg)',
 																							background: 'var(--toggle-bg)',
+																							...(isMobile
+																								? ({
+																										width: '13px',
+																										minWidth: '13px',
+																										height: '8px',
+																										borderRadius: '9999px',
+																								  } as React.CSSProperties)
+																								: {}),
 																						} as React.CSSProperties
 																					}
 																					data-checked={field.value}
@@ -314,11 +341,30 @@ const Dashboard = () => {
 																					})}
 																				>
 																					<div
-																						className={`absolute top-1/2 -translate-y-1/2 transform transition-transform duration-200 ease-in-out ${
-																							field.value
-																								? 'translate-x-[10px] bg-white'
-																								: 'translate-x-0 bg-[#050505]'
-																						} left-[2px] w-[12px] h-[12px] rounded-full shadow-none drop-shadow-none`}
+																						className={`absolute transform transition-transform duration-200 ease-in-out ${
+																							field.value ? 'bg-white' : 'bg-[#050505]'
+																						} rounded-full shadow-none drop-shadow-none`}
+																						style={
+																							isMobile
+																								? ({
+																										width: '6px',
+																										height: '6px',
+																										left: '2px',
+																										top: '50%',
+																										transform: `translateX(${
+																											field.value ? 3 : 0
+																										}px) translateY(-50%)`,
+																								  } as React.CSSProperties)
+																								: ({
+																										top: '50%',
+																										left: '2px',
+																										width: '12px',
+																										height: '12px',
+																										transform: `translateX(${
+																											field.value ? 10 : 0
+																										}px) translateY(-50%)`,
+																								  } as React.CSSProperties)
+																						}
 																					/>
 																				</div>
 																			</label>
@@ -504,7 +550,6 @@ const Dashboard = () => {
 														</div>
 													</div>
 												</FormControl>
-												<FormMessage />
 											</FormItem>
 										)}
 									/>

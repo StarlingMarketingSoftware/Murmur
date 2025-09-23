@@ -3455,3 +3455,179 @@ body,
 	td[data-slot='table-cell'] {
 	background-color: #d6e8d9 !important;
 }
+
+/* Mobile: ensure the initial dashboard search input is 41px tall */
+@media (max-width: 640px) {
+	/* Target only the hero/initial search input, not the results view */
+	.search-wave-input:not(.results-search-input) {
+		height: 41px !important;
+		font-size: 13px !important;
+	}
+}
+
+/* Match placeholder overlay typography to input size on mobile */
+.search-input-group .custom-placeholder {
+	font-size: 13px !important;
+}
+
+/* Mobile: tighten space above the initial search bar */
+body.murmur-mobile .search-bar-wrapper {
+	margin-top: 60px !important;
+}
+@media (max-width: 640px) {
+	.search-bar-wrapper {
+		margin-top: 60px;
+	}
+}
+
+/* Real mobile only: shrink the 'Exclude Used Contacts' toggle footprint */
+/* Also tighten spacing below the search input to exactly 3px */
+body.murmur-mobile .search-bar-wrapper [data-slot='form-item'] {
+	margin-bottom: 0 !important;
+}
+
+body.murmur-mobile .search-bar-wrapper .search-input-group {
+	margin-bottom: 0 !important;
+}
+
+/* Put the actions row (which contains the Exclude Used Contacts box) 3px below input */
+body.murmur-mobile .search-bar-wrapper .flex-wrap {
+	margin-top: 3px !important;
+	padding-top: 0 !important;
+}
+
+/* Even more explicit: when the actions row immediately follows the field */
+body.murmur-mobile .search-bar-wrapper [data-slot='form-item'] + .flex-wrap {
+	margin-top: 3px !important;
+	padding-top: 0 !important;
+}
+
+/* Be extra explicit: target only the immediate children of the form */
+body.murmur-mobile .search-bar-wrapper form > [data-slot='form-item'] {
+	margin-bottom: 0 !important;
+}
+
+body.murmur-mobile .search-bar-wrapper form > .flex-wrap {
+	margin-top: 3px !important;
+}
+
+body.murmur-mobile .exclude-contacts-box {
+	width: 124px !important;
+	min-width: 124px !important;
+	max-width: 124px !important;
+	height: 16px !important;
+	padding: 0 6px !important;
+	border-radius: 6px !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: space-between !important;
+	/* Remove vertical auto margins introduced by my-auto utility */
+	margin-top: 0 !important;
+	margin-bottom: 0 !important;
+	/* Ensure it anchors to the top of the row regardless of row alignment */
+	align-self: flex-start !important;
+}
+
+/* Ensure inner wrappers fill the container height and center content */
+body.murmur-mobile .exclude-contacts-box [data-slot='form-control'] {
+	height: 100% !important;
+	display: flex !important;
+	align-items: center !important;
+}
+
+/* The clickable label that wraps the switch should also fill and center */
+body.murmur-mobile .exclude-contacts-box [data-slot='form-control'] > label {
+	height: 100% !important;
+	display: inline-flex !important;
+	align-items: center !important;
+}
+
+body.murmur-mobile .exclude-contacts-box [data-slot='form-item'] {
+	gap: 6px !important;
+	width: 100% !important;
+	height: 100% !important;
+	align-items: center !important;
+	justify-content: space-between !important;
+}
+
+/* Label text: 8px Inter bold, allow full phrase inside 124px */
+body.murmur-mobile .exclude-contacts-box [data-slot='form-label'] {
+	font-size: 8px !important;
+	line-height: 10px !important;
+	font-weight: 700 !important;
+	font-family: var(--font-secondary), 'Inter', system-ui, -apple-system, Segoe UI, Roboto,
+		sans-serif !important;
+	white-space: nowrap !important;
+	max-width: 100px !important; /* leave space for 13px switch + gap */
+	overflow: hidden !important;
+	text-overflow: clip !important;
+}
+
+/* Switch track scaled down for mobile (13x8) */
+body.murmur-mobile .exclude-contacts-box .toggle-switch-track {
+	width: 13px !important;
+	height: 8px !important;
+	border-radius: 9999px !important;
+	flex: 0 0 13px !important; /* prevent stretching */
+	align-self: center !important; /* guard against baseline alignment issues */
+}
+
+/* Switch thumb sized to fit inside the 13x8 track */
+body.murmur-mobile .exclude-contacts-box .toggle-switch-track > div {
+	width: 6px !important;
+	height: 6px !important;
+	left: 2px !important;
+	top: 50% !important;
+	transform: translateY(-50%) !important;
+	border-radius: 9999px !important;
+}
+
+/* Checked state translation within 13px track (from 2px to 5px => +3px) */
+body.murmur-mobile .exclude-contacts-box .toggle-switch-track[data-checked='true'] > div {
+	/* Move thumb 3px to the right within 13px track (2px -> 5px center), leaving 1px breathing room */
+	transform: translateX(3px) translateY(-50%) !important;
+}
+
+/* Collapse the left controls wrapper height on mobile and top-align it */
+body.murmur-mobile .search-bar-wrapper .flex-wrap > .h-\[39px\] {
+	height: auto !important;
+	min-height: 16px !important;
+	align-self: flex-start !important;
+}
+
+/* Width-based fallback for responsive mode/devtools */
+@media (max-width: 640px) {
+	.search-bar-wrapper .flex-wrap > .h-\[39px\] {
+		height: auto !important;
+		min-height: 16px !important;
+		align-self: flex-start !important;
+	}
+	.exclude-contacts-box {
+		margin-top: 0 !important;
+		margin-bottom: 0 !important;
+		align-self: flex-start !important;
+	}
+}
+
+/* Width-based mobile fallback: ensure 3px gap below the search bar even when
+   the runtime mobile class is not present (e.g., devtools responsive mode). */
+@media (max-width: 640px) {
+	.search-bar-wrapper [data-slot='form-item'] {
+		margin-bottom: 0 !important;
+	}
+	.search-bar-wrapper .search-input-group {
+		margin-bottom: 0 !important;
+	}
+	.search-bar-wrapper form > [data-slot='form-item'] {
+		margin-bottom: 0 !important;
+	}
+	.search-bar-wrapper form > .flex-wrap {
+		margin-top: 3px !important;
+		padding-top: 0 !important;
+	}
+	/* Adjacent sibling fallback as well */
+	.search-bar-wrapper [data-slot='form-item'] + .flex-wrap {
+		margin-top: 3px !important;
+		padding-top: 0 !important;
+	}
+}
