@@ -35,7 +35,7 @@ const StyledInput: FC<StyledInputProps> = ({
 }) => {
 	return (
 		<div
-			className={`${width} h-[44px] rounded-[7px] border-[#7D7D7D] border-[1px] bg-[#F3F6FF] flex items-center`}
+			className={`${width} h-[44px] rounded-[7px] border-[#7D7D7D] border-[1px] bg-[#FFFFFF] flex items-center`}
 		>
 			<Input
 				className="!bg-transparent !border-0 !outline-none !ring-0 !focus-visible:ring-0 !focus:ring-0 h-full w-full pl-[12px]"
@@ -70,20 +70,25 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 		<FormProvider {...form}>
 			<form onSubmit={form.handleSubmit(onSubmit)}>
 				<div className="w-[651px] mx-auto">
-					<div className="box-border w-[651px] h-[326.05px] rounded-[8.81px] border-[2.2px] border-[#000000] p-4">
+					<div
+						className="box-border w-[651px] h-[326.05px] rounded-[8.81px] border-[2.2px] border-[#000000] p-4"
+						style={{ backgroundColor: '#F4F9FF' }}
+					>
 						<div className="space-y-4">
 							<FormField
 								control={form.control}
 								name="name"
 								render={({ field }) => (
-									<FormItem className="col-span-11">
+									<FormItem className="col-span-11 relative">
 										<FormLabel className="font-secondary text-[14px]">
 											{'Name (First and Last)*'}
 										</FormLabel>
 										<FormControl>
 											<StyledInput field={field} />
 										</FormControl>
-										<FormMessage />
+										<div className="absolute left-0 top-full mt-0.5">
+											<FormMessage className="m-0 leading-4" />
+										</div>
 									</FormItem>
 								)}
 							/>
