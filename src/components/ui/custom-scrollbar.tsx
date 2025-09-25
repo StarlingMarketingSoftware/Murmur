@@ -16,6 +16,9 @@ interface CustomScrollbarProps {
 	alwaysShow?: boolean;
 	/** When true, do not apply the Tailwind overflow-y-auto class to the inner container. */
 	disableOverflowClass?: boolean;
+	onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
+	/** When true, fall back to the native browser scrollbar. */
+	nativeScroll?: boolean;
 }
 
 export function CustomScrollbar({
@@ -29,6 +32,8 @@ export function CustomScrollbar({
 	contentClassName,
 	alwaysShow = false,
 	disableOverflowClass = false,
+	onScroll,
+	nativeScroll = false,
 }: CustomScrollbarProps) {
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const scrollThumbRef = useRef<HTMLDivElement>(null);
@@ -128,6 +133,8 @@ export function CustomScrollbar({
 	}, []);
 
 	useEffect(() => {
+		if (nativeScroll) return;
+
 		const container = scrollContainerRef.current;
 		if (!container) return;
 
@@ -155,9 +162,11 @@ export function CustomScrollbar({
 			resizeObserver.disconnect();
 			mutationObserver.disconnect();
 		};
-	}, [handleScroll, updateScrollbar]);
+	}, [handleScroll, updateScrollbar, nativeScroll]);
 
 	useEffect(() => {
+		if (nativeScroll) return;
+
 		if (isDragging) {
 			document.addEventListener('mousemove', handleMouseMove);
 			document.addEventListener('mouseup', handleMouseUp);
@@ -174,13 +183,28 @@ export function CustomScrollbar({
 			document.body.style.cursor = '';
 			document.body.style.userSelect = '';
 		};
-	}, [isDragging, handleMouseMove, handleMouseUp]);
+	}, [isDragging, handleMouseMove, handleMouseUp, nativeScroll]);
+
+	// If native scroll is enabled, render a simpler component
+	if (nativeScroll) {
+		return (
+			<div
+				ref={scrollContainerRef}
+				className={cn(className, 'overflow-y-auto')}
+				onScroll={onScroll}
+				style={style}
+			>
+				{children}
+			</div>
+		);
+	}
 
 	return (
 		<div className={cn('relative', className)} style={style} onWheel={handleWheel}>
 			{/* Scrollable content container */}
 			<div
 				ref={scrollContainerRef}
+				onScroll={onScroll}
 				className={cn(
 					'h-full scrollbar-hide',
 					!disableOverflowClass && 'overflow-y-auto',

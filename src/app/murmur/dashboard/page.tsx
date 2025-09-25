@@ -786,8 +786,7 @@ const Dashboard = () => {
 				)}
 
 				{!hasSearched && (
-					<div className="campaigns-table-wrapper">
-						<div className="absolute top-0 left-0 right-0 h-8 z-[5] pointer-events-none bg-gradient-to-b from-white to-transparent" />
+					<div className="campaigns-table-wrapper w-full max-w-[1132px] mx-auto px-4">
 						<CampaignsTable />
 					</div>
 				)}

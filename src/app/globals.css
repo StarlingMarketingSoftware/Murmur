@@ -2115,6 +2115,176 @@ body {
 	display: none !important;
 }
 
+/* Match My Campaigns table width to search bar on mobile portrait */
+@media (max-width: 640px) and (orientation: portrait) {
+	/* Remove extra internal padding so the table's border aligns with the search bar edges */
+	.mobile-campaigns-wrapper,
+	.campaigns-table-container,
+	.campaigns-table-wrapper,
+	.campaigns-table-container > div,
+	.my-campaigns-table {
+		box-sizing: border-box !important;
+		width: 100% !important;
+		max-width: 100% !important;
+		margin-left: 0 !important;
+		margin-right: 0 !important;
+	}
+
+	.mobile-campaigns-wrapper {
+		padding-left: 0 !important;
+		padding-right: 0 !important;
+	}
+
+	/* Remove any padding from card content on mobile so the border is flush */
+	[data-slot='card-content'] {
+		padding-left: 0 !important;
+		padding-right: 0 !important;
+	}
+
+	/* Ensure the visual border matches the search bar gutters */
+	.my-campaigns-table {
+		border-left-width: 2px !important;
+		border-right-width: 2px !important;
+	}
+}
+
+/* Mobile campaign name typography: Times New Roman, 14px, bold */
+@media (max-width: 640px) {
+	.campaign-name-text {
+		font-family: 'Times New Roman', 'Times', serif !important;
+		font-weight: 700 !important;
+		font-size: 14px !important;
+		line-height: 1.2 !important;
+	}
+}
+
+/* Mobile portrait: constrain campaign name column to under half width and ellipsize */
+@media (max-width: 640px) and (orientation: portrait) {
+	/* First column (campaign name) should be < 50% of row */
+	.campaigns-table-container th:nth-child(1),
+	.campaigns-table-container td:nth-child(1) {
+		width: 44% !important;
+		max-width: 44% !important;
+		min-width: 0 !important;
+	}
+
+	/* Second column (metrics) takes remaining space when delete is moved outside */
+	.campaigns-table-container th:nth-child(2),
+	.campaigns-table-container td:nth-child(2) {
+		width: 56% !important;
+		max-width: 56% !important;
+		min-width: 0 !important;
+	}
+
+	/* Ensure the title text itself truncates cleanly */
+	.campaigns-table-container td:nth-child(1) .campaign-name-text {
+		display: block !important;
+		overflow: hidden !important;
+		text-overflow: ellipsis !important;
+		white-space: nowrap !important;
+		padding-right: 4px !important; /* override pr-8 */
+		max-width: 100% !important;
+	}
+
+	/* Container for mobile campaigns in portrait mode */
+	.mobile-portrait-mode {
+		position: relative;
+	}
+
+	/* Position the table container relatively (ensure even if wrapper class is missing) */
+	.campaigns-table-container {
+		position: relative !important;
+	}
+
+	/* External delete buttons overlay (rendered outside the table, aligned per row) */
+	.mobile-delete-mask {
+		position: absolute !important;
+		top: 0; /* JS sets exact top inline to match first row */
+		left: calc(100% + 40px); /* JS may override with inline left */
+		width: 26px !important;
+		overflow: hidden !important; /* clip buttons vertically */
+		pointer-events: none !important; /* buttons re-enable */
+		z-index: 200 !important; /* ensure above table and border */
+	}
+
+	.mobile-delete-buttons-container {
+		position: absolute !important;
+		top: 0 !important;
+		left: 0 !important;
+		width: 26px !important;
+		pointer-events: none !important;
+	}
+	.mobile-external-delete-btn {
+		position: absolute !important;
+		left: 0 !important;
+		width: 20px !important;
+		height: 20px !important;
+		display: block !important;
+		background: transparent !important;
+		border: none !important;
+		padding: 0 !important;
+		cursor: pointer !important;
+		pointer-events: auto !important;
+	}
+
+	/* Ensure the touch/click target is centered vertically on the row */
+	.mobile-external-delete-btn svg {
+		display: block !important;
+		margin: 0 auto !important;
+	}
+
+	/* No extra right padding needed now that delete lives in the table */
+	.mobile-portrait-mode {
+		padding-right: 0;
+	}
+
+	/* Allow horizontal overflow for buttons; do not clip vertically so overlay is visible */
+	.campaigns-table-container {
+		overflow: visible !important;
+	}
+
+	/* Fix border in mobile portrait mode - override the default black border */
+	.mobile-portrait-mode .my-campaigns-table {
+		border-color: #8c8c8c !important;
+	}
+
+	/* Ensure the table has complete borders on all sides */
+	.mobile-portrait-mode .campaigns-table-container .my-campaigns-table {
+		border: 2px solid #8c8c8c !important;
+		border-radius: 8px !important;
+		height: 260px !important; /* Maintain fixed height for scrolling */
+		position: relative !important;
+	}
+
+	/* The native scroll container needs to allow scrolling */
+	.mobile-portrait-mode .my-campaigns-table > .overflow-y-auto {
+		border-radius: 8px !important;
+		overflow-y: auto !important;
+		overflow-x: hidden !important;
+		height: 100% !important;
+	}
+
+	/* Ensure the table inside scrolls properly */
+	.mobile-portrait-mode .my-campaigns-table table {
+		border-radius: 0 !important; /* Table itself doesn't need rounded corners */
+	}
+
+	/* Increase row height for My Campaigns on mobile portrait */
+	.mobile-portrait-mode .campaigns-table-container tbody tr {
+		min-height: 58px !important;
+	}
+	.mobile-portrait-mode .campaigns-table-container th,
+	.mobile-portrait-mode .campaigns-table-container td {
+		padding-top: 16px !important;
+		padding-bottom: 16px !important;
+	}
+
+	/* Delete column is hidden on mobile portrait; external overlay handles delete buttons */
+
+	/* Tighter mobile widths so columns fit without overflow */
+	/* Widths are set earlier to 44%/56% for name/metrics when delete is external */
+}
+
 .dark .results-search-bar-wrapper {
 	background: transparent;
 }
@@ -3674,5 +3844,95 @@ body.murmur-mobile .search-input-icon-btn {
 		width: 22px;
 		height: 22px;
 		z-index: 4;
+	}
+}
+
+.black-scrollbar-thumb::-webkit-scrollbar-thumb {
+	background-color: black;
+}
+@media (max-width: 640px) {
+	.mobile-portrait-mode .my-campaigns-table {
+		border: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table table {
+		display: block;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table thead {
+		display: none;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table tbody {
+		display: block;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table tr {
+		display: flex;
+		align-items: center;
+		justify-content: flex-start;
+		border: 1px solid #e0e0e0;
+		border-radius: 8px;
+		padding: 6px;
+		margin-bottom: 8px;
+		background-color: white;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table td {
+		display: block;
+		border: none;
+		padding: 0;
+	}
+
+	/* Constrain name area and push metrics hard right */
+	.mobile-portrait-mode .my-campaigns-table tr > td:first-child {
+		flex: 1 1 55%;
+		min-width: 0;
+	}
+	.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(2) {
+		flex: 0 0 auto;
+		margin-left: auto;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .campaign-name-text {
+		font-weight: bold;
+		margin-bottom: 0;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: flex !important;
+		width: auto !important;
+		gap: 4px !important;
+		grid-template-columns: none !important;
+		max-width: fit-content !important;
+		margin-left: 10px !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		width: auto !important;
+		flex: 0 0 auto !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div.relative {
+		width: auto !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: auto !important;
+		max-width: fit-content !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-box {
+		padding: 0 !important;
+		font-size: 12px !important;
+		margin: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-separator {
+		display: none !important;
 	}
 }

@@ -75,7 +75,8 @@ const getCreatedFillColor = (createdAt: Date): string => {
 	return '#B2C9FF'; // 3+ months ago
 };
 
-export const useCampaignsTable = () => {
+export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
+	const compactMetrics = options?.compactMetrics ?? false;
 	const [confirmingCampaignId, setConfirmingCampaignId] = useState<number | null>(null);
 	const [countdown, setCountdown] = useState<number>(5);
 	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -105,7 +106,7 @@ export const useCampaignsTable = () => {
 				return name ? (
 					<div
 						className={cn(
-							'text-left pr-8 font-bold font-primary text-[18px]',
+							'text-left pr-8 font-bold font-primary campaign-name-text text-[14px] sm:text-[18px]',
 							isConfirming && 'text-white'
 						)}
 					>
@@ -167,6 +168,13 @@ export const useCampaignsTable = () => {
 					draftCount.toString().padStart(2, '0') +
 					(draftCount === 1 ? ' draft' : ' drafts');
 				const sentLabel = sentCount.toString().padStart(2, '0') + ' sent';
+
+				const draftDisplay = compactMetrics
+					? draftCount.toString().padStart(2, '0')
+					: draftLabel;
+				const sentDisplay = compactMetrics
+					? sentCount.toString().padStart(2, '0')
+					: sentLabel;
 				const draftFill = getDraftFillColor(draftCount);
 				const sentFill = getSentFillColor(sentCount);
 				const updatedFill = getUpdatedFillColor(updatedAt);
@@ -174,7 +182,7 @@ export const useCampaignsTable = () => {
 
 				return (
 					<div
-						className="grid w-full items-center justify-items-start gap-8 md:gap-10 lg:gap-12 text-left"
+						className="metrics-grid-container grid w-full items-center justify-items-start gap-8 md:gap-10 lg:gap-12 text-left"
 						style={{
 							gridTemplateColumns:
 								'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr)',
@@ -182,21 +190,33 @@ export const useCampaignsTable = () => {
 					>
 						<div className="relative flex items-center w-full">
 							<div
-								className="metric-box inline-flex items-center justify-start w-[6.13em] h-[1.33em] rounded-[4px] border border-[#8C8C8C] px-2.5 leading-none truncate"
+								className={cn(
+									'metric-box inline-flex items-center justify-start border border-[#8C8C8C] leading-none truncate',
+									compactMetrics
+										? 'w-[35px] h-[15px] rounded-[4.06px] justify-center'
+										: 'h-[1.33em] w-[6.13em] rounded-[4px] px-2.5'
+								)}
 								style={
 									{
 										'--draft-fill-color': draftFill,
 										backgroundColor: isConfirming ? 'transparent' : draftFill,
 										color: isConfirming ? 'white' : 'inherit',
-										borderColor: isConfirming ? '#A20000' : '#8C8C8C',
+										borderColor: isConfirming
+											? '#A20000'
+											: compactMetrics
+											? '#000000'
+											: '#8C8C8C',
+										...(compactMetrics
+											? ({ fontSize: '14px' } as React.CSSProperties)
+											: {}),
 									} as React.CSSProperties
 								}
 								data-draft-fill={draftFill}
 							>
-								{draftLabel}
+								{draftDisplay}
 							</div>
 							<div
-								className="absolute h-[17px] w-[2px]"
+								className="metric-separator absolute h-[17px] w-[2px]"
 								style={{
 									top: 'calc(50% - 8.5px)',
 									backgroundColor: isConfirming ? 'transparent' : 'black',
@@ -206,21 +226,33 @@ export const useCampaignsTable = () => {
 						</div>
 						<div className="relative flex items-center w-full">
 							<div
-								className="metric-box inline-flex items-center justify-start w-[6.13em] h-[1.33em] rounded-[4px] border border-[#8C8C8C] px-2.5 leading-none truncate"
+								className={cn(
+									'metric-box inline-flex items-center justify-start border border-[#8C8C8C] leading-none truncate',
+									compactMetrics
+										? 'w-[35px] h-[15px] rounded-[4.06px] justify-center'
+										: 'h-[1.33em] w-[6.13em] rounded-[4px] px-2.5'
+								)}
 								style={
 									{
 										'--sent-fill-color': sentFill,
 										backgroundColor: isConfirming ? 'transparent' : sentFill,
 										color: isConfirming ? 'white' : 'inherit',
-										borderColor: isConfirming ? '#A20000' : '#8C8C8C',
+										borderColor: isConfirming
+											? '#A20000'
+											: compactMetrics
+											? '#000000'
+											: '#8C8C8C',
+										...(compactMetrics
+											? ({ fontSize: '14px' } as React.CSSProperties)
+											: {}),
 									} as React.CSSProperties
 								}
 								data-sent-fill={sentFill}
 							>
-								{sentLabel}
+								{sentDisplay}
 							</div>
 							<div
-								className="absolute h-[17px] w-[2px]"
+								className="metric-separator absolute h-[17px] w-[2px]"
 								style={{
 									top: 'calc(50% - 8.5px)',
 									backgroundColor: isConfirming ? 'transparent' : 'black',
@@ -230,13 +262,25 @@ export const useCampaignsTable = () => {
 						</div>
 						<div className="relative flex items-center w-full">
 							<div
-								className="metric-box inline-flex items-center justify-start w-[6.13em] h-[1.33em] rounded-[4px] border border-[#8C8C8C] px-2.5 leading-none truncate"
+								className={cn(
+									'metric-box inline-flex items-center justify-start border border-[#8C8C8C] leading-none truncate',
+									compactMetrics
+										? 'w-[45px] h-[15px] rounded-[3.31px] justify-center'
+										: 'h-[1.33em] w-[6.13em] rounded-[4px] px-2.5'
+								)}
 								style={
 									{
 										'--updated-fill-color': updatedFill,
 										backgroundColor: isConfirming ? 'transparent' : updatedFill,
 										color: isConfirming ? 'white' : 'inherit',
-										borderColor: isConfirming ? '#A20000' : '#8C8C8C',
+										borderColor: isConfirming
+											? '#A20000'
+											: compactMetrics
+											? '#000000'
+											: '#8C8C8C',
+										...(compactMetrics
+											? ({ fontSize: '14px' } as React.CSSProperties)
+											: {}),
 									} as React.CSSProperties
 								}
 								data-updated-fill={updatedFill}
@@ -244,7 +288,7 @@ export const useCampaignsTable = () => {
 								{mmdd(updatedAt)}
 							</div>
 							<div
-								className="absolute h-[17px] w-[2px]"
+								className="metric-separator absolute h-[17px] w-[2px]"
 								style={{
 									top: 'calc(50% - 8.5px)',
 									backgroundColor: isConfirming ? 'transparent' : 'black',
@@ -254,13 +298,25 @@ export const useCampaignsTable = () => {
 						</div>
 						<div className="relative flex items-center">
 							<div
-								className="metric-box inline-flex items-center justify-start w-[6.13em] h-[1.33em] rounded-[4px] border border-[#8C8C8C] px-2.5 leading-none truncate"
+								className={cn(
+									'metric-box inline-flex items-center justify-start border border-[#8C8C8C] leading-none truncate',
+									compactMetrics
+										? 'w-[45px] h-[15px] rounded-[3.31px] justify-center'
+										: 'h-[1.33em] w-[6.13em] rounded-[4px] px-2.5'
+								)}
 								style={
 									{
 										'--created-fill-color': createdFill,
 										backgroundColor: isConfirming ? 'transparent' : createdFill,
 										color: isConfirming ? 'white' : 'inherit',
-										borderColor: isConfirming ? '#A20000' : '#8C8C8C',
+										borderColor: isConfirming
+											? '#A20000'
+											: compactMetrics
+											? '#000000'
+											: '#8C8C8C',
+										...(compactMetrics
+											? ({ fontSize: '14px' } as React.CSSProperties)
+											: {}),
 									} as React.CSSProperties
 								}
 								data-created-fill={createdFill}
@@ -280,7 +336,7 @@ export const useCampaignsTable = () => {
 				return (
 					<div className="flex justify-end">
 						<button
-							className="w-[20px] h-[20px] flex items-center justify-center hover:opacity-70 transition-opacity"
+							className="campaign-delete-btn w-[20px] h-[20px] flex items-center justify-center hover:opacity-70 transition-opacity"
 							style={{
 								background: 'transparent',
 								border: 'none',
@@ -354,11 +410,42 @@ export const useCampaignsTable = () => {
 		}
 	};
 
+	const handleDeleteClick = (e: React.MouseEvent, campaignId: number) => {
+		e.stopPropagation();
+
+		// Clear any existing timeout
+		if (confirmationTimeoutRef.current) {
+			clearTimeout(confirmationTimeoutRef.current);
+		}
+
+		// If clicking the same campaign that's confirming, execute delete
+		if (campaignId === confirmingCampaignId) {
+			// Execute deletion
+			deleteCampaign(campaignId);
+			setConfirmingCampaignId(null);
+			setCurrentRow(null);
+		} else {
+			// Set confirming state for new campaign
+			setConfirmingCampaignId(campaignId);
+			const campaign = data?.find((c: Campaign) => c.id === campaignId);
+			if (campaign) {
+				setCurrentRow(campaign);
+			}
+
+			// Set timeout to revert after 5 seconds
+			confirmationTimeoutRef.current = setTimeout(() => {
+				setConfirmingCampaignId(null);
+				setCurrentRow(null);
+			}, 5000);
+		}
+	};
+
 	return {
 		columns,
 		data,
 		isPending,
 		handleRowClick,
+		handleDeleteClick,
 		isPendingDelete,
 		isConfirmDialogOpen,
 		setIsConfirmDialogOpen,

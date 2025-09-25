@@ -111,6 +111,8 @@ interface CustomTableProps<TData, TValue> extends DataTableProps<TData, TValue> 
 	useCustomScrollbar?: boolean;
 	scrollbarOffsetRight?: number;
 	onRowHover?: (rowData: TData | null) => void;
+	onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
+	nativeScroll?: boolean;
 }
 
 export function CustomTable<TData, TValue>({
@@ -141,6 +143,8 @@ export function CustomTable<TData, TValue>({
 	useCustomScrollbar = false,
 	scrollbarOffsetRight = -4,
 	onRowHover,
+	onScroll,
+	nativeScroll,
 }: CustomTableProps<TData, TValue>) {
 	type ColumnDefWithSize = ColumnDef<TData, TValue> & { size?: number };
 	const [pagination, setPagination] = useState({
@@ -327,6 +331,8 @@ export function CustomTable<TData, TValue>({
 					thumbColor="#000000"
 					trackColor="transparent"
 					offsetRight={scrollbarOffsetRight}
+					onScroll={onScroll}
+					nativeScroll={nativeScroll}
 				>
 					<div className="min-w-full">
 						{showInContainerHeader && (
@@ -554,6 +560,7 @@ export function CustomTable<TData, TValue>({
 					)}
 					tabIndex={0}
 					style={{ WebkitOverflowScrolling: 'touch' }}
+					onScroll={onScroll}
 					onWheel={(e) => {
 						const el = e.currentTarget;
 						const canScrollDown = el.scrollTop + el.clientHeight < el.scrollHeight;
