@@ -2259,7 +2259,7 @@ body {
 	.mobile-delete-buttons-column {
 		position: absolute !important;
 		right: 5px !important;
-		top: 0 !important;
+		top: 10px !important; /* fine-tune for visual alignment */
 		display: flex !important;
 		flex-direction: column !important;
 		padding-top: 0 !important; /* No header in mobile portrait mode */
