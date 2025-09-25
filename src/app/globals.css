@@ -2254,16 +2254,18 @@ body {
 		top: 0 !important;
 		display: flex !important;
 		flex-direction: column !important;
-		padding-top: 41px !important; /* Match table header height */
+		padding-top: 0 !important; /* No header in mobile portrait mode */
 		width: 20px !important;
 		align-items: center !important;
 		z-index: 10 !important;
+		gap: 8px !important; /* Match the margin-bottom of table rows */
 	}
 
-	/* Individual delete button */
+	/* Individual delete button container that matches row height exactly */
 	.mobile-delete-btn {
 		width: 20px !important;
-		height: 58px !important; /* Match row height */
+		/* Match actual row height: content + padding (12px) + border (2px) */
+		height: 58px !important;
 		display: flex !important;
 		align-items: center !important;
 		justify-content: center !important;
@@ -2273,6 +2275,8 @@ body {
 		cursor: pointer !important;
 		flex-shrink: 0 !important;
 		transition: opacity 0.2s ease !important;
+		/* Account for the same visual height as rows including their borders */
+		box-sizing: border-box !important;
 	}
 
 	.mobile-delete-btn:hover {
