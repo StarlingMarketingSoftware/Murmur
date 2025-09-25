@@ -2160,6 +2160,14 @@ body {
 		font-size: 14px !important;
 		line-height: 1.2 !important;
 	}
+
+	/* In portrait mode, adjust to better match metric boxes */
+	@media (orientation: portrait) {
+		.mobile-portrait-mode .campaign-name-text {
+			font-size: 13px !important;
+			line-height: 15px !important;
+		}
+	}
 }
 
 /* Mobile portrait: constrain campaign name column to under half width and ellipsize */
@@ -2182,12 +2190,12 @@ body {
 
 	/* Ensure the title text itself truncates cleanly */
 	.campaigns-table-container td:nth-child(1) .campaign-name-text {
-		display: block !important;
 		overflow: hidden !important;
 		text-overflow: ellipsis !important;
 		white-space: nowrap !important;
 		padding-right: 4px !important; /* override pr-8 */
 		max-width: 100% !important;
+		margin: 0 !important; /* Ensure no vertical margins */
 	}
 
 	/* Container for mobile campaigns in portrait mode */
@@ -2355,8 +2363,8 @@ body {
 	}
 	.mobile-portrait-mode .campaigns-table-container th,
 	.mobile-portrait-mode .campaigns-table-container td {
-		padding-top: 16px !important;
-		padding-bottom: 16px !important;
+		padding-top: 0 !important;
+		padding-bottom: 0 !important;
 	}
 
 	/* Delete column is hidden on mobile portrait; external overlay handles delete buttons */
@@ -3949,17 +3957,19 @@ body.murmur-mobile .search-input-icon-btn {
 
 	.mobile-portrait-mode .my-campaigns-table tr {
 		display: flex;
-		align-items: center;
+		align-items: stretch;
 		justify-content: flex-start;
 		border: 1px solid #e0e0e0;
 		border-radius: 8px;
-		padding: 6px;
+		padding: 8px 6px;
 		margin-bottom: 8px;
 		background-color: white;
+		min-height: 44px;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table td {
-		display: block;
+		display: flex !important;
+		align-items: center !important;
 		border: none;
 		padding: 0;
 	}
@@ -3968,24 +3978,38 @@ body.murmur-mobile .search-input-icon-btn {
 	.mobile-portrait-mode .my-campaigns-table tr > td:first-child {
 		flex: 1 1 55%;
 		min-width: 0;
+		height: auto;
+		padding: 0 !important;
+		margin: 0 !important;
 	}
 	.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(2) {
 		flex: 0 0 auto;
 		margin-left: auto;
+		height: auto;
+		padding: 0 !important;
+		margin-top: 0 !important;
+		margin-bottom: 0 !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .campaign-name-text {
 		font-weight: bold;
-		margin-bottom: 0;
+		margin: 0 !important;
+		line-height: 15px !important; /* Match metric box height */
+		display: inline-flex !important;
+		align-items: center !important;
+		height: auto !important;
+		vertical-align: middle !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
 		display: flex !important;
+		align-items: center !important;
 		width: auto !important;
 		gap: 4px !important;
 		grid-template-columns: none !important;
 		max-width: fit-content !important;
 		margin-left: 10px !important;
+		height: auto !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
@@ -3993,12 +4017,16 @@ body.murmur-mobile .search-input-icon-btn {
 		flex: 0 0 auto !important;
 		margin: 0 !important;
 		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div.relative {
 		width: auto !important;
 		margin: 0 !important;
 		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
@@ -4010,6 +4038,9 @@ body.murmur-mobile .search-input-icon-btn {
 		padding: 0 !important;
 		font-size: 12px !important;
 		margin: 0 !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		vertical-align: middle !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .metric-separator {
