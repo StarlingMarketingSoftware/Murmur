@@ -2217,6 +2217,9 @@ body {
 		-webkit-overflow-scrolling: touch !important;
 		scrollbar-width: none !important;
 		-ms-overflow-style: none !important;
+		/* Extend wrapper beyond visual bounds to accommodate buttons */
+		width: calc(100% + 20px) !important;
+		margin-right: -20px !important;
 		/* Ensure we can see the delete buttons */
 		clip-path: none !important;
 	}
@@ -2234,8 +2237,8 @@ body {
 		display: flex !important;
 		align-items: start !important;
 		min-height: 100% !important;
-		/* Add minimal padding to ensure buttons aren't cut off */
-		padding-right: 25px !important;
+		/* Padding for delete buttons space */
+		padding-right: 20px !important;
 		/* Ensure the container uses full available width */
 		width: 100% !important;
 		box-sizing: border-box !important;
@@ -2246,7 +2249,7 @@ body {
 		overflow: visible !important;
 		height: auto !important;
 		max-height: none !important;
-		width: calc(100% - 25px) !important; /* Leave minimal space for buttons */
+		width: calc(100% - 20px) !important; /* Account for button space */
 		flex-shrink: 0 !important;
 	}
 
@@ -2258,7 +2261,7 @@ body {
 	/* Delete buttons column */
 	.mobile-delete-buttons-column {
 		position: absolute !important;
-		right: 5px !important;
+		right: 0 !important; /* In the extended area */
 		top: 10px !important; /* fine-tune for visual alignment */
 		display: flex !important;
 		flex-direction: column !important;
