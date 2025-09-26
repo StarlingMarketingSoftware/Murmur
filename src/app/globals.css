@@ -2188,11 +2188,15 @@ body {
 		min-width: 0 !important;
 	}
 
-	/* Ensure the title text itself truncates cleanly */
+	/* Allow campaign name to wrap to two lines with ellipsis */
 	.campaigns-table-container td:nth-child(1) .campaign-name-text {
 		overflow: hidden !important;
+		display: -webkit-box !important;
+		-webkit-line-clamp: 2 !important;
+		-webkit-box-orient: vertical !important;
+		line-clamp: 2 !important;
 		text-overflow: ellipsis !important;
-		white-space: nowrap !important;
+		white-space: normal !important;
 		padding-right: 4px !important; /* override pr-8 */
 		max-width: 100% !important;
 		margin: 0 !important; /* Ensure no vertical margins */
@@ -3987,7 +3991,7 @@ body.murmur-mobile .search-input-icon-btn {
 	}
 	.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(2) {
 		flex: 0 0 auto;
-		margin-left: auto;
+		margin-left: 0 !important;
 		height: auto;
 		padding: 0 !important;
 		margin-top: 0 !important;
@@ -4036,38 +4040,50 @@ body.murmur-mobile .search-input-icon-btn {
 		vertical-align: middle !important;
 	}
 
+	/* Lock widths so container gap is the only spacing */
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-draft-fill],
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-sent-fill] {
+		width: 35px !important;
+		height: 15px !important;
+		justify-content: center !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-updated-fill],
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-created-fill] {
+		width: 45px !important;
+		height: 15px !important;
+		justify-content: center !important;
+	}
+
 	.mobile-portrait-mode .my-campaigns-table .metric-separator {
 		display: none !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-		display: grid !important;
-		grid-template-columns: minmax(0, 0.9fr) repeat(3, minmax(0, 1fr)) !important;
+		display: flex !important;
 		align-items: center !important;
+		justify-content: flex-start !important;
+		flex-wrap: nowrap !important;
 		width: 100% !important;
-		margin-left: 4px !important;
-		column-gap: clamp(4px, 1.6vw, 12px) !important;
+		margin-left: 0 !important;
+		padding-left: 0 !important;
+		gap: 7px !important;
+		height: auto !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
 		display: flex !important;
 		align-items: center !important;
 		justify-content: center !important;
-		min-width: 0 !important;
+		flex: 0 0 auto !important;
 		margin: 0 !important;
 		padding: 0 !important;
+		min-width: 0 !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
 		justify-content: flex-start !important;
-		margin-right: clamp(4px, 1.6vw, 10px) !important;
-	}
-
-	.mobile-portrait-mode
-		.my-campaigns-table
-		.metrics-grid-container
-		> div:not(:first-child) {
-		flex: 1 1 0 !important;
+		margin-right: 0 !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .metric-box {
@@ -4315,6 +4331,98 @@ body.murmur-mobile .search-input-icon-btn {
 		flex: 1 1 0 !important;
 		justify-content: center !important;
 		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-box {
+		padding: 0 !important;
+		font-size: 12px !important;
+		margin: 0 !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		vertical-align: middle !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-separator {
+		display: none !important;
+	}
+
+	/* Mobile portrait metrics layout */
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-auto-flow: column !important;
+		grid-template-columns: repeat(4, max-content) !important;
+		align-items: center !important;
+		justify-content: space-between !important;
+		width: 100% !important;
+		margin-left: 4px !important;
+		column-gap: clamp(6px, 2vw, 12px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: minmax(0, 0.8fr) repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 4px !important;
+		column-gap: clamp(3px, 1.2vw, 10px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		min-width: 0 !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		margin-right: clamp(2px, 1vw, 8px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 0 !important;
+		column-gap: 7px !important;
+		flex-wrap: nowrap !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		flex: 0 0 auto !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+	}
+
+	.mobile-portrait-mode
+		.my-campaigns-table
+		.metrics-grid-container
+		> div:not(:first-child) {
+		justify-content: center !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .metric-box {
@@ -4645,4 +4753,34 @@ body.murmur-mobile .search-input-icon-btn {
 .mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
 	justify-content: flex-start !important;
 	margin-right: clamp(2px, 1vw, 8px) !important;
+}
+
+/* Final mobile-portrait enforcement to normalize spacing */
+@media (max-width: 640px) {
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: flex-start !important;
+		flex-wrap: nowrap !important;
+		gap: 7px !important;
+		margin-left: 0 !important;
+		padding-left: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		flex: 0 0 auto !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		width: auto !important;
+		min-width: 0 !important;
+	}
+
+	/* Remove any extra margin added earlier to the first metric wrapper */
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		margin-right: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(2) {
+		margin-left: 0 !important;
+	}
 }
