@@ -41,16 +41,27 @@ export const CampaignsTable: FC = () => {
 	return (
 		<Card className="relative border-none bg-transparent w-full max-w-[1132px] mx-auto !p-0">
 			{isPending && <Spinner size="medium" className="absolute top-2 right-2" />}
-			<CardHeader className="px-4 pb-0 bg-transparent">
+			<CardHeader
+				className={`bg-transparent ${
+					shouldShowMobileFeatures ? 'mobile-portrait-card-header' : 'px-4 pb-0'
+				}`}
+			>
 				<CardTitle
-					className="text-left text-[14px] font-inter font-medium mb-0.5"
+					className={`text-left ${
+						shouldShowMobileFeatures
+							? 'mobile-portrait-card-title'
+							: 'text-[14px] font-inter font-medium mb-0.5'
+					}`}
 					variant="secondary"
-					style={{ fontFamily: 'Inter, sans-serif' }}
 				>
-					My Campaigns
+					{shouldShowMobileFeatures ? 'Your Campaigns' : 'My Campaigns'}
 				</CardTitle>
 			</CardHeader>
-			<CardContent className="space-y-2 w-full px-0 pb-6 pt-0">
+			<CardContent
+				className={`w-full px-0 pb-6 pt-0 ${
+					shouldShowMobileFeatures ? 'mobile-portrait-card-content' : 'space-y-2'
+				}`}
+			>
 				<div
 					className={`mobile-campaigns-wrapper ${
 						shouldShowMobileFeatures ? 'mobile-portrait-mode' : ''
@@ -77,6 +88,7 @@ export const CampaignsTable: FC = () => {
 										useCustomScrollbar={false}
 										scrollbarOffsetRight={0}
 										nativeScroll={false}
+										stickyHeader={false}
 									/>
 									{data && data.length > 0 && (
 										<div className="mobile-delete-buttons-column">

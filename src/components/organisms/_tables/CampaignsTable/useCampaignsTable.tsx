@@ -124,16 +124,24 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 			id: 'metrics',
 			header: () => (
 				<div
-					className="grid w-full items-center justify-items-start gap-8 md:gap-10 lg:gap-12 text-left text-sm"
+					className="metrics-header-grid grid w-full items-center justify-items-start"
 					style={{
 						gridTemplateColumns:
 							'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr)',
 					}}
 				>
-					<span>Drafts</span>
-					<span>Sent</span>
-					<span>Updated Last</span>
-					<span>Created On</span>
+					<span className="metrics-header-label" data-label="drafts">
+						Drafts
+					</span>
+					<span className="metrics-header-label" data-label="sent">
+						Sent
+					</span>
+					<span className="metrics-header-label" data-label="updated">
+						Updated Last
+					</span>
+					<span className="metrics-header-label" data-label="created">
+						Created On
+					</span>
 				</div>
 			),
 			cell: ({ row }) => {
@@ -207,7 +215,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 											? '#000000'
 											: '#8C8C8C',
 										...(compactMetrics
-											? ({ fontSize: '14px' } as React.CSSProperties)
+											? ({ fontSize: '12px' } as React.CSSProperties)
 											: {}),
 									} as React.CSSProperties
 								}
@@ -243,7 +251,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 											? '#000000'
 											: '#8C8C8C',
 										...(compactMetrics
-											? ({ fontSize: '14px' } as React.CSSProperties)
+											? ({ fontSize: '12px' } as React.CSSProperties)
 											: {}),
 									} as React.CSSProperties
 								}
@@ -279,7 +287,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 											? '#000000'
 											: '#8C8C8C',
 										...(compactMetrics
-											? ({ fontSize: '14px' } as React.CSSProperties)
+											? ({ fontSize: '12px' } as React.CSSProperties)
 											: {}),
 									} as React.CSSProperties
 								}
@@ -315,7 +323,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 											? '#000000'
 											: '#8C8C8C',
 										...(compactMetrics
-											? ({ fontSize: '14px' } as React.CSSProperties)
+											? ({ fontSize: '12px' } as React.CSSProperties)
 											: {}),
 									} as React.CSSProperties
 								}

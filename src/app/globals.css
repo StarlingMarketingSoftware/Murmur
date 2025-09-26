@@ -2207,6 +2207,30 @@ body {
 		position: relative;
 	}
 
+	.mobile-portrait-mode .mobile-portrait-card-header {
+		padding: 10px 8px 6px !important;
+		border: 2px solid #8c8c8c !important;
+		border-bottom: none !important;
+		border-radius: 8px 8px 0 0 !important;
+		margin: 0 !important;
+		background: #ffffff !important;
+	}
+
+	.mobile-portrait-card-title {
+		font-family: 'Times New Roman', 'Times', serif !important;
+		font-size: 10px !important;
+		font-weight: 700 !important;
+		line-height: 1.1 !important;
+		letter-spacing: 0.01em !important;
+		margin: 0 !important;
+	}
+
+	.mobile-portrait-card-content {
+		padding-top: 0 !important;
+		padding-bottom: 12px !important;
+		margin-top: -2px !important;
+	}
+
 	/* Position the table container relatively (ensure even if wrapper class is missing) */
 	.campaigns-table-container {
 		position: relative !important;
@@ -2355,8 +2379,54 @@ body {
 	/* Ensure the table border is visible in mobile portrait mode */
 	.mobile-portrait-mode .mobile-table-no-scroll {
 		border: 2px solid #8c8c8c !important;
-		border-radius: 8px !important;
+		border-top: none !important;
+		border-radius: 0 0 8px 8px !important;
 		position: relative !important;
+	}
+
+	.mobile-portrait-mode .metrics-header-grid {
+		display: grid !important;
+		width: 100% !important;
+		align-items: center !important;
+		justify-items: start !important;
+		gap: 2rem !important; /* match body gap-8 */
+		padding: 4px 10px 6px !important;
+		text-transform: uppercase !important;
+		font-size: 9px !important;
+		letter-spacing: 0.01em !important;
+		font-family: 'Inter', sans-serif !important;
+		line-height: 1.1 !important;
+		color: #000000 !important;
+	}
+
+	.mobile-portrait-mode .metrics-header-label {
+		white-space: nowrap !important;
+		overflow: hidden !important;
+		text-overflow: ellipsis !important;
+		font-weight: 500 !important;
+	}
+
+	/* Allow two-line wrap for longer labels */
+	.mobile-portrait-mode .metrics-header-label[data-label='updated'],
+	.mobile-portrait-mode .metrics-header-label[data-label='created'] {
+		white-space: normal !important;
+		word-break: normal !important;
+		overflow: visible !important;
+		text-overflow: clip !important;
+		display: inline-block !important;
+		max-width: 48px !important;
+		line-height: 1.05 !important;
+		text-align: center !important;
+	}
+
+	/* Slightly smaller metrics header labels on mobile portrait */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label {
+		font-size: 10px !important;
+	}
+
+	.mobile-portrait-mode .metrics-grid-container {
+		gap: 2rem !important; /* keep in sync with separators */
+		padding: 0 10px 8px !important;
 	}
 
 	/* Ensure the table inside scrolls properly */
@@ -3955,14 +4025,25 @@ body.murmur-mobile .search-input-icon-btn {
 	}
 
 	.mobile-portrait-mode .my-campaigns-table thead {
-		display: none;
+		display: table-header-group !important;
+		vertical-align: middle !important;
+	}
+
+	/* Ensure header row uses table layout, not the flex override for body rows */
+	.mobile-portrait-mode .my-campaigns-table thead tr {
+		display: table-row !important;
+	}
+	.mobile-portrait-mode .my-campaigns-table thead th {
+		display: table-cell !important;
+		padding: 0 10px 4px !important;
+		border: none !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table tbody {
 		display: block;
 	}
 
-	.mobile-portrait-mode .my-campaigns-table tr {
+	.mobile-portrait-mode .my-campaigns-table tbody tr {
 		display: flex;
 		align-items: stretch;
 		justify-content: flex-start;
@@ -3996,6 +4077,12 @@ body.murmur-mobile .search-input-icon-btn {
 		padding: 0 !important;
 		margin-top: 0 !important;
 		margin-bottom: 0 !important;
+	}
+
+	.mobile-portrait-mode [data-slot='card-title'] {
+		font-size: 7px !important;
+		font-family: Inter, sans-serif !important;
+		font-weight: 500 !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .campaign-name-text {
@@ -4782,5 +4869,41 @@ body.murmur-mobile .search-input-icon-btn {
 
 	.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(2) {
 		margin-left: 0 !important;
+	}
+
+	/* Fix header alignment to match body flexbox layout */
+	.mobile-portrait-mode .metrics-header-grid {
+		display: flex !important;
+		gap: 7px !important;
+		padding: 4px 6px 6px 6px !important; /* Match body row padding */
+		margin-left: 2px !important; /* Fine-tune alignment with metric boxes */
+		justify-content: flex-start !important;
+		align-items: center !important;
+	}
+
+	/* Match header label widths to metric box widths */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label {
+		flex: 0 0 auto !important;
+		text-align: center !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		font-size: 8px !important; /* Smaller font for mobile portrait */
+	}
+
+	/* First two labels (Drafts, Sent) - 35px wide */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='drafts'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='sent'] {
+		width: 35px !important;
+		min-width: 35px !important;
+		max-width: 35px !important;
+	}
+
+	/* Last two labels (Updated Last, Created On) - 45px wide */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='updated'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
+		width: 45px !important;
+		min-width: 45px !important;
+		max-width: 45px !important;
 	}
 }

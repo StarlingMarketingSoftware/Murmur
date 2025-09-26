@@ -113,6 +113,7 @@ interface CustomTableProps<TData, TValue> extends DataTableProps<TData, TValue> 
 	onRowHover?: (rowData: TData | null) => void;
 	onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
 	nativeScroll?: boolean;
+	stickyHeader?: boolean;
 }
 
 export function CustomTable<TData, TValue>({
@@ -145,6 +146,7 @@ export function CustomTable<TData, TValue>({
 	onRowHover,
 	onScroll,
 	nativeScroll,
+	stickyHeader = true,
 }: CustomTableProps<TData, TValue>) {
 	type ColumnDefWithSize = ColumnDef<TData, TValue> & { size?: number };
 	const [pagination, setPagination] = useState({
@@ -371,12 +373,12 @@ export function CustomTable<TData, TValue>({
 						>
 							<TableHeader
 								variant={variant}
-								sticky={!showInContainerHeader}
+								sticky={stickyHeader && !showInContainerHeader}
 								className={cn(headerClassName)}
 							>
 								{table.getHeaderGroups().map((headerGroup) => (
 									<TableRow
-										className="sticky top-0 border-0"
+										className={cn(stickyHeader ? 'sticky top-0 border-0' : 'border-0')}
 										key={headerGroup.id}
 										variant={variant}
 									>
@@ -580,10 +582,14 @@ export function CustomTable<TData, TValue>({
 						)}
 						variant={variant}
 					>
-						<TableHeader variant={variant} sticky className={cn(headerClassName)}>
+						<TableHeader
+							variant={variant}
+							sticky={stickyHeader}
+							className={cn(headerClassName)}
+						>
 							{table.getHeaderGroups().map((headerGroup) => (
 								<TableRow
-									className="sticky top-0 border-0"
+									className={cn(stickyHeader ? 'sticky top-0 border-0' : 'border-0')}
 									key={headerGroup.id}
 									variant={variant}
 								>
