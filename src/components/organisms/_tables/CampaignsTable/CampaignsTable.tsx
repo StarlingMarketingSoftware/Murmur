@@ -1,4 +1,4 @@
-import { FC, useEffect, useState } from 'react';
+import { FC, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import CustomTable from '../../../molecules/CustomTable/CustomTable';
@@ -8,6 +8,10 @@ import { Campaign } from '@prisma/client';
 
 export const CampaignsTable: FC = () => {
 	const [isMobilePortrait, setIsMobilePortrait] = useState<boolean | null>(null);
+	const mobileTableWrapperRef = useRef<HTMLDivElement | null>(null);
+	const [rowHeightsById, setRowHeightsById] = useState<Record<string | number, number>>(
+		{}
+	);
 
 	const shouldShowMobileFeatures = isMobilePortrait === true;
 
@@ -37,6 +41,93 @@ export const CampaignsTable: FC = () => {
 			window.removeEventListener('orientationchange', checkOrientation);
 		};
 	}, []);
+
+	useLayoutEffect(() => {
+		if (typeof window === 'undefined' || !shouldShowMobileFeatures) {
+			return;
+		}
+
+		const containerEl = mobileTableWrapperRef.current;
+		if (!containerEl) {
+			return;
+		}
+
+		let resizeObserver: ResizeObserver | null = null;
+		let frameId: number | null = null;
+
+		const updateMeasurements = () => {
+			if (frameId !== null) {
+				window.cancelAnimationFrame(frameId);
+			}
+			frameId = window.requestAnimationFrame(() => {
+				const firstRow = containerEl.querySelector('.my-campaigns-table tbody tr');
+				if (!firstRow) {
+					containerEl.style.removeProperty('--delete-column-top');
+					return;
+				}
+
+				const containerRect = containerEl.getBoundingClientRect();
+				const rowRect = (firstRow as HTMLElement).getBoundingClientRect();
+				const offset = Math.max(rowRect.top - containerRect.top, 0);
+				containerEl.style.setProperty('--delete-column-top', `${offset}px`);
+
+				// Measure each row height and store by campaign id for per-button height
+				const rows = containerEl.querySelectorAll('.my-campaigns-table tbody tr');
+				const nextHeights: Record<string | number, number> = {};
+				rows.forEach((r) => {
+					const el = r as HTMLElement;
+					const idAttr = el.getAttribute('data-campaign-id');
+					if (!idAttr) return;
+					const rect = el.getBoundingClientRect();
+					nextHeights[idAttr] = Math.max(Math.round(rect.height), 44);
+				});
+
+				// Shallow compare before updating state to avoid loops
+				let changed = false;
+				const keys = Object.keys(nextHeights);
+				if (keys.length !== Object.keys(rowHeightsById).length) {
+					changed = true;
+				} else {
+					for (const k of keys) {
+						if (rowHeightsById[k as unknown as string] !== nextHeights[k]) {
+							changed = true;
+							break;
+						}
+					}
+				}
+				if (changed) {
+					setRowHeightsById(nextHeights);
+				}
+			});
+		};
+
+		const handleResize = () => {
+			updateMeasurements();
+		};
+
+		updateMeasurements();
+
+		window.addEventListener('resize', handleResize);
+		window.addEventListener('orientationchange', handleResize);
+
+		const tableBody = containerEl.querySelector('.my-campaigns-table tbody');
+		if (tableBody && 'ResizeObserver' in window) {
+			resizeObserver = new ResizeObserver(() => updateMeasurements());
+			resizeObserver.observe(tableBody);
+		}
+
+		return () => {
+			window.removeEventListener('resize', handleResize);
+			window.removeEventListener('orientationchange', handleResize);
+			if (frameId !== null) {
+				window.cancelAnimationFrame(frameId);
+			}
+			if (resizeObserver) {
+				resizeObserver.disconnect();
+			}
+			containerEl.style.removeProperty('--delete-column-top');
+		};
+	}, [shouldShowMobileFeatures, data?.length, rowHeightsById]);
 
 	return (
 		<Card className="relative border-none bg-transparent w-full max-w-[1132px] mx-auto !p-0">
@@ -71,7 +162,7 @@ export const CampaignsTable: FC = () => {
 						{shouldShowMobileFeatures ? (
 							// Mobile portrait mode: wrapper scroll container with table and delete buttons
 							<div className="mobile-scroll-wrapper">
-								<div className="mobile-table-and-buttons">
+								<div className="mobile-table-and-buttons" ref={mobileTableWrapperRef}>
 									<CustomTable
 										variant="secondary"
 										containerClassName="border-[2px] border-[#8C8C8C] rounded-[8px] my-campaigns-table mobile-table-no-scroll"
@@ -98,6 +189,11 @@ export const CampaignsTable: FC = () => {
 													type="button"
 													aria-label="Delete campaign"
 													className="mobile-delete-btn"
+													style={{
+														height: rowHeightsById[campaign.id]
+															? `${rowHeightsById[campaign.id]}px`
+															: undefined,
+													}}
 													data-campaign-id={campaign.id}
 													onClick={(e) => handleDeleteClick(e, campaign.id)}
 												>
