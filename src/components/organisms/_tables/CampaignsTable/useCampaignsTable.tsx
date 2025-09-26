@@ -124,22 +124,59 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 			id: 'metrics',
 			header: () => (
 				<div
-					className="metrics-header-grid grid w-full items-center justify-items-start"
-					style={{
-						gridTemplateColumns:
-							'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr)',
-					}}
+					className={cn(
+						'metrics-header-grid w-full items-center',
+						compactMetrics
+							? 'flex flex-nowrap gap-[7px] justify-start px-2'
+							: 'grid justify-items-start gap-8 md:gap-10 lg:gap-12'
+					)}
+					style={
+						compactMetrics
+							? undefined
+							: {
+									gridTemplateColumns:
+										'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr)',
+							  }
+					}
 				>
-					<span className="metrics-header-label" data-label="drafts">
+					<span
+						className={cn(
+							'metrics-header-label',
+							compactMetrics &&
+								'flex h-[15px] w-[35px] items-center justify-center text-[10px] font-medium uppercase tracking-[0.01em]'
+						)}
+						data-label="drafts"
+					>
 						Drafts
 					</span>
-					<span className="metrics-header-label" data-label="sent">
+					<span
+						className={cn(
+							'metrics-header-label',
+							compactMetrics &&
+								'flex h-[15px] w-[35px] items-center justify-center text-[10px] font-medium uppercase tracking-[0.01em]'
+						)}
+						data-label="sent"
+					>
 						Sent
 					</span>
-					<span className="metrics-header-label" data-label="updated">
+					<span
+						className={cn(
+							'metrics-header-label',
+							compactMetrics &&
+								'flex h-[15px] w-[45px] items-center justify-center text-center text-[10px] font-medium uppercase leading-[1.05] tracking-[0.01em]'
+						)}
+						data-label="updated"
+					>
 						Updated Last
 					</span>
-					<span className="metrics-header-label" data-label="created">
+					<span
+						className={cn(
+							'metrics-header-label',
+							compactMetrics &&
+								'flex h-[15px] w-[45px] items-center justify-center text-center text-[10px] font-medium uppercase leading-[1.05] tracking-[0.01em]'
+						)}
+						data-label="created"
+					>
 						Created On
 					</span>
 				</div>
@@ -151,18 +188,49 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 				if (isConfirming) {
 					return (
 						<div
-							className="grid w-full items-center justify-items-start gap-8 md:gap-10 lg:gap-12 text-left"
-							style={{
-								gridTemplateColumns:
-									'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr)',
-							}}
+							className={cn(
+								'metrics-grid-container w-full items-center text-left',
+								compactMetrics
+									? 'flex flex-nowrap gap-[7px] justify-start'
+									: 'grid justify-items-start gap-8 md:gap-10 lg:gap-12'
+							)}
+							style={
+								compactMetrics
+									? undefined
+									: {
+											gridTemplateColumns:
+												'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr)',
+									  }
+							}
 						>
-							<div className="text-white font-inter text-[14px] font-normal pointer-events-none">
-								Click to confirm <span className="ml-2">{countdown}</span>
+							<div
+								className={cn(
+									'relative flex items-center',
+									compactMetrics ? 'w-auto flex-shrink-0 justify-start' : 'w-full'
+								)}
+							>
+								<div
+									className={cn(
+										'pointer-events-none font-inter font-normal text-white',
+										compactMetrics
+											? 'flex h-[15px] items-center justify-start text-[11px] uppercase tracking-[0.01em]'
+											: 'text-[14px]'
+									)}
+								>
+									Click to confirm <span className="ml-2">{countdown}</span>
+								</div>
 							</div>
-							<div></div>
-							<div></div>
-							<div></div>
+							{[0, 1, 2].map((index) => (
+								<div
+									key={index}
+									className={cn(
+										'flex items-center',
+										compactMetrics
+											? 'h-[15px] w-[45px] flex-shrink-0 justify-center'
+											: 'w-full'
+									)}
+								/>
+							))}
 						</div>
 					);
 				}
@@ -190,148 +258,95 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 
 				return (
 					<div
-						className="metrics-grid-container grid w-full items-center justify-items-start gap-8 md:gap-10 lg:gap-12 text-left"
-						style={{
-							gridTemplateColumns:
-								'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr)',
-						}}
+						className={cn(
+							'metrics-grid-container w-full items-center text-left',
+							compactMetrics
+								? 'flex flex-nowrap gap-[7px] justify-start'
+								: 'grid justify-items-start gap-8 md:gap-10 lg:gap-12'
+						)}
+						style={
+							compactMetrics
+								? undefined
+								: {
+										gridTemplateColumns:
+											'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr)',
+								  }
+						}
 					>
-						<div className="relative flex items-center w-full">
+						{[
+							{
+								label: draftDisplay,
+								fill: draftFill,
+								dataAttr: { 'data-draft-fill': draftFill } as Record<string, string>,
+								width: compactMetrics ? 'w-[35px]' : 'w-[6.13em]',
+								separator: !compactMetrics,
+							},
+							{
+								label: sentDisplay,
+								fill: sentFill,
+								dataAttr: { 'data-sent-fill': sentFill } as Record<string, string>,
+								width: compactMetrics ? 'w-[35px]' : 'w-[6.13em]',
+								separator: !compactMetrics,
+							},
+							{
+								label: mmdd(updatedAt),
+								fill: updatedFill,
+								dataAttr: { 'data-updated-fill': updatedFill } as Record<string, string>,
+								width: compactMetrics ? 'w-[45px]' : 'w-[6.13em]',
+								separator: !compactMetrics,
+							},
+							{
+								label: mmdd(createdAt),
+								fill: createdFill,
+								dataAttr: { 'data-created-fill': createdFill } as Record<string, string>,
+								width: compactMetrics ? 'w-[45px]' : 'w-[6.13em]',
+								separator: false,
+							},
+						].map(({ label, fill, dataAttr, width, separator }, index) => (
 							<div
+								key={index}
 								className={cn(
-									'metric-box inline-flex items-center justify-start border border-[#8C8C8C] leading-none truncate',
-									compactMetrics
-										? 'w-[35px] h-[15px] rounded-[4.06px] justify-center'
-										: 'h-[1.33em] w-[6.13em] rounded-[4px] px-2.5'
+									'relative flex items-center',
+									compactMetrics ? 'w-auto flex-shrink-0 justify-start' : 'w-full'
 								)}
-								style={
-									{
-										'--draft-fill-color': draftFill,
-										backgroundColor: isConfirming ? 'transparent' : draftFill,
-										color: isConfirming ? 'white' : 'inherit',
-										borderColor: isConfirming
-											? '#A20000'
-											: compactMetrics
-											? '#000000'
-											: '#8C8C8C',
-										...(compactMetrics
-											? ({ fontSize: '12px' } as React.CSSProperties)
-											: {}),
-									} as React.CSSProperties
-								}
-								data-draft-fill={draftFill}
 							>
-								{draftDisplay}
-							</div>
-							<div
-								className="metric-separator absolute h-[17px] w-[2px]"
-								style={{
-									top: 'calc(50% - 8.5px)',
-									backgroundColor: isConfirming ? 'transparent' : 'black',
-									right: 'calc(-1rem - 1px)', // Default: center in gap-8 (32px gap)
-								}}
-							/>
-						</div>
-						<div className="relative flex items-center w-full">
-							<div
-								className={cn(
-									'metric-box inline-flex items-center justify-start border border-[#8C8C8C] leading-none truncate',
-									compactMetrics
-										? 'w-[35px] h-[15px] rounded-[4.06px] justify-center'
-										: 'h-[1.33em] w-[6.13em] rounded-[4px] px-2.5'
+								<div
+									{...dataAttr}
+									className={cn(
+										'metric-box inline-flex items-center justify-start border border-[#8C8C8C] leading-none truncate',
+										compactMetrics
+											? cn(width, 'h-[15px] rounded-[4px] justify-center')
+											: 'h-[1.33em] w-[6.13em] rounded-[4px] px-2.5'
+									)}
+									style={
+										{
+											backgroundColor: isConfirming ? 'transparent' : fill,
+											color: isConfirming ? 'white' : 'inherit',
+											borderColor: isConfirming
+												? '#A20000'
+												: compactMetrics
+												? '#000000'
+												: '#8C8C8C',
+											...(compactMetrics
+												? ({ fontSize: '12px' } as React.CSSProperties)
+												: {}),
+										} as React.CSSProperties
+									}
+								>
+									{label}
+								</div>
+								{separator && (
+									<div
+										className="metric-separator absolute h-[17px] w-[2px]"
+										style={{
+											top: 'calc(50% - 8.5px)',
+											backgroundColor: isConfirming ? 'transparent' : 'black',
+											right: 'calc(-1rem - 1px)',
+										}}
+									/>
 								)}
-								style={
-									{
-										'--sent-fill-color': sentFill,
-										backgroundColor: isConfirming ? 'transparent' : sentFill,
-										color: isConfirming ? 'white' : 'inherit',
-										borderColor: isConfirming
-											? '#A20000'
-											: compactMetrics
-											? '#000000'
-											: '#8C8C8C',
-										...(compactMetrics
-											? ({ fontSize: '12px' } as React.CSSProperties)
-											: {}),
-									} as React.CSSProperties
-								}
-								data-sent-fill={sentFill}
-							>
-								{sentDisplay}
 							</div>
-							<div
-								className="metric-separator absolute h-[17px] w-[2px]"
-								style={{
-									top: 'calc(50% - 8.5px)',
-									backgroundColor: isConfirming ? 'transparent' : 'black',
-									right: 'calc(-1rem - 1px)', // Default: center in gap-8 (32px gap)
-								}}
-							/>
-						</div>
-						<div className="relative flex items-center w-full">
-							<div
-								className={cn(
-									'metric-box inline-flex items-center justify-start border border-[#8C8C8C] leading-none truncate',
-									compactMetrics
-										? 'w-[45px] h-[15px] rounded-[3.31px] justify-center'
-										: 'h-[1.33em] w-[6.13em] rounded-[4px] px-2.5'
-								)}
-								style={
-									{
-										'--updated-fill-color': updatedFill,
-										backgroundColor: isConfirming ? 'transparent' : updatedFill,
-										color: isConfirming ? 'white' : 'inherit',
-										borderColor: isConfirming
-											? '#A20000'
-											: compactMetrics
-											? '#000000'
-											: '#8C8C8C',
-										...(compactMetrics
-											? ({ fontSize: '12px' } as React.CSSProperties)
-											: {}),
-									} as React.CSSProperties
-								}
-								data-updated-fill={updatedFill}
-							>
-								{mmdd(updatedAt)}
-							</div>
-							<div
-								className="metric-separator absolute h-[17px] w-[2px]"
-								style={{
-									top: 'calc(50% - 8.5px)',
-									backgroundColor: isConfirming ? 'transparent' : 'black',
-									right: 'calc(-1rem - 1px)', // Default: center in gap-8 (32px gap)
-								}}
-							/>
-						</div>
-						<div className="relative flex items-center">
-							<div
-								className={cn(
-									'metric-box inline-flex items-center justify-start border border-[#8C8C8C] leading-none truncate',
-									compactMetrics
-										? 'w-[45px] h-[15px] rounded-[3.31px] justify-center'
-										: 'h-[1.33em] w-[6.13em] rounded-[4px] px-2.5'
-								)}
-								style={
-									{
-										'--created-fill-color': createdFill,
-										backgroundColor: isConfirming ? 'transparent' : createdFill,
-										color: isConfirming ? 'white' : 'inherit',
-										borderColor: isConfirming
-											? '#A20000'
-											: compactMetrics
-											? '#000000'
-											: '#8C8C8C',
-										...(compactMetrics
-											? ({ fontSize: '12px' } as React.CSSProperties)
-											: {}),
-									} as React.CSSProperties
-								}
-								data-created-fill={createdFill}
-							>
-								{mmdd(createdAt)}
-							</div>
-						</div>
+						))}
 					</div>
 				);
 			},

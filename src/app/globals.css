@@ -4035,8 +4035,18 @@ body.murmur-mobile .search-input-icon-btn {
 	}
 	.mobile-portrait-mode .my-campaigns-table thead th {
 		display: table-cell !important;
-		padding: 0 10px 4px !important;
+		padding: 0 !important; /* remove horizontal padding to align with body */
 		border: none !important;
+	}
+
+	/* Make header columns match body flex layout: 55% name, remaining for metrics */
+	.mobile-portrait-mode .my-campaigns-table thead th:first-child {
+		width: 55% !important;
+		min-width: 55% !important;
+	}
+	.mobile-portrait-mode .my-campaigns-table thead th:nth-child(2) {
+		width: 45% !important;
+		min-width: 45% !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table tbody {
@@ -4875,8 +4885,8 @@ body.murmur-mobile .search-input-icon-btn {
 	.mobile-portrait-mode .metrics-header-grid {
 		display: flex !important;
 		gap: 7px !important;
-		padding: 4px 6px 6px 6px !important; /* Match body row padding */
-		margin-left: 2px !important; /* Fine-tune alignment with metric boxes */
+		padding: 0 !important; /* no extra padding so labels start flush */
+		margin-left: 0 !important;
 		justify-content: flex-start !important;
 		align-items: center !important;
 	}
