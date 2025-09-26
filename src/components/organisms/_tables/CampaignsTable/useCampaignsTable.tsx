@@ -127,7 +127,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 					className={cn(
 						'metrics-header-grid w-full items-center',
 						compactMetrics
-							? 'flex flex-nowrap gap-[7px] justify-start px-2'
+							? 'flex flex-nowrap gap-[7px] justify-start'
 							: 'grid justify-items-start gap-8 md:gap-10 lg:gap-12'
 					)}
 					style={
