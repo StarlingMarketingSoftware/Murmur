@@ -2244,7 +2244,8 @@ body {
 		flex-wrap: nowrap !important;
 		align-items: flex-start !important;
 		gap: 0 !important;
-		width: 100% !important;
+		width: calc(100% + 24px) !important; /* Extend width to compensate for buttons */
+		margin-right: -24px !important; /* Pull container to the right */
 		/* Reserve a right gutter for the absolute delete buttons so the
 		   table border (on the scroll wrapper) remains untouched */
 		padding-right: 24px !important;
@@ -2260,8 +2261,9 @@ body {
 		-webkit-overflow-scrolling: touch !important;
 		scrollbar-width: none !important;
 		-ms-overflow-style: none !important;
-		/* Keep wrapper at its original width */
-		flex: 1 !important;
+		/* Take full width minus button space */
+		width: 100% !important;
+		flex: 1 1 auto !important;
 		/* Ensure we can see the delete buttons */
 		clip-path: none !important;
 	}
