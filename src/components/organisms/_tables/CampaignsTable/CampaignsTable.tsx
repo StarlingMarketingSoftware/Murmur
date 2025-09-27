@@ -9,6 +9,8 @@ import { Campaign } from '@prisma/client';
 export const CampaignsTable: FC = () => {
 	const [isMobilePortrait, setIsMobilePortrait] = useState<boolean | null>(null);
 	const mobileTableWrapperRef = useRef<HTMLDivElement | null>(null);
+	const mobileScrollWrapperRef = useRef<HTMLDivElement | null>(null);
+	const mobileDeleteButtonsRef = useRef<HTMLDivElement | null>(null);
 	const [rowHeightsById, setRowHeightsById] = useState<Record<string | number, number>>(
 		{}
 	);
@@ -129,6 +131,70 @@ export const CampaignsTable: FC = () => {
 		};
 	}, [shouldShowMobileFeatures, data?.length, rowHeightsById]);
 
+	// Synchronize scrolling between table wrapper and delete buttons
+	useEffect(() => {
+		if (!shouldShowMobileFeatures) return;
+
+		const scrollWrapper = mobileScrollWrapperRef.current;
+		const deleteButtons = mobileDeleteButtonsRef.current;
+
+		if (!scrollWrapper || !deleteButtons) return;
+
+		let rafId: number | null = null;
+		let isUpdating = false;
+
+		const handleScrollWrapperScroll = () => {
+			if (isUpdating) return;
+
+			// Cancel any pending animation frame
+			if (rafId !== null) {
+				cancelAnimationFrame(rafId);
+			}
+
+			// Immediately update the delete buttons position
+			deleteButtons.scrollTop = scrollWrapper.scrollTop;
+
+			// Use RAF to prevent recursive updates
+			isUpdating = true;
+			rafId = requestAnimationFrame(() => {
+				isUpdating = false;
+			});
+		};
+
+		const handleDeleteButtonsScroll = () => {
+			if (isUpdating) return;
+
+			// Cancel any pending animation frame
+			if (rafId !== null) {
+				cancelAnimationFrame(rafId);
+			}
+
+			// Immediately update the scroll wrapper position
+			scrollWrapper.scrollTop = deleteButtons.scrollTop;
+
+			// Use RAF to prevent recursive updates
+			isUpdating = true;
+			rafId = requestAnimationFrame(() => {
+				isUpdating = false;
+			});
+		};
+
+		scrollWrapper.addEventListener('scroll', handleScrollWrapperScroll, {
+			passive: true,
+		});
+		deleteButtons.addEventListener('scroll', handleDeleteButtonsScroll, {
+			passive: true,
+		});
+
+		return () => {
+			if (rafId !== null) {
+				cancelAnimationFrame(rafId);
+			}
+			scrollWrapper.removeEventListener('scroll', handleScrollWrapperScroll);
+			deleteButtons.removeEventListener('scroll', handleDeleteButtonsScroll);
+		};
+	}, [shouldShowMobileFeatures, data?.length]);
+
 	return (
 		<Card className="relative border-none bg-transparent w-full max-w-[1132px] mx-auto !p-0">
 			{isPending && <Spinner size="medium" className="absolute top-2 right-2" />}
@@ -160,63 +226,68 @@ export const CampaignsTable: FC = () => {
 				>
 					<div className="campaigns-table-container" id="campaigns-table-container">
 						{shouldShowMobileFeatures ? (
-							// Mobile portrait mode: wrapper scroll container with table and delete buttons
-							<div className="mobile-scroll-wrapper">
-								<div className="mobile-table-and-buttons" ref={mobileTableWrapperRef}>
-									<CustomTable
-										variant="secondary"
-										containerClassName="border-[2px] border-[#8C8C8C] rounded-[8px] my-campaigns-table mobile-table-no-scroll"
-										handleRowClick={handleRowClick}
-										columns={columns.filter((col) => col.id !== 'delete')}
-										data={data}
-										noDataMessage="No campaigns found."
-										rowsPerPage={100}
-										displayRowsPerPage={false}
-										constrainHeight={false}
-										hidePagination={true}
-										searchable={false}
-										useAutoLayout
-										useCustomScrollbar={false}
-										scrollbarOffsetRight={0}
-										nativeScroll={false}
-										stickyHeader={false}
-									/>
-									{data && data.length > 0 && (
-										<div className="mobile-delete-buttons-column">
-											{data.map((campaign: Campaign) => (
-												<button
-													key={campaign.id}
-													type="button"
-													aria-label="Delete campaign"
-													className="mobile-delete-btn"
-													style={{
-														height: rowHeightsById[campaign.id]
-															? `${rowHeightsById[campaign.id]}px`
-															: undefined,
-													}}
-													data-campaign-id={campaign.id}
-													onClick={(e) => handleDeleteClick(e, campaign.id)}
-												>
-													<X
-														className="w-[20px] h-[20px]"
-														style={{
-															color:
-																campaign.id === confirmingCampaignId
-																	? '#FFFFFF'
-																	: '#000000',
-														}}
-													/>
-												</button>
-											))}
-										</div>
-									)}
+							// Mobile portrait mode: wrapper scroll container with table, and delete buttons outside
+							<div className="mobile-campaigns-outer-container">
+								<div className="mobile-scroll-wrapper" ref={mobileScrollWrapperRef}>
+									<div className="mobile-table-wrapper" ref={mobileTableWrapperRef}>
+										<CustomTable
+											variant="secondary"
+											containerClassName="my-campaigns-table mobile-table-no-scroll"
+											handleRowClick={handleRowClick}
+											columns={columns.filter((col) => col.id !== 'delete')}
+											data={data}
+											noDataMessage="No campaigns found."
+											rowsPerPage={100}
+											displayRowsPerPage={false}
+											constrainHeight={false}
+											hidePagination={true}
+											searchable={false}
+											useAutoLayout
+											useCustomScrollbar={false}
+											scrollbarOffsetRight={0}
+											nativeScroll={false}
+											stickyHeader={false}
+										/>
+									</div>
 								</div>
+								{data && data.length > 0 && (
+									<div
+										className="mobile-delete-buttons-external"
+										ref={mobileDeleteButtonsRef}
+									>
+										{data.map((campaign: Campaign) => (
+											<button
+												key={campaign.id}
+												type="button"
+												aria-label="Delete campaign"
+												className="mobile-delete-btn"
+												style={{
+													height: rowHeightsById[campaign.id]
+														? `${rowHeightsById[campaign.id]}px`
+														: undefined,
+												}}
+												data-campaign-id={campaign.id}
+												onClick={(e) => handleDeleteClick(e, campaign.id)}
+											>
+												<X
+													className="w-[20px] h-[20px]"
+													style={{
+														color:
+															campaign.id === confirmingCampaignId
+																? '#FFFFFF'
+																: '#000000',
+													}}
+												/>
+											</button>
+										))}
+									</div>
+								)}
 							</div>
 						) : (
 							// Desktop mode: normal table with delete column
 							<CustomTable
 								variant="secondary"
-								containerClassName="border-[2px] border-[#8C8C8C] rounded-[8px] my-campaigns-table"
+								containerClassName="border-[2px] border-[#000000] rounded-[8px] my-campaigns-table"
 								handleRowClick={handleRowClick}
 								columns={columns}
 								data={data}

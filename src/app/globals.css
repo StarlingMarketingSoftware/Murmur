@@ -2149,6 +2149,7 @@ body {
 	.my-campaigns-table {
 		border-left-width: 2px !important;
 		border-right-width: 2px !important;
+		border-color: #000000 !important;
 	}
 }
 
@@ -2209,7 +2210,7 @@ body {
 
 	.mobile-portrait-mode .mobile-portrait-card-header {
 		padding: 10px 8px 6px !important;
-		border: 2px solid #8c8c8c !important;
+		border: 2px solid #000000 !important;
 		border-bottom: none !important;
 		border-radius: 8px 8px 0 0 !important;
 		margin: 0 !important;
@@ -2236,7 +2237,21 @@ body {
 		position: relative !important;
 	}
 
-	/* Mobile scroll wrapper that contains both table and delete buttons */
+	/* Outer container that holds both scroll wrapper and external delete buttons */
+	.mobile-campaigns-outer-container {
+		position: relative !important;
+		display: flex !important;
+		flex-wrap: nowrap !important;
+		align-items: flex-start !important;
+		gap: 0 !important;
+		width: 100% !important;
+		/* Reserve a right gutter for the absolute delete buttons so the
+		   table border (on the scroll wrapper) remains untouched */
+		padding-right: 24px !important;
+		overflow: visible !important; /* Allow delete buttons to render outside */
+	}
+
+	/* Mobile scroll wrapper - keep exact same dimensions as before */
 	.mobile-scroll-wrapper {
 		position: relative !important;
 		height: 260px !important;
@@ -2245,9 +2260,8 @@ body {
 		-webkit-overflow-scrolling: touch !important;
 		scrollbar-width: none !important;
 		-ms-overflow-style: none !important;
-		/* Extend wrapper beyond visual bounds to accommodate buttons */
-		width: calc(100% + 20px) !important;
-		margin-right: -20px !important;
+		/* Keep wrapper at its original width */
+		flex: 1 !important;
 		/* Ensure we can see the delete buttons */
 		clip-path: none !important;
 	}
@@ -2259,14 +2273,10 @@ body {
 		height: 0 !important;
 	}
 
-	/* Container for table and buttons side by side */
-	.mobile-table-and-buttons {
+	/* Container for table only */
+	.mobile-table-wrapper {
 		position: relative !important;
-		display: flex !important;
-		align-items: start !important;
 		min-height: 100% !important;
-		/* Padding for delete buttons space */
-		padding-right: 20px !important;
 		/* Ensure the container uses full available width */
 		width: 100% !important;
 		box-sizing: border-box !important;
@@ -2277,8 +2287,8 @@ body {
 		overflow: visible !important;
 		height: auto !important;
 		max-height: none !important;
-		width: calc(100% - 20px) !important; /* Account for button space */
-		flex-shrink: 0 !important;
+		flex: 1 1 auto !important; /* Take remaining space after delete buttons */
+		min-width: 0 !important; /* Allow table to shrink */
 	}
 
 	.mobile-table-no-scroll > div {
@@ -2288,16 +2298,56 @@ body {
 
 	/* Delete buttons column */
 	.mobile-delete-buttons-column {
-		position: absolute !important;
-		right: 0 !important; /* In the extended area */
-		top: var(--delete-column-top, 10px) !important; /* fine-tune for visual alignment */
+		position: relative !important;
 		display: flex !important;
 		flex-direction: column !important;
-		padding-top: 0 !important; /* No header in mobile portrait mode */
+		padding-top: var(
+			--delete-column-top,
+			10px
+		) !important; /* fine-tune for visual alignment */
+		padding-right: 5px !important; /* Position inside the padded area */
 		width: 20px !important;
 		align-items: center !important;
-		z-index: 10 !important;
 		gap: 8px !important; /* Match the margin-bottom of table rows */
+		flex-shrink: 0 !important; /* Prevent column from shrinking */
+	}
+
+	/* External delete buttons column positioned in a fixed right gutter,
+	   outside the scroll wrapper's border */
+	.mobile-delete-buttons-external {
+		position: absolute !important;
+		top: 0 !important;
+		right: -2px !important; /* Slightly overlap to appear connected to table */
+		display: flex !important;
+		flex-direction: column !important;
+		padding-top: var(
+			--delete-column-top,
+			10px
+		) !important; /* fine-tune for visual alignment */
+		padding-left: 4px !important; /* Reduced space from table border */
+		padding-right: 4px !important;
+		width: 24px !important; /* Match the X icon size */
+		align-items: center !important;
+		gap: 8px !important; /* Match the margin-bottom of table rows */
+		/* Match the scroll wrapper height and sync scrolling */
+		height: 260px !important;
+		overflow-y: auto !important;
+		overflow-x: hidden !important;
+		scrollbar-width: none !important;
+		-ms-overflow-style: none !important;
+		z-index: 200 !important; /* Above custom scrollbar track (z 100) */
+		pointer-events: auto !important;
+		/* Force GPU acceleration for smoother scrolling */
+		will-change: scroll-position !important;
+		-webkit-transform: translateZ(0) !important;
+		transform: translateZ(0) !important;
+	}
+
+	/* Hide scrollbar for delete buttons column */
+	.mobile-delete-buttons-external::-webkit-scrollbar {
+		display: none !important;
+		width: 0 !important;
+		height: 0 !important;
 	}
 
 	/* Individual delete button container that matches row height exactly */
@@ -2344,6 +2394,11 @@ body {
 		position: relative !important;
 	}
 
+	/* Ensure the wrapper div for campaigns in mobile portrait also allows overflow */
+	.mobile-portrait-mode .mobile-campaigns-wrapper {
+		overflow: visible !important;
+	}
+
 	/* Ensure parent containers don't clip the buttons */
 	.mobile-portrait-mode {
 		overflow: visible !important;
@@ -2361,7 +2416,10 @@ body {
 
 	/* Ensure the mobile scroll wrapper doesn't cut off content */
 	.mobile-portrait-mode .mobile-scroll-wrapper {
-		width: 100% !important;
+		/* Allow space for the external delete buttons column */
+		width: auto !important;
+		min-width: 0 !important;
+		flex: 1 1 auto !important;
 		position: relative !important;
 		/* Remove compensating margins - let parent handle padding */
 		margin-left: 0 !important;
@@ -2370,17 +2428,14 @@ body {
 		padding-right: 0 !important;
 	}
 
-	/* Fix border in mobile portrait mode - the table keeps its border */
+	/* No border on table in mobile portrait mode - border is on scroll wrapper */
 	.mobile-portrait-mode .my-campaigns-table {
-		border-color: #8c8c8c !important;
 		flex-shrink: 0 !important;
 	}
 
-	/* Ensure the table border is visible in mobile portrait mode */
+	/* Remove border from table in mobile portrait mode - it's on the scroll wrapper now */
 	.mobile-portrait-mode .mobile-table-no-scroll {
-		border: 2px solid #8c8c8c !important;
-		border-top: none !important;
-		border-radius: 0 0 8px 8px !important;
+		border: none !important;
 		position: relative !important;
 	}
 
@@ -4019,6 +4074,12 @@ body.murmur-mobile .search-input-icon-btn {
 		border: none !important;
 	}
 
+	/* Apply border to the scroll wrapper instead so it stays fixed */
+	.mobile-portrait-mode .mobile-scroll-wrapper {
+		border: 2px solid #000000 !important;
+		border-radius: 8px !important;
+	}
+
 	.mobile-portrait-mode .my-campaigns-table table {
 		display: block;
 	}
@@ -4056,10 +4117,11 @@ body.murmur-mobile .search-input-icon-btn {
 		display: flex;
 		align-items: stretch;
 		justify-content: flex-start;
-		border: 1px solid #e0e0e0;
+		border: 1px solid #ffffff;
 		border-radius: 8px;
 		padding: 8px 6px;
 		margin-bottom: 8px;
+		margin-right: 3px; /* Small gap between rows and delete buttons */
 		background-color: white;
 		min-height: 44px;
 	}
