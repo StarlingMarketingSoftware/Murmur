@@ -2320,10 +2320,9 @@ body {
 		right: -2px !important; /* Slightly overlap to appear connected to table */
 		display: flex !important;
 		flex-direction: column !important;
-		padding-top: var(
-			--delete-column-top,
-			10px
-		) !important; /* fine-tune for visual alignment */
+		padding-top: calc(
+			var(--delete-column-top, 10px) + 37px
+		) !important; /* Adjusted to align with first row content */
 		padding-left: 4px !important; /* Reduced space from table border */
 		padding-right: 4px !important;
 		width: 24px !important; /* Match the X icon size */
