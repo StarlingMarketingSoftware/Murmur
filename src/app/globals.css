@@ -4265,14 +4265,7 @@ body.murmur-mobile .search-input-icon-btn {
 		vertical-align: middle !important;
 	}
 
-	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-		display: grid !important;
-		grid-template-columns: minmax(0, 0.9fr) repeat(3, minmax(0, 1fr)) !important;
-		align-items: center !important;
-		width: 100% !important;
-		margin-left: 4px !important;
-		column-gap: clamp(4px, 1.6vw, 12px) !important;
-	}
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
 		display: flex !important;
@@ -4281,11 +4274,15 @@ body.murmur-mobile .search-input-icon-btn {
 		min-width: 0 !important;
 		margin: 0 !important;
 		padding: 0 !important;
+		max-width: 100% !important;
+		overflow: visible !important;
+		padding-right: 2px !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
 		justify-content: flex-start !important;
 		margin-right: clamp(4px, 1.6vw, 10px) !important;
+		max-width: 55% !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .metric-box {
@@ -4300,33 +4297,25 @@ body.murmur-mobile .search-input-icon-btn {
 	/* Lock widths so container gap is the only spacing */
 	.mobile-portrait-mode .my-campaigns-table .metric-box[data-draft-fill],
 	.mobile-portrait-mode .my-campaigns-table .metric-box[data-sent-fill] {
-		width: 35px !important;
+		width: var(--metric-width-short) !important;
 		height: 15px !important;
 		justify-content: center !important;
+		padding-right: 2px !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .metric-box[data-updated-fill],
 	.mobile-portrait-mode .my-campaigns-table .metric-box[data-created-fill] {
-		width: 45px !important;
+		width: var(--metric-width-long) !important;
 		height: 15px !important;
 		justify-content: center !important;
+		padding-right: 2px !important;
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .metric-separator {
 		display: none !important;
 	}
 
-	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-		display: flex !important;
-		align-items: center !important;
-		justify-content: flex-start !important;
-		flex-wrap: nowrap !important;
-		width: 100% !important;
-		margin-left: 0 !important;
-		padding-left: 0 !important;
-		gap: 7px !important;
-		height: auto !important;
-	}
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
 		display: flex !important;
@@ -4386,14 +4375,7 @@ body.murmur-mobile .search-input-icon-btn {
 		flex: 1 1 0 !important;
 	}
 
-	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-		display: grid !important;
-		grid-template-columns: auto repeat(3, minmax(90px, 1fr)) !important;
-		align-items: center !important;
-		width: 100% !important;
-		margin-left: 10px !important;
-		column-gap: clamp(8px, 3vw, 18px) !important;
-	}
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
 		margin: 0 !important;
@@ -4420,14 +4402,7 @@ body.murmur-mobile .search-input-icon-btn {
 		/* existing rules cleared for consolidation */
 	}
 
-	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-		display: grid !important;
-		grid-template-columns: auto repeat(3, minmax(90px, 1fr)) !important;
-		align-items: center !important;
-		width: 100% !important;
-		margin-left: 10px !important;
-		column-gap: clamp(8px, 3vw, 18px) !important;
-	}
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
 		display: flex !important;
@@ -4588,14 +4563,7 @@ body.murmur-mobile .search-input-icon-btn {
 		flex: 1 1 0 !important;
 	}
 
-	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-		display: grid !important;
-		grid-template-columns: auto repeat(3, minmax(90px, 1fr)) !important;
-		align-items: center !important;
-		width: 100% !important;
-		margin-left: 10px !important;
-		column-gap: clamp(8px, 3vw, 18px) !important;
-	}
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
 		margin: 0 !important;
@@ -4622,14 +4590,7 @@ body.murmur-mobile .search-input-icon-btn {
 		/* existing rules cleared for consolidation */
 	}
 
-	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-		display: grid !important;
-		grid-template-columns: auto repeat(3, minmax(90px, 1fr)) !important;
-		align-items: center !important;
-		width: 100% !important;
-		margin-left: 10px !important;
-		column-gap: clamp(8px, 3vw, 18px) !important;
-	}
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
 		display: flex !important;
@@ -4790,14 +4751,7 @@ body.murmur-mobile .search-input-icon-btn {
 		flex: 1 1 0 !important;
 	}
 
-	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-		display: grid !important;
-		grid-template-columns: auto repeat(3, minmax(90px, 1fr)) !important;
-		align-items: center !important;
-		width: 100% !important;
-		margin-left: 10px !important;
-		column-gap: clamp(8px, 3vw, 18px) !important;
-	}
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
 		margin: 0 !important;
@@ -4824,14 +4778,7 @@ body.murmur-mobile .search-input-icon-btn {
 		/* existing rules cleared for consolidation */
 	}
 
-	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-		display: grid !important;
-		grid-template-columns: auto repeat(3, minmax(90px, 1fr)) !important;
-		align-items: center !important;
-		width: 100% !important;
-		margin-left: 10px !important;
-		column-gap: clamp(8px, 3vw, 18px) !important;
-	}
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
 		display: flex !important;
@@ -4992,14 +4939,7 @@ body.murmur-mobile .search-input-icon-btn {
 		flex: 1 1 0 !important;
 	}
 
-	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-		display: grid !important;
-		grid-template-columns: auto repeat(3, minmax(90px, 1fr)) !important;
-		align-items: center !important;
-		width: 100% !important;
-		margin-left: 10px !important;
-		column-gap: clamp(8px, 3vw, 18px) !important;
-	}
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
 		margin: 0 !important;
@@ -5026,14 +4966,7 @@ body.murmur-mobile .search-input-icon-btn {
 		/* existing rules cleared for consolidation */
 	}
 
-	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-		display: grid !important;
-		grid-template-columns: auto repeat(3, minmax(90px, 1fr)) !important;
-		align-items: center !important;
-		width: 100% !important;
-		margin-left: 10px !important;
-		column-gap: clamp(8px, 3vw, 18px) !important;
-	}
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
 		display: flex !important;
@@ -5194,14 +5127,7 @@ body.murmur-mobile .search-input-icon-btn {
 		flex: 1 1 0 !important;
 	}
 
-	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-		display: grid !important;
-		grid-template-columns: auto repeat(3, minmax(90px, 1fr)) !important;
-		align-items: center !important;
-		width: 100% !important;
-		margin-left: 10px !important;
-		column-gap: clamp(8px, 3vw, 18px) !important;
-	}
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
 		margin: 0 !important;
@@ -5228,14 +5154,7 @@ body.murmur-mobile .search-input-icon-btn {
 		/* existing rules cleared for consolidation */
 	}
 
-	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-		display: grid !important;
-		grid-template-columns: auto repeat(3, minmax(90px, 1fr)) !important;
-		align-items: center !important;
-		width: 100% !important;
-		margin-left: 10px !important;
-		column-gap: clamp(8px, 3vw, 18px) !important;
-	}
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
 		display: flex !important;
@@ -5396,14 +5315,7 @@ body.murmur-mobile .search-input-icon-btn {
 		flex: 1 1 0 !important;
 	}
 
-	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-		display: grid !important;
-		grid-template-columns: auto repeat(3, minmax(90px, 1fr)) !important;
-		align-items: center !important;
-		width: 100% !important;
-		margin-left: 10px !important;
-		column-gap: clamp(8px, 3vw, 18px) !important;
-	}
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
 		margin: 0 !important;
@@ -5430,14 +5342,7 @@ body.murmur-mobile .search-input-icon-btn {
 		/* existing rules cleared for consolidation */
 	}
 
-	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-		display: grid !important;
-		grid-template-columns: auto repeat(3, minmax(90px, 1fr)) !important;
-		align-items: center !important;
-		width: 100% !important;
-		margin-left: 10px !important;
-		column-gap: clamp(8px, 3vw, 18px) !important;
-	}
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
 		display: flex !important;
@@ -5773,6 +5678,8 @@ body.murmur-mobile .search-input-icon-btn {
 	display: flex !important;
 	align-items: center !important;
 	justify-content: center !important;
+	min-width: 0 !important;
+	overflow: visible !important;
 }
 
 .mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
@@ -5975,63 +5882,38 @@ body.murmur-mobile .search-input-icon-btn {
 	display: none !important;
 }
 
-/* Mobile portrait metrics layout */
-.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-	display: grid !important;
-	grid-auto-flow: column !important;
-	grid-template-columns: repeat(4, max-content) !important;
-	align-items: center !important;
-	justify-content: space-between !important;
-	width: 100% !important;
-	margin-left: 4px !important;
-	column-gap: clamp(6px, 2vw, 12px) !important;
-}
-
-.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
-	display: flex !important;
-	align-items: center !important;
-	justify-content: center !important;
-	margin: 0 !important;
-	padding: 0 !important;
-}
-
-.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
-	justify-content: flex-start !important;
-}
-
-.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
-	display: grid !important;
-	grid-template-columns: minmax(0, 0.8fr) repeat(3, minmax(0, 1fr)) !important;
-	align-items: center !important;
-	width: 100% !important;
-	margin-left: 4px !important;
-	column-gap: clamp(3px, 1.2vw, 10px) !important;
-}
-
-.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
-	display: flex !important;
-	align-items: center !important;
-	justify-content: center !important;
-	min-width: 0 !important;
-	margin: 0 !important;
-	padding: 0 !important;
-}
-
-.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
-	justify-content: flex-start !important;
-	margin-right: clamp(2px, 1vw, 8px) !important;
-}
+/* Mobile portrait metrics layout - CONSOLIDATED RULE */
 
 /* Final mobile-portrait enforcement to normalize spacing */
 @media (max-width: 640px) {
+	/* CONSOLIDATED RULE - Ensures exactly 7px gap between all metric boxes */
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
 		display: flex !important;
 		align-items: center !important;
 		justify-content: flex-start !important;
 		flex-wrap: nowrap !important;
-		gap: 7px !important;
+		gap: 7px !important; /* Fixed 7px gap between all boxes */
 		margin-left: 0 !important;
 		padding-left: 0 !important;
+		width: 100% !important;
+		height: auto !important;
+	}
+
+	/* Ensure child divs don't add extra margins that could affect spacing */
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important; /* No margins - let parent gap handle spacing */
+		padding: 0 !important;
+		flex: 0 0 auto !important;
+		min-width: 0 !important;
+	}
+
+	/* First child (if needed for different alignment) */
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		margin-right: 0 !important; /* No extra margin - parent gap handles it */
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
@@ -6049,6 +5931,15 @@ body.murmur-mobile .search-input-icon-btn {
 
 	.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(2) {
 		margin-left: 0 !important;
+	}
+
+	/* Explicit override: prevent non-first metric wrappers from flexing/centering */
+	.mobile-portrait-mode
+		.my-campaigns-table
+		.metrics-grid-container
+		> div:not(:first-child) {
+		flex: 0 0 auto !important;
+		justify-content: flex-start !important;
 	}
 
 	/* Fix header alignment to match body flexbox layout */
@@ -6129,5 +6020,16 @@ body.murmur-mobile .search-input-icon-btn {
 		width: var(--metric-width-long) !important;
 		min-width: var(--metric-width-long) !important;
 		max-width: var(--metric-width-long) !important;
+	}
+
+	/* Normalize header label offsets to align with boxes */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='drafts'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='sent'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='updated'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
+		margin-left: 0 !important;
+		padding-right: 0 !important;
+		justify-content: flex-start !important;
+		text-align: left !important;
 	}
 }
