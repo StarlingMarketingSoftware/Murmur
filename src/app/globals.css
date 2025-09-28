@@ -5942,6 +5942,35 @@ body.murmur-mobile .search-input-icon-btn {
 		justify-content: flex-start !important;
 	}
 
+	/* Consistent 1px dividers between metric boxes (mobile portrait)
+	   Use border-left on the second+ item to avoid double rendering and subpixel blur. */
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		--metric-gap: 7px;
+		display: flex !important;
+		gap: 0 !important; /* emulate gap with margin/padding so divider stays centered */
+		column-gap: 0 !important;
+		row-gap: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		position: relative !important;
+	}
+
+	.mobile-portrait-mode
+		.my-campaigns-table
+		.metrics-grid-container
+		> div:not(:first-child) {
+		/* Split the visual gap evenly around a crisp 1px divider */
+		margin-left: calc((var(--metric-gap, 7px) - 1px) / 2) !important;
+		padding-left: calc((var(--metric-gap, 7px) - 1px) / 2) !important;
+		border-left: 1px solid #000000 !important;
+	}
+
+	/* Hide any DOM-based separators to prevent double-thick lines */
+	.mobile-portrait-mode .my-campaigns-table .metric-separator {
+		display: none !important;
+	}
+
 	/* Fix header alignment to match body flexbox layout */
 	.mobile-portrait-mode .metrics-header-grid {
 		display: flex !important;
