@@ -5980,6 +5980,11 @@ body.murmur-mobile .search-input-icon-btn {
 		align-items: center !important;
 	}
 
+	/* Prevent clipping: allow metrics header cell to show negatively-shifted labels */
+	.mobile-portrait-mode .campaigns-table-container thead th:nth-child(2) {
+		overflow: visible !important;
+	}
+
 	/* Match header label widths to metric box widths */
 	.mobile-portrait-mode .metrics-header-grid .metrics-header-label {
 		flex: 0 0 auto !important;
@@ -6000,7 +6005,33 @@ body.murmur-mobile .search-input-icon-btn {
 
 	/* Visually center the leftmost label over bordered metric box */
 	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='drafts'] {
-		margin-left: -1px !important;
+		margin-left: -18px !important; /* nudge only Drafts left */
+		justify-content: flex-start !important; /* text starts at left edge of its box */
+	}
+
+	/* Nudge the other labels slightly to the right to align over boxes */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='sent'] {
+		margin-left: 4px !important;
+	}
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='updated'] {
+		margin-left: 2px !important;
+	}
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
+		margin-left: 2px !important;
+	}
+
+	/* Force two-line wrap and left alignment for Updated Last / Created On, keeping box widths */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='updated'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
+		white-space: normal !important; /* allow wrapping at spaces */
+		word-break: normal !important; /* wrap on spaces only */
+		overflow: visible !important;
+		text-overflow: clip !important;
+		text-align: left !important;
+		justify-content: flex-start !important; /* left-align inside flex container */
+		align-items: flex-start !important;
+		line-height: 1.05 !important;
+		padding-right: 10px !important; /* reduce inner text width to encourage wrapping */
 	}
 
 	/* Last two labels (Updated Last, Created On) - responsive long width */
