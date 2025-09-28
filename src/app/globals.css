@@ -1802,6 +1802,23 @@ body {
 
 /* Keep exclude contacts box consistent on smaller screens */
 @media (max-width: 640px) {
+	/* Responsive metric widths for mobile portrait */
+	.mobile-portrait-mode {
+		--metric-width-short: clamp(35px, 9vw, 64px);
+		--metric-width-long: clamp(45px, 12vw, 84px);
+	}
+
+	/* Utility classes to apply responsive widths */
+	.mobile-portrait-mode .metric-width-short {
+		width: var(--metric-width-short) !important;
+		min-width: var(--metric-width-short) !important;
+		max-width: var(--metric-width-short) !important;
+	}
+	.mobile-portrait-mode .metric-width-long {
+		width: var(--metric-width-long) !important;
+		min-width: var(--metric-width-long) !important;
+		max-width: var(--metric-width-long) !important;
+	}
 	.exclude-contacts-box {
 		width: 227px !important;
 		min-width: 227px !important;
@@ -5973,19 +5990,24 @@ body.murmur-mobile .search-input-icon-btn {
 		font-size: 8px !important; /* Smaller font for mobile portrait */
 	}
 
-	/* First two labels (Drafts, Sent) - 35px wide */
+	/* First two labels (Drafts, Sent) - responsive short width */
 	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='drafts'],
 	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='sent'] {
-		width: 35px !important;
-		min-width: 35px !important;
-		max-width: 35px !important;
+		width: var(--metric-width-short) !important;
+		min-width: var(--metric-width-short) !important;
+		max-width: var(--metric-width-short) !important;
 	}
 
-	/* Last two labels (Updated Last, Created On) - 45px wide */
+	/* Visually center the leftmost label over bordered metric box */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='drafts'] {
+		margin-left: -1px !important;
+	}
+
+	/* Last two labels (Updated Last, Created On) - responsive long width */
 	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='updated'],
 	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
-		width: 45px !important;
-		min-width: 45px !important;
-		max-width: 45px !important;
+		width: var(--metric-width-long) !important;
+		min-width: var(--metric-width-long) !important;
+		max-width: var(--metric-width-long) !important;
 	}
 }

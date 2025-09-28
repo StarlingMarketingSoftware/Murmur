@@ -127,7 +127,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 					className={cn(
 						'metrics-header-grid w-full items-center',
 						compactMetrics
-								? 'flex flex-nowrap gap-[7px] justify-start'
+							? 'flex flex-nowrap gap-[7px] justify-start'
 							: 'grid justify-items-start gap-8 md:gap-10 lg:gap-12'
 					)}
 					style={
@@ -143,7 +143,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						className={cn(
 							'metrics-header-label',
 							compactMetrics &&
-									'flex h-[15px] w-[35px] items-center justify-center text-[10px] font-medium tracking-[0.01em]'
+								'flex h-[15px] metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em]'
 						)}
 						data-label="drafts"
 					>
@@ -153,7 +153,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						className={cn(
 							'metrics-header-label',
 							compactMetrics &&
-									'flex h-[15px] w-[35px] items-center justify-center text-[10px] font-medium tracking-[0.01em]'
+								'flex h-[15px] metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em]'
 						)}
 						data-label="sent"
 					>
@@ -163,7 +163,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						className={cn(
 							'metrics-header-label',
 							compactMetrics &&
-									'flex h-[15px] w-[45px] items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em]'
+								'flex h-[15px] metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em]'
 						)}
 						data-label="updated"
 					>
@@ -173,7 +173,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						className={cn(
 							'metrics-header-label',
 							compactMetrics &&
-									'flex h-[15px] w-[45px] items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em]'
+								'flex h-[15px] metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em]'
 						)}
 						data-label="created"
 					>
@@ -226,7 +226,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 									className={cn(
 										'flex items-center',
 										compactMetrics
-											? 'h-[15px] w-[45px] flex-shrink-0 justify-center'
+											? 'h-[15px] metric-width-long flex-shrink-0 justify-center'
 											: 'w-full'
 									)}
 								/>
@@ -278,28 +278,28 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 								label: draftDisplay,
 								fill: draftFill,
 								dataAttr: { 'data-draft-fill': draftFill } as Record<string, string>,
-								width: compactMetrics ? 'w-[35px]' : 'w-[6.13em]',
+								width: compactMetrics ? 'metric-width-short' : 'w-[6.13em]',
 								separator: !compactMetrics,
 							},
 							{
 								label: sentDisplay,
 								fill: sentFill,
 								dataAttr: { 'data-sent-fill': sentFill } as Record<string, string>,
-								width: compactMetrics ? 'w-[35px]' : 'w-[6.13em]',
+								width: compactMetrics ? 'metric-width-short' : 'w-[6.13em]',
 								separator: !compactMetrics,
 							},
 							{
 								label: mmdd(updatedAt),
 								fill: updatedFill,
 								dataAttr: { 'data-updated-fill': updatedFill } as Record<string, string>,
-								width: compactMetrics ? 'w-[45px]' : 'w-[6.13em]',
+								width: compactMetrics ? 'metric-width-long' : 'w-[6.13em]',
 								separator: !compactMetrics,
 							},
 							{
 								label: mmdd(createdAt),
 								fill: createdFill,
 								dataAttr: { 'data-created-fill': createdFill } as Record<string, string>,
-								width: compactMetrics ? 'w-[45px]' : 'w-[6.13em]',
+								width: compactMetrics ? 'metric-width-long' : 'w-[6.13em]',
 								separator: false,
 							},
 						].map(({ label, fill, dataAttr, width, separator }, index) => (
