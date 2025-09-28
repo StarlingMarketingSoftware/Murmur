@@ -143,7 +143,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						className={cn(
 							'metrics-header-label',
 							compactMetrics &&
-								'flex h-[15px] metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em]'
+								'flex h-[15px] metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
 						)}
 						data-label="drafts"
 					>
@@ -153,7 +153,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						className={cn(
 							'metrics-header-label',
 							compactMetrics &&
-								'flex h-[15px] metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em]'
+								'flex h-[15px] metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
 						)}
 						data-label="sent"
 					>
@@ -163,21 +163,29 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						className={cn(
 							'metrics-header-label',
 							compactMetrics &&
-								'flex h-[15px] metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em]'
+								'flex h-[15px] metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em] metrics-header-label-compact'
 						)}
 						data-label="updated"
 					>
-						Updated Last
+						<span className="metrics-two-line-label">
+							<span>Updated</span>
+							<br className="metrics-force-br" />
+							<span>Last</span>
+						</span>
 					</span>
 					<span
 						className={cn(
 							'metrics-header-label',
 							compactMetrics &&
-								'flex h-[15px] metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em]'
+								'flex h-[15px] metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em] metrics-header-label-compact'
 						)}
 						data-label="created"
 					>
-						Created On
+						<span className="metrics-two-line-label">
+							<span>Created</span>
+							<br className="metrics-force-br" />
+							<span>On</span>
+						</span>
 					</span>
 				</div>
 			),

@@ -1802,6 +1802,17 @@ body {
 
 /* Keep exclude contacts box consistent on smaller screens */
 @media (max-width: 640px) {
+	/* Show forced line breaks for metrics header labels only in mobile portrait */
+	.mobile-portrait-mode .metrics-two-line-label .metrics-force-br {
+		display: inline !important;
+	}
+	/* In compact header labels, always hide forced breaks */
+	.mobile-portrait-mode
+		.metrics-header-label-compact
+		.metrics-two-line-label
+		.metrics-force-br {
+		display: none !important;
+	}
 	/* Responsive metric widths for mobile portrait */
 	.mobile-portrait-mode {
 		--metric-width-short: clamp(35px, 9vw, 64px);
@@ -2531,7 +2542,8 @@ body {
 		white-space: nowrap !important;
 		overflow: hidden !important;
 		text-overflow: ellipsis !important;
-		font-weight: 500 !important;
+		font-family: var(--font-inter) !important;
+		font-weight: 600 !important;
 	}
 
 	/* Allow two-line wrap for longer labels */
@@ -2549,7 +2561,7 @@ body {
 
 	/* Slightly smaller metrics header labels on mobile portrait */
 	.mobile-portrait-mode .metrics-header-grid .metrics-header-label {
-		font-size: 10px !important;
+		font-size: 11px !important;
 	}
 
 	.mobile-portrait-mode .metrics-grid-container {
@@ -5983,7 +5995,7 @@ body.murmur-mobile .search-input-icon-btn {
 
 	/* Align header grid with metric boxes in campaigns table */
 	.mobile-portrait-mode .my-campaigns-table .metrics-header-grid {
-		margin-left: 0 !important; /* Remove margin to align with leftmost box */
+		margin-left: -12px !important; /* Shift further left to align with metric box edge */
 	}
 
 	/* Prevent clipping: allow metrics header cell to show negatively-shifted labels */
@@ -5998,7 +6010,7 @@ body.murmur-mobile .search-input-icon-btn {
 		display: flex !important;
 		align-items: center !important;
 		justify-content: center !important;
-		font-size: 8px !important; /* Smaller font for mobile portrait */
+		font-size: 11px !important; /* Updated to 11px for better readability */
 	}
 
 	/* First two labels (Drafts, Sent) - responsive short width */
@@ -6011,16 +6023,16 @@ body.murmur-mobile .search-input-icon-btn {
 
 	/* Align Drafts label to the left edge of metric box below */
 	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='drafts'] {
-		margin-left: -6px !important; /* Negative margin to align with box edge */
+		margin-left: 0 !important; /* Use container shift for alignment */
 		justify-content: flex-start !important; /* Align text to left edge */
 		padding-left: 0 !important; /* Ensure no internal padding */
 	}
 
 	/* Align Sent label to the left edge of metric box below */
 	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='sent'] {
-		margin-left: 7px !important; /* Positive margin to align with box edge */
+		margin-left: 0 !important; /* Use container shift for alignment */
 		justify-content: flex-start !important; /* Align text to left edge */
-		padding-left: 0 !important; /* Ensure no internal padding */
+		padding-left: 3px !important; /* Nudge text 3px to the right */
 	}
 	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='updated'] {
 		margin-left: 2px !important;
@@ -6041,6 +6053,20 @@ body.murmur-mobile .search-input-icon-btn {
 		align-items: flex-start !important;
 		line-height: 1.05 !important;
 		padding-right: 10px !important; /* reduce inner text width to encourage wrapping */
+	}
+
+	/* Ensure forced <br> stays visible for Updated/Created even in compact labels */
+	.mobile-portrait-mode
+		.metrics-header-grid
+		.metrics-header-label[data-label='updated']
+		.metrics-two-line-label
+		.metrics-force-br,
+	.mobile-portrait-mode
+		.metrics-header-grid
+		.metrics-header-label[data-label='created']
+		.metrics-two-line-label
+		.metrics-force-br {
+		display: inline !important;
 	}
 
 	/* Last two labels (Updated Last, Created On) - responsive long width */
