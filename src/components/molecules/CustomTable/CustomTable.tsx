@@ -268,10 +268,15 @@ export function CustomTable<TData, TValue>({
 	}, [pagination.pageIndex, pagination.pageSize, data]);
 
 	const showInContainerHeader = isSelectable && useCustomScrollbar;
+	const hasToolbarContent =
+		searchable ||
+		displayRowsPerPage ||
+		Boolean(headerAction) ||
+		Boolean(headerInlineAction);
 
 	return (
 		<div className="w-full">
-			{!showInContainerHeader && (
+			{!showInContainerHeader && hasToolbarContent && (
 				<div
 					className={cn(
 						'relative z-[70] flex items-end justify-between pt-2 pb-1 gap-4 w-full max-w-full mx-auto',

@@ -2225,28 +2225,89 @@ body {
 		position: relative;
 	}
 
+	/* Remove all possible spacing from Card component */
+	.mobile-portrait-mode .relative.border-none.bg-transparent {
+		padding: 0 !important;
+		margin: 0 !important;
+	}
+
+	/* Specific override for the campaigns table card */
+	.campaigns-table-wrapper .relative.border-none.bg-transparent {
+		padding-top: 0 !important;
+	}
+
+	/* Force the first child of card (header) to start at the very top */
+	@media (max-width: 640px) and (orientation: portrait) {
+		.campaigns-table-wrapper .relative.border-none.bg-transparent > :first-child {
+			margin-top: 0 !important;
+			padding-top: 0 !important;
+			position: relative !important;
+			top: 0 !important;
+		}
+	}
+
+	/* Target Card component directly */
+	.mobile-portrait-mode > div:first-child {
+		padding-top: 0 !important;
+		margin-top: 0 !important;
+	}
+
 	.mobile-portrait-mode .mobile-portrait-card-header {
-		padding: 10px 8px 6px !important;
+		padding: 0 8px 2px !important; /* Minimal bottom padding only */
 		border: 2px solid #000000 !important;
 		border-bottom: none !important;
 		border-radius: 8px 8px 0 0 !important;
 		margin: 0 !important;
 		background: #ffffff !important;
+		min-height: auto !important; /* Ensure no minimum height */
+		position: relative !important;
+		top: -1px !important; /* Pull header up slightly to compensate for any remaining space */
+	}
+
+	/* Ensure the card header slot doesn't add extra space */
+	.mobile-portrait-mode [data-slot='card-header'] {
+		padding: 0 !important;
+		margin: 0 !important;
 	}
 
 	.mobile-portrait-card-title {
 		font-family: 'Times New Roman', 'Times', serif !important;
 		font-size: 10px !important;
 		font-weight: 700 !important;
-		line-height: 1.1 !important;
+		line-height: 1 !important; /* Tighter line height */
 		letter-spacing: 0.01em !important;
 		margin: 0 !important;
+		padding: 0 !important; /* Ensure no padding */
+		display: block !important;
+	}
+
+	/* Target the card title slot specifically */
+	.mobile-portrait-mode [data-slot='card-title'] {
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	/* Force header and content to touch with no gap */
+	.mobile-portrait-mode .mobile-portrait-card-header + * {
+		margin-top: 0 !important;
+		padding-top: 0 !important;
+	}
+
+	/* Ensure the header fills any potential gap */
+	.mobile-portrait-mode .mobile-portrait-card-header::after {
+		content: '';
+		position: absolute;
+		bottom: -2px;
+		left: 0;
+		right: 0;
+		height: 4px;
+		background: #ffffff;
 	}
 
 	.mobile-portrait-card-content {
 		padding-top: 0 !important;
 		padding-bottom: 12px !important;
-		margin-top: -2px !important;
+		margin-top: -3px !important; /* Pull content up more to close any gap */
 	}
 
 	/* Position the table container relatively (ensure even if wrapper class is missing) */
@@ -3029,9 +3090,16 @@ body {
 
 /* Keep table in normal flow with consistent spacing */
 .campaigns-table-wrapper {
-	margin-top: -200px; /* Pull table up for better positioning */
+	margin-top: -200px; /* Pull table up for better positioning on desktop */
 	position: relative;
 	z-index: 30; /* Ensure table is above other elements */
+}
+
+/* Override negative margin on mobile to prevent white space */
+@media (max-width: 640px) {
+	.campaigns-table-wrapper {
+		margin-top: 20px; /* Positive margin for mobile */
+	}
 }
 
 /* Dashboard main offset: default for landscape (unchanged visual) */
@@ -3059,12 +3127,12 @@ body {
 /* Adjust table position for portrait orientation screens to prevent overlap */
 @media (orientation: portrait) {
 	.campaigns-table-wrapper {
-		margin-top: -100px; /* Less aggressive pull-up on portrait screens */
+		margin-top: 20px; /* Positive margin for proper spacing on portrait screens */
 	}
 
 	/* Add extra spacing between search area and table on portrait */
 	.hero-wrapper {
-		min-height: 600px !important; /* Reduce min-height on portrait */
+		min-height: auto !important; /* Allow flexible height on portrait */
 		height: auto !important; /* Allow flexible height */
 	}
 
@@ -3077,7 +3145,20 @@ body {
 /* Additional fix for tall portrait monitors (aspect ratio taller than 3:4) */
 @media (orientation: portrait) and (min-aspect-ratio: 3/4) {
 	.campaigns-table-wrapper {
-		margin-top: -50px; /* Even less pull-up for very tall portrait screens */
+		margin-top: 20px; /* Consistent positive margin for tall portrait screens */
+	}
+}
+
+/* Mobile portrait specific fix to ensure no white margin */
+@media (max-width: 640px) and (orientation: portrait) {
+	.campaigns-table-wrapper {
+		margin-top: 20px !important; /* Override any negative margins */
+	}
+
+	/* Ensure the dashboard offset doesn't interfere */
+	.dashboard-main-offset {
+		margin-top: 0;
+		padding-top: 20px;
 	}
 }
 
