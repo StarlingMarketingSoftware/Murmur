@@ -127,7 +127,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 					className={cn(
 						'metrics-header-grid w-full items-center',
 						compactMetrics
-							? 'flex flex-nowrap gap-[7px] justify-start'
+								? 'flex flex-nowrap gap-[7px] justify-start'
 							: 'grid justify-items-start gap-8 md:gap-10 lg:gap-12'
 					)}
 					style={
@@ -143,7 +143,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						className={cn(
 							'metrics-header-label',
 							compactMetrics &&
-								'flex h-[15px] w-[35px] items-center justify-center text-[10px] font-medium uppercase tracking-[0.01em]'
+									'flex h-[15px] w-[35px] items-center justify-center text-[10px] font-medium tracking-[0.01em]'
 						)}
 						data-label="drafts"
 					>
@@ -153,7 +153,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						className={cn(
 							'metrics-header-label',
 							compactMetrics &&
-								'flex h-[15px] w-[35px] items-center justify-center text-[10px] font-medium uppercase tracking-[0.01em]'
+									'flex h-[15px] w-[35px] items-center justify-center text-[10px] font-medium tracking-[0.01em]'
 						)}
 						data-label="sent"
 					>
@@ -163,7 +163,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						className={cn(
 							'metrics-header-label',
 							compactMetrics &&
-								'flex h-[15px] w-[45px] items-center justify-center text-center text-[10px] font-medium uppercase leading-[1.05] tracking-[0.01em]'
+									'flex h-[15px] w-[45px] items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em]'
 						)}
 						data-label="updated"
 					>
@@ -173,7 +173,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						className={cn(
 							'metrics-header-label',
 							compactMetrics &&
-								'flex h-[15px] w-[45px] items-center justify-center text-center text-[10px] font-medium uppercase leading-[1.05] tracking-[0.01em]'
+									'flex h-[15px] w-[45px] items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em]'
 						)}
 						data-label="created"
 					>
