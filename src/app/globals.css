@@ -5980,6 +5980,11 @@ body.murmur-mobile .search-input-icon-btn {
 		align-items: center !important;
 	}
 
+	/* Align header grid with metric boxes in campaigns table */
+	.mobile-portrait-mode .my-campaigns-table .metrics-header-grid {
+		margin-left: 0 !important; /* Remove margin to align with leftmost box */
+	}
+
 	/* Prevent clipping: allow metrics header cell to show negatively-shifted labels */
 	.mobile-portrait-mode .campaigns-table-container thead th:nth-child(2) {
 		overflow: visible !important;
@@ -6003,15 +6008,18 @@ body.murmur-mobile .search-input-icon-btn {
 		max-width: var(--metric-width-short) !important;
 	}
 
-	/* Visually center the leftmost label over bordered metric box */
+	/* Align Drafts label to the left edge of metric box below */
 	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='drafts'] {
-		margin-left: -18px !important; /* nudge only Drafts left */
-		justify-content: flex-start !important; /* text starts at left edge of its box */
+		margin-left: -6px !important; /* Negative margin to align with box edge */
+		justify-content: flex-start !important; /* Align text to left edge */
+		padding-left: 0 !important; /* Ensure no internal padding */
 	}
 
-	/* Nudge the other labels slightly to the right to align over boxes */
+	/* Align Sent label to the left edge of metric box below */
 	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='sent'] {
-		margin-left: 4px !important;
+		margin-left: 7px !important; /* Positive margin to align with box edge */
+		justify-content: flex-start !important; /* Align text to left edge */
+		padding-left: 0 !important; /* Ensure no internal padding */
 	}
 	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='updated'] {
 		margin-left: 2px !important;
