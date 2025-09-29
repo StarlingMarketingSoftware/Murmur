@@ -678,7 +678,7 @@ const Dashboard = () => {
 								<ConsoleLoader searchQuery={activeSearchQuery} />
 							</div>
 						) : contacts && contacts.length > 0 ? (
-							<div className="flex justify-center w-full px-4">
+							<div className="flex justify-center w-full px-0 sm:px-4">
 								<div className="w-full max-w-full results-appear results-align">
 									<Card className="border-0 shadow-none !p-0 w-full">
 										<CardContent className="!p-0 w-full">
@@ -695,7 +695,7 @@ const Dashboard = () => {
 												constrainHeight
 												useCustomScrollbar
 												scrollbarOffsetRight={-5}
-												containerClassName="search-results-table w-[1209px] h-[499px] rounded-[8px] border-[#737373]"
+												containerClassName="search-results-table w-[1209px] h-[499px] rounded-[8px] border-[#737373] md:w-[1209px]"
 												tableClassName="w-full"
 												headerClassName="[&_tr]:border-[#737373]"
 												theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"

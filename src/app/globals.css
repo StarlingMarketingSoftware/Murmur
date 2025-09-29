@@ -3969,6 +3969,14 @@ body,
 	background-color: #d6e8d9 !important;
 }
 
+/* Mobile 390px breakpoint: fix search results table width to 361px */
+@media (min-width: 389px) and (max-width: 391px) {
+	body.murmur-mobile .search-results-table {
+		width: 361px !important;
+		max-width: 361px !important;
+	}
+}
+
 /* Mobile: ensure the initial dashboard search input is 41px tall */
 @media (max-width: 640px) {
 	/* Target only the hero/initial search input, not the results view */
