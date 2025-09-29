@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { gsap } from 'gsap';
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { useDashboard } from './useDashboard';
@@ -131,10 +132,14 @@ const Dashboard = () => {
 		return null;
 	}
 
+	// Reduce extra white space above the fixed mobile action button by
+	// only adding bottom padding when needed and using a smaller value on mobile
+	const bottomPadding = isMobile && hasSearched ? 'pb-[64px]' : 'pb-0 md:pb-[100px]';
+
 	return (
 		<AppLayout>
 			<div
-				className={`relative min-h-screen transition-all duration-500 dashboard-main-offset pb-[100px] w-full max-w-full ${
+				className={`relative min-h-screen transition-all duration-500 dashboard-main-offset w-full max-w-full ${bottomPadding} ${
 					hasSearched ? 'search-active' : ''
 				}`}
 			>
@@ -712,55 +717,83 @@ const Dashboard = () => {
 													</button>
 												}
 												headerInlineAction={
-													<button
-														type="button"
-														onClick={handleCreateCampaign}
-														disabled={selectedContacts.length === 0}
-														className="font-secondary"
-														style={{
-															width: 'auto',
-															height: '28px',
-															background:
-																selectedContacts.length === 0
-																	? 'rgba(93, 171, 104, 0.1)'
-																	: 'rgba(93, 171, 104, 0.22)',
-															border: '2px solid #000000',
-															color:
-																selectedContacts.length === 0
-																	? 'rgba(0, 0, 0, 0.4)'
-																	: '#000000',
-															fontSize: '13px',
-															fontWeight: 500,
-															borderRadius: '8px',
-															lineHeight: 'normal',
-															display: 'flex',
-															alignItems: 'center',
-															justifyContent: 'center',
-															padding: '0 12px',
-															textAlign: 'center',
-															cursor:
-																selectedContacts.length === 0 ? 'default' : 'pointer',
-															opacity: selectedContacts.length === 0 ? 0.6 : 1,
-														}}
-													>
-														Create Campaign
-													</button>
+													!isMobile ? (
+														<button
+															type="button"
+															onClick={handleCreateCampaign}
+															disabled={selectedContacts.length === 0}
+															className="font-secondary"
+															style={{
+																width: 'auto',
+																height: '28px',
+																background:
+																	selectedContacts.length === 0
+																		? 'rgba(93, 171, 104, 0.1)'
+																		: 'rgba(93, 171, 104, 0.22)',
+																border: '2px solid #000000',
+																color:
+																	selectedContacts.length === 0
+																		? 'rgba(0, 0, 0, 0.4)'
+																		: '#000000',
+																fontSize: '13px',
+																fontWeight: 500,
+																borderRadius: '8px',
+																lineHeight: 'normal',
+																display: 'flex',
+																alignItems: 'center',
+																justifyContent: 'center',
+																padding: '0 12px',
+																textAlign: 'center',
+																cursor:
+																	selectedContacts.length === 0 ? 'default' : 'pointer',
+																opacity: selectedContacts.length === 0 ? 0.6 : 1,
+															}}
+														>
+															Create Campaign
+														</button>
+													) : null
 												}
 											/>
 										</CardContent>
 									</Card>
-									<div className="flex items-center w-full">
-										<Button
-											onClick={handleCreateCampaign}
-											isLoading={isPendingCreateCampaign || isPendingBatchUpdateContacts}
-											variant="primary-light"
-											bold
-											className="w-full max-w-full h-[39px] mx-auto mt-5"
-											disabled={selectedContacts.length === 0}
-										>
-											Create Campaign
-										</Button>
-									</div>
+									{/* Desktop button (non-sticky) */}
+									{!isMobile && (
+										<div className="flex items-center w-full">
+											<Button
+												onClick={handleCreateCampaign}
+												isLoading={
+													isPendingCreateCampaign || isPendingBatchUpdateContacts
+												}
+												variant="primary-light"
+												bold
+												className="w-full max-w-full h-[39px] mx-auto mt-5"
+												disabled={selectedContacts.length === 0}
+											>
+												Create Campaign
+											</Button>
+										</div>
+									)}
+
+									{/* Mobile sticky button at bottom */}
+									{isMobile &&
+										typeof window !== 'undefined' &&
+										createPortal(
+											<div className="mobile-sticky-cta">
+												<Button
+													onClick={handleCreateCampaign}
+													isLoading={
+														isPendingCreateCampaign || isPendingBatchUpdateContacts
+													}
+													variant="primary-light"
+													bold
+													className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#5dab68] transition-colors !opacity-100 disabled:!opacity-100"
+													disabled={selectedContacts.length === 0}
+												>
+													Create Campaign
+												</Button>
+											</div>,
+											document.body
+										)}
 								</div>
 							</div>
 						) : hasSearched &&

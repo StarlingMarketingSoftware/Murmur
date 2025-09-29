@@ -4079,6 +4079,28 @@ body.murmur-mobile .exclude-contacts-box [data-slot='form-item'] {
 	justify-content: space-between !important;
 }
 
+/* Sticky bottom container for mobile CTA (accounts for iOS safe area and zoom) */
+.mobile-sticky-cta {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 300; /* Above other overlays */
+}
+
+/* Ensure the mobile CTA never fades when disabled */
+.mobile-sticky-cta [data-slot='button'][disabled] {
+	opacity: 1 !important;
+}
+
+/* Respect iOS safe-area when present */
+@supports (bottom: env(safe-area-inset-bottom)) {
+	.mobile-sticky-cta {
+		bottom: env(safe-area-inset-bottom);
+		padding-bottom: env(safe-area-inset-bottom);
+	}
+}
+
 /* Label text: 8px Inter bold, allow full phrase inside 124px */
 body.murmur-mobile .exclude-contacts-box [data-slot='form-label'] {
 	font-size: 8px !important;
