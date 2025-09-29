@@ -2083,6 +2083,53 @@ body {
 	position: relative;
 }
 
+/* Mobile portrait: ensure the results search bar fits within the viewport */
+@media (max-width: 640px) and (orientation: portrait) {
+	/* Make form a single full-width column */
+	.results-search-form {
+		grid-template-columns: 1fr !important;
+		justify-content: stretch !important;
+	}
+	/* Let the group and its container expand fluidly */
+	.results-search-input-group {
+		width: 100% !important;
+		min-width: 0 !important;
+	}
+	.results-search-input-group .search-wave-container {
+		width: 100% !important;
+		min-width: 0 !important;
+		max-width: 100% !important;
+	}
+	/* Input fills available width; keep room for left icon */
+	.results-search-input {
+		width: 100% !important;
+		max-width: 100% !important;
+		padding-left: 36px; /* icon space */
+		padding-right: 12px;
+	}
+}
+
+/* Width-based fallback for responsive mode/devtools */
+@media (max-width: 640px) {
+	.results-search-form {
+		grid-template-columns: 1fr !important;
+		justify-content: stretch !important;
+	}
+	.results-search-input-group {
+		width: 100% !important;
+		min-width: 0 !important;
+	}
+	.results-search-input-group .search-wave-container {
+		width: 100% !important;
+		min-width: 0 !important;
+		max-width: 100% !important;
+	}
+	.results-search-input {
+		width: 100% !important;
+		max-width: 100% !important;
+	}
+}
+
 .results-search-icon-btn {
 	position: absolute;
 	left: 18px;
