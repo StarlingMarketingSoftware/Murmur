@@ -4040,6 +4040,24 @@ body.murmur-mobile .search-results-table td[data-slot='table-cell'] {
 	}
 }
 
+/* Mobile: tighten vertical spacing between search result rows to 5px */
+@media (max-width: 640px) {
+	.search-results-table table[data-slot='table'] {
+		border-spacing: 0 5px !important; /* reduce from default 8px only on mobile */
+	}
+	.search-results-table thead[data-slot='table-header'] {
+		margin-bottom: -5px !important; /* keep header flush with reduced row gap */
+	}
+}
+
+/* Real mobile devices only (extra guard) */
+body.murmur-mobile .search-results-table table[data-slot='table'] {
+	border-spacing: 0 5px !important;
+}
+body.murmur-mobile .search-results-table thead[data-slot='table-header'] {
+	margin-bottom: -5px !important;
+}
+
 /* Mobile: ensure the initial dashboard search input is 41px tall */
 @media (max-width: 640px) {
 	/* Target only the hero/initial search input, not the results view */
