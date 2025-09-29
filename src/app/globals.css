@@ -3963,6 +3963,33 @@ body,
 .search-results-table tr[data-slot='table-row']:hover td[data-slot='table-cell'] {
 	background-color: #edf5ee !important;
 }
+
+/* Disable hover effects on mobile to prevent stuck states */
+@media (max-width: 640px) {
+	.search-results-table tr[data-slot='table-row']:hover td[data-slot='table-cell'] {
+		background-color: white !important;
+	}
+	.row-hover-scroll:hover .hover-scroll-text {
+		animation: none !important;
+	}
+	/* Allow text wrapping in table cells on mobile */
+	.search-results-table td[data-slot='table-cell'] {
+		white-space: normal !important;
+	}
+}
+body.murmur-mobile
+	.search-results-table
+	tr[data-slot='table-row']:hover
+	td[data-slot='table-cell'] {
+	background-color: white !important;
+}
+body.murmur-mobile .row-hover-scroll:hover .hover-scroll-text {
+	animation: none !important;
+}
+/* Allow text wrapping in table cells on mobile */
+body.murmur-mobile .search-results-table td[data-slot='table-cell'] {
+	white-space: normal !important;
+}
 .search-results-table
 	tr[data-slot='table-row'][data-state='selected']
 	td[data-slot='table-cell'] {

@@ -56,6 +56,13 @@ const Dashboard = () => {
 		hoveredContact,
 	} = useDashboard();
 
+	// Clear hover state on mobile to prevent stuck hover
+	useEffect(() => {
+		if (isMobile) {
+			setHoveredContact(null);
+		}
+	}, [isMobile, setHoveredContact]);
+
 	useEffect(() => {
 		// Small delay to ensure DOM is ready
 		const timer = setTimeout(() => {
@@ -601,7 +608,7 @@ const Dashboard = () => {
 								</div>
 							</Form>
 						</div>
-						{hoveredContact && (
+						{hoveredContact && !isMobile && (
 							<div className="absolute inset-0 z-[90] flex items-start justify-center pointer-events-none bg-white">
 								<div className="w-full max-w-[1132px] mx-auto px-4 py-3 text-center">
 									<div className="font-secondary font-bold text-[19px] leading-tight truncate">
@@ -706,7 +713,9 @@ const Dashboard = () => {
 												theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
 												rowClassName="border-[#737373] row-hover-scroll"
 												hidePagination
-												onRowHover={(row) => setHoveredContact(row)}
+												onRowHover={
+													isMobile ? undefined : (row) => setHoveredContact(row)
+												}
 												headerAction={
 													<button
 														onClick={handleSelectAll}

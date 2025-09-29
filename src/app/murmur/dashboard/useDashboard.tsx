@@ -319,20 +319,20 @@ export const useDashboard = () => {
 				cell: ({ row }) => {
 					const contact = row.original as ContactWithName;
 					const isUsed = usedContactIdsSet.has(contact.id);
-					const renderUsedIndicator = () =>
-						!isUsed ? null : (
-							<span
-								className="inline-block shrink-0 mr-2"
-								title="Used in a previous campaign"
-								style={{
-									width: '16px',
-									height: '16px',
-									borderRadius: '50%',
-									border: '1px solid #000000',
-									backgroundColor: '#DAE6FE',
-								}}
-							/>
-						);
+					const renderUsedIndicator = () => (
+						<span
+							className="inline-block shrink-0 mr-2"
+							title={isUsed ? 'Used in a previous campaign' : undefined}
+							style={{
+								width: '16px',
+								height: '16px',
+								borderRadius: '50%',
+								border: '1px solid #000000',
+								backgroundColor: '#DAE6FE',
+								visibility: isUsed ? 'visible' : 'hidden',
+							}}
+						/>
+					);
 					// Compute name from firstName and lastName fields
 					const hasName = contactHasName(contact);
 					const nameValue = hasName ? computeName(contact) : '';
@@ -550,7 +550,6 @@ export const useDashboard = () => {
 				header: () => <span className="sr-only">Contact</span>,
 				cell: ({ row }) => {
 					const contact = row.original as ContactWithName;
-					const isUsed = usedContactIdsSet.has(contact.id);
 					const hasName = contactHasName(contact);
 					const nameValue = hasName ? computeName(contact) : '';
 					const companyValue = contact.company || '';
@@ -569,55 +568,53 @@ export const useDashboard = () => {
 						canadianProvinceAbbreviations.includes(normalizedState.toUpperCase()) ||
 						canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
 
-					const renderUsedIndicator = () =>
-						!isUsed ? null : (
-							<span
-								className="inline-block shrink-0 mr-2"
-								title="Used in a previous campaign"
-								style={{
-									width: '16px',
-									height: '16px',
-									borderRadius: '50%',
-									border: '1px solid #000000',
-									backgroundColor: '#DAE6FE',
-								}}
-							/>
-						);
-
 					// If neither name nor company, show a dash on the left, hide right-side blocks
 					if (!hasName && !hasCompany) {
 						return (
 							<div className="relative min-h-[44px] flex items-center">
-								{renderUsedIndicator()}
 								<span className="select-none text-gray-300 dark:text-gray-700">—</span>
 							</div>
 						);
 					}
 
 					return (
-						<div className="relative min-h-[44px]">
+						<div className="relative flex items-center min-h-[44px] py-1.5 !whitespace-normal">
 							{/* Left block: name and company with extra right padding to make space for the fixed right block */}
-							<div className="flex items-start gap-2 pr-[168px] py-1">
-								{renderUsedIndicator()}
-								<div className="flex flex-col gap-0.5 min-w-0">
+							<div className="flex-1 pl-1 pr-[188px]">
+								<div className="flex flex-col gap-0 min-w-0">
 									{(hasName || hasCompany) && (
-										<div className="truncate font-bold font-primary text-[16px]">
-											<TableCellTooltip
-												text={hasName ? nameValue : companyValue}
-												maxLength={MAX_CELL_LENGTH}
-												positioning="below-right"
-												onHover={handleCellHover}
-											/>
+										<div
+											className={
+												hasName
+													? 'truncate font-bold font-primary text-[14px]'
+													: companyValue.length > 30
+													? 'font-bold font-primary text-[10px] leading-[1.15] overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] !whitespace-normal'
+													: 'font-bold font-primary text-[14px] overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] !whitespace-normal'
+											}
+											style={!hasName ? { wordBreak: 'break-word' } : undefined}
+										>
+											{hasName ? (
+												<TableCellTooltip
+													text={nameValue}
+													maxLength={MAX_CELL_LENGTH}
+													positioning="below-right"
+													onHover={handleCellHover}
+												/>
+											) : (
+												<span title={companyValue}>{companyValue}</span>
+											)}
 										</div>
 									)}
 									{hasName && hasCompany && (
-										<div className="truncate text-sm text-gray-500 dark:text-gray-400">
-											<TableCellTooltip
-												text={companyValue}
-												maxLength={MAX_CELL_LENGTH}
-												positioning="below-right"
-												onHover={handleCellHover}
-											/>
+										<div
+											className={
+												companyValue.length > 30
+													? 'text-[9px] leading-[1.15] text-gray-500 dark:text-gray-400 overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] !whitespace-normal'
+													: 'text-sm text-gray-500 dark:text-gray-400 overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] !whitespace-normal'
+											}
+											style={{ wordBreak: 'break-word' }}
+										>
+											<span title={companyValue}>{companyValue}</span>
 										</div>
 									)}
 								</div>
@@ -672,7 +669,7 @@ export const useDashboard = () => {
 												/>
 											))}
 										{city && (
-											<div className="truncate text-[12px] leading-none font-secondary font-medium max-w-[115px]">
+											<div className="truncate text-[10.5px] leading-none font-secondary font-semibold max-w-[115px]">
 												{city}
 											</div>
 										)}
