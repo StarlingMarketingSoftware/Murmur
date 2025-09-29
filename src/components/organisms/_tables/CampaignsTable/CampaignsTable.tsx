@@ -287,7 +287,7 @@ export const CampaignsTable: FC = () => {
 							// Desktop mode: normal table with delete column
 							<CustomTable
 								variant="secondary"
-								containerClassName="border-[2px] border-[#000000] rounded-[8px] my-campaigns-table"
+								containerClassName="border-[2px] !border-[#8c8c8c] rounded-[8px] my-campaigns-table"
 								handleRowClick={handleRowClick}
 								columns={columns}
 								data={data}

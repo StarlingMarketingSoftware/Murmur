@@ -1800,8 +1800,21 @@ body {
 	}
 }
 
+/* Desktop/tablet default: keep metrics header labels on one line */
+.metrics-two-line-label .metrics-force-br {
+	display: none;
+}
+/* When the <br> is hidden on desktop, insert a separating space */
+.metrics-two-line-label .metrics-force-br + span::before {
+	content: ' ';
+}
+
 /* Keep exclude contacts box consistent on smaller screens */
 @media (max-width: 640px) {
+	/* Remove the synthetic space on mobile where the <br> is visible */
+	.mobile-portrait-mode .metrics-two-line-label .metrics-force-br + span::before {
+		content: none !important;
+	}
 	/* Show forced line breaks for metrics header labels only in mobile portrait */
 	.mobile-portrait-mode .metrics-two-line-label .metrics-force-br {
 		display: inline !important;
