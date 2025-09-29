@@ -587,9 +587,7 @@ export const useDashboard = () => {
 											className={
 												hasName
 													? 'truncate font-bold font-primary text-[14px]'
-													: companyValue.length > 30
-													? 'font-bold font-primary text-[10px] leading-[1.15] overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] !whitespace-normal'
-													: 'font-bold font-primary text-[14px] overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] !whitespace-normal'
+													: 'font-bold font-primary text-[11.5px] leading-[1.15] overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] !whitespace-normal'
 											}
 											style={!hasName ? { wordBreak: 'break-word' } : undefined}
 										>
@@ -607,11 +605,7 @@ export const useDashboard = () => {
 									)}
 									{hasName && hasCompany && (
 										<div
-											className={
-												companyValue.length > 30
-													? 'text-[9px] leading-[1.15] text-gray-500 dark:text-gray-400 overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] !whitespace-normal'
-													: 'text-sm text-gray-500 dark:text-gray-400 overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] !whitespace-normal'
-											}
+											className="text-[10.5px] leading-[1.15] text-gray-500 dark:text-gray-400 overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] !whitespace-normal"
 											style={{ wordBreak: 'break-word' }}
 										>
 											<span title={companyValue}>{companyValue}</span>
