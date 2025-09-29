@@ -3019,6 +3019,21 @@ body {
 	}
 }
 
+/* Real mobile: remove outer padding so the results container can center exactly
+   without overflowing the viewport when using custom internal paddings/borders. */
+body.murmur-mobile .results-appear,
+body.murmur-mobile .results-align {
+	padding: 0 !important;
+}
+
+/* Width-based fallback for responsive mode/devtools */
+@media (max-width: 640px) {
+	.results-appear,
+	.results-align {
+		padding: 0 !important;
+	}
+}
+
 /* Table container responsive behavior */
 .table-responsive-container {
 	width: 100%;
@@ -3996,11 +4011,32 @@ body.murmur-mobile .search-results-table td[data-slot='table-cell'] {
 	background-color: #d6e8d9 !important;
 }
 
-/* Mobile 390px breakpoint: fix search results table width to 361px */
-@media (min-width: 389px) and (max-width: 391px) {
+/* Mobile portrait: make results container width proportional to viewport
+   At 375px viewport width, container = 349px (ratio ≈ 0.9306667) */
+@media (max-width: 640px) and (orientation: portrait) {
 	body.murmur-mobile .search-results-table {
-		width: 361px !important;
-		max-width: 361px !important;
+		/* Desired row width at 375px viewport is 349px.
+		   The visible row width is the table's content width, which is the
+		   container width minus:
+		   - 2px left + 2px right container border (from border-2)
+		   - 8px left + 8px right table padding declared in .search-results-table table[data-slot='table']
+		   We maintain a constant ratio for the row content area and then add back these
+		   fixed offsets so that the content (row) width scales proportionally. */
+		--search-results-row-ratio: 0.9306666667; /* 349 / 375 */
+		--search-results-horizontal-table-padding: 16px; /* 8px left + 8px right */
+		--search-results-container-border: 2px; /* tailwind border-2 => 2px per side */
+		width: calc(
+			var(--search-results-row-ratio) * 100vw +
+				var(--search-results-horizontal-table-padding) +
+				(var(--search-results-container-border) * 2)
+		) !important;
+		max-width: calc(
+			var(--search-results-row-ratio) * 100vw +
+				var(--search-results-horizontal-table-padding) +
+				(var(--search-results-container-border) * 2)
+		) !important;
+		margin-left: auto !important;
+		margin-right: auto !important;
 	}
 }
 
