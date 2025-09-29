@@ -9,7 +9,6 @@ import { DraftingSection } from './DraftingSection/DraftingSection';
 import { useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import Link from 'next/link';
-import { NoMobilePage } from '@/components/atoms/NoMobilePage/NoMobilePage';
 import { cn } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
@@ -279,78 +278,73 @@ const Murmur = () => {
 				className="relative min-h-screen mt-2 border-t-2 border-black"
 				style={{ backgroundColor: 'rgba(222, 242, 225, 0.65)' }}
 			>
-				<NoMobilePage />
 				{shouldHideContent && (
 					<div className="fixed inset-0 bg-background z-40 pointer-events-none" />
 				)}
-				{!isMobile && (
-					<>
-						<div
-							className={cn(
-								'transition-opacity duration-200',
-								shouldHideContent
-									? 'opacity-0 pointer-events-none select-none'
-									: 'opacity-100'
-							)}
-							style={{
-								WebkitTransition: 'opacity 0.2s',
-								transition: 'opacity 0.2s',
-							}}
-						>
-							<IdentityDialog
-								campaign={campaign}
-								title="User Settings"
-								open={isIdentityDialogOpen}
-								onOpenChange={setIsIdentityDialogOpen}
-								backButtonText={
-									identityDialogOrigin === 'search'
-										? 'Back to Search Results'
-										: 'Back to Campaign'
-								}
-							/>
+				<div
+					className={cn(
+						'transition-opacity duration-200',
+						shouldHideContent
+							? 'opacity-0 pointer-events-none select-none'
+							: 'opacity-100'
+					)}
+					style={{
+						WebkitTransition: 'opacity 0.2s',
+						transition: 'opacity 0.2s',
+					}}
+				>
+					<IdentityDialog
+						campaign={campaign}
+						title="User Settings"
+						open={isIdentityDialogOpen}
+						onOpenChange={setIsIdentityDialogOpen}
+						backButtonText={
+							identityDialogOrigin === 'search'
+								? 'Back to Search Results'
+								: 'Back to Campaign'
+						}
+					/>
 
-							{/* View tabs - text-only Inter font */}
-							<div className="mt-4 flex justify-center">
-								<div className="w-full max-w-[1250px] px-6">
-									<div className="flex gap-6 justify-center">
-										<button
-											type="button"
-											className={cn(
-												'font-inter text-[20px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-												activeView === 'testing'
-													? 'text-black font-semibold'
-													: 'text-[#6B6B6B] hover:text-black'
-											)}
-											onClick={() => setActiveView('testing')}
-										>
-											Testing
-										</button>
-										<button
-											type="button"
-											className={cn(
-												'font-inter text-[20px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-												activeView === 'drafting'
-													? 'text-black font-semibold'
-													: 'text-[#6B6B6B] hover:text-black'
-											)}
-											onClick={() => setActiveView('drafting')}
-										>
-											Drafting
-										</button>
-									</div>
-								</div>
-							</div>
-
-							<div className="mt-6 flex justify-center">
-								<DraftingSection
-									campaign={campaign}
-									view={activeView}
-									goToDrafting={() => setActiveView('drafting')}
-								/>
+					{/* View tabs - text-only Inter font */}
+					<div className="mt-4 flex justify-center">
+						<div className="w-full max-w-[1250px] px-6">
+							<div className="flex gap-6 justify-center">
+								<button
+									type="button"
+									className={cn(
+										'font-inter text-[20px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										activeView === 'testing'
+											? 'text-black font-semibold'
+											: 'text-[#6B6B6B] hover:text-black'
+									)}
+									onClick={() => setActiveView('testing')}
+								>
+									Testing
+								</button>
+								<button
+									type="button"
+									className={cn(
+										'font-inter text-[20px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										activeView === 'drafting'
+											? 'text-black font-semibold'
+											: 'text-[#6B6B6B] hover:text-black'
+									)}
+									onClick={() => setActiveView('drafting')}
+								>
+									Drafting
+								</button>
 							</div>
 						</div>
-					</>
-				)}
+					</div>
+
+					<div className="mt-6 flex justify-center">
+						<DraftingSection
+							campaign={campaign}
+							view={activeView}
+							goToDrafting={() => setActiveView('drafting')}
+						/>
+					</div>
+				</div>
 			</div>
 		</>
 	);
