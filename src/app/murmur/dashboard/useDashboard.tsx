@@ -31,6 +31,7 @@ import {
 	canadianProvinceAbbreviations,
 	stateBadgeColorMap,
 } from '@/constants/ui';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 const formSchema = z.object({
 	searchText: z.string().min(1, 'Search text is required'),
@@ -307,7 +308,9 @@ export const useDashboard = () => {
 	}, []);
 
 	// Build columns for the table
+	const isMobile = useIsMobile();
 	const columns = useMemo(() => {
+		// Desktop columns (existing layout)
 		const allColumns: ColumnDef<ContactWithName>[] = [
 			{
 				accessorKey: 'company',
@@ -540,8 +543,150 @@ export const useDashboard = () => {
 			},
 		];
 
-		return allColumns;
-	}, [contactHasName, computeName, handleCellHover, usedContactIdsSet]);
+		// Mobile: single-column layout with right-aligned title and location inside the row
+		const mobileColumns: ColumnDef<ContactWithName>[] = [
+			{
+				id: 'mobileContact',
+				header: () => <span className="sr-only">Contact</span>,
+				cell: ({ row }) => {
+					const contact = row.original as ContactWithName;
+					const isUsed = usedContactIdsSet.has(contact.id);
+					const hasName = contactHasName(contact);
+					const nameValue = hasName ? computeName(contact) : '';
+					const companyValue = contact.company || '';
+					const hasCompany = companyValue.length > 0;
+					const title = (contact.title as string) || '';
+					const fullStateName = (contact.state as string) || '';
+					const stateAbbr = getStateAbbreviation(fullStateName) || '';
+					const city = (contact.city as string) || '';
+
+					const normalizedState = fullStateName.trim();
+					const lowercaseCanadianProvinceNames = canadianProvinceNames.map((s) =>
+						s.toLowerCase()
+					);
+					const isCanadianProvince =
+						lowercaseCanadianProvinceNames.includes(normalizedState.toLowerCase()) ||
+						canadianProvinceAbbreviations.includes(normalizedState.toUpperCase()) ||
+						canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+
+					const renderUsedIndicator = () =>
+						!isUsed ? null : (
+							<span
+								className="inline-block shrink-0 mr-2"
+								title="Used in a previous campaign"
+								style={{
+									width: '16px',
+									height: '16px',
+									borderRadius: '50%',
+									border: '1px solid #000000',
+									backgroundColor: '#DAE6FE',
+								}}
+							/>
+						);
+
+					// If neither name nor company, show a dash on the left, hide right-side blocks
+					if (!hasName && !hasCompany) {
+						return (
+							<div className="relative min-h-[44px] flex items-center">
+								{renderUsedIndicator()}
+								<span className="select-none text-gray-300 dark:text-gray-700">—</span>
+							</div>
+						);
+					}
+
+					return (
+						<div className="relative min-h-[44px]">
+							{/* Left block: name and company with extra right padding to make space for the fixed right block */}
+							<div className="flex items-start gap-2 pr-[168px] py-1">
+								{renderUsedIndicator()}
+								<div className="flex flex-col gap-0.5 min-w-0">
+									{(hasName || hasCompany) && (
+										<div className="truncate font-bold font-primary text-[16px]">
+											<TableCellTooltip
+												text={hasName ? nameValue : companyValue}
+												maxLength={MAX_CELL_LENGTH}
+												positioning="below-right"
+												onHover={handleCellHover}
+											/>
+										</div>
+									)}
+									{hasName && hasCompany && (
+										<div className="truncate text-sm text-gray-500 dark:text-gray-400">
+											<TableCellTooltip
+												text={companyValue}
+												maxLength={MAX_CELL_LENGTH}
+												positioning="below-right"
+												onHover={handleCellHover}
+											/>
+										</div>
+									)}
+								</div>
+							</div>
+
+							{/* Right block: title pill (top) and location (bottom) */}
+							<div className="absolute top-[6px] right-[8px] flex flex-col items-start gap-[2px] w-[152px] pointer-events-none">
+								{title && (
+									<div
+										className="flex items-center justify-start gap-1 h-[12px] w-[152px] rounded-[5.33px] px-2 overflow-hidden"
+										style={{
+											backgroundColor: '#E8EFFF',
+											border: '0.7px solid #000000',
+										}}
+									>
+										<ScrollableText
+											text={title}
+											className="text-[10.5px] leading-none text-black font-secondary font-medium"
+										/>
+									</div>
+								)}
+								{(stateAbbr || city) && (
+									<div className="flex items-center justify-start gap-1 h-[14px] w-[152px]">
+										{stateAbbr &&
+											(isCanadianProvince ? (
+												<div
+													className="inline-flex items-center justify-center w-[25px] h-[14px] rounded-[4.05px] border overflow-hidden"
+													style={{ borderColor: 'rgba(0,0,0,0.7)' }}
+													title="Canadian province"
+												>
+													<CanadianFlag
+														width="100%"
+														height="100%"
+														className="w-full h-full"
+													/>
+												</div>
+											) : /\b[A-Z]{2}\b/.test(stateAbbr) ? (
+												<span
+													className="inline-flex items-center justify-center w-[25px] h-[14px] rounded-[4.05px] border text-[11.42px] leading-none font-secondary font-normal"
+													style={{
+														backgroundColor:
+															stateBadgeColorMap[stateAbbr] || 'transparent',
+														borderColor: 'rgba(0,0,0,0.7)',
+													}}
+												>
+													{stateAbbr}
+												</span>
+											) : (
+												<span
+													className="inline-flex items-center justify-center w-[25px] h-[14px] rounded-[4.05px] border"
+													style={{ borderColor: 'rgba(0,0,0,0.7)' }}
+												/>
+											))}
+										{city && (
+											<div className="truncate text-[12px] leading-none font-secondary font-medium max-w-[115px]">
+												{city}
+											</div>
+										)}
+									</div>
+								)}
+							</div>
+						</div>
+					);
+				},
+			},
+		];
+
+		return isMobile ? mobileColumns : allColumns;
+	}, [contactHasName, computeName, handleCellHover, usedContactIdsSet, isMobile]);
 
 	return {
 		form,
