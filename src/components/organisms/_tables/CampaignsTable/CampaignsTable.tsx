@@ -200,18 +200,18 @@ export const CampaignsTable: FC = () => {
 			{isPending && <Spinner size="medium" className="absolute top-2 right-2" />}
 			<CardHeader
 				className={`bg-transparent ${
-					shouldShowMobileFeatures ? 'mobile-portrait-card-header' : 'px-4 pb-0'
+					shouldShowMobileFeatures ? 'mobile-portrait-card-header' : 'px-0 pb-0'
 				}`}
 			>
 				<CardTitle
 					className={`text-left ${
 						shouldShowMobileFeatures
-							? 'mobile-portrait-card-title'
-							: 'text-[14px] font-inter font-medium mb-0.5'
+							? 'text-[10px] font-secondary font-medium'
+							: 'text-[14px] font-secondary font-medium mb-0.5'
 					}`}
 					variant="secondary"
 				>
-					{shouldShowMobileFeatures ? 'Your Campaigns' : 'My Campaigns'}
+					Your Campaigns
 				</CardTitle>
 			</CardHeader>
 			<CardContent
@@ -299,7 +299,7 @@ export const CampaignsTable: FC = () => {
 								searchable={false}
 								useAutoLayout
 								useCustomScrollbar={true}
-								scrollbarOffsetRight={0}
+								scrollbarOffsetRight={-5}
 								nativeScroll={false}
 							/>
 						)}
