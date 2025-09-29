@@ -786,7 +786,7 @@ const Dashboard = () => {
 													}
 													variant="primary-light"
 													bold
-													className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#5dab68] transition-colors !opacity-100 disabled:!opacity-100"
+													className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#050505] transition-colors !opacity-100 disabled:!opacity-100"
 													disabled={selectedContacts.length === 0}
 												>
 													Create Campaign
