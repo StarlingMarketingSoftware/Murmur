@@ -2412,8 +2412,8 @@ body {
 		display: flex !important;
 		flex-direction: column !important;
 		padding-top: calc(
-			var(--delete-column-top, 10px) + 37px
-		) !important; /* Adjusted to align with first row content */
+			var(--delete-column-top, 10px) + 26px
+		) !important; /* Slightly lower than previous to re-align */
 		padding-left: 4px !important; /* Reduced space from table border */
 		padding-right: 4px !important;
 		width: 24px !important; /* Match the X icon size */
