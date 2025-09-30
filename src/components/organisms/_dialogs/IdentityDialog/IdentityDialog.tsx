@@ -221,7 +221,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 													style={{
 														// Keep desktop at 652px; scale on mobile portrait to ~93.8667% of viewport width (352px at 375px vw)
 														width: 'min(652px, 93.8666667vw)',
-														height: '50px',
+														height: isDesktopTabsWidth ? '50px' : '33px',
 														borderWidth: 2.45,
 														borderRadius: '9.8px',
 														borderStyle: 'solid',
@@ -240,7 +240,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 															width: isDesktopTabsWidth
 																? '186px'
 																: `${highlightWidthPx}px`,
-															height: '24px',
+															height: isDesktopTabsWidth ? '24px' : '20px',
 															borderRadius: '9.8px',
 															border: '1.3px solid #000000',
 															background: '#DADAFC',
@@ -254,7 +254,17 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 														style={{ boxShadow: 'none' }}
 														value="create"
 													>
-														<span ref={createLabelRef} className="whitespace-nowrap">
+														<span
+															ref={createLabelRef}
+															className="whitespace-nowrap"
+															style={{
+																fontSize: isDesktopTabsWidth ? undefined : '12.3px',
+																fontFamily: isDesktopTabsWidth
+																	? undefined
+																	: 'Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji',
+																fontWeight: isDesktopTabsWidth ? undefined : 500,
+															}}
+														>
 															Create New Profile
 														</span>
 													</TabsTrigger>
@@ -263,7 +273,17 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 														style={{ boxShadow: 'none' }}
 														value="select"
 													>
-														<span ref={selectLabelRef} className="whitespace-nowrap">
+														<span
+															ref={selectLabelRef}
+															className="whitespace-nowrap"
+															style={{
+																fontSize: isDesktopTabsWidth ? undefined : '12.3px',
+																fontFamily: isDesktopTabsWidth
+																	? undefined
+																	: 'Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji',
+																fontWeight: isDesktopTabsWidth ? undefined : 500,
+															}}
+														>
 															Select Existing Profile
 														</span>
 													</TabsTrigger>
