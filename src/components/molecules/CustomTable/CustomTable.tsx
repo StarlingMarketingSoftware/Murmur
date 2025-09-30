@@ -383,7 +383,11 @@ export function CustomTable<TData, TValue>({
 							>
 								{table.getHeaderGroups().map((headerGroup) => (
 									<TableRow
-										className={cn(stickyHeader ? 'sticky top-0 border-0' : 'border-0')}
+										className={cn(
+											stickyHeader && !showInContainerHeader
+												? 'sticky top-0 border-0'
+												: 'border-0'
+										)}
 										key={headerGroup.id}
 										variant={variant}
 									>
