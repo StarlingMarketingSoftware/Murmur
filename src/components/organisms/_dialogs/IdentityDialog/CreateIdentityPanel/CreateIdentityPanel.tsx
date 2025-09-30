@@ -18,6 +18,8 @@ import { ControllerRenderProps, FormProvider } from 'react-hook-form';
 import { CheckCircleIcon } from 'lucide-react';
 import { Typography } from '@/components/ui/typography';
 import { FC } from 'react';
+import { createPortal } from 'react-dom';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import InfoTooltip from '@/components/atoms/InfoTooltip/InfoTooltip';
 
 interface StyledInputProps {
@@ -29,7 +31,7 @@ interface StyledInputProps {
 
 const StyledInput: FC<StyledInputProps> = ({
 	field,
-	width = 'w-[615.75px]',
+	width = 'w-full md:w-[615.75px]',
 	paddingRight = '12px',
 	disabled = false,
 }) => {
@@ -68,12 +70,14 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 		isPendingSubmit,
 	} = useCreateIdentityPanel(props);
 
+	const isMobile = useIsMobile();
+
 	return (
 		<FormProvider {...form}>
 			<form onSubmit={form.handleSubmit(onSubmit)}>
-				<div className="w-[651px] mx-auto">
+				<div className="mx-auto" style={{ width: 'min(651px, 96vw)' }}>
 					<div
-						className="box-border w-[651px] h-[326.05px] rounded-[8.81px] border-[2.2px] border-[#000000] p-4"
+						className="box-border w-full h-[326.05px] rounded-[8.81px] border-[2.2px] border-[#000000] p-4"
 						style={{ backgroundColor: '#F4F9FF' }}
 					>
 						<div className="space-y-4">
@@ -125,7 +129,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 												<div className="flex-1 relative">
 													<StyledInput
 														field={field}
-														width="w-[510.01px]"
+														width="w-full md:w-[510.01px]"
 														paddingRight="32px"
 														disabled={isCodeVerified}
 													/>
@@ -161,8 +165,8 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 						</div>
 					</div>
 
-					{/* Verify button */}
-					<div className="-mt-[24px]">
+					{/* Verify button - desktop only */}
+					<div className="-mt-[24px] hidden md:block">
 						<Button
 							disabled={!isCodeVerified}
 							isLoading={isPendingSubmit}
@@ -181,6 +185,26 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 						</Button>
 					</div>
 
+					{/* Spacer to prevent overlap with mobile sticky CTA */}
+					<div className="md:hidden h-[64px]" />
+
+					{/* Mobile sticky Save button via portal (matches dashboard style) */}
+					{isMobile && typeof window !== 'undefined'
+						? createPortal(
+								<div className="mobile-sticky-cta" style={{ zIndex: 100500 }}>
+									<Button
+										disabled={!isCodeVerified}
+										isLoading={isPendingSubmit}
+										type="submit"
+										className="w-full h-[53px] min-h-[53px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#050505] transition-colors !opacity-100 disabled:!opacity-100"
+									>
+										Save and continue
+									</Button>
+								</div>,
+								document.body
+						  )
+						: null}
+
 					{isEmailVerificationCodeSent && !isCodeVerified && (
 						<FormField
 							control={form.control}
@@ -191,7 +215,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 										Verification Code
 									</FormLabel>
 									<div
-										className="box-border w-[651px] h-[120px] rounded-[8px] border-[2px] border-[#000000] flex flex-col items-center justify-center"
+										className="box-border w-full h-[120px] rounded-[8px] border-[2px] border-[#000000] flex flex-col items-center justify-center"
 										style={{ borderStyle: 'solid' }}
 									>
 										<FormControl>
