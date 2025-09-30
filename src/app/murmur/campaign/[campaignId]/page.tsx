@@ -91,7 +91,10 @@ const Murmur = () => {
 					<Link
 						href={urls.murmur.dashboard.index}
 						prefetch
-						className="absolute left-8 flex items-center text-[15px] font-inter font-normal no-underline hover:no-underline z-[100] group text-[#060606] hover:text-gray-500"
+						className={cn(
+							'absolute left-8 flex items-center text-[15px] font-inter font-normal no-underline hover:no-underline z-[100] group text-[#060606] hover:text-gray-500',
+							isMobile && 'hidden'
+						)}
 						title="Back to Home"
 						onClick={(e) => {
 							e.preventDefault();
@@ -121,6 +124,42 @@ const Murmur = () => {
 						</svg>
 						<span>Back to Home</span>
 					</Link>
+					{isMobile && !shouldHideContent && (
+						<button
+							onClick={() => {
+								if (typeof window !== 'undefined') {
+									window.location.assign(urls.murmur.dashboard.index);
+								}
+							}}
+							title="Home"
+							aria-label="Back to Home"
+							className="absolute right-8 z-[100] inline-flex items-center justify-center rounded-[6px] bg-[#EEEEEE] text-black shadow-[0_2px_10px_rgba(0,0,0,0.15)] active:scale-95 transition-all duration-200"
+							style={{
+								width: '23px',
+								height: '17px',
+								top: '41px',
+								transform: 'translateY(-50%)',
+								WebkitTapHighlightColor: 'transparent',
+							}}
+						>
+							<svg
+								width="11"
+								height="11"
+								viewBox="0 0 11 11"
+								fill="none"
+								xmlns="http://www.w3.org/2000/svg"
+							>
+								<path
+									d="M8.0564 5.64955V8.90431H2.80971V5.64955H8.0564ZM9.20009 4.50586H1.66602V10.048H9.20009V4.50586Z"
+									fill="black"
+								/>
+								<path
+									d="M5.43871 1.74879L8.05729 4.40787H2.84396L5.4411 1.74879M5.43395 0.114258L0.127686 5.55157H10.7879L5.43633 0.114258H5.43395Z"
+									fill="black"
+								/>
+							</svg>
+						</button>
+					)}
 					<div className="max-w-[1250px] w-9/10 mx-auto lg:w-9/10">
 						<div
 							className={cn(
