@@ -132,51 +132,76 @@ const Murmur = () => {
 						>
 							<div className="flex flex-col items-center" style={{ paddingTop: '18px' }}>
 								<CampaignName campaign={campaign} />
-								<div className="flex flex-col items-center" style={{ marginTop: '14px' }}>
-									<div className="flex items-start gap-6">
-										<div className="flex items-center">
-											<Link
-												href={urls.murmur.dashboard.index}
-												prefetch
-												onClick={(e) => {
-													e.preventDefault();
-													if (typeof window !== 'undefined') {
-														window.location.assign(urls.murmur.dashboard.index);
-													}
-												}}
-												className="block relative z-[100]"
-											>
-												<div
-													className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]"
-													style={{
-														width: '36.06px',
-														height: '14.21px',
-														borderRadius: '5.55px',
-													}}
-												>
-													<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
-														To
-													</span>
-												</div>
-											</Link>
-											<Typography
-												className="ml-2 text-gray-600 font-inter font-extralight"
-												style={{ fontSize: '11.79px' }}
-											>
-												{campaign?.userContactLists
-													?.map((list) => list.name)
-													.join(', ') || 'No recipients selected'}
-											</Typography>
+
+								{/* Mobile Layout - Single Container with all elements */}
+								{isMobile ? (
+									<div
+										className="flex items-center justify-between px-1 border border-[#000000] bg-white"
+										style={{
+											marginTop: '14px',
+											height: '29px',
+											width: '94.67%', // This will be 355px on 375px viewport
+											maxWidth: '100%',
+											borderWidth: '1.3px',
+											gap: '3px',
+										}}
+									>
+										{/* Contacts box - keeping exact styling */}
+										<div
+											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+											style={{
+												backgroundColor: getContactsFillColor(contactsCount),
+												borderWidth: '1.3px',
+												width: '84px',
+												height: '20px',
+												fontSize: '11.7px',
+											}}
+										>
+											{`${String(contactsCount).padStart(2, '0')} contacts`}
 										</div>
 
-										<div className="flex items-start">
-											<button
-												type="button"
-												onClick={() => {
-													setIdentityDialogOrigin('campaign');
-													setIsIdentityDialogOpen(true);
-												}}
-												className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969]"
+										{/* Drafts box - keeping exact styling */}
+										<div
+											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+											style={{
+												backgroundColor: getDraftFillColor(draftCount),
+												borderWidth: '1.3px',
+												width: '84px',
+												height: '20px',
+												fontSize: '11.7px',
+											}}
+										>
+											{`${String(draftCount).padStart(2, '0')} drafts`}
+										</div>
+
+										{/* Sent box - keeping exact styling */}
+										<div
+											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+											style={{
+												backgroundColor: getSentFillColor(sentCount),
+												borderWidth: '1.3px',
+												width: '84px',
+												height: '20px',
+												fontSize: '11.7px',
+											}}
+										>
+											{`${String(sentCount).padStart(2, '0')} sent`}
+										</div>
+
+										{/* To button - keeping exact gray styling */}
+										<Link
+											href={urls.murmur.dashboard.index}
+											prefetch
+											onClick={(e) => {
+												e.preventDefault();
+												if (typeof window !== 'undefined') {
+													window.location.assign(urls.murmur.dashboard.index);
+												}
+											}}
+											className="block"
+										>
+											<div
+												className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]"
 												style={{
 													width: '36.06px',
 													height: '14.21px',
@@ -184,89 +209,174 @@ const Murmur = () => {
 												}}
 											>
 												<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
-													From
+													To
 												</span>
-											</button>
-											<div className="ml-2 flex flex-col items-start">
+											</div>
+										</Link>
+
+										{/* From button - keeping exact gray styling */}
+										<button
+											type="button"
+											onClick={() => {
+												setIdentityDialogOrigin('campaign');
+												setIsIdentityDialogOpen(true);
+											}}
+											className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969]"
+											style={{
+												width: '36.06px',
+												height: '14.21px',
+												borderRadius: '5.55px',
+											}}
+										>
+											<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
+												From
+											</span>
+										</button>
+									</div>
+								) : (
+									/* Desktop Layout - Keep existing unchanged */
+									<div
+										className="flex flex-col items-center"
+										style={{ marginTop: '14px' }}
+									>
+										<div className="flex items-start gap-6">
+											<div className="flex items-center">
+												<Link
+													href={urls.murmur.dashboard.index}
+													prefetch
+													onClick={(e) => {
+														e.preventDefault();
+														if (typeof window !== 'undefined') {
+															window.location.assign(urls.murmur.dashboard.index);
+														}
+													}}
+													className="block relative z-[100]"
+												>
+													<div
+														className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]"
+														style={{
+															width: '36.06px',
+															height: '14.21px',
+															borderRadius: '5.55px',
+														}}
+													>
+														<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
+															To
+														</span>
+													</div>
+												</Link>
+												<Typography
+													className="ml-2 text-gray-600 font-inter font-extralight"
+													style={{ fontSize: '11.79px' }}
+												>
+													{campaign?.userContactLists
+														?.map((list) => list.name)
+														.join(', ') || 'No recipients selected'}
+												</Typography>
+											</div>
+
+											<div className="flex items-start">
 												<button
 													type="button"
-													className="text-gray-600 font-inter font-extralight hover:underline cursor-pointer text-left"
-													style={{ fontSize: '11.79px' }}
-													onClick={() => setIsIdentityInfoOpen((open) => !open)}
-													aria-expanded={isIdentityInfoOpen}
+													onClick={() => {
+														setIdentityDialogOrigin('campaign');
+														setIsIdentityDialogOpen(true);
+													}}
+													className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969]"
+													style={{
+														width: '36.06px',
+														height: '14.21px',
+														borderRadius: '5.55px',
+													}}
 												>
-													{campaign?.identity?.name}
+													<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
+														From
+													</span>
 												</button>
-												{isIdentityInfoOpen && (
-													<div className="mt-1 text-left">
-														{campaign?.identity?.email && (
-															<div
-																className="text-gray-600 font-inter font-extralight"
-																style={{ fontSize: '11.79px' }}
-															>
-																{campaign.identity.email}
-															</div>
-														)}
-														{campaign?.identity?.website && (
-															<a
-																href={
-																	(campaign.identity.website || '').startsWith('http')
-																		? campaign.identity.website
-																		: `https://${campaign.identity.website}`
-																}
-																target="_blank"
-																rel="noopener noreferrer"
-																className="text-gray-600 font-inter font-extralight hover:underline break-all"
-																style={{ fontSize: '11.79px' }}
-															>
-																{campaign.identity.website}
-															</a>
-														)}
-													</div>
-												)}
+												<div className="ml-2 flex flex-col items-start">
+													<button
+														type="button"
+														className="text-gray-600 font-inter font-extralight hover:underline cursor-pointer text-left"
+														style={{ fontSize: '11.79px' }}
+														onClick={() => setIsIdentityInfoOpen((open) => !open)}
+														aria-expanded={isIdentityInfoOpen}
+													>
+														{campaign?.identity?.name}
+													</button>
+													{isIdentityInfoOpen && (
+														<div className="mt-1 text-left">
+															{campaign?.identity?.email && (
+																<div
+																	className="text-gray-600 font-inter font-extralight"
+																	style={{ fontSize: '11.79px' }}
+																>
+																	{campaign.identity.email}
+																</div>
+															)}
+															{campaign?.identity?.website && (
+																<a
+																	href={
+																		(campaign.identity.website || '').startsWith('http')
+																			? campaign.identity.website
+																			: `https://${campaign.identity.website}`
+																	}
+																	target="_blank"
+																	rel="noopener noreferrer"
+																	className="text-gray-600 font-inter font-extralight hover:underline break-all"
+																	style={{ fontSize: '11.79px' }}
+																>
+																	{campaign.identity.website}
+																</a>
+															)}
+														</div>
+													)}
+												</div>
+											</div>
+										</div>
+										{/* Metric boxes below To/From */}
+										<div
+											className="flex items-center gap-5"
+											style={{ marginTop: '13px' }}
+										>
+											<div
+												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+												style={{
+													backgroundColor: getContactsFillColor(contactsCount),
+													borderWidth: '1.3px',
+													minWidth: '80.38px',
+													height: '19px',
+													fontSize: '11.7px',
+												}}
+											>
+												{`${String(contactsCount).padStart(2, '0')} contacts`}
+											</div>
+											<div
+												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+												style={{
+													backgroundColor: getDraftFillColor(draftCount),
+													borderWidth: '1.3px',
+													minWidth: '80.38px',
+													height: '19px',
+													fontSize: '11.7px',
+												}}
+											>
+												{`${String(draftCount).padStart(2, '0')} drafts`}
+											</div>
+											<div
+												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+												style={{
+													backgroundColor: getSentFillColor(sentCount),
+													borderWidth: '1.3px',
+													minWidth: '80.38px',
+													height: '19px',
+													fontSize: '11.7px',
+												}}
+											>
+												{`${String(sentCount).padStart(2, '0')} sent`}
 											</div>
 										</div>
 									</div>
-									{/* Metric boxes below To/From */}
-									<div className="flex items-center gap-5" style={{ marginTop: '13px' }}>
-										<div
-											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-											style={{
-												backgroundColor: getContactsFillColor(contactsCount),
-												borderWidth: '1.3px',
-												minWidth: '80.38px',
-												height: '19px',
-												fontSize: '11.7px',
-											}}
-										>
-											{`${String(contactsCount).padStart(2, '0')} contacts`}
-										</div>
-										<div
-											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-											style={{
-												backgroundColor: getDraftFillColor(draftCount),
-												borderWidth: '1.3px',
-												minWidth: '80.38px',
-												height: '19px',
-												fontSize: '11.7px',
-											}}
-										>
-											{`${String(draftCount).padStart(2, '0')} drafts`}
-										</div>
-										<div
-											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-											style={{
-												backgroundColor: getSentFillColor(sentCount),
-												borderWidth: '1.3px',
-												minWidth: '80.38px',
-												height: '19px',
-												fontSize: '11.7px',
-											}}
-										>
-											{`${String(sentCount).padStart(2, '0')} sent`}
-										</div>
-									</div>
-								</div>
+								)}
 							</div>
 						</div>
 					</div>
