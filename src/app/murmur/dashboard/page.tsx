@@ -706,7 +706,7 @@ const Dashboard = () => {
 												displayRowsPerPage={false}
 												constrainHeight
 												useCustomScrollbar
-								scrollbarOffsetRight={isMobile ? -8 : -5}
+												scrollbarOffsetRight={-5}
 												containerClassName="search-results-table h-[499px] rounded-[8px] border-[#737373] md:w-[1209px]"
 												tableClassName="w-full"
 												headerClassName="[&_tr]:border-[#737373]"
@@ -717,16 +717,26 @@ const Dashboard = () => {
 													isMobile ? undefined : (row) => setHoveredContact(row)
 												}
 												headerAction={
-													<button
-														onClick={handleSelectAll}
-														className="text-[14px] font-secondary font-normal text-black hover:underline"
-														type="button"
-													>
-														{isAllSelected ? 'Deselect All' : 'Select all'}
-													</button>
+													!isMobile ? (
+														<button
+															onClick={handleSelectAll}
+															className="text-[14px] font-secondary font-normal text-black hover:underline"
+															type="button"
+														>
+															{isAllSelected ? 'Deselect All' : 'Select all'}
+														</button>
+													) : null
 												}
 												headerInlineAction={
-													!isMobile ? (
+													isMobile ? (
+														<button
+															onClick={handleSelectAll}
+															className="text-[14px] font-secondary font-normal text-black hover:underline"
+															type="button"
+														>
+															{isAllSelected ? 'Deselect All' : 'Select all'}
+														</button>
+													) : (
 														<button
 															type="button"
 															onClick={handleCreateCampaign}
@@ -760,7 +770,7 @@ const Dashboard = () => {
 														>
 															Create Campaign
 														</button>
-													) : null
+													)
 												}
 											/>
 										</CardContent>
