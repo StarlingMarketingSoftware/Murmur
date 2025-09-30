@@ -114,7 +114,12 @@ const SortableAIBlock = ({
 	if (isCollapsed && isHybridBlock) {
 		return (
 			<div
-				className={cn('flex justify-end', showTestPreview ? 'w-[426px]' : 'w-[868px]')}
+				className={cn(
+					'flex justify-end',
+					showTestPreview
+						? 'w-[426px] max-[480px]:w-[89.8vw]'
+						: 'w-[868px] max-[480px]:w-[93.7vw]'
+				)}
 			>
 				<Button
 					type="button"
@@ -145,19 +150,23 @@ const SortableAIBlock = ({
 					'border-2 border-gray-300 bg-background',
 				isTextBlock
 					? showTestPreview
-						? 'w-[426px] min-h-[44px]'
-						: 'w-[868px] min-h-[80px]'
+						? 'w-[426px] max-[480px]:w-[89.8vw] min-h-[44px]'
+						: 'w-[868px] max-[480px]:w-[93.7vw] min-h-[80px]'
 					: isCompactBlock
 					? showTestPreview
-						? `w-[426px] ${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'}`
-						: `w-[868px] ${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'}`
+						? `w-[426px] max-[480px]:w-[89.8vw] ${
+								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'
+						  }`
+						: `w-[868px] max-[480px]:w-[93.7vw] ${
+								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'
+						  }`
 					: isFullAutomatedBlock
 					? showTestPreview
-						? 'w-[426px]'
-						: 'w-[868px]'
+						? 'w-[426px] max-[480px]:w-[89.8vw]'
+						: 'w-[868px] max-[480px]:w-[93.7vw]'
 					: showTestPreview
-					? 'w-[426px]'
-					: 'w-[868px]',
+					? 'w-[426px] max-[480px]:w-[89.8vw]'
+					: 'w-[868px] max-[480px]:w-[93.7vw]',
 				!isIntroductionBlock &&
 					!isResearchBlock &&
 					!isActionBlock &&
@@ -1090,7 +1099,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							className={`${
 								compactLeftOnly
 									? ''
-									: 'w-[892px] min-h-[686px] transition mb-4 flex mx-auto '
+									: 'w-[892px] max-[480px]:w-[96.27vw] min-h-[686px] transition mb-4 flex mx-auto '
 							}	${
 								showTestPreview
 									? 'flex-row gap-[40px] justify-center items-start'
@@ -1133,8 +1142,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											className={cn(
 												'h-[36px] flex items-center relative z-20',
 												showTestPreview
-													? 'w-[426px] mx-auto pl-[8px]'
-													: 'w-[868px] mx-auto pl-[8px]'
+													? 'w-[426px] max-[480px]:w-[89.8vw] mx-auto pl-[8px]'
+													: 'w-[868px] max-[480px]:w-[93.7vw] mx-auto pl-[8px]'
 											)}
 											data-left-drag-handle
 											data-root-drag-handle
@@ -1237,7 +1246,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												rules={{ required: form.watch('isAiSubject') }}
 												render={({ field }) => (
 													<FormItem
-														className={cn(showTestPreview ? 'w-[426px]' : 'w-[868px]')}
+														className={cn(
+															showTestPreview
+																? 'w-[426px] max-[480px]:w-[89.8vw]'
+																: 'w-[868px] max-[480px]:w-[93.7vw]'
+														)}
 													>
 														<div
 															className={cn(
@@ -1463,7 +1476,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															<div
 																className={cn(
 																	'flex justify-end',
-																	showTestPreview ? 'w-[426px]' : 'w-[868px]'
+																	showTestPreview
+																		? 'w-[426px] max-[480px]:w-[89.8vw]'
+																		: 'w-[868px] max-[480px]:w-[93.7vw]'
 																)}
 															>
 																<Button
@@ -1570,7 +1585,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<div
 															className={cn(
 																`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
-																showTestPreview ? 'w-[426px]' : 'w-[868px]'
+																showTestPreview
+																	? 'w-[426px] max-[480px]:w-[89.8vw]'
+																	: 'w-[868px] max-[480px]:w-[93.7vw]'
 															)}
 														>
 															<FormLabel className="text-base font-semibold font-secondary">
@@ -1617,7 +1634,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												<div
 													className={cn(
 														`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
-														showTestPreview ? 'w-[426px]' : 'w-[868px]'
+														showTestPreview
+															? 'w-[426px] max-[480px]:w-[89.8vw]'
+															: 'w-[868px] max-[480px]:w-[93.7vw]'
 													)}
 												>
 													<FormLabel className="text-base font-semibold font-secondary">
@@ -1658,7 +1677,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													disabled={isGenerationDisabled?.()}
 													className={cn(
 														'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
-														showTestPreview ? 'w-[426px]' : 'w-[868px]',
+														showTestPreview
+															? 'w-[426px] max-[480px]:w-[89.8vw]'
+															: 'w-[868px] max-[480px]:w-[93.7vw]',
 														isGenerationDisabled?.()
 															? 'opacity-50 cursor-not-allowed'
 															: 'opacity-100'
@@ -1674,7 +1695,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															? 'text-destructive'
 															: 'text-black',
 														'text-sm font-medium -mt-2 mb-2',
-														showTestPreview ? 'w-[426px]' : 'w-[868px]'
+														showTestPreview
+															? 'w-[426px] max-[480px]:w-[89.8vw]'
+															: 'w-[868px] max-[480px]:w-[93.7vw]'
 													)}
 												>
 													Fill in all text blocks in order to compose an email.
@@ -1690,7 +1713,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								: showTestPreview && (
 										<div
 											className={cn(
-												'w-[461px] shrink-0',
+												'w-[461px] max-[480px]:w-[96.27vw] shrink-0',
 												isPanelsReversed ? 'order-1' : 'order-2'
 											)}
 										>
