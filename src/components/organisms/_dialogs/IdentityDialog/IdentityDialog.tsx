@@ -181,7 +181,7 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 
 						<div className="text-center">
 							<p
-								className="mt-1"
+								className="mt-1 hidden sm:block"
 								style={{
 									fontFamily: 'Times New Roman, Times, serif',
 									fontSize: '21px',
