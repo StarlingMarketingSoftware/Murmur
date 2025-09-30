@@ -57,7 +57,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 							/>
 							{/* Right panel for Testing view - positioned absolutely */}
 							<div
-								className="absolute"
+								className="absolute hidden lg:block"
 								style={{
 									left: 'calc(50% + 446px + 50px)',
 									top: '0',
