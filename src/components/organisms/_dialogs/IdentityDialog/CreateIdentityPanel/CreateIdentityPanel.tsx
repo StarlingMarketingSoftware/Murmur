@@ -191,12 +191,31 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 					{/* Mobile sticky Save button via portal (matches dashboard style) */}
 					{isMobile && typeof window !== 'undefined'
 						? createPortal(
-								<div className="mobile-sticky-cta" style={{ zIndex: 100500 }}>
+								<div
+									className="mobile-sticky-cta"
+									style={{
+										zIndex: 100500,
+										pointerEvents: 'auto',
+									}}
+									onClick={(e) => {
+										e.stopPropagation();
+									}}
+								>
 									<Button
 										disabled={!isCodeVerified}
 										isLoading={isPendingSubmit}
-										type="submit"
+										onClick={(e) => {
+											e.stopPropagation();
+											// Since this button is outside the form, we need to manually trigger the submit
+											form.handleSubmit(onSubmit)();
+										}}
+										onPointerDown={(e) => {
+											e.stopPropagation();
+										}}
 										className="w-full h-[53px] min-h-[53px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#050505] transition-colors !opacity-100 disabled:!opacity-100"
+										style={{
+											pointerEvents: isCodeVerified ? 'auto' : 'none',
+										}}
 									>
 										Save and continue
 									</Button>

@@ -144,12 +144,30 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 					{/* Mobile sticky button (portal to body to pin to true bottom) */}
 					{isMobile && typeof window !== 'undefined'
 						? createPortal(
-								<div className="mobile-sticky-cta" style={{ zIndex: 100500 }}>
+								<div
+									className="mobile-sticky-cta"
+									style={{
+										zIndex: 100500,
+										pointerEvents: 'auto',
+									}}
+									onClick={(e) => {
+										e.stopPropagation();
+									}}
+								>
 									<Button
-										onClick={handleAssignIdentity}
+										onClick={(e) => {
+											e.stopPropagation();
+											handleAssignIdentity();
+										}}
+										onPointerDown={(e) => {
+											e.stopPropagation();
+										}}
 										isLoading={isPendingAssignIdentity}
 										className="w-full h-[53px] min-h-[53px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#050505] transition-colors !opacity-100 disabled:!opacity-100"
 										disabled={!selectedIdentity}
+										style={{
+											pointerEvents: selectedIdentity ? 'auto' : 'none',
+										}}
 									>
 										Continue
 									</Button>
