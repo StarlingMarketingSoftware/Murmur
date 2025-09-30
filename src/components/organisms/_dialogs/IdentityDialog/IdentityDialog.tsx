@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useState } from 'react';
+import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IdentityDialogProps, useIdentityDialog } from './useIdentityDialog';
 import {
@@ -16,6 +16,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 	const router = useRouter();
 	const [isContentReady, setIsContentReady] = useState(false);
+	const tabsListRef = useRef<HTMLDivElement | null>(null);
+	const createLabelRef = useRef<HTMLSpanElement | null>(null);
+	const selectLabelRef = useRef<HTMLSpanElement | null>(null);
+	const [highlightWidthPx, setHighlightWidthPx] = useState<number>(186);
+	const [isDesktopTabsWidth, setIsDesktopTabsWidth] = useState<boolean>(true);
 	const {
 		// title removed from header
 		open,
@@ -65,8 +70,39 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 		}
 	}, [isPendingIdentities, identities, setShowCreatePanel]);
 
-	// Left position of highlight box inside 652px container
-	const highlightLeftPx = useMemo(() => (showCreatePanel ? 70 : 396), [showCreatePanel]);
+	// Anchor position of highlight: use center anchors so width can vary.
+	// Original desktop design (652px wide, highlight 186px) puts centers at 25% and 75%.
+	const highlightCenterPercent = useMemo(
+		() => (showCreatePanel ? '25%' : '75%'),
+		[showCreatePanel]
+	);
+
+	// Measure label width on mobile to size the highlight to the text with padding
+	useEffect(() => {
+		const measure = () => {
+			const containerWidth = tabsListRef.current?.offsetWidth ?? 0;
+			const isDesktop = containerWidth >= 652;
+			setIsDesktopTabsWidth(isDesktop);
+			if (isDesktop) {
+				// Preserve exact desktop appearance
+				setHighlightWidthPx(186);
+				return;
+			}
+			const labelEl = showCreatePanel ? createLabelRef.current : selectLabelRef.current;
+			if (!labelEl) return;
+			const labelWidth = Math.ceil(labelEl.getBoundingClientRect().width);
+			// Add horizontal padding to match capsule look; keep within container bounds
+			const desired = Math.min(
+				Math.max(labelWidth + 20, 80),
+				Math.max(containerWidth - 16, 80)
+			);
+			setHighlightWidthPx(desired);
+		};
+
+		measure();
+		window.addEventListener('resize', measure);
+		return () => window.removeEventListener('resize', measure);
+	}, [showCreatePanel]);
 
 	return (
 		<Dialog
@@ -183,27 +219,33 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 												<TabsList
 													className="relative !bg-transparent border border-black !shadow-none !p-0"
 													style={{
-														width: '652px',
+														// Keep desktop at 652px; scale on mobile portrait to ~93.8667% of viewport width (352px at 375px vw)
+														width: 'min(652px, 93.8666667vw)',
 														height: '50px',
 														borderWidth: 2.45,
 														borderRadius: '9.8px',
 														borderStyle: 'solid',
 														boxShadow: 'none',
 													}}
+													ref={tabsListRef}
 												>
 													{/* Moving highlight box */}
 													<div
 														className="absolute z-10 pointer-events-none"
 														style={{
-															left: `${highlightLeftPx}px`,
+															left: highlightCenterPercent,
 															top: '50%',
-															transform: 'translateY(-50%)',
-															width: '186px',
+															transform: 'translate(-50%, -50%)',
+															// Desktop keeps 186px; mobile uses measured text width with padding
+															width: isDesktopTabsWidth
+																? '186px'
+																: `${highlightWidthPx}px`,
 															height: '24px',
 															borderRadius: '9.8px',
 															border: '1.3px solid #000000',
 															background: '#DADAFC',
-															transition: 'left 0.25s ease-in-out',
+															transition:
+																'left 0.25s ease-in-out, width 0.2s ease-in-out',
 															boxShadow: 'none',
 														}}
 													/>
@@ -212,14 +254,18 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 														style={{ boxShadow: 'none' }}
 														value="create"
 													>
-														Create New Profile
+														<span ref={createLabelRef} className="whitespace-nowrap">
+															Create New Profile
+														</span>
 													</TabsTrigger>
 													<TabsTrigger
 														className="relative z-20 flex-1 !h-full font-secondary !text-[14px] sm:!text-[14px] font-medium !bg-transparent !border-0 hover:!bg-transparent focus-visible:!ring-0 focus-visible:!outline-0 !outline-none !ring-0 data-[state=active]:!bg-transparent data-[state=active]:!shadow-none data-[state=active]:!border-transparent text-black"
 														style={{ boxShadow: 'none' }}
 														value="select"
 													>
-														Select Existing Profile
+														<span ref={selectLabelRef} className="whitespace-nowrap">
+															Select Existing Profile
+														</span>
 													</TabsTrigger>
 												</TabsList>
 											</div>
