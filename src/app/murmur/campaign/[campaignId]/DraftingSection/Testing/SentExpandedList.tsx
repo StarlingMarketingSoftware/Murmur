@@ -49,7 +49,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 	);
 	return (
 		<div
-			className="w-[376px] h-[426px] rounded-md border-2 border-black/30 bg-[#CFEBCF] px-2 pb-2 flex flex-col"
+			className="w-[376px] max-[480px]:w-[96.27vw] h-[426px] rounded-md border-2 border-black/30 bg-[#CFEBCF] px-2 pb-2 flex flex-col"
 			role="region"
 			aria-label="Expanded sent preview"
 		>
@@ -103,7 +103,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 							<div
 								key={email.id}
 								className={cn(
-									'transition-colors relative select-none w-full max-w-[356px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2'
+									'transition-colors relative select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2'
 								)}
 							>
 								{/* Fixed top-right info (Location + Title) */}
@@ -178,7 +178,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 								{/* Content grid */}
 								<div className="grid grid-cols-1 grid-rows-4 h-full pr-[120px] pl-[22px]">
 									{/* Row 1: Name */}
-									<div className="row-start-1 col-start-1 flex items-center">
+									<div className="row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
 										<div className="font-bold text-[11px] truncate leading-none">
 											{contactName}
 										</div>
@@ -191,7 +191,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 												(contact?.lastName && contact.lastName.trim())
 										);
 										return (
-											<div className="row-start-2 col-start-1 flex items-center pr-2">
+											<div className="row-start-2 col-start-1 flex items-center pr-2 h-[16px] max-[480px]:h-[12px]">
 												<div className="text-[11px] text-black truncate leading-none">
 													{hasSeparateName ? contact?.company || '' : ''}
 												</div>
@@ -217,12 +217,12 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 									})()}
 
 									{/* Row 3: Subject */}
-									<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center">
+									<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
 										{email.subject || 'No subject'}
 									</div>
 
 									{/* Row 4: Message preview */}
-									<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center">
+									<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px]">
 										{email.message
 											? email.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
 											: 'No content'}
@@ -234,7 +234,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 					{Array.from({ length: Math.max(0, 6 - sent.length) }).map((_, idx) => (
 						<div
 							key={`sent-placeholder-${idx}`}
-							className="select-none w-full max-w-[356px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
+							className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
 						/>
 					))}
 				</div>
