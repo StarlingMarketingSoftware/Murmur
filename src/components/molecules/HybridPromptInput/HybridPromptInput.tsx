@@ -1088,7 +1088,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	const isMobile = useIsMobile();
 	return (
-		<div className={compactLeftOnly ? '' : 'flex justify-center'}>
+		<div
+			className={cn(
+				compactLeftOnly ? '' : 'flex justify-center',
+				!showTestPreview && 'max-[480px]:pb-[60px]'
+			)}
+		>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
 				<Droppable id="droppable">
 					<DraggableBox
@@ -1668,45 +1673,78 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 									{/* Test button and notices (hidden in compact mode) */}
 									{compactLeftOnly ? null : (
-										<div className={cn('w-full', showTestPreview && 'hidden')}>
-											<div className="flex justify-center mb-4 w-full">
-												<Button
-													type="button"
-													onClick={() => {
-														setShowTestPreview?.(true);
-														handleGenerateTestDrafts?.();
-														setHasAttemptedTest(true);
-													}}
-													disabled={isGenerationDisabled?.()}
-													className={cn(
-														'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
-														showTestPreview
-															? 'w-[426px] max-[480px]:w-[89.8vw]'
-															: 'w-[868px] max-[480px]:w-[93.7vw]',
-														isGenerationDisabled?.()
-															? 'opacity-50 cursor-not-allowed'
-															: 'opacity-100'
-													)}
-												>
-													{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
-												</Button>
+										<>
+											<div
+												className={cn(
+													'w-full',
+													showTestPreview && 'hidden',
+													'max-[480px]:hidden'
+												)}
+											>
+												<div className="flex justify-center mb-4 w-full">
+													<Button
+														type="button"
+														onClick={() => {
+															setShowTestPreview?.(true);
+															handleGenerateTestDrafts?.();
+															setHasAttemptedTest(true);
+														}}
+														disabled={isGenerationDisabled?.()}
+														className={cn(
+															'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
+															showTestPreview
+																? 'w-[426px] max-[480px]:w-[89.8vw]'
+																: 'w-[868px] max-[480px]:w-[93.7vw]',
+															isGenerationDisabled?.()
+																? 'opacity-50 cursor-not-allowed'
+																: 'opacity-100'
+														)}
+													>
+														{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+													</Button>
+												</div>
+												{hasEmptyTextBlocks && (
+													<div
+														className={cn(
+															hasTouchedEmptyTextBlocks || hasAttemptedTest
+																? 'text-destructive'
+																: 'text-black',
+															'text-sm font-medium -mt-2 mb-2',
+															showTestPreview
+																? 'w-[426px] max-[480px]:w-[89.8vw]'
+																: 'w-[868px] max-[480px]:w-[93.7vw]'
+														)}
+													>
+														Fill in all text blocks in order to compose an email.
+													</div>
+												)}
 											</div>
-											{hasEmptyTextBlocks && (
-												<div
-													className={cn(
-														hasTouchedEmptyTextBlocks || hasAttemptedTest
-															? 'text-destructive'
-															: 'text-black',
-														'text-sm font-medium -mt-2 mb-2',
-														showTestPreview
-															? 'w-[426px] max-[480px]:w-[89.8vw]'
-															: 'w-[868px] max-[480px]:w-[93.7vw]'
-													)}
-												>
-													Fill in all text blocks in order to compose an email.
+
+											{/* Mobile sticky Test button at page bottom */}
+											{!showTestPreview && (
+												<div className="hidden max-[480px]:block">
+													<div className="fixed bottom-0 left-0 right-0 z-40 border-t-2 border-black">
+														<Button
+															type="button"
+															onClick={() => {
+																setShowTestPreview?.(true);
+																handleGenerateTestDrafts?.();
+																setHasAttemptedTest(true);
+															}}
+															disabled={isGenerationDisabled?.()}
+															className={cn(
+																'h-[53px] w-full rounded-none bg-[#5DAB68] text-white font-times font-bold cursor-pointer flex items-center justify-center font-primary',
+																isGenerationDisabled?.()
+																	? 'opacity-50 cursor-not-allowed'
+																	: 'opacity-100'
+															)}
+														>
+															{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+														</Button>
+													</div>
 												</div>
 											)}
-										</div>
+										</>
 									)}
 								</div>
 							)}
