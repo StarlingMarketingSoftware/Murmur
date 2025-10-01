@@ -103,6 +103,9 @@ const SortableAIBlock = ({
 	// Only show red styling if the field has been touched and is empty
 	const shouldShowRedStyling = isTextBlockEmpty && hasBeenTouched;
 
+	// Mobile detection for conditional placeholder shortening
+	const isMobile = useIsMobile();
+
 	// Get the border color for the block
 	const getBorderColor = () => {
 		if (isIntroductionBlock) return '#6673FF';
@@ -367,10 +370,14 @@ const SortableAIBlock = ({
 																: (block as { label: string }).label}
 														</span>
 													</div>
-													<div className="flex-1 flex items-center pl-0 pr-12">
-														<span className="text-sm font-inter italic text-[#5d5d5d]">
-															{isResearchBlock && showTestPreview
-																? 'Automated Research'
+													<div className="flex-1 min-w-0 flex items-center pl-0 pr-12 overflow-hidden">
+														<span className="text-sm max-[480px]:text-[10px] font-inter italic text-[#5d5d5d] truncate">
+															{isResearchBlock
+																? isMobile
+																	? 'Automatic Research'
+																	: showTestPreview
+																	? 'Automated Research'
+																	: block.placeholder
 																: block.placeholder}
 														</span>
 													</div>
@@ -472,8 +479,12 @@ const SortableAIBlock = ({
 															<input
 																type="text"
 																placeholder={
-																	isResearchBlock && showTestPreview
-																		? 'Automated Research'
+																	isResearchBlock
+																		? isMobile
+																			? 'Automatic Research'
+																			: showTestPreview
+																			? 'Automated Research'
+																			: block.placeholder
 																		: block.placeholder
 																}
 																onClick={(e) => e.stopPropagation()}
@@ -484,14 +495,14 @@ const SortableAIBlock = ({
 																	!isAdvancedEnabled
 																}
 																className={cn(
-																	'flex-1 outline-none text-sm',
+																	'flex-1 outline-none text-sm max-[480px]:text-[10px] truncate min-w-0',
 																	isIntroductionBlock || isResearchBlock || isActionBlock
 																		? '!bg-[#DADAFC]'
 																		: 'bg-white placeholder:text-gray-400',
 																	(isIntroductionBlock ||
 																		isResearchBlock ||
 																		isActionBlock) &&
-																		'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
+																		'font-inter placeholder:italic placeholder:text-[#5d5d5d] max-[480px]:placeholder:text-[10px]',
 																	'pl-0',
 																	isIntroductionBlock || isResearchBlock || isActionBlock
 																		? 'pr-24'
@@ -651,7 +662,7 @@ const SortableAIBlock = ({
 														}
 														onClick={(e) => e.stopPropagation()}
 														className={cn(
-															'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0',
+															'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 max-[480px]:placeholder:text-[10px]',
 															isIntroductionBlock
 																? '!bg-[#DADAFC] [&]:!bg-[#DADAFC]'
 																: 'bg-white',
