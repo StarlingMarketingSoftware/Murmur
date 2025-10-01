@@ -311,7 +311,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	return (
 		<div
 			data-test-preview-panel
-			className="w-[457px] h-[644px] flex flex-col bg-gray-50 relative"
+			className="w-[457px] max-[480px]:w-full h-[644px] flex flex-col bg-gray-50 relative"
 			style={{
 				boxSizing: 'border-box',
 				border: '2px solid black',

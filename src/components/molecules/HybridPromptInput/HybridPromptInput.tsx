@@ -1136,7 +1136,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									if (overId === 'test-preview-panel') setIsPanelsReversed((p) => !p);
 								}}
 								className={cn(
-									showTestPreview ? (isPanelsReversed ? 'order-2' : 'order-1') : ''
+									showTestPreview ? (isPanelsReversed ? 'order-2' : 'order-1') : '',
+									// Hide the main drafting panel on mobile when Test Preview is open
+									isMobile && showTestPreview && 'hidden'
 								)}
 							>
 								<div
