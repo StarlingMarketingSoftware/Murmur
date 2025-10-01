@@ -705,7 +705,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									<Fragment key={b.id}>
 										<div
 											className={cn(
-												'rounded-[8px] border-2 bg-white px-2 py-1 relative w-[357px] mx-auto'
+												'rounded-[8px] border-2 bg-white px-2 py-1 relative w-[357px] max-[480px]:w-[89.33vw] mx-auto'
 											)}
 											style={{
 												borderColor:

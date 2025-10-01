@@ -163,8 +163,8 @@ const SortableAIBlock = ({
 						  }`
 					: isFullAutomatedBlock
 					? showTestPreview
-						? 'w-[426px] max-[480px]:w-[89.8vw]'
-						: 'w-[868px] max-[480px]:w-[93.7vw]'
+						? 'w-[426px] max-[480px]:w-[89.33vw]'
+						: 'w-[868px] max-[480px]:w-[89.33vw]'
 					: showTestPreview
 					? 'w-[426px] max-[480px]:w-[89.8vw]'
 					: 'w-[868px] max-[480px]:w-[93.7vw]',
