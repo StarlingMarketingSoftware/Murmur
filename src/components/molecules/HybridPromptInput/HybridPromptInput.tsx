@@ -1805,6 +1805,30 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													contact={contact}
 												/>
 											</DraggableBox>
+											{/* Mobile sticky footer with Back to Testing and Go to Drafting */}
+											<div className="hidden max-[480px]:block">
+												<div className="fixed bottom-0 left-0 right-0 z-40">
+													<div className="flex w-full">
+														<Button
+															type="button"
+															onClick={() => setShowTestPreview?.(false)}
+															className={cn(
+																'h-[53px] flex-1 rounded-none bg-[#5DAB68] text-white font-times font-bold cursor-pointer flex items-center justify-center font-primary border-2 border-black border-r-0'
+															)}
+														>
+															Back to Testing
+														</Button>
+														<button
+															type="button"
+															onClick={() => onGoToDrafting?.()}
+															className="h-[53px] w-[92px] bg-[#EEEEEE] text-black font-inter text-[16px] leading-none border-2 border-[#626262] rounded-none flex-shrink-0 border-l-[#626262]"
+														>
+															<span className="block">Go to</span>
+															<span className="block">Drafting</span>
+														</button>
+													</div>
+												</div>
+											</div>
 										</div>
 								  )}
 						</div>
