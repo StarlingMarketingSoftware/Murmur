@@ -279,21 +279,22 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	return (
 		<div
 			className={cn(
-				'w-[400px] rounded-lg border-2 border-black bg-[#EEF2F6]',
+				'w-[400px] max-[480px]:w-[96.27vw]',
+				'rounded-lg max-[480px]:rounded-none',
+				'border-2 border-black max-[480px]:border-0',
+				'bg-[#EEF2F6] max-[480px]:bg-transparent',
 				'overflow-visible font-inter',
-				'origin-top-left'
+				'origin-top-left',
+				'scale-[0.85] max-[480px]:scale-100'
 			)}
-			style={{
-				transform: 'scale(0.85)',
-			}}
 		>
-			<div className="h-[31px] bg-white rounded-t-lg px-3 flex items-center">
+			<div className="h-[31px] bg-white rounded-t-lg px-3 flex items-center max-[480px]:hidden">
 				<div className="text-[14px] font-inter font-medium">Drafting</div>
 				<div className="ml-auto">{headerRight}</div>
 			</div>
 
 			{isOpen && (
-				<div className="p-3">
+				<div className="p-3 max-[480px]:p-0">
 					{/* Contacts */}
 					<div className="mb-2">
 						{activePreview === 'contacts' ? (
@@ -313,9 +314,9 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 							<div
 								className={cn(
 									'rounded-md border-2 border-black/30 font-sans',
-									'bg-[#F5DADA] backdrop-blur-sm select-none transition-all'
+									'bg-[#F5DADA] backdrop-blur-sm select-none transition-all',
+									'w-[376px] max-[480px]:w-[96.27vw]'
 								)}
-								style={{ width: '376px' }}
 							>
 								<div
 									className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
@@ -374,7 +375,7 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 
 					{/* Email Structure */}
 					<div
-						className="flex items-stretch rounded-lg border-2 border-black w-[376px] h-[32px] font-sans text-xs cursor-pointer overflow-hidden mb-2"
+						className="flex items-stretch rounded-lg border-2 border-black w-[376px] max-[480px]:w-[96.27vw] h-[32px] font-sans text-xs cursor-pointer overflow-hidden mb-2"
 						onClick={() => setActivePreview('emailStructure')}
 					>
 						<div className="px-3 text-sm font-bold text-black bg-white flex items-center border-r border-black/40">
@@ -428,9 +429,9 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 							<div
 								className={cn(
 									'rounded-md border-2 border-[#295094] mb-2 font-sans',
-									'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all'
+									'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all',
+									'w-[376px] max-[480px]:w-[96.27vw]'
 								)}
-								style={{ width: '376px' }}
 							>
 								<div
 									className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
@@ -491,9 +492,9 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 						<div
 							className={cn(
 								'rounded-md border-2 border-black/30 mb-2 font-sans',
-								'bg-[#F4E5BC] backdrop-blur-sm select-none transition-all'
+								'bg-[#F4E5BC] backdrop-blur-sm select-none transition-all',
+								'w-[376px] max-[480px]:w-[96.27vw]'
 							)}
-							style={{ width: '376px' }}
 						>
 							<div
 								className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
@@ -562,9 +563,9 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 							<div
 								className={cn(
 									'rounded-md border-2 border-[#295094] mb-2 font-sans',
-									'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all'
+									'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all',
+									'w-[376px] max-[480px]:w-[96.27vw]'
 								)}
-								style={{ width: '376px' }}
 							>
 								<div
 									className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
@@ -617,9 +618,9 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 						<div
 							className={cn(
 								'rounded-md border-2 border-black/30 mb-2 font-sans',
-								'bg-[#CFEBCF] backdrop-blur-sm select-none transition-all'
+								'bg-[#CFEBCF] backdrop-blur-sm select-none transition-all',
+								'w-[376px] max-[480px]:w-[96.27vw]'
 							)}
-							style={{ width: '376px' }}
 						>
 							<div
 								className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"

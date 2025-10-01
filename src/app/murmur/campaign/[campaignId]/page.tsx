@@ -436,11 +436,16 @@ const Murmur = () => {
 
 			{/* Container with background that starts after the divider */}
 			<div
-				className="relative min-h-screen mt-2 border-t-2 border-black"
-				style={{ backgroundColor: 'rgba(222, 242, 225, 0.65)' }}
+				className="relative min-h-screen mt-2 border-t-0 md:border-t-2 border-black"
+				style={{ backgroundColor: isMobile ? '#FFFFFF' : 'rgba(222, 242, 225, 0.65)' }}
 			>
 				{shouldHideContent && (
-					<div className="fixed inset-0 bg-background z-40 pointer-events-none" />
+					<div
+						className={cn(
+							'fixed inset-0 z-40 pointer-events-none',
+							isMobile ? 'bg-white' : 'bg-background'
+						)}
+					/>
 				)}
 				<div
 					className={cn(
@@ -505,7 +510,7 @@ const Murmur = () => {
 							goToDrafting={() => setActiveView('drafting')}
 						/>
 					</div>
-					{/* Mobile-only: hide drafting boxes container on the Drafting tab */}
+					{/* using this to hide the default boxes in the drafting tab so we can add in a UI specific to mobile */}
 					<style jsx global>{`
 						body.murmur-mobile [data-drafting-container] {
 							display: none !important;

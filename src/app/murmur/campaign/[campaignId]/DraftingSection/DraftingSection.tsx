@@ -5,6 +5,7 @@ import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/Hybr
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { EmailGeneration } from './EmailGeneration/EmailGeneration';
 import { cn } from '@/utils';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import DraftingStatusPanel from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftingStatusPanel';
 // removed unused DraftingMode/HybridBlock imports after moving mode toggles inside
 
@@ -35,6 +36,8 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 		livePreviewMessage,
 		livePreviewSubject,
 	} = useDraftingSection(props);
+
+	const isMobile = useIsMobile();
 
 	return (
 		<div className="mb-30 flex flex-col items-center">
@@ -108,6 +111,28 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 							/>
 						)}
 					</div>
+
+					{/* Mobile-only: show the Drafting status panel inside the Drafting tab */}
+					{view === 'drafting' && isMobile && (
+						<div className="mt-6 flex justify-center lg:hidden">
+							<DraftingStatusPanel
+								campaign={campaign}
+								contacts={contacts || []}
+								form={form}
+								generationProgress={generationProgress}
+								onOpenDrafting={goToDrafting}
+								isGenerationDisabled={isGenerationDisabled}
+								isPendingGeneration={isPendingGeneration}
+								isLivePreviewVisible={isLivePreviewVisible}
+								livePreviewContactId={livePreviewContactId || undefined}
+								livePreviewSubject={livePreviewSubject}
+								livePreviewMessage={livePreviewMessage}
+								onDraftSelectedContacts={async (ids) => {
+									await handleGenerateDrafts(ids);
+								}}
+							/>
+						</div>
+					)}
 				</form>
 			</Form>
 
