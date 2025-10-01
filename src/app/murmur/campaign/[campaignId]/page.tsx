@@ -505,6 +505,12 @@ const Murmur = () => {
 							goToDrafting={() => setActiveView('drafting')}
 						/>
 					</div>
+					{/* Mobile-only: hide drafting boxes container on the Drafting tab */}
+					<style jsx global>{`
+						body.murmur-mobile [data-drafting-container] {
+							display: none !important;
+						}
+					`}</style>
 				</div>
 			</div>
 		</>
