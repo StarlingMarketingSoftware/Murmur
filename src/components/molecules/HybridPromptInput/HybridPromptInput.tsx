@@ -1337,12 +1337,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	<Input
 																		{...field}
 																		className={cn(
-																			'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0',
+																			'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 max-[480px]:placeholder:text-[10px]',
 																			form.watch('isAiSubject')
 																				? '!text-[#969696] placeholder:!text-[#969696]'
 																				: shouldShowSubjectRedStyling
 																				? '!text-[#A20000] placeholder:!text-[#A20000]'
-																				: '!text-black placeholder:!text-black'
+																				: '!text-black placeholder:!text-black',
+																			!form.watch('isAiSubject') && 'max-[480px]:pl-2'
 																		)}
 																		placeholder={
 																			form.watch('isAiSubject')
