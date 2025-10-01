@@ -590,8 +590,8 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 						)}
 					</div>
 
-					{/* Footer with Test button */}
-					<div className="p-4 bg-background rounded-b-md">
+					{/* Footer with Test button (hidden on mobile; sticky footer exists there) */}
+					<div className="p-4 bg-background rounded-b-md max-[480px]:hidden">
 						<Button
 							type="button"
 							onClick={onTest}
