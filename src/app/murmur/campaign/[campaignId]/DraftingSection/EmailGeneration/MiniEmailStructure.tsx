@@ -532,7 +532,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						</div>
 
 						{/* Auto Subject */}
-						<div className="mb-3 w-[357px] mx-auto">
+						<div className="mb-3 w-[357px] max-[480px]:w-[89.33vw] mx-auto">
 							<div
 								className={cn(
 									'flex items-center h-[25px] rounded-[8px] border-2 border-black overflow-hidden',

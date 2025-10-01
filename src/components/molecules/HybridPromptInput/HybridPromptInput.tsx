@@ -1250,8 +1250,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<FormItem
 														className={cn(
 															showTestPreview
-																? 'w-[426px] max-[480px]:w-[89.8vw]'
-																: 'w-[868px] max-[480px]:w-[93.7vw]'
+																? 'w-[426px] max-[480px]:w-[89.33vw]'
+																: 'w-[868px] max-[480px]:w-[89.33vw]'
 														)}
 													>
 														<div
@@ -1280,7 +1280,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<FormControl>
 															<div
 																className={cn(
-																	'flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden',
+																	'flex items-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden',
 																	form.watch('isAiSubject') && 'bg-[#F1F1F1]'
 																)}
 															>
