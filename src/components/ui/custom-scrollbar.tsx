@@ -124,11 +124,10 @@ export function CustomScrollbar({
 	const handleWheel: React.WheelEventHandler<HTMLDivElement> = useCallback((e) => {
 		const container = scrollContainerRef.current;
 		if (!container) return;
-		const prev = container.scrollTop;
+		const previousScrollTop = container.scrollTop;
 		container.scrollTop += e.deltaY;
-		if (container.scrollTop !== prev) {
+		if (container.scrollTop !== previousScrollTop) {
 			e.stopPropagation();
-			e.preventDefault();
 		}
 	}, []);
 
@@ -218,6 +217,10 @@ export function CustomScrollbar({
 						// Allow side content to render outside horizontally (e.g., external buttons)
 						overflowX: 'visible',
 						overflowY: 'auto',
+						// Prevent scroll chaining to parent/page and improve mobile scroll behavior
+						overscrollBehavior: 'contain',
+						WebkitOverflowScrolling: 'touch',
+						touchAction: 'pan-y',
 					} as React.CSSProperties
 				}
 			>
