@@ -11,6 +11,7 @@ import { DraftsExpandedList } from './DraftsExpandedList';
 import { SentExpandedList } from './SentExpandedList';
 import { DraftPreviewExpandedList } from './DraftPreviewExpandedList';
 import { SendPreviewExpandedList } from './SendPreviewExpandedList';
+import EmailStructureExpandedBox from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/EmailStructureExpandedBox';
 
 export type DraftingPreviewKind =
 	| 'none'
@@ -374,34 +375,49 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					</div>
 
 					{/* Email Structure */}
-					<div
-						className="flex items-stretch rounded-lg border-2 border-black w-[376px] max-[480px]:w-[96.27vw] h-[32px] font-sans text-xs cursor-pointer overflow-hidden mb-2"
-						onClick={() => setActivePreview('emailStructure')}
-					>
-						<div className="px-3 text-sm font-bold text-black bg-white flex items-center border-r border-black/40">
-							<span className="whitespace-nowrap">Email Structure</span>
-						</div>
+					{activePreview === 'emailStructure' ? (
+						<EmailStructureExpandedBox
+							form={form}
+							onHeaderClick={() => setActivePreview('none')}
+							onDraft={() => {}}
+							isDraftDisabled={
+								props.isGenerationDisabled ? props.isGenerationDisabled() : true
+							}
+							isPendingGeneration={props.isPendingGeneration}
+							generationProgress={generationProgress}
+							generationTotal={generationTotal}
+							onCancel={() => {}}
+						/>
+					) : (
 						<div
-							className="px-3 flex items-center border-r border-black/40 font-medium text-black/80 text-[11px]"
-							style={draftingModeStyle}
+							className="flex items-stretch rounded-lg border-2 border-black w-[376px] max-[480px]:w-[96.27vw] h-[32px] font-sans text-xs cursor-pointer overflow-hidden mb-2"
+							onClick={() => setActivePreview('emailStructure')}
 						>
-							<span className="whitespace-nowrap">{draftingMode}</span>
+							<div className="px-3 text-sm font-bold text-black bg-white flex items-center border-r border-black/40">
+								<span className="whitespace-nowrap">Email Structure</span>
+							</div>
+							<div
+								className="px-3 flex items-center border-r border-black/40 font-medium text-black/80 text-[11px]"
+								style={draftingModeStyle}
+							>
+								<span className="whitespace-nowrap">{draftingMode}</span>
+							</div>
+							<div
+								className="px-3 flex items-center border-r border-black/40 font-medium text-black/80 text-[11px]"
+								style={subjectStyle}
+							>
+								<span className="whitespace-nowrap">
+									{isAiSubject ? 'Auto Subject' : 'Subject'}
+								</span>
+							</div>
+							<div className="px-3 bg-[#E0E0E0] flex items-center flex-grow font-medium text-black/80 text-[11px] min-w-0">
+								<span className="truncate">{fromName || 'From'}</span>
+							</div>
+							<div className="bg-white flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
+								<span className="w-[20px] text-center">2</span>
+							</div>
 						</div>
-						<div
-							className="px-3 flex items-center border-r border-black/40 font-medium text-black/80 text-[11px]"
-							style={subjectStyle}
-						>
-							<span className="whitespace-nowrap">
-								{isAiSubject ? 'Auto Subject' : 'Subject'}
-							</span>
-						</div>
-						<div className="px-3 bg-[#E0E0E0] flex items-center flex-grow font-medium text-black/80 text-[11px] min-w-0">
-							<span className="truncate">{fromName || 'From'}</span>
-						</div>
-						<div className="bg-white flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
-							<span className="w-[20px] text-center">2</span>
-						</div>
-					</div>
+					)}
 
 					{/* Draft Preview */}
 					{showDraftPreviewBox &&
