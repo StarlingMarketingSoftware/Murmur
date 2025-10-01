@@ -151,14 +151,14 @@ const SortableAIBlock = ({
 					'border-2 border-gray-300 bg-background',
 				isTextBlock
 					? showTestPreview
-						? 'w-[426px] max-[480px]:w-[89.8vw] min-h-[44px]'
-						: 'w-[868px] max-[480px]:w-[93.7vw] min-h-[80px]'
+						? 'w-[426px] max-[480px]:w-[89.33vw] min-h-[44px]'
+						: 'w-[868px] max-[480px]:w-[89.33vw] min-h-[80px]'
 					: isCompactBlock
 					? showTestPreview
-						? `w-[426px] max-[480px]:w-[89.8vw] ${
+						? `w-[426px] max-[480px]:w-[89.33vw] ${
 								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'
 						  }`
-						: `w-[868px] max-[480px]:w-[93.7vw] ${
+						: `w-[868px] max-[480px]:w-[89.33vw] ${
 								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'
 						  }`
 					: isFullAutomatedBlock
@@ -166,8 +166,8 @@ const SortableAIBlock = ({
 						? 'w-[426px] max-[480px]:w-[89.33vw]'
 						: 'w-[868px] max-[480px]:w-[89.33vw]'
 					: showTestPreview
-					? 'w-[426px] max-[480px]:w-[89.8vw]'
-					: 'w-[868px] max-[480px]:w-[93.7vw]',
+					? 'w-[426px] max-[480px]:w-[89.33vw]'
+					: 'w-[868px] max-[480px]:w-[89.33vw]',
 				!isIntroductionBlock &&
 					!isResearchBlock &&
 					!isActionBlock &&
@@ -619,7 +619,7 @@ const SortableAIBlock = ({
 											<>
 												<div className={isFullAutomatedBlock ? 'relative' : ''}>
 													{showCustomPlaceholder && (
-														<div className="absolute inset-0 pointer-events-none py-2 pr-10 text-[#505050] text-base md:text-sm">
+														<div className="absolute inset-0 pointer-events-none py-2 pr-10 text-[#505050] text-base md:text-sm max-[480px]:text-[10px]">
 															<div className="space-y-3">
 																<div>
 																	<p>Prompt Murmur here.</p>
@@ -1588,8 +1588,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															className={cn(
 																`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
 																showTestPreview
-																	? 'w-[426px] max-[480px]:w-[89.8vw]'
-																	: 'w-[868px] max-[480px]:w-[93.7vw]'
+																	? 'w-[426px] max-[480px]:w-[89.33vw]'
+																	: 'w-[868px] max-[480px]:w-[89.33vw]'
 															)}
 														>
 															<FormLabel className="text-base font-semibold font-secondary">
@@ -1637,8 +1637,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													className={cn(
 														`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
 														showTestPreview
-															? 'w-[426px] max-[480px]:w-[89.8vw]'
-															: 'w-[868px] max-[480px]:w-[93.7vw]'
+															? 'w-[426px] max-[480px]:w-[89.33vw]'
+															: 'w-[868px] max-[480px]:w-[89.33vw]'
 													)}
 												>
 													<FormLabel className="text-base font-semibold font-secondary">

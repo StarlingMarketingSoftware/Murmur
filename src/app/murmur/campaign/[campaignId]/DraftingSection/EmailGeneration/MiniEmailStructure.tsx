@@ -753,7 +753,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													</div>
 													<div className="relative">
 														{!b.value && (
-															<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px]">
+															<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px] max-[480px]:text-[10px]">
 																<div className="space-y-2">
 																	<div>
 																		<p>Prompt Murmur here.</p>
@@ -897,7 +897,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					)}
 				>
 					<div
-						className="rounded-[8px] border-2 bg-white px-2 py-2 w-[357px] mx-auto"
+						className="rounded-[8px] border-2 bg-white px-2 py-2 w-[357px] max-[480px]:w-[89.33vw] mx-auto"
 						style={{ borderColor: '#969696' }}
 					>
 						<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
