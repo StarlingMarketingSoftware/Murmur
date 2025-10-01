@@ -51,7 +51,7 @@ const Murmur = () => {
 		silentLoad ? 'search' : 'campaign'
 	);
 	const [isIdentityInfoOpen, setIsIdentityInfoOpen] = useState(false);
-	const [activeView, setActiveView] = useState<'testing' | 'drafting'>('testing');
+	const [activeView, setActiveView] = useState<'testing' | 'drafting'>('drafting');
 
 	// Header counts
 	const contactListIds = campaign?.userContactLists?.map((l) => l.id) || [];

@@ -54,6 +54,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 								isPendingGeneration={isPendingGeneration}
 								isTest={isTest}
 								contact={contacts?.[0]}
+								onGoToDrafting={goToDrafting}
 							/>
 							{/* Right panel for Testing view - positioned absolutely */}
 							<div
