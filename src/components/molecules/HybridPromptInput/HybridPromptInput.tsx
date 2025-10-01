@@ -24,6 +24,7 @@ import { HybridBlock } from '@prisma/client';
 import { HybridPromptInputProps, useHybridPromptInput } from './useHybridPromptInput';
 import { cn } from '@/utils';
 import React, { useState, FC, Fragment, useRef, useEffect, useMemo } from 'react';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
 import { ParagraphSlider } from '@/components/atoms/ParagraphSlider/ParagraphSlider';
@@ -1085,6 +1086,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		}
 	};
 
+	const isMobile = useIsMobile();
 	return (
 		<div className={compactLeftOnly ? '' : 'flex justify-center'}>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
@@ -1092,7 +1094,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 					<DraggableBox
 						id="main-drafting"
 						dragHandleSelector="[data-root-drag-handle]"
-						enabled={!showTestPreview}
+						enabled={isMobile === false && !showTestPreview}
 						onDropOver={() => {}}
 					>
 						<div
@@ -1142,22 +1144,22 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											className={cn(
 												'h-[36px] flex items-center relative z-20',
 												showTestPreview
-													? 'w-[426px] max-[480px]:w-[89.8vw] mx-auto pl-[8px]'
-													: 'w-[868px] max-[480px]:w-[93.7vw] mx-auto pl-[8px]'
+													? 'w-[426px] max-[480px]:w-[89.8vw] mx-auto pl-[8px] max-[480px]:pl-[6px]'
+													: 'w-[868px] max-[480px]:w-[93.7vw] mx-auto pl-[8px] max-[480px]:pl-[6px]'
 											)}
 											data-left-drag-handle
 											data-root-drag-handle
 										>
 											<span
 												className={cn(
-													'font-inter font-semibold text-[17px] mr-[56px] text-black'
+													'font-inter font-semibold text-[17px] mr-[56px] max-[480px]:mr-[22px] text-black'
 												)}
 											>
 												Mode
 											</span>
 											<div
 												ref={modeContainerRef}
-												className="relative flex items-center gap-[67px]"
+												className="relative flex items-center gap-[67px] max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:w-[230px] max-[480px]:ml-[2px]"
 											>
 												<DndContext
 													onDragEnd={handleHighlightDragEnd}
