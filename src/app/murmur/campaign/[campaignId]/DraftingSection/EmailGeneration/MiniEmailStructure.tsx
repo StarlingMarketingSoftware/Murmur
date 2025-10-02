@@ -990,7 +990,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				)}
 			</div>
 			<div
-				className="absolute top-0 right-[-18px] z-50 flex flex-col"
+				className="absolute top-0 right-[-18px] max-[480px]:-right-[15px] z-50 flex flex-col"
 				style={{ pointerEvents: 'none' }}
 			>
 				{addTextButtons.map((btn, index) => {
