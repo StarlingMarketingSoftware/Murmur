@@ -130,7 +130,7 @@ const SortableAIBlock = ({
 					'flex justify-end',
 					showTestPreview
 						? 'w-[426px] max-[480px]:w-[89.8vw]'
-						: 'w-[868px] max-[480px]:w-[93.7vw]'
+						: 'w-[93.7vw] max-w-[868px]'
 				)}
 			>
 				<Button
@@ -163,22 +163,20 @@ const SortableAIBlock = ({
 				isTextBlock
 					? showTestPreview
 						? 'w-[426px] max-[480px]:w-[89.33vw] min-h-[44px]'
-						: 'w-[868px] max-[480px]:w-[89.33vw] min-h-[80px]'
+						: 'w-[89.33vw] max-w-[868px] min-h-[80px]'
 					: isCompactBlock
 					? showTestPreview
 						? `w-[426px] max-[480px]:w-[89.33vw] ${
 								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'
 						  }`
-						: `w-[868px] max-[480px]:w-[89.33vw] ${
-								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'
-						  }`
+						: `w-[89.33vw] max-w-[868px] ${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'}`
 					: isFullAutomatedBlock
 					? showTestPreview
 						? 'w-[426px] max-[480px]:w-[89.33vw]'
-						: 'w-[868px] max-[480px]:w-[89.33vw]'
+						: 'w-[89.33vw] max-w-[868px]'
 					: showTestPreview
 					? 'w-[426px] max-[480px]:w-[89.33vw]'
-					: 'w-[868px] max-[480px]:w-[89.33vw]',
+					: 'w-[89.33vw] max-w-[868px]',
 				!isIntroductionBlock &&
 					!isResearchBlock &&
 					!isActionBlock &&
@@ -1165,7 +1163,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							className={`${
 								compactLeftOnly
 									? ''
-									: 'w-[892px] max-[480px]:w-[96.27vw] min-h-[686px] transition mb-4 flex mx-auto '
+									: 'w-[96.27vw] max-w-[892px] min-h-[686px] transition mb-4 flex mx-auto '
 							}	${
 								showTestPreview
 									? 'flex-row gap-[40px] justify-center items-start'
@@ -1231,7 +1229,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												'h-[36px] flex items-center relative z-20',
 												showTestPreview
 													? 'w-[426px] max-[480px]:w-[89.8vw] mx-auto pl-[8px] max-[480px]:pl-[6px]'
-													: 'w-[868px] max-[480px]:w-[93.7vw] mx-auto pl-[8px] max-[480px]:pl-[6px]'
+													: 'w-[93.7vw] max-w-[868px] mx-auto pl-[8px] max-[480px]:pl-[6px]'
 											)}
 											data-left-drag-handle
 											data-root-drag-handle
@@ -1338,7 +1336,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														className={cn(
 															showTestPreview
 																? 'w-[426px] max-[480px]:w-[89.33vw]'
-																: 'w-[868px] max-[480px]:w-[89.33vw]'
+																: 'w-[89.33vw] max-w-[868px]'
 														)}
 													>
 														<div
@@ -1559,7 +1557,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	'flex justify-end',
 																	showTestPreview
 																		? 'w-[426px] max-[480px]:w-[89.8vw]'
-																		: 'w-[868px] max-[480px]:w-[93.7vw]'
+																		: 'w-[93.7vw] max-w-[868px]'
 																)}
 															>
 																<Button
@@ -1624,7 +1622,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			'flex relative z-30',
 																			showTestPreview
 																				? 'justify-start w-full'
-																				: 'justify-end -mr-[102px] w-[868px] max-[480px]:w-[93.7vw] max-[480px]:-mr-[4.4vw]'
+																				: 'justify-end -mr-[102px] w-[93.7vw] max-w-[868px] max-[480px]:-mr-[4.4vw]'
 																		)}
 																		style={{ transform: 'translateY(-12px)' }}
 																	>
@@ -1668,7 +1666,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																`min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2`,
 																showTestPreview
 																	? 'w-[426px] max-[480px]:w-[89.33vw]'
-																	: 'w-[868px] max-[480px]:w-[89.33vw]'
+																	: 'w-[89.33vw] max-w-[868px]'
 															)}
 														>
 															<FormLabel className="text-base font-semibold font-secondary">
@@ -1717,7 +1715,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														`min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2`,
 														showTestPreview
 															? 'w-[426px] max-[480px]:w-[89.33vw]'
-															: 'w-[868px] max-[480px]:w-[89.33vw]'
+															: 'w-[89.33vw] max-w-[868px]'
 													)}
 												>
 													<FormLabel className="text-base font-semibold font-secondary">
@@ -1767,7 +1765,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
 															showTestPreview
 																? 'w-[426px] max-[480px]:w-[89.8vw]'
-																: 'w-[868px] max-[480px]:w-[93.7vw]',
+																: 'w-[93.7vw] max-w-[868px]',
 															isGenerationDisabled?.()
 																? 'opacity-50 cursor-not-allowed'
 																: 'opacity-100'
@@ -1785,7 +1783,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															'text-sm font-medium -mt-2 mb-2',
 															showTestPreview
 																? 'w-[426px] max-[480px]:w-[89.8vw]'
-																: 'w-[868px] max-[480px]:w-[93.7vw]'
+																: 'w-[93.7vw] max-w-[868px]'
 														)}
 													>
 														Fill in all text blocks in order to compose an email.
