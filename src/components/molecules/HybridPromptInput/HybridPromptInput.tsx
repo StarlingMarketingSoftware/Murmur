@@ -23,7 +23,15 @@ import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingS
 import { HybridBlock } from '@prisma/client';
 import { HybridPromptInputProps, useHybridPromptInput } from './useHybridPromptInput';
 import { cn } from '@/utils';
-import React, { useState, FC, Fragment, useRef, useEffect, useMemo } from 'react';
+import React, {
+	useState,
+	FC,
+	Fragment,
+	useRef,
+	useEffect,
+	useMemo,
+	useLayoutEffect,
+} from 'react';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
@@ -980,6 +988,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const fullModeButtonRef = useRef<HTMLButtonElement>(null);
 	const hybridModeButtonRef = useRef<HTMLButtonElement>(null);
 	const manualModeButtonRef = useRef<HTMLButtonElement>(null);
+	const mainContainerRef = useRef<HTMLDivElement>(null);
+	const headerSectionRef = useRef<HTMLDivElement>(null);
+	const modeDividerRef = useRef<HTMLDivElement>(null);
+	const [overlayTopPx, setOverlayTopPx] = useState<number | null>(null);
 
 	const [highlightStyle, setHighlightStyle] = useState({
 		left: 0,
@@ -1099,6 +1111,40 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	};
 
 	const isMobile = useIsMobile();
+
+	// Mobile-only: measure to start overlay exactly at the big divider line under Mode
+	useLayoutEffect(() => {
+		if (!isMobile || showTestPreview) {
+			setOverlayTopPx(null);
+			return;
+		}
+		const recalc = () => {
+			const container = mainContainerRef.current;
+			const headerSection = headerSectionRef.current;
+			const divider = modeDividerRef.current;
+			if (!container) return;
+			const containerRect = container.getBoundingClientRect();
+			let startBelow = 0;
+			if (divider) {
+				const dividerRect = divider.getBoundingClientRect();
+				startBelow = dividerRect.bottom - containerRect.top;
+			} else if (headerSection) {
+				const headerRect = headerSection.getBoundingClientRect();
+				startBelow = headerRect.bottom - containerRect.top;
+			} else {
+				return;
+			}
+			const nextTop = Math.max(0, Math.ceil(startBelow + 1));
+			setOverlayTopPx(nextTop);
+		};
+		recalc();
+		window.addEventListener('resize', recalc);
+		window.addEventListener('orientationchange', recalc);
+		return () => {
+			window.removeEventListener('resize', recalc);
+			window.removeEventListener('orientationchange', recalc);
+		};
+	}, [isMobile, showTestPreview, fields.length, selectedModeKey]);
 	return (
 		<div
 			className={cn(
@@ -1115,6 +1161,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 						onDropOver={() => {}}
 					>
 						<div
+							ref={mainContainerRef}
 							className={`${
 								compactLeftOnly
 									? ''
@@ -1127,6 +1174,23 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									: 'flex-col border-[3px] border-black rounded-md bg-white min-h-[686px]'
 							}	relative overflow-visible`}
 						>
+							{/* Mobile-only gradient background overlay starting under Mode divider */}
+							{isMobile && !showTestPreview && overlayTopPx !== null && (
+								<div
+									style={{
+										position: 'absolute',
+										left: 0,
+										right: 0,
+										top: overlayTopPx,
+										bottom: 0,
+										background:
+											'linear-gradient(to bottom, rgba(222,242,225,0.71) 0%, rgba(222,242,225,0.5) 40%, rgba(222,242,225,0.25) 80%, rgba(222,242,225,0.15) 100%)',
+										pointerEvents: 'none',
+										zIndex: 0,
+										borderRadius: 'inherit',
+									}}
+								/>
+							)}
 							{/* Left side - Content area (draggable when testing) */}
 							<DraggableBox
 								id="test-left-panel"
@@ -1138,7 +1202,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								className={cn(
 									showTestPreview ? (isPanelsReversed ? 'order-2' : 'order-1') : '',
 									// Hide the main drafting panel on mobile when Test Preview is open
-									isMobile && showTestPreview && 'hidden'
+									isMobile && showTestPreview && 'hidden',
+									'relative z-10'
 								)}
 							>
 								<div
@@ -1148,14 +1213,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											? 'w-[457px] shrink-0 h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-white'
 											: compactLeftOnly
 											? 'w-[350px]'
-											: 'w-full min-h-0 pt-[10px] px-0 pb-0 flex-1'
+											: 'w-full min-h-0 pt-[10px] px-0 pb-0 flex-1',
+										'relative z-10'
 									)}
 								>
 									{/* Removed explicit drag bar; header below acts as the drag handle */}
 									{/* Subject header inside the box */}
 									<div
+										ref={headerSectionRef}
 										className={cn(
-											'pt-0 pb-0 bg-white',
+											'pt-0 pb-0',
 											showTestPreview && '-mx-[18px] px-[18px] rounded-t-[8px]'
 										)}
 									>
@@ -1255,6 +1322,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<div className="h-[2px] bg-black -mx-[18px]" />
 												)}
 												<div
+													ref={modeDividerRef}
 													className={cn('h-[2px] bg-black', showTestPreview && 'hidden')}
 												/>
 												{showTestPreview && <div className="h-2" />}
@@ -1300,15 +1368,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															<div
 																className={cn(
 																	'flex items-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden',
-																	form.watch('isAiSubject') && 'bg-[#F1F1F1]'
+																	form.watch('isAiSubject') ? 'bg-[#F1F1F1]' : 'bg-white'
 																)}
 															>
 																<div
 																	className={cn(
 																		'pl-2 flex items-center h-full shrink-0 w-[120px]',
-																		form.watch('isAiSubject')
-																			? 'bg-transparent'
-																			: 'bg-white'
+																		'bg-white'
 																	)}
 																>
 																	<span className="font-inter font-semibold text-[17px] text-black">
@@ -1345,14 +1411,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	<span className="absolute right-0 h-full border-r border-black"></span>
 																</button>
 
-																<div
-																	className={cn(
-																		'flex-grow h-full',
-																		form.watch('isAiSubject')
-																			? 'bg-transparent'
-																			: 'bg-white'
-																	)}
-																>
+																<div className={cn('flex-grow h-full', 'bg-white')}>
 																	<Input
 																		{...field}
 																		className={cn(
@@ -1606,7 +1665,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<FormItem className="mb-[9px]">
 														<div
 															className={cn(
-																`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
+																`min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2`,
 																showTestPreview
 																	? 'w-[426px] max-[480px]:w-[89.33vw]'
 																	: 'w-[868px] max-[480px]:w-[89.33vw]'
@@ -1655,7 +1714,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											>
 												<div
 													className={cn(
-														`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
+														`min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2`,
 														showTestPreview
 															? 'w-[426px] max-[480px]:w-[89.33vw]'
 															: 'w-[868px] max-[480px]:w-[89.33vw]'
