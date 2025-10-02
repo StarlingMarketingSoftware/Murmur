@@ -86,6 +86,7 @@ export const EmailStructureExpandedBox: FC<EmailStructureExpandedBoxProps> = ({
 					onCancel={onCancel}
 					hideTopChrome
 					hideFooter
+					fullWidthMobile
 				/>
 			</div>
 		</div>

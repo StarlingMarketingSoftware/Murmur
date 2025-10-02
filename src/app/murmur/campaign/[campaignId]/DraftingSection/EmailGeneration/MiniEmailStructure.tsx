@@ -30,6 +30,8 @@ interface MiniEmailStructureProps {
 	hideTopChrome?: boolean;
 	/** When true, hides the footer Draft/progress controls */
 	hideFooter?: boolean;
+	/** When true, use 100% width so parent can control width on mobile */
+	fullWidthMobile?: boolean;
 }
 
 export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
@@ -42,6 +44,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	onCancel,
 	hideTopChrome,
 	hideFooter,
+	fullWidthMobile,
 }) => {
 	const watchedHybridBlocks = form.watch('hybridBlockPrompts');
 	const hybridBlocks = useMemo(() => watchedHybridBlocks || [], [watchedHybridBlocks]);
@@ -425,7 +428,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		<div
 			ref={rootRef}
 			style={{
-				width: '376px',
+				width: fullWidthMobile ? '100%' : '376px',
 				height: '474px',
 				position: 'relative',
 				overflow: 'visible',
