@@ -5,9 +5,11 @@ import CustomTable from '../../../molecules/CustomTable/CustomTable';
 import { useCampaignsTable } from './useCampaignsTable';
 import { X } from 'lucide-react';
 import { Campaign } from '@prisma/client';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 export const CampaignsTable: FC = () => {
-	const [isMobilePortrait, setIsMobilePortrait] = useState<boolean | null>(null);
+	// Treat all mobile orientations (portrait and landscape) as mobile for this table
+	const isMobile = useIsMobile();
 	const mobileTableWrapperRef = useRef<HTMLDivElement | null>(null);
 	const mobileScrollWrapperRef = useRef<HTMLDivElement | null>(null);
 	const mobileDeleteButtonsRef = useRef<HTMLDivElement | null>(null);
@@ -15,7 +17,32 @@ export const CampaignsTable: FC = () => {
 		{}
 	);
 
-	const shouldShowMobileFeatures = isMobilePortrait === true;
+	const shouldShowMobileFeatures = isMobile === true;
+	// Detect landscape to decide whether to embed delete buttons back into rows
+	const [isLandscape, setIsLandscape] = useState<boolean>(false);
+
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		const mq = window.matchMedia('(orientation: landscape)');
+		const handleChange = (ev: MediaQueryListEvent) => setIsLandscape(ev.matches);
+		// Initialize from current state
+		setIsLandscape(mq.matches);
+		if (typeof mq.addEventListener === 'function') {
+			mq.addEventListener('change', handleChange);
+		} else if (typeof mq.addListener === 'function') {
+			mq.addListener(handleChange);
+		}
+		return () => {
+			if (typeof mq.removeEventListener === 'function') {
+				mq.removeEventListener('change', handleChange);
+			} else if (typeof mq.removeListener === 'function') {
+				mq.removeListener(handleChange);
+			}
+		};
+	}, []);
+
+	// Only use the external delete overlay in portrait; in landscape place delete inside each row
+	const shouldUseExternalDeleteColumn = shouldShowMobileFeatures && !isLandscape;
 
 	const {
 		data,
@@ -26,26 +53,10 @@ export const CampaignsTable: FC = () => {
 		confirmingCampaignId,
 	} = useCampaignsTable({ compactMetrics: shouldShowMobileFeatures });
 
-	// Check if we're in mobile portrait mode
-	useEffect(() => {
-		const checkOrientation = () => {
-			const isPortrait = window.innerHeight > window.innerWidth;
-			const isMobile = window.innerWidth <= 640;
-			setIsMobilePortrait(isPortrait && isMobile);
-		};
-
-		checkOrientation();
-		window.addEventListener('resize', checkOrientation);
-		window.addEventListener('orientationchange', checkOrientation);
-
-		return () => {
-			window.removeEventListener('resize', checkOrientation);
-			window.removeEventListener('orientationchange', checkOrientation);
-		};
-	}, []);
+	// No orientation gating; we rely on device detection so landscape uses mobile layout too
 
 	useLayoutEffect(() => {
-		if (typeof window === 'undefined' || !shouldShowMobileFeatures) {
+		if (typeof window === 'undefined' || !shouldUseExternalDeleteColumn) {
 			return;
 		}
 
@@ -129,11 +140,11 @@ export const CampaignsTable: FC = () => {
 			}
 			containerEl.style.removeProperty('--delete-column-top');
 		};
-	}, [shouldShowMobileFeatures, data?.length, rowHeightsById]);
+	}, [shouldUseExternalDeleteColumn, data?.length, rowHeightsById]);
 
 	// Synchronize scrolling between table wrapper and delete buttons
 	useEffect(() => {
-		if (!shouldShowMobileFeatures) return;
+		if (!shouldUseExternalDeleteColumn) return;
 
 		const scrollWrapper = mobileScrollWrapperRef.current;
 		const deleteButtons = mobileDeleteButtonsRef.current;
@@ -193,7 +204,11 @@ export const CampaignsTable: FC = () => {
 			scrollWrapper.removeEventListener('scroll', handleScrollWrapperScroll);
 			deleteButtons.removeEventListener('scroll', handleDeleteButtonsScroll);
 		};
-	}, [shouldShowMobileFeatures, data?.length]);
+	}, [shouldUseExternalDeleteColumn, data?.length]);
+
+	if (isMobile === null) {
+		return null;
+	}
 
 	return (
 		<Card className="relative border-none bg-transparent w-full max-w-[1132px] mx-auto !p-0">
@@ -222,7 +237,7 @@ export const CampaignsTable: FC = () => {
 				<div
 					className={`mobile-campaigns-wrapper ${
 						shouldShowMobileFeatures ? 'mobile-portrait-mode' : ''
-					}`}
+					} ${shouldShowMobileFeatures && isLandscape ? 'mobile-landscape-mode' : ''}`}
 				>
 					<div className="campaigns-table-container" id="campaigns-table-container">
 						{shouldShowMobileFeatures ? (
@@ -234,7 +249,11 @@ export const CampaignsTable: FC = () => {
 											variant="secondary"
 											containerClassName="my-campaigns-table mobile-table-no-scroll"
 											handleRowClick={handleRowClick}
-											columns={columns.filter((col) => col.id !== 'delete')}
+											columns={
+												shouldUseExternalDeleteColumn
+													? columns.filter((col) => col.id !== 'delete')
+													: columns
+											}
 											data={data}
 											noDataMessage="No campaigns found."
 											rowsPerPage={100}
@@ -250,7 +269,7 @@ export const CampaignsTable: FC = () => {
 										/>
 									</div>
 								</div>
-								{data && data.length > 0 && (
+								{shouldUseExternalDeleteColumn && data && data.length > 0 && (
 									<div
 										className="mobile-delete-buttons-external"
 										ref={mobileDeleteButtonsRef}

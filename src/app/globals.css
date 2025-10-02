@@ -77,6 +77,53 @@
 	--font-zen: var(--font-zen-antique);
 }
 
+/* Mobile landscape hard sizing for campaign metric boxes and headers */
+@media (orientation: landscape) {
+	/* Metric boxes themselves */
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-draft-fill],
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-sent-fill],
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-updated-fill],
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-created-fill] {
+		width: 50px !important;
+		min-width: 50px !important;
+		max-width: 50px !important;
+		height: 15px !important;
+		min-height: 15px !important;
+	}
+
+	/* Utility width classes used by compact variant */
+	.mobile-portrait-mode .metric-width-short,
+	.mobile-portrait-mode .metric-width-long {
+		width: 50px !important;
+		min-width: 50px !important;
+		max-width: 50px !important;
+	}
+
+	/* Header label widths to match boxes */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='drafts'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='sent'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='updated'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
+		width: 50px !important;
+		min-width: 50px !important;
+		max-width: 50px !important;
+	}
+}
+
+/* Mobile landscape: prevent clipping of the leftmost metric box in metrics column */
+@media (orientation: landscape) {
+	/* Allow metrics column to render outside cell bounds if needed (do not move layout) */
+	.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(2),
+	.mobile-portrait-mode .my-campaigns-table thead th:nth-child(2) {
+		overflow: visible !important; /* overrides table cell overflow-hidden */
+	}
+
+	/* Ensure the inner metrics container is never clipped */
+	.mobile-portrait-mode .my-campaigns-table td:nth-child(2) .metrics-grid-container {
+		overflow: visible !important;
+	}
+}
+
 :root {
 	--radius: 0.625rem;
 	--foreground: rgb(37, 37, 38); /* oklch(0.147 0.004 49.25) */
@@ -1832,6 +1879,56 @@ body {
 		--metric-width-long: clamp(45px, 12vw, 84px);
 	}
 
+	/* Landscape: uniform 50px width for all metric boxes */
+	@media (orientation: landscape) {
+		.mobile-portrait-mode {
+			--metric-width-short: 50px !important;
+			--metric-width-long: 50px !important;
+		}
+		.mobile-portrait-mode .my-campaigns-table .metric-box {
+			height: 15px !important;
+			min-height: 15px !important;
+		}
+
+		/* In landscape we embed delete inside each row, so remove extra right gutter */
+		.mobile-portrait-mode .mobile-campaigns-outer-container {
+			width: 100% !important;
+			margin-right: 0 !important;
+			padding-right: 0 !important;
+		}
+
+		/* Remove small gap that was used for external buttons */
+		.mobile-portrait-mode .my-campaigns-table tbody tr {
+			margin-right: 0 !important;
+		}
+
+		/* Header widths for 3 columns: name | metrics | delete */
+		.mobile-portrait-mode .my-campaigns-table thead th:first-child {
+			width: 55% !important;
+			min-width: 55% !important;
+		}
+		.mobile-portrait-mode .my-campaigns-table thead th:nth-child(2) {
+			width: auto !important;
+			min-width: 0 !important;
+		}
+		.mobile-portrait-mode .my-campaigns-table thead th:nth-child(3) {
+			width: 28px !important;
+			min-width: 28px !important;
+		}
+
+		/* Body cell sizing for 3 columns */
+		.mobile-portrait-mode .my-campaigns-table tr > td:first-child {
+			flex: 1 1 55% !important;
+		}
+		.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(2) {
+			flex: 0 1 auto !important;
+		}
+		.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(3) {
+			flex: 0 0 28px !important;
+			justify-content: flex-end !important;
+		}
+	}
+
 	/* Utility classes to apply responsive widths */
 	.mobile-portrait-mode .metric-width-short {
 		width: var(--metric-width-short) !important;
@@ -2259,6 +2356,14 @@ body {
 	}
 }
 
+/* Mobile landscape: keep campaign name at 14px to match portrait */
+@media (orientation: landscape) {
+	.mobile-landscape-mode .campaign-name-text {
+		font-size: 14px !important;
+		line-height: 1.2 !important;
+	}
+}
+
 /* Mobile portrait: constrain campaign name column to under half width and ellipsize */
 @media (max-width: 640px) and (orientation: portrait) {
 	/* First column (campaign name) should be < 50% of row */
@@ -2384,6 +2489,87 @@ body {
 	/* Position the table container relatively (ensure even if wrapper class is missing) */
 	.campaigns-table-container {
 		position: relative !important;
+	}
+
+	/* Force mobile table styles in any mobile orientation when wrapper has mobile-portrait-mode */
+	/* This mirrors the portrait rules so landscape uses the same compact design */
+	.mobile-portrait-mode .my-campaigns-table {
+		border: none !important;
+	}
+
+	.mobile-portrait-mode .mobile-scroll-wrapper {
+		border: 2px solid #000000 !important;
+		border-radius: 8px !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table table {
+		display: block;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table thead {
+		display: table-header-group !important;
+		vertical-align: middle !important;
+	}
+
+	/* Ensure header row uses table layout, not the flex override for body rows */
+	.mobile-portrait-mode .my-campaigns-table thead tr {
+		display: table-row !important;
+	}
+	.mobile-portrait-mode .my-campaigns-table thead th {
+		display: table-cell !important;
+		padding: 0 !important; /* remove horizontal padding to align with body */
+		border: none !important;
+	}
+
+	/* Make header columns match body flex layout: 55% name, remaining for metrics */
+	.mobile-portrait-mode .my-campaigns-table thead th:first-child {
+		width: 55% !important;
+		min-width: 55% !important;
+	}
+	.mobile-portrait-mode .my-campaigns-table thead th:nth-child(2) {
+		width: 45% !important;
+		min-width: 45% !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table tbody {
+		display: block;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table tbody tr {
+		display: flex;
+		align-items: stretch;
+		justify-content: flex-start;
+		border: 1px solid #ffffff;
+		border-radius: 8px;
+		padding: 8px 6px;
+		margin-bottom: 8px;
+		margin-right: 3px; /* Small gap between rows and delete buttons */
+		background-color: white;
+		min-height: 44px;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table td {
+		display: flex !important;
+		align-items: center !important;
+		border: none;
+		padding: 0;
+	}
+
+	/* Constrain name area and push metrics hard right */
+	.mobile-portrait-mode .my-campaigns-table tr > td:first-child {
+		flex: 1 1 55%;
+		min-width: 0;
+		height: auto;
+		padding: 0 !important;
+		margin: 0 !important;
+	}
+	.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(2) {
+		flex: 0 0 auto;
+		margin-left: 0 !important;
+		height: auto;
+		padding: 0 !important;
+		margin-top: 0 !important;
+		margin-bottom: 0 !important;
 	}
 
 	/* Outer container that holds both scroll wrapper and external delete buttons */
@@ -2653,6 +2839,37 @@ body {
 
 	/* Tighter mobile widths so columns fit without overflow */
 	/* Widths are set earlier to 44%/56% for name/metrics when delete is external */
+}
+
+/* Additional tuning for mobile landscape so metric boxes are fully visible
+   and evenly spaced without changing their sizes. We give the metrics area
+   more breathing room and pull rows slightly away from the right border. */
+@media (orientation: landscape) {
+	.mobile-portrait-mode .my-campaigns-table tbody tr {
+		/* Add more right margin so boxes don’t hug the container border */
+		margin-right: 10px !important;
+	}
+
+	/* Shrink name cell so metrics begin further left */
+	.mobile-portrait-mode .my-campaigns-table tr > td:first-child {
+		flex: 1 1 42% !important;
+	}
+
+	/* Slightly reduce name share to free space for metrics */
+	.mobile-portrait-mode .my-campaigns-table thead th:first-child {
+		width: 42% !important;
+		min-width: 42% !important;
+	}
+	.mobile-portrait-mode .my-campaigns-table thead th:nth-child(2) {
+		width: 58% !important;
+		min-width: 58% !important;
+	}
+
+	/* Keep metrics content hugging left inside its cell */
+	.mobile-portrait-mode .metrics-grid-container {
+		justify-content: flex-start !important;
+		gap: 7px !important;
+	}
 }
 
 .dark .results-search-bar-wrapper {
@@ -3180,6 +3397,19 @@ body.murmur-mobile .results-align {
 	margin-top: -200px; /* Pull table up for better positioning on desktop */
 	position: relative;
 	z-index: 30; /* Ensure table is above other elements */
+}
+
+/* Mobile landscape: scale campaigns table wrapper width proportionally
+   Example: at 852px viewport width, table width ≈ 503px → 503/852 ≈ 59.04% */
+@media (orientation: landscape) and (max-width: 960px) {
+	.campaigns-table-wrapper {
+		width: 59.04vw !important; /* Maintain 503/852 proportion across breakpoints */
+		max-width: none !important; /* Override tailwind max-w-[960px] */
+		min-width: 0 !important;
+		box-sizing: border-box !important; /* Include padding in computed width */
+		padding-left: 0 !important; /* Neutralize px-4 so width matches proportion */
+		padding-right: 0 !important;
+	}
 }
 
 /* Override negative margin on mobile to prevent white space */
@@ -4675,6 +4905,30 @@ body.murmur-mobile .search-input-icon-btn {
 		justify-content: flex-start !important;
 		width: auto !important;
 		min-width: auto !important;
+	}
+
+	/* Mobile landscape: force metric boxes to 50x15 regardless of viewport width */
+	@media (orientation: landscape) {
+		.mobile-portrait-mode .metric-width-short,
+		.mobile-portrait-mode .my-campaigns-table .metric-box[data-draft-fill],
+		.mobile-portrait-mode .my-campaigns-table .metric-box[data-sent-fill] {
+			width: 50px !important;
+			min-width: 50px !important;
+			max-width: 50px !important;
+		}
+
+		.mobile-portrait-mode .metric-width-long,
+		.mobile-portrait-mode .my-campaigns-table .metric-box[data-updated-fill],
+		.mobile-portrait-mode .my-campaigns-table .metric-box[data-created-fill] {
+			width: 50px !important;
+			min-width: 50px !important;
+			max-width: 50px !important;
+		}
+
+		.mobile-portrait-mode .my-campaigns-table .metric-box {
+			height: 15px !important;
+			min-height: 15px !important;
+		}
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
@@ -6257,5 +6511,154 @@ body.murmur-mobile .search-input-icon-btn {
 		padding-right: 0 !important;
 		justify-content: flex-start !important;
 		text-align: left !important;
+	}
+}
+
+/* Mobile landscape: evenly space 4 metric boxes per row in campaigns table */
+.mobile-landscape-mode .my-campaigns-table .metrics-grid-container {
+	display: flex !important;
+	align-items: center !important;
+	justify-content: flex-start !important; /* keep even internal spacing via gap */
+	flex-wrap: nowrap !important;
+	gap: 7px !important; /* even spacing between all four metric boxes */
+	margin-left: auto !important; /* push the whole group to the right */
+	margin-right: var(
+		--metrics-delete-gap,
+		6px
+	) !important; /* a little space before delete */
+	padding-left: 0 !important;
+	width: auto !important; /* shrink to content so margin-left:auto takes effect */
+}
+
+.mobile-landscape-mode .my-campaigns-table .metrics-grid-container > div {
+	flex: 0 0 auto !important; /* prevent stretching that causes zero-gap clumping */
+	margin: 0 !important;
+	padding: 0 !important;
+	justify-content: center !important;
+}
+
+.mobile-landscape-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+	margin-right: 0 !important; /* remove oversized gap after first box */
+	justify-content: flex-start !important;
+}
+
+.mobile-landscape-mode .mobile-campaigns-outer-container {
+	/* Remove reserved gutter used only for portrait external delete column */
+	padding-right: 0 !important;
+	margin-right: 0 !important;
+	width: 100% !important;
+}
+
+.mobile-landscape-mode .my-campaigns-table thead th:first-child {
+	width: 55% !important;
+	min-width: 55% !important;
+}
+.mobile-landscape-mode .my-campaigns-table thead th:nth-child(2) {
+	width: auto !important;
+	min-width: 0 !important;
+}
+.mobile-landscape-mode .my-campaigns-table thead th:nth-child(3) {
+	width: 20px !important; /* match the X icon width */
+	min-width: 20px !important;
+}
+
+.mobile-landscape-mode .my-campaigns-table tr > td:first-child {
+	flex: 0 1 55% !important;
+}
+.mobile-landscape-mode .my-campaigns-table tr > td:nth-child(2) {
+	flex: 1 1 auto !important; /* fill all space between name and delete */
+	margin-left: 0 !important; /* let flex grow handle the push */
+	justify-content: flex-end !important; /* keep metric group hugging delete column */
+}
+.mobile-landscape-mode .my-campaigns-table tr > td:nth-child(3) {
+	flex: 0 0 20px !important; /* match icon */
+	justify-content: flex-end !important;
+}
+
+.mobile-landscape-mode .my-campaigns-table thead th:nth-child(2),
+.mobile-landscape-mode .my-campaigns-table tr > td:nth-child(2) {
+	/* Ensure a hard buffer so metrics never sit under the delete column */
+	padding-right: 16px !important;
+}
+
+.mobile-landscape-mode .my-campaigns-table tr > td:nth-child(2) {
+	margin-left: 0 !important; /* avoid creating a huge gap before metrics */
+	justify-content: flex-end !important; /* keep boxes hugging the right edge */
+}
+
+.mobile-landscape-mode .my-campaigns-table tbody tr {
+	margin-right: 0 !important; /* no extra gap on the row's right side in landscape */
+	padding-right: 0 !important; /* sit flush against delete column */
+}
+
+.mobile-landscape-mode .my-campaigns-table .metric-separator {
+	display: none !important; /* rely on flex gap for spacing */
+}
+
+/* Match header spacing/widths to body metrics in landscape */
+.mobile-landscape-mode .metrics-header-grid {
+	display: flex !important;
+	align-items: center !important;
+	justify-content: flex-start !important;
+	gap: 7px !important;
+	margin-left: auto !important; /* align header labels with right-shifted boxes */
+	margin-right: var(
+		--metrics-delete-gap,
+		6px
+	) !important; /* match body spacing before delete */
+	padding-left: 0 !important;
+	width: auto !important;
+}
+
+.mobile-landscape-mode .metrics-header-grid .metrics-header-label {
+	flex: 0 0 auto !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+}
+
+.mobile-landscape-mode .metrics-header-grid .metrics-header-label[data-label='drafts'],
+.mobile-landscape-mode .metrics-header-grid .metrics-header-label[data-label='sent'] {
+	width: var(--metric-width-short) !important;
+	min-width: var(--metric-width-short) !important;
+	max-width: var(--metric-width-short) !important;
+}
+
+.mobile-landscape-mode .metrics-header-grid .metrics-header-label[data-label='updated'],
+.mobile-landscape-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
+	width: var(--metric-width-long) !important;
+	min-width: var(--metric-width-long) !important;
+	max-width: var(--metric-width-long) !important;
+}
+
+/* Final spacing/layout fix for mobile landscape metrics
+   - Reserve three fixed 50px columns on the right for metrics 2-4
+   - Let the left-most metric expand leftward (auto column)
+   - Keep the whole metrics group right-aligned via margin-left:auto above
+   - Add explicit 8px gaps so boxes never touch */
+@media (orientation: landscape) {
+	.mobile-landscape-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto 50px 50px 50px !important;
+		column-gap: 8px !important;
+		margin-left: 0 !important;
+		/* Pull the entire metrics group left so it's clear of the delete icon */
+		transform: translateX(-45px) !important;
+	}
+
+	.mobile-landscape-mode .my-campaigns-table .metrics-grid-container > div {
+		justify-content: center !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-landscape-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+	}
+
+	/* Keep header labels aligned with the shifted metric boxes */
+	.mobile-landscape-mode .metrics-header-grid {
+		margin-left: 0 !important;
+		/* match the body translate so labels align with boxes */
+		transform: translateX(-30px) !important;
 	}
 }
