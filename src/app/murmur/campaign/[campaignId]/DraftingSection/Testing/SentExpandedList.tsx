@@ -86,7 +86,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 				thumbWidth={2}
 				thumbColor="#000000"
 				trackColor="transparent"
-				offsetRight={-5}
+				offsetRight={-14}
 				contentClassName="overflow-x-hidden"
 				alwaysShow
 			>
