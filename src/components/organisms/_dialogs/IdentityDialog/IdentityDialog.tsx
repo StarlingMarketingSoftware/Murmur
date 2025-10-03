@@ -1,4 +1,5 @@
 import { FC, useEffect, useMemo, useRef, useState } from 'react';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { useRouter } from 'next/navigation';
 import { IdentityDialogProps, useIdentityDialog } from './useIdentityDialog';
 import {
@@ -12,6 +13,7 @@ import { ExistingProfilesSection } from './ExistingProfilesSection';
 
 // removed Typography usage for simplified header
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/utils/ui';
 
 export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 	const router = useRouter();
@@ -21,6 +23,8 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 	const selectLabelRef = useRef<HTMLSpanElement | null>(null);
 	const [highlightWidthPx, setHighlightWidthPx] = useState<number>(186);
 	const [isDesktopTabsWidth, setIsDesktopTabsWidth] = useState<boolean>(true);
+	const [isLandscape, setIsLandscape] = useState<boolean>(false);
+	const isMobile = useIsMobile();
 	const {
 		// title removed from header
 		open,
@@ -104,6 +108,21 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 		return () => window.removeEventListener('resize', measure);
 	}, [showCreatePanel]);
 
+	// Track orientation to apply landscape-specific proportional widths
+	useEffect(() => {
+		const updateOrientation = () => {
+			if (typeof window === 'undefined') return;
+			setIsLandscape(window.innerWidth > window.innerHeight);
+		};
+		updateOrientation();
+		window.addEventListener('resize', updateOrientation);
+		window.addEventListener('orientationchange', updateOrientation);
+		return () => {
+			window.removeEventListener('resize', updateOrientation);
+			window.removeEventListener('orientationchange', updateOrientation);
+		};
+	}, []);
+
 	return (
 		<Dialog
 			open={open}
@@ -139,7 +158,13 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 					}}
 				>
 					{/* Full screen header with back button - fixed position */}
-					<div className="relative bg-background px-8 py-6 flex-shrink-0">
+					<div
+						className="relative bg-background px-8 py-6 flex-shrink-0"
+						style={{
+							paddingTop: isMobile && isLandscape ? 8 : undefined,
+							paddingBottom: isMobile && isLandscape ? 8 : undefined,
+						}}
+					>
 						{/* Back button - closes dialog if possible, otherwise navigates back */}
 						{isContentReady && (
 							<button
@@ -180,18 +205,20 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 						)}
 
 						<div className="text-center">
-							<p
-								className="mt-1 hidden sm:block"
-								style={{
-									fontFamily: 'Times New Roman, Times, serif',
-									fontSize: '21px',
-									color: '#000000',
-								}}
-							>
-								create a new{' '}
-								<span style={{ fontWeight: 700, color: '#5DAB68' }}>profile</span> or
-								select an existing one
-							</p>
+							{!(isMobile && isLandscape) && (
+								<p
+									className="mt-1 hidden sm:block"
+									style={{
+										fontFamily: 'Times New Roman, Times, serif',
+										fontSize: '21px',
+										color: '#000000',
+									}}
+								>
+									create a new{' '}
+									<span style={{ fontWeight: 700, color: '#5DAB68' }}>profile</span> or
+									select an existing one
+								</p>
+							)}
 						</div>
 					</div>
 
@@ -202,9 +229,16 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 							scrollbarWidth: 'none',
 							msOverflowStyle: 'none',
 							WebkitOverflowScrolling: 'touch',
+							paddingBottom: isMobile && isLandscape ? 0 : undefined,
 						}}
 					>
-						<div className="flex justify-center pt-6">
+						<div
+							className="flex justify-center pt-6"
+							style={{
+								paddingTop: isMobile && isLandscape ? 8 : undefined,
+								paddingBottom: isMobile && isLandscape ? 0 : undefined,
+							}}
+						>
 							<div className="w-full max-w-[1444px] px-0 mx-auto">
 								{isPendingIdentities ? (
 									<div className="h-full flex items-center justify-center" />
@@ -213,14 +247,22 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 										<Tabs
 											value={showCreatePanel ? 'create' : 'select'}
 											onValueChange={(val) => setShowCreatePanel(val === 'create')}
-											className="w-full max-w-[1444px]"
+											className={cn(
+												'w-full max-w-[1444px]',
+												isMobile && isLandscape ? '!gap-0' : undefined
+											)}
 										>
-											<div className="flex justify-center mb-4">
+											<div
+												className="flex justify-center"
+												style={{ marginBottom: isMobile && isLandscape ? 0 : 16 }}
+											>
 												<TabsList
 													className="relative !bg-transparent border border-black !shadow-none !p-0"
 													style={{
-														// Keep desktop at 652px; scale on mobile portrait to ~93.8667% of viewport width (352px at 375px vw)
-														width: 'min(652px, 93.8666667vw)',
+														// Desktop fixed 652px. Mobile: portrait uses ~93.87vw (~352px @ 375), landscape uses 41.43vw (~353px @ 852)
+														width: isLandscape
+															? 'min(652px, 41.43vw)'
+															: 'min(652px, 93.8666667vw)',
 														height: isDesktopTabsWidth ? '50px' : '33px',
 														borderWidth: 2.45,
 														borderRadius: '9.8px',

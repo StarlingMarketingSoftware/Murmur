@@ -17,10 +17,11 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp
 import { ControllerRenderProps, FormProvider } from 'react-hook-form';
 import { CheckCircleIcon } from 'lucide-react';
 import { Typography } from '@/components/ui/typography';
-import { FC } from 'react';
+import { FC, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import InfoTooltip from '@/components/atoms/InfoTooltip/InfoTooltip';
+import { cn } from '@/utils/ui';
 
 interface StyledInputProps {
 	field: ControllerRenderProps<UpsertIdentityFormValues>;
@@ -71,11 +72,31 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 	} = useCreateIdentityPanel(props);
 
 	const isMobile = useIsMobile();
+	const [isLandscape, setIsLandscape] = useState(false);
+
+	useEffect(() => {
+		const updateOrientation = () => {
+			if (typeof window === 'undefined') return;
+			setIsLandscape(window.innerWidth > window.innerHeight);
+		};
+		updateOrientation();
+		window.addEventListener('resize', updateOrientation);
+		window.addEventListener('orientationchange', updateOrientation);
+		return () => {
+			window.removeEventListener('resize', updateOrientation);
+			window.removeEventListener('orientationchange', updateOrientation);
+		};
+	}, []);
 
 	return (
 		<FormProvider {...form}>
 			<form onSubmit={form.handleSubmit(onSubmit)}>
-				<div className="mx-auto" style={{ width: 'min(651px, 96vw)' }}>
+				<div
+					className="mx-auto"
+					style={{
+						width: isMobile && isLandscape ? 'min(651px, 41.43vw)' : 'min(651px, 96vw)',
+					}}
+				>
 					<div
 						className="box-border w-full h-[326.05px] rounded-[8.81px] border-[2.2px] border-[#000000] p-4"
 						style={{ backgroundColor: '#F4F9FF' }}
@@ -90,7 +111,10 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 											{'Name (First and Last)*'}
 										</FormLabel>
 										<FormControl>
-											<StyledInput field={field} />
+											<StyledInput
+												field={field}
+												width={isMobile && isLandscape ? 'w-full' : undefined}
+											/>
 										</FormControl>
 										<div className="absolute left-0 top-full mt-0.5">
 											<FormMessage className="m-0 leading-4" />
@@ -107,7 +131,10 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 											Website Link
 										</FormLabel>
 										<FormControl>
-											<StyledInput field={field} />
+											<StyledInput
+												field={field}
+												width={isMobile && isLandscape ? 'w-full' : undefined}
+											/>
 										</FormControl>
 										<FormMessage />
 									</FormItem>
@@ -129,7 +156,11 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 												<div className="flex-1 relative">
 													<StyledInput
 														field={field}
-														width="w-full md:w-[510.01px]"
+														width={
+															isMobile && isLandscape
+																? 'w-full'
+																: 'w-full md:w-[510.01px]'
+														}
 														paddingRight="32px"
 														disabled={isCodeVerified}
 													/>
@@ -165,13 +196,29 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 						</div>
 					</div>
 
-					{/* Verify button - desktop only */}
-					<div className="-mt-[24px] hidden md:block">
+					{/* Save and continue button - desktop and mobile landscape (in-flow) */}
+					<div
+						className={cn(
+							// Hide on mobile portrait where sticky portal is used
+							isMobile && !isLandscape ? 'hidden' : '',
+							// Match ExistingProfilesSection pull in mobile landscape
+							isMobile && isLandscape ? '-mt-[36px]' : '-mt-[24px]',
+							// Always show on desktop
+							'md:block'
+						)}
+						style={{
+							marginBottom: isMobile && isLandscape ? 0 : undefined,
+						}}
+					>
 						<Button
 							disabled={!isCodeVerified}
 							isLoading={isPendingSubmit}
 							type="submit"
-							className="relative -top-[10px] z-10 w-full h-[43.05px] rounded-[8.83px] border-[2px] text-white font-bold text-[18.77px] transition-colors hover:!bg-[#4C9E5C] active:!bg-[#428A51] active:translate-y-[1px] disabled:!opacity-100"
+							className={cn(
+								'z-10 w-full h-[43.05px] rounded-[8.83px] border-[2px] text-white font-bold text-[18.77px] transition-colors hover:!bg-[#4C9E5C] active:!bg-[#428A51] active:translate-y-[1px] disabled:!opacity-100',
+								// Nudge slightly lower in mobile landscape
+								isMobile && isLandscape ? 'relative -top-[3px]' : 'relative -top-[2px]'
+							)}
 							style={{
 								backgroundColor: '#5DAB68',
 								borderColor: '#050505',
@@ -185,11 +232,11 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 						</Button>
 					</div>
 
-					{/* Spacer to prevent overlap with mobile sticky CTA */}
-					<div className="md:hidden h-[64px]" />
+					{/* Spacer to prevent overlap with mobile sticky CTA (portrait only) */}
+					{isMobile && !isLandscape ? <div className="md:hidden h-[64px]" /> : null}
 
-					{/* Mobile sticky Save button via portal (matches dashboard style) */}
-					{isMobile && typeof window !== 'undefined'
+					{/* Mobile sticky Save button via portal (portrait only) */}
+					{isMobile && !isLandscape && typeof window !== 'undefined'
 						? createPortal(
 								<div
 									className="mobile-sticky-cta"

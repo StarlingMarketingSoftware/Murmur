@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -29,6 +29,30 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 	selectedIdentity,
 }) => {
 	const isMobile = useIsMobile();
+	const [isLandscape, setIsLandscape] = useState(false);
+
+	useEffect(() => {
+		const updateOrientation = () => {
+			if (typeof window === 'undefined') return;
+			setIsLandscape(window.innerWidth > window.innerHeight);
+		};
+		updateOrientation();
+		window.addEventListener('resize', updateOrientation);
+		window.addEventListener('orientationchange', updateOrientation);
+		return () => {
+			window.removeEventListener('resize', updateOrientation);
+			window.removeEventListener('orientationchange', updateOrientation);
+		};
+	}, []);
+
+	// 353px at an 852px landscape viewport => ~41.43vw
+	const landscapeSectionWidth = '41.43vw';
+	// Only reserve space in portrait (sticky CTA). In landscape/mobile, make it zero.
+	const contentPaddingClass = isMobile
+		? isLandscape
+			? 'pb-0'
+			: 'pb-[64px]'
+		: 'pb-0 md:pb-[24px]';
 	return (
 		<div className={cn(showCreatePanel ? 'opacity-26' : 'opacity-100')}>
 			<Form {...form}>
@@ -42,14 +66,19 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 									'box-border shrink-0 w-[652px] h-[326px] rounded-[8px] border-[2px] border-[#000000] bg-[#EAF1FF]',
 									showCreatePanel ? 'cursor-pointer' : 'cursor-default'
 								)}
-								style={{ width: 'min(652px, 96vw)' }}
+								style={{
+									width:
+										isMobile && isLandscape
+											? `min(652px, ${landscapeSectionWidth})`
+											: 'min(652px, 96vw)',
+								}}
 								onClick={() => {
 									if (showCreatePanel) setShowCreatePanel(false);
 								}}
 							>
 								<CustomScrollbar
 									className="w-full h-full"
-									contentClassName="scrollbar-hide pb-[64px] md:pb-[24px]"
+									contentClassName={cn('scrollbar-hide', contentPaddingClass)}
 									disableOverflowClass
 									thumbWidth={2}
 									thumbColor="#000000"
@@ -78,6 +107,15 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 																		? 'bg-[#A6CFB0] hover:bg-[#94BF9E]'
 																		: 'bg-white hover:bg-[#F5F5F5]'
 																)}
+																style={
+																	isMobile && isLandscape
+																		? {
+																				width: 'min(636px, 40.35vw)',
+																				minWidth: 'min(636px, 40.35vw)',
+																				maxWidth: 'min(636px, 40.35vw)',
+																		  }
+																		: undefined
+																}
 															>
 																<div
 																	className="font-primary text-black pl-1"
@@ -121,13 +159,19 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 			{!showCreatePanel && (
 				<>
 					{/* Desktop button (unchanged) */}
-					<div className="-mt-[36px] hidden md:block">
+					<div
+						className="-mt-[36px] hidden md:block"
+						style={{ marginBottom: isMobile && isLandscape ? 4 : undefined }}
+					>
 						<Button
 							onClick={handleAssignIdentity}
 							isLoading={isPendingAssignIdentity}
-							className="relative -top-[16px] z-10 w-[652.4px] h-[43.05px] rounded-[8.83px] border-[2px] text-white font-bold text-[18.77px] transition-colors hover:!bg-[#4C9E5C] active:!bg-[#428A51]"
+							className="relative -top-[16px] z-10 w-[652px] h-[43.05px] rounded-[8.83px] border-[2px] text-white font-bold text-[18.77px] transition-colors hover:!bg-[#4C9E5C] active:!bg-[#428A51]"
 							style={{
-								width: 'min(652.4px, 96vw)',
+								width:
+									isMobile && isLandscape
+										? `min(652px, ${landscapeSectionWidth})`
+										: 'min(652px, 96vw)',
 								backgroundColor: '#5DAB68',
 								borderColor: '#050505',
 								color: '#FFFFFF',
@@ -141,8 +185,8 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 						</Button>
 					</div>
 
-					{/* Mobile sticky button (portal to body to pin to true bottom) */}
-					{isMobile && typeof window !== 'undefined'
+					{/* Mobile sticky button (portal) — disabled in landscape */}
+					{isMobile && !isLandscape && typeof window !== 'undefined'
 						? createPortal(
 								<div
 									className="mobile-sticky-cta"
