@@ -6733,13 +6733,35 @@ body.murmur-mobile .search-input-icon-btn {
 		> div:not(:first-child)::before {
 		content: '';
 		position: absolute;
-		left: -4px; /* center within 8px column gap */
+		left: -4.5px; /* center within 8px column gap, adjusted for pixel alignment */
 		top: 50%;
-		transform: translateY(-50%);
+		transform: translateY(-50%) translateZ(0); /* force GPU rendering */
 		width: 1px;
 		height: 17px;
 		background-color: #000000;
 		pointer-events: none;
 		z-index: 1;
+		/* Prevent sub-pixel rendering issues */
+		will-change: transform;
+		backface-visibility: hidden;
+		-webkit-backface-visibility: hidden;
+		/* Force crisp edges */
+		image-rendering: -webkit-optimize-contrast;
+		image-rendering: crisp-edges;
+		/* Ensure pixel-perfect rendering */
+		transform-origin: center center;
+	}
+
+	/* Additional fixes for specific breakpoints where dividers appear thick */
+	@media (min-width: 840px) and (max-width: 850px),
+		(min-width: 880px) and (max-width: 890px) {
+		.mobile-landscape-mode
+			.my-campaigns-table
+			.metrics-grid-container
+			> div:not(:first-child)::before {
+			/* Force exact pixel alignment at problematic breakpoints */
+			left: -4px;
+			transform: translateY(-8.5px) translateZ(0); /* exact pixel position */
+		}
 	}
 }
