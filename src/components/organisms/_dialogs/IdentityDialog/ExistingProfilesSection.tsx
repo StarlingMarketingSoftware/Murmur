@@ -30,11 +30,13 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 }) => {
 	const isMobile = useIsMobile();
 	const [isLandscape, setIsLandscape] = useState(false);
+	const [viewportHeight, setViewportHeight] = useState<number | null>(null);
 
 	useEffect(() => {
 		const updateOrientation = () => {
 			if (typeof window === 'undefined') return;
 			setIsLandscape(window.innerWidth > window.innerHeight);
+			setViewportHeight(window.innerHeight);
 		};
 		updateOrientation();
 		window.addEventListener('resize', updateOrientation);
@@ -47,12 +49,35 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 
 	// 353px at an 852px landscape viewport => ~41.43vw
 	const landscapeSectionWidth = '41.43vw';
+	// Detect short landscape heights to compress layout further
+	const isShortLandscape = isMobile && isLandscape && (viewportHeight ?? Infinity) <= 420;
+	const isVeryShortLandscape =
+		isMobile && isLandscape && (viewportHeight ?? Infinity) <= 360;
 	// Only reserve space in portrait (sticky CTA). In landscape/mobile, make it zero.
 	const contentPaddingClass = isMobile
 		? isLandscape
 			? 'pb-0'
 			: 'pb-[64px]'
 		: 'pb-0 md:pb-[24px]';
+
+	// Row spacing and size adjustments when height is tight in landscape
+	const rowSpacingClass = isVeryShortLandscape
+		? 'border-spacing-y-[4px]'
+		: isShortLandscape
+		? 'border-spacing-y-[6px]'
+		: 'border-spacing-y-[10px]';
+
+	const rowHeightClass = isVeryShortLandscape
+		? 'h-[72px] min-h-[72px] max-h-[72px]'
+		: isShortLandscape
+		? 'h-[80px] min-h-[80px] max-h-[80px]'
+		: 'h-[91px] min-h-[91px] max-h-[91px]';
+
+	// Panel height compresses with viewport height in landscape
+	const panelHeightStyle =
+		isMobile && isLandscape
+			? { height: isVeryShortLandscape ? 'min(326px, 52vh)' : 'min(326px, 60vh)' }
+			: undefined;
 	return (
 		<div className={cn(showCreatePanel ? 'opacity-26' : 'opacity-100')}>
 			<Form {...form}>
@@ -71,6 +96,7 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 										isMobile && isLandscape
 											? `min(652px, ${landscapeSectionWidth})`
 											: 'min(652px, 96vw)',
+									...panelHeightStyle,
 								}}
 								onClick={() => {
 									if (showCreatePanel) setShowCreatePanel(false);
@@ -85,7 +111,12 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 									trackColor="transparent"
 									offsetRight={-5}
 								>
-									<Table className="w-full !rounded-none !border-separate border-spacing-y-[10px] border-spacing-x-0">
+									<Table
+										className={cn(
+											'w-full !rounded-none !border-separate border-spacing-x-0',
+											rowSpacingClass
+										)}
+									>
 										<TableBody>
 											{identities.map((identity) => {
 												const isSelected = field.value === identity.id.toString();
@@ -102,7 +133,8 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 														<TableCell className="p-0">
 															<div
 																className={cn(
-																	'box-border mx-auto w-[calc(100%-16px)] min-w-[calc(100%-16px)] max-w-[calc(100%-16px)] md:w-[636px] md:min-w-[636px] md:max-w-[636px] h-[91px] min-h-[91px] max-h-[91px] shrink-0 rounded-[8px] border-[2px] border-[#000000] flex flex-col justify-center gap-0 px-4 transition-colors cursor-pointer',
+																	'box-border mx-auto w-[calc(100%-16px)] min-w-[calc(100%-16px)] max-w-[calc(100%-16px)] md:w-[636px] md:min-w-[636px] md:max-w-[636px] shrink-0 rounded-[8px] border-[2px] border-[#000000] flex flex-col justify-center gap-0 px-4 transition-colors cursor-pointer',
+																	rowHeightClass,
 																	isSelected
 																		? 'bg-[#A6CFB0] hover:bg-[#94BF9E]'
 																		: 'bg-white hover:bg-[#F5F5F5]'
@@ -160,23 +192,37 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 				<>
 					{/* Desktop button (unchanged) */}
 					<div
-						className="-mt-[36px] hidden md:block"
-						style={{ marginBottom: isMobile && isLandscape ? 4 : undefined }}
+						className={cn(
+							'-mt-[36px]',
+							isMobile && isLandscape ? 'block' : 'hidden md:block'
+						)}
+						style={{
+							marginBottom: isVeryShortLandscape
+								? 2
+								: isMobile && isLandscape
+								? 4
+								: undefined,
+						}}
 					>
 						<Button
 							onClick={handleAssignIdentity}
 							isLoading={isPendingAssignIdentity}
-							className="relative -top-[16px] z-10 w-[652px] h-[43.05px] rounded-[8.83px] border-[2px] text-white font-bold text-[18.77px] transition-colors hover:!bg-[#4C9E5C] active:!bg-[#428A51]"
+							className="relative -top-[16px] z-10 w-[652px] rounded-[8.83px] border-[2px] text-white font-bold transition-colors hover:!bg-[#4C9E5C] active:!bg-[#428A51]"
 							style={{
 								width:
 									isMobile && isLandscape
 										? `min(652px, ${landscapeSectionWidth})`
 										: 'min(652px, 96vw)',
+								height: isVeryShortLandscape ? 39 : isShortLandscape ? 41 : 43.05,
 								backgroundColor: '#5DAB68',
 								borderColor: '#050505',
 								color: '#FFFFFF',
 								fontWeight: 700,
-								fontSize: '18.77px',
+								fontSize: isVeryShortLandscape
+									? '16.5px'
+									: isShortLandscape
+									? '17.6px'
+									: '18.77px',
 								fontFamily: 'Times New Roman, Times, serif',
 							}}
 							disabled={!selectedIdentity}
