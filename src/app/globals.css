@@ -6631,6 +6631,61 @@ body.murmur-mobile .search-input-icon-btn {
 	max-width: var(--metric-width-long) !important;
 }
 
+/* Force two-line header labels for Updated/Created in mobile landscape */
+.mobile-landscape-mode .metrics-header-grid .metrics-header-label[data-label='updated'],
+.mobile-landscape-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
+	white-space: normal !important; /* allow wrapping */
+	word-break: normal !important; /* wrap on spaces */
+	text-align: left !important; /* align like portrait */
+	justify-content: flex-start !important;
+	align-items: flex-start !important;
+	line-height: 1.05 !important;
+}
+
+/* Show forced <br> in landscape for metrics header two-line labels */
+.mobile-landscape-mode .metrics-header-grid .metrics-two-line-label .metrics-force-br {
+	display: inline !important;
+}
+
+/* Remove synthetic space when <br> is visible in landscape */
+.mobile-landscape-mode
+	.metrics-header-grid
+	.metrics-two-line-label
+	.metrics-force-br
+	+ span::before {
+	content: none !important;
+}
+
+/* --- Mobile landscape alignment for campaigns metrics header and boxes --- */
+@media (orientation: landscape) {
+	/* Use the same fixed grid for header labels and metric boxes */
+	.mobile-portrait-mode .my-campaigns-table thead th:nth-child(2) .metrics-header-grid,
+	.mobile-portrait-mode .my-campaigns-table td:nth-child(2) .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: repeat(4, 50px) !important;
+		column-gap: 7px !important;
+		justify-content: start !important;
+		align-items: center !important;
+		margin-left: 0 !important; /* override earlier negative shift */
+		width: auto !important;
+	}
+
+	/* Ensure metric boxes' declared width includes the border so 50px matches labels */
+	.mobile-portrait-mode .my-campaigns-table .metric-box {
+		box-sizing: border-box !important;
+	}
+
+	/* Header labels: lock widths and center text over each 50px column */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label {
+		width: 50px !important;
+		min-width: 50px !important;
+		max-width: 50px !important;
+		justify-content: center !important;
+		padding-left: 0 !important;
+		margin-left: 0 !important;
+	}
+}
+
 /* Final spacing/layout fix for mobile landscape metrics
    - Reserve three fixed 50px columns on the right for metrics 2-4
    - Let the left-most metric expand leftward (auto column)
