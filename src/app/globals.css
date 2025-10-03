@@ -6614,7 +6614,8 @@ body.murmur-mobile .search-input-icon-btn {
 	flex: 0 0 auto !important;
 	display: flex !important;
 	align-items: center !important;
-	justify-content: center !important;
+	justify-content: flex-start !important;
+	text-align: left !important;
 }
 
 .mobile-landscape-mode .metrics-header-grid .metrics-header-label[data-label='drafts'],
@@ -6636,7 +6637,7 @@ body.murmur-mobile .search-input-icon-btn {
 .mobile-landscape-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
 	white-space: normal !important; /* allow wrapping */
 	word-break: normal !important; /* wrap on spaces */
-	text-align: left !important; /* align like portrait */
+	text-align: left !important; /* left align over metric boxes */
 	justify-content: flex-start !important;
 	align-items: flex-start !important;
 	line-height: 1.05 !important;
@@ -6680,7 +6681,8 @@ body.murmur-mobile .search-input-icon-btn {
 		width: 50px !important;
 		min-width: 50px !important;
 		max-width: 50px !important;
-		justify-content: center !important;
+		justify-content: flex-start !important;
+		text-align: left !important;
 		padding-left: 0 !important;
 		margin-left: 0 !important;
 	}
@@ -6714,6 +6716,8 @@ body.murmur-mobile .search-input-icon-btn {
 	.mobile-landscape-mode .metrics-header-grid {
 		margin-left: 0 !important;
 		/* match the body translate so labels align with boxes */
-		transform: translateX(-30px) !important;
+		transform: translateX(-45px) !important;
+		/* match body gap exactly */
+		column-gap: 8px !important;
 	}
 }
