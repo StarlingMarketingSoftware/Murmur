@@ -6595,6 +6595,35 @@ body.murmur-mobile .search-input-icon-btn {
 	display: none !important; /* rely on flex gap for spacing */
 }
 
+/* Render a single 1px 54% black divider below the header on mobile landscape */
+.mobile-landscape-mode .my-campaigns-table thead {
+	position: relative !important;
+	z-index: 2 !important;
+}
+.mobile-landscape-mode .my-campaigns-table thead::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 1px;
+	background: rgba(0, 0, 0, 0.54);
+	pointer-events: none;
+}
+
+/* Force white dividers for rows and header in mobile landscape */
+.mobile-landscape-mode .my-campaigns-table tbody tr {
+	/* Override Tailwind row borders (border, border-t, border-gray-200) */
+	border-color: #ffffff !important;
+	border-top-color: #ffffff !important;
+	border-bottom-color: #ffffff !important;
+}
+
+.mobile-landscape-mode .my-campaigns-table thead th {
+	/* Header bottom divider should also be white */
+	border-bottom-color: #ffffff !important;
+}
+
 /* Match header spacing/widths to body metrics in landscape */
 .mobile-landscape-mode .metrics-header-grid {
 	display: flex !important;
