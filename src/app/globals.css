@@ -6720,4 +6720,26 @@ body.murmur-mobile .search-input-icon-btn {
 		/* match body gap exactly */
 		column-gap: 8px !important;
 	}
+
+	/* Reinstate vertical dividers between metric boxes in mobile landscape
+	   without shifting layout. Lines are centered inside the 8px column gap. */
+	.mobile-landscape-mode .my-campaigns-table .metrics-grid-container > div {
+		position: relative !important;
+		overflow: visible !important;
+	}
+	.mobile-landscape-mode
+		.my-campaigns-table
+		.metrics-grid-container
+		> div:not(:first-child)::before {
+		content: '';
+		position: absolute;
+		left: -4px; /* center within 8px column gap */
+		top: 50%;
+		transform: translateY(-50%);
+		width: 1px;
+		height: 17px;
+		background-color: #000000;
+		pointer-events: none;
+		z-index: 1;
+	}
 }
