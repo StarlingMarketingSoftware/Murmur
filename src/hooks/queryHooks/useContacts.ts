@@ -285,7 +285,9 @@ export const useBatchUpdateContacts = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async (data: PostBulkUpdateContactData) => {
-			const response = await _fetch(urls.api.contacts.bulkUpdate.index, 'PATCH', data);
+			const response = await _fetch(urls.api.contacts.bulkUpdate.index, 'PATCH', data, {
+				timeout: 120000,
+			});
 			if (!response.ok) {
 				let errorMessage = 'Failed to update contacts';
 				try {

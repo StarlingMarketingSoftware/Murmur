@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { gsap } from 'gsap';
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { useDashboard } from './useDashboard';
@@ -11,14 +12,7 @@ import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import {
-	Form,
-	FormControl,
-	FormField,
-	FormItem,
-	FormLabel,
-	FormMessage,
-} from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import ConsoleLoader from '@/components/atoms/ConsoleLoader/ConsoleLoader';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,11 +20,14 @@ import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUp
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 import { useClerk } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { MobileAppComingSoon } from '@/components/molecules/MobileAppComingSoon/MobileAppComingSoon';
 
 const Dashboard = () => {
 	const { isSignedIn, openSignIn } = useClerk();
 	const isMobile = useIsMobile();
+	// Mobile-friendly sizing for hero logo and subtitle; desktop remains unchanged
+	const logoWidth = isMobile ? '190px' : '300px';
+	const logoHeight = isMobile ? '50px' : '79px';
+	const subtitleFontSize = isMobile ? '11px' : '15px';
 	const hasProblematicBrowser = isProblematicBrowser();
 	const searchContainerRef = useRef<HTMLDivElement>(null);
 	const {
@@ -58,6 +55,13 @@ const Dashboard = () => {
 		setHoveredContact,
 		hoveredContact,
 	} = useDashboard();
+
+	// Clear hover state on mobile to prevent stuck hover
+	useEffect(() => {
+		if (isMobile) {
+			setHoveredContact(null);
+		}
+	}, [isMobile, setHoveredContact]);
 
 	useEffect(() => {
 		// Small delay to ensure DOM is ready
@@ -135,14 +139,14 @@ const Dashboard = () => {
 		return null;
 	}
 
-	if (isMobile) {
-		return <MobileAppComingSoon />;
-	}
+	// Reduce extra white space above the fixed mobile action button by
+	// only adding bottom padding when needed and using a smaller value on mobile
+	const bottomPadding = isMobile && hasSearched ? 'pb-[64px]' : 'pb-0 md:pb-[100px]';
 
 	return (
 		<AppLayout>
 			<div
-				className={`relative min-h-screen transition-all duration-500 dashboard-main-offset pb-[100px] w-full max-w-full ${
+				className={`relative min-h-screen transition-all duration-500 dashboard-main-offset w-full max-w-full ${bottomPadding} ${
 					hasSearched ? 'search-active' : ''
 				}`}
 			>
@@ -150,19 +154,19 @@ const Dashboard = () => {
 					<div className="w-full">
 						<div
 							className="flex justify-center items-center w-full px-4"
-							style={{ marginBottom: '0.75rem' }}
+							style={{ marginBottom: '0.75rem', marginTop: isMobile ? '20px' : '0' }}
 						>
 							<div className="premium-hero-section flex flex-col items-center justify-center w-full max-w-[600px]">
 								<div
 									className="premium-logo-container flex items-center justify-center"
-									style={{ width: '300px', height: '79px' }}
+									style={{ width: logoWidth, height: logoHeight }}
 								>
-									<MurmurLogoNew width="300px" height="79px" />
+									<MurmurLogoNew width={logoWidth} height={logoHeight} />
 								</div>
 								<Typography
 									font="secondary"
 									className="mt-3 text-center premium-subtitle-gradient w-full"
-									style={{ fontSize: '15px', lineHeight: '1.3' }}
+									style={{ fontSize: subtitleFontSize, lineHeight: '1.3' }}
 									color="light"
 								>
 									Let&apos;s <strong style={{ color: '#248531' }}>start</strong> by
@@ -261,17 +265,57 @@ const Dashboard = () => {
 																			“Music Venues in North Carolina”
 																		</span>
 																	</div>
+																	{/* Mobile-only submit icon inside input */}
+																	<button
+																		type="submit"
+																		className="search-input-icon-btn"
+																		aria-label="Search"
+																	>
+																		<svg
+																			width="17"
+																			height="16"
+																			viewBox="0 0 17 16"
+																			fill="none"
+																			xmlns="http://www.w3.org/2000/svg"
+																			aria-hidden="true"
+																		>
+																			<path
+																				d="M9.82227 0.848633C12.8952 0.848855 15.2988 3.17275 15.2988 5.93457C15.2988 8.69637 12.8952 11.0203 9.82227 11.0205C6.74914 11.0205 4.34475 8.69651 4.34473 5.93457C4.34473 3.17261 6.74912 0.848633 9.82227 0.848633Z"
+																				stroke="#A0A0A0"
+																				strokeWidth="1.56483"
+																			/>
+																			<line
+																				x1="6.50289"
+																				y1="9.18905"
+																				x2="1.02598"
+																				y2="15.4484"
+																				stroke="#A0A0A0"
+																				strokeWidth="1.56483"
+																			/>
+																		</svg>
+																	</button>
 																</div>
 															</div>
 														</FormControl>
-														<FormMessage />
 													</FormItem>
 												)}
 											/>
 											{!hasSearched && (
 												<div className="flex flex-row gap-4 items-center justify-between w-full flex-wrap">
 													<div className="flex flex-row gap-4 items-center h-[39px] justify-start flex-shrink-0">
-														<div className="exclude-contacts-box bg-[#EFEFEF] w-[227px] h-[32px] rounded-[8px] flex items-center px-4 my-auto">
+														<div
+															className="exclude-contacts-box bg-[#EFEFEF] w-[227px] h-[32px] rounded-[8px] flex items-center px-4 my-auto"
+															style={
+																isMobile
+																	? ({
+																			width: '124px',
+																			height: '16px',
+																			padding: '0 6px',
+																			borderRadius: '6px',
+																	  } as React.CSSProperties)
+																	: undefined
+															}
+														>
 															<FormField
 																control={form.control}
 																name="excludeUsedContacts"
@@ -280,7 +324,22 @@ const Dashboard = () => {
 																		<div className="leading-none flex items-center">
 																			<FormLabel
 																				className="font-bold cursor-pointer select-none whitespace-nowrap"
-																				style={{ fontSize: '14px', lineHeight: '16px' }}
+																				style={
+																					isMobile
+																						? ({
+																								fontSize: '8px',
+																								lineHeight: '10px',
+																								fontFamily:
+																									'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																								fontWeight: 700,
+																								letterSpacing: '0',
+																								whiteSpace: 'nowrap',
+																						  } as React.CSSProperties)
+																						: ({
+																								fontSize: '14px',
+																								lineHeight: '16px',
+																						  } as React.CSSProperties)
+																				}
 																			>
 																				Exclude Used Contacts
 																			</FormLabel>
@@ -306,6 +365,14 @@ const Dashboard = () => {
 																								: '#E5E5E5',
 																							backgroundColor: 'var(--toggle-bg)',
 																							background: 'var(--toggle-bg)',
+																							...(isMobile
+																								? ({
+																										width: '13px',
+																										minWidth: '13px',
+																										height: '8px',
+																										borderRadius: '9999px',
+																								  } as React.CSSProperties)
+																								: {}),
 																						} as React.CSSProperties
 																					}
 																					data-checked={field.value}
@@ -315,11 +382,30 @@ const Dashboard = () => {
 																					})}
 																				>
 																					<div
-																						className={`absolute top-1/2 -translate-y-1/2 transform transition-transform duration-200 ease-in-out ${
-																							field.value
-																								? 'translate-x-[10px] bg-white'
-																								: 'translate-x-0 bg-[#050505]'
-																						} left-[2px] w-[12px] h-[12px] rounded-full shadow-none drop-shadow-none`}
+																						className={`absolute transform transition-transform duration-200 ease-in-out ${
+																							field.value ? 'bg-white' : 'bg-[#050505]'
+																						} rounded-full shadow-none drop-shadow-none`}
+																						style={
+																							isMobile
+																								? ({
+																										width: '6px',
+																										height: '6px',
+																										left: '2px',
+																										top: '50%',
+																										transform: `translateX(${
+																											field.value ? 3 : 0
+																										}px) translateY(-50%)`,
+																								  } as React.CSSProperties)
+																								: ({
+																										top: '50%',
+																										left: '2px',
+																										width: '12px',
+																										height: '12px',
+																										transform: `translateX(${
+																											field.value ? 10 : 0
+																										}px) translateY(-50%)`,
+																								  } as React.CSSProperties)
+																						}
 																					/>
 																				</div>
 																			</label>
@@ -329,43 +415,45 @@ const Dashboard = () => {
 															/>
 														</div>
 													</div>
-													<div className="flex items-center justify-end flex-shrink-0 ml-auto">
-														{isFreeTrial ? (
-															<UpgradeSubscriptionDrawer
-																message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
-																triggerButtonText="Import"
-																buttonVariant="light"
-																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-															/>
-														) : (
-															<ContactTSVUploadDialog
-																isAdmin={false}
-																triggerText="Import"
-																buttonVariant="light"
-																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-																fullScreen
-															/>
-														)}
-														<div className="w-[19px]"></div>
-														{!canSearch ? (
-															<UpgradeSubscriptionDrawer
-																message="Searching for contacts requires an active subscription or free trial. Please upgrade your plan to proceed."
-																triggerButtonText="Generate"
-																buttonVariant="primary-light"
-																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
-															/>
-														) : (
-															<Button
-																variant="primary-light"
-																type="submit"
-																bold
-																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
-																isLoading={isLoadingContacts || isRefetchingContacts}
-															>
-																Generate
-															</Button>
-														)}
-													</div>
+													{!isMobile && (
+														<div className="flex items-center justify-end flex-shrink-0 ml-auto">
+															{isFreeTrial ? (
+																<UpgradeSubscriptionDrawer
+																	message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
+																	triggerButtonText="Import"
+																	buttonVariant="light"
+																	className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
+																/>
+															) : (
+																<ContactTSVUploadDialog
+																	isAdmin={false}
+																	triggerText="Import"
+																	buttonVariant="light"
+																	className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
+																	fullScreen
+																/>
+															)}
+															<div className="w-[19px]"></div>
+															{!canSearch ? (
+																<UpgradeSubscriptionDrawer
+																	message="Searching for contacts requires an active subscription or free trial. Please upgrade your plan to proceed."
+																	triggerButtonText="Generate"
+																	buttonVariant="primary-light"
+																	className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
+																/>
+															) : (
+																<Button
+																	variant="primary-light"
+																	type="submit"
+																	bold
+																	className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
+																	isLoading={isLoadingContacts || isRefetchingContacts}
+																>
+																	Generate
+																</Button>
+															)}
+														</div>
+													)}
 												</div>
 											)}
 										</form>
@@ -505,7 +593,6 @@ const Dashboard = () => {
 														</div>
 													</div>
 												</FormControl>
-												<FormMessage />
 											</FormItem>
 										)}
 									/>
@@ -521,7 +608,7 @@ const Dashboard = () => {
 								</div>
 							</Form>
 						</div>
-						{hoveredContact && (
+						{hoveredContact && !isMobile && (
 							<div className="absolute inset-0 z-[90] flex items-start justify-center pointer-events-none bg-white">
 								<div className="w-full max-w-[1132px] mx-auto px-4 py-3 text-center">
 									<div className="font-secondary font-bold text-[19px] leading-tight truncate">
@@ -603,7 +690,7 @@ const Dashboard = () => {
 								<ConsoleLoader searchQuery={activeSearchQuery} />
 							</div>
 						) : contacts && contacts.length > 0 ? (
-							<div className="flex justify-center w-full px-4">
+							<div className="flex justify-center w-full px-0 sm:px-4">
 								<div className="w-full max-w-full results-appear results-align">
 									<Card className="border-0 shadow-none !p-0 w-full">
 										<CardContent className="!p-0 w-full">
@@ -620,72 +707,112 @@ const Dashboard = () => {
 												constrainHeight
 												useCustomScrollbar
 												scrollbarOffsetRight={-5}
-												containerClassName="search-results-table w-[1209px] h-[499px] rounded-[8px] border-[#737373]"
+												containerClassName="search-results-table h-[499px] rounded-[8px] border-[#737373] md:w-[1209px]"
 												tableClassName="w-full"
 												headerClassName="[&_tr]:border-[#737373]"
 												theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
 												rowClassName="border-[#737373] row-hover-scroll"
 												hidePagination
-												onRowHover={(row) => setHoveredContact(row)}
+												onRowHover={
+													isMobile ? undefined : (row) => setHoveredContact(row)
+												}
 												headerAction={
-													<button
-														onClick={handleSelectAll}
-														className="text-[14px] font-secondary font-normal text-black hover:underline"
-														type="button"
-													>
-														{isAllSelected ? 'Deselect All' : 'Select all'}
-													</button>
+													!isMobile ? (
+														<button
+															onClick={handleSelectAll}
+															className="text-[14px] font-secondary font-normal text-black hover:underline"
+															type="button"
+														>
+															{isAllSelected ? 'Deselect All' : 'Select all'}
+														</button>
+													) : null
 												}
 												headerInlineAction={
-													<button
-														type="button"
-														onClick={handleCreateCampaign}
-														disabled={selectedContacts.length === 0}
-														className="font-secondary"
-														style={{
-															width: 'auto',
-															height: '28px',
-															background:
-																selectedContacts.length === 0
-																	? 'rgba(93, 171, 104, 0.1)'
-																	: 'rgba(93, 171, 104, 0.22)',
-															border: '2px solid #000000',
-															color:
-																selectedContacts.length === 0
-																	? 'rgba(0, 0, 0, 0.4)'
-																	: '#000000',
-															fontSize: '13px',
-															fontWeight: 500,
-															borderRadius: '8px',
-															lineHeight: 'normal',
-															display: 'flex',
-															alignItems: 'center',
-															justifyContent: 'center',
-															padding: '0 12px',
-															textAlign: 'center',
-															cursor:
-																selectedContacts.length === 0 ? 'default' : 'pointer',
-															opacity: selectedContacts.length === 0 ? 0.6 : 1,
-														}}
-													>
-														Create Campaign
-													</button>
+													isMobile ? (
+														<button
+															onClick={handleSelectAll}
+															className="text-[14px] font-secondary font-normal text-black hover:underline"
+															type="button"
+														>
+															{isAllSelected ? 'Deselect All' : 'Select all'}
+														</button>
+													) : (
+														<button
+															type="button"
+															onClick={handleCreateCampaign}
+															disabled={selectedContacts.length === 0}
+															className="font-secondary"
+															style={{
+																width: 'auto',
+																height: '28px',
+																background:
+																	selectedContacts.length === 0
+																		? 'rgba(93, 171, 104, 0.1)'
+																		: 'rgba(93, 171, 104, 0.22)',
+																border: '2px solid #000000',
+																color:
+																	selectedContacts.length === 0
+																		? 'rgba(0, 0, 0, 0.4)'
+																		: '#000000',
+																fontSize: '13px',
+																fontWeight: 500,
+																borderRadius: '8px',
+																lineHeight: 'normal',
+																display: 'flex',
+																alignItems: 'center',
+																justifyContent: 'center',
+																padding: '0 12px',
+																textAlign: 'center',
+																cursor:
+																	selectedContacts.length === 0 ? 'default' : 'pointer',
+																opacity: selectedContacts.length === 0 ? 0.6 : 1,
+															}}
+														>
+															Create Campaign
+														</button>
+													)
 												}
 											/>
 										</CardContent>
 									</Card>
-									<div className="flex items-center w-full">
-										<Button
-											onClick={handleCreateCampaign}
-											isLoading={isPendingCreateCampaign || isPendingBatchUpdateContacts}
-											variant="primary-light"
-											bold
-											className="w-full max-w-full h-[39px] mx-auto mt-5"
-											disabled={selectedContacts.length === 0}
-										>
-											Create Campaign
-										</Button>
-									</div>
+									{/* Desktop button (non-sticky) */}
+									{!isMobile && (
+										<div className="flex items-center w-full">
+											<Button
+												onClick={handleCreateCampaign}
+												isLoading={
+													isPendingCreateCampaign || isPendingBatchUpdateContacts
+												}
+												variant="primary-light"
+												bold
+												className="w-full max-w-full h-[39px] mx-auto mt-5"
+												disabled={selectedContacts.length === 0}
+											>
+												Create Campaign
+											</Button>
+										</div>
+									)}
+
+									{/* Mobile sticky button at bottom */}
+									{isMobile &&
+										typeof window !== 'undefined' &&
+										createPortal(
+											<div className="mobile-sticky-cta">
+												<Button
+													onClick={handleCreateCampaign}
+													isLoading={
+														isPendingCreateCampaign || isPendingBatchUpdateContacts
+													}
+													variant="primary-light"
+													bold
+													className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#050505] transition-colors !opacity-100 disabled:!opacity-100"
+													disabled={selectedContacts.length === 0}
+												>
+													Create Campaign
+												</Button>
+											</div>,
+											document.body
+										)}
 								</div>
 							</div>
 						) : hasSearched &&
@@ -711,8 +838,7 @@ const Dashboard = () => {
 				)}
 
 				{!hasSearched && (
-					<div className="campaigns-table-wrapper">
-						<div className="absolute top-0 left-0 right-0 h-8 z-[5] pointer-events-none bg-gradient-to-b from-white to-transparent" />
+					<div className="campaigns-table-wrapper w-full max-w-[960px] mx-auto px-4">
 						<CampaignsTable />
 					</div>
 				)}

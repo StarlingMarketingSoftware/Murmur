@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 export function GlobalScrollbar() {
 	const scrollThumbRef = useRef<HTMLDivElement>(null);
@@ -15,6 +16,8 @@ export function GlobalScrollbar() {
 		undefined
 	);
 	const rafRef = useRef<number | undefined>(undefined);
+	const isMobile = useIsMobile();
+	const [isMobilePortrait, setIsMobilePortrait] = useState<boolean | null>(null);
 
 	const updateScrollbar = useCallback(() => {
 		const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
@@ -68,6 +71,29 @@ export function GlobalScrollbar() {
 			}, 1000);
 		});
 	}, [updateScrollbar]);
+
+	// Check if we're in mobile portrait mode
+	useEffect(() => {
+		const checkOrientation = () => {
+			if (typeof window !== 'undefined') {
+				const isPortrait = window.innerHeight > window.innerWidth;
+				const isMobileDevice = isMobile === true;
+				setIsMobilePortrait(isMobileDevice && isPortrait);
+			}
+		};
+
+		// Check on mount
+		checkOrientation();
+
+		// Check on resize and orientation change
+		window.addEventListener('resize', checkOrientation);
+		window.addEventListener('orientationchange', checkOrientation);
+
+		return () => {
+			window.removeEventListener('resize', checkOrientation);
+			window.removeEventListener('orientationchange', checkOrientation);
+		};
+	}, [isMobile]);
 
 	// Detect when any app dialog is open (e.g. IdentityDialog) and hide the global scrollbar
 	useEffect(() => {
@@ -194,8 +220,8 @@ export function GlobalScrollbar() {
 		updateScrollbar();
 	}, [updateScrollbar]);
 
-	// Do not render the global scrollbar while a dialog is open
-	if (isDialogOpen) {
+	// Do not render the global scrollbar while a dialog is open or on mobile portrait view
+	if (isDialogOpen || isMobilePortrait) {
 		return null;
 	}
 

@@ -17,6 +17,7 @@ import { MiniEmailStructure } from './MiniEmailStructure';
 import { SentEmails } from './SentEmails/SentEmails';
 import DraftPreviewBox from './DraftPreviewBox';
 import DraggableBox from './DraggableBox';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	const {
@@ -53,6 +54,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 	// Live preview props passed from parent
 	const { isLivePreviewVisible, livePreviewContactId, livePreviewMessage } = props;
+
+	const isMobile = useIsMobile();
 
 	// Sending preview: shows the email currently being sent
 	const [sendingPreview, setSendingPreview] = useState<{
@@ -536,13 +539,15 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 			</div>
 
 			<div>
-				<div className="flex flex-col gap-4 mt-4">
-					{getAutosaveStatusDisplay() && (
-						<div className="flex flex-col sm:flex-row gap-4 items-center justify-end">
-							{getAutosaveStatusDisplay()}
-						</div>
-					)}
-				</div>
+				{!isMobile && (
+					<div className="flex flex-col gap-4 mt-4">
+						{getAutosaveStatusDisplay() && (
+							<div className="flex flex-col sm:flex-row gap-4 items-center justify-end">
+								{getAutosaveStatusDisplay()}
+							</div>
+						)}
+					</div>
+				)}
 			</div>
 			<ViewEditEmailDialog
 				email={selectedDraft}

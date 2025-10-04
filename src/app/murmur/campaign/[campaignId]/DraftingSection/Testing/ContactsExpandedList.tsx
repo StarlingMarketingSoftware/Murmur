@@ -87,7 +87,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 	return (
 		<div
-			className="w-[376px] h-[424px] rounded-md border-2 border-black/30 bg-[#F5DADA] px-2 pb-2 flex flex-col"
+			className="w-[376px] max-[480px]:w-[96.27vw] h-[424px] rounded-md border-2 border-black/30 bg-[#F5DADA] px-2 pb-2 flex flex-col"
 			role="region"
 			aria-label="Expanded contacts preview"
 		>
@@ -157,7 +157,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				thumbWidth={2}
 				thumbColor="#000000"
 				trackColor="transparent"
-				offsetRight={-5}
+				offsetRight={-14}
 				contentClassName="overflow-x-hidden"
 				alwaysShow
 			>
@@ -172,7 +172,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							<div
 								key={contact.id}
 								className={cn(
-									'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full max-w-[356px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none',
+									'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full max-w-[356px] max-[480px]:max-w-none h-[49px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none',
 									isSelected && 'bg-[#EAAEAE]'
 								)}
 								onMouseDown={(e) => {
@@ -478,28 +478,30 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					{Array.from({ length: Math.max(0, 7 - contacts.length) }).map((_, idx) => (
 						<div
 							key={`placeholder-${idx}`}
-							className="select-none w-full max-w-[356px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
+							className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[49px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
 						/>
 					))}
 				</div>
 			</CustomScrollbar>
 
 			{/* Footer bar */}
-			<button
-				type="button"
-				onClick={() => {
-					if (computedIsDraftDisabled) return;
-					if (onDraftSelected) onDraftSelected(Array.from(selectedContactIds));
-				}}
-				disabled={computedIsDraftDisabled}
-				className={cn(
-					'w-full max-w-[356px] h-[26px] rounded-[6px] bg-[#B5E2B5] border border-black flex items-center justify-center text-[12px] font-medium',
-					computedIsDraftDisabled && 'opacity-50 cursor-not-allowed'
-				)}
-				aria-disabled={computedIsDraftDisabled}
-			>
-				{isPendingGeneration ? 'Drafting...' : 'Draft'}
-			</button>
+			<div className="flex justify-center w-full">
+				<button
+					type="button"
+					onClick={() => {
+						if (computedIsDraftDisabled) return;
+						if (onDraftSelected) onDraftSelected(Array.from(selectedContactIds));
+					}}
+					disabled={computedIsDraftDisabled}
+					className={cn(
+						'w-full max-w-[356px] max-[480px]:max-w-none h-[26px] rounded-[6px] bg-[#B5E2B5] border border-black flex items-center justify-center text-[12px] font-medium',
+						computedIsDraftDisabled && 'opacity-50 cursor-not-allowed'
+					)}
+					aria-disabled={computedIsDraftDisabled}
+				>
+					{isPendingGeneration ? 'Drafting...' : 'Draft'}
+				</button>
+			</div>
 		</div>
 	);
 };

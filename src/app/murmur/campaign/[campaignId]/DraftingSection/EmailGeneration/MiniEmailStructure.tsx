@@ -26,6 +26,12 @@ interface MiniEmailStructureProps {
 	generationProgress?: number;
 	generationTotal?: number;
 	onCancel?: () => void;
+	/** When true, hides the floating top number/label chrome */
+	hideTopChrome?: boolean;
+	/** When true, hides the footer Draft/progress controls */
+	hideFooter?: boolean;
+	/** When true, use 100% width so parent can control width on mobile */
+	fullWidthMobile?: boolean;
 }
 
 export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
@@ -36,6 +42,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	generationProgress,
 	generationTotal,
 	onCancel,
+	hideTopChrome,
+	hideFooter,
+	fullWidthMobile,
 }) => {
 	const watchedHybridBlocks = form.watch('hybridBlockPrompts');
 	const hybridBlocks = useMemo(() => watchedHybridBlocks || [], [watchedHybridBlocks]);
@@ -419,34 +428,43 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		<div
 			ref={rootRef}
 			style={{
-				width: '376px',
+				width: fullWidthMobile ? '100%' : '376px',
 				height: '474px',
 				position: 'relative',
 				overflow: 'visible',
 			}}
 		>
 			{/* Centered number above block */}
-			<div
-				data-drafting-top-number
-				style={{
-					position: 'absolute',
-					top: '-26px',
-					left: '50%',
-					transform: 'translateX(-50%)',
-					pointerEvents: 'none',
-				}}
-				className="text-[12px] font-inter font-medium text-black"
-			>
-				2
-			</div>
+			{!hideTopChrome && (
+				<div
+					data-drafting-top-number
+					style={{
+						position: 'absolute',
+						top: '-26px',
+						left: '50%',
+						transform: 'translateX(-50%)',
+						pointerEvents: 'none',
+					}}
+					className="text-[12px] font-inter font-medium text-black"
+				>
+					2
+				</div>
+			)}
 			{/* Top-left text label */}
-			<div
-				data-drafting-top-label
-				style={{ position: 'absolute', top: '-20px', left: '2px', pointerEvents: 'none' }}
-				className="text-[12px] font-inter font-medium text-black"
-			>
-				Email Structure
-			</div>
+			{!hideTopChrome && (
+				<div
+					data-drafting-top-label
+					style={{
+						position: 'absolute',
+						top: '-20px',
+						left: '2px',
+						pointerEvents: 'none',
+					}}
+					className="text-[12px] font-inter font-medium text-black"
+				>
+					Email Structure
+				</div>
+			)}
 			{/* Container with header to match table sizing */}
 			<div
 				style={{
@@ -532,7 +550,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						</div>
 
 						{/* Auto Subject */}
-						<div className="mb-3 w-[357px] mx-auto">
+						<div className="mb-3 w-[357px] max-[480px]:w-[89.33vw] mx-auto">
 							<div
 								className={cn(
 									'flex items-center h-[25px] rounded-[8px] border-2 border-black overflow-hidden',
@@ -705,7 +723,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									<Fragment key={b.id}>
 										<div
 											className={cn(
-												'rounded-[8px] border-2 bg-white px-2 py-1 relative w-[357px] mx-auto'
+												'rounded-[8px] border-2 bg-white px-2 py-1 relative w-[357px] max-[480px]:w-[89.33vw] mx-auto'
 											)}
 											style={{
 												borderColor:
@@ -753,7 +771,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													</div>
 													<div className="relative">
 														{!b.value && (
-															<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px]">
+															<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px] max-[480px]:text-[10px]">
 																<div className="space-y-2">
 																	<div>
 																		<p>Prompt Murmur here.</p>
@@ -897,7 +915,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					)}
 				>
 					<div
-						className="rounded-[8px] border-2 bg-white px-2 py-2 w-[357px] mx-auto"
+						className="rounded-[8px] border-2 bg-white px-2 py-2 w-[357px] max-[480px]:w-[89.33vw] mx-auto"
 						style={{ borderColor: '#969696' }}
 					>
 						<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
@@ -917,60 +935,62 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				</div>
 
 				{/* Footer with Draft button */}
-				<div className="px-0 pb-3">
-					<Button
-						type="button"
-						onClick={onDraft}
-						disabled={isDraftDisabled}
-						className={cn(
-							'w-[357px] !h-[28px] mx-auto !rounded-[4px] border border-black bg-[#68C575] text-black font-inter font-medium text-[14px] flex items-center justify-center'
-						)}
-					>
-						{isPendingGeneration ? 'Drafting...' : 'Draft'}
-					</Button>
-					{typeof generationProgress === 'number' &&
-						generationProgress >= 0 &&
-						(generationTotal || 0) > 0 && (
-							<div className="mt-2">
-								<div className="flex items-center gap-3">
-									<div className="text-xs font-inter text-gray-600 flex-none">
-										{generationProgress >= (generationTotal || 0)
-											? `Drafted ${Math.min(
-													generationProgress,
-													generationTotal || 0
-											  )}/${generationTotal}`
-											: `Drafting ${generationProgress}/${generationTotal}`}
+				{!hideFooter && (
+					<div className="px-0 pb-3">
+						<Button
+							type="button"
+							onClick={onDraft}
+							disabled={isDraftDisabled}
+							className={cn(
+								'w-[357px] !h-[28px] mx-auto !rounded-[4px] border border-black bg-[#68C575] text-black font-inter font-medium text-[14px] flex items-center justify-center'
+							)}
+						>
+							{isPendingGeneration ? 'Drafting...' : 'Draft'}
+						</Button>
+						{typeof generationProgress === 'number' &&
+							generationProgress >= 0 &&
+							(generationTotal || 0) > 0 && (
+								<div className="mt-2">
+									<div className="flex items-center gap-3">
+										<div className="text-xs font-inter text-gray-600 flex-none">
+											{generationProgress >= (generationTotal || 0)
+												? `Drafted ${Math.min(
+														generationProgress,
+														generationTotal || 0
+												  )}/${generationTotal}`
+												: `Drafting ${generationProgress}/${generationTotal}`}
+										</div>
+										<div className="flex-1 h-[7px] bg-[rgba(93,171,104,0.49)] border-0 relative">
+											<div
+												className="h-full bg-[#5DAB68] transition-all duration-300 ease-out absolute top-0 left-0"
+												style={{
+													width: `${Math.min(
+														generationTotal && generationTotal > 0
+															? (generationProgress / generationTotal) * 100
+															: 0,
+														100
+													)}%`,
+												}}
+											/>
+										</div>
+										{onCancel && (
+											<button
+												type="button"
+												onClick={onCancel}
+												className="ml-2 p-0 h-auto w-auto bg-transparent border-0 text-black hover:text-red-600 transition-colors cursor-pointer"
+												aria-label="Cancel drafting"
+											>
+												×
+											</button>
+										)}
 									</div>
-									<div className="flex-1 h-[7px] bg-[rgba(93,171,104,0.49)] border-0 relative">
-										<div
-											className="h-full bg-[#5DAB68] transition-all duration-300 ease-out absolute top-0 left-0"
-											style={{
-												width: `${Math.min(
-													generationTotal && generationTotal > 0
-														? (generationProgress / generationTotal) * 100
-														: 0,
-													100
-												)}%`,
-											}}
-										/>
-									</div>
-									{onCancel && (
-										<button
-											type="button"
-											onClick={onCancel}
-											className="ml-2 p-0 h-auto w-auto bg-transparent border-0 text-black hover:text-red-600 transition-colors cursor-pointer"
-											aria-label="Cancel drafting"
-										>
-											×
-										</button>
-									)}
 								</div>
-							</div>
-						)}
-				</div>
+							)}
+					</div>
+				)}
 			</div>
 			<div
-				className="absolute top-0 right-[-18px] z-50 flex flex-col"
+				className="absolute top-0 right-[-18px] max-[480px]:-right-[15px] z-50 flex flex-col"
 				style={{ pointerEvents: 'none' }}
 			>
 				{addTextButtons.map((btn, index) => {

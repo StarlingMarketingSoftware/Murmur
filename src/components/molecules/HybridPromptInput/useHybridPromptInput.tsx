@@ -66,6 +66,7 @@ export interface HybridPromptInputProps {
 	contact?: ContactWithName | null;
 	forceShowTestPreview?: boolean;
 	compactLeftOnly?: boolean;
+	onGoToDrafting?: () => void;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {
@@ -78,6 +79,7 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		isTest,
 		contact,
 		forceShowTestPreview,
+		onGoToDrafting,
 	} = props;
 
 	/* HOOKS */
@@ -403,11 +405,8 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 
 	/* EFFECTS */
 
-	useEffect(() => {
-		if (testMessage) {
-			setShowTestPreview(true);
-		}
-	}, [testMessage]);
+	// Do not auto-open the Test Preview when a prior testMessage exists.
+	// Users can explicitly open it via the Test button.
 
 	const handleAddTextBlockAt = (index: number) => {
 		const newTextId = `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -447,5 +446,6 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		isPendingGeneration,
 		isTest,
 		contact,
+		onGoToDrafting,
 	};
 };

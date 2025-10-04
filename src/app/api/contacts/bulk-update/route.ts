@@ -45,6 +45,25 @@ const bulkUpdateSchema = z.object({
 
 export type PostBulkUpdateContactData = z.infer<typeof bulkUpdateSchema>;
 
+// Fields that affect the embedding content in vector DB. Changes to these
+// should trigger re-embedding; other fields (e.g., manualDeselections) should not.
+const EMBEDDING_RELEVANT_FIELDS = new Set<keyof z.infer<typeof updateContactSchema>>([
+	'firstName',
+	'lastName',
+	'company',
+	'title',
+	'headline',
+	'city',
+	'state',
+	'country',
+	'address',
+	'website',
+	'metadata',
+	'email',
+	// Include company attributes used in embedding text
+	'emailValidationStatus', // not used directly in embedding text, but safe to include/exclude
+]);
+
 export async function PATCH(req: NextRequest) {
 	try {
 		const { userId } = await auth();
@@ -71,8 +90,13 @@ export async function PATCH(req: NextRequest) {
 					data: update.data,
 				});
 
-				// Update vector database if contact was successfully updated
-				await upsertContactToVectorDb(updatedContact);
+				// Only regenerate embedding if relevant fields changed
+				const shouldReembed = Object.keys(update.data).some((key) =>
+					EMBEDDING_RELEVANT_FIELDS.has(key as keyof z.infer<typeof updateContactSchema>)
+				);
+				if (shouldReembed) {
+					await upsertContactToVectorDb(updatedContact);
+				}
 				updatedContacts.push(updatedContact);
 			} catch (error) {
 				failedUpdates.push({
