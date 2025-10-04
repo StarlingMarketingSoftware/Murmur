@@ -676,6 +676,16 @@ const Murmur = () => {
 								padding-bottom: 0 !important;
 								gap: 8px !important;
 							}
+							/* Reduce space below the subject bar and above first block */
+							body.murmur-mobile
+								[data-hpi-left-panel]
+								[data-slot='form-item']:first-of-type {
+								margin-bottom: 2px !important;
+							}
+							body.murmur-mobile [data-hpi-content] {
+								padding-top: 2px !important;
+								gap: 6px !important;
+							}
 							/* Subject bar: minimal but legible */
 							body.murmur-mobile .subject-bar {
 								height: 24px !important;
@@ -692,7 +702,11 @@ const Murmur = () => {
 							}
 							/* Signature area: single-line compact */
 							body.murmur-mobile [data-hpi-footer] {
-								margin-top: 6px !important;
+								margin-top: 2px !important;
+							}
+							/* Reduce space between last block and signature */
+							body.murmur-mobile [data-hpi-content] [data-block-type]:last-of-type {
+								margin-bottom: 2px !important;
 							}
 							body.murmur-mobile [data-hpi-signature-card] {
 								min-height: 42px !important;
