@@ -1368,7 +1368,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														className={cn(
 															showTestPreview
 																? 'w-[426px] max-[480px]:w-[89.33vw]'
-																: 'w-[89.33vw] max-w-[868px]'
+																: 'w-[89.33vw] max-w-[868px]',
+															// On mobile portrait, remove default mb-6 to tighten spacing under subject
+															'max-[480px]:mb-0'
 														)}
 													>
 														<div
@@ -1489,7 +1491,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									</div>
 									<div className="flex-1 flex flex-col" data-hpi-content>
 										{/* Content area */}
-										<div className="pt-[16px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
+										<div className="pt-[16px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
 											{fields.length === 0 && (
 												<span className="text-gray-300 font-primary text-[12px]">
 													Add blocks here to build your prompt...
@@ -1635,7 +1637,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 														return (
 															<Fragment key={field.id}>
-																<div className={cn(index === 0 && '-mt-2')}>
+																<div
+																	className={cn(index === 0 && '-mt-2 max-[480px]:mt-0')}
+																>
 																	<SortableAIBlock
 																		id={field.id}
 																		fieldIndex={index}
