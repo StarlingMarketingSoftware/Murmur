@@ -599,7 +599,7 @@ const Murmur = () => {
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[20px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[20px] max-[480px]:text-[12px] max-[480px]:font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'testing'
 											? 'text-black font-semibold'
 											: 'text-[#6B6B6B] hover:text-black'
@@ -611,7 +611,7 @@ const Murmur = () => {
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[20px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[20px] max-[480px]:text-[12px] max-[480px]:font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'drafting'
 											? 'text-black font-semibold'
 											: 'text-[#6B6B6B] hover:text-black'
