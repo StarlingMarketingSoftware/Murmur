@@ -110,6 +110,13 @@
 	}
 }
 
+/* Mobile landscape: hide outline/border around campaign header controls */
+@media (orientation: landscape) {
+	body.murmur-mobile [data-slot='mobile-header-controls'] {
+		border: 0 !important;
+	}
+}
+
 /* Mobile landscape: prevent clipping of the leftmost metric box in metrics column */
 @media (orientation: landscape) {
 	/* Allow metrics column to render outside cell bounds if needed (do not move layout) */

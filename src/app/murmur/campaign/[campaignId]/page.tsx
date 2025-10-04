@@ -187,6 +187,7 @@ const Murmur = () => {
 								{/* Mobile Layout - Single Container with all elements */}
 								{isMobile ? (
 									<div
+										data-slot="mobile-header-controls"
 										className="flex items-center justify-between px-1 border border-[#000000] bg-white"
 										style={{
 											marginTop: '14px',
