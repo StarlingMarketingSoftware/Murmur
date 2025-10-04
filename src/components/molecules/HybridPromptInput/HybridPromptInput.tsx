@@ -1203,7 +1203,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											'linear-gradient(to bottom, rgba(222,242,225,0.71) 0%, rgba(222,242,225,0.5) 40%, rgba(222,242,225,0.25) 80%, rgba(222,242,225,0.15) 100%)',
 										pointerEvents: 'none',
 										zIndex: 0,
-										borderRadius: 'inherit',
+										// Square off the top corners so the fill meets the border flush on mobile
+										borderTopLeftRadius: 0,
+										borderTopRightRadius: 0,
+										// Preserve the container's rounded bottoms
+										borderBottomLeftRadius: 'inherit',
+										borderBottomRightRadius: 'inherit',
 									}}
 								/>
 							)}
