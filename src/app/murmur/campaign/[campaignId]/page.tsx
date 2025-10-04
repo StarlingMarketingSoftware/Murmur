@@ -656,6 +656,17 @@ const Murmur = () => {
 								white-space: nowrap;
 								text-overflow: ellipsis;
 							}
+
+							/* Make the preview panel mimic portrait style by hiding its outer chrome */
+							body.murmur-mobile [data-drafting-preview-panel] {
+								background: transparent !important;
+								border: 0 !important;
+								scale: 1 !important;
+								border-radius: 0 !important;
+							}
+							body.murmur-mobile [data-drafting-preview-header] {
+								display: none !important;
+							}
 						}
 
 						/* At 667px landscape, adjust spacing for less cramped layout */

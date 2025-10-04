@@ -114,7 +114,7 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 
 					{/* Mobile-only: show the Drafting status panel inside the Drafting tab */}
 					{view === 'drafting' && isMobile && (
-						<div className="mt-6 flex justify-center lg:hidden">
+						<div className="mt-6 lg:hidden w-screen max-w-none px-3 flex justify-end">
 							<DraftingStatusPanel
 								campaign={campaign}
 								contacts={contacts || []}
