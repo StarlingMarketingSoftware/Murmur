@@ -556,6 +556,7 @@ const Murmur = () => {
 
 			{/* Container with background that starts after the divider */}
 			<div
+				data-slot="campaign-content"
 				className="relative min-h-screen mt-2 border-t-0 md:border-t-2 border-black"
 				style={{ backgroundColor: isMobile ? '#FFFFFF' : 'rgba(222, 242, 225, 0.65)' }}
 			>
@@ -655,6 +656,20 @@ const Murmur = () => {
 								white-space: nowrap;
 								text-overflow: ellipsis;
 							}
+						}
+
+						/* At 667px landscape, adjust spacing for less cramped layout */
+						@media (max-width: 667px) and (orientation: landscape) {
+							body.murmur-mobile .campaign-title-landscape {
+								margin-left: -8px;
+							}
+							/* Home button on the right - push it out slightly */
+							body.murmur-mobile button[title='Home'] {
+								margin-right: -4px;
+							}
+						}
+
+						@media (orientation: landscape) {
 							/* Hide portrait container and bottom tabs while in landscape */
 							body.murmur-mobile [data-slot='mobile-header-controls'] {
 								display: none !important;
@@ -749,6 +764,15 @@ const Murmur = () => {
 							}
 							body.murmur-mobile .w-full > .flex.justify-center.mb-4.w-full {
 								display: none !important;
+							}
+						}
+
+						/* Ensure the divider below the header is visible in mobile landscape at all widths */
+						@media (orientation: landscape) {
+							body.murmur-mobile [data-slot='campaign-content'] {
+								border-top-width: 2px !important;
+								border-top-style: solid !important;
+								border-top-color: #000000 !important;
 							}
 						}
 					`}</style>
