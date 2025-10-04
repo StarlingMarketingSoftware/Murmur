@@ -144,9 +144,128 @@ const Murmur = () => {
 									style={isMobile ? { width: '94.67%' } : undefined}
 								>
 									{/* Slight mobile-only vertical nudge to sit closer to the box */}
-									<div style={isMobile ? { transform: 'translateY(3px)' } : undefined}>
+									<div
+										className="campaign-title-landscape"
+										style={isMobile ? { transform: 'translateY(3px)' } : undefined}
+									>
 										<CampaignName campaign={campaign} />
 									</div>
+
+									{/* Mobile landscape inline controls: hidden by default; shown via CSS in landscape */}
+									{isMobile && (
+										<div className="mobile-landscape-inline-controls">
+											{/* Metrics */}
+											<div
+												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+												style={{
+													backgroundColor: getContactsFillColor(contactsCount),
+													borderWidth: '1.3px',
+													width: '84px',
+													height: '20px',
+													fontSize: '11.7px',
+												}}
+											>
+												{`${String(contactsCount).padStart(2, '0')} contacts`}
+											</div>
+											<div
+												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+												style={{
+													backgroundColor: getDraftFillColor(draftCount),
+													borderWidth: '1.3px',
+													width: '84px',
+													height: '20px',
+													fontSize: '11.7px',
+												}}
+											>
+												{`${String(draftCount).padStart(2, '0')} drafts`}
+											</div>
+											<div
+												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+												style={{
+													backgroundColor: getSentFillColor(sentCount),
+													borderWidth: '1.3px',
+													width: '84px',
+													height: '20px',
+													fontSize: '11.7px',
+												}}
+											>
+												{`${String(sentCount).padStart(2, '0')} sent`}
+											</div>
+
+											{/* To */}
+											<Link
+												href={urls.murmur.dashboard.index}
+												prefetch
+												onClick={(e) => {
+													e.preventDefault();
+													if (typeof window !== 'undefined') {
+														window.location.assign(urls.murmur.dashboard.index);
+													}
+												}}
+												className="block"
+											>
+												<div
+													className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]"
+													style={{
+														width: '36.06px',
+														height: '14.21px',
+														borderRadius: '5.55px',
+													}}
+												>
+													<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
+														To
+													</span>
+												</div>
+											</Link>
+
+											{/* From */}
+											<button
+												type="button"
+												onClick={() => {
+													setIdentityDialogOrigin('campaign');
+													setIsIdentityDialogOpen(true);
+												}}
+												className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969]"
+												style={{
+													width: '36.06px',
+													height: '14.21px',
+													borderRadius: '5.55px',
+												}}
+											>
+												<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
+													From
+												</span>
+											</button>
+
+											{/* Inline view tabs */}
+											<div className="flex items-center gap-3 ml-2">
+												<button
+													type="button"
+													className={cn(
+														'font-inter text-[16px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+														activeView === 'testing'
+															? 'text-black font-semibold'
+															: 'text-[#6B6B6B] hover:text-black'
+													)}
+													onClick={() => setActiveView('testing')}
+												>
+													Testing
+												</button>
+												<button
+													type="button"
+													className={cn(
+														'font-inter text-[16px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+														activeView === 'drafting'
+															? 'text-black font-semibold'
+															: 'text-[#6B6B6B] hover:text-black'
+													)}
+													onClick={() => setActiveView('drafting')}
+												>
+													Drafting
+												</button>
+											</div>
+										</div>
+									)}
 									{isMobile && !shouldHideContent && (
 										<button
 											onClick={() => {
@@ -184,7 +303,7 @@ const Murmur = () => {
 									)}
 								</div>
 
-								{/* Mobile Layout - Single Container with all elements */}
+								{/* Mobile Layout - Single Container with all elements (portrait only) */}
 								{isMobile ? (
 									<div
 										data-slot="mobile-header-controls"
@@ -472,8 +591,8 @@ const Murmur = () => {
 						}
 					/>
 
-					{/* View tabs - text-only Inter font */}
-					<div className="mt-4 flex justify-center">
+					{/* View tabs - text-only Inter font (hidden in mobile landscape via local styles) */}
+					<div className="mt-4 flex justify-center mobile-landscape-hide">
 						<div className="w-full max-w-[1250px] px-6">
 							<div className="flex gap-6 justify-center">
 								<button
@@ -511,10 +630,38 @@ const Murmur = () => {
 							goToDrafting={() => setActiveView('drafting')}
 						/>
 					</div>
-					{/* using this to hide the default boxes in the drafting tab so we can add in a UI specific to mobile */}
+					{/* using this to hide the default boxes in the drafting tab so we can add in a UI specific to mobile
+							and to define mobile landscape header layout without touching globals */}
 					<style jsx global>{`
 						body.murmur-mobile [data-drafting-container] {
 							display: none !important;
+						}
+
+						/* Default: hide the inline header controls (used only in landscape) */
+						body.murmur-mobile .mobile-landscape-inline-controls {
+							display: none !important;
+						}
+
+						/* Mobile landscape: inline header controls and title clipping */
+						@media (orientation: landscape) {
+							body.murmur-mobile .mobile-landscape-inline-controls {
+								display: inline-flex !important;
+								gap: 8px;
+								align-items: center;
+							}
+							body.murmur-mobile .campaign-title-landscape {
+								max-width: 200px;
+								overflow: hidden;
+								white-space: nowrap;
+								text-overflow: ellipsis;
+							}
+							/* Hide portrait container and bottom tabs while in landscape */
+							body.murmur-mobile [data-slot='mobile-header-controls'] {
+								display: none !important;
+							}
+							body.murmur-mobile .mobile-landscape-hide {
+								display: none !important;
+							}
 						}
 					`}</style>
 				</div>
