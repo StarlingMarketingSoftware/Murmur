@@ -643,6 +643,23 @@ const Murmur = () => {
 							display: none !important;
 						}
 
+						/* Mobile portrait: fix signature block height */
+						@media (max-width: 480px) and (orientation: portrait) {
+							body.murmur-mobile [data-hpi-signature-card] {
+								min-height: 68px !important;
+							}
+							body.murmur-mobile .signature-textarea {
+								height: 44px !important;
+								min-height: 44px !important;
+								max-height: 44px !important;
+								font-size: 12px !important;
+								line-height: 1.2 !important;
+								padding: 2px 0 0 2px !important;
+								overflow: hidden !important;
+								resize: none !important;
+							}
+						}
+
 						/* Mobile landscape: inline header controls and title clipping */
 						@media (orientation: landscape) {
 							body.murmur-mobile .mobile-landscape-inline-controls {
