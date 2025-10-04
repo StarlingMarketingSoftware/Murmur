@@ -1399,7 +1399,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		'bg-white'
 																	)}
 																>
-																	<span className="font-inter font-semibold text-[17px] text-black">
+																	<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
 																		{form.watch('isAiSubject')
 																			? 'Auto Subject'
 																			: 'Subject'}
