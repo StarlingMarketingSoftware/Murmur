@@ -645,6 +645,26 @@ const Murmur = () => {
 
 						/* Mobile portrait: fix signature block height */
 						@media (max-width: 480px) and (orientation: portrait) {
+							/* Let the drafting box shrink to fit content */
+							body.murmur-mobile [data-hpi-container] {
+								min-height: 0 !important; /* override min-h-[686px] */
+							}
+							/* Ensure the signature sits 8px below the last block */
+							body.murmur-mobile [data-hpi-content] {
+								padding-bottom: 0 !important;
+							}
+							body.murmur-mobile [data-hpi-content] > div {
+								padding-bottom: 0 !important; /* override inner pb-3 */
+							}
+							/* Make the gap from Signature to the bottom of the box exactly 8px */
+							body.murmur-mobile [data-hpi-footer] .mb-\[23px\],
+							body.murmur-mobile [data-hpi-footer] .mb-\[9px\] {
+								margin-bottom: 8px !important;
+							}
+							/* Ensure 8px space between last content block and Signature */
+							body.murmur-mobile [data-hpi-footer] {
+								margin-top: 8px !important; /* override mt-auto */
+							}
 							body.murmur-mobile [data-hpi-signature-card] {
 								min-height: 68px !important;
 							}
