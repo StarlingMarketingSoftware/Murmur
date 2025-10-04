@@ -151,6 +151,19 @@ const SortableAIBlock = ({
 		<div
 			ref={setNodeRef}
 			style={style}
+			data-block-type={
+				isFullAutomatedBlock
+					? 'full'
+					: isIntroductionBlock
+					? 'introduction'
+					: isResearchBlock
+					? 'research'
+					: isActionBlock
+					? 'action'
+					: isTextBlock
+					? 'text'
+					: 'other'
+			}
 			className={cn(
 				'relative rounded-md overflow-hidden',
 				isIntroductionBlock && 'border-2 border-[#6673FF] bg-background',
@@ -201,6 +214,7 @@ const SortableAIBlock = ({
 				<div
 					{...attributes}
 					{...listeners}
+					data-drag-handle
 					className={cn(
 						'absolute top-0 left-0 cursor-move z-[1]',
 						isTextBlock
@@ -645,7 +659,7 @@ const SortableAIBlock = ({
 																		emails based on your instructions.
 																	</p>
 																</div>
-																<div>
+																<div className="full-auto-placeholder-example">
 																	<p>Ex.</p>
 																	<p>
 																		&ldquo;Compose a professional booking pitch email.
@@ -672,7 +686,9 @@ const SortableAIBlock = ({
 															isIntroductionBlock
 																? '!bg-[#DADAFC] [&]:!bg-[#DADAFC]'
 																: 'bg-white',
-															isFullAutomatedBlock ? 'h-[195px] px-0 resize-none' : '',
+															isFullAutomatedBlock
+																? 'h-[195px] px-0 resize-none full-auto-textarea'
+																: '',
 															shouldShowRedStyling ? 'placeholder:text-[#A20000]' : '',
 															(isIntroductionBlock || isResearchBlock || isActionBlock) &&
 																'font-inter placeholder:italic placeholder:text-[#5d5d5d]'
@@ -1149,6 +1165,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 				compactLeftOnly ? '' : 'flex justify-center',
 				!showTestPreview && 'max-[480px]:pb-[60px]'
 			)}
+			data-hpi-root
 		>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
 				<Droppable id="droppable">
@@ -1171,6 +1188,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									? 'flex-col'
 									: 'flex-col border-[3px] border-black rounded-md bg-white min-h-[686px]'
 							}	relative overflow-visible`}
+							data-hpi-container
 						>
 							{/* Mobile-only gradient background overlay starting under Mode divider */}
 							{isMobile && !showTestPreview && overlayTopPx !== null && (
@@ -1214,6 +1232,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											: 'w-full min-h-0 pt-[10px] px-0 pb-0 flex-1',
 										'relative z-10'
 									)}
+									data-hpi-left-panel
 								>
 									{/* Removed explicit drag bar; header below acts as the drag handle */}
 									{/* Subject header inside the box */}
@@ -1365,7 +1384,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<FormControl>
 															<div
 																className={cn(
-																	'flex items-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden',
+																	'flex items-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar',
 																	form.watch('isAiSubject') ? 'bg-[#F1F1F1]' : 'bg-white'
 																)}
 															>
@@ -1453,7 +1472,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											/>
 										</div>
 									</div>
-									<div className="flex-1 flex flex-col">
+									<div className="flex-1 flex flex-col" data-hpi-content>
 										{/* Content area */}
 										<div className="pt-[16px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
 											{fields.length === 0 && (
@@ -1675,7 +1694,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															<FormControl>
 																<Textarea
 																	placeholder="Enter your signature..."
-																	className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white"
+																	className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white signature-textarea"
 																	style={{
 																		fontFamily: form.watch('font') || 'Arial',
 																	}}
@@ -1699,7 +1718,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 							{/* Bottom-anchored footer with Signature and Test */}
 							{!showTestPreview && (
-								<div className="flex flex-col items-center px-3 mt-auto">
+								<div className="flex flex-col items-center px-3 mt-auto" data-hpi-footer>
 									{/* Signature Block - always visible; positioned above Test with fixed gap */}
 									<FormField
 										control={form.control}
@@ -1717,6 +1736,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															? 'w-[426px] max-[480px]:w-[89.33vw]'
 															: 'w-[89.33vw] max-w-[868px]'
 													)}
+													data-hpi-signature-card
 												>
 													<FormLabel className="text-base font-semibold font-secondary">
 														Signature
@@ -1724,7 +1744,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<FormControl>
 														<Textarea
 															placeholder="Enter your signature..."
-															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white"
+															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white signature-textarea"
 															style={{
 																fontFamily: form.watch('font') || 'Arial',
 															}}
@@ -1793,7 +1813,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 											{/* Mobile sticky Test button at page bottom */}
 											{!showTestPreview && (
-												<div className="hidden max-[480px]:block">
+												<div className="hidden max-[480px]:block mobile-sticky-test-button">
 													<div className="fixed bottom-0 left-0 right-0 z-40">
 														<div className="flex w-full">
 															<Button

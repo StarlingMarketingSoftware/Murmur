@@ -662,6 +662,80 @@ const Murmur = () => {
 							body.murmur-mobile .mobile-landscape-hide {
 								display: none !important;
 							}
+							/* Mobile landscape: shrink the Hybrid Prompt Input to its minimal functional height */
+							body.murmur-mobile [data-hpi-container] {
+								min-height: unset !important;
+								margin-bottom: 6px !important;
+							}
+							body.murmur-mobile [data-hpi-left-panel] {
+								padding-top: 6px !important;
+								padding-bottom: 6px !important;
+							}
+							body.murmur-mobile [data-hpi-content] {
+								padding-top: 6px !important;
+								padding-bottom: 0 !important;
+								gap: 8px !important;
+							}
+							/* Subject bar: minimal but legible */
+							body.murmur-mobile .subject-bar {
+								height: 24px !important;
+								min-height: 24px !important;
+								max-height: 24px !important;
+							}
+							/* Full Auto textarea: reduce height and hide example for space */
+							body.murmur-mobile .full-auto-textarea {
+								height: 110px !important;
+								min-height: 110px !important;
+							}
+							body.murmur-mobile .full-auto-placeholder-example {
+								display: none !important;
+							}
+							/* Signature area: single-line compact */
+							body.murmur-mobile [data-hpi-footer] {
+								margin-top: 6px !important;
+							}
+							body.murmur-mobile [data-hpi-signature-card] {
+								min-height: 42px !important;
+								padding-top: 4px !important;
+								padding-bottom: 4px !important;
+								display: flex !important;
+								align-items: center !important;
+								gap: 8px !important;
+							}
+							body.murmur-mobile [data-hpi-signature-card] [data-slot='form-label'] {
+								margin: 0 8px 0 0 !important;
+								white-space: nowrap !important;
+							}
+							body.murmur-mobile .signature-textarea {
+								height: 30px !important;
+								min-height: 30px !important;
+								max-height: 30px !important;
+								overflow: hidden !important;
+								resize: none !important;
+								flex: 1 1 auto !important;
+								min-width: 0 !important;
+								font-size: 10px !important;
+								line-height: 1.2 !important;
+								padding: 2px 0 0 2px !important;
+							}
+							/* Blocks: tighten vertical chrome */
+							body.murmur-mobile [data-block-type] {
+								margin-top: 6px !important;
+								margin-bottom: 6px !important;
+							}
+							body.murmur-mobile [data-block-type='text'] {
+								min-height: 44px !important;
+							}
+							body.murmur-mobile [data-drag-handle] {
+								height: 24px !important;
+							}
+							/* Show sticky Test; hide in-box Test */
+							body.murmur-mobile .mobile-sticky-test-button {
+								display: block !important;
+							}
+							body.murmur-mobile .w-full > .flex.justify-center.mb-4.w-full {
+								display: none !important;
+							}
 						}
 					`}</style>
 				</div>
