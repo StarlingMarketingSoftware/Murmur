@@ -602,7 +602,9 @@ const SortableAIBlock = ({
 									className={cn(
 										'flex gap-2 min-h-7 items-center relative z-20',
 										isFullAutomatedBlock || isTextBlock ? 'mb-1' : 'mb-2',
-										isFullAutomatedBlock && showTestPreview && testMessage && 'flex-wrap'
+										isFullAutomatedBlock && showTestPreview && testMessage && 'flex-wrap',
+										// On mobile portrait, allow the header to wrap so the tone selector can move to a second row
+										isFullAutomatedBlock && 'max-[480px]:flex-wrap max-[480px]:gap-y-1'
 									)}
 								>
 									{!isTextBlock ? (
