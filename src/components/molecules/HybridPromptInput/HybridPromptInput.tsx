@@ -1140,6 +1140,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			const divider = modeDividerRef.current;
 			if (!container) return;
 			const containerRect = container.getBoundingClientRect();
+			// Account for the container's border so our absolutely positioned overlay,
+			// which is positioned relative to the padding edge, starts exactly at the
+			// visual divider line without leaving a gap on mobile.
+			const borderTopWidth = container.clientTop || 0;
 			let startBelow = 0;
 			if (divider) {
 				const dividerRect = divider.getBoundingClientRect();
@@ -1150,7 +1154,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			} else {
 				return;
 			}
-			const nextTop = Math.max(0, Math.ceil(startBelow + 1));
+			// Subtract the borderTop so the overlay's top aligns to the inside edge.
+			// Using round avoids sub-pixel gaps on some DPRs.
+			const nextTop = Math.max(0, Math.round(startBelow - borderTopWidth));
 			setOverlayTopPx(nextTop);
 		};
 		recalc();
@@ -1381,7 +1387,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	className={cn(
 																		showTestPreview ? 'text-xs' : 'text-sm',
 																		'font-inter font-medium text-[#AFAFAF] hover:underline',
-																		showTestPreview ? 'mr-[12px]' : 'relative top-[4px]'
+																		showTestPreview ? 'mr-[12px]' : 'relative top-[4px]',
+																		// Hide on mobile portrait
+																		'max-[480px]:hidden'
 																	)}
 																>
 																	Clear All
