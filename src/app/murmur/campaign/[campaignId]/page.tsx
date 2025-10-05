@@ -645,6 +645,17 @@ const Murmur = () => {
 
 						/* Mobile portrait: fix signature block height */
 						@media (max-width: 480px) and (orientation: portrait) {
+							/* Specific case: when Full Auto block exists, set exact 8px gap to Signature while keeping it bottom-anchored */
+							body.murmur-mobile [data-hpi-left-panel]:has([data-block-type='full']) {
+								display: grid !important;
+								grid-template-rows: auto 1fr auto !important;
+								row-gap: 8px !important;
+							}
+							body.murmur-mobile
+								[data-hpi-left-panel]:has([data-block-type='full'])
+								[data-hpi-footer] {
+								margin-top: 0 !important; /* grid controls the 8px gap */
+							}
 							/* Ensure the drafting box doesn't get too small */
 							body.murmur-mobile [data-hpi-container] {
 								min-height: 483px !important;
@@ -661,9 +672,20 @@ const Murmur = () => {
 							body.murmur-mobile [data-hpi-footer] .mb-\[9px\] {
 								margin-bottom: 8px !important;
 							}
-							/* Anchor footer at bottom of the drafting box */
+							/* Anchor footer at bottom of the drafting box and layer above gradient */
 							body.murmur-mobile [data-hpi-footer] {
 								margin-top: auto !important; /* keep bottom-anchored */
+								position: relative !important;
+								z-index: 10 !important;
+							}
+							/* Ensure signature card and textarea are fully opaque white */
+							body.murmur-mobile [data-hpi-signature-card] {
+								background-color: #ffffff !important;
+								position: relative !important;
+								z-index: 10 !important;
+							}
+							body.murmur-mobile .signature-textarea {
+								background-color: #ffffff !important;
 							}
 							body.murmur-mobile [data-hpi-signature-card] {
 								min-height: 68px !important;
