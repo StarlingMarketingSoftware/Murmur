@@ -180,9 +180,11 @@ const SortableAIBlock = ({
 					: isCompactBlock
 					? showTestPreview
 						? `w-[426px] max-[480px]:w-[89.33vw] ${
-								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'
+								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
 						  }`
-						: `w-[89.33vw] max-w-[868px] ${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'}`
+						: `w-[89.33vw] max-w-[868px] ${
+								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
+						  }`
 					: isFullAutomatedBlock
 					? showTestPreview
 						? 'w-[426px] max-[480px]:w-[89.33vw]'
@@ -223,8 +225,12 @@ const SortableAIBlock = ({
 								: 'h-[80px] w-[172px]'
 							: isCompactBlock
 							? showTestPreview
-								? `${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'} w-[80px]`
-								: `${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'} w-[90px]`
+								? `${
+										isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
+								  } w-[80px]`
+								: `${
+										isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
+								  } w-[90px]`
 							: 'h-12',
 						isFullAutomatedBlock
 							? 'w-[172px]'
@@ -240,7 +246,7 @@ const SortableAIBlock = ({
 						isCompactBlock
 							? isAdvancedEnabled
 								? 'p-0 h-full'
-								: 'p-2 h-full'
+								: 'p-2 h-full max-[480px]:py-[2px]'
 							: isFullAutomatedBlock || isTextBlock
 							? 'px-4 pt-2 pb-4'
 							: 'p-4'
