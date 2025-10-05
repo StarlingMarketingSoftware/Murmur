@@ -1661,7 +1661,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			'flex relative z-30',
 																			showTestPreview
 																				? 'justify-start w-full'
-																				: 'justify-end -mr-[102px] w-[93.7vw] max-w-[868px] max-[480px]:-mr-[4.4vw]'
+																				: 'justify-end -mr-[102px] w-[93.7vw] max-w-[868px] max-[480px]:-mr-[2vw]'
 																		)}
 																		style={{ transform: 'translateY(-12px)' }}
 																	>
@@ -1669,7 +1669,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			type="button"
 																			onClick={() => handleAddTextBlockAt(index)}
 																			className={cn(
-																				'w-[52px] h-[20px] bg-background hover:bg-stone-100 active:bg-stone-200 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600 max-[480px]:translate-x-[15px]',
+																				'w-[52px] h-[20px] bg-background hover:bg-stone-100 active:bg-stone-200 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600 max-[480px]:translate-x-[6px]',
 																				showTestPreview &&
 																					'absolute left-0 -translate-x-[calc(100%+5px)]'
 																			)}
