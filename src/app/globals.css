@@ -4943,7 +4943,8 @@ body.murmur-mobile .search-input-icon-btn {
 		grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
 		align-items: center !important;
 		width: 100% !important;
-		margin-left: 6px !important;
+		/* Shift slightly left so right edge isn't clipped on iPhone */
+		margin-left: 0 !important;
 		column-gap: clamp(4px, 1.5vw, 10px) !important;
 		height: auto !important;
 	}
@@ -6337,8 +6338,11 @@ body.murmur-mobile .search-input-icon-btn {
 		justify-content: flex-start !important;
 		flex-wrap: nowrap !important;
 		gap: 7px !important; /* Fixed 7px gap between all boxes */
-		margin-left: 0 !important;
+		/* Pull metrics slightly left to avoid right-edge clipping on iPhone */
+		margin-left: -10px !important;
 		padding-left: 0 !important;
+		/* Give a tiny right inset so the last box never kisses the border on iPhone */
+		padding-right: 6px !important;
 		width: 100% !important;
 		height: auto !important;
 	}
@@ -6427,7 +6431,14 @@ body.murmur-mobile .search-input-icon-btn {
 
 	/* Align header grid with metric boxes in campaigns table */
 	.mobile-portrait-mode .my-campaigns-table .metrics-header-grid {
-		margin-left: -12px !important; /* Shift further left to align with metric box edge */
+		/* Shift header labels to track the body metrics position */
+		margin-left: -10px !important;
+		padding-right: 6px !important; /* mirror body padding-right to avoid clipping */
+	}
+
+	/* Allow the metrics cell to let content extend left a few pixels */
+	.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(2) {
+		overflow: visible !important;
 	}
 
 	/* Prevent clipping: allow metrics header cell to show negatively-shifted labels */

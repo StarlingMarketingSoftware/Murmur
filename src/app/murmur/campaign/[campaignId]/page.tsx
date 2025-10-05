@@ -599,7 +599,7 @@ const Murmur = () => {
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[20px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[20px] max-[480px]:text-[12px] max-[480px]:font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'testing'
 											? 'text-black font-semibold'
 											: 'text-[#6B6B6B] hover:text-black'
@@ -611,7 +611,7 @@ const Murmur = () => {
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[20px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[20px] max-[480px]:text-[12px] max-[480px]:font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'drafting'
 											? 'text-black font-semibold'
 											: 'text-[#6B6B6B] hover:text-black'
@@ -641,6 +641,65 @@ const Murmur = () => {
 						/* Default: hide the inline header controls (used only in landscape) */
 						body.murmur-mobile .mobile-landscape-inline-controls {
 							display: none !important;
+						}
+
+						/* Mobile portrait: fix signature block height */
+						@media (max-width: 480px) and (orientation: portrait) {
+							/* Specific case: when Full Auto block exists, set exact 8px gap to Signature while keeping it bottom-anchored */
+							body.murmur-mobile [data-hpi-left-panel]:has([data-block-type='full']) {
+								display: grid !important;
+								grid-template-rows: auto 1fr auto !important;
+								row-gap: 8px !important;
+							}
+							body.murmur-mobile
+								[data-hpi-left-panel]:has([data-block-type='full'])
+								[data-hpi-footer] {
+								margin-top: 0 !important; /* grid controls the 8px gap */
+							}
+							/* Ensure the drafting box doesn't get too small */
+							body.murmur-mobile [data-hpi-container] {
+								min-height: 483px !important;
+							}
+							/* Keep the signature footer anchored to the bottom */
+							body.murmur-mobile [data-hpi-content] {
+								padding-bottom: 0 !important;
+							}
+							body.murmur-mobile [data-hpi-content] > div {
+								padding-bottom: 0 !important; /* override inner pb-3 */
+							}
+							/* Make the gap from Signature to the bottom of the box exactly 8px */
+							body.murmur-mobile [data-hpi-footer] .mb-\[23px\],
+							body.murmur-mobile [data-hpi-footer] .mb-\[9px\] {
+								margin-bottom: 8px !important;
+							}
+							/* Anchor footer at bottom of the drafting box and layer above gradient */
+							body.murmur-mobile [data-hpi-footer] {
+								margin-top: auto !important; /* keep bottom-anchored */
+								position: relative !important;
+								z-index: 10 !important;
+							}
+							/* Ensure signature card and textarea are fully opaque white */
+							body.murmur-mobile [data-hpi-signature-card] {
+								background-color: #ffffff !important;
+								position: relative !important;
+								z-index: 10 !important;
+							}
+							body.murmur-mobile .signature-textarea {
+								background-color: #ffffff !important;
+							}
+							body.murmur-mobile [data-hpi-signature-card] {
+								min-height: 68px !important;
+							}
+							body.murmur-mobile .signature-textarea {
+								height: 44px !important;
+								min-height: 44px !important;
+								max-height: 44px !important;
+								font-size: 12px !important;
+								line-height: 1.2 !important;
+								padding: 2px 0 0 2px !important;
+								overflow: hidden !important;
+								resize: none !important;
+							}
 						}
 
 						/* Mobile landscape: inline header controls and title clipping */

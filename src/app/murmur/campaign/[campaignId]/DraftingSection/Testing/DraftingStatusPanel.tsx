@@ -1,4 +1,4 @@
-import { FC, ReactNode, useEffect, useMemo, useState } from 'react';
+import { FC, ReactNode, useEffect, useMemo, useState, useCallback } from 'react';
 import { cn } from '@/utils';
 import { CampaignWithRelations } from '@/types/campaign';
 import { ContactWithName } from '@/types/contact';
@@ -122,6 +122,7 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	}, []);
 
 	const isSplitLayout = Boolean(isMobile && isLandscape);
+	const isPortraitMobile = Boolean(isMobile && !isLandscape);
 
 	// Live inline preview state for Send Preview row (updated by DraftsExpandedList)
 	const [sendingPreviewContactId, setSendingPreviewContactId] = useState<number | null>(
@@ -134,20 +135,6 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	// Only show Send Preview while a send is actively previewing
 	// Note: depends only on state declared above
 	const showSendPreviewBox = Boolean(sendingPreviewContactId && sendingPreviewSubject);
-
-	// Ensure expanded Draft Preview collapses when hidden
-	useEffect(() => {
-		if (!showDraftPreviewBox && activePreview === 'draftPreview') {
-			setActivePreview('none');
-		}
-	}, [showDraftPreviewBox, activePreview]);
-
-	// Ensure expanded Send Preview collapses when hidden
-	useEffect(() => {
-		if (!showSendPreviewBox && activePreview === 'sendPreview') {
-			setActivePreview('none');
-		}
-	}, [showSendPreviewBox, activePreview]);
 
 	const { data: emails } = useGetEmails({
 		filters: { campaignId: campaign.id },
@@ -173,6 +160,58 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	const contactsCount = availableContacts.length;
 	const draftsCount = draftedEmails.length;
 	const sentCount = sentEmails.length;
+
+	// Helper to select a fallback preview panel (for portrait mobile)
+	const selectFallbackPreview = useCallback(
+		(exclude?: DraftingPreviewKind): DraftingPreviewKind => {
+			// Priority order: contacts, emailStructure, draftPreview, drafts, sendPreview, sent
+			const candidates: DraftingPreviewKind[] = [];
+			if (contactsCount > 0) candidates.push('contacts');
+			candidates.push('emailStructure'); // Always available
+			if (showDraftPreviewBox) candidates.push('draftPreview');
+			if (draftsCount > 0) candidates.push('drafts');
+			if (showSendPreviewBox) candidates.push('sendPreview');
+			if (sentCount > 0) candidates.push('sent');
+
+			// Return first available that's not excluded
+			for (const c of candidates) {
+				if (!exclude || c !== exclude) return c;
+			}
+			// Fallback to emailStructure (always available)
+			return 'emailStructure';
+		},
+		[contactsCount, showDraftPreviewBox, draftsCount, showSendPreviewBox, sentCount]
+	);
+
+	// Default-open Contacts when entering Drafting on mobile portrait
+	useEffect(() => {
+		if (!isMobile) return; // only mobile
+		if (isLandscape) return; // only portrait
+		// only on first mount when nothing selected yet
+		setActivePreview((prev) => (prev === 'none' ? 'contacts' : prev));
+	}, [isMobile, isLandscape]);
+
+	// In portrait mobile, never allow 'none' state
+	useEffect(() => {
+		if (!isPortraitMobile) return;
+		if (activePreview === 'none') {
+			setActivePreview(selectFallbackPreview());
+		}
+	}, [isPortraitMobile, activePreview, selectFallbackPreview]);
+
+	// Ensure expanded Draft Preview collapses when hidden
+	useEffect(() => {
+		if (!showDraftPreviewBox && activePreview === 'draftPreview') {
+			setActivePreview(isPortraitMobile ? selectFallbackPreview('draftPreview') : 'none');
+		}
+	}, [showDraftPreviewBox, activePreview, isPortraitMobile, selectFallbackPreview]);
+
+	// Ensure expanded Send Preview collapses when hidden
+	useEffect(() => {
+		if (!showSendPreviewBox && activePreview === 'sendPreview') {
+			setActivePreview(isPortraitMobile ? selectFallbackPreview('sendPreview') : 'none');
+		}
+	}, [showSendPreviewBox, activePreview, isPortraitMobile, selectFallbackPreview]);
 
 	const isDrafting =
 		generationProgress >= 0 &&
@@ -305,7 +344,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 				return (
 					<ContactsExpandedList
 						contacts={availableContacts}
-						onHeaderClick={() => setActivePreview('none')}
+						onHeaderClick={() =>
+							setActivePreview(
+								isPortraitMobile ? selectFallbackPreview('contacts') : 'none'
+							)
+						}
 						onDraftSelected={async (ids) => {
 							if (props.onDraftSelectedContacts) await props.onDraftSelectedContacts(ids);
 						}}
@@ -319,7 +362,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 				return (
 					<EmailStructureExpandedBox
 						form={form}
-						onHeaderClick={() => setActivePreview('none')}
+						onHeaderClick={() =>
+							setActivePreview(
+								isPortraitMobile ? selectFallbackPreview('emailStructure') : 'none'
+							)
+						}
 						onDraft={() => {}}
 						isDraftDisabled={
 							props.isGenerationDisabled ? props.isGenerationDisabled() : true
@@ -335,7 +382,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 				return (
 					<DraftPreviewExpandedList
 						contacts={contacts}
-						onHeaderClick={() => setActivePreview('none')}
+						onHeaderClick={() =>
+							setActivePreview(
+								isPortraitMobile ? selectFallbackPreview('draftPreview') : 'none'
+							)
+						}
 						livePreview={{
 							visible: props.isLivePreviewVisible,
 							contactId: props.livePreviewContactId || null,
@@ -358,7 +409,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					<DraftsExpandedList
 						drafts={draftedEmails}
 						contacts={contacts}
-						onHeaderClick={() => setActivePreview('none')}
+						onHeaderClick={() =>
+							setActivePreview(
+								isPortraitMobile ? selectFallbackPreview('drafts') : 'none'
+							)
+						}
 						onSendingPreviewUpdate={({ contactId, subject }) => {
 							setSendingPreviewContactId(contactId || null);
 							setSendingPreviewSubject(subject || '');
@@ -374,7 +429,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 				return (
 					<SendPreviewExpandedList
 						contacts={contacts}
-						onHeaderClick={() => setActivePreview('none')}
+						onHeaderClick={() =>
+							setActivePreview(
+								isPortraitMobile ? selectFallbackPreview('sendPreview') : 'none'
+							)
+						}
 						livePreview={{
 							visible: Boolean(sendingPreviewContactId && sendingInlineSubject),
 							contactId: sendingPreviewContactId,
@@ -399,7 +458,9 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					<SentExpandedList
 						sent={sentEmails}
 						contacts={contacts}
-						onHeaderClick={() => setActivePreview('none')}
+						onHeaderClick={() =>
+							setActivePreview(isPortraitMobile ? selectFallbackPreview('sent') : 'none')
+						}
 					/>
 				);
 			default:
@@ -441,7 +502,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 							{activePreview === 'contacts' && !isSplitLayout ? (
 								<ContactsExpandedList
 									contacts={availableContacts}
-									onHeaderClick={() => setActivePreview('none')}
+									onHeaderClick={() =>
+										setActivePreview(
+											isPortraitMobile ? selectFallbackPreview('contacts') : 'none'
+										)
+									}
 									onDraftSelected={async (ids) => {
 										if (props.onDraftSelectedContacts)
 											await props.onDraftSelectedContacts(ids);
@@ -518,7 +583,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 						{activePreview === 'emailStructure' && !isSplitLayout ? (
 							<EmailStructureExpandedBox
 								form={form}
-								onHeaderClick={() => setActivePreview('none')}
+								onHeaderClick={() =>
+									setActivePreview(
+										isPortraitMobile ? selectFallbackPreview('emailStructure') : 'none'
+									)
+								}
 								onDraft={() => {}}
 								isDraftDisabled={
 									props.isGenerationDisabled ? props.isGenerationDisabled() : true
@@ -564,7 +633,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 							(activePreview === 'draftPreview' && !isSplitLayout ? (
 								<DraftPreviewExpandedList
 									contacts={contacts}
-									onHeaderClick={() => setActivePreview('none')}
+									onHeaderClick={() =>
+										setActivePreview(
+											isPortraitMobile ? selectFallbackPreview('draftPreview') : 'none'
+										)
+									}
 									livePreview={{
 										visible: props.isLivePreviewVisible,
 										contactId: props.livePreviewContactId || null,
@@ -634,7 +707,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 							<DraftsExpandedList
 								drafts={draftedEmails}
 								contacts={contacts}
-								onHeaderClick={() => setActivePreview('none')}
+								onHeaderClick={() =>
+									setActivePreview(
+										isPortraitMobile ? selectFallbackPreview('drafts') : 'none'
+									)
+								}
 								onSendingPreviewUpdate={({ contactId, subject }) => {
 									setSendingPreviewContactId(contactId || null);
 									setSendingPreviewSubject(subject || '');
@@ -696,7 +773,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 							(activePreview === 'sendPreview' && !isSplitLayout ? (
 								<SendPreviewExpandedList
 									contacts={contacts}
-									onHeaderClick={() => setActivePreview('none')}
+									onHeaderClick={() =>
+										setActivePreview(
+											isPortraitMobile ? selectFallbackPreview('sendPreview') : 'none'
+										)
+									}
 									livePreview={{
 										visible: Boolean(sendingPreviewContactId && sendingInlineSubject),
 										contactId: sendingPreviewContactId,
@@ -768,7 +849,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 							<SentExpandedList
 								sent={sentEmails}
 								contacts={contacts}
-								onHeaderClick={() => setActivePreview('none')}
+								onHeaderClick={() =>
+									setActivePreview(
+										isPortraitMobile ? selectFallbackPreview('sent') : 'none'
+									)
+								}
 							/>
 						) : (
 							<div
