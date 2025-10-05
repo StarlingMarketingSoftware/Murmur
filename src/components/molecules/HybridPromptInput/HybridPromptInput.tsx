@@ -1242,7 +1242,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											? 'w-[457px] shrink-0 h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-white'
 											: compactLeftOnly
 											? 'w-[350px]'
-											: 'w-full min-h-0 pt-[10px] px-0 pb-0 flex-1',
+											: 'w-full min-h-0 pt-[10px] max-[480px]:pt-[1px] px-0 pb-0 flex-1',
+
 										'relative z-10'
 									)}
 									data-hpi-left-panel
@@ -1268,14 +1269,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										>
 											<span
 												className={cn(
-													'font-inter font-semibold text-[17px] mr-[56px] max-[480px]:mr-[22px] text-black'
+													'font-inter font-semibold text-[17px] max-[480px]:text-[20px] mr-[56px] max-[480px]:mr-[22px] text-black'
 												)}
 											>
 												Mode
 											</span>
 											<div
 												ref={modeContainerRef}
-												className="relative flex items-center gap-[67px] max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:w-[230px] max-[480px]:ml-[2px]"
+												className="relative flex items-center gap-[67px] max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:ml-[2px] flex-1 max-[480px]:w-auto max-[480px]:pr-[4.4vw]"
 											>
 												<DndContext
 													onDragEnd={handleHighlightDragEnd}
@@ -1294,7 +1295,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													variant="ghost"
 													type="button"
 													className={cn(
-														'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
+														'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
 														selectedModeKey !== 'none' &&
 															form
 																.getValues('hybridBlockPrompts')
@@ -1311,7 +1312,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													variant="ghost"
 													type="button"
 													className={cn(
-														'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
+														'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
 														selectedModeKey !== 'none' &&
 															!form
 																.getValues('hybridBlockPrompts')
@@ -1331,7 +1332,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													variant="ghost"
 													type="button"
 													className={cn(
-														'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
+														'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
 														selectedModeKey !== 'none' &&
 															(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
 															form
