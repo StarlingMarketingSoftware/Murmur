@@ -83,8 +83,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				(b) => b.type === 'introduction' || b.type === 'research' || b.type === 'action'
 			);
 
-			// Fixed offset for all buttons below their blocks
-			const buttonOffset = 2; // Consistent distance below each block
+			// Fixed offset for buttons below their blocks
+			// Add a tiny bit more space on small screens to avoid visual crowding
+			const isMobilePortrait =
+				typeof window !== 'undefined' && window.matchMedia('(max-width: 480px)').matches;
+			const buttonOffset = isMobilePortrait ? 4 : 2;
 
 			const container = buttonContainerRef.current;
 			const containerRect = container?.getBoundingClientRect();
@@ -605,7 +608,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						</div>
 
 						{/* Blocks list - overflow visible to show buttons outside */}
-						<div className="flex flex-col gap-[25px] overflow-visible">
+						<div className="flex flex-col gap-[25px] max-[480px]:gap-[40px] overflow-visible">
 							{(() => {
 								// Renderers reused below
 								const renderHybridCore = (b: {
@@ -627,8 +630,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													blockRefs.current[b.id] = el;
 												}}
 												className={cn(
-													'rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden relative w-[357px] mx-auto',
-													isExpanded ? 'h-[78px]' : 'h-[31px]'
+													'rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden relative w-[357px] max-[480px]:w-[89.33vw] mx-auto',
+													isExpanded ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
 												)}
 												style={{ borderColor: strokeColor }}
 											>
@@ -636,7 +639,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													<div
 														className={cn(
 															'flex flex-row items-center flex-shrink-0',
-															isExpanded ? 'h-[21px]' : 'h-[31px]'
+															isExpanded ? 'h-[21px]' : 'h-[31px] max-[480px]:h-[24px]'
 														)}
 													>
 														<div className="flex-1 flex h-full items-center px-3">
@@ -653,7 +656,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															<div
 																className={cn(
 																	'border-l border-black',
-																	isExpanded ? 'h-[21px]' : 'h-[27px]'
+																	isExpanded
+																		? 'h-[21px]'
+																		: 'h-[27px] max-[480px]:h-[20px]'
 																)}
 															/>
 															<button
@@ -678,7 +683,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															<div
 																className={cn(
 																	'border-l border-black',
-																	isExpanded ? 'h-[21px]' : 'h-[27px]'
+																	isExpanded
+																		? 'h-[21px]'
+																		: 'h-[27px] max-[480px]:h-[20px]'
 																)}
 															/>
 															<button
@@ -877,7 +884,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										out.push(
 											<div
 												key={`mini-ph-${slot}`}
-												className="w-[357px] mx-auto h-[31px] flex items-center justify-end"
+												className="w-[357px] max-[480px]:w-[89.33vw] mx-auto h-[31px] max-[480px]:h-[24px] flex items-center justify-end"
 											>
 												<Button
 													type="button"
@@ -990,7 +997,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				)}
 			</div>
 			<div
-				className="absolute top-0 right-[-18px] max-[480px]:-right-[15px] z-50 flex flex-col"
+				className="absolute top-0 right-[-18px] max-[480px]:-right-[10px] z-50 flex flex-col"
 				style={{ pointerEvents: 'none' }}
 			>
 				{addTextButtons.map((btn, index) => {
