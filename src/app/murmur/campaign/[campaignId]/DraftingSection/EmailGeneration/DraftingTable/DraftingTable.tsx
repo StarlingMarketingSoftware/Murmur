@@ -78,6 +78,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						: isSent
 						? '#5AB477'
 						: 'white',
+					opacity: !hasData && (isDrafts || isSent) ? 0.3 : 1,
+					filter: !hasData && (isDrafts || isSent) ? 'grayscale(1)' : 'none',
 				}}
 			>
 				{/* Header section with top rounded corners */}
@@ -181,6 +183,23 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					>
 						{footer}
 					</div>
+				)}
+
+				{/* Gray overlay when not in use (no data) */}
+				{!hasData && (isDrafts || isSent) && (
+					<div
+						style={{
+							position: 'absolute',
+							top: 0,
+							right: 0,
+							bottom: 0,
+							left: 0,
+							backgroundColor: '#9B9B9B',
+							opacity: 0.3,
+							borderRadius: '8px',
+							pointerEvents: 'none',
+						}}
+					/>
 				)}
 			</div>
 		</div>
