@@ -818,7 +818,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															onChange={(e) => updateBlockValue(b.id, e.target.value)}
 														/>
 													</div>
-													<div className="pl-2 mb-2">
+													<div className="pl-2 mb-2 max-[480px]:mb-0">
 														<ParagraphSlider />
 													</div>
 												</div>
@@ -939,11 +939,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								className="rounded-[8px] border-2 bg-white px-2 py-2 w-[357px] max-[480px]:w-[89.33vw] mx-auto"
 								style={{ borderColor: '#969696' }}
 							>
-								<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
+								<div className="font-inter text-[16px] font-semibold text-black mb-1 pl-1">
 									Signature
 								</div>
 								<textarea
-									className="w-full text-[12px] leading-[16px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none h-[48px]"
+									className="w-full text-[9px] leading-[16px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none h-[48px]"
 									value={signature}
 									onChange={(e) => updateSignature(e.target.value)}
 								/>
