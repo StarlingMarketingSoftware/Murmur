@@ -87,7 +87,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 	return (
 		<div
-			className="w-[376px] max-[480px]:w-[96.27vw] h-[424px] rounded-md border-2 border-black/30 bg-[#F5DADA] px-2 pb-2 flex flex-col"
+			className="w-[376px] max-[480px]:w-[96.27vw] h-[424px] rounded-md border-2 border-[#8D5B5B] bg-[#EB8586] px-2 pb-2 flex flex-col"
 			role="region"
 			aria-label="Expanded contacts preview"
 		>

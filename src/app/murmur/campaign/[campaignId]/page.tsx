@@ -558,7 +558,7 @@ const Murmur = () => {
 			<div
 				data-slot="campaign-content"
 				className="relative min-h-screen mt-2 border-t-0 md:border-t-2 border-black"
-				style={{ backgroundColor: isMobile ? '#FFFFFF' : 'rgba(222, 242, 225, 0.65)' }}
+				style={{ backgroundColor: isMobile ? '#FFFFFF' : 'rgba(222, 242, 241, 0.43)' }}
 			>
 				{shouldHideContent && (
 					<div

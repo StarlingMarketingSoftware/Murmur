@@ -519,8 +519,8 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 							) : (
 								<div
 									className={cn(
-										'rounded-md border-2 border-black/30 font-sans',
-										'bg-[#F5DADA] backdrop-blur-sm select-none transition-all',
+										'rounded-md border-2 border-[#8D5B5B] font-sans',
+										'bg-[#EB8586] backdrop-blur-sm select-none transition-all',
 										'w-[376px] max-[480px]:w-[96.27vw]'
 									)}
 								>
