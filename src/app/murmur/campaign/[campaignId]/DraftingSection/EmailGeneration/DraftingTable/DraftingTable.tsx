@@ -72,11 +72,11 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					display: 'flex',
 					flexDirection: 'column',
 					backgroundColor: isContacts
-						? '#F5DADA'
+						? '#EB8586'
 						: isDrafts
-						? '#EFDAAF'
+						? '#FFD383'
 						: isSent
-						? '#C3E7BF'
+						? '#5AB477'
 						: 'white',
 				}}
 			>
@@ -93,11 +93,11 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						alignItems: 'center',
 						height: isCompactHeader ? '20px' : '48px',
 						backgroundColor: isContacts
-							? '#F5DADA'
+							? '#EB8586'
 							: isDrafts
-							? '#EFDAAF'
+							? '#FFD383'
 							: isSent
-							? '#C3E7BF'
+							? '#5AB477'
 							: 'white',
 					}}
 				>
@@ -171,11 +171,11 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						style={{
 							padding: isDrafts ? '6px 5px' : isCompactHeader ? '6px 16px' : '12px 16px',
 							backgroundColor: isContacts
-								? '#F5DADA'
+								? '#EB8586'
 								: isDrafts
-								? '#EFDAAF'
+								? '#FFD383'
 								: isSent
-								? '#DAF5E0'
+								? '#5AB477'
 								: 'white',
 						}}
 					>
