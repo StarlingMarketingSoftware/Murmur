@@ -824,7 +824,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												</div>
 											) : (
 												<textarea
-													className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none"
+													className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none max-[480px]:placeholder:text-[8px]"
 													placeholder={
 														b.type === 'text'
 															? 'Write the exact text you want in your email here. *required'
@@ -943,7 +943,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									Signature
 								</div>
 								<textarea
-									className="w-full text-[12px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none h-[40px]"
+									className="w-full text-[12px] leading-[16px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none h-[48px]"
 									value={signature}
 									onChange={(e) => updateSignature(e.target.value)}
 								/>
