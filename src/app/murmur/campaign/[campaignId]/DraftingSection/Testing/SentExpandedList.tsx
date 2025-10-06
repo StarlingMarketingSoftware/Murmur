@@ -49,7 +49,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 	);
 	return (
 		<div
-			className="w-[376px] max-[480px]:w-[96.27vw] h-[426px] rounded-md border-2 border-black/30 bg-[#CFEBCF] px-2 pb-2 flex flex-col"
+			className="w-[376px] max-[480px]:w-[96.27vw] h-[426px] rounded-md border-2 border-[#19670F] bg-[#5AB477] px-2 pb-2 flex flex-col"
 			role="region"
 			aria-label="Expanded sent preview"
 		>

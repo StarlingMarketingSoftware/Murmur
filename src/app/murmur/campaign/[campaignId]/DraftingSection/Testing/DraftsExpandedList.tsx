@@ -240,7 +240,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	};
 	return (
 		<div
-			className="w-[376px] max-[480px]:w-[96.27vw] h-[426px] rounded-md border-2 border-black/30 bg-[#F4E5BC] px-2 pb-2 flex flex-col"
+			className="w-[376px] max-[480px]:w-[96.27vw] h-[426px] rounded-md border-2 border-[#A8833A] bg-[#FFD383] px-2 pb-2 flex flex-col"
 			role="region"
 			aria-label="Expanded drafts preview"
 		>

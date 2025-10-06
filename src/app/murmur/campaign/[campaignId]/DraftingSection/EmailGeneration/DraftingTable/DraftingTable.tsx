@@ -74,9 +74,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					backgroundColor: isContacts
 						? '#EB8586'
 						: isDrafts
-						? '#EFDAAF'
+						? '#FFD383'
 						: isSent
-						? '#C3E7BF'
+						? '#5AB477'
 						: 'white',
 				}}
 			>
@@ -95,9 +95,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						backgroundColor: isContacts
 							? '#EB8586'
 							: isDrafts
-							? '#EFDAAF'
+							? '#FFD383'
 							: isSent
-							? '#C3E7BF'
+							? '#5AB477'
 							: 'white',
 					}}
 				>
@@ -173,9 +173,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							backgroundColor: isContacts
 								? '#EB8586'
 								: isDrafts
-								? '#EFDAAF'
+								? '#FFD383'
 								: isSent
-								? '#DAF5E0'
+								? '#5AB477'
 								: 'white',
 						}}
 					>

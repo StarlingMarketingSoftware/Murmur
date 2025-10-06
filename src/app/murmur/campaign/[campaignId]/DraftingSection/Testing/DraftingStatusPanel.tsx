@@ -724,8 +724,8 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 						) : (
 							<div
 								className={cn(
-									'rounded-md border-2 border-black/30 mb-2 font-sans',
-									'bg-[#F4E5BC] backdrop-blur-sm select-none transition-all',
+									'rounded-md border-2 border-[#A8833A] mb-2 font-sans',
+									'bg-[#FFD383] backdrop-blur-sm select-none transition-all',
 									'w-[376px] max-[480px]:w-[96.27vw]'
 								)}
 							>
@@ -858,8 +858,8 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 						) : (
 							<div
 								className={cn(
-									'rounded-md border-2 border-black/30 mb-2 font-sans',
-									'bg-[#CFEBCF] backdrop-blur-sm select-none transition-all',
+									'rounded-md border-2 border-[#19670F] mb-2 font-sans',
+									'bg-[#5AB477] backdrop-blur-sm select-none transition-all',
 									'w-[376px] max-[480px]:w-[96.27vw]'
 								)}
 							>
