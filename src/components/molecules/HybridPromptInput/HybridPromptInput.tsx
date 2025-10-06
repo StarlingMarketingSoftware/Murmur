@@ -1407,7 +1407,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		'font-inter font-medium text-[#AFAFAF] hover:underline',
 																		showTestPreview ? 'mr-[12px]' : 'relative top-[4px]',
 																		// Hide on mobile portrait
-																		'max-[480px]:hidden'
+																		'max-[480px]:hidden',
+																		// Hide in mobile landscape view of the campaign page
+																		'mobile-landscape-hide'
 																	)}
 																>
 																	Clear All
