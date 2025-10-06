@@ -105,6 +105,13 @@ const SortableAIBlock = ({
 		block.value === HybridBlock.action ||
 		block.value === HybridBlock.text;
 
+	// Detect if the Manual tab is selected (all blocks are Text)
+	const isManualModeSelected =
+		(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
+		form
+			.getValues('hybridBlockPrompts')
+			.every((b: { type: HybridBlock }) => b.type === HybridBlock.text);
+
 	// Watch the field value to determine if text block is empty
 	const fieldValue = form.watch(`hybridBlockPrompts.${fieldIndex}.value`);
 	const isTextBlockEmpty = isTextBlock && !fieldValue;
@@ -222,7 +229,7 @@ const SortableAIBlock = ({
 						isTextBlock
 							? showTestPreview
 								? 'h-[44px] w-[80px]'
-								: 'h-[80px] w-[172px]'
+								: 'h-[80px] w-[90px]'
 							: isCompactBlock
 							? showTestPreview
 								? `${
@@ -338,9 +345,11 @@ const SortableAIBlock = ({
 														(isIntroductionBlock || isResearchBlock || isActionBlock) &&
 															'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
 														'pl-0',
-														'pr-12'
+														'pr-12',
+														// Make placeholder text much smaller on mobile portrait when in Manual mode
+														isManualModeSelected && 'max-[480px]:placeholder:text-[10px]'
 													)}
-													rows={1}
+													rows={isMobile ? 2 : 1}
 													{...fieldProps}
 													onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
 														const target = e.currentTarget;
