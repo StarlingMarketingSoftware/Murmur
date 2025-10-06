@@ -45,6 +45,9 @@ const Murmur = () => {
 	const [isIdentityInfoOpen, setIsIdentityInfoOpen] = useState(false);
 	const [activeView, setActiveView] = useState<'testing' | 'drafting'>('testing');
 
+	// Track orientation to fine-tune mobile landscape spacing
+	const [isLandscape, setIsLandscape] = useState(false);
+
 	// Measure campaign title width on desktop to position the To/From block just to its right
 	const titleRef = useRef<HTMLDivElement | null>(null);
 	const [titleWidth, setTitleWidth] = useState<number>(0);
@@ -69,6 +72,28 @@ const Murmur = () => {
 			if (ro) ro.disconnect();
 		};
 	}, [campaign?.id]);
+
+	// Watch for orientation changes so we can reduce header top padding in landscape
+	useEffect(() => {
+		if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+		const mq = window.matchMedia('(orientation: landscape)');
+		const update = () => setIsLandscape(Boolean(mq.matches));
+		update();
+		const handler = (ev: MediaQueryListEvent) => setIsLandscape(ev.matches);
+		// Support older Safari
+		if (typeof mq.addEventListener === 'function') {
+			mq.addEventListener('change', handler);
+		} else if (typeof mq.addListener === 'function') {
+			mq.addListener(handler);
+		}
+		return () => {
+			if (typeof mq.removeEventListener === 'function') {
+				mq.removeEventListener('change', handler);
+			} else if (typeof mq.removeListener === 'function') {
+				mq.removeListener(handler);
+			}
+		};
+	}, []);
 
 	// Header counts
 	const contactListIds = campaign?.userContactLists?.map((l) => l.id) || [];
@@ -103,7 +128,7 @@ const Murmur = () => {
 	return (
 		<>
 			{/* Header section with white background */}
-			<div className="bg-white">
+			<div className="bg-white" data-slot="campaign-header">
 				<div className="relative">
 					<Link
 						href={urls.murmur.dashboard.index}
@@ -154,7 +179,7 @@ const Murmur = () => {
 							<div
 								className="flex flex-col items-center"
 								style={{
-									paddingTop: isMobile ? '18px' : '12px',
+									paddingTop: isMobile ? (isLandscape ? '6px' : '18px') : '12px',
 									paddingBottom: isMobile ? undefined : '8px',
 								}}
 							>
@@ -170,7 +195,15 @@ const Murmur = () => {
 									<div
 										className="campaign-title-landscape"
 										ref={titleRef}
-										style={isMobile ? { transform: 'translateY(3px)' } : undefined}
+										style={
+											isMobile
+												? {
+														transform: isLandscape
+															? 'translateY(0px)'
+															: 'translateY(3px)',
+												  }
+												: undefined
+										}
 									>
 										<CampaignName campaign={campaign} />
 									</div>
@@ -410,7 +443,7 @@ const Murmur = () => {
 											style={{
 												width: '23px',
 												height: '17px',
-												transform: 'translateY(2px)',
+												transform: isLandscape ? 'translateY(0px)' : 'translateY(2px)',
 												WebkitTapHighlightColor: 'transparent',
 											}}
 										>
@@ -881,12 +914,17 @@ const Murmur = () => {
 							}
 						}
 
-						/* Ensure the divider below the header is visible in mobile landscape at all widths */
+						/* Previously we drew only a bottom divider. Replace with a full header box in landscape. */
 						@media (orientation: landscape) {
+							/* Full-width box around header */
+							body.murmur-mobile [data-slot='campaign-header'] {
+								border: 2px solid #000000 !important;
+								box-sizing: border-box !important;
+							}
+							/* Remove old bottom divider and any gap so header box touches content */
 							body.murmur-mobile [data-slot='campaign-content'] {
-								border-top-width: 2px !important;
-								border-top-style: solid !important;
-								border-top-color: #000000 !important;
+								border-top: 0 !important;
+								margin-top: 0 !important;
 							}
 						}
 					`}</style>
