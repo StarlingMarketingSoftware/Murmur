@@ -1720,7 +1720,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															<FormControl>
 																<Textarea
 																	placeholder="Enter your signature..."
-																	className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white signature-textarea"
+																	className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white max-[480px]:text-[10px] signature-textarea"
 																	style={{
 																		fontFamily: form.watch('font') || 'Arial',
 																	}}
@@ -1770,7 +1770,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<FormControl>
 														<Textarea
 															placeholder="Enter your signature..."
-															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white signature-textarea"
+															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white max-[480px]:text-[10px] signature-textarea"
 															style={{
 																fontFamily: form.watch('font') || 'Arial',
 															}}
