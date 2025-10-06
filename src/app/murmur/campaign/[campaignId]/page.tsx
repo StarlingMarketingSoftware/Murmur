@@ -14,7 +14,7 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus } from '@/constants/prismaEnums';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // Fixed metric fills for header boxes
 const getDraftFillColor = (value: number): string => {
@@ -44,6 +44,31 @@ const Murmur = () => {
 	);
 	const [isIdentityInfoOpen, setIsIdentityInfoOpen] = useState(false);
 	const [activeView, setActiveView] = useState<'testing' | 'drafting'>('testing');
+
+	// Measure campaign title width on desktop to position the To/From block just to its right
+	const titleRef = useRef<HTMLDivElement | null>(null);
+	const [titleWidth, setTitleWidth] = useState<number>(0);
+	useEffect(() => {
+		if (!titleRef.current) return;
+		const node = titleRef.current;
+		const measure = () => {
+			try {
+				const rect = node.getBoundingClientRect();
+				setTitleWidth(rect?.width || 0);
+			} catch {
+				setTitleWidth(0);
+			}
+		};
+		measure();
+		const ro =
+			typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => measure()) : null;
+		if (ro) ro.observe(node);
+		window.addEventListener('resize', measure);
+		return () => {
+			window.removeEventListener('resize', measure);
+			if (ro) ro.disconnect();
+		};
+	}, [campaign?.id]);
 
 	// Header counts
 	const contactListIds = campaign?.userContactLists?.map((l) => l.id) || [];
@@ -126,7 +151,13 @@ const Murmur = () => {
 									: 'opacity-100'
 							)}
 						>
-							<div className="flex flex-col items-center" style={{ paddingTop: '18px' }}>
+							<div
+								className="flex flex-col items-center"
+								style={{
+									paddingTop: isMobile ? '18px' : '12px',
+									paddingBottom: isMobile ? undefined : '8px',
+								}}
+							>
 								<div
 									className={cn(
 										isMobile
@@ -138,10 +169,112 @@ const Murmur = () => {
 									{/* Slight mobile-only vertical nudge to sit closer to the box */}
 									<div
 										className="campaign-title-landscape"
+										ref={titleRef}
 										style={isMobile ? { transform: 'translateY(3px)' } : undefined}
 									>
 										<CampaignName campaign={campaign} />
 									</div>
+
+									{/* Desktop: place To/From to the right side of the title */}
+									{!isMobile && (
+										<div
+											className="absolute top-1/2 -translate-y-1/2 flex flex-col items-start gap-[6px]"
+											style={{ left: '50%', marginLeft: `${titleWidth / 2 + 72}px` }}
+										>
+											<div className="flex items-center">
+												<Link
+													href={urls.murmur.dashboard.index}
+													prefetch
+													onClick={(e) => {
+														e.preventDefault();
+														if (typeof window !== 'undefined') {
+															window.location.assign(urls.murmur.dashboard.index);
+														}
+													}}
+													className="block relative z-[100]"
+												>
+													<div
+														className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]"
+														style={{
+															width: '36.06px',
+															height: '14.21px',
+															borderRadius: '5.55px',
+														}}
+													>
+														<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
+															To
+														</span>
+													</div>
+												</Link>
+												<Typography
+													className="ml-2 text-gray-600 font-inter font-extralight"
+													style={{ fontSize: '11.79px' }}
+												>
+													{campaign?.userContactLists
+														?.map((list) => list.name)
+														.join(', ') || 'No recipients selected'}
+												</Typography>
+											</div>
+
+											<div className="flex items-start">
+												<button
+													type="button"
+													onClick={() => {
+														setIdentityDialogOrigin('campaign');
+														setIsIdentityDialogOpen(true);
+													}}
+													className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969]"
+													style={{
+														width: '36.06px',
+														height: '14.21px',
+														borderRadius: '5.55px',
+													}}
+												>
+													<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
+														From
+													</span>
+												</button>
+												<div className="ml-2 flex flex-col items-start">
+													<button
+														type="button"
+														className="text-gray-600 font-inter font-extralight hover:underline cursor-pointer text-left"
+														style={{ fontSize: '11.79px' }}
+														onClick={() => setIsIdentityInfoOpen((open) => !open)}
+														aria-expanded={isIdentityInfoOpen}
+													>
+														{campaign?.identity?.name}
+													</button>
+													{isIdentityInfoOpen && (
+														<div className="mt-1 text-left">
+															{campaign?.identity?.email && (
+																<div
+																	className="text-gray-600 font-inter font-extralight"
+																	style={{ fontSize: '11.79px' }}
+																>
+																	{campaign.identity.email}
+																</div>
+															)}
+															{campaign?.identity?.website && (
+																<a
+																	href={
+																		(campaign.identity.website || '').startsWith('http')
+																			? campaign.identity.website
+																			: `https://${campaign.identity.website}`
+																	}
+																	target="_blank"
+																	rel="noopener noreferrer"
+																	className="text-gray-600 font-inter font-extralight hover:underline break-all"
+																	style={{ fontSize: '11.79px' }}
+																>
+																	{campaign.identity.website}
+																</a>
+															)}
+														</div>
+													)}
+												</div>
+											</div>
+										</div>
+									)}
 
 									{/* Mobile landscape inline controls: hidden by default; shown via CSS in landscape */}
 									{isMobile && (
@@ -409,110 +542,12 @@ const Murmur = () => {
 										</button>
 									</div>
 								) : (
-									/* Desktop Layout - Keep existing unchanged */
+									/* Desktop Layout - metrics below title only */
 									<div
 										className="flex flex-col items-center"
-										style={{ marginTop: '14px' }}
+										style={{ marginTop: '3px' }}
 									>
-										<div className="flex items-start gap-6">
-											<div className="flex items-center">
-												<Link
-													href={urls.murmur.dashboard.index}
-													prefetch
-													onClick={(e) => {
-														e.preventDefault();
-														if (typeof window !== 'undefined') {
-															window.location.assign(urls.murmur.dashboard.index);
-														}
-													}}
-													className="block relative z-[100]"
-												>
-													<div
-														className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]"
-														style={{
-															width: '36.06px',
-															height: '14.21px',
-															borderRadius: '5.55px',
-														}}
-													>
-														<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
-															To
-														</span>
-													</div>
-												</Link>
-												<Typography
-													className="ml-2 text-gray-600 font-inter font-extralight"
-													style={{ fontSize: '11.79px' }}
-												>
-													{campaign?.userContactLists
-														?.map((list) => list.name)
-														.join(', ') || 'No recipients selected'}
-												</Typography>
-											</div>
-
-											<div className="flex items-start">
-												<button
-													type="button"
-													onClick={() => {
-														setIdentityDialogOrigin('campaign');
-														setIsIdentityDialogOpen(true);
-													}}
-													className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969]"
-													style={{
-														width: '36.06px',
-														height: '14.21px',
-														borderRadius: '5.55px',
-													}}
-												>
-													<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
-														From
-													</span>
-												</button>
-												<div className="ml-2 flex flex-col items-start">
-													<button
-														type="button"
-														className="text-gray-600 font-inter font-extralight hover:underline cursor-pointer text-left"
-														style={{ fontSize: '11.79px' }}
-														onClick={() => setIsIdentityInfoOpen((open) => !open)}
-														aria-expanded={isIdentityInfoOpen}
-													>
-														{campaign?.identity?.name}
-													</button>
-													{isIdentityInfoOpen && (
-														<div className="mt-1 text-left">
-															{campaign?.identity?.email && (
-																<div
-																	className="text-gray-600 font-inter font-extralight"
-																	style={{ fontSize: '11.79px' }}
-																>
-																	{campaign.identity.email}
-																</div>
-															)}
-															{campaign?.identity?.website && (
-																<a
-																	href={
-																		(campaign.identity.website || '').startsWith('http')
-																			? campaign.identity.website
-																			: `https://${campaign.identity.website}`
-																	}
-																	target="_blank"
-																	rel="noopener noreferrer"
-																	className="text-gray-600 font-inter font-extralight hover:underline break-all"
-																	style={{ fontSize: '11.79px' }}
-																>
-																	{campaign.identity.website}
-																</a>
-															)}
-														</div>
-													)}
-												</div>
-											</div>
-										</div>
-										{/* Metric boxes below To/From */}
-										<div
-											className="flex items-center gap-5"
-											style={{ marginTop: '13px' }}
-										>
+										<div className="flex items-center gap-5" style={{ marginTop: '0px' }}>
 											<div
 												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
 												style={{
@@ -567,7 +602,7 @@ const Murmur = () => {
 			{/* Container with background that starts after the divider */}
 			<div
 				data-slot="campaign-content"
-				className="relative min-h-screen mt-2 border-t-0 md:border-t-2 border-black"
+				className="relative min-h-screen mt-2 md:mt-0 border-t-0 md:border-t-2 border-black"
 				style={{ backgroundColor: isMobile ? '#FFFFFF' : 'rgba(222, 242, 241, 0.43)' }}
 			>
 				{shouldHideContent && (
