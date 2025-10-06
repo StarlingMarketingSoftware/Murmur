@@ -16,29 +16,21 @@ import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { useState } from 'react';
 
-// Reuse dashboard metric colors for consistency
+// Fixed metric fills for header boxes
 const getDraftFillColor = (value: number): string => {
-	const v = Math.max(0, Math.min(value, 50));
-	if (v === 0) return '#FFFFFF';
-	if (v <= 6.25) return '#FFFBF3';
-	if (v <= 12.5) return '#FFF7E7';
-	if (v <= 18.75) return '#FFF3DB';
-	if (v <= 25) return '#FFEFCE';
-	if (v <= 31.25) return '#FFEBC2';
-	if (v <= 37.5) return '#FFE7B6';
+	void value;
 	return '#FFE3AA';
 };
 
 const getSentFillColor = (value: number): string => {
-	const v = Math.max(0, Math.min(value, 50));
-	if (v === 0) return '#FFFFFF';
-	if (v > 1) return '#F3FCF1';
-	return '#FFFFFF';
+	void value;
+	return '#B0E0A6';
 };
 
-// Contacts tint — light red when there are contacts, otherwise white (keeps visual parity with dashboard-style metric boxes)
-const getContactsFillColor = (value: number): string =>
-	value > 0 ? '#FBEEEE' : '#FFFFFF';
+const getContactsFillColor = (value: number): string => {
+	void value;
+	return '#F5DADA';
+};
 
 const Murmur = () => {
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
@@ -175,9 +167,12 @@ const Murmur = () => {
 													width: '84px',
 													height: '20px',
 													fontSize: '11.7px',
+													opacity: draftCount === 0 ? 0.5 : 1,
 												}}
 											>
-												{`${String(draftCount).padStart(2, '0')} drafts`}
+												{draftCount === 0
+													? 'drafts'
+													: `${String(draftCount).padStart(2, '0')} drafts`}
 											</div>
 											<div
 												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
@@ -187,9 +182,12 @@ const Murmur = () => {
 													width: '84px',
 													height: '20px',
 													fontSize: '11.7px',
+													opacity: sentCount === 0 ? 0.5 : 1,
 												}}
 											>
-												{`${String(sentCount).padStart(2, '0')} sent`}
+												{sentCount === 0
+													? 'sent'
+													: `${String(sentCount).padStart(2, '0')} sent`}
 											</div>
 
 											{/* To */}
@@ -340,9 +338,12 @@ const Murmur = () => {
 												width: '84px',
 												height: '20px',
 												fontSize: '11.7px',
+												opacity: draftCount === 0 ? 0.5 : 1,
 											}}
 										>
-											{`${String(draftCount).padStart(2, '0')} drafts`}
+											{draftCount === 0
+												? 'drafts'
+												: `${String(draftCount).padStart(2, '0')} drafts`}
 										</div>
 
 										{/* Sent box - keeping exact styling */}
@@ -354,9 +355,12 @@ const Murmur = () => {
 												width: '84px',
 												height: '20px',
 												fontSize: '11.7px',
+												opacity: sentCount === 0 ? 0.5 : 1,
 											}}
 										>
-											{`${String(sentCount).padStart(2, '0')} sent`}
+											{sentCount === 0
+												? 'sent'
+												: `${String(sentCount).padStart(2, '0')} sent`}
 										</div>
 
 										{/* To button - keeping exact gray styling */}
@@ -529,9 +533,12 @@ const Murmur = () => {
 													minWidth: '80.38px',
 													height: '19px',
 													fontSize: '11.7px',
+													opacity: draftCount === 0 ? 0.5 : 1,
 												}}
 											>
-												{`${String(draftCount).padStart(2, '0')} drafts`}
+												{draftCount === 0
+													? 'drafts'
+													: `${String(draftCount).padStart(2, '0')} drafts`}
 											</div>
 											<div
 												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
@@ -541,9 +548,12 @@ const Murmur = () => {
 													minWidth: '80.38px',
 													height: '19px',
 													fontSize: '11.7px',
+													opacity: sentCount === 0 ? 0.5 : 1,
 												}}
 											>
-												{`${String(sentCount).padStart(2, '0')} sent`}
+												{sentCount === 0
+													? 'sent'
+													: `${String(sentCount).padStart(2, '0')} sent`}
 											</div>
 										</div>
 									</div>
