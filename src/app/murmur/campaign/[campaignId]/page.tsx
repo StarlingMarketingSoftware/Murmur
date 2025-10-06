@@ -856,8 +856,8 @@ const Murmur = () => {
 							}
 							/* Full Auto textarea: reduce height and hide example for space */
 							body.murmur-mobile .full-auto-textarea {
-								height: 110px !important;
-								min-height: 110px !important;
+								height: 90px !important;
+								min-height: 90px !important;
 							}
 							body.murmur-mobile .full-auto-placeholder-example {
 								display: none !important;
