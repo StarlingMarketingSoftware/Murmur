@@ -341,6 +341,11 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 											id="contacts"
 											dragHandleSelector="[data-drafting-table-header]"
 											onDropOver={(overId) => swapBoxes('contacts', overId)}
+											className={
+												!isMobile && availableContacts.length === 0
+													? 'opacity-30 rounded-[8px] overflow-hidden before:content-["""] before:absolute before:inset-0 before:bg-[#9B9B9B]/20 before:pointer-events-none'
+													: undefined
+											}
 										>
 											<ContactsSelection
 												contacts={availableContacts}
@@ -426,7 +431,11 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 											id="drafts"
 											dragHandleSelector="[data-drafting-table-header]"
 											onDropOver={(overId) => swapBoxes('drafts', overId)}
-											className={draftEmails.length === 0 ? 'opacity-50' : undefined}
+											className={
+												!isMobile && draftEmails.length === 0
+													? 'opacity-30 rounded-[8px] overflow-hidden before:content-["""] before:absolute before:inset-0 before:bg-[#9B9B9B]/20 before:pointer-events-none'
+													: undefined
+											}
 										>
 											<DraftedEmails
 												draftEmails={draftEmails}
@@ -452,7 +461,11 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 											id="sent"
 											dragHandleSelector="[data-drafting-table-header]"
 											onDropOver={(overId) => swapBoxes('sent', overId)}
-											className={sentEmails.length === 0 ? 'opacity-50' : undefined}
+											className={
+												!isMobile && sentEmails.length === 0
+													? 'opacity-30 rounded-[8px] overflow-hidden before:content-["""] before:absolute before:inset-0 before:bg-[#9B9B9B]/20 before:pointer-events-none'
+													: undefined
+											}
 										>
 											<SentEmails emails={sentEmails} isPendingEmails={isPendingEmails} />
 										</DraggableBox>
