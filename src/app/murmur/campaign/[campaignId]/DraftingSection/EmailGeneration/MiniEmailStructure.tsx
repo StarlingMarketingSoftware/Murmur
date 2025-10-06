@@ -606,7 +606,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									<input
 										type="text"
 										className={cn(
-											'w-full text-[12px] leading-tight outline-none focus:outline-none bg-transparent',
+											'w-full text-[12px] leading-tight outline-none focus:outline-none bg-transparent max-[480px]:placeholder:text-[8px]',
 											isAiSubject
 												? 'text-[#6B6B6B] italic cursor-not-allowed'
 												: 'text-black'
