@@ -1495,9 +1495,9 @@ body {
 
 /* Set a compact, scrollable height for the My Campaigns table */
 .campaigns-table-container .my-campaigns-table {
-	height: 260px !important;
-	max-height: 260px !important;
-	min-height: 260px !important; /* Force exact height */
+	height: 172px !important;
+	max-height: 172px !important;
+	min-height: 172px !important; /* Force exact height */
 	position: relative !important;
 	display: block !important; /* Ensure it's a block element */
 }
@@ -1509,9 +1509,9 @@ body {
 
 /* Override default h-[429px] class when campaigns table uses constrainHeight */
 .campaigns-table-container .my-campaigns-table.h-\[429px\] {
-	height: 260px !important;
-	max-height: 260px !important;
-	min-height: 260px !important;
+	height: 172px !important;
+	max-height: 172px !important;
+	min-height: 172px !important;
 }
 
 /* Force hide ALL native scrollbars in campaigns table and its children */
@@ -1602,7 +1602,7 @@ body {
 /* Ensure proper scrolling behavior for campaigns table with custom scrollbar */
 .campaigns-table-container .my-campaigns-table {
 	position: relative !important;
-	height: 260px !important;
+	height: 172px !important;
 }
 
 /* Ensure the scrollbar components have proper dimensions and scrolling */
@@ -2597,7 +2597,7 @@ body {
 	/* Mobile scroll wrapper - keep exact same dimensions as before */
 	.mobile-scroll-wrapper {
 		position: relative !important;
-		height: 260px !important;
+		height: 172px !important;
 		overflow-y: auto !important;
 		overflow-x: hidden !important;
 		-webkit-overflow-scrolling: touch !important;
@@ -2673,7 +2673,7 @@ body {
 		align-items: center !important;
 		gap: 8px !important; /* Match the margin-bottom of table rows */
 		/* Match the scroll wrapper height and sync scrolling */
-		height: 260px !important;
+		height: 172px !important;
 		overflow-y: auto !important;
 		overflow-x: hidden !important;
 		scrollbar-width: none !important;
@@ -3849,8 +3849,8 @@ html.murmur-compact {
 
 /* --- Campaigns Table Custom Scrollbar --- */
 .my-campaigns-table {
-	height: 260px !important;
-	max-height: 260px !important;
+	height: 172px !important;
+	max-height: 172px !important;
 }
 
 .my-campaigns-table .scrollbar-hide {
