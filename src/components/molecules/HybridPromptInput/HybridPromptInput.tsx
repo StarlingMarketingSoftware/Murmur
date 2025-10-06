@@ -667,7 +667,7 @@ const SortableAIBlock = ({
 											<>
 												<div className={isFullAutomatedBlock ? 'relative' : ''}>
 													{showCustomPlaceholder && (
-														<div className="absolute inset-0 pointer-events-none py-2 pr-10 text-[#505050] text-base md:text-sm max-[480px]:text-[10px]">
+														<div className="absolute inset-0 pointer-events-none py-2 pr-10 text-[#505050] text-base md:text-sm max-[480px]:text-[10px] z-10">
 															<div className="space-y-3">
 																<div>
 																	<p>Prompt Murmur here.</p>
