@@ -223,10 +223,12 @@ export function GlobalScrollbar() {
 	}, [updateScrollbar]);
 
 	// Do not render the global scrollbar while a dialog is open.
-	// Also hide on the campaign page when in mobile landscape orientation.
+	// Also hide on the campaign and dashboard pages when in mobile landscape orientation.
 	const isCampaignPage =
 		typeof pathname === 'string' && pathname.startsWith('/murmur/campaign');
-	if (isDialogOpen || (isCampaignPage && isMobileLandscape)) {
+	const isDashboardPage =
+		typeof pathname === 'string' && pathname.startsWith('/murmur/dashboard');
+	if (isDialogOpen || ((isCampaignPage || isDashboardPage) && isMobileLandscape)) {
 		return null;
 	}
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { gsap } from 'gsap';
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
@@ -24,6 +24,28 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 const Dashboard = () => {
 	const { isSignedIn, openSignIn } = useClerk();
 	const isMobile = useIsMobile();
+	const [isMobileLandscape, setIsMobileLandscape] = useState(false);
+
+	useEffect(() => {
+		if (isMobile !== true) {
+			setIsMobileLandscape(false);
+			return;
+		}
+
+		const check = () => {
+			if (typeof window !== 'undefined') {
+				setIsMobileLandscape(window.innerWidth > window.innerHeight);
+			}
+		};
+
+		check();
+		window.addEventListener('resize', check);
+		window.addEventListener('orientationchange', check);
+		return () => {
+			window.removeEventListener('resize', check);
+			window.removeEventListener('orientationchange', check);
+		};
+	}, [isMobile]);
 	// Mobile-friendly sizing for hero logo and subtitle; desktop remains unchanged
 	const logoWidth = isMobile ? '190px' : '300px';
 	const logoHeight = isMobile ? '50px' : '79px';
@@ -705,7 +727,7 @@ const Dashboard = () => {
 												rowsPerPage={100}
 												displayRowsPerPage={false}
 												constrainHeight
-												useCustomScrollbar
+												useCustomScrollbar={!isMobileLandscape}
 												scrollbarOffsetRight={-5}
 												containerClassName="search-results-table h-[499px] rounded-[8px] border-[#737373] md:w-[1209px]"
 												tableClassName="w-full"
