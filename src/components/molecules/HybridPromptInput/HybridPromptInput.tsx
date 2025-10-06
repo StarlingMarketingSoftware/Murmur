@@ -105,6 +105,13 @@ const SortableAIBlock = ({
 		block.value === HybridBlock.action ||
 		block.value === HybridBlock.text;
 
+	// Detect if the Manual tab is selected (all blocks are Text)
+	const isManualModeSelected =
+		(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
+		form
+			.getValues('hybridBlockPrompts')
+			.every((b: { type: HybridBlock }) => b.type === HybridBlock.text);
+
 	// Watch the field value to determine if text block is empty
 	const fieldValue = form.watch(`hybridBlockPrompts.${fieldIndex}.value`);
 	const isTextBlockEmpty = isTextBlock && !fieldValue;
@@ -180,9 +187,11 @@ const SortableAIBlock = ({
 					: isCompactBlock
 					? showTestPreview
 						? `w-[426px] max-[480px]:w-[89.33vw] ${
-								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'
+								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
 						  }`
-						: `w-[89.33vw] max-w-[868px] ${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'}`
+						: `w-[89.33vw] max-w-[868px] ${
+								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
+						  }`
 					: isFullAutomatedBlock
 					? showTestPreview
 						? 'w-[426px] max-[480px]:w-[89.33vw]'
@@ -220,11 +229,15 @@ const SortableAIBlock = ({
 						isTextBlock
 							? showTestPreview
 								? 'h-[44px] w-[80px]'
-								: 'h-[80px] w-[172px]'
+								: 'h-[80px] w-[90px]'
 							: isCompactBlock
 							? showTestPreview
-								? `${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'} w-[80px]`
-								: `${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'} w-[90px]`
+								? `${
+										isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
+								  } w-[80px]`
+								: `${
+										isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
+								  } w-[90px]`
 							: 'h-12',
 						isFullAutomatedBlock
 							? 'w-[172px]'
@@ -240,7 +253,7 @@ const SortableAIBlock = ({
 						isCompactBlock
 							? isAdvancedEnabled
 								? 'p-0 h-full'
-								: 'p-2 h-full'
+								: 'p-2 h-full max-[480px]:py-[2px]'
 							: isFullAutomatedBlock || isTextBlock
 							? 'px-4 pt-2 pb-4'
 							: 'p-4'
@@ -332,9 +345,11 @@ const SortableAIBlock = ({
 														(isIntroductionBlock || isResearchBlock || isActionBlock) &&
 															'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
 														'pl-0',
-														'pr-12'
+														'pr-12',
+														// Make placeholder text much smaller on mobile portrait when in Manual mode
+														isManualModeSelected && 'max-[480px]:placeholder:text-[10px]'
 													)}
-													rows={1}
+													rows={isMobile ? 2 : 1}
 													{...fieldProps}
 													onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
 														const target = e.currentTarget;
@@ -652,7 +667,7 @@ const SortableAIBlock = ({
 											<>
 												<div className={isFullAutomatedBlock ? 'relative' : ''}>
 													{showCustomPlaceholder && (
-														<div className="absolute inset-0 pointer-events-none py-2 pr-10 text-[#505050] text-base md:text-sm max-[480px]:text-[10px]">
+														<div className="absolute inset-0 pointer-events-none py-2 pr-10 text-[#505050] text-base md:text-sm max-[480px]:text-[10px] z-10">
 															<div className="space-y-3">
 																<div>
 																	<p>Prompt Murmur here.</p>
@@ -1661,7 +1676,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			'flex relative z-30',
 																			showTestPreview
 																				? 'justify-start w-full'
-																				: 'justify-end -mr-[102px] w-[93.7vw] max-w-[868px] max-[480px]:-mr-[4.4vw]'
+																				: 'justify-end -mr-[102px] w-[93.7vw] max-w-[868px] max-[480px]:-mr-[2vw]'
 																		)}
 																		style={{ transform: 'translateY(-12px)' }}
 																	>
@@ -1669,7 +1684,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			type="button"
 																			onClick={() => handleAddTextBlockAt(index)}
 																			className={cn(
-																				'w-[52px] h-[20px] bg-background hover:bg-stone-100 active:bg-stone-200 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600 max-[480px]:translate-x-[15px]',
+																				'w-[52px] h-[20px] bg-background hover:bg-stone-100 active:bg-stone-200 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600 max-[480px]:translate-x-[6px]',
 																				showTestPreview &&
 																					'absolute left-0 -translate-x-[calc(100%+5px)]'
 																			)}
@@ -1714,7 +1729,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															<FormControl>
 																<Textarea
 																	placeholder="Enter your signature..."
-																	className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white signature-textarea"
+																	className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white max-[480px]:text-[10px] signature-textarea"
 																	style={{
 																		fontFamily: form.watch('font') || 'Arial',
 																	}}
@@ -1764,7 +1779,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<FormControl>
 														<Textarea
 															placeholder="Enter your signature..."
-															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white signature-textarea"
+															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white max-[480px]:text-[10px] signature-textarea"
 															style={{
 																fontFamily: form.watch('font') || 'Arial',
 															}}

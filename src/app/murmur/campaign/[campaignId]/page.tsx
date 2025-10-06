@@ -690,10 +690,9 @@ const Murmur = () => {
 							body.murmur-mobile [data-hpi-signature-card] {
 								min-height: 68px !important;
 							}
+							/* Allow the signature textarea to auto-expand on mobile portrait */
 							body.murmur-mobile .signature-textarea {
-								height: 44px !important;
-								min-height: 44px !important;
-								max-height: 44px !important;
+								min-height: 44px !important; /* base height */
 								font-size: 12px !important;
 								line-height: 1.2 !important;
 								padding: 2px 0 0 2px !important;
