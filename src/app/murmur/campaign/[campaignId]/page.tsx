@@ -589,7 +589,7 @@ const Murmur = () => {
 									/* Desktop Layout - metrics below title only */
 									<div
 										className="flex flex-col items-center"
-										style={{ marginTop: '3px' }}
+										style={{ marginTop: '11px' }}
 									>
 										<div className="flex items-center gap-5" style={{ marginTop: '0px' }}>
 											<div
