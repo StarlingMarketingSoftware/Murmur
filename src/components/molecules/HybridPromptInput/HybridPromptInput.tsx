@@ -1429,7 +1429,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		'bg-white'
 																	)}
 																>
-																	<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+																	<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
 																		{form.watch('isAiSubject')
 																			? 'Auto Subject'
 																			: 'Subject'}
@@ -1449,7 +1449,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	}}
 																	disabled={isHandwrittenMode}
 																	className={cn(
-																		'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0',
+																		'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 subject-toggle',
 																		form.watch('isAiSubject')
 																			? 'w-auto px-3 justify-center bg-[#5dab68] text-white'
 																			: 'w-[100px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8] -translate-x-[30px]',

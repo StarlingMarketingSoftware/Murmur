@@ -858,6 +858,13 @@ const Murmur = () => {
 								min-height: 24px !important;
 								max-height: 24px !important;
 							}
+							/* iPhone landscape: prevent overlap by slightly reducing label size and spacing toggle */
+							body.murmur-mobile .subject-bar .subject-label {
+								font-size: 15px !important;
+							}
+							body.murmur-mobile .subject-bar .subject-toggle {
+								margin-right: 4px !important;
+							}
 							/* Full Auto textarea: reduce height and hide example for space */
 							body.murmur-mobile .full-auto-textarea {
 								height: 90px !important;
