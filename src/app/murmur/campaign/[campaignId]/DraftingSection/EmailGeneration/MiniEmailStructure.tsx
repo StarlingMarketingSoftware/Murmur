@@ -83,6 +83,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	const isMobilePortrait =
 		typeof window !== 'undefined' && window.matchMedia('(max-width: 480px)').matches;
 
+	// Treat short-height devices as mobile landscape for spacing tweaks
+	const isMobileLandscape =
+		typeof window !== 'undefined' && window.matchMedia('(max-height: 480px)').matches;
+
 	const [addTextButtons, setAddTextButtons] = useState<
 		Array<{ blockId: string; top: number; show: boolean }>
 	>([]);
@@ -446,7 +450,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 			ref={rootRef}
 			style={{
 				width: fullWidthMobile ? '100%' : '376px',
-				height: isMobilePortrait ? 'auto' : '474px',
+				height: isMobilePortrait || isMobileLandscape ? 'auto' : '474px',
 				position: 'relative',
 				overflow: 'visible',
 			}}
@@ -486,7 +490,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 			<div
 				style={{
 					width: '100%',
-					height: isMobilePortrait ? 'auto' : '100%',
+					height: isMobilePortrait || isMobileLandscape ? 'auto' : '100%',
 					border: '3px solid #000000',
 					borderRadius: '8px',
 					position: 'relative',
@@ -499,7 +503,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				{/* Content area - miniature, but interactive */}
 				<div
 					ref={buttonContainerRef}
-					className={cn('overflow-visible', isMobilePortrait ? '' : 'flex-1')}
+					className={cn(
+						'overflow-visible',
+						isMobilePortrait || isMobileLandscape ? '' : 'flex-1'
+					)}
 				>
 					<div className="px-0 pb-3 max-[480px]:pb-2">
 						{/* Mode */}
@@ -747,7 +754,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									<Fragment key={b.id}>
 										<div
 											className={cn(
-												'rounded-[8px] border-2 bg-white px-2 py-1 relative w-[357px] max-[480px]:w-[89.33vw] mx-auto'
+												'rounded-[8px] border-2 bg-white px-2 py-1 relative w-[357px] max-[480px]:w-[89.33vw] mx-auto',
+												b.type === 'full_automated' && 'mini-full-auto-card'
 											)}
 											style={{
 												borderColor:
@@ -795,7 +803,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													</div>
 													<div className="relative">
 														{!b.value && (
-															<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px] max-[480px]:text-[10px]">
+															<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px] max-[480px]:text-[10px] mini-full-auto-placeholder">
 																<div className="space-y-2">
 																	<div>
 																		<p>Prompt Murmur here.</p>
@@ -811,14 +819,15 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															className={cn(
 																'border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 w-full max-w-full min-w-0',
 																'h-[70px] py-2 pr-2 px-0 resize-none',
-																'bg-white text-[12px] leading-[16px]'
+																'bg-white text-[12px] leading-[16px]',
+																'mini-full-auto-textarea'
 															)}
 															placeholder=""
 															value={b.value || ''}
 															onChange={(e) => updateBlockValue(b.id, e.target.value)}
 														/>
 													</div>
-													<div className="pl-2 mb-2 max-[480px]:mb-0">
+													<div className="pl-2 mb-2 max-[480px]:mb-0 mini-paragraph-slider">
 														<ParagraphSlider />
 													</div>
 												</div>
@@ -928,22 +937,23 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								return out;
 							})()}
 						</div>
-						{/* Mobile portrait: Signature inline spacing (extra in hybrid to avoid cutoff) */}
+						{/* Mobile portrait/landscape: Signature inline spacing (extra in hybrid to avoid cutoff) */}
 						<div
 							className={cn(
 								'max-[480px]:block hidden',
 								shouldUseLargeHybridSigGap ? 'mt-8' : 'mt-2'
 							)}
+							style={{ display: isMobileLandscape ? 'block' : undefined }}
 						>
 							<div
 								className="rounded-[8px] border-2 bg-white px-2 py-2 w-[357px] max-[480px]:w-[89.33vw] mx-auto"
 								style={{ borderColor: '#969696' }}
 							>
-								<div className="font-inter text-[16px] font-semibold text-black mb-1 pl-1">
+								<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
 									Signature
 								</div>
 								<textarea
-									className="w-full text-[9px] leading-[16px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none h-[48px]"
+									className="w-full text-[12px] leading-[16px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none h-[48px] signature-textarea"
 									value={signature}
 									onChange={(e) => updateSignature(e.target.value)}
 								/>
@@ -954,10 +964,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 
 				{/* Signature - fixed at bottom (outside scroll) for non-mobile only */}
 				<div
-					className={cn(
-						'px-0 pb-2 mt-3 max-[480px]:hidden',
-						hybridBlocks.some((b) => b.type === 'full_automated') && 'mt-6'
-					)}
+					className={cn('px-0 pb-2 max-[480px]:hidden', 'mt-3')}
+					style={{ display: isMobileLandscape ? 'none' : undefined }}
 				>
 					<div
 						className="rounded-[8px] border-2 bg-white px-2 py-2 w-[357px] max-[480px]:w-[89.33vw] mx-auto"
@@ -968,7 +976,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						</div>
 						<textarea
 							className={cn(
-								'w-full text-[12px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none max-[480px]:h-[40px]',
+								'w-full text-[12px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none max-[480px]:h-[40px] signature-textarea',
 								hybridBlocks.some((b) => b.type === 'full_automated')
 									? 'h-[40px]'
 									: 'h-[58px]'

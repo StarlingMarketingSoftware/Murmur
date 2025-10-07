@@ -797,6 +797,21 @@ const Murmur = () => {
 
 						/* Mobile landscape: inline header controls, centered metrics, and title layout */
 						@media (orientation: landscape) {
+							/* Left-side expanded panel height cap in mobile landscape (exclude Email Structure) */
+							body.murmur-mobile
+								[data-left-expanded-panel]
+								> div:not([aria-label='Expanded email structure']) {
+								height: 273px !important;
+								max-height: 273px !important;
+								overflow: hidden !important;
+							}
+							/* Ensure inner scroll areas flex correctly within the capped height */
+							body.murmur-mobile
+								[data-left-expanded-panel]
+								> div:not([aria-label='Expanded email structure'])
+								> * {
+								max-height: 100% !important;
+							}
 							/* Row: use a 3-column grid so title/metrics/controls never overlap */
 							body.murmur-mobile .mobile-header-row {
 								display: grid !important;
@@ -958,6 +973,36 @@ const Murmur = () => {
 							body.murmur-mobile .full-auto-placeholder-example {
 								display: none !important;
 							}
+							/* Mini Email Structure: make Full Auto much shorter in mobile landscape */
+							body.murmur-mobile
+								[aria-label='Expanded email structure']
+								.mini-full-auto-textarea {
+								height: 48px !important;
+								min-height: 48px !important;
+							}
+							/* Reduce extra whitespace under the paragraph slider in the mini card */
+							body.murmur-mobile
+								[aria-label='Expanded email structure']
+								.mini-paragraph-slider {
+								margin-bottom: 0 !important;
+								padding-bottom: 0 !important;
+							}
+							body.murmur-mobile
+								[aria-label='Expanded email structure']
+								.mini-full-auto-card {
+								padding-bottom: 6px !important; /* tighten bottom padding of the card */
+							}
+							body.murmur-mobile
+								[aria-label='Expanded email structure']
+								.mini-full-auto-placeholder {
+								display: block !important;
+								font-size: 9px !important;
+								line-height: 1.15 !important;
+								padding: 4px 6px 2px 0 !important;
+								color: #505050 !important;
+								overflow: hidden !important;
+							}
+							/* Show full guidance text (both lines) but keep smaller sizing */
 							/* Signature area: single-line compact */
 							body.murmur-mobile [data-hpi-footer] {
 								margin-top: 2px !important;
@@ -986,7 +1031,7 @@ const Murmur = () => {
 								resize: none !important;
 								flex: 1 1 auto !important;
 								min-width: 0 !important;
-								font-size: 10px !important;
+								font-size: 12px !important; /* match the 'Signature' header size on mobile */
 								line-height: 1.2 !important;
 								padding: 2px 0 0 2px !important;
 							}

@@ -513,7 +513,9 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 			)}
 		>
 			{isSplitLayout && activePreview !== 'none' && (
-				<div className="absolute left-3 top-0">{renderLeftExpanded()}</div>
+				<div className="absolute left-3 top-0" data-left-expanded-panel>
+					{renderLeftExpanded()}
+				</div>
 			)}
 			<div
 				className={cn(
