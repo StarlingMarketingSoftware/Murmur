@@ -916,6 +916,43 @@ const Murmur = () => {
 							body.murmur-mobile .w-full > .flex.justify-center.mb-4.w-full {
 								display: none !important;
 							}
+							/* Exact 8px gap between last content block and Signature; keep Signature bottom-anchored */
+							body.murmur-mobile [data-hpi-container] {
+								display: grid !important;
+								grid-template-rows: 1fr auto !important; /* content fills, footer at bottom */
+								align-items: stretch !important;
+								row-gap: 8px !important; /* exact gap above signature */
+							}
+							/* Remove extra bottom spacing inside the content area so the gap is truly 8px */
+							body.murmur-mobile [data-hpi-left-panel] {
+								padding-bottom: 0 !important;
+							}
+							body.murmur-mobile [data-hpi-content] {
+								padding-bottom: 0 !important;
+							}
+							body.murmur-mobile [data-hpi-content] > div {
+								padding-bottom: 0 !important; /* override inner pb-3 */
+							}
+							body.murmur-mobile [data-hpi-content] [data-block-type]:last-of-type {
+								margin-bottom: 0 !important; /* account for any margins on the last block */
+							}
+							/* Rely on grid spacing; do not add margin on footer */
+							body.murmur-mobile [data-hpi-footer] {
+								margin-top: 0 !important; /* override mt-auto/margin rules */
+							}
+							/* Ensure exactly 8px between the bottom of Signature and the bottom of the box */
+							body.murmur-mobile [data-hpi-footer] {
+								padding-bottom: 8px !important;
+							}
+							/* Remove extra bottom margin from the Signature FormItem wrapper */
+							body.murmur-mobile [data-hpi-footer] .mb-\[23px\],
+							body.murmur-mobile [data-hpi-footer] .mb-\[9px\] {
+								margin-bottom: 0 !important;
+							}
+							/* Hide any in-box footer content below Signature in landscape (Test/error), relying on sticky Test */
+							body.murmur-mobile [data-hpi-footer] > .w-full {
+								display: none !important;
+							}
 						}
 
 						/* Previously we drew only a bottom divider. Replace with a full header box in landscape. */
