@@ -191,6 +191,14 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 		setActivePreview((prev) => (prev === 'none' ? 'contacts' : prev));
 	}, [isMobile, isLandscape]);
 
+	// Default-open Contacts when in mobile landscape (split layout)
+	useEffect(() => {
+		if (!isMobile) return; // only mobile
+		if (!isLandscape) return; // only landscape
+		// only on first mount when nothing selected yet
+		setActivePreview((prev) => (prev === 'none' ? 'contacts' : prev));
+	}, [isMobile, isLandscape]);
+
 	// In portrait mobile, never allow 'none' state
 	useEffect(() => {
 		if (!isPortraitMobile) return;
@@ -199,19 +207,43 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 		}
 	}, [isPortraitMobile, activePreview, selectFallbackPreview]);
 
+	// In mobile landscape (split layout), also never allow 'none' state
+	useEffect(() => {
+		if (!isSplitLayout) return;
+		if (activePreview === 'none') {
+			setActivePreview(selectFallbackPreview());
+		}
+	}, [isSplitLayout, activePreview, selectFallbackPreview]);
+
 	// Ensure expanded Draft Preview collapses when hidden
 	useEffect(() => {
 		if (!showDraftPreviewBox && activePreview === 'draftPreview') {
-			setActivePreview(isPortraitMobile ? selectFallbackPreview('draftPreview') : 'none');
+			setActivePreview(
+				isPortraitMobile || isSplitLayout ? selectFallbackPreview('draftPreview') : 'none'
+			);
 		}
-	}, [showDraftPreviewBox, activePreview, isPortraitMobile, selectFallbackPreview]);
+	}, [
+		showDraftPreviewBox,
+		activePreview,
+		isPortraitMobile,
+		isSplitLayout,
+		selectFallbackPreview,
+	]);
 
 	// Ensure expanded Send Preview collapses when hidden
 	useEffect(() => {
 		if (!showSendPreviewBox && activePreview === 'sendPreview') {
-			setActivePreview(isPortraitMobile ? selectFallbackPreview('sendPreview') : 'none');
+			setActivePreview(
+				isPortraitMobile || isSplitLayout ? selectFallbackPreview('sendPreview') : 'none'
+			);
 		}
-	}, [showSendPreviewBox, activePreview, isPortraitMobile, selectFallbackPreview]);
+	}, [
+		showSendPreviewBox,
+		activePreview,
+		isPortraitMobile,
+		isSplitLayout,
+		selectFallbackPreview,
+	]);
 
 	const isDrafting =
 		generationProgress >= 0 &&
@@ -344,11 +376,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 				return (
 					<ContactsExpandedList
 						contacts={availableContacts}
-						onHeaderClick={() =>
-							setActivePreview(
-								isPortraitMobile ? selectFallbackPreview('contacts') : 'none'
-							)
-						}
+						onHeaderClick={() => {
+							if (isPortraitMobile) {
+								setActivePreview(selectFallbackPreview('contacts'));
+							}
+						}}
 						onDraftSelected={async (ids) => {
 							if (props.onDraftSelectedContacts) await props.onDraftSelectedContacts(ids);
 						}}
@@ -362,11 +394,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 				return (
 					<EmailStructureExpandedBox
 						form={form}
-						onHeaderClick={() =>
-							setActivePreview(
-								isPortraitMobile ? selectFallbackPreview('emailStructure') : 'none'
-							)
-						}
+						onHeaderClick={() => {
+							if (isPortraitMobile) {
+								setActivePreview(selectFallbackPreview('emailStructure'));
+							}
+						}}
 						onDraft={() => {}}
 						isDraftDisabled={
 							props.isGenerationDisabled ? props.isGenerationDisabled() : true
@@ -382,11 +414,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 				return (
 					<DraftPreviewExpandedList
 						contacts={contacts}
-						onHeaderClick={() =>
-							setActivePreview(
-								isPortraitMobile ? selectFallbackPreview('draftPreview') : 'none'
-							)
-						}
+						onHeaderClick={() => {
+							if (isPortraitMobile) {
+								setActivePreview(selectFallbackPreview('draftPreview'));
+							}
+						}}
 						livePreview={{
 							visible: props.isLivePreviewVisible,
 							contactId: props.livePreviewContactId || null,
@@ -409,11 +441,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					<DraftsExpandedList
 						drafts={draftedEmails}
 						contacts={contacts}
-						onHeaderClick={() =>
-							setActivePreview(
-								isPortraitMobile ? selectFallbackPreview('drafts') : 'none'
-							)
-						}
+						onHeaderClick={() => {
+							if (isPortraitMobile) {
+								setActivePreview(selectFallbackPreview('drafts'));
+							}
+						}}
 						onSendingPreviewUpdate={({ contactId, subject }) => {
 							setSendingPreviewContactId(contactId || null);
 							setSendingPreviewSubject(subject || '');
@@ -429,11 +461,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 				return (
 					<SendPreviewExpandedList
 						contacts={contacts}
-						onHeaderClick={() =>
-							setActivePreview(
-								isPortraitMobile ? selectFallbackPreview('sendPreview') : 'none'
-							)
-						}
+						onHeaderClick={() => {
+							if (isPortraitMobile) {
+								setActivePreview(selectFallbackPreview('sendPreview'));
+							}
+						}}
 						livePreview={{
 							visible: Boolean(sendingPreviewContactId && sendingInlineSubject),
 							contactId: sendingPreviewContactId,
@@ -458,9 +490,11 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 					<SentExpandedList
 						sent={sentEmails}
 						contacts={contacts}
-						onHeaderClick={() =>
-							setActivePreview(isPortraitMobile ? selectFallbackPreview('sent') : 'none')
-						}
+						onHeaderClick={() => {
+							if (isPortraitMobile) {
+								setActivePreview(selectFallbackPreview('sent'));
+							}
+						}}
 					/>
 				);
 			default:
