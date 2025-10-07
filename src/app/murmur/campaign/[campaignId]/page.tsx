@@ -206,7 +206,7 @@ const Murmur = () => {
 											isMobile
 												? {
 														transform: isLandscape
-															? 'translateY(0px) scale(0.72)'
+															? 'translateY(0px) scale(0.6)'
 															: 'translateY(3px)',
 														transformOrigin: isLandscape ? 'left center' : undefined,
 												  }
@@ -826,12 +826,14 @@ const Murmur = () => {
 								left: auto !important;
 								transform: none !important;
 								margin-left: 0 !important;
+								padding-right: 15px !important; /* increased right padding */
 								justify-self: end !important;
 								grid-column: 3 / 4 !important;
 							}
 							/* Title: flex and truncate on the left side */
 							body.murmur-mobile .campaign-title-landscape {
 								margin-left: -8px !important; /* nudge farther left in landscape */
+								padding-left: 15px !important; /* increased left padding */
 								max-width: none;
 								overflow: hidden;
 								white-space: nowrap;
@@ -839,11 +841,16 @@ const Murmur = () => {
 								flex: 1 1 auto; /* allow the title to use remaining row space */
 								min-width: 0; /* enable proper truncation inside flex layouts */
 							}
-							/* smaller title text only in mobile landscape */
+							/* smaller title text only in mobile landscape and enforce truncation */
 							body.murmur-mobile .campaign-title-landscape * {
 								font-size: 15px !important;
 								line-height: 1 !important;
 								text-align: left !important; /* show more of the beginning */
+								max-width: 100% !important;
+								width: 100% !important; /* override inner w-fit to enable truncation */
+								overflow: hidden !important;
+								white-space: nowrap !important;
+								text-overflow: ellipsis !important;
 							}
 
 							/* Shrink metric boxes a bit to free width for the title */
