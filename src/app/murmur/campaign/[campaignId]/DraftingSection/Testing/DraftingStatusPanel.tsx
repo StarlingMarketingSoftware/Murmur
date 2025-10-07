@@ -504,10 +504,16 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 
 	return (
 		<div
-			className={cn(isSplitLayout ? 'relative flex items-start self-end ml-auto' : '')}
+			className={cn(
+				isSplitLayout ? 'relative flex items-start mx-auto' : '',
+				// When showing a left expanded panel in split layout, pad the wrapper on the left
+				// so the wrapper's width reflects both panels. This allows mx-auto centering
+				// of the entire combined unit (left expanded + right preview).
+				isSplitLayout && activePreview !== 'none' ? 'pl-[388px]' : ''
+			)}
 		>
 			{isSplitLayout && activePreview !== 'none' && (
-				<div className="absolute right-full mr-3 top-0">{renderLeftExpanded()}</div>
+				<div className="absolute left-3 top-0">{renderLeftExpanded()}</div>
 			)}
 			<div
 				className={cn(
