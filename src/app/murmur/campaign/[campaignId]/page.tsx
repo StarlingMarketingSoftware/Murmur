@@ -167,7 +167,12 @@ const Murmur = () => {
 						<span>Back to Home</span>
 					</Link>
 					{isMobile && !shouldHideContent && null}
-					<div className="max-w-[1250px] w-9/10 mx-auto lg:w-9/10">
+					<div
+						className={cn(
+							'max-w-[1250px] mx-auto lg:w-9/10',
+							isMobile ? (isLandscape ? 'w-full' : 'w-9/10') : 'w-9/10'
+						)}
+					>
 						<div
 							className={cn(
 								'transition-opacity duration-200',
@@ -180,16 +185,18 @@ const Murmur = () => {
 								className="flex flex-col items-center"
 								style={{
 									paddingTop: isMobile ? (isLandscape ? '6px' : '18px') : '12px',
-									paddingBottom: isMobile ? undefined : '8px',
+									paddingBottom: isMobile ? (isLandscape ? '6px' : undefined) : '8px',
 								}}
 							>
 								<div
 									className={cn(
 										isMobile
-											? 'mx-auto flex items-center justify-between'
+											? 'mx-auto flex items-center justify-between mobile-header-row'
 											: 'relative w-full flex items-center justify-center'
 									)}
-									style={isMobile ? { width: '94.67%' } : undefined}
+									style={
+										isMobile ? { width: isLandscape ? '100%' : '94.67%' } : undefined
+									}
 								>
 									{/* Slight mobile-only vertical nudge to sit closer to the box */}
 									<div
@@ -199,8 +206,9 @@ const Murmur = () => {
 											isMobile
 												? {
 														transform: isLandscape
-															? 'translateY(0px)'
+															? 'translateY(0px) scale(0.72)'
 															: 'translateY(3px)',
+														transformOrigin: isLandscape ? 'left center' : undefined,
 												  }
 												: undefined
 										}
@@ -309,10 +317,9 @@ const Murmur = () => {
 										</div>
 									)}
 
-									{/* Mobile landscape inline controls: hidden by default; shown via CSS in landscape */}
+									{/* Mobile landscape metrics centered overlay */}
 									{isMobile && (
-										<div className="mobile-landscape-inline-controls">
-											{/* Metrics */}
+										<div className="mobile-landscape-metrics-center" aria-hidden="true">
 											<div
 												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
 												style={{
@@ -355,7 +362,12 @@ const Murmur = () => {
 													? 'sent'
 													: `${String(sentCount).padStart(2, '0')} sent`}
 											</div>
+										</div>
+									)}
 
+									{/* Mobile landscape inline controls: hidden by default; shown via CSS in landscape */}
+									{isMobile && (
+										<div className="mobile-landscape-inline-controls">
 											{/* To */}
 											<Link
 												href={urls.murmur.dashboard.index}
@@ -369,7 +381,7 @@ const Murmur = () => {
 												className="block"
 											>
 												<div
-													className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]"
+													className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969] pill-mini"
 													style={{
 														width: '36.06px',
 														height: '14.21px',
@@ -389,7 +401,7 @@ const Murmur = () => {
 													setIdentityDialogOrigin('campaign');
 													setIsIdentityDialogOpen(true);
 												}}
-												className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969]"
+												className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969] pill-mini"
 												style={{
 													width: '36.06px',
 													height: '14.21px',
@@ -427,44 +439,43 @@ const Murmur = () => {
 												>
 													Drafting
 												</button>
+												{/* Home button moved into right controls (landscape) */}
+												<button
+													onClick={() => {
+														if (typeof window !== 'undefined') {
+															window.location.assign(urls.murmur.dashboard.index);
+														}
+													}}
+													title="Home"
+													aria-label="Back to Home"
+													className="inline-flex items-center justify-center rounded-[6px] bg-[#EEEEEE] text-black shadow-[0_2px_10px_rgba(0,0,0,0.15)] active:scale-95 transition-all duration-200 ml-2"
+													style={{
+														width: '23px',
+														height: '17px',
+														WebkitTapHighlightColor: 'transparent',
+													}}
+												>
+													<svg
+														width="11"
+														height="11"
+														viewBox="0 0 11 11"
+														fill="none"
+														xmlns="http://www.w3.org/2000/svg"
+													>
+														<path
+															d="M8.0564 5.64955V8.90431H2.80971V5.64955H8.0564ZM9.20009 4.50586H1.66602V10.048H9.20009V4.50586Z"
+															fill="black"
+														/>
+														<path
+															d="M5.43871 1.74879L8.05729 4.40787H2.84396L5.4411 1.74879M5.43395 0.114258L0.127686 5.55157H10.7879L5.43633 0.114258H5.43395Z"
+															fill="black"
+														/>
+													</svg>
+												</button>
 											</div>
 										</div>
 									)}
-									{isMobile && !shouldHideContent && (
-										<button
-											onClick={() => {
-												if (typeof window !== 'undefined') {
-													window.location.assign(urls.murmur.dashboard.index);
-												}
-											}}
-											title="Home"
-											aria-label="Back to Home"
-											className="z-[100] inline-flex items-center justify-center rounded-[6px] bg-[#EEEEEE] text-black shadow-[0_2px_10px_rgba(0,0,0,0.15)] active:scale-95 transition-all duration-200"
-											style={{
-												width: '23px',
-												height: '17px',
-												transform: isLandscape ? 'translateY(0px)' : 'translateY(2px)',
-												WebkitTapHighlightColor: 'transparent',
-											}}
-										>
-											<svg
-												width="11"
-												height="11"
-												viewBox="0 0 11 11"
-												fill="none"
-												xmlns="http://www.w3.org/2000/svg"
-											>
-												<path
-													d="M8.0564 5.64955V8.90431H2.80971V5.64955H8.0564ZM9.20009 4.50586H1.66602V10.048H9.20009V4.50586Z"
-													fill="black"
-												/>
-												<path
-													d="M5.43871 1.74879L8.05729 4.40787H2.84396L5.4411 1.74879M5.43395 0.114258L0.127686 5.55157H10.7879L5.43633 0.114258H5.43395Z"
-													fill="black"
-												/>
-											</svg>
-										</button>
-									)}
+									{isMobile && !shouldHideContent && null}
 								</div>
 
 								{/* Mobile Layout - Single Container with all elements (portrait only) */}
@@ -721,6 +732,11 @@ const Murmur = () => {
 							display: none !important;
 						}
 
+						/* Default: hide the centered metrics overlay (shown only in landscape) */
+						body.murmur-mobile .mobile-landscape-metrics-center {
+							display: none !important;
+						}
+
 						/* Mobile portrait: fix signature block height */
 						@media (max-width: 480px) and (orientation: portrait) {
 							/* Specific case: when Full Auto block exists, set exact 8px gap to Signature while keeping it bottom-anchored */
@@ -779,18 +795,80 @@ const Murmur = () => {
 							}
 						}
 
-						/* Mobile landscape: inline header controls and title clipping */
+						/* Mobile landscape: inline header controls, centered metrics, and title layout */
 						@media (orientation: landscape) {
+							/* Row: use a 3-column grid so title/metrics/controls never overlap */
+							body.murmur-mobile .mobile-header-row {
+								display: grid !important;
+								grid-template-columns: 1fr auto 1fr !important; /* left flex, centered auto, right flex */
+								align-items: center !important;
+								gap: 6px !important;
+							}
+							/* Centered metrics: inline in the center grid cell */
+							body.murmur-mobile .mobile-landscape-metrics-center {
+								display: inline-flex !important;
+								gap: 6px !important;
+								position: static !important;
+								left: auto !important;
+								top: auto !important;
+								transform: none !important;
+								z-index: auto !important;
+								pointer-events: auto !important;
+								justify-self: center !important; /* center within middle column */
+								grid-column: 2 / 3 !important;
+							}
+							/* Controls: right grid cell */
 							body.murmur-mobile .mobile-landscape-inline-controls {
 								display: inline-flex !important;
-								gap: 8px;
-								align-items: center;
+								gap: 3px; /* tighter spacing to free more room for title */
+								align-items: center !important;
+								position: static !important;
+								left: auto !important;
+								transform: none !important;
+								margin-left: 0 !important;
+								justify-self: end !important;
+								grid-column: 3 / 4 !important;
 							}
+							/* Title: flex and truncate on the left side */
 							body.murmur-mobile .campaign-title-landscape {
-								max-width: 200px;
+								margin-left: -8px !important; /* nudge farther left in landscape */
+								max-width: none;
 								overflow: hidden;
 								white-space: nowrap;
 								text-overflow: ellipsis;
+								flex: 1 1 auto; /* allow the title to use remaining row space */
+								min-width: 0; /* enable proper truncation inside flex layouts */
+							}
+							/* smaller title text only in mobile landscape */
+							body.murmur-mobile .campaign-title-landscape * {
+								font-size: 15px !important;
+								line-height: 1 !important;
+								text-align: left !important; /* show more of the beginning */
+							}
+
+							/* Shrink metric boxes a bit to free width for the title */
+							body.murmur-mobile .mobile-landscape-inline-controls .metric-box {
+								width: 70px !important;
+								font-size: 10.5px !important;
+								padding-left: 6px !important;
+								padding-right: 6px !important;
+							}
+							/* Make To/From pills slightly narrower */
+							body.murmur-mobile .mobile-landscape-inline-controls .pill-mini {
+								width: 32px !important;
+								height: 14px !important;
+								border-radius: 5px !important;
+							}
+							body.murmur-mobile .mobile-landscape-inline-controls .pill-mini span {
+								font-size: 9px !important;
+							}
+							/* Tighten spacing before the inline view tabs in landscape */
+							body.murmur-mobile .mobile-landscape-inline-controls .ml-2 {
+								margin-left: 4px !important;
+							}
+							/* Slightly smaller view-tab labels to prioritize title width */
+							body.murmur-mobile .mobile-landscape-inline-controls button {
+								font-size: 14px !important;
 							}
 
 							/* Make the preview panel mimic portrait style by hiding its outer chrome */
@@ -808,7 +886,7 @@ const Murmur = () => {
 						/* At 667px landscape, adjust spacing for less cramped layout */
 						@media (max-width: 667px) and (orientation: landscape) {
 							body.murmur-mobile .campaign-title-landscape {
-								margin-left: -8px;
+								margin-left: -20px;
 							}
 							/* Home button on the right - push it out slightly */
 							body.murmur-mobile button[title='Home'] {
