@@ -838,15 +838,19 @@ const Murmur = () => {
 								padding-bottom: 0 !important;
 								gap: 8px !important;
 							}
-							/* Reduce space below the subject bar and above first block */
+							/* Mobile landscape: enforce exact 8px gap from subject bar to first block */
 							body.murmur-mobile
 								[data-hpi-left-panel]
 								[data-slot='form-item']:first-of-type {
-								margin-bottom: 2px !important;
+								margin-bottom: 0 !important;
 							}
+							/* Remove container top padding and set inner wrapper top padding to 8px */
 							body.murmur-mobile [data-hpi-content] {
-								padding-top: 2px !important;
-								gap: 6px !important;
+								padding-top: 0 !important;
+								gap: 6px !important; /* keep tighter inter-block spacing */
+							}
+							body.murmur-mobile [data-hpi-content] > div {
+								padding-top: 8px !important; /* overrides pt-[16px]/pt-[8px] utility classes */
 							}
 							/* Subject bar: minimal but legible */
 							body.murmur-mobile .subject-bar {
