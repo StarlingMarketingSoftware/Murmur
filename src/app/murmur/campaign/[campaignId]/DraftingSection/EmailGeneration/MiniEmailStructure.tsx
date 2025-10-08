@@ -455,8 +455,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				overflow: 'visible',
 			}}
 		>
-			{/* Centered number above block */}
-			{!hideTopChrome && (
+			{/* Centered number above block (hidden in mobile landscape) */}
+			{!hideTopChrome && !isMobileLandscape && (
 				<div
 					data-drafting-top-number
 					style={{
@@ -472,7 +472,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				</div>
 			)}
 			{/* Top-left text label */}
-			{!hideTopChrome && (
+			{!hideTopChrome && !isMobileLandscape && (
 				<div
 					data-drafting-top-label
 					style={{
@@ -510,7 +510,26 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				>
 					<div className="px-0 pb-3 max-[480px]:pb-2">
 						{/* Mode */}
-						<div className="w-full bg-white pt-2 rounded-t-[5px]">
+						<div className="w-full bg-white pt-2 rounded-t-[5px] relative">
+							{/* Inline step indicator for mobile landscape */}
+							{isMobileLandscape && (
+								<div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[12px] leading-none font-inter font-medium text-black">
+									<span>2</span>
+									<svg
+										width="7"
+										height="12"
+										viewBox="0 0 7 12"
+										fill="none"
+										xmlns="http://www.w3.org/2000/svg"
+									>
+										<path
+											d="M6.53033 6.53033C6.82322 6.23744 6.82322 5.76256 6.53033 5.46967L1.75736 0.696699C1.46447 0.403806 0.989593 0.403806 0.696699 0.696699C0.403806 0.989593 0.403806 1.46447 0.696699 1.75736L4.93934 6L0.696699 10.2426C0.403806 10.5355 0.403806 11.0104 0.696699 11.3033C0.989593 11.5962 1.46447 11.5962 1.75736 11.3033L6.53033 6.53033ZM5 6V6.75H6V6V5.25H5V6Z"
+											fill="#636363"
+											fillOpacity="0.46"
+										/>
+									</svg>
+								</div>
+							)}
 							<div className="flex items-center gap-4 mb-1 w-[357px] mx-auto">
 								<span className="font-inter font-semibold text-[13px]">Mode</span>
 								<div ref={modeContainerRef} className="relative flex items-center gap-6">

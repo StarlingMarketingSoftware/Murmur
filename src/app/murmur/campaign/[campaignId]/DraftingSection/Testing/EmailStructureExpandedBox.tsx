@@ -5,6 +5,7 @@ import { UseFormReturn } from 'react-hook-form';
 import { DraftingFormValues } from '../useDraftingSection';
 import { cn } from '@/utils';
 import { MiniEmailStructure } from '../EmailGeneration/MiniEmailStructure';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 export interface EmailStructureExpandedBoxProps {
 	form: UseFormReturn<DraftingFormValues>;
@@ -44,35 +45,43 @@ export const EmailStructureExpandedBox: FC<EmailStructureExpandedBoxProps> = ({
 	generationTotal,
 	onCancel,
 }) => {
+	const isMobile = useIsMobile();
+	const isLandscape =
+		typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+			? window.matchMedia('(orientation: landscape)').matches
+			: false;
+	const isMobileLandscape = Boolean(isMobile && isLandscape);
 	return (
 		<div
 			className="w-[376px] max-[480px]:w-[96.27vw] h-auto px-0 pb-0 flex flex-col bg-transparent mb-2"
 			role="region"
 			aria-label="Expanded email structure"
 		>
-			{/* Header */}
-			<div
-				className={cn(
-					'flex items-center gap-2 h-[21px] px-1',
-					onHeaderClick ? 'cursor-pointer' : ''
-				)}
-				role={onHeaderClick ? 'button' : undefined}
-				tabIndex={onHeaderClick ? 0 : undefined}
-				onClick={onHeaderClick}
-				onKeyDown={(e) => {
-					if (!onHeaderClick) return;
-					if (e.key === 'Enter' || e.key === ' ') {
-						e.preventDefault();
-						onHeaderClick();
-					}
-				}}
-			>
-				<span className="font-bold text-black text-sm">Email Structure</span>
-				<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
-					<span className="w-[20px] text-center">2</span>
-					<ArrowIcon />
+			{/* Header (hidden on mobile landscape; the number will render inside the box) */}
+			{!isMobileLandscape && (
+				<div
+					className={cn(
+						'flex items-center gap-2 h-[21px] px-1',
+						onHeaderClick ? 'cursor-pointer' : ''
+					)}
+					role={onHeaderClick ? 'button' : undefined}
+					tabIndex={onHeaderClick ? 0 : undefined}
+					onClick={onHeaderClick}
+					onKeyDown={(e) => {
+						if (!onHeaderClick) return;
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							onHeaderClick();
+						}
+					}}
+				>
+					<span className="font-bold text-black text-sm">Email Structure</span>
+					<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
+						<span className="w-[20px] text-center">2</span>
+						<ArrowIcon />
+					</div>
 				</div>
-			</div>
+			)}
 
 			{/* Body */}
 			<div className="pt-1 flex justify-center">
