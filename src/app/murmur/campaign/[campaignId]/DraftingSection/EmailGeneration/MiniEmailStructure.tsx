@@ -1062,7 +1062,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				)}
 			</div>
 			<div
-				className="absolute top-0 right-[-18px] max-[480px]:-right-[10px] z-50 flex flex-col"
+				className="absolute top-0 left-[-18px] max-[480px]:-left-[10px] z-50 flex flex-col"
 				style={{ pointerEvents: 'none' }}
 			>
 				{addTextButtons.map((btn, index) => {
@@ -1075,7 +1075,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							style={{
 								position: 'absolute',
 								top: `${btn.top}px`,
-								right: 0,
+								left: 0,
 								pointerEvents: 'all',
 							}}
 						>
