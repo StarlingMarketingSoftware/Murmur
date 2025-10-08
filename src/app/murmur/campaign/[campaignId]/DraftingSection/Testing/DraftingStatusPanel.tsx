@@ -559,64 +559,72 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 									isPendingGeneration={props.isPendingGeneration}
 								/>
 							) : (
-								<div
-									className={cn(
-										'rounded-md border-2 border-black/30 font-sans',
-										'bg-[#F5DADA] backdrop-blur-sm select-none transition-all',
-										'w-[376px] max-[480px]:w-[96.27vw]'
+								<div className="relative">
+									{isSplitLayout && activePreview === 'contacts' && (
+										<div
+											className="absolute -inset-1 rounded-none border-2 border-black/50 bg-[rgba(93,171,104,0.35)] z-0 pointer-events-none"
+											aria-hidden="true"
+										/>
 									)}
-								>
 									<div
-										className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
-										style={{ height: '28px' }}
-										onClick={() => setActivePreview('contacts')}
+										className={cn(
+											'relative z-10 rounded-md border-2 border-black/30 font-sans',
+											'bg-[#F5DADA] backdrop-blur-sm select-none transition-all',
+											'w-[376px] max-[480px]:w-[96.27vw]'
+										)}
 									>
-										<span className="font-bold text-black text-sm">Contacts</span>
-										<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
-											<span>{`${String(contactsCount).padStart(2, '0')} ${
-												contactsCount === 1 ? 'person' : 'people'
-											}`}</span>
-											<Divider />
-											<button
-												type="button"
-												className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-												onClick={(e) => {
-													e.stopPropagation();
-													setActivePreview('contacts');
-												}}
-											>
-												Select
-											</button>
-											<Divider />
-											<button
-												type="button"
-												className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-												onClick={(e) => {
-													e.stopPropagation();
-													setActivePreview('draftPreview');
-												}}
-											>
-												Draft
-											</button>
-										</div>
-										<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
-											<span className="w-[20px] text-center">1</span>
-											<ArrowIcon />
-										</div>
-									</div>
-									{isDrafting && (
-										<div className="px-2 pb-2">
-											<div className="mt-1">
-												<div className="text-[10px] mb-0.5">Drafting</div>
-												<div className="h-1.5 w-full rounded-sm border-2 border-black/20 bg-white">
-													<div
-														className="h-full bg-[#B5E2B5]"
-														style={{ width: `${draftingPct}%` }}
-													/>
-												</div>
+										<div
+											className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+											style={{ height: '28px' }}
+											onClick={() => setActivePreview('contacts')}
+										>
+											<span className="font-bold text-black text-sm">Contacts</span>
+											<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
+												<span>{`${String(contactsCount).padStart(2, '0')} ${
+													contactsCount === 1 ? 'person' : 'people'
+												}`}</span>
+												<Divider />
+												<button
+													type="button"
+													className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
+													onClick={(e) => {
+														e.stopPropagation();
+														setActivePreview('contacts');
+													}}
+												>
+													Select
+												</button>
+												<Divider />
+												<button
+													type="button"
+													className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
+													onClick={(e) => {
+														e.stopPropagation();
+														setActivePreview('draftPreview');
+													}}
+												>
+													Draft
+												</button>
+											</div>
+											<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
+												<span className="w-[20px] text-center">1</span>
+												<ArrowIcon />
 											</div>
 										</div>
-									)}
+										{isDrafting && (
+											<div className="px-2 pb-2">
+												<div className="mt-1">
+													<div className="text-[10px] mb-0.5">Drafting</div>
+													<div className="h-1.5 w-full rounded-sm border-2 border-black/20 bg-white">
+														<div
+															className="h-full bg-[#B5E2B5]"
+															style={{ width: `${draftingPct}%` }}
+														/>
+													</div>
+												</div>
+											</div>
+										)}
+									</div>
 								</div>
 							)}
 						</div>
@@ -640,32 +648,40 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 								onCancel={() => {}}
 							/>
 						) : (
-							<div
-								className="flex items-stretch rounded-lg border-2 border-black w-[376px] max-[480px]:w-[96.27vw] h-[32px] font-sans text-xs cursor-pointer overflow-hidden mb-2"
-								onClick={() => setActivePreview('emailStructure')}
-							>
-								<div className="px-3 text-sm font-bold text-black bg-white flex items-center border-r border-black/40">
-									<span className="whitespace-nowrap">Email Structure</span>
-								</div>
+							<div className="relative mb-2">
+								{isSplitLayout && activePreview === 'emailStructure' && (
+									<div
+										className="absolute -inset-1 rounded-none border-2 border-black/50 bg-[rgba(93,171,104,0.35)] z-0 pointer-events-none"
+										aria-hidden="true"
+									/>
+								)}
 								<div
-									className="px-3 flex items-center border-r border-black/40 font-medium text-black/80 text-[11px]"
-									style={draftingModeStyle}
+									className="relative z-10 flex items-stretch rounded-lg border-2 border-black w-[376px] max-[480px]:w-[96.27vw] h-[32px] font-sans text-xs cursor-pointer overflow-hidden"
+									onClick={() => setActivePreview('emailStructure')}
 								>
-									<span className="whitespace-nowrap">{draftingMode}</span>
-								</div>
-								<div
-									className="px-3 flex items-center border-r border-black/40 font-medium text-black/80 text-[11px]"
-									style={subjectStyle}
-								>
-									<span className="whitespace-nowrap">
-										{isAiSubject ? 'Auto Subject' : 'Subject'}
-									</span>
-								</div>
-								<div className="px-3 bg-[#E0E0E0] flex items-center flex-grow font-medium text-black/80 text-[11px] min-w-0">
-									<span className="truncate">{fromName || 'From'}</span>
-								</div>
-								<div className="bg-white flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
-									<span className="w-[20px] text-center">2</span>
+									<div className="px-3 text-sm font-bold text-black bg-white flex items-center border-r border-black/40">
+										<span className="whitespace-nowrap">Email Structure</span>
+									</div>
+									<div
+										className="px-3 flex items-center border-r border-black/40 font-medium text-black/80 text-[11px]"
+										style={draftingModeStyle}
+									>
+										<span className="whitespace-nowrap">{draftingMode}</span>
+									</div>
+									<div
+										className="px-3 flex items-center border-r border-black/40 font-medium text-black/80 text-[11px]"
+										style={subjectStyle}
+									>
+										<span className="whitespace-nowrap">
+											{isAiSubject ? 'Auto Subject' : 'Subject'}
+										</span>
+									</div>
+									<div className="px-3 bg-[#E0E0E0] flex items-center flex-grow font-medium text-black/80 text-[11px] min-w-0">
+										<span className="truncate">{fromName || 'From'}</span>
+									</div>
+									<div className="bg-white flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
+										<span className="w-[20px] text-center">2</span>
+									</div>
 								</div>
 							</div>
 						)}
@@ -697,48 +713,56 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 									}
 								/>
 							) : (
-								<div
-									className={cn(
-										'rounded-md border-2 border-[#295094] mb-2 font-sans',
-										'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all',
-										'w-[376px] max-[480px]:w-[96.27vw]'
+								<div className="relative mb-2">
+									{isSplitLayout && activePreview === 'draftPreview' && (
+										<div
+											className="absolute -inset-1 rounded-none border-2 border-black/50 bg-[rgba(93,171,104,0.35)] z-0 pointer-events-none"
+											aria-hidden="true"
+										/>
 									)}
-								>
 									<div
-										className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
-										style={{ height: '28px' }}
-										onClick={() => setActivePreview('draftPreview')}
+										className={cn(
+											'relative z-10 rounded-md border-2 border-[#295094] font-sans',
+											'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all',
+											'w-[376px] max-[480px]:w-[96.27vw]'
+										)}
 									>
-										<span className="font-bold text-black text-sm">Draft Preview</span>
-										<div className="ml-2 flex-1 min-w-0 self-stretch flex items-stretch">
-											<div className="w-px self-stretch border-l border-black" />
-											<div
-												className="flex items-center bg-white w-full px-2"
-												style={{ backgroundColor: '#FFFFFF' }}
-											>
-												{livePreviewContactName && (
-													<>
-														<div
-															className="text-[12px] font-bold text-black truncate"
-															title={livePreviewContactName}
-														>
-															{livePreviewContactName}
-														</div>
-														<div className="w-px self-stretch border-l border-black/40 mx-2" />
-													</>
-												)}
+										<div
+											className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+											style={{ height: '28px' }}
+											onClick={() => setActivePreview('draftPreview')}
+										>
+											<span className="font-bold text-black text-sm">Draft Preview</span>
+											<div className="ml-2 flex-1 min-w-0 self-stretch flex items-stretch">
+												<div className="w-px self-stretch border-l border-black" />
 												<div
-													className="text-[12px] text-black/80 truncate flex-1"
-													title={livePreviewSubject}
+													className="flex items-center bg-white w-full px-2"
+													style={{ backgroundColor: '#FFFFFF' }}
 												>
-													{livePreviewSubject || <>&nbsp;</>}
+													{livePreviewContactName && (
+														<>
+															<div
+																className="text-[12px] font-bold text-black truncate"
+																title={livePreviewContactName}
+															>
+																{livePreviewContactName}
+															</div>
+															<div className="w-px self-stretch border-l border-black/40 mx-2" />
+														</>
+													)}
+													<div
+														className="text-[12px] text-black/80 truncate flex-1"
+														title={livePreviewSubject}
+													>
+														{livePreviewSubject || <>&nbsp;</>}
+													</div>
 												</div>
+												<div className="w-px self-stretch border-l border-black" />
 											</div>
-											<div className="w-px self-stretch border-l border-black" />
-										</div>
-										<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
-											<span className="w-[20px] text-center"></span>
-											<ArrowIcon />
+											<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
+												<span className="w-[20px] text-center"></span>
+												<ArrowIcon />
+											</div>
 										</div>
 									</div>
 								</div>
@@ -764,47 +788,55 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 								}}
 							/>
 						) : (
-							<div
-								className={cn(
-									'rounded-md border-2 border-black/30 mb-2 font-sans',
-									'bg-[#F4E5BC] backdrop-blur-sm select-none transition-all',
-									'w-[376px] max-[480px]:w-[96.27vw]'
+							<div className="relative mb-2">
+								{isSplitLayout && activePreview === 'drafts' && (
+									<div
+										className="absolute -inset-1 rounded-none border-2 border-black/50 bg-[rgba(93,171,104,0.35)] z-0 pointer-events-none"
+										aria-hidden="true"
+									/>
 								)}
-							>
 								<div
-									className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
-									style={{ height: '28px' }}
-									onClick={() => setActivePreview('drafts')}
+									className={cn(
+										'relative z-10 rounded-md border-2 border-black/30 font-sans',
+										'bg-[#F4E5BC] backdrop-blur-sm select-none transition-all',
+										'w-[376px] max-[480px]:w-[96.27vw]'
+									)}
 								>
-									<span className="font-bold text-black text-sm">Drafts</span>
-									<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
-										<span>{`${draftsCount} drafts`}</span>
-										<Divider />
-										<button
-											type="button"
-											className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-											onClick={(e) => {
-												e.stopPropagation();
-												setActivePreview('drafts');
-											}}
-										>
-											Select
-										</button>
-										<Divider />
-										<button
-											type="button"
-											className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-											onClick={(e) => {
-												e.stopPropagation();
-												setActivePreview('sendPreview');
-											}}
-										>
-											Send
-										</button>
-									</div>
-									<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
-										<span className="w-[20px] text-center">3</span>
-										<ArrowIcon />
+									<div
+										className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+										style={{ height: '28px' }}
+										onClick={() => setActivePreview('drafts')}
+									>
+										<span className="font-bold text-black text-sm">Drafts</span>
+										<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
+											<span>{`${draftsCount} drafts`}</span>
+											<Divider />
+											<button
+												type="button"
+												className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
+												onClick={(e) => {
+													e.stopPropagation();
+													setActivePreview('drafts');
+												}}
+											>
+												Select
+											</button>
+											<Divider />
+											<button
+												type="button"
+												className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
+												onClick={(e) => {
+													e.stopPropagation();
+													setActivePreview('sendPreview');
+												}}
+											>
+												Send
+											</button>
+										</div>
+										<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
+											<span className="w-[20px] text-center">3</span>
+											<ArrowIcon />
+										</div>
 									</div>
 								</div>
 							</div>
@@ -839,48 +871,56 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 									})()}
 								/>
 							) : (
-								<div
-									className={cn(
-										'rounded-md border-2 border-[#295094] mb-2 font-sans',
-										'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all',
-										'w-[376px] max-[480px]:w-[96.27vw]'
+								<div className="relative mb-2">
+									{isSplitLayout && activePreview === 'sendPreview' && (
+										<div
+											className="absolute -inset-1 rounded-none border-2 border-black/50 bg-[rgba(93,171,104,0.35)] z-0 pointer-events-none"
+											aria-hidden="true"
+										/>
 									)}
-								>
 									<div
-										className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
-										style={{ height: '28px' }}
-										onClick={() => setActivePreview('sendPreview')}
+										className={cn(
+											'relative z-10 rounded-md border-2 border-[#295094] font-sans',
+											'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all',
+											'w-[376px] max-[480px]:w-[96.27vw]'
+										)}
 									>
-										<span className="font-bold text-black text-sm">Send Preview</span>
-										<div className="ml-2 flex-1 min-w-0 self-stretch flex items-stretch">
-											<div className="w-px self-stretch border-l border-black" />
-											<div
-												className="flex items-center bg-white w-full px-2"
-												style={{ backgroundColor: '#FFFFFF' }}
-											>
-												{sendingPreviewContactName && (
-													<>
-														<div
-															className="text-[12px] font-bold text-black truncate"
-															title={sendingPreviewContactName}
-														>
-															{sendingPreviewContactName}
-														</div>
-														<div className="w-px self-stretch border-l border-black/40 mx-2" />
-													</>
-												)}
+										<div
+											className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+											style={{ height: '28px' }}
+											onClick={() => setActivePreview('sendPreview')}
+										>
+											<span className="font-bold text-black text-sm">Send Preview</span>
+											<div className="ml-2 flex-1 min-w-0 self-stretch flex items-stretch">
+												<div className="w-px self-stretch border-l border-black" />
 												<div
-													className="text-[12px] text-black/80 truncate flex-1"
-													title={sendingInlineSubject}
+													className="flex items-center bg-white w-full px-2"
+													style={{ backgroundColor: '#FFFFFF' }}
 												>
-													{sendingInlineSubject || <>&nbsp;</>}
+													{sendingPreviewContactName && (
+														<>
+															<div
+																className="text-[12px] font-bold text-black truncate"
+																title={sendingPreviewContactName}
+															>
+																{sendingPreviewContactName}
+															</div>
+															<div className="w-px self-stretch border-l border-black/40 mx-2" />
+														</>
+													)}
+													<div
+														className="text-[12px] text-black/80 truncate flex-1"
+														title={sendingInlineSubject}
+													>
+														{sendingInlineSubject || <>&nbsp;</>}
+													</div>
 												</div>
+												<div className="w-px self-stretch border-l border-black" />
 											</div>
-											<div className="w-px self-stretch border-l border-black" />
-										</div>
-										<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
-											<span className="w-[20px] text-center"></span>
-											<ArrowIcon />
+											<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
+												<span className="w-[20px] text-center"></span>
+												<ArrowIcon />
+											</div>
 										</div>
 									</div>
 								</div>
@@ -898,25 +938,33 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 								}
 							/>
 						) : (
-							<div
-								className={cn(
-									'rounded-md border-2 border-black/30 mb-2 font-sans',
-									'bg-[#CFEBCF] backdrop-blur-sm select-none transition-all',
-									'w-[376px] max-[480px]:w-[96.27vw]'
+							<div className="relative mb-2">
+								{isSplitLayout && activePreview === 'sent' && (
+									<div
+										className="absolute -inset-1 rounded-none border-2 border-black/50 bg-[rgba(93,171,104,0.35)] z-0 pointer-events-none"
+										aria-hidden="true"
+									/>
 								)}
-							>
 								<div
-									className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
-									style={{ height: '28px' }}
-									onClick={() => setActivePreview('sent')}
+									className={cn(
+										'relative z-10 rounded-md border-2 border-black/30 font-sans',
+										'bg-[#CFEBCF] backdrop-blur-sm select-none transition-all',
+										'w-[376px] max-[480px]:w-[96.27vw]'
+									)}
 								>
-									<span className="font-bold text-black text-sm">Sent</span>
-									<div className="flex-1 flex items-center justify-center text-[11px] text-black/70 font-medium h-full">
-										<span>{`${sentCount.toString().padStart(2, '0')} sent`}</span>
-									</div>
-									<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
-										<span className="w-[20px] text-center">4</span>
-										<ArrowIcon />
+									<div
+										className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+										style={{ height: '28px' }}
+										onClick={() => setActivePreview('sent')}
+									>
+										<span className="font-bold text-black text-sm">Sent</span>
+										<div className="flex-1 flex items-center justify-center text-[11px] text-black/70 font-medium h-full">
+											<span>{`${sentCount.toString().padStart(2, '0')} sent`}</span>
+										</div>
+										<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
+											<span className="w-[20px] text-center">4</span>
+											<ArrowIcon />
+										</div>
 									</div>
 								</div>
 							</div>
