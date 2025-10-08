@@ -1407,7 +1407,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		'font-inter font-medium text-[#AFAFAF] hover:underline',
 																		showTestPreview ? 'mr-[12px]' : 'relative top-[4px]',
 																		// Hide on mobile portrait
-																		'max-[480px]:hidden'
+																		'max-[480px]:hidden',
+																		// Hide in mobile landscape view of the campaign page
+																		'mobile-landscape-hide'
 																	)}
 																>
 																	Clear All
@@ -1427,7 +1429,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		'bg-white'
 																	)}
 																>
-																	<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+																	<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
 																		{form.watch('isAiSubject')
 																			? 'Auto Subject'
 																			: 'Subject'}
@@ -1447,7 +1449,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	}}
 																	disabled={isHandwrittenMode}
 																	className={cn(
-																		'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0',
+																		'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 subject-toggle',
 																		form.watch('isAiSubject')
 																			? 'w-auto px-3 justify-center bg-[#5dab68] text-white'
 																			: 'w-[100px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8] -translate-x-[30px]',
@@ -1893,6 +1895,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												'w-[461px] max-[480px]:w-[96.27vw] shrink-0',
 												isPanelsReversed ? 'order-1' : 'order-2'
 											)}
+											data-test-preview-wrapper
 										>
 											<DraggableBox
 												id="test-preview-panel"
@@ -1918,7 +1921,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												/>
 											</DraggableBox>
 											{/* Mobile sticky footer with Back to Testing and Go to Drafting */}
-											<div className="hidden max-[480px]:block">
+											<div className="hidden max-[480px]:block mobile-landscape-sticky-preview-footer">
 												<div className="fixed bottom-0 left-0 right-0 z-40">
 													<div className="flex w-full">
 														<Button

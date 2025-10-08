@@ -83,6 +83,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	const isMobilePortrait =
 		typeof window !== 'undefined' && window.matchMedia('(max-width: 480px)').matches;
 
+	// Treat short-height devices as mobile landscape for spacing tweaks
+	const isMobileLandscape =
+		typeof window !== 'undefined' && window.matchMedia('(max-height: 480px)').matches;
+
 	const [addTextButtons, setAddTextButtons] = useState<
 		Array<{ blockId: string; top: number; show: boolean }>
 	>([]);
@@ -446,13 +450,13 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 			ref={rootRef}
 			style={{
 				width: fullWidthMobile ? '100%' : '376px',
-				height: isMobilePortrait ? 'auto' : '474px',
+				height: isMobilePortrait || isMobileLandscape ? 'auto' : '474px',
 				position: 'relative',
 				overflow: 'visible',
 			}}
 		>
-			{/* Centered number above block */}
-			{!hideTopChrome && (
+			{/* Centered number above block (hidden in mobile landscape) */}
+			{!hideTopChrome && !isMobileLandscape && (
 				<div
 					data-drafting-top-number
 					style={{
@@ -468,7 +472,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				</div>
 			)}
 			{/* Top-left text label */}
-			{!hideTopChrome && (
+			{!hideTopChrome && !isMobileLandscape && (
 				<div
 					data-drafting-top-label
 					style={{
@@ -486,7 +490,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 			<div
 				style={{
 					width: '100%',
-					height: isMobilePortrait ? 'auto' : '100%',
+					height: isMobilePortrait || isMobileLandscape ? 'auto' : '100%',
 					border: '3px solid #000000',
 					borderRadius: '8px',
 					position: 'relative',
@@ -499,11 +503,33 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				{/* Content area - miniature, but interactive */}
 				<div
 					ref={buttonContainerRef}
-					className={cn('overflow-visible', isMobilePortrait ? '' : 'flex-1')}
+					className={cn(
+						'overflow-visible',
+						isMobilePortrait || isMobileLandscape ? '' : 'flex-1'
+					)}
 				>
 					<div className="px-0 pb-3 max-[480px]:pb-2">
 						{/* Mode */}
-						<div className="w-full bg-white pt-2 rounded-t-[5px]">
+						<div className="w-full bg-white pt-2 rounded-t-[5px] relative">
+							{/* Inline step indicator for mobile landscape */}
+							{isMobileLandscape && (
+								<div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[12px] leading-none font-inter font-medium text-black">
+									<span>2</span>
+									<svg
+										width="7"
+										height="12"
+										viewBox="0 0 7 12"
+										fill="none"
+										xmlns="http://www.w3.org/2000/svg"
+									>
+										<path
+											d="M6.53033 6.53033C6.82322 6.23744 6.82322 5.76256 6.53033 5.46967L1.75736 0.696699C1.46447 0.403806 0.989593 0.403806 0.696699 0.696699C0.403806 0.989593 0.403806 1.46447 0.696699 1.75736L4.93934 6L0.696699 10.2426C0.403806 10.5355 0.403806 11.0104 0.696699 11.3033C0.989593 11.5962 1.46447 11.5962 1.75736 11.3033L6.53033 6.53033ZM5 6V6.75H6V6V5.25H5V6Z"
+											fill="#636363"
+											fillOpacity="0.46"
+										/>
+									</svg>
+								</div>
+							)}
 							<div className="flex items-center gap-4 mb-1 w-[357px] mx-auto">
 								<span className="font-inter font-semibold text-[13px]">Mode</span>
 								<div ref={modeContainerRef} className="relative flex items-center gap-6">
@@ -648,7 +674,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												}}
 												className={cn(
 													'rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden relative w-[357px] max-[480px]:w-[89.33vw] mx-auto',
-													isExpanded ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
+													isExpanded ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]',
+													!isExpanded && isMobileLandscape && 'h-[24px]'
 												)}
 												style={{ borderColor: strokeColor }}
 											>
@@ -656,10 +683,16 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													<div
 														className={cn(
 															'flex flex-row items-center flex-shrink-0',
-															isExpanded ? 'h-[21px]' : 'h-[31px] max-[480px]:h-[24px]'
+															isExpanded ? 'h-[21px]' : 'h-[31px] max-[480px]:h-[24px]',
+															!isExpanded && isMobileLandscape && 'h-[24px]'
 														)}
 													>
-														<div className="flex-1 flex h-full items-center px-3">
+														<div
+															className={cn(
+																'flex-1 flex h-full px-3',
+																isMobileLandscape ? 'items-center' : 'items-center'
+															)}
+														>
 															<span className="font-inter text-[12px] leading-none font-semibold text-black">
 																{blockLabel(b.type as HybridBlock)}
 															</span>
@@ -669,13 +702,19 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																</span>
 															)}
 														</div>
-														<div className="flex flex-row h-full items-stretch">
+														<div
+															className={cn(
+																'flex flex-row h-full',
+																isMobileLandscape ? 'items-center' : 'items-stretch'
+															)}
+														>
 															<div
 																className={cn(
 																	'border-l border-black',
 																	isExpanded
 																		? 'h-[21px]'
-																		: 'h-[27px] max-[480px]:h-[20px]'
+																		: 'h-[27px] max-[480px]:h-[20px]',
+																	!isExpanded && isMobileLandscape && 'h-[20px]'
 																)}
 															/>
 															<button
@@ -702,13 +741,17 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																	'border-l border-black',
 																	isExpanded
 																		? 'h-[21px]'
-																		: 'h-[27px] max-[480px]:h-[20px]'
+																		: 'h-[27px] max-[480px]:h-[20px]',
+																	!isExpanded && isMobileLandscape && 'h-[20px]'
 																)}
 															/>
 															<button
 																type="button"
 																onClick={() => removeBlock(b.id)}
-																className="w-[30px] h-full flex items-center justify-center text-[18px] leading-none font-bold text-red-600 hover:bg-black/10 appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none"
+																className={cn(
+																	'w-[30px] h-full flex items-center justify-center leading-none font-bold text-red-600 hover:bg-black/10 appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none',
+																	isMobileLandscape ? 'text-[16px]' : 'text-[18px]'
+																)}
 																aria-label="Remove block"
 															>
 																×
@@ -747,7 +790,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									<Fragment key={b.id}>
 										<div
 											className={cn(
-												'rounded-[8px] border-2 bg-white px-2 py-1 relative w-[357px] max-[480px]:w-[89.33vw] mx-auto'
+												'rounded-[8px] border-2 bg-white px-2 py-1 relative w-[357px] max-[480px]:w-[89.33vw] mx-auto',
+												b.type === 'full_automated' && 'mini-full-auto-card'
 											)}
 											style={{
 												borderColor:
@@ -795,7 +839,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													</div>
 													<div className="relative">
 														{!b.value && (
-															<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px] max-[480px]:text-[10px]">
+															<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px] max-[480px]:text-[10px] mini-full-auto-placeholder">
 																<div className="space-y-2">
 																	<div>
 																		<p>Prompt Murmur here.</p>
@@ -811,14 +855,15 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															className={cn(
 																'border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 w-full max-w-full min-w-0',
 																'h-[70px] py-2 pr-2 px-0 resize-none',
-																'bg-white text-[12px] leading-[16px]'
+																'bg-white text-[12px] leading-[16px]',
+																'mini-full-auto-textarea'
 															)}
 															placeholder=""
 															value={b.value || ''}
 															onChange={(e) => updateBlockValue(b.id, e.target.value)}
 														/>
 													</div>
-													<div className="pl-2 mb-2">
+													<div className="pl-2 mb-2 max-[480px]:mb-0 mini-paragraph-slider">
 														<ParagraphSlider />
 													</div>
 												</div>
@@ -901,7 +946,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										out.push(
 											<div
 												key={`mini-ph-${slot}`}
-												className="w-[357px] max-[480px]:w-[89.33vw] mx-auto h-[31px] max-[480px]:h-[24px] flex items-center justify-end"
+												className={cn(
+													'w-[357px] max-[480px]:w-[89.33vw] mx-auto h-[31px] max-[480px]:h-[24px] flex items-center justify-end',
+													isMobileLandscape && 'h-[24px]'
+												)}
 											>
 												<Button
 													type="button"
@@ -928,12 +976,13 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								return out;
 							})()}
 						</div>
-						{/* Mobile portrait: Signature inline spacing (extra in hybrid to avoid cutoff) */}
+						{/* Mobile portrait/landscape: Signature inline spacing (extra in hybrid to avoid cutoff) */}
 						<div
 							className={cn(
 								'max-[480px]:block hidden',
 								shouldUseLargeHybridSigGap ? 'mt-8' : 'mt-2'
 							)}
+							style={{ display: isMobileLandscape ? 'block' : undefined }}
 						>
 							<div
 								className="rounded-[8px] border-2 bg-white px-2 py-2 w-[357px] max-[480px]:w-[89.33vw] mx-auto"
@@ -943,7 +992,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									Signature
 								</div>
 								<textarea
-									className="w-full text-[12px] leading-[16px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none h-[48px]"
+									className="w-full text-[12px] leading-[16px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none h-[48px] signature-textarea"
 									value={signature}
 									onChange={(e) => updateSignature(e.target.value)}
 								/>
@@ -954,10 +1003,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 
 				{/* Signature - fixed at bottom (outside scroll) for non-mobile only */}
 				<div
-					className={cn(
-						'px-0 pb-2 mt-3 max-[480px]:hidden',
-						hybridBlocks.some((b) => b.type === 'full_automated') && 'mt-6'
-					)}
+					className={cn('px-0 pb-2 max-[480px]:hidden', 'mt-3')}
+					style={{ display: isMobileLandscape ? 'none' : undefined }}
 				>
 					<div
 						className="rounded-[8px] border-2 bg-white px-2 py-2 w-[357px] max-[480px]:w-[89.33vw] mx-auto"
@@ -968,7 +1015,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						</div>
 						<textarea
 							className={cn(
-								'w-full text-[12px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none max-[480px]:h-[40px]',
+								'w-full text-[12px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none max-[480px]:h-[40px] signature-textarea',
 								hybridBlocks.some((b) => b.type === 'full_automated')
 									? 'h-[40px]'
 									: 'h-[58px]'
@@ -1035,7 +1082,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				)}
 			</div>
 			<div
-				className="absolute top-0 right-[-18px] max-[480px]:-right-[10px] z-50 flex flex-col"
+				className="absolute top-0 left-[-18px] max-[480px]:-left-[10px] z-50 flex flex-col"
 				style={{ pointerEvents: 'none' }}
 			>
 				{addTextButtons.map((btn, index) => {
@@ -1048,7 +1095,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							style={{
 								position: 'absolute',
 								top: `${btn.top}px`,
-								right: 0,
+								left: 0,
 								pointerEvents: 'all',
 							}}
 						>

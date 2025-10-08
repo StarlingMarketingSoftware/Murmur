@@ -70,6 +70,20 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 					-webkit-text-size-adjust: 100%;
 					text-size-adjust: 100%;
 				}
+
+				/* Exception: Mini Email Structure signature textarea on mobile should match its 12px header */
+				@media (orientation: landscape) {
+					body.murmur-page.murmur-ios.murmur-mobile .signature-textarea {
+						font-size: 12px !important;
+						line-height: 1.2 !important;
+					}
+				}
+				@media (max-width: 480px) and (orientation: portrait) {
+					body.murmur-page.murmur-ios.murmur-mobile .signature-textarea {
+						font-size: 12px !important;
+						line-height: 1.2 !important;
+					}
+				}
 			`}</style>
 		</>
 	);

@@ -14,31 +14,23 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus } from '@/constants/prismaEnums';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-// Reuse dashboard metric colors for consistency
+// Fixed metric fills for header boxes
 const getDraftFillColor = (value: number): string => {
-	const v = Math.max(0, Math.min(value, 50));
-	if (v === 0) return '#FFFFFF';
-	if (v <= 6.25) return '#FFFBF3';
-	if (v <= 12.5) return '#FFF7E7';
-	if (v <= 18.75) return '#FFF3DB';
-	if (v <= 25) return '#FFEFCE';
-	if (v <= 31.25) return '#FFEBC2';
-	if (v <= 37.5) return '#FFE7B6';
+	void value;
 	return '#FFE3AA';
 };
 
 const getSentFillColor = (value: number): string => {
-	const v = Math.max(0, Math.min(value, 50));
-	if (v === 0) return '#FFFFFF';
-	if (v > 1) return '#F3FCF1';
-	return '#FFFFFF';
+	void value;
+	return '#B0E0A6';
 };
 
-// Contacts tint — light red when there are contacts, otherwise white (keeps visual parity with dashboard-style metric boxes)
-const getContactsFillColor = (value: number): string =>
-	value > 0 ? '#FBEEEE' : '#FFFFFF';
+const getContactsFillColor = (value: number): string => {
+	void value;
+	return '#F5DADA';
+};
 
 const Murmur = () => {
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
@@ -52,6 +44,56 @@ const Murmur = () => {
 	);
 	const [isIdentityInfoOpen, setIsIdentityInfoOpen] = useState(false);
 	const [activeView, setActiveView] = useState<'testing' | 'drafting'>('testing');
+
+	// Track orientation to fine-tune mobile landscape spacing
+	const [isLandscape, setIsLandscape] = useState(false);
+
+	// Measure campaign title width on desktop to position the To/From block just to its right
+	const titleRef = useRef<HTMLDivElement | null>(null);
+	const [titleWidth, setTitleWidth] = useState<number>(0);
+	useEffect(() => {
+		if (!titleRef.current) return;
+		const node = titleRef.current;
+		const measure = () => {
+			try {
+				const rect = node.getBoundingClientRect();
+				setTitleWidth(rect?.width || 0);
+			} catch {
+				setTitleWidth(0);
+			}
+		};
+		measure();
+		const ro =
+			typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => measure()) : null;
+		if (ro) ro.observe(node);
+		window.addEventListener('resize', measure);
+		return () => {
+			window.removeEventListener('resize', measure);
+			if (ro) ro.disconnect();
+		};
+	}, [campaign?.id]);
+
+	// Watch for orientation changes so we can reduce header top padding in landscape
+	useEffect(() => {
+		if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+		const mq = window.matchMedia('(orientation: landscape)');
+		const update = () => setIsLandscape(Boolean(mq.matches));
+		update();
+		const handler = (ev: MediaQueryListEvent) => setIsLandscape(ev.matches);
+		// Support older Safari
+		if (typeof mq.addEventListener === 'function') {
+			mq.addEventListener('change', handler);
+		} else if (typeof mq.addListener === 'function') {
+			mq.addListener(handler);
+		}
+		return () => {
+			if (typeof mq.removeEventListener === 'function') {
+				mq.removeEventListener('change', handler);
+			} else if (typeof mq.removeListener === 'function') {
+				mq.removeListener(handler);
+			}
+		};
+	}, []);
 
 	// Header counts
 	const contactListIds = campaign?.userContactLists?.map((l) => l.id) || [];
@@ -86,7 +128,7 @@ const Murmur = () => {
 	return (
 		<>
 			{/* Header section with white background */}
-			<div className="bg-white">
+			<div className="bg-white" data-slot="campaign-header">
 				<div className="relative">
 					<Link
 						href={urls.murmur.dashboard.index}
@@ -125,7 +167,12 @@ const Murmur = () => {
 						<span>Back to Home</span>
 					</Link>
 					{isMobile && !shouldHideContent && null}
-					<div className="max-w-[1250px] w-9/10 mx-auto lg:w-9/10">
+					<div
+						className={cn(
+							'max-w-[1250px] mx-auto lg:w-9/10',
+							isMobile ? (isLandscape ? 'w-full' : 'w-9/10') : 'w-9/10'
+						)}
+					>
 						<div
 							className={cn(
 								'transition-opacity duration-200',
@@ -134,283 +181,47 @@ const Murmur = () => {
 									: 'opacity-100'
 							)}
 						>
-							<div className="flex flex-col items-center" style={{ paddingTop: '18px' }}>
+							<div
+								className="flex flex-col items-center"
+								style={{
+									paddingTop: isMobile ? (isLandscape ? '6px' : '18px') : '12px',
+									paddingBottom: isMobile ? (isLandscape ? '6px' : undefined) : '8px',
+								}}
+							>
 								<div
 									className={cn(
 										isMobile
-											? 'mx-auto flex items-center justify-between'
+											? 'mx-auto flex items-center justify-between mobile-header-row'
 											: 'relative w-full flex items-center justify-center'
 									)}
-									style={isMobile ? { width: '94.67%' } : undefined}
+									style={
+										isMobile ? { width: isLandscape ? '100%' : '94.67%' } : undefined
+									}
 								>
 									{/* Slight mobile-only vertical nudge to sit closer to the box */}
 									<div
 										className="campaign-title-landscape"
-										style={isMobile ? { transform: 'translateY(3px)' } : undefined}
+										ref={titleRef}
+										style={
+											isMobile
+												? {
+														transform: isLandscape
+															? 'translateY(0px) scale(0.6)'
+															: 'translateY(3px)',
+														transformOrigin: isLandscape ? 'left center' : undefined,
+												  }
+												: undefined
+										}
 									>
 										<CampaignName campaign={campaign} />
 									</div>
 
-									{/* Mobile landscape inline controls: hidden by default; shown via CSS in landscape */}
-									{isMobile && (
-										<div className="mobile-landscape-inline-controls">
-											{/* Metrics */}
-											<div
-												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-												style={{
-													backgroundColor: getContactsFillColor(contactsCount),
-													borderWidth: '1.3px',
-													width: '84px',
-													height: '20px',
-													fontSize: '11.7px',
-												}}
-											>
-												{`${String(contactsCount).padStart(2, '0')} contacts`}
-											</div>
-											<div
-												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-												style={{
-													backgroundColor: getDraftFillColor(draftCount),
-													borderWidth: '1.3px',
-													width: '84px',
-													height: '20px',
-													fontSize: '11.7px',
-												}}
-											>
-												{`${String(draftCount).padStart(2, '0')} drafts`}
-											</div>
-											<div
-												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-												style={{
-													backgroundColor: getSentFillColor(sentCount),
-													borderWidth: '1.3px',
-													width: '84px',
-													height: '20px',
-													fontSize: '11.7px',
-												}}
-											>
-												{`${String(sentCount).padStart(2, '0')} sent`}
-											</div>
-
-											{/* To */}
-											<Link
-												href={urls.murmur.dashboard.index}
-												prefetch
-												onClick={(e) => {
-													e.preventDefault();
-													if (typeof window !== 'undefined') {
-														window.location.assign(urls.murmur.dashboard.index);
-													}
-												}}
-												className="block"
-											>
-												<div
-													className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]"
-													style={{
-														width: '36.06px',
-														height: '14.21px',
-														borderRadius: '5.55px',
-													}}
-												>
-													<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
-														To
-													</span>
-												</div>
-											</Link>
-
-											{/* From */}
-											<button
-												type="button"
-												onClick={() => {
-													setIdentityDialogOrigin('campaign');
-													setIsIdentityDialogOpen(true);
-												}}
-												className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969]"
-												style={{
-													width: '36.06px',
-													height: '14.21px',
-													borderRadius: '5.55px',
-												}}
-											>
-												<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
-													From
-												</span>
-											</button>
-
-											{/* Inline view tabs */}
-											<div className="flex items-center gap-3 ml-2">
-												<button
-													type="button"
-													className={cn(
-														'font-inter text-[16px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-														activeView === 'testing'
-															? 'text-black font-semibold'
-															: 'text-[#6B6B6B] hover:text-black'
-													)}
-													onClick={() => setActiveView('testing')}
-												>
-													Testing
-												</button>
-												<button
-													type="button"
-													className={cn(
-														'font-inter text-[16px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-														activeView === 'drafting'
-															? 'text-black font-semibold'
-															: 'text-[#6B6B6B] hover:text-black'
-													)}
-													onClick={() => setActiveView('drafting')}
-												>
-													Drafting
-												</button>
-											</div>
-										</div>
-									)}
-									{isMobile && !shouldHideContent && (
-										<button
-											onClick={() => {
-												if (typeof window !== 'undefined') {
-													window.location.assign(urls.murmur.dashboard.index);
-												}
-											}}
-											title="Home"
-											aria-label="Back to Home"
-											className="z-[100] inline-flex items-center justify-center rounded-[6px] bg-[#EEEEEE] text-black shadow-[0_2px_10px_rgba(0,0,0,0.15)] active:scale-95 transition-all duration-200"
-											style={{
-												width: '23px',
-												height: '17px',
-												transform: 'translateY(2px)',
-												WebkitTapHighlightColor: 'transparent',
-											}}
-										>
-											<svg
-												width="11"
-												height="11"
-												viewBox="0 0 11 11"
-												fill="none"
-												xmlns="http://www.w3.org/2000/svg"
-											>
-												<path
-													d="M8.0564 5.64955V8.90431H2.80971V5.64955H8.0564ZM9.20009 4.50586H1.66602V10.048H9.20009V4.50586Z"
-													fill="black"
-												/>
-												<path
-													d="M5.43871 1.74879L8.05729 4.40787H2.84396L5.4411 1.74879M5.43395 0.114258L0.127686 5.55157H10.7879L5.43633 0.114258H5.43395Z"
-													fill="black"
-												/>
-											</svg>
-										</button>
-									)}
-								</div>
-
-								{/* Mobile Layout - Single Container with all elements (portrait only) */}
-								{isMobile ? (
-									<div
-										data-slot="mobile-header-controls"
-										className="flex items-center justify-between px-1 border border-[#000000] bg-white"
-										style={{
-											marginTop: '14px',
-											height: '29px',
-											width: '94.67%', // This will be 355px on 375px viewport
-											maxWidth: '100%',
-											borderWidth: '1.3px',
-											gap: '3px',
-										}}
-									>
-										{/* Contacts box - keeping exact styling */}
+									{/* Desktop: place To/From to the right side of the title */}
+									{!isMobile && (
 										<div
-											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-											style={{
-												backgroundColor: getContactsFillColor(contactsCount),
-												borderWidth: '1.3px',
-												width: '84px',
-												height: '20px',
-												fontSize: '11.7px',
-											}}
+											className="absolute top-1/2 -translate-y-1/2 flex flex-col items-start gap-[6px]"
+											style={{ left: '50%', marginLeft: `${titleWidth / 2 + 72}px` }}
 										>
-											{`${String(contactsCount).padStart(2, '0')} contacts`}
-										</div>
-
-										{/* Drafts box - keeping exact styling */}
-										<div
-											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-											style={{
-												backgroundColor: getDraftFillColor(draftCount),
-												borderWidth: '1.3px',
-												width: '84px',
-												height: '20px',
-												fontSize: '11.7px',
-											}}
-										>
-											{`${String(draftCount).padStart(2, '0')} drafts`}
-										</div>
-
-										{/* Sent box - keeping exact styling */}
-										<div
-											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-											style={{
-												backgroundColor: getSentFillColor(sentCount),
-												borderWidth: '1.3px',
-												width: '84px',
-												height: '20px',
-												fontSize: '11.7px',
-											}}
-										>
-											{`${String(sentCount).padStart(2, '0')} sent`}
-										</div>
-
-										{/* To button - keeping exact gray styling */}
-										<Link
-											href={urls.murmur.dashboard.index}
-											prefetch
-											onClick={(e) => {
-												e.preventDefault();
-												if (typeof window !== 'undefined') {
-													window.location.assign(urls.murmur.dashboard.index);
-												}
-											}}
-											className="block"
-										>
-											<div
-												className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]"
-												style={{
-													width: '36.06px',
-													height: '14.21px',
-													borderRadius: '5.55px',
-												}}
-											>
-												<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
-													To
-												</span>
-											</div>
-										</Link>
-
-										{/* From button - keeping exact gray styling */}
-										<button
-											type="button"
-											onClick={() => {
-												setIdentityDialogOrigin('campaign');
-												setIsIdentityDialogOpen(true);
-											}}
-											className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969]"
-											style={{
-												width: '36.06px',
-												height: '14.21px',
-												borderRadius: '5.55px',
-											}}
-										>
-											<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
-												From
-											</span>
-										</button>
-									</div>
-								) : (
-									/* Desktop Layout - Keep existing unchanged */
-									<div
-										className="flex flex-col items-center"
-										style={{ marginTop: '14px' }}
-									>
-										<div className="flex items-start gap-6">
 											<div className="flex items-center">
 												<Link
 													href={urls.murmur.dashboard.index}
@@ -504,11 +315,283 @@ const Murmur = () => {
 												</div>
 											</div>
 										</div>
-										{/* Metric boxes below To/From */}
+									)}
+
+									{/* Mobile landscape metrics centered overlay */}
+									{isMobile && (
+										<div className="mobile-landscape-metrics-center" aria-hidden="true">
+											<div
+												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+												style={{
+													backgroundColor: getContactsFillColor(contactsCount),
+													borderWidth: '1.3px',
+													width: '84px',
+													height: '20px',
+													fontSize: '11.7px',
+												}}
+											>
+												{`${String(contactsCount).padStart(2, '0')} contacts`}
+											</div>
+											<div
+												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+												style={{
+													backgroundColor: getDraftFillColor(draftCount),
+													borderWidth: '1.3px',
+													width: '84px',
+													height: '20px',
+													fontSize: '11.7px',
+													opacity: draftCount === 0 ? 0.5 : 1,
+												}}
+											>
+												{draftCount === 0
+													? 'drafts'
+													: `${String(draftCount).padStart(2, '0')} drafts`}
+											</div>
+											<div
+												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+												style={{
+													backgroundColor: getSentFillColor(sentCount),
+													borderWidth: '1.3px',
+													width: '84px',
+													height: '20px',
+													fontSize: '11.7px',
+													opacity: sentCount === 0 ? 0.5 : 1,
+												}}
+											>
+												{sentCount === 0
+													? 'sent'
+													: `${String(sentCount).padStart(2, '0')} sent`}
+											</div>
+										</div>
+									)}
+
+									{/* Mobile landscape inline controls: hidden by default; shown via CSS in landscape */}
+									{isMobile && (
+										<div className="mobile-landscape-inline-controls">
+											{/* To */}
+											<Link
+												href={urls.murmur.dashboard.index}
+												prefetch
+												onClick={(e) => {
+													e.preventDefault();
+													if (typeof window !== 'undefined') {
+														window.location.assign(urls.murmur.dashboard.index);
+													}
+												}}
+												className="block"
+											>
+												<div
+													className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969] pill-mini"
+													style={{
+														width: '36.06px',
+														height: '14.21px',
+														borderRadius: '5.55px',
+													}}
+												>
+													<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
+														To
+													</span>
+												</div>
+											</Link>
+
+											{/* From */}
+											<button
+												type="button"
+												onClick={() => {
+													setIdentityDialogOrigin('campaign');
+													setIsIdentityDialogOpen(true);
+												}}
+												className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969] pill-mini"
+												style={{
+													width: '36.06px',
+													height: '14.21px',
+													borderRadius: '5.55px',
+												}}
+											>
+												<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
+													From
+												</span>
+											</button>
+
+											{/* Inline view tabs */}
+											<div className="flex items-center gap-3 ml-2">
+												<button
+													type="button"
+													className={cn(
+														'font-inter text-[16px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+														activeView === 'testing'
+															? 'text-black font-semibold'
+															: 'text-[#6B6B6B] hover:text-black'
+													)}
+													onClick={() => setActiveView('testing')}
+												>
+													Testing
+												</button>
+												<button
+													type="button"
+													className={cn(
+														'font-inter text-[16px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+														activeView === 'drafting'
+															? 'text-black font-semibold'
+															: 'text-[#6B6B6B] hover:text-black'
+													)}
+													onClick={() => setActiveView('drafting')}
+												>
+													Drafting
+												</button>
+												{/* Home button moved into right controls (landscape) */}
+												<button
+													onClick={() => {
+														if (typeof window !== 'undefined') {
+															window.location.assign(urls.murmur.dashboard.index);
+														}
+													}}
+													title="Home"
+													aria-label="Back to Home"
+													className="inline-flex items-center justify-center rounded-[6px] bg-[#EEEEEE] text-black shadow-[0_2px_10px_rgba(0,0,0,0.15)] active:scale-95 transition-all duration-200 ml-2"
+													style={{
+														width: '23px',
+														height: '17px',
+														WebkitTapHighlightColor: 'transparent',
+													}}
+												>
+													<svg
+														width="11"
+														height="11"
+														viewBox="0 0 11 11"
+														fill="none"
+														xmlns="http://www.w3.org/2000/svg"
+													>
+														<path
+															d="M8.0564 5.64955V8.90431H2.80971V5.64955H8.0564ZM9.20009 4.50586H1.66602V10.048H9.20009V4.50586Z"
+															fill="black"
+														/>
+														<path
+															d="M5.43871 1.74879L8.05729 4.40787H2.84396L5.4411 1.74879M5.43395 0.114258L0.127686 5.55157H10.7879L5.43633 0.114258H5.43395Z"
+															fill="black"
+														/>
+													</svg>
+												</button>
+											</div>
+										</div>
+									)}
+									{isMobile && !shouldHideContent && null}
+								</div>
+
+								{/* Mobile Layout - Single Container with all elements (portrait only) */}
+								{isMobile ? (
+									<div
+										data-slot="mobile-header-controls"
+										className="flex items-center justify-between px-1 border border-[#000000] bg-white"
+										style={{
+											marginTop: '14px',
+											height: '29px',
+											width: '94.67%', // This will be 355px on 375px viewport
+											maxWidth: '100%',
+											borderWidth: '1.3px',
+											gap: '3px',
+										}}
+									>
+										{/* Contacts box - keeping exact styling */}
 										<div
-											className="flex items-center gap-5"
-											style={{ marginTop: '13px' }}
+											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+											style={{
+												backgroundColor: getContactsFillColor(contactsCount),
+												borderWidth: '1.3px',
+												width: '84px',
+												height: '20px',
+												fontSize: '11.7px',
+											}}
 										>
+											{`${String(contactsCount).padStart(2, '0')} contacts`}
+										</div>
+
+										{/* Drafts box - keeping exact styling */}
+										<div
+											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+											style={{
+												backgroundColor: getDraftFillColor(draftCount),
+												borderWidth: '1.3px',
+												width: '84px',
+												height: '20px',
+												fontSize: '11.7px',
+												opacity: draftCount === 0 ? 0.5 : 1,
+											}}
+										>
+											{draftCount === 0
+												? 'drafts'
+												: `${String(draftCount).padStart(2, '0')} drafts`}
+										</div>
+
+										{/* Sent box - keeping exact styling */}
+										<div
+											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
+											style={{
+												backgroundColor: getSentFillColor(sentCount),
+												borderWidth: '1.3px',
+												width: '84px',
+												height: '20px',
+												fontSize: '11.7px',
+												opacity: sentCount === 0 ? 0.5 : 1,
+											}}
+										>
+											{sentCount === 0
+												? 'sent'
+												: `${String(sentCount).padStart(2, '0')} sent`}
+										</div>
+
+										{/* To button - keeping exact gray styling */}
+										<Link
+											href={urls.murmur.dashboard.index}
+											prefetch
+											onClick={(e) => {
+												e.preventDefault();
+												if (typeof window !== 'undefined') {
+													window.location.assign(urls.murmur.dashboard.index);
+												}
+											}}
+											className="block"
+										>
+											<div
+												className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]"
+												style={{
+													width: '36.06px',
+													height: '14.21px',
+													borderRadius: '5.55px',
+												}}
+											>
+												<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
+													To
+												</span>
+											</div>
+										</Link>
+
+										{/* From button - keeping exact gray styling */}
+										<button
+											type="button"
+											onClick={() => {
+												setIdentityDialogOrigin('campaign');
+												setIsIdentityDialogOpen(true);
+											}}
+											className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969]"
+											style={{
+												width: '36.06px',
+												height: '14.21px',
+												borderRadius: '5.55px',
+											}}
+										>
+											<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
+												From
+											</span>
+										</button>
+									</div>
+								) : (
+									/* Desktop Layout - metrics below title only */
+									<div
+										className="flex flex-col items-center"
+										style={{ marginTop: '11px' }}
+									>
+										<div className="flex items-center gap-5" style={{ marginTop: '0px' }}>
 											<div
 												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
 												style={{
@@ -529,9 +612,12 @@ const Murmur = () => {
 													minWidth: '80.38px',
 													height: '19px',
 													fontSize: '11.7px',
+													opacity: draftCount === 0 ? 0.5 : 1,
 												}}
 											>
-												{`${String(draftCount).padStart(2, '0')} drafts`}
+												{draftCount === 0
+													? 'drafts'
+													: `${String(draftCount).padStart(2, '0')} drafts`}
 											</div>
 											<div
 												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
@@ -541,9 +627,12 @@ const Murmur = () => {
 													minWidth: '80.38px',
 													height: '19px',
 													fontSize: '11.7px',
+													opacity: sentCount === 0 ? 0.5 : 1,
 												}}
 											>
-												{`${String(sentCount).padStart(2, '0')} sent`}
+												{sentCount === 0
+													? 'sent'
+													: `${String(sentCount).padStart(2, '0')} sent`}
 											</div>
 										</div>
 									</div>
@@ -557,7 +646,7 @@ const Murmur = () => {
 			{/* Container with background that starts after the divider */}
 			<div
 				data-slot="campaign-content"
-				className="relative min-h-screen mt-2 border-t-0 md:border-t-2 border-black"
+				className="relative min-h-screen mt-2 md:mt-0 border-t-0 md:border-t-2 border-black"
 				style={{ backgroundColor: isMobile ? '#FFFFFF' : 'rgba(222, 242, 241, 0.43)' }}
 			>
 				{shouldHideContent && (
@@ -643,6 +732,11 @@ const Murmur = () => {
 							display: none !important;
 						}
 
+						/* Default: hide the centered metrics overlay (shown only in landscape) */
+						body.murmur-mobile .mobile-landscape-metrics-center {
+							display: none !important;
+						}
+
 						/* Mobile portrait: fix signature block height */
 						@media (max-width: 480px) and (orientation: portrait) {
 							/* Specific case: when Full Auto block exists, set exact 8px gap to Signature while keeping it bottom-anchored */
@@ -701,18 +795,102 @@ const Murmur = () => {
 							}
 						}
 
-						/* Mobile landscape: inline header controls and title clipping */
+						/* Mobile landscape: inline header controls, centered metrics, and title layout */
 						@media (orientation: landscape) {
+							/* Left-side expanded panel height cap in mobile landscape (exclude Email Structure) */
+							body.murmur-mobile
+								[data-left-expanded-panel]
+								> div:not([aria-label='Expanded email structure']) {
+								height: 273px !important;
+								max-height: 273px !important;
+								overflow: hidden !important;
+							}
+							/* Ensure inner scroll areas flex correctly within the capped height */
+							body.murmur-mobile
+								[data-left-expanded-panel]
+								> div:not([aria-label='Expanded email structure'])
+								> * {
+								max-height: 100% !important;
+							}
+							/* Row: use a 3-column grid so title/metrics/controls never overlap */
+							body.murmur-mobile .mobile-header-row {
+								display: grid !important;
+								grid-template-columns: 1fr auto 1fr !important; /* left flex, centered auto, right flex */
+								align-items: center !important;
+								gap: 6px !important;
+							}
+							/* Centered metrics: inline in the center grid cell */
+							body.murmur-mobile .mobile-landscape-metrics-center {
+								display: inline-flex !important;
+								gap: 6px !important;
+								position: static !important;
+								left: auto !important;
+								top: auto !important;
+								transform: none !important;
+								z-index: auto !important;
+								pointer-events: auto !important;
+								justify-self: center !important; /* center within middle column */
+								grid-column: 2 / 3 !important;
+							}
+							/* Controls: right grid cell */
 							body.murmur-mobile .mobile-landscape-inline-controls {
 								display: inline-flex !important;
-								gap: 8px;
-								align-items: center;
+								gap: 3px; /* tighter spacing to free more room for title */
+								align-items: center !important;
+								position: static !important;
+								left: auto !important;
+								transform: none !important;
+								margin-left: 0 !important;
+								padding-right: 15px !important; /* increased right padding */
+								justify-self: end !important;
+								grid-column: 3 / 4 !important;
 							}
+							/* Title: flex and truncate on the left side */
 							body.murmur-mobile .campaign-title-landscape {
-								max-width: 200px;
+								margin-left: -8px !important; /* nudge farther left in landscape */
+								padding-left: 15px !important; /* increased left padding */
+								max-width: none;
 								overflow: hidden;
 								white-space: nowrap;
 								text-overflow: ellipsis;
+								flex: 1 1 auto; /* allow the title to use remaining row space */
+								min-width: 0; /* enable proper truncation inside flex layouts */
+							}
+							/* smaller title text only in mobile landscape and enforce truncation */
+							body.murmur-mobile .campaign-title-landscape * {
+								font-size: 15px !important;
+								line-height: 1 !important;
+								text-align: left !important; /* show more of the beginning */
+								max-width: 100% !important;
+								width: 100% !important; /* override inner w-fit to enable truncation */
+								overflow: hidden !important;
+								white-space: nowrap !important;
+								text-overflow: ellipsis !important;
+							}
+
+							/* Shrink metric boxes a bit to free width for the title */
+							body.murmur-mobile .mobile-landscape-inline-controls .metric-box {
+								width: 70px !important;
+								font-size: 10.5px !important;
+								padding-left: 6px !important;
+								padding-right: 6px !important;
+							}
+							/* Make To/From pills slightly narrower */
+							body.murmur-mobile .mobile-landscape-inline-controls .pill-mini {
+								width: 32px !important;
+								height: 14px !important;
+								border-radius: 5px !important;
+							}
+							body.murmur-mobile .mobile-landscape-inline-controls .pill-mini span {
+								font-size: 9px !important;
+							}
+							/* Tighten spacing before the inline view tabs in landscape */
+							body.murmur-mobile .mobile-landscape-inline-controls .ml-2 {
+								margin-left: 4px !important;
+							}
+							/* Slightly smaller view-tab labels to prioritize title width */
+							body.murmur-mobile .mobile-landscape-inline-controls button {
+								font-size: 14px !important;
 							}
 
 							/* Make the preview panel mimic portrait style by hiding its outer chrome */
@@ -725,12 +903,27 @@ const Murmur = () => {
 							body.murmur-mobile [data-drafting-preview-header] {
 								display: none !important;
 							}
+
+							/* Mobile landscape: make Test Preview match main drafting box dimensions */
+							body.murmur-mobile [data-test-preview-wrapper] {
+								width: 96.27vw !important; /* same as main drafting box */
+							}
+							body.murmur-mobile [data-test-preview-wrapper] [data-test-preview-panel] {
+								width: 100% !important; /* fill wrapper */
+								height: 644px !important; /* keep same inner height used in portrait */
+							}
+							/* Show sticky Back to Testing / Go to Drafting footer in landscape on mobile */
+							body.murmur-mobile
+								[data-test-preview-wrapper]
+								.mobile-landscape-sticky-preview-footer {
+								display: block !important;
+							}
 						}
 
 						/* At 667px landscape, adjust spacing for less cramped layout */
 						@media (max-width: 667px) and (orientation: landscape) {
 							body.murmur-mobile .campaign-title-landscape {
-								margin-left: -8px;
+								margin-left: -20px;
 							}
 							/* Home button on the right - push it out slightly */
 							body.murmur-mobile button[title='Home'] {
@@ -760,15 +953,19 @@ const Murmur = () => {
 								padding-bottom: 0 !important;
 								gap: 8px !important;
 							}
-							/* Reduce space below the subject bar and above first block */
+							/* Mobile landscape: enforce exact 8px gap from subject bar to first block */
 							body.murmur-mobile
 								[data-hpi-left-panel]
 								[data-slot='form-item']:first-of-type {
-								margin-bottom: 2px !important;
+								margin-bottom: 0 !important;
 							}
+							/* Remove container top padding and set inner wrapper top padding to 8px */
 							body.murmur-mobile [data-hpi-content] {
-								padding-top: 2px !important;
-								gap: 6px !important;
+								padding-top: 0 !important;
+								gap: 6px !important; /* keep tighter inter-block spacing */
+							}
+							body.murmur-mobile [data-hpi-content] > div {
+								padding-top: 8px !important; /* overrides pt-[16px]/pt-[8px] utility classes */
 							}
 							/* Subject bar: minimal but legible */
 							body.murmur-mobile .subject-bar {
@@ -776,14 +973,51 @@ const Murmur = () => {
 								min-height: 24px !important;
 								max-height: 24px !important;
 							}
+							/* iPhone landscape: prevent overlap by slightly reducing label size and spacing toggle */
+							body.murmur-mobile .subject-bar .subject-label {
+								font-size: 15px !important;
+							}
+							body.murmur-mobile .subject-bar .subject-toggle {
+								margin-right: 4px !important;
+							}
 							/* Full Auto textarea: reduce height and hide example for space */
 							body.murmur-mobile .full-auto-textarea {
-								height: 110px !important;
-								min-height: 110px !important;
+								height: 90px !important;
+								min-height: 90px !important;
 							}
 							body.murmur-mobile .full-auto-placeholder-example {
 								display: none !important;
 							}
+							/* Mini Email Structure: make Full Auto much shorter in mobile landscape */
+							body.murmur-mobile
+								[aria-label='Expanded email structure']
+								.mini-full-auto-textarea {
+								height: 48px !important;
+								min-height: 48px !important;
+							}
+							/* Reduce extra whitespace under the paragraph slider in the mini card */
+							body.murmur-mobile
+								[aria-label='Expanded email structure']
+								.mini-paragraph-slider {
+								margin-bottom: 0 !important;
+								padding-bottom: 0 !important;
+							}
+							body.murmur-mobile
+								[aria-label='Expanded email structure']
+								.mini-full-auto-card {
+								padding-bottom: 6px !important; /* tighten bottom padding of the card */
+							}
+							body.murmur-mobile
+								[aria-label='Expanded email structure']
+								.mini-full-auto-placeholder {
+								display: block !important;
+								font-size: 9px !important;
+								line-height: 1.15 !important;
+								padding: 4px 6px 2px 0 !important;
+								color: #505050 !important;
+								overflow: hidden !important;
+							}
+							/* Show full guidance text (both lines) but keep smaller sizing */
 							/* Signature area: single-line compact */
 							body.murmur-mobile [data-hpi-footer] {
 								margin-top: 2px !important;
@@ -812,7 +1046,7 @@ const Murmur = () => {
 								resize: none !important;
 								flex: 1 1 auto !important;
 								min-width: 0 !important;
-								font-size: 10px !important;
+								font-size: 12px !important; /* match the 'Signature' header size on mobile */
 								line-height: 1.2 !important;
 								padding: 2px 0 0 2px !important;
 							}
@@ -834,14 +1068,56 @@ const Murmur = () => {
 							body.murmur-mobile .w-full > .flex.justify-center.mb-4.w-full {
 								display: none !important;
 							}
+							/* Exact 8px gap between last content block and Signature; keep Signature bottom-anchored */
+							body.murmur-mobile [data-hpi-container] {
+								display: grid !important;
+								grid-template-rows: 1fr auto !important; /* content fills, footer at bottom */
+								align-items: stretch !important;
+								row-gap: 8px !important; /* exact gap above signature */
+							}
+							/* Remove extra bottom spacing inside the content area so the gap is truly 8px */
+							body.murmur-mobile [data-hpi-left-panel] {
+								padding-bottom: 0 !important;
+							}
+							body.murmur-mobile [data-hpi-content] {
+								padding-bottom: 0 !important;
+							}
+							body.murmur-mobile [data-hpi-content] > div {
+								padding-bottom: 0 !important; /* override inner pb-3 */
+							}
+							body.murmur-mobile [data-hpi-content] [data-block-type]:last-of-type {
+								margin-bottom: 0 !important; /* account for any margins on the last block */
+							}
+							/* Rely on grid spacing; do not add margin on footer */
+							body.murmur-mobile [data-hpi-footer] {
+								margin-top: 0 !important; /* override mt-auto/margin rules */
+							}
+							/* Ensure exactly 8px between the bottom of Signature and the bottom of the box */
+							body.murmur-mobile [data-hpi-footer] {
+								padding-bottom: 8px !important;
+							}
+							/* Remove extra bottom margin from the Signature FormItem wrapper */
+							body.murmur-mobile [data-hpi-footer] .mb-\[23px\],
+							body.murmur-mobile [data-hpi-footer] .mb-\[9px\] {
+								margin-bottom: 0 !important;
+							}
+							/* Hide any in-box footer content below Signature in landscape (Test/error), relying on sticky Test */
+							body.murmur-mobile [data-hpi-footer] > .w-full {
+								display: none !important;
+							}
 						}
 
-						/* Ensure the divider below the header is visible in mobile landscape at all widths */
+						/* Previously we drew only a bottom divider. Replace with a full header box in landscape. */
 						@media (orientation: landscape) {
+							/* Full-width box around header */
+							body.murmur-mobile [data-slot='campaign-header'] {
+								border: 2px solid #000000 !important;
+								box-sizing: border-box !important;
+							}
+							/* Remove old bottom divider and any gap so header box touches content */
 							body.murmur-mobile [data-slot='campaign-content'] {
-								border-top-width: 2px !important;
-								border-top-style: solid !important;
-								border-top-color: #000000 !important;
+								border-top: 0 !important;
+								margin-top: 0 !important;
 							}
 						}
 					`}</style>

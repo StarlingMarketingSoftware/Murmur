@@ -6,6 +6,11 @@ html {
 	overflow-x: hidden;
 }
 
+/* Explicitly disable smooth scrolling when requested (e.g., mobile dashboard) */
+html.no-smooth-scroll {
+	scroll-behavior: auto !important;
+}
+
 /* When Lenis is active, override smooth behavior */
 html.lenis-active {
 	scroll-behavior: auto; /* Let Lenis handle smooth scrolling */
