@@ -674,7 +674,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												}}
 												className={cn(
 													'rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden relative w-[357px] max-[480px]:w-[89.33vw] mx-auto',
-													isExpanded ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
+													isExpanded ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]',
+													!isExpanded && isMobileLandscape && 'h-[24px]'
 												)}
 												style={{ borderColor: strokeColor }}
 											>
@@ -682,10 +683,16 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													<div
 														className={cn(
 															'flex flex-row items-center flex-shrink-0',
-															isExpanded ? 'h-[21px]' : 'h-[31px] max-[480px]:h-[24px]'
+															isExpanded ? 'h-[21px]' : 'h-[31px] max-[480px]:h-[24px]',
+															!isExpanded && isMobileLandscape && 'h-[24px]'
 														)}
 													>
-														<div className="flex-1 flex h-full items-center px-3">
+														<div
+															className={cn(
+																'flex-1 flex h-full px-3',
+																isMobileLandscape ? 'items-center' : 'items-center'
+															)}
+														>
 															<span className="font-inter text-[12px] leading-none font-semibold text-black">
 																{blockLabel(b.type as HybridBlock)}
 															</span>
@@ -695,13 +702,19 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																</span>
 															)}
 														</div>
-														<div className="flex flex-row h-full items-stretch">
+														<div
+															className={cn(
+																'flex flex-row h-full',
+																isMobileLandscape ? 'items-center' : 'items-stretch'
+															)}
+														>
 															<div
 																className={cn(
 																	'border-l border-black',
 																	isExpanded
 																		? 'h-[21px]'
-																		: 'h-[27px] max-[480px]:h-[20px]'
+																		: 'h-[27px] max-[480px]:h-[20px]',
+																	!isExpanded && isMobileLandscape && 'h-[20px]'
 																)}
 															/>
 															<button
@@ -728,13 +741,17 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																	'border-l border-black',
 																	isExpanded
 																		? 'h-[21px]'
-																		: 'h-[27px] max-[480px]:h-[20px]'
+																		: 'h-[27px] max-[480px]:h-[20px]',
+																	!isExpanded && isMobileLandscape && 'h-[20px]'
 																)}
 															/>
 															<button
 																type="button"
 																onClick={() => removeBlock(b.id)}
-																className="w-[30px] h-full flex items-center justify-center text-[18px] leading-none font-bold text-red-600 hover:bg-black/10 appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none"
+																className={cn(
+																	'w-[30px] h-full flex items-center justify-center leading-none font-bold text-red-600 hover:bg-black/10 appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none',
+																	isMobileLandscape ? 'text-[16px]' : 'text-[18px]'
+																)}
 																aria-label="Remove block"
 															>
 																×
@@ -929,7 +946,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										out.push(
 											<div
 												key={`mini-ph-${slot}`}
-												className="w-[357px] max-[480px]:w-[89.33vw] mx-auto h-[31px] max-[480px]:h-[24px] flex items-center justify-end"
+												className={cn(
+													'w-[357px] max-[480px]:w-[89.33vw] mx-auto h-[31px] max-[480px]:h-[24px] flex items-center justify-end',
+													isMobileLandscape && 'h-[24px]'
+												)}
 											>
 												<Button
 													type="button"
