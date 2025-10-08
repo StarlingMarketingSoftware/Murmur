@@ -903,6 +903,21 @@ const Murmur = () => {
 							body.murmur-mobile [data-drafting-preview-header] {
 								display: none !important;
 							}
+
+							/* Mobile landscape: make Test Preview match main drafting box dimensions */
+							body.murmur-mobile [data-test-preview-wrapper] {
+								width: 96.27vw !important; /* same as main drafting box */
+							}
+							body.murmur-mobile [data-test-preview-wrapper] [data-test-preview-panel] {
+								width: 100% !important; /* fill wrapper */
+								height: 644px !important; /* keep same inner height used in portrait */
+							}
+							/* Show sticky Back to Testing / Go to Drafting footer in landscape on mobile */
+							body.murmur-mobile
+								[data-test-preview-wrapper]
+								.mobile-landscape-sticky-preview-footer {
+								display: block !important;
+							}
 						}
 
 						/* At 667px landscape, adjust spacing for less cramped layout */

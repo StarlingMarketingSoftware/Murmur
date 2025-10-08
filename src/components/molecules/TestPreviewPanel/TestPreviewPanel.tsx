@@ -566,8 +566,8 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 						)}
 					</div>
 
-					{/* Footer with Test button (hidden on mobile; sticky footer exists there) */}
-					<div className="p-4 bg-background rounded-b-md max-[480px]:hidden">
+					{/* Footer with Test button (hidden on mobile portrait via max-[480px], and on mobile landscape via .mobile-landscape-hide) */}
+					<div className="p-4 bg-background rounded-b-md max-[480px]:hidden mobile-landscape-hide">
 						<Button
 							type="button"
 							onClick={onTest}

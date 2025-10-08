@@ -1895,6 +1895,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												'w-[461px] max-[480px]:w-[96.27vw] shrink-0',
 												isPanelsReversed ? 'order-1' : 'order-2'
 											)}
+											data-test-preview-wrapper
 										>
 											<DraggableBox
 												id="test-preview-panel"
@@ -1920,7 +1921,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												/>
 											</DraggableBox>
 											{/* Mobile sticky footer with Back to Testing and Go to Drafting */}
-											<div className="hidden max-[480px]:block">
+											<div className="hidden max-[480px]:block mobile-landscape-sticky-preview-footer">
 												<div className="fixed bottom-0 left-0 right-0 z-40">
 													<div className="flex w-full">
 														<Button
