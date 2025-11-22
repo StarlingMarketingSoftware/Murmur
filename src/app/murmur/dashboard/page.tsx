@@ -48,7 +48,6 @@ const Dashboard = () => {
 	// Mobile-friendly sizing for hero logo and subtitle; desktop remains unchanged
 	const logoWidth = isMobile ? '190px' : '300px';
 	const logoHeight = isMobile ? '50px' : '79px';
-	const subtitleFontSize = isMobile ? '11px' : '15px';
 	const hasProblematicBrowser = isProblematicBrowser();
 	const searchContainerRef = useRef<HTMLDivElement>(null);
 	const {
@@ -113,15 +112,6 @@ const Dashboard = () => {
 								>
 									<MurmurLogoNew width={logoWidth} height={logoHeight} />
 								</div>
-								<Typography
-									font="secondary"
-									className="mt-3 text-center premium-subtitle-gradient w-full"
-									style={{ fontSize: subtitleFontSize, lineHeight: '1.3' }}
-									color="light"
-								>
-									Let&apos;s <strong style={{ color: '#248531' }}>start</strong> by
-									finding contacts.
-								</Typography>
 							</div>
 						</div>
 
@@ -197,7 +187,7 @@ const Dashboard = () => {
 																	{/* Desktop Search Button */}
 																	<button
 																		type="submit"
-																		className="hidden md:flex absolute right-[6px] top-[6px] items-center justify-center w-[58px] h-[62px] hover:bg-[#4e9b5d] transition-colors z-10"
+																		className="hidden md:flex absolute right-[6px] top-[6px] items-center justify-center w-[58px] h-[62px] transition-colors z-10 cursor-pointer group"
 																		style={{
 																			backgroundColor: 'rgba(93, 171, 104, 0.49)',
 																			borderTopRightRadius: '7px',
@@ -206,6 +196,14 @@ const Dashboard = () => {
 																			borderBottomLeftRadius: '0',
 																			border: '2px solid #5DAB68',
 																			borderLeft: '2px solid #5DAB68',
+																		}}
+																		onMouseEnter={(e) => {
+																			e.currentTarget.style.backgroundColor =
+																				'rgba(93, 171, 104, 0.65)';
+																		}}
+																		onMouseLeave={(e) => {
+																			e.currentTarget.style.backgroundColor =
+																				'rgba(93, 171, 104, 0.49)';
 																		}}
 																	>
 																		<svg
