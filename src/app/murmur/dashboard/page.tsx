@@ -157,7 +157,7 @@ const Dashboard = () => {
 					<div className="w-full">
 						<div
 							className="flex justify-center items-center w-full px-4"
-							style={{ marginBottom: '0.75rem', marginTop: isMobile ? '20px' : '0' }}
+							style={{ marginBottom: '0.75rem', marginTop: '50px' }}
 						>
 							<div className="premium-hero-section flex flex-col items-center justify-center w-full max-w-[600px]">
 								<div
@@ -618,45 +618,6 @@ const Dashboard = () => {
 															/>
 														</div>
 													</div>
-													{!isMobile && (
-														<div className="flex items-center justify-end flex-shrink-0 ml-auto">
-															{isFreeTrial ? (
-																<UpgradeSubscriptionDrawer
-																	message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
-																	triggerButtonText="Import"
-																	buttonVariant="light"
-																	className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-																/>
-															) : (
-																<ContactTSVUploadDialog
-																	isAdmin={false}
-																	triggerText="Import"
-																	buttonVariant="light"
-																	className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-																	fullScreen
-																/>
-															)}
-															<div className="w-[19px]"></div>
-															{!canSearch ? (
-																<UpgradeSubscriptionDrawer
-																	message="Searching for contacts requires an active subscription or free trial. Please upgrade your plan to proceed."
-																	triggerButtonText="Generate"
-																	buttonVariant="primary-light"
-																	className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
-																/>
-															) : (
-																<Button
-																	variant="primary-light"
-																	type="submit"
-																	bold
-																	className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
-																	isLoading={isLoadingContacts || isRefetchingContacts}
-																>
-																	Generate
-																</Button>
-															)}
-														</div>
-													)}
 												</div>
 											)}
 										</form>
