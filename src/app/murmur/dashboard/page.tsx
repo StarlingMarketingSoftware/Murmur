@@ -185,9 +185,30 @@ const Dashboard = () => {
 																		{...field}
 																	/>
 																	{/* New 532x64px element - Added border-black and z-20 */}
-																	<div className="hidden md:block absolute left-[4px] top-1/2 -translate-y-1/2 w-[532px] h-[64px] rounded-[8px] bg-white border border-black pointer-events-none z-20">
+																	<div className="hidden md:block absolute left-[4px] top-1/2 -translate-y-1/2 w-[532px] h-[64px] rounded-[8px] bg-white border border-black pointer-events-none z-20 font-secondary">
 																		<div className="absolute left-[172px] top-0 bottom-0 w-[2px] bg-black/10" />
 																		<div className="absolute left-[332px] top-0 bottom-0 w-[2px] bg-black/10" />
+																		{/* Why Section */}
+																		<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
+																			Why
+																		</div>
+																		<div className="absolute left-[24px] top-[42px] font-semibold text-black/42 text-[12px] leading-none whitespace-nowrap">
+																			Choose Type of Search
+																		</div>
+																		{/* What Section */}
+																		<div className="absolute left-[196px] top-[10px] font-bold text-black text-[22px] leading-none">
+																			What
+																		</div>
+																		<div className="absolute left-[196px] top-[42px] font-semibold text-black/42 text-[12px] leading-none whitespace-nowrap">
+																			Add Recipients
+																		</div>
+																		{/* Where Section */}
+																		<div className="absolute left-[356px] top-[10px] font-bold text-black text-[22px] leading-none">
+																			Where
+																		</div>
+																		<div className="absolute left-[356px] top-[42px] font-semibold text-black/42 text-[12px] leading-none whitespace-nowrap">
+																			Search Destinations
+																		</div>
 																	</div>
 																	{/* Desktop Search Button */}
 																	<button
