@@ -187,15 +187,17 @@ const Dashboard = () => {
 																	{/* Desktop Search Button */}
 																	<button
 																		type="submit"
-																		className="hidden md:flex absolute right-[6px] top-[6px] items-center justify-center w-[58px] h-[62px] transition-colors z-10 cursor-pointer group"
+																		className="hidden md:flex absolute right-[6px] items-center justify-center w-[58px] h-[62px] transition-colors z-10 cursor-pointer group"
 																		style={{
+																			top: '50%',
+																			transform: 'translateY(-50%)',
 																			backgroundColor: 'rgba(93, 171, 104, 0.49)',
 																			borderTopRightRadius: '7px',
 																			borderBottomRightRadius: '7px',
 																			borderTopLeftRadius: '0',
 																			borderBottomLeftRadius: '0',
-																			border: '2px solid #5DAB68',
-																			borderLeft: '2px solid #5DAB68',
+																			border: '1px solid #5DAB68',
+																			borderLeft: '1px solid #5DAB68',
 																		}}
 																		onMouseEnter={(e) => {
 																			e.currentTarget.style.backgroundColor =
