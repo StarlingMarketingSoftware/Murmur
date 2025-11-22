@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { gsap } from 'gsap';
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { useDashboard } from './useDashboard';
 import { urls } from '@/constants/urls';
@@ -85,77 +84,6 @@ const Dashboard = () => {
 		}
 	}, [isMobile, setHoveredContact]);
 
-	useEffect(() => {
-		// Small delay to ensure DOM is ready
-		const timer = setTimeout(() => {
-			// Animate all overlays present (initial and results views)
-			const overlays = Array.from(
-				document.querySelectorAll('.search-wave-overlay')
-			) as HTMLElement[];
-			console.log('Found overlays:', overlays.length);
-			if (overlays.length === 0) {
-				console.log('No overlays found, trying again...');
-				return;
-			}
-
-			const timelines: gsap.core.Tween[] = [];
-			const enterHandlers: Array<() => void> = [];
-			const leaveHandlers: Array<() => void> = [];
-
-			overlays.forEach((overlay, index) => {
-				console.log(`Animating overlay ${index}:`, overlay);
-				// Make sure the overlay is visible
-				gsap.set(overlay, {
-					backgroundPosition: '100% 0',
-					opacity: 1,
-					visibility: 'visible',
-				});
-				const tl = gsap.to(overlay, {
-					backgroundPosition: '-100% 0',
-					duration: 3, // 3 second loop
-					repeat: -1,
-					ease: 'none',
-					onStart: function () {
-						console.log('Animation started for overlay', index);
-					},
-				});
-				timelines.push(tl);
-
-				const container = overlay.parentElement;
-				const handleMouseEnter = () => gsap.to(tl, { timeScale: 2, duration: 0.3 });
-				const handleMouseLeave = () => gsap.to(tl, { timeScale: 1, duration: 0.3 });
-				if (container) {
-					container.addEventListener('mouseenter', handleMouseEnter);
-					container.addEventListener('mouseleave', handleMouseLeave);
-					enterHandlers.push(handleMouseEnter);
-					leaveHandlers.push(handleMouseLeave);
-				} else {
-					enterHandlers.push(() => {});
-					leaveHandlers.push(() => {});
-				}
-			});
-
-			// Store cleanup function
-			(window as any).cleanupSearchAnimations = () => {
-				overlays.forEach((overlay, i) => {
-					const container = overlay.parentElement;
-					if (container) {
-						container.removeEventListener('mouseenter', enterHandlers[i]);
-						container.removeEventListener('mouseleave', leaveHandlers[i]);
-					}
-				});
-				timelines.forEach((tl) => tl.kill());
-			};
-		}, 100); // 100ms delay
-
-		return () => {
-			clearTimeout(timer);
-			if ((window as any).cleanupSearchAnimations) {
-				(window as any).cleanupSearchAnimations();
-				delete (window as any).cleanupSearchAnimations;
-			}
-		};
-	}, [hasSearched]);
 	// Return null during initial load to prevent hydration mismatch
 	if (isMobile === null) {
 		return null;
@@ -266,7 +194,6 @@ const Dashboard = () => {
 																		spellCheck="false"
 																		{...field}
 																	/>
-																	<div className="search-wave-overlay" />
 																	{/* Mobile-only submit icon inside input */}
 																	<button
 																		type="submit"
@@ -591,7 +518,6 @@ const Dashboard = () => {
 																spellCheck="false"
 																{...field}
 															/>
-															<div className="search-wave-overlay" />
 														</div>
 													</div>
 												</FormControl>
