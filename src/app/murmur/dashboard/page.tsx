@@ -184,6 +184,11 @@ const Dashboard = () => {
 																		spellCheck="false"
 																		{...field}
 																	/>
+																	{/* New 532x64px element - Added border-black and z-20 */}
+																	<div className="hidden md:block absolute left-[4px] top-1/2 -translate-y-1/2 w-[532px] h-[64px] rounded-[8px] bg-white border border-black pointer-events-none z-20">
+																		<div className="absolute left-[172px] top-0 bottom-0 w-[2px] bg-black/10" />
+																		<div className="absolute left-[332px] top-0 bottom-0 w-[2px] bg-black/10" />
+																	</div>
 																	{/* Desktop Search Button */}
 																	<button
 																		type="submit"
