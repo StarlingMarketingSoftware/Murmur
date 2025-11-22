@@ -550,7 +550,6 @@ body {
 	width: 100% !important;
 	min-width: 100% !important;
 	max-width: 100% !important;
-	background: #ffffff;
 	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 	box-shadow: none;
 	transform: none !important;
@@ -4563,9 +4562,11 @@ body.murmur-mobile .search-bar-wrapper .flex-wrap > .h-\[39px\] {
 		min-width: 100% !important;
 		max-width: 100% !important;
 		border-radius: 8px !important;
+		background: #f2f2f2 !important;
 	}
 
 	.search-bar-wrapper:not(.search-bar-active) .search-wave-container::before {
+		background: #f2f2f2 !important;
 		border-radius: 8px !important;
 	}
 
