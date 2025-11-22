@@ -35,7 +35,7 @@ async function importProductionContacts() {
 		process.cwd(),
 		'public',
 		'contactLists',
-		'2025-07-31ProductionContacts.xlsx'
+		'2025-11-21Contacts.xlsx'
 	);
 
 	console.log('Reading production contacts from:', filePath);

@@ -381,6 +381,15 @@ export async function GET(req: NextRequest) {
 				const fallback = await substringSearch();
 				return apiResponse(fallback);
 			}
+
+			// If vector returns no matches (e.g., strict state filter too narrow), fall back to substring search
+			if (!vectorSearchResults?.matches || vectorSearchResults.matches.length === 0) {
+				console.warn(
+					'Vector search returned no matches, falling back to substring search.'
+				);
+				const fallback = await substringSearch();
+				return apiResponse(fallback);
+			}
 			// Pre-filter ES matches using post-training to remove academic institutions early,
 			// but allow a lenient tail to fill close-to-limit venue searches
 			const prePostProfile = postTrainingProfile;
@@ -596,14 +605,12 @@ export async function GET(req: NextRequest) {
 				});
 			}
 
-			// Posttraining step: exclude or demote universities for music venue searches
-			let postProfile;
-			try {
-				postProfile = await getPostTrainingForQuery(query || '');
-			} catch (error) {
-				console.error('Error getting post training profile for filtering:', error);
-				postProfile = { active: false, excludeTerms: [], demoteTerms: [] };
-			}
+			// Posttraining step: reuse earlier postTrainingProfile to avoid a second LLM call
+			let postProfile = postTrainingProfile || {
+				active: false,
+				excludeTerms: [],
+				demoteTerms: [],
+			};
 			if (postProfile.active && contacts.length > 0) {
 				const excludeTerms = postProfile.excludeTerms.map((t) => t.toLowerCase());
 				const demoteTerms = postProfile.demoteTerms.map((t) => t.toLowerCase());
