@@ -267,26 +267,6 @@ const Dashboard = () => {
 																		{...field}
 																	/>
 																	<div className="search-wave-overlay" />
-																	<div
-																		className="custom-placeholder"
-																		aria-hidden="true"
-																		style={{
-																			opacity:
-																				(field.value?.trim()?.length ?? 0) > 0 ? 0 : 1,
-																		}}
-																	>
-																		<span className="custom-placeholder-bold">
-																			Type who you want to contact, then click generate
-																		</span>
-																		<span> </span>
-																		<span className="custom-placeholder-regular">
-																			i.e.
-																		</span>
-																		<span> </span>
-																		<span className="custom-placeholder-italic">
-																			“Music Venues in North Carolina”
-																		</span>
-																	</div>
 																	{/* Mobile-only submit icon inside input */}
 																	<button
 																		type="submit"
