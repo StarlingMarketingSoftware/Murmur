@@ -24,6 +24,12 @@ const Dashboard = () => {
 	const { isSignedIn, openSignIn } = useClerk();
 	const isMobile = useIsMobile();
 	const [isMobileLandscape, setIsMobileLandscape] = useState(false);
+	const [whyValue, setWhyValue] = useState('');
+	const [whatValue, setWhatValue] = useState('');
+	const [whereValue, setWhereValue] = useState('');
+	const [activeSection, setActiveSection] = useState<'why' | 'what' | 'where' | null>(
+		null
+	);
 
 	useEffect(() => {
 		if (isMobile !== true) {
@@ -50,6 +56,9 @@ const Dashboard = () => {
 	const logoHeight = isMobile ? '50px' : '79px';
 	const hasProblematicBrowser = isProblematicBrowser();
 	const searchContainerRef = useRef<HTMLDivElement>(null);
+	const whyInputRef = useRef<HTMLInputElement>(null);
+	const whatInputRef = useRef<HTMLInputElement>(null);
+	const whereInputRef = useRef<HTMLInputElement>(null);
 	const {
 		form,
 		onSubmit,
@@ -82,6 +91,51 @@ const Dashboard = () => {
 			setHoveredContact(null);
 		}
 	}, [isMobile, setHoveredContact]);
+
+	// Combine section values into main search field
+	useEffect(() => {
+		const combinedSearch = [whyValue, whatValue, whereValue].filter(Boolean).join(' ');
+		if (combinedSearch) {
+			form.setValue('searchText', combinedSearch);
+		}
+	}, [whyValue, whatValue, whereValue, form]);
+
+	// Handle clicks outside to deactivate sections
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as HTMLElement;
+			if (!target.closest('.search-sections-container')) {
+				setActiveSection(null);
+			}
+		};
+
+		if (activeSection) {
+			document.addEventListener('mousedown', handleClickOutside);
+			return () => {
+				document.removeEventListener('mousedown', handleClickOutside);
+			};
+		}
+	}, [activeSection]);
+
+	// Focus input when section becomes active
+	useEffect(() => {
+		if (activeSection === 'why' && whyInputRef.current) {
+			whyInputRef.current.focus();
+		} else if (activeSection === 'what' && whatInputRef.current) {
+			whatInputRef.current.focus();
+		} else if (activeSection === 'where' && whereInputRef.current) {
+			whereInputRef.current.focus();
+		}
+	}, [activeSection]);
+
+	// Enhanced reset search that also clears section values
+	const handleEnhancedResetSearch = () => {
+		handleResetSearch();
+		setWhyValue('');
+		setWhatValue('');
+		setWhereValue('');
+		setActiveSection(null);
+	};
 
 	// Return null during initial load to prevent hydration mismatch
 	if (isMobile === null) {
@@ -185,29 +239,149 @@ const Dashboard = () => {
 																		{...field}
 																	/>
 																	{/* New 532x64px element - Added border-black and z-20 */}
-																	<div className="hidden md:block absolute left-[4px] top-1/2 -translate-y-1/2 w-[532px] h-[64px] rounded-[8px] bg-white border border-black pointer-events-none z-20 font-secondary">
+																	<div className="search-sections-container hidden md:block absolute left-[4px] top-1/2 -translate-y-1/2 w-[532px] h-[64px] rounded-[8px] bg-white border border-black z-20 font-secondary">
 																		<div className="absolute left-[172px] top-0 bottom-0 w-[2px] bg-black/10" />
 																		<div className="absolute left-[332px] top-0 bottom-0 w-[2px] bg-black/10" />
 																		{/* Why Section */}
 																		<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
 																			Why
 																		</div>
-																		<div className="absolute left-[24px] top-[42px] font-semibold text-black/42 text-[12px] leading-none whitespace-nowrap">
-																			Choose Type of Search
+																		<div
+																			className="absolute left-[24px] top-[42px] w-[144px] h-[12px] cursor-pointer"
+																			onClick={() => setActiveSection('why')}
+																		>
+																			{activeSection === 'why' ? (
+																				<input
+																					ref={whyInputRef}
+																					type="text"
+																					value={whyValue}
+																					onChange={(e) => setWhyValue(e.target.value)}
+																					onKeyDown={(e) => {
+																						if (e.key === 'Enter') {
+																							e.preventDefault();
+																							setActiveSection(null);
+																						}
+																					}}
+																					className="absolute top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																					style={{
+																						height: '12px',
+																						lineHeight: '12px',
+																						padding: '0',
+																						margin: '0',
+																						transform: 'translateY(-1px)',
+																						fontFamily:
+																							'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																					}}
+																					placeholder="Choose Type of Search"
+																					onClick={(e) => e.stopPropagation()}
+																				/>
+																			) : (
+																				<div
+																					className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap hover:text-black/60 transition-colors"
+																					style={{
+																						height: '12px',
+																						lineHeight: '12px',
+																						padding: '0',
+																						margin: '0',
+																					}}
+																				>
+																					{whyValue || 'Choose Type of Search'}
+																				</div>
+																			)}
 																		</div>
 																		{/* What Section */}
 																		<div className="absolute left-[196px] top-[10px] font-bold text-black text-[22px] leading-none">
 																			What
 																		</div>
-																		<div className="absolute left-[196px] top-[42px] font-semibold text-black/42 text-[12px] leading-none whitespace-nowrap">
-																			Add Recipients
+																		<div
+																			className="absolute left-[196px] top-[42px] w-[124px] h-[12px] cursor-pointer"
+																			onClick={() => setActiveSection('what')}
+																		>
+																			{activeSection === 'what' ? (
+																				<input
+																					ref={whatInputRef}
+																					type="text"
+																					value={whatValue}
+																					onChange={(e) => setWhatValue(e.target.value)}
+																					onKeyDown={(e) => {
+																						if (e.key === 'Enter') {
+																							e.preventDefault();
+																							setActiveSection(null);
+																						}
+																					}}
+																					className="absolute top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																					style={{
+																						height: '12px',
+																						lineHeight: '12px',
+																						padding: '0',
+																						margin: '0',
+																						transform: 'translateY(-1px)',
+																						fontFamily:
+																							'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																					}}
+																					placeholder="Add Recipients"
+																					onClick={(e) => e.stopPropagation()}
+																				/>
+																			) : (
+																				<div
+																					className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap hover:text-black/60 transition-colors"
+																					style={{
+																						height: '12px',
+																						lineHeight: '12px',
+																						padding: '0',
+																						margin: '0',
+																					}}
+																				>
+																					{whatValue || 'Add Recipients'}
+																				</div>
+																			)}
 																		</div>
 																		{/* Where Section */}
 																		<div className="absolute left-[356px] top-[10px] font-bold text-black text-[22px] leading-none">
 																			Where
 																		</div>
-																		<div className="absolute left-[356px] top-[42px] font-semibold text-black/42 text-[12px] leading-none whitespace-nowrap">
-																			Search Destinations
+																		<div
+																			className="absolute left-[356px] top-[42px] w-[156px] h-[12px] cursor-pointer"
+																			onClick={() => setActiveSection('where')}
+																		>
+																			{activeSection === 'where' ? (
+																				<input
+																					ref={whereInputRef}
+																					type="text"
+																					value={whereValue}
+																					onChange={(e) => setWhereValue(e.target.value)}
+																					onKeyDown={(e) => {
+																						if (e.key === 'Enter') {
+																							e.preventDefault();
+																							setActiveSection(null);
+																						}
+																					}}
+																					className="absolute top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																					style={{
+																						height: '12px',
+																						lineHeight: '12px',
+																						padding: '0',
+																						margin: '0',
+																						transform: 'translateY(-1px)',
+																						fontFamily:
+																							'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																					}}
+																					placeholder="Search Destinations"
+																					onClick={(e) => e.stopPropagation()}
+																				/>
+																			) : (
+																				<div
+																					className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap hover:text-black/60 transition-colors"
+																					style={{
+																						height: '12px',
+																						lineHeight: '12px',
+																						padding: '0',
+																						margin: '0',
+																					}}
+																				>
+																					{whereValue || 'Search Destinations'}
+																				</div>
+																			)}
 																		</div>
 																	</div>
 																	{/* Desktop Search Button */}
@@ -454,7 +628,7 @@ const Dashboard = () => {
 						<div className="search-query-display mt-8">
 							<div className="search-query-display-inner">
 								<button
-									onClick={handleResetSearch}
+									onClick={handleEnhancedResetSearch}
 									className="search-back-button"
 									aria-label="Back to search"
 								>
