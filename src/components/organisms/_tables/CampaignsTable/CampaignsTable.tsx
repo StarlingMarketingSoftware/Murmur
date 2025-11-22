@@ -222,7 +222,7 @@ export const CampaignsTable: FC = () => {
 					className={`text-left ${
 						shouldShowMobileFeatures
 							? 'text-[10px] font-secondary font-medium'
-							: 'text-[14px] font-secondary font-medium mb-0.5'
+							: 'text-[14px] font-secondary font-medium mb-0.5 hidden'
 					}`}
 					variant="secondary"
 				>
@@ -247,7 +247,9 @@ export const CampaignsTable: FC = () => {
 									<div className="mobile-table-wrapper" ref={mobileTableWrapperRef}>
 										<CustomTable
 											variant="secondary"
-											containerClassName="my-campaigns-table mobile-table-no-scroll"
+											containerClassName="my-campaigns-table mobile-table-no-scroll !bg-[#EDEDED]"
+											headerClassName="[&_tr]:!bg-[#EDEDED] [&_th]:!bg-[#EDEDED] [&_th]:!border-b-[#EDEDED]"
+											rowClassName="!bg-[#EDEDED] !border-b-[#EDEDED]"
 											handleRowClick={handleRowClick}
 											columns={
 												shouldUseExternalDeleteColumn
@@ -306,7 +308,9 @@ export const CampaignsTable: FC = () => {
 							// Desktop mode: normal table with delete column
 							<CustomTable
 								variant="secondary"
-								containerClassName="border-[2px] !border-[#8c8c8c] rounded-[8px] my-campaigns-table"
+								containerClassName="border-none rounded-[8px] my-campaigns-table !bg-[#EDEDED] !w-[891px] !mx-auto !px-[4.5px] !pt-[4.5px]"
+								headerClassName="[&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[4px] [&_th:last-child]:rounded-tr-[4px]"
+								rowClassName="!bg-[#EDEDED] !border-0"
 								handleRowClick={handleRowClick}
 								columns={columns}
 								data={data}

@@ -99,7 +99,11 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 	const columns: ColumnDef<CampaignWithCounts>[] = [
 		{
 			accessorKey: 'name',
-			header: () => <div className="text-left"></div>,
+			header: () => (
+				<div className="text-left pl-0 font-secondary font-medium text-[14px] text-black">
+					Your Campaigns
+				</div>
+			),
 			cell: ({ row }) => {
 				const name: string = row.getValue('name');
 				const isConfirming = row.original.id === confirmingCampaignId;
