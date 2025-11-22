@@ -239,155 +239,201 @@ const Dashboard = () => {
 																		{...field}
 																	/>
 																	{/* New 532x64px element - Added border-black and z-20 */}
-																	<div className="search-sections-container hidden md:block absolute left-[4px] top-1/2 -translate-y-1/2 w-[532px] h-[64px] rounded-[8px] bg-white border border-black z-20 font-secondary">
-																		<div className="absolute left-[172px] top-0 bottom-0 w-[2px] bg-black/10" />
-																		<div className="absolute left-[332px] top-0 bottom-0 w-[2px] bg-black/10" />
-																		{/* Why Section */}
-																		<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
-																			Why
-																		</div>
+																	<div
+																		className={`search-sections-container hidden md:block absolute left-[4px] top-1/2 -translate-y-1/2 w-[532px] h-[64px] rounded-[8px] border z-20 font-secondary ${
+																			activeSection
+																				? 'bg-[#EFEFEF] border-transparent'
+																				: 'bg-white border-black'
+																		}`}
+																	>
 																		<div
-																			className="absolute left-[24px] top-[42px] w-[144px] h-[12px] cursor-pointer"
+																			className={`absolute left-[172px] top-0 bottom-0 w-[2px] bg-black/10 ${
+																				activeSection ? 'hidden' : ''
+																			}`}
+																		/>
+																		<div
+																			className={`absolute left-[332px] top-0 bottom-0 w-[2px] bg-black/10 ${
+																				activeSection ? 'hidden' : ''
+																			}`}
+																		/>
+																		{/* Why Section */}
+																		<div
+																			className={`absolute left-0 top-[-1px] h-[64px] cursor-pointer border ${
+																				activeSection === 'why'
+																					? 'w-[174px] bg-white border-black z-30 rounded-[8px]'
+																					: `w-[172px] border-transparent ${
+																							activeSection
+																								? 'hover:bg-[#F9F9F9]'
+																								: 'hover:bg-black/5'
+																					  } rounded-l-[8px]`
+																			}`}
 																			onClick={() => setActiveSection('why')}
 																		>
-																			{activeSection === 'why' ? (
-																				<input
-																					ref={whyInputRef}
-																					type="text"
-																					value={whyValue}
-																					onChange={(e) => setWhyValue(e.target.value)}
-																					onKeyDown={(e) => {
-																						if (e.key === 'Enter') {
-																							e.preventDefault();
-																							setActiveSection(null);
-																						}
-																					}}
-																					className="absolute top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
-																					style={{
-																						height: '12px',
-																						lineHeight: '12px',
-																						padding: '0',
-																						margin: '0',
-																						transform: 'translateY(-1px)',
-																						fontFamily:
-																							'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																					}}
-																					placeholder="Choose Type of Search"
-																					onClick={(e) => e.stopPropagation()}
-																				/>
-																			) : (
-																				<div
-																					className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap hover:text-black/60 transition-colors"
-																					style={{
-																						height: '12px',
-																						lineHeight: '12px',
-																						padding: '0',
-																						margin: '0',
-																					}}
-																				>
-																					{whyValue || 'Choose Type of Search'}
-																				</div>
-																			)}
+																			<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
+																				Why
+																			</div>
+																			<div className="absolute left-[24px] top-[42px] w-[144px] h-[12px]">
+																				{activeSection === 'why' ? (
+																					<input
+																						ref={whyInputRef}
+																						type="text"
+																						value={whyValue}
+																						onChange={(e) => setWhyValue(e.target.value)}
+																						onKeyDown={(e) => {
+																							if (e.key === 'Enter') {
+																								e.preventDefault();
+																								setActiveSection(null);
+																							}
+																						}}
+																						className="absolute top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																						style={{
+																							height: '12px',
+																							lineHeight: '12px',
+																							padding: '0',
+																							margin: '0',
+																							transform: 'translateY(-1px)',
+																							fontFamily:
+																								'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																						}}
+																						placeholder="Choose Type of Search"
+																						onClick={(e) => e.stopPropagation()}
+																					/>
+																				) : (
+																					<div
+																						className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap"
+																						style={{
+																							height: '12px',
+																							lineHeight: '12px',
+																							padding: '0',
+																							margin: '0',
+																						}}
+																					>
+																						{whyValue || 'Choose Type of Search'}
+																					</div>
+																				)}
+																			</div>
 																		</div>
 																		{/* What Section */}
-																		<div className="absolute left-[196px] top-[10px] font-bold text-black text-[22px] leading-none">
-																			What
-																		</div>
 																		<div
-																			className="absolute left-[196px] top-[42px] w-[124px] h-[12px] cursor-pointer"
+																			className={`absolute left-[172px] top-[-1px] h-[64px] cursor-pointer border ${
+																				activeSection === 'what'
+																					? 'w-[161px] bg-white border-black z-30 rounded-[8px]'
+																					: `w-[160px] border-transparent ${
+																							activeSection
+																								? 'hover:bg-[#F9F9F9]'
+																								: 'hover:bg-black/5'
+																					  }`
+																			}`}
 																			onClick={() => setActiveSection('what')}
 																		>
-																			{activeSection === 'what' ? (
-																				<input
-																					ref={whatInputRef}
-																					type="text"
-																					value={whatValue}
-																					onChange={(e) => setWhatValue(e.target.value)}
-																					onKeyDown={(e) => {
-																						if (e.key === 'Enter') {
-																							e.preventDefault();
-																							setActiveSection(null);
-																						}
-																					}}
-																					className="absolute top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
-																					style={{
-																						height: '12px',
-																						lineHeight: '12px',
-																						padding: '0',
-																						margin: '0',
-																						transform: 'translateY(-1px)',
-																						fontFamily:
-																							'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																					}}
-																					placeholder="Add Recipients"
-																					onClick={(e) => e.stopPropagation()}
-																				/>
-																			) : (
-																				<div
-																					className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap hover:text-black/60 transition-colors"
-																					style={{
-																						height: '12px',
-																						lineHeight: '12px',
-																						padding: '0',
-																						margin: '0',
-																					}}
-																				>
-																					{whatValue || 'Add Recipients'}
-																				</div>
-																			)}
+																			<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
+																				What
+																			</div>
+																			<div className="absolute left-[24px] top-[42px] w-[124px] h-[12px]">
+																				{activeSection === 'what' ? (
+																					<input
+																						ref={whatInputRef}
+																						type="text"
+																						value={whatValue}
+																						onChange={(e) => setWhatValue(e.target.value)}
+																						onKeyDown={(e) => {
+																							if (e.key === 'Enter') {
+																								e.preventDefault();
+																								setActiveSection(null);
+																							}
+																						}}
+																						className="absolute top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																						style={{
+																							height: '12px',
+																							lineHeight: '12px',
+																							padding: '0',
+																							margin: '0',
+																							transform: 'translateY(-1px)',
+																							fontFamily:
+																								'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																						}}
+																						placeholder="Add Recipients"
+																						onClick={(e) => e.stopPropagation()}
+																					/>
+																				) : (
+																					<div
+																						className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap hover:text-black/60 transition-colors"
+																						style={{
+																							height: '12px',
+																							lineHeight: '12px',
+																							padding: '0',
+																							margin: '0',
+																						}}
+																					>
+																						{whatValue || 'Add Recipients'}
+																					</div>
+																				)}
+																			</div>
 																		</div>
 																		{/* Where Section */}
-																		<div className="absolute left-[356px] top-[10px] font-bold text-black text-[22px] leading-none">
-																			Where
-																		</div>
 																		<div
-																			className="absolute left-[356px] top-[42px] w-[156px] h-[12px] cursor-pointer"
+																			className={`absolute left-[332px] top-[-1px] h-[64px] cursor-pointer border ${
+																				activeSection === 'where'
+																					? 'w-[201px] bg-white border-black z-30 rounded-[8px]'
+																					: `w-[200px] border-transparent ${
+																							activeSection
+																								? 'hover:bg-[#F9F9F9]'
+																								: 'hover:bg-black/5'
+																					  } rounded-r-[8px]`
+																			}`}
 																			onClick={() => setActiveSection('where')}
 																		>
-																			{activeSection === 'where' ? (
-																				<input
-																					ref={whereInputRef}
-																					type="text"
-																					value={whereValue}
-																					onChange={(e) => setWhereValue(e.target.value)}
-																					onKeyDown={(e) => {
-																						if (e.key === 'Enter') {
-																							e.preventDefault();
-																							setActiveSection(null);
+																			<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
+																				Where
+																			</div>
+																			<div className="absolute left-[24px] top-[42px] w-[156px] h-[12px]">
+																				{activeSection === 'where' ? (
+																					<input
+																						ref={whereInputRef}
+																						type="text"
+																						value={whereValue}
+																						onChange={(e) =>
+																							setWhereValue(e.target.value)
 																						}
-																					}}
-																					className="absolute top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
-																					style={{
-																						height: '12px',
-																						lineHeight: '12px',
-																						padding: '0',
-																						margin: '0',
-																						transform: 'translateY(-1px)',
-																						fontFamily:
-																							'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																					}}
-																					placeholder="Search Destinations"
-																					onClick={(e) => e.stopPropagation()}
-																				/>
-																			) : (
-																				<div
-																					className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap hover:text-black/60 transition-colors"
-																					style={{
-																						height: '12px',
-																						lineHeight: '12px',
-																						padding: '0',
-																						margin: '0',
-																					}}
-																				>
-																					{whereValue || 'Search Destinations'}
-																				</div>
-																			)}
+																						onKeyDown={(e) => {
+																							if (e.key === 'Enter') {
+																								e.preventDefault();
+																								setActiveSection(null);
+																							}
+																						}}
+																						className="absolute top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																						style={{
+																							height: '12px',
+																							lineHeight: '12px',
+																							padding: '0',
+																							margin: '0',
+																							transform: 'translateY(-1px)',
+																							fontFamily:
+																								'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																						}}
+																						placeholder="Search Destinations"
+																						onClick={(e) => e.stopPropagation()}
+																					/>
+																				) : (
+																					<div
+																						className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap hover:text-black/60 transition-colors"
+																						style={{
+																							height: '12px',
+																							lineHeight: '12px',
+																							padding: '0',
+																							margin: '0',
+																						}}
+																					>
+																						{whereValue || 'Search Destinations'}
+																					</div>
+																				)}
+																			</div>
 																		</div>
 																	</div>
 																	{/* Desktop Search Button */}
 																	<button
 																		type="submit"
-																		className="hidden md:flex absolute right-[6px] items-center justify-center w-[58px] h-[62px] transition-colors z-10 cursor-pointer group"
+																		className="hidden md:flex absolute right-[6px] items-center justify-center w-[58px] h-[62px] transition-colors z-40 cursor-pointer group"
 																		style={{
 																			top: '50%',
 																			transform: 'translateY(-50%)',
