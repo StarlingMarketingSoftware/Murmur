@@ -506,7 +506,7 @@ const Dashboard = () => {
 																{activeSection === 'why' && (
 																	<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[12px] absolute top-[calc(100%+10px)] left-[4px] w-[439px] h-[173px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
 																		<div
-																			className="w-[410px] h-[68px] bg-white rounded-[12px] flex items-center px-[15px] cursor-pointer hover:bg-gray-50 transition-colors"
+																			className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 																			onClick={() => {
 																				setWhyValue('Promotion');
 																				setActiveSection(null);
@@ -526,7 +526,7 @@ const Dashboard = () => {
 																			</div>
 																		</div>
 																		<div
-																			className="w-[410px] h-[68px] bg-white rounded-[12px] flex items-center px-[15px] cursor-pointer hover:bg-gray-50 transition-colors"
+																			className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 																			onClick={() => {
 																				setWhyValue('Booking');
 																				setActiveSection(null);
