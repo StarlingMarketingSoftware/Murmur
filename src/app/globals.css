@@ -4548,6 +4548,37 @@ body.murmur-mobile .search-bar-wrapper .flex-wrap > .h-\[39px\] {
 	}
 }
 
+/* Desktop: constrain hero search input to 603x72 with 8px radius */
+@media (min-width: 1024px) {
+	.search-bar-wrapper:not(.search-bar-active) .search-input-group {
+		width: 603px !important;
+		max-width: 603px !important;
+		min-width: 603px !important;
+		margin-left: auto !important;
+		margin-right: auto !important;
+	}
+
+	.search-bar-wrapper:not(.search-bar-active) .search-wave-container {
+		width: 100% !important;
+		min-width: 100% !important;
+		max-width: 100% !important;
+		border-radius: 8px !important;
+	}
+
+	.search-bar-wrapper:not(.search-bar-active) .search-wave-container::before {
+		border-radius: 8px !important;
+	}
+
+	.search-bar-wrapper:not(.search-bar-active) .search-wave-input:not(.results-search-input) {
+		width: 100% !important;
+		height: 72px !important;
+		border-radius: 8px !important;
+		padding-left: 1.25rem !important;
+		padding-right: 1.25rem !important;
+		font-size: 1.0625rem;
+	}
+}
+
 /* Mobile-only button inside the initial search input */
 .search-input-icon-btn {
 	display: none;
