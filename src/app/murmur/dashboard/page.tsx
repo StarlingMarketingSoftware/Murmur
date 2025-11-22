@@ -183,7 +183,7 @@ const Dashboard = () => {
 																	}`}
 																>
 																	<Input
-																		className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent"
+																		className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent md:!h-[72px] md:pr-[80px]"
 																		placeholder=""
 																		style={{
 																			accentColor: 'transparent',
@@ -194,6 +194,34 @@ const Dashboard = () => {
 																		spellCheck="false"
 																		{...field}
 																	/>
+																	{/* Desktop Search Button */}
+																	<button
+																		type="submit"
+																		className="hidden md:flex absolute right-[6px] top-[6px] items-center justify-center w-[58px] h-[62px] hover:bg-[#4e9b5d] transition-colors z-10"
+																		style={{
+																			backgroundColor: 'rgba(93, 171, 104, 0.49)',
+																			borderTopRightRadius: '7px',
+																			borderBottomRightRadius: '7px',
+																			borderTopLeftRadius: '0',
+																			borderBottomLeftRadius: '0',
+																			border: '2px solid #5DAB68',
+																			borderLeft: '2px solid #5DAB68',
+																		}}
+																	>
+																		<svg
+																			width="26"
+																			height="28"
+																			viewBox="0 0 28 30"
+																			fill="none"
+																			xmlns="http://www.w3.org/2000/svg"
+																		>
+																			<path
+																				d="M10.7681 16.6402L0.768066 28.6402M26.9998 10.5C26.9998 15.7467 22.5227 20 16.9998 20C11.477 20 6.99985 15.7467 6.99985 10.5C6.99985 5.25329 11.477 1 16.9998 1C22.5227 1 26.9998 5.25329 26.9998 10.5Z"
+																				stroke="black"
+																				strokeWidth="2"
+																			/>
+																		</svg>
+																	</button>
 																	{/* Mobile-only submit icon inside input */}
 																	<button
 																		type="submit"
