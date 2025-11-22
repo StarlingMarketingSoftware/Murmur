@@ -153,7 +153,7 @@ const Dashboard = () => {
 					hasSearched ? 'search-active' : ''
 				}`}
 			>
-				<div className="hero-wrapper flex flex-col justify-center items-center">
+				<div className="hero-wrapper flex flex-col justify-center items-center !z-[40]">
 					<div className="w-full">
 						<div
 							className="flex justify-center items-center w-full px-4"
@@ -170,7 +170,7 @@ const Dashboard = () => {
 						</div>
 
 						<div
-							className={`search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 ${
+							className={`search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 !z-[50] ${
 								hasSearched ? 'search-bar-active' : ''
 							}`}
 						>
@@ -215,7 +215,7 @@ const Dashboard = () => {
 														<FormControl>
 															<div
 																ref={searchContainerRef}
-																className={`search-input-group ${
+																className={`search-input-group relative ${
 																	hasSearched ? 'search-input-group-active' : ''
 																}`}
 															>
@@ -498,6 +498,16 @@ const Dashboard = () => {
 																		</svg>
 																	</button>
 																</div>
+																{activeSection === 'why' && (
+																	<div className="hidden md:flex flex-col items-center justify-center gap-[12px] absolute top-[calc(100%+10px)] left-[4px] w-[439px] h-[173px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+																		<div className="w-[410px] h-[68px] bg-white rounded-[12px] flex items-center px-[15px]">
+																			<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0" />
+																		</div>
+																		<div className="w-[410px] h-[68px] bg-white rounded-[12px] flex items-center px-[15px]">
+																			<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0" />
+																		</div>
+																	</div>
+																)}
 															</div>
 														</FormControl>
 													</FormItem>
