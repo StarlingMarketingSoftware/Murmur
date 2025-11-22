@@ -547,6 +547,15 @@ const Dashboard = () => {
 																		</div>
 																	</div>
 																)}
+																{activeSection === 'what' && (
+																	<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] absolute top-[calc(100%+10px)] left-[176px] w-[439px] h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
+																	</div>
+																)}
 															</div>
 														</FormControl>
 													</FormItem>
