@@ -324,6 +324,7 @@ export const CampaignsTable: FC = () => {
 								useCustomScrollbar={true}
 								scrollbarOffsetRight={-5}
 								nativeScroll={false}
+								stickyHeader={false}
 							/>
 						)}
 					</div>
