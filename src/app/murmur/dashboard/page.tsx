@@ -8,6 +8,8 @@ import { urls } from '@/constants/urls';
 import { isProblematicBrowser } from '@/utils/browserDetection';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
+import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
+import { BookingIcon } from '@/components/atoms/_svg/BookingIcon';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -104,7 +106,10 @@ const Dashboard = () => {
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
 			const target = event.target as HTMLElement;
-			if (!target.closest('.search-sections-container')) {
+			if (
+				!target.closest('.search-sections-container') &&
+				!target.closest('.search-dropdown-menu')
+			) {
 				setActiveSection(null);
 			}
 		};
@@ -499,12 +504,46 @@ const Dashboard = () => {
 																	</button>
 																</div>
 																{activeSection === 'why' && (
-																	<div className="hidden md:flex flex-col items-center justify-center gap-[12px] absolute top-[calc(100%+10px)] left-[4px] w-[439px] h-[173px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
-																		<div className="w-[410px] h-[68px] bg-white rounded-[12px] flex items-center px-[15px]">
-																			<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0" />
+																	<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[12px] absolute top-[calc(100%+10px)] left-[4px] w-[439px] h-[173px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+																		<div
+																			className="w-[410px] h-[68px] bg-white rounded-[12px] flex items-center px-[15px] cursor-pointer hover:bg-gray-50 transition-colors"
+																			onClick={() => {
+																				setWhyValue('Promotion');
+																				setActiveSection(null);
+																			}}
+																		>
+																			<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																				<PromotionIcon />
+																			</div>
+																			<div className="ml-[12px] flex flex-col">
+																				<div className="text-[20px] font-medium leading-none text-black font-inter">
+																					Promotion
+																				</div>
+																				<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
+																					reach out to radio stations, playlists, and more
+																					to get your music played
+																				</div>
+																			</div>
 																		</div>
-																		<div className="w-[410px] h-[68px] bg-white rounded-[12px] flex items-center px-[15px]">
-																			<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0" />
+																		<div
+																			className="w-[410px] h-[68px] bg-white rounded-[12px] flex items-center px-[15px] cursor-pointer hover:bg-gray-50 transition-colors"
+																			onClick={() => {
+																				setWhyValue('Booking');
+																				setActiveSection(null);
+																			}}
+																		>
+																			<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																				<BookingIcon />
+																			</div>
+																			<div className="ml-[12px] flex flex-col">
+																				<div className="text-[20px] font-medium leading-none text-black font-inter">
+																					Booking
+																				</div>
+																				<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
+																					contact venues, resturants and more, to book
+																					shows
+																				</div>
+																			</div>
 																		</div>
 																	</div>
 																)}
