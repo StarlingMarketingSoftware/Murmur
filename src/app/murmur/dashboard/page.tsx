@@ -509,7 +509,7 @@ const Dashboard = () => {
 																			className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 																			onClick={() => {
 																				setWhyValue('Promotion');
-																				setActiveSection(null);
+																				setActiveSection('what');
 																			}}
 																		>
 																			<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -529,7 +529,7 @@ const Dashboard = () => {
 																			className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 																			onClick={() => {
 																				setWhyValue('Booking');
-																				setActiveSection(null);
+																				setActiveSection('what');
 																			}}
 																		>
 																			<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
