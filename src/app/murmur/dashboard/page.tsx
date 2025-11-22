@@ -503,7 +503,7 @@ const Dashboard = () => {
 													</FormItem>
 												)}
 											/>
-											{!hasSearched && (
+											{false && !hasSearched && (
 												<div className="flex flex-row gap-4 items-center justify-between w-full flex-wrap">
 													<div className="flex flex-row gap-4 items-center h-[39px] justify-start flex-shrink-0">
 														<div
