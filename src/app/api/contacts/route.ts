@@ -103,10 +103,14 @@ export async function GET(req: NextRequest) {
 
 		let locationResponse: string | null = null;
 		const rawQuery = query || '';
-		// Promotion-mode: special directive to prioritize Radio Stations across all states
-		const isPromotionSearch = rawQuery.trim().toLowerCase().startsWith('[promotion]');
+		// Special directives
+		const _trimmedLc = rawQuery.trim().toLowerCase();
+		const isPromotionSearch = _trimmedLc.startsWith('[promotion]');
+		const isBookingSearch = _trimmedLc.startsWith('[booking]');
 		const rawQueryForParsing = isPromotionSearch
 			? rawQuery.replace(/^\s*\[promotion\]\s*/i, '')
+			: isBookingSearch
+			? rawQuery.replace(/^\s*\[booking\]\s*/i, '')
 			: rawQuery;
 		if (process.env.OPEN_AI_API_KEY && rawQuery) {
 			try {
@@ -202,6 +206,276 @@ export async function GET(req: NextRequest) {
 					addedContactIds.push(contact.id);
 				}
 			}
+		}
+
+		// Strict "Music Venues" filter: when query mentions "music venues" (or singular), only return titles starting with "Music Venues"
+		{
+			const mentionsMusicVenues = /\bmusic venues?\b/i.test(rawQueryForParsing);
+			if (mentionsMusicVenues) {
+				const finalLimit = Math.max(
+					1,
+					Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200)
+				);
+				const fetchTake = Math.min(finalLimit * 4, 500);
+
+				const baseWhere: Prisma.ContactWhereInput = {
+					id: addedContactIds.length > 0 ? { notIn: addedContactIds } : undefined,
+					emailValidationStatus: verificationStatus
+						? {
+								equals: verificationStatus,
+						  }
+						: undefined,
+				};
+
+				// Respect strict state if present (exact or any-of synonyms)
+				const stateStrictAnd: Prisma.ContactWhereInput[] = [];
+				if (forceStateAny && forceStateAny.length > 0) {
+					stateStrictAnd.push({
+						OR: forceStateAny.map((s) => ({
+							state: { equals: s, mode: 'insensitive' },
+						})),
+					});
+				} else if (queryJson.state) {
+					stateStrictAnd.push({
+						state: { equals: queryJson.state, mode: 'insensitive' },
+					});
+				}
+
+				const results = await prisma.contact.findMany({
+					where: {
+						AND: [
+							baseWhere,
+							...stateStrictAnd,
+							{ title: { mode: 'insensitive', startsWith: 'Music Venues' } },
+						],
+					},
+					orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+					take: fetchTake,
+				});
+
+				// Prioritize exact state-label titles: "Music Venues <STATE or ABBR>"
+				const STATE_NAMES = [
+					'Alabama',
+					'Alaska',
+					'Arizona',
+					'Arkansas',
+					'California',
+					'Colorado',
+					'Connecticut',
+					'Delaware',
+					'Florida',
+					'Georgia',
+					'Hawaii',
+					'Idaho',
+					'Illinois',
+					'Indiana',
+					'Iowa',
+					'Kansas',
+					'Kentucky',
+					'Louisiana',
+					'Maine',
+					'Maryland',
+					'Massachusetts',
+					'Michigan',
+					'Minnesota',
+					'Mississippi',
+					'Missouri',
+					'Montana',
+					'Nebraska',
+					'Nevada',
+					'New Hampshire',
+					'New Jersey',
+					'New Mexico',
+					'New York',
+					'North Carolina',
+					'North Dakota',
+					'Ohio',
+					'Oklahoma',
+					'Oregon',
+					'Pennsylvania',
+					'Rhode Island',
+					'South Carolina',
+					'South Dakota',
+					'Tennessee',
+					'Texas',
+					'Utah',
+					'Vermont',
+					'Virginia',
+					'Washington',
+					'West Virginia',
+					'Wisconsin',
+					'Wyoming',
+					'District of Columbia',
+				];
+				const STATE_ABBRS = [
+					'AL',
+					'AK',
+					'AZ',
+					'AR',
+					'CA',
+					'CO',
+					'CT',
+					'DE',
+					'FL',
+					'GA',
+					'HI',
+					'ID',
+					'IL',
+					'IN',
+					'IA',
+					'KS',
+					'KY',
+					'LA',
+					'ME',
+					'MD',
+					'MA',
+					'MI',
+					'MN',
+					'MS',
+					'MO',
+					'MT',
+					'NE',
+					'NV',
+					'NH',
+					'NJ',
+					'NM',
+					'NY',
+					'NC',
+					'ND',
+					'OH',
+					'OK',
+					'OR',
+					'PA',
+					'RI',
+					'SC',
+					'SD',
+					'TN',
+					'TX',
+					'UT',
+					'VT',
+					'VA',
+					'WA',
+					'WV',
+					'WI',
+					'WY',
+					'DC',
+				];
+				const STATE_NAME_SET = new Set(STATE_NAMES.map((s) => s.toLowerCase()));
+				const STATE_ABBR_SET = new Set(STATE_ABBRS);
+
+				const isStateLabelAfterPrefix = (title: string | null | undefined): boolean => {
+					if (!title) return false;
+					const trimmed = title.trim();
+					const m = /^music venues\b(.*)$/i.exec(trimmed);
+					if (!m) return false;
+					let rest = m[1].trim();
+					// Remove common separators right after prefix
+					rest = rest.replace(/^[-–—:|,()\[\]]+/, '').trim();
+					// Collapse repeated whitespace
+					rest = rest.replace(/\s+/g, ' ').trim();
+					if (!rest) return false;
+					// Match exact state label
+					if (STATE_NAME_SET.has(rest.toLowerCase())) return true;
+					if (STATE_ABBR_SET.has(rest.toUpperCase())) return true;
+					return false;
+				};
+
+				const prioritized = results.sort((a, b) => {
+					const aStateTitle = isStateLabelAfterPrefix(a.title);
+					const bStateTitle = isStateLabelAfterPrefix(b.title);
+					if (aStateTitle && !bStateTitle) return -1;
+					if (!aStateTitle && bStateTitle) return 1;
+					return 0;
+				});
+
+				return apiResponse(prioritized.slice(0, finalLimit));
+			}
+		}
+
+		// Special-case: Booking searches - filter to specific title prefixes and respect strict state if present
+		if (isBookingSearch) {
+			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200));
+
+			const baseWhere: Prisma.ContactWhereInput = {
+				id: addedContactIds.length > 0 ? { notIn: addedContactIds } : undefined,
+				emailValidationStatus: verificationStatus
+					? {
+							equals: verificationStatus,
+					  }
+					: undefined,
+			};
+
+			// Strict state matching when present
+			const stateStrictAnd: Prisma.ContactWhereInput[] = [];
+			if (forceStateAny && forceStateAny.length > 0) {
+				stateStrictAnd.push({
+					OR: forceStateAny.map((s) => ({
+						state: { equals: s, mode: 'insensitive' },
+					})),
+				});
+			} else if (queryJson.state) {
+				stateStrictAnd.push({
+					state: { equals: queryJson.state, mode: 'insensitive' },
+				});
+			}
+
+			const titlePrefixes = [
+				'Music Venues',
+				'Restaurants',
+				'Coffee Shops',
+				'Music Festivals',
+				'Breweries',
+				'Distilleries',
+				'Wineries',
+				'Cideries',
+				'Wedding Planners',
+				'Wedding Venues',
+			];
+
+			const primary = await prisma.contact.findMany({
+				where: {
+					AND: [
+						baseWhere,
+						...stateStrictAnd,
+						{
+							OR: titlePrefixes.map((p) => ({
+								title: { mode: 'insensitive', startsWith: p },
+							})),
+						},
+					],
+				},
+				orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+				take: finalLimit,
+			});
+
+			// Optional: if under limit, allow contains-based fill (still title-focused)
+			const results = primary;
+			if (results.length < finalLimit) {
+				const filler = await prisma.contact.findMany({
+					where: {
+						AND: [
+							baseWhere,
+							...stateStrictAnd,
+							{
+								OR: titlePrefixes.map((p) => ({
+									title: { mode: 'insensitive', contains: p },
+								})),
+							},
+						],
+					},
+					orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+					take: finalLimit - results.length,
+				});
+				const seen = new Set(results.map((c) => c.id));
+				for (const c of filler) {
+					if (seen.has(c.id)) continue;
+					results.push(c);
+					seen.add(c.id);
+					if (results.length >= finalLimit) break;
+				}
+			}
+
+			return apiResponse(results.slice(0, finalLimit));
 		}
 
 		// Special-case: Promotion searches prioritize Radio Stations across all states
