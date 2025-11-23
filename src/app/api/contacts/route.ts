@@ -103,6 +103,11 @@ export async function GET(req: NextRequest) {
 
 		let locationResponse: string | null = null;
 		const rawQuery = query || '';
+		// Promotion-mode: special directive to prioritize Radio Stations across all states
+		const isPromotionSearch = rawQuery.trim().toLowerCase().startsWith('[promotion]');
+		const rawQueryForParsing = isPromotionSearch
+			? rawQuery.replace(/^\s*\[promotion\]\s*/i, '')
+			: rawQuery;
 		if (process.env.OPEN_AI_API_KEY && rawQuery) {
 			try {
 				locationResponse = await fetchOpenAi(
@@ -119,7 +124,7 @@ export async function GET(req: NextRequest) {
                     - Return a valid JSON string that can be parsed by a JSON.parse() in JavaScript. 
                     - There are some place names that can also be a word (such as buffalo steak house in new york) (Buffalo is a city in New York but it is also a general word for an animal). Use the context of the query to determine if the word is a place name or not.
                     - Return the JSON string and nothing else.`,
-					rawQuery
+					rawQueryForParsing
 				);
 			} catch (openAiError) {
 				console.error('OpenAI location parsing failed:', openAiError);
@@ -140,7 +145,7 @@ export async function GET(req: NextRequest) {
 			city: null,
 			state: null,
 			country: null,
-			restOfQuery: rawQuery,
+			restOfQuery: rawQueryForParsing,
 		};
 		if (locationResponse) {
 			try {
@@ -150,7 +155,9 @@ export async function GET(req: NextRequest) {
 					state: parsed?.state ?? null,
 					country: parsed?.country ?? null,
 					restOfQuery:
-						typeof parsed?.restOfQuery === 'string' ? parsed.restOfQuery : rawQuery,
+						typeof parsed?.restOfQuery === 'string'
+							? parsed.restOfQuery
+							: rawQueryForParsing,
 				};
 			} catch (e) {
 				console.warn('OpenAI location parsing failed, falling back to raw query.', e);
@@ -167,7 +174,11 @@ export async function GET(req: NextRequest) {
 			strictPenalty,
 		} = applyHardcodedLocationOverrides(query || '', queryJson);
 		queryJson = overrides;
-		const effectiveLocationStrategy = queryJson?.state ? 'strict' : 'flexible';
+		const effectiveLocationStrategy = isPromotionSearch
+			? 'broad'
+			: queryJson?.state
+			? 'strict'
+			: 'flexible';
 
 		const numberContactListIds: number[] =
 			contactListIds?.map((id) => Number(id)).filter((id) => !isNaN(id)) || [];
@@ -191,6 +202,87 @@ export async function GET(req: NextRequest) {
 					addedContactIds.push(contact.id);
 				}
 			}
+		}
+
+		// Special-case: Promotion searches prioritize Radio Stations across all states
+		if (isPromotionSearch) {
+			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200));
+			const radioTitleWhere: Prisma.StringFilter = {
+				mode: 'insensitive',
+				contains: 'radio station',
+			};
+
+			const baseWhere: Prisma.ContactWhereInput = {
+				id: addedContactIds.length > 0 ? { notIn: addedContactIds } : undefined,
+				emailValidationStatus: verificationStatus
+					? {
+							equals: verificationStatus,
+					  }
+					: undefined,
+			};
+			// Enforce strict state matching when a state is present in the query
+			const stateStrictAnd: Prisma.ContactWhereInput[] = [];
+			if (forceStateAny && forceStateAny.length > 0) {
+				stateStrictAnd.push({
+					OR: forceStateAny.map((s) => ({
+						state: { equals: s, mode: 'insensitive' },
+					})),
+				});
+			} else if (queryJson.state) {
+				stateStrictAnd.push({
+					state: { equals: queryJson.state, mode: 'insensitive' },
+				});
+			}
+
+			// Fetch contacts with title indicating Radio Stations first
+			const primary = await prisma.contact.findMany({
+				where: {
+					AND: [
+						baseWhere,
+						...stateStrictAnd,
+						{
+							OR: [
+								{ title: radioTitleWhere },
+								{ company: { mode: 'insensitive', contains: 'radio station' } },
+							],
+						},
+					],
+				},
+				orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+				take: finalLimit,
+			});
+
+			// If we didn't hit the limit, fill with broader radio-related signals
+			const results = primary;
+			if (results.length < finalLimit) {
+				const filler = await prisma.contact.findMany({
+					where: {
+						AND: [
+							baseWhere,
+							...stateStrictAnd,
+							{
+								OR: [
+									{ headline: { mode: 'insensitive', contains: 'radio' } },
+									{ companyIndustry: { mode: 'insensitive', contains: 'radio' } },
+									{ metadata: { mode: 'insensitive', contains: 'radio' } },
+								],
+							},
+						],
+					},
+					orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+					take: finalLimit - results.length,
+				});
+				// Deduplicate by id
+				const seen = new Set(results.map((c) => c.id));
+				for (const c of filler) {
+					if (seen.has(c.id)) continue;
+					results.push(c);
+					seen.add(c.id);
+					if (results.length >= finalLimit) break;
+				}
+			}
+
+			return apiResponse(results.slice(0, finalLimit));
 		}
 
 		const substringSearch = async (): Promise<Contact[]> => {
@@ -606,7 +698,7 @@ export async function GET(req: NextRequest) {
 			}
 
 			// Posttraining step: reuse earlier postTrainingProfile to avoid a second LLM call
-			let postProfile = postTrainingProfile || {
+			const postProfile = postTrainingProfile || {
 				active: false,
 				excludeTerms: [],
 				demoteTerms: [],
