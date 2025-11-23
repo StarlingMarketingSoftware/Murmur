@@ -44,6 +44,7 @@ const Dashboard = () => {
 	const [whyValue, setWhyValue] = useState('');
 	const [whatValue, setWhatValue] = useState('');
 	const [whereValue, setWhereValue] = useState('');
+	const hasWhereValue = whereValue.trim().length > 0;
 	const [activeSection, setActiveSection] = useState<'why' | 'what' | 'where' | null>(
 		null
 	);
@@ -518,32 +519,52 @@ const Dashboard = () => {
 																			</div>
 																			<div className="absolute left-[24px] top-[42px] w-[156px] h-[12px]">
 																				{activeSection === 'where' ? (
-																					<input
-																						ref={whereInputRef}
-																						type="text"
-																						value={whereValue}
-																						onChange={(e) =>
-																							setWhereValue(e.target.value)
-																						}
-																						onKeyDown={(e) => {
-																							if (e.key === 'Enter') {
-																								e.preventDefault();
-																								setActiveSection(null);
+																					<div className="absolute top-0 left-0 w-full h-full flex items-center gap-[2px]">
+																						<span
+																							className="font-semibold text-black text-[12px] leading-none"
+																							style={{
+																								opacity: hasWhereValue ? 1 : 0,
+																								transform: 'translateY(-1px)',
+																							}}
+																						>
+																							(
+																						</span>
+																						<input
+																							ref={whereInputRef}
+																							type="text"
+																							value={whereValue}
+																							onChange={(e) =>
+																								setWhereValue(e.target.value)
 																							}
-																						}}
-																						className="absolute top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
-																						style={{
-																							height: '12px',
-																							lineHeight: '12px',
-																							padding: '0',
-																							margin: '0',
-																							transform: 'translateY(-1px)',
-																							fontFamily:
-																								'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																						}}
-																						placeholder="Search Destinations"
-																						onClick={(e) => e.stopPropagation()}
-																					/>
+																							onKeyDown={(e) => {
+																								if (e.key === 'Enter') {
+																									e.preventDefault();
+																									setActiveSection(null);
+																								}
+																							}}
+																							className="flex-1 font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																							style={{
+																								height: '12px',
+																								lineHeight: '12px',
+																								padding: '0',
+																								margin: '0',
+																								transform: 'translateY(-1px)',
+																								fontFamily:
+																									'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																							}}
+																							placeholder="Search Destinations"
+																							onClick={(e) => e.stopPropagation()}
+																						/>
+																						<span
+																							className="font-semibold text-black text-[12px] leading-none"
+																							style={{
+																								opacity: hasWhereValue ? 1 : 0,
+																								transform: 'translateY(-1px)',
+																							}}
+																						>
+																							)
+																						</span>
+																					</div>
 																				) : (
 																					<div
 																						className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap hover:text-black/60 transition-colors"
@@ -554,7 +575,9 @@ const Dashboard = () => {
 																							margin: '0',
 																						}}
 																					>
-																						{whereValue || 'Search Destinations'}
+																						{hasWhereValue
+																							? `(${whereValue})`
+																							: 'Search Destinations'}
 																					</div>
 																				)}
 																			</div>
