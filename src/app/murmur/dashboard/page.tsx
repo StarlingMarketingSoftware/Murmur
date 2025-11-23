@@ -9,6 +9,10 @@ import { isProblematicBrowser } from '@/utils/browserDetection';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
+import { BookingIcon } from '@/components/atoms/_svg/BookingIcon';
+import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
+import { SearchIconMobile } from '@/components/atoms/_svg/SearchIconMobile';
+import { SearchIconResults } from '@/components/atoms/_svg/SearchIconResults';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
@@ -21,8 +25,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import ConsoleLoader from '@/components/atoms/ConsoleLoader/ConsoleLoader';
 import { Card, CardContent } from '@/components/ui/card';
-import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
-import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
+
 import { useClerk } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 
@@ -79,8 +82,6 @@ const Dashboard = () => {
 		tableRef,
 		selectedContacts,
 		isPendingBatchUpdateContacts,
-		isFreeTrial,
-		canSearch,
 		isError,
 		error,
 		hasSearched,
@@ -463,19 +464,7 @@ const Dashboard = () => {
 																				'rgba(93, 171, 104, 0.49)';
 																		}}
 																	>
-																		<svg
-																			width="26"
-																			height="28"
-																			viewBox="0 0 28 30"
-																			fill="none"
-																			xmlns="http://www.w3.org/2000/svg"
-																		>
-																			<path
-																				d="M10.7681 16.6402L0.768066 28.6402M26.9998 10.5C26.9998 15.7467 22.5227 20 16.9998 20C11.477 20 6.99985 15.7467 6.99985 10.5C6.99985 5.25329 11.477 1 16.9998 1C22.5227 1 26.9998 5.25329 26.9998 10.5Z"
-																				stroke="black"
-																				strokeWidth="2"
-																			/>
-																		</svg>
+																		<SearchIconDesktop />
 																	</button>
 																	{/* Mobile-only submit icon inside input */}
 																	<button
@@ -483,28 +472,7 @@ const Dashboard = () => {
 																		className="search-input-icon-btn"
 																		aria-label="Search"
 																	>
-																		<svg
-																			width="17"
-																			height="16"
-																			viewBox="0 0 17 16"
-																			fill="none"
-																			xmlns="http://www.w3.org/2000/svg"
-																			aria-hidden="true"
-																		>
-																			<path
-																				d="M9.82227 0.848633C12.8952 0.848855 15.2988 3.17275 15.2988 5.93457C15.2988 8.69637 12.8952 11.0203 9.82227 11.0205C6.74914 11.0205 4.34475 8.69651 4.34473 5.93457C4.34473 3.17261 6.74912 0.848633 9.82227 0.848633Z"
-																				stroke="#A0A0A0"
-																				strokeWidth="1.56483"
-																			/>
-																			<line
-																				x1="6.50289"
-																				y1="9.18905"
-																				x2="1.02598"
-																				y2="15.4484"
-																				stroke="#A0A0A0"
-																				strokeWidth="1.56483"
-																			/>
-																		</svg>
+																		<SearchIconMobile />
 																	</button>
 																</div>
 																{activeSection === 'why' && (
@@ -797,28 +765,7 @@ const Dashboard = () => {
 																className="results-search-icon-btn"
 																aria-label="Search"
 															>
-																<svg
-																	width="20"
-																	height="21"
-																	viewBox="0 0 20 21"
-																	fill="none"
-																	xmlns="http://www.w3.org/2000/svg"
-																	aria-hidden="true"
-																>
-																	<path
-																		d="M12 1C15.9278 1 19 3.96996 19 7.5C19 11.03 15.9278 14 12 14C8.07223 14 5 11.03 5 7.5C5 3.96996 8.07223 1 12 1Z"
-																		stroke="#A0A0A0"
-																		strokeWidth="2"
-																	/>
-																	<line
-																		x1="7.75258"
-																		y1="11.6585"
-																		x2="0.752577"
-																		y2="19.6585"
-																		stroke="#A0A0A0"
-																		strokeWidth="2"
-																	/>
-																</svg>
+																<SearchIconResults />
 															</button>
 															<Input
 																className={`search-wave-input results-search-input !border-2 !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-[#cfcfcf] ${
