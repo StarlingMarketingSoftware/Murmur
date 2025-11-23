@@ -214,6 +214,26 @@ export async function GET(req: NextRequest) {
 
 		// If mode is 'state', we prioritize state matching and return distinct states
 		if (mode === 'state') {
+			// Check for comma to handle "City, State" inputs (e.g. "Philadelphia, PA" -> search "PA" -> "Pennsylvania")
+			if (cleanQuery.includes(',')) {
+				const parts = cleanQuery.split(',');
+				const statePart = parts[parts.length - 1].trim();
+
+				// Try to resolve state part to full name
+				let fullState = abbreviationToState[statePart.toUpperCase()];
+
+				// If no abbreviation found, but it looks like a state name (longer than 2 chars), use it
+				if (!fullState && statePart.length > 2) {
+					fullState = statePart;
+				}
+
+				if (fullState) {
+					searchTerms.push(fullState);
+				} else if (statePart.length > 0) {
+					searchTerms.push(statePart);
+				}
+			}
+
 			// Handle abbreviations in query
 			if (cleanQuery.length === 2) {
 				const fullState = abbreviationToState[cleanQuery.toUpperCase()];
