@@ -392,6 +392,190 @@ export async function GET(req: NextRequest) {
 			}
 		}
 
+		// Strict "Music Festivals" filter: when query mentions "festival(s)", only return titles starting with "Music Festivals"
+		{
+			const mentionsFestivals = /\bfestivals?\b/i.test(rawQueryForParsing);
+			if (mentionsFestivals) {
+				const finalLimit = Math.max(
+					1,
+					Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200)
+				);
+				const fetchTake = Math.min(finalLimit * 4, 500);
+
+				const baseWhere: Prisma.ContactWhereInput = {
+					id: addedContactIds.length > 0 ? { notIn: addedContactIds } : undefined,
+					emailValidationStatus: verificationStatus
+						? {
+								equals: verificationStatus,
+						  }
+						: undefined,
+				};
+
+				// Respect strict state if present (exact or any-of synonyms)
+				const stateStrictAnd: Prisma.ContactWhereInput[] = [];
+				if (forceStateAny && forceStateAny.length > 0) {
+					stateStrictAnd.push({
+						OR: forceStateAny.map((s) => ({
+							state: { equals: s, mode: 'insensitive' },
+						})),
+					});
+				} else if (queryJson.state) {
+					stateStrictAnd.push({
+						state: { equals: queryJson.state, mode: 'insensitive' },
+					});
+				}
+
+				const results = await prisma.contact.findMany({
+					where: {
+						AND: [
+							baseWhere,
+							...stateStrictAnd,
+							{ title: { mode: 'insensitive', startsWith: 'Music Festivals' } },
+						],
+					},
+					orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+					take: fetchTake,
+				});
+
+				// Prioritize exact state-label titles: "Music Festivals <STATE or ABBR>"
+				const STATE_NAMES = [
+					'Alabama',
+					'Alaska',
+					'Arizona',
+					'Arkansas',
+					'California',
+					'Colorado',
+					'Connecticut',
+					'Delaware',
+					'Florida',
+					'Georgia',
+					'Hawaii',
+					'Idaho',
+					'Illinois',
+					'Indiana',
+					'Iowa',
+					'Kansas',
+					'Kentucky',
+					'Louisiana',
+					'Maine',
+					'Maryland',
+					'Massachusetts',
+					'Michigan',
+					'Minnesota',
+					'Mississippi',
+					'Missouri',
+					'Montana',
+					'Nebraska',
+					'Nevada',
+					'New Hampshire',
+					'New Jersey',
+					'New Mexico',
+					'New York',
+					'North Carolina',
+					'North Dakota',
+					'Ohio',
+					'Oklahoma',
+					'Oregon',
+					'Pennsylvania',
+					'Rhode Island',
+					'South Carolina',
+					'South Dakota',
+					'Tennessee',
+					'Texas',
+					'Utah',
+					'Vermont',
+					'Virginia',
+					'Washington',
+					'West Virginia',
+					'Wisconsin',
+					'Wyoming',
+					'District of Columbia',
+				];
+				const STATE_ABBRS = [
+					'AL',
+					'AK',
+					'AZ',
+					'AR',
+					'CA',
+					'CO',
+					'CT',
+					'DE',
+					'FL',
+					'GA',
+					'HI',
+					'ID',
+					'IL',
+					'IN',
+					'IA',
+					'KS',
+					'KY',
+					'LA',
+					'ME',
+					'MD',
+					'MA',
+					'MI',
+					'MN',
+					'MS',
+					'MO',
+					'MT',
+					'NE',
+					'NV',
+					'NH',
+					'NJ',
+					'NM',
+					'NY',
+					'NC',
+					'ND',
+					'OH',
+					'OK',
+					'OR',
+					'PA',
+					'RI',
+					'SC',
+					'SD',
+					'TN',
+					'TX',
+					'UT',
+					'VT',
+					'VA',
+					'WA',
+					'WV',
+					'WI',
+					'WY',
+					'DC',
+				];
+				const STATE_NAME_SET = new Set(STATE_NAMES.map((s) => s.toLowerCase()));
+				const STATE_ABBR_SET = new Set(STATE_ABBRS);
+
+				const isStateLabelAfterPrefix = (title: string | null | undefined): boolean => {
+					if (!title) return false;
+					const trimmed = title.trim();
+					const m = /^music festivals\b(.*)$/i.exec(trimmed);
+					if (!m) return false;
+					let rest = m[1].trim();
+					// Remove common separators right after prefix
+					rest = rest.replace(/^[-–—:|,()\[\]]+/, '').trim();
+					// Collapse repeated whitespace
+					rest = rest.replace(/\s+/g, ' ').trim();
+					if (!rest) return false;
+					// Match exact state label
+					if (STATE_NAME_SET.has(rest.toLowerCase())) return true;
+					if (STATE_ABBR_SET.has(rest.toUpperCase())) return true;
+					return false;
+				};
+
+				const prioritized = results.sort((a, b) => {
+					const aStateTitle = isStateLabelAfterPrefix(a.title);
+					const bStateTitle = isStateLabelAfterPrefix(b.title);
+					if (aStateTitle && !bStateTitle) return -1;
+					if (!aStateTitle && bStateTitle) return 1;
+					return 0;
+				});
+
+				return apiResponse(prioritized.slice(0, finalLimit));
+			}
+		}
+
 		// Special-case: Booking searches - filter to specific title prefixes and respect strict state if present
 		if (isBookingSearch) {
 			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200));
