@@ -41,6 +41,56 @@ const Dashboard = () => {
 	const [activeSection, setActiveSection] = useState<'why' | 'what' | 'where' | null>(
 		null
 	);
+	const [userLocationName, setUserLocationName] = useState<string | null>(null);
+	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+
+	useEffect(() => {
+		if (activeSection === 'where' && !userLocationName && !isLoadingLocation) {
+			setIsLoadingLocation(true);
+			if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+				navigator.geolocation.getCurrentPosition(
+					async (position) => {
+						try {
+							const { latitude, longitude } = position.coords;
+							const response = await fetch(
+								`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+							);
+							const data = await response.json();
+							const city =
+								data.address?.city ||
+								data.address?.town ||
+								data.address?.village ||
+								data.address?.hamlet;
+							const state = data.address?.state;
+
+							if (city && state) {
+								setUserLocationName(`${city}, ${state}`);
+							} else if (city) {
+								setUserLocationName(city);
+							} else if (state) {
+								setUserLocationName(state);
+							} else {
+								setUserLocationName('Current Location');
+							}
+						} catch (error) {
+							console.error('Error getting location:', error);
+							setUserLocationName('Unable to find location');
+						} finally {
+							setIsLoadingLocation(false);
+						}
+					},
+					(error) => {
+						console.error('Geolocation error:', error);
+						setUserLocationName('Location access needed');
+						setIsLoadingLocation(false);
+					}
+				);
+			} else {
+				setUserLocationName('Geolocation not supported');
+				setIsLoadingLocation(false);
+			}
+		}
+	}, [activeSection, userLocationName, isLoadingLocation]);
 
 	useEffect(() => {
 		if (isMobile !== true) {
@@ -653,8 +703,16 @@ const Dashboard = () => {
 																				<div className="text-[20px] font-medium leading-none text-black font-inter">
 																					Near Me
 																				</div>
-																				<div className="text-[12px] leading-tight text-transparent mt-[4px] select-none">
-																					Placeholder
+																				<div
+																					className={`text-[12px] leading-tight mt-[4px] select-none ${
+																						userLocationName || isLoadingLocation
+																							? 'text-black/60'
+																							: 'text-transparent'
+																					}`}
+																				>
+																					{isLoadingLocation
+																						? 'Locating...'
+																						: userLocationName || 'Placeholder'}
 																				</div>
 																			</div>
 																		</div>
