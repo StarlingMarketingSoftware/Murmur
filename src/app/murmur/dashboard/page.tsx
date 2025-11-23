@@ -65,12 +65,67 @@ const Dashboard = () => {
 								data.address?.hamlet;
 							const state = data.address?.state;
 
-							if (city && state) {
-								setUserLocationName(`${city}, ${state}`);
+							const stateToAbbr: Record<string, string> = {
+								Alabama: 'AL',
+								Alaska: 'AK',
+								Arizona: 'AZ',
+								Arkansas: 'AR',
+								California: 'CA',
+								Colorado: 'CO',
+								Connecticut: 'CT',
+								Delaware: 'DE',
+								Florida: 'FL',
+								Georgia: 'GA',
+								Hawaii: 'HI',
+								Idaho: 'ID',
+								Illinois: 'IL',
+								Indiana: 'IN',
+								Iowa: 'IA',
+								Kansas: 'KS',
+								Kentucky: 'KY',
+								Louisiana: 'LA',
+								Maine: 'ME',
+								Maryland: 'MD',
+								Massachusetts: 'MA',
+								Michigan: 'MI',
+								Minnesota: 'MN',
+								Mississippi: 'MS',
+								Missouri: 'MO',
+								Montana: 'MT',
+								Nebraska: 'NE',
+								Nevada: 'NV',
+								'New Hampshire': 'NH',
+								'New Jersey': 'NJ',
+								'New Mexico': 'NM',
+								'New York': 'NY',
+								'North Carolina': 'NC',
+								'North Dakota': 'ND',
+								Ohio: 'OH',
+								Oklahoma: 'OK',
+								Oregon: 'OR',
+								Pennsylvania: 'PA',
+								'Rhode Island': 'RI',
+								'South Carolina': 'SC',
+								'South Dakota': 'SD',
+								Tennessee: 'TN',
+								Texas: 'TX',
+								Utah: 'UT',
+								Vermont: 'VT',
+								Virginia: 'VA',
+								Washington: 'WA',
+								'West Virginia': 'WV',
+								Wisconsin: 'WI',
+								Wyoming: 'WY',
+							};
+
+							const stateAbbr = state ? stateToAbbr[state] || state : null;
+
+							if (city && stateAbbr) {
+								setUserLocationName(`${city}, ${stateAbbr}`);
 							} else if (city) {
 								setUserLocationName(city);
-							} else if (state) {
-								setUserLocationName(state);
+							} else if (stateAbbr) {
+								setUserLocationName(stateAbbr);
 							} else {
 								setUserLocationName('Current Location');
 							}
@@ -697,7 +752,15 @@ const Dashboard = () => {
 																)}
 																{activeSection === 'where' && (
 																	<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[20px] absolute top-[calc(100%+10px)] left-[98px] w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
-																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px]">
+																		<div
+																			className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer hover:bg-[#f0f0f0] transition-colors duration-200"
+																			onClick={() => {
+																				if (userLocationName && !isLoadingLocation) {
+																					setWhereValue(userLocationName);
+																					setActiveSection(null);
+																				}
+																			}}
+																		>
 																			<div className="w-[38px] h-[38px] bg-[#D0E6FF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
 																				<NearMeIcon />
 																			</div>
@@ -718,7 +781,13 @@ const Dashboard = () => {
 																				</div>
 																			</div>
 																		</div>
-																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px]">
+																		<div
+																			className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																			onClick={() => {
+																				setWhereValue('New York, NY');
+																				setActiveSection(null);
+																			}}
+																		>
 																			<div className="w-[38px] h-[38px] bg-[#9F9FEE] rounded-[8px] flex-shrink-0 flex items-center justify-center">
 																				<CityIcon />
 																			</div>
@@ -732,7 +801,13 @@ const Dashboard = () => {
 																				</div>
 																			</div>
 																		</div>
-																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px]">
+																		<div
+																			className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																			onClick={() => {
+																				setWhereValue('Nashville, TN');
+																				setActiveSection(null);
+																			}}
+																		>
 																			<div className="w-[38px] h-[38px] bg-[#9F9FEE] rounded-[8px] flex-shrink-0 flex items-center justify-center">
 																				<CityIcon />
 																			</div>
@@ -746,7 +821,13 @@ const Dashboard = () => {
 																				</div>
 																			</div>
 																		</div>
-																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px]">
+																		<div
+																			className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																			onClick={() => {
+																				setWhereValue('Pennsylvania');
+																				setActiveSection(null);
+																			}}
+																		>
 																			<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
 																				<SuburbsIcon />
 																			</div>
