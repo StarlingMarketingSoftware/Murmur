@@ -51,8 +51,10 @@ const Dashboard = () => {
 	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
 	const debouncedWhereValue = useDebounce(whereValue, 300);
-	const { data: locationResults, isLoading: isLoadingLocations } =
-		useGetLocations(debouncedWhereValue);
+	const { data: locationResults, isLoading: isLoadingLocations } = useGetLocations(
+		debouncedWhereValue,
+		whyValue === 'Promotion' ? 'state' : undefined
+	);
 
 	useEffect(() => {
 		if (activeSection === 'where' && !userLocationName && !isLoadingLocation) {
@@ -833,7 +835,7 @@ const Dashboard = () => {
 																		) : (
 																			<div className="flex flex-col items-center justify-center gap-[20px] w-full h-full">
 																				<div
-																					className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer hover:bg-[#f0f0f0] transition-colors duration-200"
+																					className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 																					onClick={() => {
 																						if (userLocationName && !isLoadingLocation) {
 																							setWhereValue(userLocationName);
@@ -861,66 +863,133 @@ const Dashboard = () => {
 																						</div>
 																					</div>
 																				</div>
-																				<div
-																					className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-																					onClick={() => {
-																						setWhereValue('New York, NY');
-																						setActiveSection(null);
-																					}}
-																				>
-																					<div className="w-[38px] h-[38px] bg-[#9F9FEE] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																						<CityIcon />
-																					</div>
-																					<div className="ml-[12px] flex flex-col">
-																						<div className="text-[20px] font-medium leading-none text-black font-inter">
-																							New York, NY
+																				{whyValue === 'Promotion' ? (
+																					<>
+																						<div
+																							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																							onClick={() => {
+																								setWhereValue('New York');
+																								setActiveSection(null);
+																							}}
+																						>
+																							<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																								<SuburbsIcon />
+																							</div>
+																							<div className="ml-[12px] flex flex-col">
+																								<div className="text-[20px] font-medium leading-none text-black font-inter">
+																									New York
+																								</div>
+																								<div className="text-[12px] leading-tight text-black mt-[4px]">
+																									reach out to radio stations, playlists,
+																									and more
+																								</div>
+																							</div>
 																						</div>
-																						<div className="text-[12px] leading-tight text-black mt-[4px]">
-																							contact venues, restaurants and more, to
-																							book shows
+																						<div
+																							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																							onClick={() => {
+																								setWhereValue('California');
+																								setActiveSection(null);
+																							}}
+																						>
+																							<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																								<SuburbsIcon />
+																							</div>
+																							<div className="ml-[12px] flex flex-col">
+																								<div className="text-[20px] font-medium leading-none text-black font-inter">
+																									California
+																								</div>
+																								<div className="text-[12px] leading-tight text-black mt-[4px]">
+																									reach out to radio stations, playlists,
+																									and more
+																								</div>
+																							</div>
 																						</div>
-																					</div>
-																				</div>
-																				<div
-																					className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-																					onClick={() => {
-																						setWhereValue('Nashville, TN');
-																						setActiveSection(null);
-																					}}
-																				>
-																					<div className="w-[38px] h-[38px] bg-[#9F9FEE] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																						<CityIcon />
-																					</div>
-																					<div className="ml-[12px] flex flex-col">
-																						<div className="text-[20px] font-medium leading-none text-black font-inter">
-																							Nashville, TN
+																						<div
+																							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																							onClick={() => {
+																								setWhereValue('Pennsylvania');
+																								setActiveSection(null);
+																							}}
+																						>
+																							<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																								<SuburbsIcon />
+																							</div>
+																							<div className="ml-[12px] flex flex-col">
+																								<div className="text-[20px] font-medium leading-none text-black font-inter">
+																									Pennsylvania
+																								</div>
+																								<div className="text-[12px] leading-tight text-black mt-[4px]">
+																									reach out to radio stations, playlists,
+																									and more
+																								</div>
+																							</div>
 																						</div>
-																						<div className="text-[12px] leading-tight text-black mt-[4px]">
-																							contact venues, restaurants and more, to
-																							book shows
+																					</>
+																				) : (
+																					<>
+																						<div
+																							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																							onClick={() => {
+																								setWhereValue('New York, NY');
+																								setActiveSection(null);
+																							}}
+																						>
+																							<div className="w-[38px] h-[38px] bg-[#9F9FEE] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																								<CityIcon />
+																							</div>
+																							<div className="ml-[12px] flex flex-col">
+																								<div className="text-[20px] font-medium leading-none text-black font-inter">
+																									New York, NY
+																								</div>
+																								<div className="text-[12px] leading-tight text-black mt-[4px]">
+																									contact venues, restaurants and more, to
+																									book shows
+																								</div>
+																							</div>
 																						</div>
-																					</div>
-																				</div>
-																				<div
-																					className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-																					onClick={() => {
-																						setWhereValue('Pennsylvania');
-																						setActiveSection(null);
-																					}}
-																				>
-																					<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																						<SuburbsIcon />
-																					</div>
-																					<div className="ml-[12px] flex flex-col">
-																						<div className="text-[20px] font-medium leading-none text-black font-inter">
-																							Pennsylvania
+																						<div
+																							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																							onClick={() => {
+																								setWhereValue('Nashville, TN');
+																								setActiveSection(null);
+																							}}
+																						>
+																							<div className="w-[38px] h-[38px] bg-[#9F9FEE] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																								<CityIcon />
+																							</div>
+																							<div className="ml-[12px] flex flex-col">
+																								<div className="text-[20px] font-medium leading-none text-black font-inter">
+																									Nashville, TN
+																								</div>
+																								<div className="text-[12px] leading-tight text-black mt-[4px]">
+																									contact venues, restaurants and more, to
+																									book shows
+																								</div>
+																							</div>
 																						</div>
-																						<div className="text-[12px] leading-tight text-black mt-[4px]">
-																							contact venues, restaurants and more, to
-																							book shows
+																						<div
+																							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																							onClick={() => {
+																								setWhereValue('Pennsylvania');
+																								setActiveSection(null);
+																							}}
+																						>
+																							<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																								<SuburbsIcon />
+																							</div>
+																							<div className="ml-[12px] flex flex-col">
+																								<div className="text-[20px] font-medium leading-none text-black font-inter">
+																									Pennsylvania
+																								</div>
+																								<div className="text-[12px] leading-tight text-black mt-[4px]">
+																									contact venues, restaurants and more, to
+																									book shows
+																								</div>
+																							</div>
 																						</div>
-																					</div>
-																				</div>
+																					</>
+																				)}
 																			</div>
 																		)}
 																	</div>

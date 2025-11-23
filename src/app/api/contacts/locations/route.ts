@@ -203,6 +203,7 @@ export async function GET(req: NextRequest) {
 
 		const { searchParams } = new URL(req.url);
 		const query = searchParams.get('query');
+		const mode = searchParams.get('mode'); // 'state' or undefined
 
 		if (!query || query.length < 1) {
 			return apiResponse([]);
@@ -210,6 +211,46 @@ export async function GET(req: NextRequest) {
 
 		const cleanQuery = query.trim();
 		const searchTerms = [cleanQuery];
+
+		// If mode is 'state', we prioritize state matching and return distinct states
+		if (mode === 'state') {
+			// Handle abbreviations in query
+			if (cleanQuery.length === 2) {
+				const fullState = abbreviationToState[cleanQuery.toUpperCase()];
+				if (fullState) searchTerms.push(fullState);
+			}
+			const possibleAbbr = stateAbbreviations[cleanQuery.toLowerCase()];
+			if (possibleAbbr) searchTerms.push(possibleAbbr);
+
+			// Handle "State, USA" or similar logic if needed, but usually just state name
+			// We search where state starts with query
+			const stateResults = await prisma.contact.findMany({
+				where: {
+					OR: searchTerms.flatMap((term) => [
+						{ state: { startsWith: term, mode: 'insensitive' } },
+						{ state: { contains: term, mode: 'insensitive' } },
+					]),
+					state: { not: null },
+				},
+				select: {
+					state: true,
+				},
+				distinct: ['state'],
+				take: 20,
+			});
+
+			const locations = stateResults
+				.filter((r) => r.state)
+				.map((r) => ({
+					city: '',
+					state: r.state!,
+					label: r.state!, // Just display state name
+				}));
+
+			return apiResponse(locations);
+		}
+
+		// DEFAULT MODE (City Search)
 
 		// Check for comma to handle "City, State" inputs
 		if (cleanQuery.includes(',')) {

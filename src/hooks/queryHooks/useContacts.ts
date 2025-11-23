@@ -332,12 +332,15 @@ export interface LocationResult {
 	label: string;
 }
 
-export const useGetLocations = (query: string) => {
+export const useGetLocations = (query: string, mode?: 'state') => {
 	return useQuery<LocationResult[]>({
-		queryKey: ['locations', query],
+		queryKey: ['locations', query, mode],
 		queryFn: async () => {
 			if (!query || query.length < 1) return [];
-			const url = appendQueryParamsToUrl(urls.api.contacts.locations.index, { query });
+			const url = appendQueryParamsToUrl(urls.api.contacts.locations.index, {
+				query,
+				mode,
+			});
 			const response = await _fetch(url);
 			if (!response.ok) {
 				throw new Error('Failed to fetch locations');
