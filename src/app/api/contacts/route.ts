@@ -603,7 +603,7 @@ export async function GET(req: NextRequest) {
 				});
 			}
 
-			const titlePrefixes = [
+			const defaultTitlePrefixes = [
 				'Music Venues',
 				'Restaurants',
 				'Coffee Shops',
@@ -616,13 +616,17 @@ export async function GET(req: NextRequest) {
 				'Wedding Venues',
 			];
 
+			const cleanQuery = queryJson.restOfQuery.trim();
+			const effectivePrefixes =
+				cleanQuery.length > 0 ? [cleanQuery] : defaultTitlePrefixes;
+
 			const primary = await prisma.contact.findMany({
 				where: {
 					AND: [
 						baseWhere,
 						...stateStrictAnd,
 						{
-							OR: titlePrefixes.map((p) => ({
+							OR: effectivePrefixes.map((p) => ({
 								title: { mode: 'insensitive', startsWith: p },
 							})),
 						},
@@ -641,7 +645,7 @@ export async function GET(req: NextRequest) {
 							baseWhere,
 							...stateStrictAnd,
 							{
-								OR: titlePrefixes.map((p) => ({
+								OR: effectivePrefixes.map((p) => ({
 									title: { mode: 'insensitive', contains: p },
 								})),
 							},
