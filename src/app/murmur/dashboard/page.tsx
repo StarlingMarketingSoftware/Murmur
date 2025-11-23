@@ -18,6 +18,7 @@ import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
@@ -529,8 +530,8 @@ const Dashboard = () => {
 																				setActiveSection('where');
 																			}}
 																		>
-																			<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																				<PromotionIcon />
+																			<div className="w-[38px] h-[38px] bg-[#56DA73] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																				<RadioStationsIcon />
 																			</div>
 																			<div className="ml-[12px] flex flex-col">
 																				<div className="text-[20px] font-medium leading-none text-black font-inter">
@@ -647,6 +648,14 @@ const Dashboard = () => {
 																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px]">
 																			<div className="w-[38px] h-[38px] bg-[#D0E6FF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
 																				<NearMeIcon />
+																			</div>
+																			<div className="ml-[12px] flex flex-col">
+																				<div className="text-[20px] font-medium leading-none text-black font-inter">
+																					Near Me
+																				</div>
+																				<div className="text-[12px] leading-tight text-transparent mt-[4px] select-none">
+																					Placeholder
+																				</div>
 																			</div>
 																		</div>
 																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
