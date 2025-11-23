@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { apiResponse, apiUnauthorized, handleApiError } from '@/app/api/_utils';
+import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
 
 // Helper function to map state names to abbreviations
 const stateAbbreviations: Record<string, string> = {
@@ -74,6 +75,11 @@ function getStateAbbreviation(stateName: string): string {
 	return stateAbbreviations[normalized] || stateName;
 }
 
+function isCity(city: string, state: string): boolean {
+	const key = `${city.trim()}, ${state.trim()}`.toLowerCase();
+	return CITY_LOCATIONS_SET.has(key);
+}
+
 export async function GET(req: NextRequest) {
 	try {
 		const { userId } = await auth();
@@ -105,13 +111,13 @@ export async function GET(req: NextRequest) {
 			searchTerms.push(possibleAbbr);
 		}
 
-		const results = await prisma.contact.findMany({
+		// Prioritize results that START with the query
+		const startsWithResults = await prisma.contact.findMany({
 			where: {
 				OR: searchTerms.flatMap((term) => [
-					{ city: { contains: term, mode: 'insensitive' } },
-					{ state: { contains: term, mode: 'insensitive' } },
+					{ city: { startsWith: term, mode: 'insensitive' } },
+					{ state: { startsWith: term, mode: 'insensitive' } },
 				]),
-				// Ensure we have valid location data
 				city: { not: null },
 				state: { not: null },
 			},
@@ -120,23 +126,75 @@ export async function GET(req: NextRequest) {
 				state: true,
 			},
 			distinct: ['city', 'state'],
-			take: 10,
+			take: 20, // Increased take to allow for sorting
 		});
 
-		// Format results
-		const locations = results
-			.filter((r) => r.city && r.state) // Double check, though query enforces it
-			.map((r) => {
-				const city = r.city || '';
-				const rawState = r.state || '';
-				// Always format as "City, ST" in the label using abbreviation
+		// Sort startsWith results: Cities first
+		startsWithResults.sort((a, b) => {
+			const aIsCity = isCity(a.city!, a.state!);
+			const bIsCity = isCity(b.city!, b.state!);
+			if (aIsCity && !bIsCity) return -1;
+			if (!aIsCity && bIsCity) return 1;
+			return 0;
+		});
+
+		let finalResults = [...startsWithResults];
+
+		// If we have fewer than 10 results, fetch those that CONTAIN the query
+		if (finalResults.length < 10) {
+			const containsResults = await prisma.contact.findMany({
+				where: {
+					OR: searchTerms.flatMap((term) => [
+						{ city: { contains: term, mode: 'insensitive' } },
+						{ state: { contains: term, mode: 'insensitive' } },
+					]),
+					city: { not: null },
+					state: { not: null },
+				},
+				select: {
+					city: true,
+					state: true,
+				},
+				distinct: ['city', 'state'],
+				take: 20,
+			});
+
+			// Sort contains results: Cities first
+			containsResults.sort((a, b) => {
+				const aIsCity = isCity(a.city!, a.state!);
+				const bIsCity = isCity(b.city!, b.state!);
+				if (aIsCity && !bIsCity) return -1;
+				if (!aIsCity && bIsCity) return 1;
+				return 0;
+			});
+
+			finalResults = [...finalResults, ...containsResults];
+		}
+
+		// Format and deduplicate results
+		const seen = new Set<string>();
+		const locations = [];
+
+		for (const r of finalResults) {
+			if (!r.city || !r.state) continue;
+
+			const key = `${r.city.toLowerCase()}-${r.state.toLowerCase()}`;
+			if (!seen.has(key)) {
+				seen.add(key);
+
+				const city = r.city;
+				const rawState = r.state;
 				const stateAbbr = getStateAbbreviation(rawState);
-				return {
+
+				locations.push({
 					city,
 					state: rawState,
 					label: `${city}, ${stateAbbr}`,
-				};
-			});
+				});
+			}
+
+			if (locations.length >= 10) break;
+		}
 
 		return apiResponse(locations);
 	} catch (error) {
