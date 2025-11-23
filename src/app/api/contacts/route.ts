@@ -63,6 +63,27 @@ export type PostContactData = z.infer<typeof createContactSchema>;
 
 export const maxDuration = 60;
 
+const startsWithCaseInsensitive = (
+	value: string | null | undefined,
+	prefix: string
+): boolean => {
+	if (!value) return false;
+	const normalizedPrefix = prefix.trim().toLowerCase();
+	if (!normalizedPrefix) return false;
+	return value.trim().toLowerCase().startsWith(normalizedPrefix);
+};
+
+const filterContactsByTitlePrefix = <T extends { title?: string | null }>(
+	items: T[],
+	prefix: string
+): T[] => {
+	const normalizedPrefix = prefix.trim();
+	if (!normalizedPrefix) return items;
+	return items.filter((item) =>
+		startsWithCaseInsensitive(item.title ?? null, normalizedPrefix)
+	);
+};
+
 export async function GET(req: NextRequest) {
 	try {
 		const { userId } = await auth();
@@ -178,6 +199,10 @@ export async function GET(req: NextRequest) {
 			strictPenalty,
 		} = applyHardcodedLocationOverrides(query || '', queryJson);
 		queryJson = overrides;
+		const bookingTitlePrefix = isBookingSearch
+			? (queryJson.restOfQuery ?? '').trim()
+			: '';
+		const shouldFilterBookingTitles = bookingTitlePrefix.length > 0;
 		const effectiveLocationStrategy = isPromotionSearch
 			? 'broad'
 			: queryJson?.state
@@ -663,7 +688,15 @@ export async function GET(req: NextRequest) {
 				}
 			}
 
-			return apiResponse(results.slice(0, finalLimit));
+			const filteredResults = shouldFilterBookingTitles
+				? filterContactsByTitlePrefix(results, bookingTitlePrefix)
+				: results;
+
+			if (filteredResults.length > 0 || !useVectorSearch) {
+				return apiResponse(filteredResults.slice(0, finalLimit));
+			}
+			// When vector search is requested but Prisma lacks matches, fall through
+			// so Elasticsearch/vector logic below can attempt to satisfy the query.
 		}
 
 		// Special-case: Promotion searches prioritize Radio Stations across all states
@@ -933,7 +966,10 @@ export async function GET(req: NextRequest) {
 					e
 				);
 				const fallback = await substringSearch();
-				return apiResponse(fallback);
+				const filteredFallback = shouldFilterBookingTitles
+					? filterContactsByTitlePrefix(fallback, bookingTitlePrefix)
+					: fallback;
+				return apiResponse(filteredFallback);
 			}
 
 			// If vector returns no matches (e.g., strict state filter too narrow), fall back to substring search
@@ -1290,6 +1326,10 @@ export async function GET(req: NextRequest) {
 				contacts = filtered;
 			}
 
+			if (shouldFilterBookingTitles && contacts.length > 0) {
+				contacts = filterContactsByTitlePrefix(contacts, bookingTitlePrefix);
+			}
+
 			// Fallback: if local Postgres doesn't have these contacts, return minimal data from Elasticsearch directly
 			if (!contacts || contacts.length === 0) {
 				const fallbackContacts = esMatches.map((match) => {
@@ -1349,7 +1389,11 @@ export async function GET(req: NextRequest) {
 					};
 				});
 
-				return apiResponse(fallbackContacts.slice(0, limit));
+				const filteredFallbackContacts = shouldFilterBookingTitles
+					? filterContactsByTitlePrefix(fallbackContacts, bookingTitlePrefix)
+					: fallbackContacts;
+
+				return apiResponse(filteredFallbackContacts.slice(0, limit));
 			}
 
 			return apiResponse(contacts.slice(0, limit));
