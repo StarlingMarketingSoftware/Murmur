@@ -22,6 +22,7 @@ import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
+import { getCityIconProps } from '@/utils/cityIcons';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,8 @@ import { Card, CardContent } from '@/components/ui/card';
 
 import { useClerk } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useDebounce } from '@/hooks/useDebounce';
+import { useGetLocations } from '@/hooks/queryHooks/useContacts';
 
 const Dashboard = () => {
 	const { isSignedIn, openSignIn } = useClerk();
@@ -45,6 +48,10 @@ const Dashboard = () => {
 	);
 	const [userLocationName, setUserLocationName] = useState<string | null>(null);
 	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+
+	const debouncedWhereValue = useDebounce(whereValue, 300);
+	const { data: locationResults, isLoading: isLoadingLocations } =
+		useGetLocations(debouncedWhereValue);
 
 	useEffect(() => {
 		if (activeSection === 'where' && !userLocationName && !isLoadingLocation) {
@@ -751,96 +758,147 @@ const Dashboard = () => {
 																	</div>
 																)}
 																{activeSection === 'where' && (
-																	<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[20px] absolute top-[calc(100%+10px)] left-[98px] w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
-																		<div
-																			className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer hover:bg-[#f0f0f0] transition-colors duration-200"
-																			onClick={() => {
-																				if (userLocationName && !isLoadingLocation) {
-																					setWhereValue(userLocationName);
-																					setActiveSection(null);
-																				}
-																			}}
-																		>
-																			<div className="w-[38px] h-[38px] bg-[#D0E6FF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																				<NearMeIcon />
-																			</div>
-																			<div className="ml-[12px] flex flex-col">
-																				<div className="text-[20px] font-medium leading-none text-black font-inter">
-																					Near Me
+																	<div
+																		className={`search-dropdown-menu hidden md:flex flex-col items-center ${
+																			whereValue.length >= 1
+																				? 'justify-start py-4 overflow-y-auto'
+																				: 'justify-center'
+																		} gap-[20px] absolute top-[calc(100%+10px)] left-[98px] w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]`}
+																	>
+																		{whereValue.length >= 1 ? (
+																			isLoadingLocations ? (
+																				<div className="flex items-center justify-center h-full">
+																					<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+																				</div>
+																			) : locationResults &&
+																			  locationResults.length > 0 ? (
+																				locationResults.map((loc, idx) => {
+																					const { icon, backgroundColor } =
+																						getCityIconProps(loc.city, loc.state);
+																					return (
+																						<div
+																							key={`${loc.city}-${loc.state}-${idx}`}
+																							className="w-[415px] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
+																							onClick={() => {
+																								setWhereValue(loc.label);
+																								setActiveSection(null);
+																							}}
+																						>
+																							<div
+																								className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
+																								style={{ backgroundColor }}
+																							>
+																								{icon}
+																							</div>
+																							<div className="ml-[12px] flex flex-col">
+																								<div className="text-[20px] font-medium leading-none text-black font-inter">
+																									{loc.label}
+																								</div>
+																								<div className="text-[12px] leading-tight text-black mt-[4px]">
+																									Search contacts in {loc.city}
+																								</div>
+																							</div>
+																						</div>
+																					);
+																				})
+																			) : (
+																				<div className="text-black font-medium font-secondary">
+																					No locations found
+																				</div>
+																			)
+																		) : (
+																			<>
+																				<div
+																					className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer hover:bg-[#f0f0f0] transition-colors duration-200"
+																					onClick={() => {
+																						if (userLocationName && !isLoadingLocation) {
+																							setWhereValue(userLocationName);
+																							setActiveSection(null);
+																						}
+																					}}
+																				>
+																					<div className="w-[38px] h-[38px] bg-[#D0E6FF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																						<NearMeIcon />
+																					</div>
+																					<div className="ml-[12px] flex flex-col">
+																						<div className="text-[20px] font-medium leading-none text-black font-inter">
+																							Near Me
+																						</div>
+																						<div
+																							className={`text-[12px] leading-tight mt-[4px] select-none ${
+																								userLocationName || isLoadingLocation
+																									? 'text-black/60'
+																									: 'text-transparent'
+																							}`}
+																						>
+																							{isLoadingLocation
+																								? 'Locating...'
+																								: userLocationName || 'Placeholder'}
+																						</div>
+																					</div>
 																				</div>
 																				<div
-																					className={`text-[12px] leading-tight mt-[4px] select-none ${
-																						userLocationName || isLoadingLocation
-																							? 'text-black/60'
-																							: 'text-transparent'
-																					}`}
+																					className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																					onClick={() => {
+																						setWhereValue('New York, NY');
+																						setActiveSection(null);
+																					}}
 																				>
-																					{isLoadingLocation
-																						? 'Locating...'
-																						: userLocationName || 'Placeholder'}
+																					<div className="w-[38px] h-[38px] bg-[#9F9FEE] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																						<CityIcon />
+																					</div>
+																					<div className="ml-[12px] flex flex-col">
+																						<div className="text-[20px] font-medium leading-none text-black font-inter">
+																							New York, NY
+																						</div>
+																						<div className="text-[12px] leading-tight text-black mt-[4px]">
+																							contact venues, restaurants and more, to
+																							book shows
+																						</div>
+																					</div>
 																				</div>
-																			</div>
-																		</div>
-																		<div
-																			className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-																			onClick={() => {
-																				setWhereValue('New York, NY');
-																				setActiveSection(null);
-																			}}
-																		>
-																			<div className="w-[38px] h-[38px] bg-[#9F9FEE] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																				<CityIcon />
-																			</div>
-																			<div className="ml-[12px] flex flex-col">
-																				<div className="text-[20px] font-medium leading-none text-black font-inter">
-																					New York, NY
+																				<div
+																					className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																					onClick={() => {
+																						setWhereValue('Nashville, TN');
+																						setActiveSection(null);
+																					}}
+																				>
+																					<div className="w-[38px] h-[38px] bg-[#9F9FEE] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																						<CityIcon />
+																					</div>
+																					<div className="ml-[12px] flex flex-col">
+																						<div className="text-[20px] font-medium leading-none text-black font-inter">
+																							Nashville, TN
+																						</div>
+																						<div className="text-[12px] leading-tight text-black mt-[4px]">
+																							contact venues, restaurants and more, to
+																							book shows
+																						</div>
+																					</div>
 																				</div>
-																				<div className="text-[12px] leading-tight text-black mt-[4px]">
-																					contact venues, restaurants and more, to book
-																					shows
+																				<div
+																					className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																					onClick={() => {
+																						setWhereValue('Pennsylvania');
+																						setActiveSection(null);
+																					}}
+																				>
+																					<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																						<SuburbsIcon />
+																					</div>
+																					<div className="ml-[12px] flex flex-col">
+																						<div className="text-[20px] font-medium leading-none text-black font-inter">
+																							Pennsylvania
+																						</div>
+																						<div className="text-[12px] leading-tight text-black mt-[4px]">
+																							contact venues, restaurants and more, to
+																							book shows
+																						</div>
+																					</div>
 																				</div>
-																			</div>
-																		</div>
-																		<div
-																			className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-																			onClick={() => {
-																				setWhereValue('Nashville, TN');
-																				setActiveSection(null);
-																			}}
-																		>
-																			<div className="w-[38px] h-[38px] bg-[#9F9FEE] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																				<CityIcon />
-																			</div>
-																			<div className="ml-[12px] flex flex-col">
-																				<div className="text-[20px] font-medium leading-none text-black font-inter">
-																					Nashville, TN
-																				</div>
-																				<div className="text-[12px] leading-tight text-black mt-[4px]">
-																					contact venues, restaurants and more, to book
-																					shows
-																				</div>
-																			</div>
-																		</div>
-																		<div
-																			className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-																			onClick={() => {
-																				setWhereValue('Pennsylvania');
-																				setActiveSection(null);
-																			}}
-																		>
-																			<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																				<SuburbsIcon />
-																			</div>
-																			<div className="ml-[12px] flex flex-col">
-																				<div className="text-[20px] font-medium leading-none text-black font-inter">
-																					Pennsylvania
-																				</div>
-																				<div className="text-[12px] leading-tight text-black mt-[4px]">
-																					contact venues, restaurants and more, to book
-																					shows
-																				</div>
-																			</div>
-																		</div>
+																			</>
+																		)}
 																	</div>
 																)}
 															</div>
