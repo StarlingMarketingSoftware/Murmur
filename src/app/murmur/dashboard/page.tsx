@@ -18,6 +18,7 @@ import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -643,7 +644,11 @@ const Dashboard = () => {
 																)}
 																{activeSection === 'where' && (
 																	<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[20px] absolute top-[calc(100%+10px)] left-[98px] w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
-																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px]">
+																			<div className="w-[38px] h-[38px] bg-[#D0E6FF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																				<NearMeIcon />
+																			</div>
+																		</div>
 																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
 																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
 																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
