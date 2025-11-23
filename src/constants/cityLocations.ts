@@ -1,6 +1,11 @@
 // Set of "City" locations that get the CityIcon and #9F9FEE background
 // Format: "City, State"
 export const CITY_LOCATIONS_LIST = [
+	'The Bronx, New York',
+	'Brooklyn, New York',
+	'Manhattan, New York',
+	'Queens, New York',
+	'Staten Island, New York',
 	'New York, New York',
 	'Los Angeles, California',
 	'Chicago, Illinois',

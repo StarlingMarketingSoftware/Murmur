@@ -80,6 +80,90 @@ function isCity(city: string, state: string): boolean {
 	return CITY_LOCATIONS_SET.has(key);
 }
 
+// Explicit priority boosts for marquee cities to strongly prefer them in suggestions
+// Keys must be lowercased "city, state"
+const PRIORITY_CITY_SCORES: Record<string, number> = {
+	'new york, new york': 100,
+	'los angeles, california': 95,
+	'chicago, illinois': 94,
+	'houston, texas': 93,
+	'philadelphia, pennsylvania': 92,
+	'phoenix, arizona': 92,
+	'san antonio, texas': 91,
+	'san diego, california': 91,
+	'dallas, texas': 91,
+	'san jose, california': 91,
+	'nashville, tennessee': 90,
+	'austin, texas': 90,
+	'new orleans, louisiana': 90,
+	'atlanta, georgia': 90,
+	'miami, florida': 90,
+	'tampa, florida': 90,
+	'st. petersburg, florida': 90,
+	'orlando, florida': 90,
+	'denver, colorado': 90,
+	'seattle, washington': 90,
+	'portland, oregon': 90,
+	'boston, massachusetts': 90,
+	'washington, district of columbia': 90,
+	'baltimore, maryland': 90,
+	'pittsburgh, pennsylvania': 90,
+	'cleveland, ohio': 90,
+	'charlotte, north carolina': 90,
+	'raleigh, north carolina': 90,
+	'durham, north carolina': 90,
+	'indianapolis, indiana': 90,
+	'columbus, ohio': 90,
+	'cincinnati, ohio': 90,
+	'las vegas, nevada': 90,
+	'salt lake city, utah': 90,
+	'detroit, michigan': 90,
+	'minneapolis, minnesota': 90,
+	'saint paul, minnesota': 90,
+	'milwaukee, wisconsin': 90,
+	'st. louis, missouri': 90,
+	'kansas city, missouri': 90,
+	'the bronx, new york': 89,
+	'brooklyn, new york': 89,
+	'manhattan, new york': 89,
+	'queens, new york': 89,
+	'staten island, new york': 89,
+};
+
+function getSuggestionScore(
+	record: { city: string | null; state: string | null },
+	rawQuery: string
+): number {
+	const city = (record.city || '').trim();
+	const state = (record.state || '').trim();
+	const q = rawQuery.trim().toLowerCase();
+	const cityLc = city.toLowerCase();
+	const stateLc = state.toLowerCase();
+
+	let score = 0;
+
+	// Strongly prefer items that are known major cities
+	if (isCity(city, state)) score += 1000;
+
+	// Prefer city name matches over state matches; startsWith beats contains
+	if (cityLc.startsWith(q)) score += 400;
+	else if (cityLc.includes(q)) score += 50;
+
+	if (stateLc.startsWith(q)) score += 200;
+	else if (stateLc.includes(q)) score += 10;
+
+	// Apply explicit marquee-city boosts (e.g., make Philadelphia outrank Phoenix for "p")
+	const key = `${cityLc}, ${stateLc}`;
+	if (PRIORITY_CITY_SCORES[key]) score += PRIORITY_CITY_SCORES[key];
+
+	// Light bonus when the query is very short (1 char): emphasize big-city startsWith
+	if (q.length === 1 && cityLc.startsWith(q) && isCity(city, state)) {
+		score += 75;
+	}
+
+	return score;
+}
+
 export async function GET(req: NextRequest) {
 	try {
 		const { userId } = await auth();
@@ -129,7 +213,7 @@ export async function GET(req: NextRequest) {
 			take: 20, // Increased take to allow for sorting
 		});
 
-		// Sort startsWith results: Cities first
+		// Initial sort for startsWith results: Cities first
 		startsWithResults.sort((a, b) => {
 			const aIsCity = isCity(a.city!, a.state!);
 			const bIsCity = isCity(b.city!, b.state!);
@@ -159,7 +243,7 @@ export async function GET(req: NextRequest) {
 				take: 20,
 			});
 
-			// Sort contains results: Cities first
+			// Initial sort for contains results: Cities first
 			containsResults.sort((a, b) => {
 				const aIsCity = isCity(a.city!, a.state!);
 				const bIsCity = isCity(b.city!, b.state!);
@@ -170,6 +254,19 @@ export async function GET(req: NextRequest) {
 
 			finalResults = [...finalResults, ...containsResults];
 		}
+
+		// Strong re-sort of combined results using a scoring function that:
+		// - strongly prefers marquee cities (NYC, LA, Philadelphia, Nashville)
+		// - prefers city startsWith > state startsWith > contains
+		// - always prefers city results over non-city locations
+		finalResults.sort(
+			(a, b) =>
+				getSuggestionScore(
+					b as { city: string | null; state: string | null },
+					cleanQuery
+				) -
+				getSuggestionScore(a as { city: string | null; state: string | null }, cleanQuery)
+		);
 
 		// Format and deduplicate results
 		const seen = new Set<string>();
