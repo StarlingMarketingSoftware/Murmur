@@ -142,15 +142,45 @@ function getSuggestionScore(
 
 	let score = 0;
 
+	// Handle "City, State" query parsing for scoring boost
+	let qCity = q;
+	let qState = '';
+	let fullQState = '';
+
+	if (q.includes(',')) {
+		const parts = q.split(',');
+		qCity = parts[0].trim();
+		if (parts.length > 1) {
+			qState = parts[parts.length - 1].trim();
+			// Try to expand qState if it's an abbreviation
+			fullQState = abbreviationToState[qState.toUpperCase()];
+			if (!fullQState && qState.length > 2) {
+				fullQState = qState;
+			}
+		}
+	}
+
 	// Strongly prefer items that are known major cities
 	if (isCity(city, state)) score += 1000;
 
 	// Prefer city name matches over state matches; startsWith beats contains
-	if (cityLc.startsWith(q)) score += 400;
-	else if (cityLc.includes(q)) score += 50;
+	// Check if city matches the query or the city part of a split query
+	if (cityLc.startsWith(q) || (qCity && cityLc.startsWith(qCity))) score += 400;
+	else if (cityLc.includes(q) || (qCity && cityLc.includes(qCity))) score += 50;
 
 	if (stateLc.startsWith(q)) score += 200;
 	else if (stateLc.includes(q)) score += 10;
+
+	// Boost if state matches the state part of a "City, State" query
+	// Check both raw state part and expanded full state name
+	if (qState) {
+		if (stateLc.startsWith(qState) || stateLc.includes(qState)) {
+			score += 150;
+		}
+		if (fullQState && (stateLc.startsWith(fullQState) || stateLc.includes(fullQState))) {
+			score += 150;
+		}
+	}
 
 	// Apply explicit marquee-city boosts (e.g., make Philadelphia outrank Phoenix for "p")
 	const key = `${cityLc}, ${stateLc}`;
@@ -180,6 +210,34 @@ export async function GET(req: NextRequest) {
 
 		const cleanQuery = query.trim();
 		const searchTerms = [cleanQuery];
+
+		// Check for comma to handle "City, State" inputs
+		if (cleanQuery.includes(',')) {
+			const parts = cleanQuery.split(',');
+			const cityPart = parts[0].trim();
+			const statePart = parts[parts.length - 1].trim();
+
+			// Try to resolve state part to full name
+			// e.g. "NY" -> "New York"
+			let fullState = abbreviationToState[statePart.toUpperCase()];
+
+			// If no abbreviation found, but it looks like a state name (longer than 2 chars), use it
+			if (!fullState && statePart.length > 2) {
+				fullState = statePart;
+			}
+
+			if (fullState) {
+				searchTerms.push(fullState);
+			} else if (statePart.length > 0) {
+				// Fallback: add the raw part if it might be a partial state name
+				searchTerms.push(statePart);
+			}
+
+			// Also add the city part to search terms to be robust
+			if (cityPart.length > 0) {
+				searchTerms.push(cityPart);
+			}
+		}
 
 		// If query is 2 chars (likely abbreviation), add the full state name to search
 		if (cleanQuery.length === 2) {
