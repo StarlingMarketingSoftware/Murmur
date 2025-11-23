@@ -642,7 +642,12 @@ const Dashboard = () => {
 																	</div>
 																)}
 																{activeSection === 'where' && (
-																	<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] absolute top-[calc(100%+10px)] left-[98px] w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]"></div>
+																	<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[20px] absolute top-[calc(100%+10px)] left-[98px] w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
+																	</div>
 																)}
 															</div>
 														</FormControl>
