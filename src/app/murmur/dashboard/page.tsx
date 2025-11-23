@@ -519,7 +519,30 @@ const Dashboard = () => {
 																		</div>
 																	</div>
 																)}
-																{activeSection === 'what' && (
+																{activeSection === 'what' && whyValue === 'Promotion' && (
+																	<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] absolute top-[calc(100%+10px)] left-[176px] w-[439px] h-[92px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+																		<div
+																			className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																			onClick={() => {
+																				setWhatValue('Radio Stations');
+																				setActiveSection('where');
+																			}}
+																		>
+																			<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																				<PromotionIcon />
+																			</div>
+																			<div className="ml-[12px] flex flex-col">
+																				<div className="text-[20px] font-medium leading-none text-black font-inter">
+																					Radio Stations
+																				</div>
+																				<div className="text-[12px] leading-tight text-black mt-[4px]">
+																					Reach out to radio stations
+																				</div>
+																			</div>
+																		</div>
+																	</div>
+																)}
+																{activeSection === 'what' && whyValue !== 'Promotion' && (
 																	<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] absolute top-[calc(100%+10px)] left-[176px] w-[439px] h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
 																		<div
 																			className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
