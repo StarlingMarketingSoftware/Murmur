@@ -20,6 +20,8 @@ import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
+import { CityIcon } from '@/components/atoms/_svg/CityIcon';
+import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -716,9 +718,48 @@ const Dashboard = () => {
 																				</div>
 																			</div>
 																		</div>
-																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
-																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
-																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px]">
+																			<div className="w-[38px] h-[38px] bg-[#9F9FEE] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																				<CityIcon />
+																			</div>
+																			<div className="ml-[12px] flex flex-col">
+																				<div className="text-[20px] font-medium leading-none text-black font-inter">
+																					New York, NY
+																				</div>
+																				<div className="text-[12px] leading-tight text-black mt-[4px]">
+																					contact venues, restaurants and more, to book
+																					shows
+																				</div>
+																			</div>
+																		</div>
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px]">
+																			<div className="w-[38px] h-[38px] bg-[#9F9FEE] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																				<CityIcon />
+																			</div>
+																			<div className="ml-[12px] flex flex-col">
+																				<div className="text-[20px] font-medium leading-none text-black font-inter">
+																					Nashville, TN
+																				</div>
+																				<div className="text-[12px] leading-tight text-black mt-[4px]">
+																					contact venues, restaurants and more, to book
+																					shows
+																				</div>
+																			</div>
+																		</div>
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px]">
+																			<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																				<SuburbsIcon />
+																			</div>
+																			<div className="ml-[12px] flex flex-col">
+																				<div className="text-[20px] font-medium leading-none text-black font-inter">
+																					Pennsylvania
+																				</div>
+																				<div className="text-[12px] leading-tight text-black mt-[4px]">
+																					contact venues, restaurants and more, to book
+																					shows
+																				</div>
+																			</div>
+																		</div>
 																	</div>
 																)}
 															</div>
