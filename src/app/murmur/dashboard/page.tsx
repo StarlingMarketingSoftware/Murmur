@@ -549,11 +549,21 @@ const Dashboard = () => {
 																)}
 																{activeSection === 'what' && (
 																	<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] absolute top-[calc(100%+10px)] left-[176px] w-[439px] h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
-																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
-																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
-																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
-																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
-																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0" />
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px]">
+																			<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center" />
+																		</div>
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px]">
+																			<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center" />
+																		</div>
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px]">
+																			<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center" />
+																		</div>
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px]">
+																			<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center" />
+																		</div>
+																		<div className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px]">
+																			<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center" />
+																		</div>
 																	</div>
 																)}
 															</div>
