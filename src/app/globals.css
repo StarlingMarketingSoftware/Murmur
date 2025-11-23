@@ -3400,7 +3400,7 @@ body.murmur-mobile .results-align {
 
 /* Keep table in normal flow with consistent spacing */
 .campaigns-table-wrapper {
-	margin-top: -200px; /* Pull table up for better positioning on desktop */
+	margin-top: 35px; /* Push table down for better positioning on desktop */
 	position: relative;
 	z-index: 30; /* Ensure table is above other elements */
 }
