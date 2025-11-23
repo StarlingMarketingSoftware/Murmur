@@ -35,6 +35,7 @@ import { useClerk } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useGetLocations } from '@/hooks/queryHooks/useContacts';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
 const Dashboard = () => {
 	const { isSignedIn, openSignIn } = useClerk();
@@ -176,6 +177,7 @@ const Dashboard = () => {
 			window.removeEventListener('orientationchange', check);
 		};
 	}, [isMobile]);
+
 	// Mobile-friendly sizing for hero logo and subtitle; desktop remains unchanged
 	const logoWidth = isMobile ? '190px' : '300px';
 	const logoHeight = isMobile ? '50px' : '79px';
@@ -759,55 +761,77 @@ const Dashboard = () => {
 																)}
 																{activeSection === 'where' && (
 																	<div
-																		className={`search-dropdown-menu hidden md:flex flex-col items-center ${
-																			whereValue.length >= 1
-																				? 'justify-start py-4 overflow-y-auto'
-																				: 'justify-center'
-																		} gap-[20px] absolute top-[calc(100%+10px)] left-[98px] w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]`}
+																		id="where-dropdown-container"
+																		className={`search-dropdown-menu hidden md:block absolute top-[calc(100%+10px)] left-[98px] w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]`}
+																		style={{ overflow: 'visible' }}
 																	>
+																		<style jsx global>{`
+																			#where-dropdown-container .scrollbar-hide {
+																				scrollbar-width: none !important;
+																				scrollbar-color: transparent transparent !important;
+																				-ms-overflow-style: none !important;
+																			}
+																			#where-dropdown-container
+																				.scrollbar-hide::-webkit-scrollbar {
+																				display: none !important;
+																				width: 0 !important;
+																				height: 0 !important;
+																				background: transparent !important;
+																				-webkit-appearance: none !important;
+																			}
+																		`}</style>
 																		{whereValue.length >= 1 ? (
-																			isLoadingLocations ? (
-																				<div className="flex items-center justify-center h-full">
-																					<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-																				</div>
-																			) : locationResults &&
-																			  locationResults.length > 0 ? (
-																				locationResults.map((loc, idx) => {
-																					const { icon, backgroundColor } =
-																						getCityIconProps(loc.city, loc.state);
-																					return (
-																						<div
-																							key={`${loc.city}-${loc.state}-${idx}`}
-																							className="w-[415px] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
-																							onClick={() => {
-																								setWhereValue(loc.label);
-																								setActiveSection(null);
-																							}}
-																						>
+																			<CustomScrollbar
+																				className="w-full h-full"
+																				contentClassName="flex flex-col items-center justify-start gap-[20px] py-4"
+																				thumbWidth={2}
+																				thumbColor="#000000"
+																				trackColor="transparent"
+																				offsetRight={-5}
+																			>
+																				{isLoadingLocations ? (
+																					<div className="flex items-center justify-center h-full">
+																						<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+																					</div>
+																				) : locationResults &&
+																				  locationResults.length > 0 ? (
+																					locationResults.map((loc, idx) => {
+																						const { icon, backgroundColor } =
+																							getCityIconProps(loc.city, loc.state);
+																						return (
 																							<div
-																								className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
-																								style={{ backgroundColor }}
+																								key={`${loc.city}-${loc.state}-${idx}`}
+																								className="w-[415px] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
+																								onClick={() => {
+																									setWhereValue(loc.label);
+																									setActiveSection(null);
+																								}}
 																							>
-																								{icon}
-																							</div>
-																							<div className="ml-[12px] flex flex-col">
-																								<div className="text-[20px] font-medium leading-none text-black font-inter">
-																									{loc.label}
+																								<div
+																									className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
+																									style={{ backgroundColor }}
+																								>
+																									{icon}
 																								</div>
-																								<div className="text-[12px] leading-tight text-black mt-[4px]">
-																									Search contacts in {loc.city}
+																								<div className="ml-[12px] flex flex-col">
+																									<div className="text-[20px] font-medium leading-none text-black font-inter">
+																										{loc.label}
+																									</div>
+																									<div className="text-[12px] leading-tight text-black mt-[4px]">
+																										Search contacts in {loc.city}
+																									</div>
 																								</div>
 																							</div>
-																						</div>
-																					);
-																				})
-																			) : (
-																				<div className="text-black font-medium font-secondary">
-																					No locations found
-																				</div>
-																			)
+																						);
+																					})
+																				) : (
+																					<div className="text-black font-medium font-secondary">
+																						No locations found
+																					</div>
+																				)}
+																			</CustomScrollbar>
 																		) : (
-																			<>
+																			<div className="flex flex-col items-center justify-center gap-[20px] w-full h-full">
 																				<div
 																					className="w-[415px] h-[68px] bg-white rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer hover:bg-[#f0f0f0] transition-colors duration-200"
 																					onClick={() => {
@@ -897,7 +921,7 @@ const Dashboard = () => {
 																						</div>
 																					</div>
 																				</div>
-																			</>
+																			</div>
 																		)}
 																	</div>
 																)}
