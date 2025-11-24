@@ -1114,7 +1114,7 @@ const Dashboard = () => {
 					)}
 
 				{hasSearched && !isLoadingContacts && !isRefetchingContacts && (
-					<div className="results-search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 relative">
+					<div className="results-search-bar-wrapper w-full max-w-[499px] mx-auto px-4 relative">
 						<div
 							className={`results-search-bar-inner ${hoveredContact ? 'invisible' : ''}`}
 						>
@@ -1165,7 +1165,7 @@ const Dashboard = () => {
 																<SearchIconResults />
 															</button>
 															<Input
-																className={`search-wave-input results-search-input !border-2 !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-[#cfcfcf] ${
+																className={`search-wave-input results-search-input !h-[49px] !border-2 !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black ${
 																	field.value === activeSearchQuery &&
 																	(field.value?.trim()?.length ?? 0) > 0
 																		? 'text-center'
