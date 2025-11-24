@@ -1170,6 +1170,158 @@ export async function GET(req: NextRequest) {
 			}
 		}
 
+		// Lenient "Coffee Shops" filter: broaden matching to common coffee terms across multiple fields
+		{
+			const mentionsCoffee =
+				/\bcoffee\b|\bcaf[eé]\b|\bespresso\b|\bcoffee shops?\b/i.test(rawQueryForParsing);
+			if (mentionsCoffee) {
+				const finalLimit = Math.max(
+					1,
+					Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200)
+				);
+				const fetchTake = Math.min(finalLimit * 6, 800);
+
+				const baseWhere: Prisma.ContactWhereInput = {
+					id: addedContactIds.length > 0 ? { notIn: addedContactIds } : undefined,
+					emailValidationStatus: verificationStatus
+						? {
+								equals: verificationStatus,
+						  }
+						: undefined,
+				};
+
+				// Keep state strict, but loosen city constraints
+				const stateStrictAnd: Prisma.ContactWhereInput[] = [];
+				if (forceStateAny && forceStateAny.length > 0) {
+					stateStrictAnd.push({
+						OR: forceStateAny.map((s) => ({
+							state: { equals: s, mode: 'insensitive' },
+						})),
+					});
+				} else if (queryJson.state) {
+					stateStrictAnd.push({
+						state: { equals: queryJson.state, mode: 'insensitive' },
+					});
+				}
+
+				// City is optional for lenient coffee search; only enforce if an exact city is forced
+				const cityStrictAnd: Prisma.ContactWhereInput[] = [];
+				if (forceCityExactCity) {
+					cityStrictAnd.push({
+						city: { equals: forceCityExactCity, mode: 'insensitive' },
+					});
+				} else if (forceCityAny && forceCityAny.length > 0) {
+					cityStrictAnd.push({
+						OR: forceCityAny.map((c) => ({
+							city: { equals: c, mode: 'insensitive' },
+						})),
+					});
+				}
+
+				// If a state is present, prefer exact state-label titles: "Coffee Shops <STATE or ABBR>"
+				if (queryJson.state && queryJson.state.trim().length > 0) {
+					const canonicalState = detectStateFromValue(queryJson.state) || queryJson.state;
+					const targetAbbr = US_STATE_METADATA.find(
+						(s) => s.name.toLowerCase() === canonicalState.toLowerCase()
+					)?.abbr;
+					const targetLabels = new Set(
+						[targetAbbr, canonicalState]
+							.filter(Boolean)
+							.map((s) => String(s).toLowerCase())
+					);
+
+					const extractStateLabelAfterCoffeePrefix = (
+						title: string | null | undefined
+					): string | null => {
+						if (!title) return null;
+						const trimmed = title.trim();
+						const m = /^coffee shops?\b(.*)$/i.exec(trimmed);
+						if (!m) return null;
+						let rest = m[1].trim();
+						// Remove common separators right after prefix
+						rest = rest.replace(/^[-–—:|,()\[\]]+/, '').trim();
+						// Collapse repeated whitespace
+						rest = rest.replace(/\s+/g, ' ').trim();
+						if (!rest) return null;
+						return rest;
+					};
+
+					const coffeeTitleStartsWith = await prisma.contact.findMany({
+						where: {
+							AND: [
+								baseWhere,
+								...cityStrictAnd,
+								{ title: { mode: 'insensitive', startsWith: 'Coffee Shops' } },
+							],
+						},
+						orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+						take: Math.min(fetchTake, 500),
+					});
+
+					const preferredByStateLabel = coffeeTitleStartsWith.filter((c) => {
+						const label = extractStateLabelAfterCoffeePrefix(c.title);
+						if (!label) return false;
+						const canon = detectStateFromValue(label) || label;
+						return targetLabels.has(canon.toLowerCase());
+					});
+
+					if (preferredByStateLabel.length > 0) {
+						return apiResponse(preferredByStateLabel.slice(0, finalLimit));
+					}
+				}
+
+				const COFFEE_TERMS = [
+					'coffee',
+					'coffee shop',
+					'coffee shops',
+					'cafe',
+					'café',
+					'espresso',
+					'roaster',
+					'roastery',
+				];
+
+				const results = await prisma.contact.findMany({
+					where: {
+						AND: [
+							baseWhere,
+							...stateStrictAnd,
+							...cityStrictAnd,
+							{
+								OR: COFFEE_TERMS.flatMap((t) => [
+									{ title: { mode: 'insensitive', contains: t } },
+									{ company: { mode: 'insensitive', contains: t } },
+									{ companyIndustry: { mode: 'insensitive', contains: t } },
+									{ website: { mode: 'insensitive', contains: t } },
+									{ metadata: { mode: 'insensitive', contains: t } },
+								]),
+							},
+						],
+					},
+					orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+					take: fetchTake,
+				});
+
+				// Prefer records explicitly labeled as "Coffee Shops" in title
+				if (results.length > 0 || !useVectorSearch) {
+					const scoreCoffeeTitle = (title: string | null | undefined): number => {
+						const t = (title || '').trim().toLowerCase();
+						let s = 0;
+						if (t.startsWith('coffee shops')) s += 4;
+						else if (t.startsWith('coffee shop')) s += 3;
+						if (t.includes('coffee shops')) s += 2;
+						if (t.includes('coffee shop')) s += 1;
+						return s;
+					};
+					const prioritized = results
+						.slice()
+						.sort((a, b) => scoreCoffeeTitle(b.title) - scoreCoffeeTitle(a.title));
+					return apiResponse(prioritized.slice(0, finalLimit));
+				}
+				// If still empty and vector requested, let vector path try below
+			}
+		}
+
 		// Special-case: Booking searches - filter to specific title prefixes and respect strict state if present
 		if (isBookingSearch) {
 			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200));
@@ -1401,9 +1553,14 @@ export async function GET(req: NextRequest) {
 			// and raw parenthetical locations when building search terms. Use the
 			// cleaned, non-location portion of the query instead so we don't require
 			// impossible literal matches like "[booking]" or "(philadelphia, pa)".
-			const baseSearch = isBookingSearch
-				? (queryJson?.restOfQuery || rawQueryForParsing || '').toLowerCase()
-				: (query || '').toLowerCase();
+			// Always prefer the non-location portion (restOfQuery) for term matching,
+			// regardless of booking mode, to avoid forcing tokens like "(new" or "ny)".
+			const baseSearch = (
+				queryJson?.restOfQuery ||
+				rawQueryForParsing ||
+				query ||
+				''
+			).toLowerCase();
 
 			const searchTerms: string[] = baseSearch
 				.split(/\s+/)
