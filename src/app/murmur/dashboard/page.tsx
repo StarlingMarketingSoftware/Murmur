@@ -1297,7 +1297,7 @@ const Dashboard = () => {
 												useCustomScrollbar={!isMobileLandscape}
 												scrollbarOffsetRight={-7}
 												containerClassName="search-results-table h-[571px] rounded-[8px] border-[#143883] md:w-[1004px] border-[3px]"
-												tableClassName="w-[calc(100%-1rem)] md:w-[985px] mx-auto border-separate border-spacing-y-[6px]"
+												tableClassName="w-[calc(100%-12px)] mx-auto border-separate border-spacing-y-[6px]"
 												headerClassName="[&_tr]:border-[#737373]"
 												theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
 												rowClassName="border-[#737373] row-hover-scroll bg-white odd:bg-white even:bg-white rounded-[8px] [&>td:first-child]:rounded-l-[8px] [&>td:last-child]:rounded-r-[8px] [&>td]:border-y-2 [&>td:first-child]:border-l-2 [&>td:last-child]:border-r-2 border-none !h-[58px] min-h-[58px] [&>td]:!h-[58px] [&>td]:!py-0"

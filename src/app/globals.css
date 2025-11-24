@@ -4180,12 +4180,12 @@ body,
 .search-results-table table[data-slot='table'] {
 	border-collapse: separate !important;
 	border-spacing: 0 6px !important; /* vertical gap between rows only */
-	padding: 0 8px !important;
+	padding: 0 !important;
 }
 
 .search-results-table thead[data-slot='table-header'] {
 	display: block !important;
-	padding: 0 8px !important;
+	padding: 0 !important;
 	/* Collapse header vertical footprint for in-box sticky header layout */
 	height: 0 !important;
 	margin: 0 !important;
@@ -4209,7 +4209,7 @@ body,
 
 .search-results-table tbody[data-slot='table-body'] {
 	display: block !important;
-	padding: 0 8px !important;
+	padding: 0 !important;
 }
 
 .search-results-table tr[data-slot='table-row'],
