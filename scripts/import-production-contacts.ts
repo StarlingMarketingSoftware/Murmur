@@ -31,12 +31,7 @@ export type ProductionContactRow = {
 };
 
 async function importProductionContacts() {
-	const filePath = path.join(
-		process.cwd(),
-		'public',
-		'contactLists',
-		'2025-07-31ProductionContacts.xlsx'
-	);
+	const filePath = path.join(process.cwd(), 'public', 'contactLists', 'Contact.xlsx');
 
 	console.log('Reading production contacts from:', filePath);
 

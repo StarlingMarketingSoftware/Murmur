@@ -71,6 +71,9 @@ export const urls = {
 		},
 		contacts: {
 			index: '/api/contacts',
+			locations: {
+				index: '/api/contacts/locations',
+			},
 			usedContacts: {
 				index: '/api/contacts/used-contacts',
 			},

@@ -99,7 +99,11 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 	const columns: ColumnDef<CampaignWithCounts>[] = [
 		{
 			accessorKey: 'name',
-			header: () => <div className="text-left"></div>,
+			header: () => (
+				<div className="text-left pl-0 font-secondary font-medium text-[14px] text-black">
+					Your Campaigns
+				</div>
+			),
 			cell: ({ row }) => {
 				const name: string = row.getValue('name');
 				const isConfirming = row.original.id === confirmingCampaignId;
@@ -324,7 +328,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 										'metric-box inline-flex items-center justify-start border border-[#8C8C8C] leading-none truncate',
 										compactMetrics
 											? cn(width, 'h-[15px] rounded-[4px] justify-center')
-											: 'h-[1.33em] w-[6.13em] rounded-[4px] px-2.5'
+											: 'h-[20px] w-[92px] rounded-[4px] justify-center px-0'
 									)}
 									style={
 										{

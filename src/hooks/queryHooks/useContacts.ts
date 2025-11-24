@@ -325,3 +325,29 @@ export const useBatchUpdateContacts = (options: CustomMutationOptions = {}) => {
 		},
 	});
 };
+
+export interface LocationResult {
+	city: string;
+	state: string;
+	label: string;
+}
+
+export const useGetLocations = (query: string, mode?: 'state' | 'state-first') => {
+	return useQuery<LocationResult[]>({
+		queryKey: ['locations', query, mode],
+		queryFn: async () => {
+			if (!query || query.length < 1) return [];
+			const url = appendQueryParamsToUrl(urls.api.contacts.locations.index, {
+				query,
+				mode,
+			});
+			const response = await _fetch(url);
+			if (!response.ok) {
+				throw new Error('Failed to fetch locations');
+			}
+			return response.json();
+		},
+		enabled: query.length >= 1,
+		staleTime: 1000 * 60 * 5, // 5 minutes
+	});
+};
