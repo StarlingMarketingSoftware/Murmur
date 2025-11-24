@@ -1309,36 +1309,17 @@ const Dashboard = () => {
 												headerAction={
 													!isMobile ? (
 														<button
-															onClick={handleSelectAll}
-															className="text-[14px] font-secondary font-normal text-black hover:underline"
-															type="button"
-														>
-															{isAllSelected ? 'Deselect All' : 'Select all'}
-														</button>
-													) : null
-												}
-												headerInlineAction={
-													isMobile ? (
-														<button
-															onClick={handleSelectAll}
-															className="text-[14px] font-secondary font-normal text-black hover:underline"
-															type="button"
-														>
-															{isAllSelected ? 'Deselect All' : 'Select all'}
-														</button>
-													) : (
-														<button
 															type="button"
 															onClick={handleCreateCampaign}
 															disabled={selectedContacts.length === 0}
 															className="font-secondary"
 															style={{
-																width: 'auto',
-																height: '28px',
+																width: '127px',
+																height: '31px',
 																background:
 																	selectedContacts.length === 0
 																		? 'rgba(93, 171, 104, 0.1)'
-																		: 'rgba(93, 171, 104, 0.22)',
+																		: '#B8E4BE',
 																border: '2px solid #000000',
 																color:
 																	selectedContacts.length === 0
@@ -1351,8 +1332,9 @@ const Dashboard = () => {
 																display: 'flex',
 																alignItems: 'center',
 																justifyContent: 'center',
-																padding: '0 12px',
+																padding: '0',
 																textAlign: 'center',
+																whiteSpace: 'nowrap',
 																cursor:
 																	selectedContacts.length === 0 ? 'default' : 'pointer',
 																opacity: selectedContacts.length === 0 ? 0.6 : 1,
@@ -1360,7 +1342,16 @@ const Dashboard = () => {
 														>
 															Create Campaign
 														</button>
-													)
+													) : null
+												}
+												headerInlineAction={
+													<button
+														onClick={handleSelectAll}
+														className="text-[14px] font-secondary font-normal text-black hover:underline"
+														type="button"
+													>
+														{isAllSelected ? 'Deselect All' : 'Select all'}
+													</button>
 												}
 											/>
 										</CardContent>
