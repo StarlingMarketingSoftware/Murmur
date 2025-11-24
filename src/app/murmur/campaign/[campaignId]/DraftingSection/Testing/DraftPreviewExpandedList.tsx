@@ -96,7 +96,7 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 
 	return (
 		<div
-			className="w-[376px] h-[426px] rounded-md border-2 border-black/30 bg-[#B4CBF4] px-2 pb-2 flex flex-col"
+			className="w-[376px] max-[480px]:w-[96.27vw] h-[426px] rounded-md border-2 border-black/30 bg-[#B4CBF4] px-2 pb-2 flex flex-col"
 			role="region"
 			aria-label="Expanded draft preview"
 		>

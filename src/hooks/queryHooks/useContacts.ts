@@ -285,7 +285,9 @@ export const useBatchUpdateContacts = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async (data: PostBulkUpdateContactData) => {
-			const response = await _fetch(urls.api.contacts.bulkUpdate.index, 'PATCH', data);
+			const response = await _fetch(urls.api.contacts.bulkUpdate.index, 'PATCH', data, {
+				timeout: 120000,
+			});
 			if (!response.ok) {
 				let errorMessage = 'Failed to update contacts';
 				try {
@@ -321,5 +323,31 @@ export const useBatchUpdateContacts = (options: CustomMutationOptions = {}) => {
 				toast.error(errorMessage);
 			}
 		},
+	});
+};
+
+export interface LocationResult {
+	city: string;
+	state: string;
+	label: string;
+}
+
+export const useGetLocations = (query: string, mode?: 'state' | 'state-first') => {
+	return useQuery<LocationResult[]>({
+		queryKey: ['locations', query, mode],
+		queryFn: async () => {
+			if (!query || query.length < 1) return [];
+			const url = appendQueryParamsToUrl(urls.api.contacts.locations.index, {
+				query,
+				mode,
+			});
+			const response = await _fetch(url);
+			if (!response.ok) {
+				throw new Error('Failed to fetch locations');
+			}
+			return response.json();
+		},
+		enabled: query.length >= 1,
+		staleTime: 1000 * 60 * 5, // 5 minutes
 	});
 };

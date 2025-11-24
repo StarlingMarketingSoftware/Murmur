@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, useMemo } from 'react';
 import { EmailWithRelations } from '@/types/campaign';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
 import { cn } from '@/utils';
@@ -10,6 +10,7 @@ import {
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
+import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 
 interface SentEmailsProps {
 	emails: EmailWithRelations[];
@@ -17,6 +18,11 @@ interface SentEmailsProps {
 }
 
 export const SentEmails: FC<SentEmailsProps> = ({ emails, isPendingEmails }) => {
+	const { data: usedContactIds } = useGetUsedContactIds();
+	const usedContactIdsSet = useMemo(
+		() => new Set(usedContactIds || []),
+		[usedContactIds]
+	);
 	return (
 		<DraftingTable
 			handleClick={() => {}}
@@ -43,6 +49,22 @@ export const SentEmails: FC<SentEmailsProps> = ({ emails, isPendingEmails }) => 
 								'transition-colors relative select-none w-[366px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2'
 							)}
 						>
+							{/* Used-contact indicator - vertically centered */}
+							{usedContactIdsSet.has(email.contactId) && (
+								<span
+									className="absolute left-[8px]"
+									title="Used in a previous campaign"
+									style={{
+										top: '50%',
+										transform: 'translateY(-50%)',
+										width: '16px',
+										height: '16px',
+										borderRadius: '50%',
+										border: '1px solid #000000',
+										backgroundColor: '#DAE6FE',
+									}}
+								/>
+							)}
 							{/* Fixed top-right info (Location + Title) */}
 							<div className="absolute top-[6px] right-[6px] flex flex-col items-end gap-[2px] w-[114px] pointer-events-none">
 								<div className="flex items-center justify-start gap-1 h-[11.67px] w-full">
@@ -112,7 +134,7 @@ export const SentEmails: FC<SentEmailsProps> = ({ emails, isPendingEmails }) => 
 							</div>
 
 							{/* Content grid */}
-							<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px]">
+							<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px] pl-[22px]">
 								{/* Row 1: Name */}
 								<div className="row-start-1 col-start-1 flex items-center">
 									<div className="font-bold text-[11px] truncate leading-none">

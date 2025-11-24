@@ -26,6 +26,12 @@ interface MiniEmailStructureProps {
 	generationProgress?: number;
 	generationTotal?: number;
 	onCancel?: () => void;
+	/** When true, hides the floating top number/label chrome */
+	hideTopChrome?: boolean;
+	/** When true, hides the footer Draft/progress controls */
+	hideFooter?: boolean;
+	/** When true, use 100% width so parent can control width on mobile */
+	fullWidthMobile?: boolean;
 }
 
 export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
@@ -36,6 +42,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	generationProgress,
 	generationTotal,
 	onCancel,
+	hideTopChrome,
+	hideFooter,
+	fullWidthMobile,
 }) => {
 	const watchedHybridBlocks = form.watch('hybridBlockPrompts');
 	const hybridBlocks = useMemo(() => watchedHybridBlocks || [], [watchedHybridBlocks]);
@@ -60,6 +69,24 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [hybridBlocks?.length, hybridBlocks?.map((b) => b.type).join(',')]);
 
+	// On mobile portrait in hybrid mode, add extra gap before the inline signature
+	// only when the last rendered block is a core (not a trailing text block).
+	const shouldUseLargeHybridSigGap = useMemo(() => {
+		if (draftingMode !== 'hybrid') return false;
+		const blocks = hybridBlocks || [];
+		if (blocks.length === 0) return false;
+		const last = blocks[blocks.length - 1];
+		return last?.type !== 'text';
+	}, [draftingMode, hybridBlocks]);
+
+	// Simple breakpoint check for render-time style tweaks (mobile portrait)
+	const isMobilePortrait =
+		typeof window !== 'undefined' && window.matchMedia('(max-width: 480px)').matches;
+
+	// Treat short-height devices as mobile landscape for spacing tweaks
+	const isMobileLandscape =
+		typeof window !== 'undefined' && window.matchMedia('(max-height: 480px)').matches;
+
 	const [addTextButtons, setAddTextButtons] = useState<
 		Array<{ blockId: string; top: number; show: boolean }>
 	>([]);
@@ -74,8 +101,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				(b) => b.type === 'introduction' || b.type === 'research' || b.type === 'action'
 			);
 
-			// Fixed offset for all buttons below their blocks
-			const buttonOffset = 2; // Consistent distance below each block
+			// Fixed offset for buttons below their blocks
+			// Add a tiny bit more space on small screens to avoid visual crowding
+			const isMobilePortrait =
+				typeof window !== 'undefined' && window.matchMedia('(max-width: 480px)').matches;
+			const buttonOffset = isMobilePortrait ? 4 : 2;
 
 			const container = buttonContainerRef.current;
 			const containerRect = container?.getBoundingClientRect();
@@ -419,39 +449,48 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		<div
 			ref={rootRef}
 			style={{
-				width: '376px',
-				height: '474px',
+				width: fullWidthMobile ? '100%' : '376px',
+				height: isMobilePortrait || isMobileLandscape ? 'auto' : '474px',
 				position: 'relative',
 				overflow: 'visible',
 			}}
 		>
-			{/* Centered number above block */}
-			<div
-				data-drafting-top-number
-				style={{
-					position: 'absolute',
-					top: '-26px',
-					left: '50%',
-					transform: 'translateX(-50%)',
-					pointerEvents: 'none',
-				}}
-				className="text-[12px] font-inter font-medium text-black"
-			>
-				2
-			</div>
+			{/* Centered number above block (hidden in mobile landscape) */}
+			{!hideTopChrome && !isMobileLandscape && (
+				<div
+					data-drafting-top-number
+					style={{
+						position: 'absolute',
+						top: '-26px',
+						left: '50%',
+						transform: 'translateX(-50%)',
+						pointerEvents: 'none',
+					}}
+					className="text-[12px] font-inter font-medium text-black"
+				>
+					2
+				</div>
+			)}
 			{/* Top-left text label */}
-			<div
-				data-drafting-top-label
-				style={{ position: 'absolute', top: '-20px', left: '2px', pointerEvents: 'none' }}
-				className="text-[12px] font-inter font-medium text-black"
-			>
-				Email Structure
-			</div>
+			{!hideTopChrome && !isMobileLandscape && (
+				<div
+					data-drafting-top-label
+					style={{
+						position: 'absolute',
+						top: '-20px',
+						left: '2px',
+						pointerEvents: 'none',
+					}}
+					className="text-[12px] font-inter font-medium text-black"
+				>
+					Email Structure
+				</div>
+			)}
 			{/* Container with header to match table sizing */}
 			<div
 				style={{
 					width: '100%',
-					height: '100%',
+					height: isMobilePortrait || isMobileLandscape ? 'auto' : '100%',
 					border: '3px solid #000000',
 					borderRadius: '8px',
 					position: 'relative',
@@ -462,10 +501,35 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				}}
 			>
 				{/* Content area - miniature, but interactive */}
-				<div ref={buttonContainerRef} className="flex-1 overflow-visible">
-					<div className="px-0 pb-3">
+				<div
+					ref={buttonContainerRef}
+					className={cn(
+						'overflow-visible',
+						isMobilePortrait || isMobileLandscape ? '' : 'flex-1'
+					)}
+				>
+					<div className="px-0 pb-3 max-[480px]:pb-2">
 						{/* Mode */}
-						<div className="w-full bg-white pt-2 rounded-t-[5px]">
+						<div className="w-full bg-white pt-2 rounded-t-[5px] relative">
+							{/* Inline step indicator for mobile landscape */}
+							{isMobileLandscape && (
+								<div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[12px] leading-none font-inter font-medium text-black">
+									<span>2</span>
+									<svg
+										width="7"
+										height="12"
+										viewBox="0 0 7 12"
+										fill="none"
+										xmlns="http://www.w3.org/2000/svg"
+									>
+										<path
+											d="M6.53033 6.53033C6.82322 6.23744 6.82322 5.76256 6.53033 5.46967L1.75736 0.696699C1.46447 0.403806 0.989593 0.403806 0.696699 0.696699C0.403806 0.989593 0.403806 1.46447 0.696699 1.75736L4.93934 6L0.696699 10.2426C0.403806 10.5355 0.403806 11.0104 0.696699 11.3033C0.989593 11.5962 1.46447 11.5962 1.75736 11.3033L6.53033 6.53033ZM5 6V6.75H6V6V5.25H5V6Z"
+											fill="#636363"
+											fillOpacity="0.46"
+										/>
+									</svg>
+								</div>
+							)}
 							<div className="flex items-center gap-4 mb-1 w-[357px] mx-auto">
 								<span className="font-inter font-semibold text-[13px]">Mode</span>
 								<div ref={modeContainerRef} className="relative flex items-center gap-6">
@@ -532,7 +596,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						</div>
 
 						{/* Auto Subject */}
-						<div className="mb-3 w-[357px] mx-auto">
+						<div className="mb-3 w-[357px] max-[480px]:w-[89.33vw] mx-auto">
 							<div
 								className={cn(
 									'flex items-center h-[25px] rounded-[8px] border-2 border-black overflow-hidden',
@@ -540,7 +604,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								)}
 							>
 								<div className="pl-2 flex items-center h-full shrink-0 w-[90px] bg-transparent">
-									<span className="font-inter font-semibold text-[13px] text-black">
+									<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
 										{isAiSubject ? 'Auto Subject' : 'Subject'}
 									</span>
 								</div>
@@ -568,7 +632,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									<input
 										type="text"
 										className={cn(
-											'w-full text-[12px] leading-tight outline-none focus:outline-none bg-transparent',
+											'w-full text-[12px] leading-tight outline-none focus:outline-none bg-transparent max-[480px]:placeholder:text-[8px]',
 											isAiSubject
 												? 'text-[#6B6B6B] italic cursor-not-allowed'
 												: 'text-black'
@@ -587,7 +651,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						</div>
 
 						{/* Blocks list - overflow visible to show buttons outside */}
-						<div className="flex flex-col gap-[25px] overflow-visible">
+						<div className="flex flex-col gap-[25px] max-[480px]:gap-[40px] overflow-visible">
 							{(() => {
 								// Renderers reused below
 								const renderHybridCore = (b: {
@@ -609,8 +673,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													blockRefs.current[b.id] = el;
 												}}
 												className={cn(
-													'rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden relative w-[357px] mx-auto',
-													isExpanded ? 'h-[78px]' : 'h-[31px]'
+													'rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden relative w-[357px] max-[480px]:w-[89.33vw] mx-auto',
+													isExpanded ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]',
+													!isExpanded && isMobileLandscape && 'h-[24px]'
 												)}
 												style={{ borderColor: strokeColor }}
 											>
@@ -618,10 +683,16 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													<div
 														className={cn(
 															'flex flex-row items-center flex-shrink-0',
-															isExpanded ? 'h-[21px]' : 'h-[31px]'
+															isExpanded ? 'h-[21px]' : 'h-[31px] max-[480px]:h-[24px]',
+															!isExpanded && isMobileLandscape && 'h-[24px]'
 														)}
 													>
-														<div className="flex-1 flex h-full items-center px-3">
+														<div
+															className={cn(
+																'flex-1 flex h-full px-3',
+																isMobileLandscape ? 'items-center' : 'items-center'
+															)}
+														>
 															<span className="font-inter text-[12px] leading-none font-semibold text-black">
 																{blockLabel(b.type as HybridBlock)}
 															</span>
@@ -631,11 +702,19 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																</span>
 															)}
 														</div>
-														<div className="flex flex-row h-full items-stretch">
+														<div
+															className={cn(
+																'flex flex-row h-full',
+																isMobileLandscape ? 'items-center' : 'items-stretch'
+															)}
+														>
 															<div
 																className={cn(
 																	'border-l border-black',
-																	isExpanded ? 'h-[21px]' : 'h-[27px]'
+																	isExpanded
+																		? 'h-[21px]'
+																		: 'h-[27px] max-[480px]:h-[20px]',
+																	!isExpanded && isMobileLandscape && 'h-[20px]'
 																)}
 															/>
 															<button
@@ -660,13 +739,19 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															<div
 																className={cn(
 																	'border-l border-black',
-																	isExpanded ? 'h-[21px]' : 'h-[27px]'
+																	isExpanded
+																		? 'h-[21px]'
+																		: 'h-[27px] max-[480px]:h-[20px]',
+																	!isExpanded && isMobileLandscape && 'h-[20px]'
 																)}
 															/>
 															<button
 																type="button"
 																onClick={() => removeBlock(b.id)}
-																className="w-[30px] h-full flex items-center justify-center text-[18px] leading-none font-bold text-red-600 hover:bg-black/10 appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none"
+																className={cn(
+																	'w-[30px] h-full flex items-center justify-center leading-none font-bold text-red-600 hover:bg-black/10 appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none',
+																	isMobileLandscape ? 'text-[16px]' : 'text-[18px]'
+																)}
 																aria-label="Remove block"
 															>
 																×
@@ -705,7 +790,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									<Fragment key={b.id}>
 										<div
 											className={cn(
-												'rounded-[8px] border-2 bg-white px-2 py-1 relative w-[357px] mx-auto'
+												'rounded-[8px] border-2 bg-white px-2 py-1 relative w-[357px] max-[480px]:w-[89.33vw] mx-auto',
+												b.type === 'full_automated' && 'mini-full-auto-card'
 											)}
 											style={{
 												borderColor:
@@ -753,7 +839,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													</div>
 													<div className="relative">
 														{!b.value && (
-															<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px]">
+															<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px] max-[480px]:text-[10px] mini-full-auto-placeholder">
 																<div className="space-y-2">
 																	<div>
 																		<p>Prompt Murmur here.</p>
@@ -769,20 +855,21 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															className={cn(
 																'border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 w-full max-w-full min-w-0',
 																'h-[70px] py-2 pr-2 px-0 resize-none',
-																'bg-white text-[12px] leading-[16px]'
+																'bg-white text-[12px] leading-[16px]',
+																'mini-full-auto-textarea'
 															)}
 															placeholder=""
 															value={b.value || ''}
 															onChange={(e) => updateBlockValue(b.id, e.target.value)}
 														/>
 													</div>
-													<div className="pl-2 mb-2">
+													<div className="pl-2 mb-2 max-[480px]:mb-0 mini-paragraph-slider">
 														<ParagraphSlider />
 													</div>
 												</div>
 											) : (
 												<textarea
-													className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none"
+													className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none max-[480px]:placeholder:text-[8px]"
 													placeholder={
 														b.type === 'text'
 															? 'Write the exact text you want in your email here. *required'
@@ -859,7 +946,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										out.push(
 											<div
 												key={`mini-ph-${slot}`}
-												className="w-[357px] mx-auto h-[31px] flex items-center justify-end"
+												className={cn(
+													'w-[357px] max-[480px]:w-[89.33vw] mx-auto h-[31px] max-[480px]:h-[24px] flex items-center justify-end',
+													isMobileLandscape && 'h-[24px]'
+												)}
 											>
 												<Button
 													type="button"
@@ -886,18 +976,38 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								return out;
 							})()}
 						</div>
+						{/* Mobile portrait/landscape: Signature inline spacing (extra in hybrid to avoid cutoff) */}
+						<div
+							className={cn(
+								'max-[480px]:block hidden',
+								shouldUseLargeHybridSigGap ? 'mt-8' : 'mt-2'
+							)}
+							style={{ display: isMobileLandscape ? 'block' : undefined }}
+						>
+							<div
+								className="rounded-[8px] border-2 bg-white px-2 py-2 w-[357px] max-[480px]:w-[89.33vw] mx-auto"
+								style={{ borderColor: '#969696' }}
+							>
+								<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
+									Signature
+								</div>
+								<textarea
+									className="w-full text-[12px] leading-[16px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none h-[48px] signature-textarea"
+									value={signature}
+									onChange={(e) => updateSignature(e.target.value)}
+								/>
+							</div>
+						</div>
 					</div>
 				</div>
 
-				{/* Signature - fixed at bottom (outside scroll) */}
+				{/* Signature - fixed at bottom (outside scroll) for non-mobile only */}
 				<div
-					className={cn(
-						'px-0 pb-2 mt-3',
-						hybridBlocks.some((b) => b.type === 'full_automated') && 'mt-6'
-					)}
+					className={cn('px-0 pb-2 max-[480px]:hidden', 'mt-3')}
+					style={{ display: isMobileLandscape ? 'none' : undefined }}
 				>
 					<div
-						className="rounded-[8px] border-2 bg-white px-2 py-2 w-[357px] mx-auto"
+						className="rounded-[8px] border-2 bg-white px-2 py-2 w-[357px] max-[480px]:w-[89.33vw] mx-auto"
 						style={{ borderColor: '#969696' }}
 					>
 						<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
@@ -905,7 +1015,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						</div>
 						<textarea
 							className={cn(
-								'w-full text-[12px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none',
+								'w-full text-[12px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none max-[480px]:h-[40px] signature-textarea',
 								hybridBlocks.some((b) => b.type === 'full_automated')
 									? 'h-[40px]'
 									: 'h-[58px]'
@@ -917,60 +1027,62 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				</div>
 
 				{/* Footer with Draft button */}
-				<div className="px-0 pb-3">
-					<Button
-						type="button"
-						onClick={onDraft}
-						disabled={isDraftDisabled}
-						className={cn(
-							'w-[357px] !h-[28px] mx-auto !rounded-[4px] border border-black bg-[#68C575] text-black font-inter font-medium text-[14px] flex items-center justify-center'
-						)}
-					>
-						{isPendingGeneration ? 'Drafting...' : 'Draft'}
-					</Button>
-					{typeof generationProgress === 'number' &&
-						generationProgress >= 0 &&
-						(generationTotal || 0) > 0 && (
-							<div className="mt-2">
-								<div className="flex items-center gap-3">
-									<div className="text-xs font-inter text-gray-600 flex-none">
-										{generationProgress >= (generationTotal || 0)
-											? `Drafted ${Math.min(
-													generationProgress,
-													generationTotal || 0
-											  )}/${generationTotal}`
-											: `Drafting ${generationProgress}/${generationTotal}`}
+				{!hideFooter && (
+					<div className="px-0 pb-3">
+						<Button
+							type="button"
+							onClick={onDraft}
+							disabled={isDraftDisabled}
+							className={cn(
+								'w-[357px] !h-[28px] mx-auto !rounded-[4px] border border-black bg-[#68C575] text-black font-inter font-medium text-[14px] flex items-center justify-center'
+							)}
+						>
+							{isPendingGeneration ? 'Drafting...' : 'Draft'}
+						</Button>
+						{typeof generationProgress === 'number' &&
+							generationProgress >= 0 &&
+							(generationTotal || 0) > 0 && (
+								<div className="mt-2">
+									<div className="flex items-center gap-3">
+										<div className="text-xs font-inter text-gray-600 flex-none">
+											{generationProgress >= (generationTotal || 0)
+												? `Drafted ${Math.min(
+														generationProgress,
+														generationTotal || 0
+												  )}/${generationTotal}`
+												: `Drafting ${generationProgress}/${generationTotal}`}
+										</div>
+										<div className="flex-1 h-[7px] bg-[rgba(93,171,104,0.49)] border-0 relative">
+											<div
+												className="h-full bg-[#5DAB68] transition-all duration-300 ease-out absolute top-0 left-0"
+												style={{
+													width: `${Math.min(
+														generationTotal && generationTotal > 0
+															? (generationProgress / generationTotal) * 100
+															: 0,
+														100
+													)}%`,
+												}}
+											/>
+										</div>
+										{onCancel && (
+											<button
+												type="button"
+												onClick={onCancel}
+												className="ml-2 p-0 h-auto w-auto bg-transparent border-0 text-black hover:text-red-600 transition-colors cursor-pointer"
+												aria-label="Cancel drafting"
+											>
+												×
+											</button>
+										)}
 									</div>
-									<div className="flex-1 h-[7px] bg-[rgba(93,171,104,0.49)] border-0 relative">
-										<div
-											className="h-full bg-[#5DAB68] transition-all duration-300 ease-out absolute top-0 left-0"
-											style={{
-												width: `${Math.min(
-													generationTotal && generationTotal > 0
-														? (generationProgress / generationTotal) * 100
-														: 0,
-													100
-												)}%`,
-											}}
-										/>
-									</div>
-									{onCancel && (
-										<button
-											type="button"
-											onClick={onCancel}
-											className="ml-2 p-0 h-auto w-auto bg-transparent border-0 text-black hover:text-red-600 transition-colors cursor-pointer"
-											aria-label="Cancel drafting"
-										>
-											×
-										</button>
-									)}
 								</div>
-							</div>
-						)}
-				</div>
+							)}
+					</div>
+				)}
 			</div>
 			<div
-				className="absolute top-0 right-[-18px] z-50 flex flex-col"
+				className="absolute top-0 left-[-18px] max-[480px]:-left-[10px] z-50 flex flex-col"
 				style={{ pointerEvents: 'none' }}
 			>
 				{addTextButtons.map((btn, index) => {
@@ -983,7 +1095,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							style={{
 								position: 'absolute',
 								top: `${btn.top}px`,
-								right: 0,
+								left: 0,
 								pointerEvents: 'all',
 							}}
 						>

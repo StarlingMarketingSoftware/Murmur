@@ -17,6 +17,7 @@ import { MiniEmailStructure } from './MiniEmailStructure';
 import { SentEmails } from './SentEmails/SentEmails';
 import DraftPreviewBox from './DraftPreviewBox';
 import DraggableBox from './DraggableBox';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	const {
@@ -53,6 +54,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 	// Live preview props passed from parent
 	const { isLivePreviewVisible, livePreviewContactId, livePreviewMessage } = props;
+
+	const isMobile = useIsMobile();
 
 	// Sending preview: shows the email currently being sent
 	const [sendingPreview, setSendingPreview] = useState<{
@@ -338,6 +341,11 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 											id="contacts"
 											dragHandleSelector="[data-drafting-table-header]"
 											onDropOver={(overId) => swapBoxes('contacts', overId)}
+											className={
+												!isMobile && availableContacts.length === 0
+													? 'opacity-30 rounded-[8px] overflow-hidden before:content-["""] before:absolute before:inset-0 before:bg-[#9B9B9B]/20 before:pointer-events-none'
+													: undefined
+											}
 										>
 											<ContactsSelection
 												contacts={availableContacts}
@@ -423,7 +431,11 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 											id="drafts"
 											dragHandleSelector="[data-drafting-table-header]"
 											onDropOver={(overId) => swapBoxes('drafts', overId)}
-											className={draftEmails.length === 0 ? 'opacity-50' : undefined}
+											className={
+												!isMobile && draftEmails.length === 0
+													? 'opacity-30 rounded-[8px] overflow-hidden before:content-["""] before:absolute before:inset-0 before:bg-[#9B9B9B]/20 before:pointer-events-none'
+													: undefined
+											}
 										>
 											<DraftedEmails
 												draftEmails={draftEmails}
@@ -449,7 +461,11 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 											id="sent"
 											dragHandleSelector="[data-drafting-table-header]"
 											onDropOver={(overId) => swapBoxes('sent', overId)}
-											className={sentEmails.length === 0 ? 'opacity-50' : undefined}
+											className={
+												!isMobile && sentEmails.length === 0
+													? 'opacity-30 rounded-[8px] overflow-hidden before:content-["""] before:absolute before:inset-0 before:bg-[#9B9B9B]/20 before:pointer-events-none'
+													: undefined
+											}
 										>
 											<SentEmails emails={sentEmails} isPendingEmails={isPendingEmails} />
 										</DraggableBox>
@@ -536,13 +552,15 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 			</div>
 
 			<div>
-				<div className="flex flex-col gap-4 mt-4">
-					{getAutosaveStatusDisplay() && (
-						<div className="flex flex-col sm:flex-row gap-4 items-center justify-end">
-							{getAutosaveStatusDisplay()}
-						</div>
-					)}
-				</div>
+				{!isMobile && (
+					<div className="flex flex-col gap-4 mt-4">
+						{getAutosaveStatusDisplay() && (
+							<div className="flex flex-col sm:flex-row gap-4 items-center justify-end">
+								{getAutosaveStatusDisplay()}
+							</div>
+						)}
+					</div>
+				)}
 			</div>
 			<ViewEditEmailDialog
 				email={selectedDraft}

@@ -1,4 +1,4 @@
-import { FC, ReactNode, useEffect, useMemo, useState } from 'react';
+import { FC, ReactNode, useEffect, useMemo, useState, useCallback } from 'react';
 import { cn } from '@/utils';
 import { CampaignWithRelations } from '@/types/campaign';
 import { ContactWithName } from '@/types/contact';
@@ -11,6 +11,8 @@ import { DraftsExpandedList } from './DraftsExpandedList';
 import { SentExpandedList } from './SentExpandedList';
 import { DraftPreviewExpandedList } from './DraftPreviewExpandedList';
 import { SendPreviewExpandedList } from './SendPreviewExpandedList';
+import EmailStructureExpandedBox from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/EmailStructureExpandedBox';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 export type DraftingPreviewKind =
 	| 'none'
@@ -102,6 +104,26 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	const [isOpen, setIsOpen] = useState(true);
 	const [activePreview, setActivePreview] = useState<DraftingPreviewKind>('none');
 
+	// Detect mobile landscape mode for split layout (left expanded, right panel)
+	const isMobile = useIsMobile();
+	const [isLandscape, setIsLandscape] = useState<boolean>(false);
+	useEffect(() => {
+		if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+		const mq = window.matchMedia('(orientation: landscape)');
+		const update = () => setIsLandscape(Boolean(mq.matches));
+		update();
+		try {
+			mq.addEventListener('change', update);
+			return () => mq.removeEventListener('change', update);
+		} catch {
+			mq.addListener(update);
+			return () => mq.removeListener(update);
+		}
+	}, []);
+
+	const isSplitLayout = Boolean(isMobile && isLandscape);
+	const isPortraitMobile = Boolean(isMobile && !isLandscape);
+
 	// Live inline preview state for Send Preview row (updated by DraftsExpandedList)
 	const [sendingPreviewContactId, setSendingPreviewContactId] = useState<number | null>(
 		null
@@ -113,20 +135,6 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	// Only show Send Preview while a send is actively previewing
 	// Note: depends only on state declared above
 	const showSendPreviewBox = Boolean(sendingPreviewContactId && sendingPreviewSubject);
-
-	// Ensure expanded Draft Preview collapses when hidden
-	useEffect(() => {
-		if (!showDraftPreviewBox && activePreview === 'draftPreview') {
-			setActivePreview('none');
-		}
-	}, [showDraftPreviewBox, activePreview]);
-
-	// Ensure expanded Send Preview collapses when hidden
-	useEffect(() => {
-		if (!showSendPreviewBox && activePreview === 'sendPreview') {
-			setActivePreview('none');
-		}
-	}, [showSendPreviewBox, activePreview]);
 
 	const { data: emails } = useGetEmails({
 		filters: { campaignId: campaign.id },
@@ -152,6 +160,90 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 	const contactsCount = availableContacts.length;
 	const draftsCount = draftedEmails.length;
 	const sentCount = sentEmails.length;
+
+	// Helper to select a fallback preview panel (for portrait mobile)
+	const selectFallbackPreview = useCallback(
+		(exclude?: DraftingPreviewKind): DraftingPreviewKind => {
+			// Priority order: contacts, emailStructure, draftPreview, drafts, sendPreview, sent
+			const candidates: DraftingPreviewKind[] = [];
+			if (contactsCount > 0) candidates.push('contacts');
+			candidates.push('emailStructure'); // Always available
+			if (showDraftPreviewBox) candidates.push('draftPreview');
+			if (draftsCount > 0) candidates.push('drafts');
+			if (showSendPreviewBox) candidates.push('sendPreview');
+			if (sentCount > 0) candidates.push('sent');
+
+			// Return first available that's not excluded
+			for (const c of candidates) {
+				if (!exclude || c !== exclude) return c;
+			}
+			// Fallback to emailStructure (always available)
+			return 'emailStructure';
+		},
+		[contactsCount, showDraftPreviewBox, draftsCount, showSendPreviewBox, sentCount]
+	);
+
+	// Default-open Contacts when entering Drafting on mobile portrait
+	useEffect(() => {
+		if (!isMobile) return; // only mobile
+		if (isLandscape) return; // only portrait
+		// only on first mount when nothing selected yet
+		setActivePreview((prev) => (prev === 'none' ? 'contacts' : prev));
+	}, [isMobile, isLandscape]);
+
+	// Default-open Contacts when in mobile landscape (split layout)
+	useEffect(() => {
+		if (!isMobile) return; // only mobile
+		if (!isLandscape) return; // only landscape
+		// only on first mount when nothing selected yet
+		setActivePreview((prev) => (prev === 'none' ? 'contacts' : prev));
+	}, [isMobile, isLandscape]);
+
+	// In portrait mobile, never allow 'none' state
+	useEffect(() => {
+		if (!isPortraitMobile) return;
+		if (activePreview === 'none') {
+			setActivePreview(selectFallbackPreview());
+		}
+	}, [isPortraitMobile, activePreview, selectFallbackPreview]);
+
+	// In mobile landscape (split layout), also never allow 'none' state
+	useEffect(() => {
+		if (!isSplitLayout) return;
+		if (activePreview === 'none') {
+			setActivePreview(selectFallbackPreview());
+		}
+	}, [isSplitLayout, activePreview, selectFallbackPreview]);
+
+	// Ensure expanded Draft Preview collapses when hidden
+	useEffect(() => {
+		if (!showDraftPreviewBox && activePreview === 'draftPreview') {
+			setActivePreview(
+				isPortraitMobile || isSplitLayout ? selectFallbackPreview('draftPreview') : 'none'
+			);
+		}
+	}, [
+		showDraftPreviewBox,
+		activePreview,
+		isPortraitMobile,
+		isSplitLayout,
+		selectFallbackPreview,
+	]);
+
+	// Ensure expanded Send Preview collapses when hidden
+	useEffect(() => {
+		if (!showSendPreviewBox && activePreview === 'sendPreview') {
+			setActivePreview(
+				isPortraitMobile || isSplitLayout ? selectFallbackPreview('sendPreview') : 'none'
+			);
+		}
+	}, [
+		showSendPreviewBox,
+		activePreview,
+		isPortraitMobile,
+		isSplitLayout,
+		selectFallbackPreview,
+	]);
 
 	const isDrafting =
 		generationProgress >= 0 &&
@@ -276,371 +368,612 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 		}
 	};
 
+	// When in split mode (mobile landscape), render the expanded content on the left
+	const renderLeftExpanded = (): ReactNode => {
+		if (activePreview === 'none') return null;
+		switch (activePreview) {
+			case 'contacts':
+				return (
+					<ContactsExpandedList
+						contacts={availableContacts}
+						onHeaderClick={() => {
+							if (isPortraitMobile) {
+								setActivePreview(selectFallbackPreview('contacts'));
+							}
+						}}
+						onDraftSelected={async (ids) => {
+							if (props.onDraftSelectedContacts) await props.onDraftSelectedContacts(ids);
+						}}
+						isDraftDisabled={
+							props.isGenerationDisabled ? props.isGenerationDisabled() : false
+						}
+						isPendingGeneration={props.isPendingGeneration}
+					/>
+				);
+			case 'emailStructure':
+				return (
+					<EmailStructureExpandedBox
+						form={form}
+						onHeaderClick={() => {
+							if (isPortraitMobile) {
+								setActivePreview(selectFallbackPreview('emailStructure'));
+							}
+						}}
+						onDraft={() => {}}
+						isDraftDisabled={
+							props.isGenerationDisabled ? props.isGenerationDisabled() : true
+						}
+						isPendingGeneration={props.isPendingGeneration}
+						generationProgress={generationProgress}
+						generationTotal={generationTotal}
+						onCancel={() => {}}
+					/>
+				);
+			case 'draftPreview':
+				if (!showDraftPreviewBox) return null;
+				return (
+					<DraftPreviewExpandedList
+						contacts={contacts}
+						onHeaderClick={() => {
+							if (isPortraitMobile) {
+								setActivePreview(selectFallbackPreview('draftPreview'));
+							}
+						}}
+						livePreview={{
+							visible: props.isLivePreviewVisible,
+							contactId: props.livePreviewContactId || null,
+							subject: livePreviewSubject,
+							message: props.livePreviewMessage || '',
+						}}
+						fallbackDraft={
+							draftedEmails?.[0]
+								? {
+										contactId: draftedEmails[0].contactId,
+										subject: draftedEmails[0].subject,
+										message: draftedEmails[0].message,
+								  }
+								: null
+						}
+					/>
+				);
+			case 'drafts':
+				return (
+					<DraftsExpandedList
+						drafts={draftedEmails}
+						contacts={contacts}
+						onHeaderClick={() => {
+							if (isPortraitMobile) {
+								setActivePreview(selectFallbackPreview('drafts'));
+							}
+						}}
+						onSendingPreviewUpdate={({ contactId, subject }) => {
+							setSendingPreviewContactId(contactId || null);
+							setSendingPreviewSubject(subject || '');
+						}}
+						onSendingPreviewReset={() => {
+							setSendingPreviewContactId(null);
+							setSendingPreviewSubject('');
+						}}
+					/>
+				);
+			case 'sendPreview':
+				if (!showSendPreviewBox) return null;
+				return (
+					<SendPreviewExpandedList
+						contacts={contacts}
+						onHeaderClick={() => {
+							if (isPortraitMobile) {
+								setActivePreview(selectFallbackPreview('sendPreview'));
+							}
+						}}
+						livePreview={{
+							visible: Boolean(sendingPreviewContactId && sendingInlineSubject),
+							contactId: sendingPreviewContactId,
+							subject: sendingInlineSubject,
+						}}
+						fallbackDraft={(() => {
+							const match = sendingPreviewContactId
+								? draftedEmails.find((e) => e.contactId === sendingPreviewContactId)
+								: draftedEmails?.[0];
+							return match
+								? {
+										contactId: match.contactId,
+										subject: match.subject,
+										message: match.message,
+								  }
+								: null;
+						})()}
+					/>
+				);
+			case 'sent':
+				return (
+					<SentExpandedList
+						sent={sentEmails}
+						contacts={contacts}
+						onHeaderClick={() => {
+							if (isPortraitMobile) {
+								setActivePreview(selectFallbackPreview('sent'));
+							}
+						}}
+					/>
+				);
+			default:
+				return null;
+		}
+	};
+
 	return (
 		<div
 			className={cn(
-				'w-[400px] rounded-lg border-2 border-black bg-[#EEF2F6]',
-				'overflow-visible font-inter',
-				'origin-top-left'
+				isSplitLayout ? 'relative flex items-start mx-auto' : '',
+				// When showing a left expanded panel in split layout, pad the wrapper on the left
+				// so the wrapper's width reflects both panels. This allows mx-auto centering
+				// of the entire combined unit (left expanded + right preview).
+				isSplitLayout && activePreview !== 'none' ? 'pl-[388px]' : ''
 			)}
-			style={{
-				transform: 'scale(0.85)',
-			}}
 		>
-			<div className="h-[31px] bg-white rounded-t-lg px-3 flex items-center">
-				<div className="text-[14px] font-inter font-medium">Drafting</div>
-				<div className="ml-auto">{headerRight}</div>
-			</div>
-
-			{isOpen && (
-				<div className="p-3">
-					{/* Contacts */}
-					<div className="mb-2">
-						{activePreview === 'contacts' ? (
-							<ContactsExpandedList
-								contacts={availableContacts}
-								onHeaderClick={() => setActivePreview('none')}
-								onDraftSelected={async (ids) => {
-									if (props.onDraftSelectedContacts)
-										await props.onDraftSelectedContacts(ids);
-								}}
-								isDraftDisabled={
-									props.isGenerationDisabled ? props.isGenerationDisabled() : false
-								}
-								isPendingGeneration={props.isPendingGeneration}
-							/>
-						) : (
-							<div
-								className={cn(
-									'rounded-md border-2 border-black/30 font-sans',
-									'bg-[#F5DADA] backdrop-blur-sm select-none transition-all'
-								)}
-								style={{ width: '376px' }}
-							>
-								<div
-									className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
-									style={{ height: '28px' }}
-									onClick={() => setActivePreview('contacts')}
-								>
-									<span className="font-bold text-black text-sm">Contacts</span>
-									<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
-										<span>{`${String(contactsCount).padStart(2, '0')} ${
-											contactsCount === 1 ? 'person' : 'people'
-										}`}</span>
-										<Divider />
-										<button
-											type="button"
-											className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-											onClick={(e) => {
-												e.stopPropagation();
-												setActivePreview('contacts');
-											}}
-										>
-											Select
-										</button>
-										<Divider />
-										<button
-											type="button"
-											className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-											onClick={(e) => {
-												e.stopPropagation();
-												setActivePreview('draftPreview');
-											}}
-										>
-											Draft
-										</button>
-									</div>
-									<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
-										<span className="w-[20px] text-center">1</span>
-										<ArrowIcon />
-									</div>
-								</div>
-								{isDrafting && (
-									<div className="px-2 pb-2">
-										<div className="mt-1">
-											<div className="text-[10px] mb-0.5">Drafting</div>
-											<div className="h-1.5 w-full rounded-sm border-2 border-black/20 bg-white">
-												<div
-													className="h-full bg-[#B5E2B5]"
-													style={{ width: `${draftingPct}%` }}
-												/>
-											</div>
-										</div>
-									</div>
-								)}
-							</div>
-						)}
-					</div>
-
-					{/* Email Structure */}
-					<div
-						className="flex items-stretch rounded-lg border-2 border-black w-[376px] h-[32px] font-sans text-xs cursor-pointer overflow-hidden mb-2"
-						onClick={() => setActivePreview('emailStructure')}
-					>
-						<div className="px-3 text-sm font-bold text-black bg-white flex items-center border-r border-black/40">
-							<span className="whitespace-nowrap">Email Structure</span>
-						</div>
-						<div
-							className="px-3 flex items-center border-r border-black/40 font-medium text-black/80 text-[11px]"
-							style={draftingModeStyle}
-						>
-							<span className="whitespace-nowrap">{draftingMode}</span>
-						</div>
-						<div
-							className="px-3 flex items-center border-r border-black/40 font-medium text-black/80 text-[11px]"
-							style={subjectStyle}
-						>
-							<span className="whitespace-nowrap">
-								{isAiSubject ? 'Auto Subject' : 'Subject'}
-							</span>
-						</div>
-						<div className="px-3 bg-[#E0E0E0] flex items-center flex-grow font-medium text-black/80 text-[11px] min-w-0">
-							<span className="truncate">{fromName || 'From'}</span>
-						</div>
-						<div className="bg-white flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
-							<span className="w-[20px] text-center">2</span>
-						</div>
-					</div>
-
-					{/* Draft Preview */}
-					{showDraftPreviewBox &&
-						(activePreview === 'draftPreview' ? (
-							<DraftPreviewExpandedList
-								contacts={contacts}
-								onHeaderClick={() => setActivePreview('none')}
-								livePreview={{
-									visible: props.isLivePreviewVisible,
-									contactId: props.livePreviewContactId || null,
-									subject: livePreviewSubject,
-									message: props.livePreviewMessage || '',
-								}}
-								fallbackDraft={
-									draftedEmails?.[0]
-										? {
-												contactId: draftedEmails[0].contactId,
-												subject: draftedEmails[0].subject,
-												message: draftedEmails[0].message,
-										  }
-										: null
-								}
-							/>
-						) : (
-							<div
-								className={cn(
-									'rounded-md border-2 border-[#295094] mb-2 font-sans',
-									'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all'
-								)}
-								style={{ width: '376px' }}
-							>
-								<div
-									className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
-									style={{ height: '28px' }}
-									onClick={() => setActivePreview('draftPreview')}
-								>
-									<span className="font-bold text-black text-sm">Draft Preview</span>
-									<div className="ml-2 flex-1 min-w-0 self-stretch flex items-stretch">
-										<div className="w-px self-stretch border-l border-black" />
-										<div
-											className="flex items-center bg-white w-full px-2"
-											style={{ backgroundColor: '#FFFFFF' }}
-										>
-											{livePreviewContactName && (
-												<>
-													<div
-														className="text-[12px] font-bold text-black truncate"
-														title={livePreviewContactName}
-													>
-														{livePreviewContactName}
-													</div>
-													<div className="w-px self-stretch border-l border-black/40 mx-2" />
-												</>
-											)}
-											<div
-												className="text-[12px] text-black/80 truncate flex-1"
-												title={livePreviewSubject}
-											>
-												{livePreviewSubject || <>&nbsp;</>}
-											</div>
-										</div>
-										<div className="w-px self-stretch border-l border-black" />
-									</div>
-									<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
-										<span className="w-[20px] text-center"></span>
-										<ArrowIcon />
-									</div>
-								</div>
-							</div>
-						))}
-
-					{/* Drafts */}
-					{activePreview === 'drafts' ? (
-						<DraftsExpandedList
-							drafts={draftedEmails}
-							contacts={contacts}
-							onHeaderClick={() => setActivePreview('none')}
-							onSendingPreviewUpdate={({ contactId, subject }) => {
-								setSendingPreviewContactId(contactId || null);
-								setSendingPreviewSubject(subject || '');
-							}}
-							onSendingPreviewReset={() => {
-								setSendingPreviewContactId(null);
-								setSendingPreviewSubject('');
-							}}
-						/>
-					) : (
-						<div
-							className={cn(
-								'rounded-md border-2 border-black/30 mb-2 font-sans',
-								'bg-[#F4E5BC] backdrop-blur-sm select-none transition-all'
-							)}
-							style={{ width: '376px' }}
-						>
-							<div
-								className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
-								style={{ height: '28px' }}
-								onClick={() => setActivePreview('drafts')}
-							>
-								<span className="font-bold text-black text-sm">Drafts</span>
-								<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
-									<span>{`${draftsCount} drafts`}</span>
-									<Divider />
-									<button
-										type="button"
-										className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-										onClick={(e) => {
-											e.stopPropagation();
-											setActivePreview('drafts');
-										}}
-									>
-										Select
-									</button>
-									<Divider />
-									<button
-										type="button"
-										className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-										onClick={(e) => {
-											e.stopPropagation();
-											setActivePreview('sendPreview');
-										}}
-									>
-										Send
-									</button>
-								</div>
-								<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
-									<span className="w-[20px] text-center">3</span>
-									<ArrowIcon />
-								</div>
-							</div>
-						</div>
-					)}
-
-					{/* Send Preview */}
-					{showSendPreviewBox &&
-						(activePreview === 'sendPreview' ? (
-							<SendPreviewExpandedList
-								contacts={contacts}
-								onHeaderClick={() => setActivePreview('none')}
-								livePreview={{
-									visible: Boolean(sendingPreviewContactId && sendingInlineSubject),
-									contactId: sendingPreviewContactId,
-									subject: sendingInlineSubject,
-								}}
-								fallbackDraft={(() => {
-									const match = sendingPreviewContactId
-										? draftedEmails.find((e) => e.contactId === sendingPreviewContactId)
-										: draftedEmails?.[0];
-									return match
-										? {
-												contactId: match.contactId,
-												subject: match.subject,
-												message: match.message,
-										  }
-										: null;
-								})()}
-							/>
-						) : (
-							<div
-								className={cn(
-									'rounded-md border-2 border-[#295094] mb-2 font-sans',
-									'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all'
-								)}
-								style={{ width: '376px' }}
-							>
-								<div
-									className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
-									style={{ height: '28px' }}
-									onClick={() => setActivePreview('sendPreview')}
-								>
-									<span className="font-bold text-black text-sm">Send Preview</span>
-									<div className="ml-2 flex-1 min-w-0 self-stretch flex items-stretch">
-										<div className="w-px self-stretch border-l border-black" />
-										<div
-											className="flex items-center bg-white w-full px-2"
-											style={{ backgroundColor: '#FFFFFF' }}
-										>
-											{sendingPreviewContactName && (
-												<>
-													<div
-														className="text-[12px] font-bold text-black truncate"
-														title={sendingPreviewContactName}
-													>
-														{sendingPreviewContactName}
-													</div>
-													<div className="w-px self-stretch border-l border-black/40 mx-2" />
-												</>
-											)}
-											<div
-												className="text-[12px] text-black/80 truncate flex-1"
-												title={sendingInlineSubject}
-											>
-												{sendingInlineSubject || <>&nbsp;</>}
-											</div>
-										</div>
-										<div className="w-px self-stretch border-l border-black" />
-									</div>
-									<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
-										<span className="w-[20px] text-center"></span>
-										<ArrowIcon />
-									</div>
-								</div>
-							</div>
-						))}
-
-					{/* Sent */}
-					{activePreview === 'sent' ? (
-						<SentExpandedList
-							sent={sentEmails}
-							contacts={contacts}
-							onHeaderClick={() => setActivePreview('none')}
-						/>
-					) : (
-						<div
-							className={cn(
-								'rounded-md border-2 border-black/30 mb-2 font-sans',
-								'bg-[#CFEBCF] backdrop-blur-sm select-none transition-all'
-							)}
-							style={{ width: '376px' }}
-						>
-							<div
-								className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
-								style={{ height: '28px' }}
-								onClick={() => setActivePreview('sent')}
-							>
-								<span className="font-bold text-black text-sm">Sent</span>
-								<div className="flex-1 flex items-center justify-center text-[11px] text-black/70 font-medium h-full">
-									<span>{`${sentCount.toString().padStart(2, '0')} sent`}</span>
-								</div>
-								<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
-									<span className="w-[20px] text-center">4</span>
-									<ArrowIcon />
-								</div>
-							</div>
-						</div>
-					)}
-
-					{renderActivePreview()}
+			{isSplitLayout && activePreview !== 'none' && (
+				<div className="absolute left-3 top-3" data-left-expanded-panel>
+					{renderLeftExpanded()}
 				</div>
 			)}
+			<div
+				className={cn(
+					'w-[400px] max-[480px]:w-[96.27vw]',
+					'rounded-lg max-[480px]:rounded-none',
+					'border-2 border-black max-[480px]:border-0',
+					'bg-[#EEF2F6] max-[480px]:bg-transparent',
+					'overflow-visible font-inter',
+					'origin-top-left',
+					'scale-[0.85] max-[480px]:scale-100'
+				)}
+				data-drafting-preview-panel
+			>
+				<div
+					className="h-[31px] bg-white rounded-t-lg px-3 flex items-center max-[480px]:hidden"
+					data-drafting-preview-header
+				>
+					<div className="text-[14px] font-inter font-medium">Drafting</div>
+					<div className="ml-auto">{headerRight}</div>
+				</div>
+
+				{isOpen && (
+					<div className="p-3 max-[480px]:p-0">
+						{/* Contacts */}
+						<div className="mb-2">
+							{activePreview === 'contacts' && !isSplitLayout ? (
+								<ContactsExpandedList
+									contacts={availableContacts}
+									onHeaderClick={() =>
+										setActivePreview(
+											isPortraitMobile ? selectFallbackPreview('contacts') : 'none'
+										)
+									}
+									onDraftSelected={async (ids) => {
+										if (props.onDraftSelectedContacts)
+											await props.onDraftSelectedContacts(ids);
+									}}
+									isDraftDisabled={
+										props.isGenerationDisabled ? props.isGenerationDisabled() : false
+									}
+									isPendingGeneration={props.isPendingGeneration}
+								/>
+							) : (
+								<div className="relative">
+									{isSplitLayout && activePreview === 'contacts' && (
+										<div
+											className="absolute -inset-1 rounded-none border-2 border-black/50 bg-[rgba(93,171,104,0.35)] z-0 pointer-events-none"
+											aria-hidden="true"
+										/>
+									)}
+									<div
+										className={cn(
+											'relative z-10 rounded-md border-2 border-black/30 font-sans',
+											'bg-[#F5DADA] backdrop-blur-sm select-none transition-all',
+											'w-[376px] max-[480px]:w-[96.27vw]'
+										)}
+									>
+										<div
+											className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+											style={{ height: '28px' }}
+											onClick={() => setActivePreview('contacts')}
+										>
+											<span className="font-bold text-black text-sm">Contacts</span>
+											<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
+												<span>{`${String(contactsCount).padStart(2, '0')} ${
+													contactsCount === 1 ? 'person' : 'people'
+												}`}</span>
+												<Divider />
+												<button
+													type="button"
+													className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
+													onClick={(e) => {
+														e.stopPropagation();
+														setActivePreview('contacts');
+													}}
+												>
+													Select
+												</button>
+												<Divider />
+												<button
+													type="button"
+													className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
+													onClick={(e) => {
+														e.stopPropagation();
+														setActivePreview('draftPreview');
+													}}
+												>
+													Draft
+												</button>
+											</div>
+											<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
+												<span className="w-[20px] text-center">1</span>
+												<ArrowIcon />
+											</div>
+										</div>
+										{isDrafting && (
+											<div className="px-2 pb-2">
+												<div className="mt-1">
+													<div className="text-[10px] mb-0.5">Drafting</div>
+													<div className="h-1.5 w-full rounded-sm border-2 border-black/20 bg-white">
+														<div
+															className="h-full bg-[#B5E2B5]"
+															style={{ width: `${draftingPct}%` }}
+														/>
+													</div>
+												</div>
+											</div>
+										)}
+									</div>
+								</div>
+							)}
+						</div>
+
+						{/* Email Structure */}
+						{activePreview === 'emailStructure' && !isSplitLayout ? (
+							<EmailStructureExpandedBox
+								form={form}
+								onHeaderClick={() =>
+									setActivePreview(
+										isPortraitMobile ? selectFallbackPreview('emailStructure') : 'none'
+									)
+								}
+								onDraft={() => {}}
+								isDraftDisabled={
+									props.isGenerationDisabled ? props.isGenerationDisabled() : true
+								}
+								isPendingGeneration={props.isPendingGeneration}
+								generationProgress={generationProgress}
+								generationTotal={generationTotal}
+								onCancel={() => {}}
+							/>
+						) : (
+							<div className="relative mb-2">
+								{isSplitLayout && activePreview === 'emailStructure' && (
+									<div
+										className="absolute -inset-1 rounded-none border-2 border-black/50 bg-[rgba(93,171,104,0.35)] z-0 pointer-events-none"
+										aria-hidden="true"
+									/>
+								)}
+								<div
+									className="relative z-10 flex items-stretch rounded-lg border-2 border-black w-[376px] max-[480px]:w-[96.27vw] h-[32px] font-sans text-xs cursor-pointer overflow-hidden"
+									onClick={() => setActivePreview('emailStructure')}
+								>
+									<div className="px-3 text-sm font-bold text-black bg-white flex items-center border-r border-black/40">
+										<span className="whitespace-nowrap">Email Structure</span>
+									</div>
+									<div
+										className="px-3 flex items-center border-r border-black/40 font-medium text-black/80 text-[11px]"
+										style={draftingModeStyle}
+									>
+										<span className="whitespace-nowrap">{draftingMode}</span>
+									</div>
+									<div
+										className="px-3 flex items-center border-r border-black/40 font-medium text-black/80 text-[11px]"
+										style={subjectStyle}
+									>
+										<span className="whitespace-nowrap">
+											{isAiSubject ? 'Auto Subject' : 'Subject'}
+										</span>
+									</div>
+									<div className="px-3 bg-[#E0E0E0] flex items-center flex-grow font-medium text-black/80 text-[11px] min-w-0">
+										<span className="truncate">{fromName || 'From'}</span>
+									</div>
+									<div className="bg-white flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
+										<span className="w-[20px] text-center">2</span>
+									</div>
+								</div>
+							</div>
+						)}
+
+						{/* Draft Preview */}
+						{showDraftPreviewBox &&
+							(activePreview === 'draftPreview' && !isSplitLayout ? (
+								<DraftPreviewExpandedList
+									contacts={contacts}
+									onHeaderClick={() =>
+										setActivePreview(
+											isPortraitMobile ? selectFallbackPreview('draftPreview') : 'none'
+										)
+									}
+									livePreview={{
+										visible: props.isLivePreviewVisible,
+										contactId: props.livePreviewContactId || null,
+										subject: livePreviewSubject,
+										message: props.livePreviewMessage || '',
+									}}
+									fallbackDraft={
+										draftedEmails?.[0]
+											? {
+													contactId: draftedEmails[0].contactId,
+													subject: draftedEmails[0].subject,
+													message: draftedEmails[0].message,
+											  }
+											: null
+									}
+								/>
+							) : (
+								<div className="relative mb-2">
+									{isSplitLayout && activePreview === 'draftPreview' && (
+										<div
+											className="absolute -inset-1 rounded-none border-2 border-black/50 bg-[rgba(93,171,104,0.35)] z-0 pointer-events-none"
+											aria-hidden="true"
+										/>
+									)}
+									<div
+										className={cn(
+											'relative z-10 rounded-md border-2 border-[#295094] font-sans',
+											'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all',
+											'w-[376px] max-[480px]:w-[96.27vw]'
+										)}
+									>
+										<div
+											className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+											style={{ height: '28px' }}
+											onClick={() => setActivePreview('draftPreview')}
+										>
+											<span className="font-bold text-black text-sm">Draft Preview</span>
+											<div className="ml-2 flex-1 min-w-0 self-stretch flex items-stretch">
+												<div className="w-px self-stretch border-l border-black" />
+												<div
+													className="flex items-center bg-white w-full px-2"
+													style={{ backgroundColor: '#FFFFFF' }}
+												>
+													{livePreviewContactName && (
+														<>
+															<div
+																className="text-[12px] font-bold text-black truncate"
+																title={livePreviewContactName}
+															>
+																{livePreviewContactName}
+															</div>
+															<div className="w-px self-stretch border-l border-black/40 mx-2" />
+														</>
+													)}
+													<div
+														className="text-[12px] text-black/80 truncate flex-1"
+														title={livePreviewSubject}
+													>
+														{livePreviewSubject || <>&nbsp;</>}
+													</div>
+												</div>
+												<div className="w-px self-stretch border-l border-black" />
+											</div>
+											<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
+												<span className="w-[20px] text-center"></span>
+												<ArrowIcon />
+											</div>
+										</div>
+									</div>
+								</div>
+							))}
+
+						{/* Drafts */}
+						{activePreview === 'drafts' && !isSplitLayout ? (
+							<DraftsExpandedList
+								drafts={draftedEmails}
+								contacts={contacts}
+								onHeaderClick={() =>
+									setActivePreview(
+										isPortraitMobile ? selectFallbackPreview('drafts') : 'none'
+									)
+								}
+								onSendingPreviewUpdate={({ contactId, subject }) => {
+									setSendingPreviewContactId(contactId || null);
+									setSendingPreviewSubject(subject || '');
+								}}
+								onSendingPreviewReset={() => {
+									setSendingPreviewContactId(null);
+									setSendingPreviewSubject('');
+								}}
+							/>
+						) : (
+							<div className="relative mb-2">
+								{isSplitLayout && activePreview === 'drafts' && (
+									<div
+										className="absolute -inset-1 rounded-none border-2 border-black/50 bg-[rgba(93,171,104,0.35)] z-0 pointer-events-none"
+										aria-hidden="true"
+									/>
+								)}
+								<div
+									className={cn(
+										'relative z-10 rounded-md border-2 border-black/30 font-sans',
+										'bg-[#F4E5BC] backdrop-blur-sm select-none transition-all',
+										'w-[376px] max-[480px]:w-[96.27vw]'
+									)}
+								>
+									<div
+										className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+										style={{ height: '28px' }}
+										onClick={() => setActivePreview('drafts')}
+									>
+										<span className="font-bold text-black text-sm">Drafts</span>
+										<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full pr-2">
+											<span>{`${draftsCount} drafts`}</span>
+											<Divider />
+											<button
+												type="button"
+												className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
+												onClick={(e) => {
+													e.stopPropagation();
+													setActivePreview('drafts');
+												}}
+											>
+												Select
+											</button>
+											<Divider />
+											<button
+												type="button"
+												className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
+												onClick={(e) => {
+													e.stopPropagation();
+													setActivePreview('sendPreview');
+												}}
+											>
+												Send
+											</button>
+										</div>
+										<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
+											<span className="w-[20px] text-center">3</span>
+											<ArrowIcon />
+										</div>
+									</div>
+								</div>
+							</div>
+						)}
+
+						{/* Send Preview */}
+						{showSendPreviewBox &&
+							(activePreview === 'sendPreview' && !isSplitLayout ? (
+								<SendPreviewExpandedList
+									contacts={contacts}
+									onHeaderClick={() =>
+										setActivePreview(
+											isPortraitMobile ? selectFallbackPreview('sendPreview') : 'none'
+										)
+									}
+									livePreview={{
+										visible: Boolean(sendingPreviewContactId && sendingInlineSubject),
+										contactId: sendingPreviewContactId,
+										subject: sendingInlineSubject,
+									}}
+									fallbackDraft={(() => {
+										const match = sendingPreviewContactId
+											? draftedEmails.find((e) => e.contactId === sendingPreviewContactId)
+											: draftedEmails?.[0];
+										return match
+											? {
+													contactId: match.contactId,
+													subject: match.subject,
+													message: match.message,
+											  }
+											: null;
+									})()}
+								/>
+							) : (
+								<div className="relative mb-2">
+									{isSplitLayout && activePreview === 'sendPreview' && (
+										<div
+											className="absolute -inset-1 rounded-none border-2 border-black/50 bg-[rgba(93,171,104,0.35)] z-0 pointer-events-none"
+											aria-hidden="true"
+										/>
+									)}
+									<div
+										className={cn(
+											'relative z-10 rounded-md border-2 border-[#295094] font-sans',
+											'bg-[#B4CBF4] backdrop-blur-sm select-none transition-all',
+											'w-[376px] max-[480px]:w-[96.27vw]'
+										)}
+									>
+										<div
+											className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+											style={{ height: '28px' }}
+											onClick={() => setActivePreview('sendPreview')}
+										>
+											<span className="font-bold text-black text-sm">Send Preview</span>
+											<div className="ml-2 flex-1 min-w-0 self-stretch flex items-stretch">
+												<div className="w-px self-stretch border-l border-black" />
+												<div
+													className="flex items-center bg-white w-full px-2"
+													style={{ backgroundColor: '#FFFFFF' }}
+												>
+													{sendingPreviewContactName && (
+														<>
+															<div
+																className="text-[12px] font-bold text-black truncate"
+																title={sendingPreviewContactName}
+															>
+																{sendingPreviewContactName}
+															</div>
+															<div className="w-px self-stretch border-l border-black/40 mx-2" />
+														</>
+													)}
+													<div
+														className="text-[12px] text-black/80 truncate flex-1"
+														title={sendingInlineSubject}
+													>
+														{sendingInlineSubject || <>&nbsp;</>}
+													</div>
+												</div>
+												<div className="w-px self-stretch border-l border-black" />
+											</div>
+											<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
+												<span className="w-[20px] text-center"></span>
+												<ArrowIcon />
+											</div>
+										</div>
+									</div>
+								</div>
+							))}
+
+						{/* Sent */}
+						{activePreview === 'sent' && !isSplitLayout ? (
+							<SentExpandedList
+								sent={sentEmails}
+								contacts={contacts}
+								onHeaderClick={() =>
+									setActivePreview(
+										isPortraitMobile ? selectFallbackPreview('sent') : 'none'
+									)
+								}
+							/>
+						) : (
+							<div className="relative mb-2">
+								{isSplitLayout && activePreview === 'sent' && (
+									<div
+										className="absolute -inset-1 rounded-none border-2 border-black/50 bg-[rgba(93,171,104,0.35)] z-0 pointer-events-none"
+										aria-hidden="true"
+									/>
+								)}
+								<div
+									className={cn(
+										'relative z-10 rounded-md border-2 border-black/30 font-sans',
+										'bg-[#CFEBCF] backdrop-blur-sm select-none transition-all',
+										'w-[376px] max-[480px]:w-[96.27vw]'
+									)}
+								>
+									<div
+										className="flex items-center pl-3 pr-0 cursor-pointer hover:bg-black/5"
+										style={{ height: '28px' }}
+										onClick={() => setActivePreview('sent')}
+									>
+										<span className="font-bold text-black text-sm">Sent</span>
+										<div className="flex-1 flex items-center justify-center text-[11px] text-black/70 font-medium h-full">
+											<span>{`${sentCount.toString().padStart(2, '0')} sent`}</span>
+										</div>
+										<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
+											<span className="w-[20px] text-center">4</span>
+											<ArrowIcon />
+										</div>
+									</div>
+								</div>
+							</div>
+						)}
+
+						{!isSplitLayout && renderActivePreview()}
+					</div>
+				)}
+			</div>
 		</div>
 	);
 };

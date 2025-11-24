@@ -1,10 +1,11 @@
 export const fetchOpenAi = async (
 	model: string,
 	prompt: string,
-	content: string
+	content: string,
+	options?: { timeoutMs?: number }
 ): Promise<string> => {
 	const controller = new AbortController();
-	const timeoutMs = 12000; // 12s hard limit for location parse to avoid UI hangs
+	const timeoutMs = options?.timeoutMs ?? 12000; // 12s hard limit by default (tuned per caller)
 	const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 	try {
 		const response = await fetch('https://api.openai.com/v1/chat/completions', {

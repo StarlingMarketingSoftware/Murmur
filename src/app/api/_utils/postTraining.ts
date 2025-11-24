@@ -76,7 +76,8 @@ Return ONLY the category name (e.g., "music_venue"), nothing else.`;
 		const response = await fetchOpenAi(
 			OPEN_AI_MODEL_OPTIONS.o4mini,
 			prompt,
-			`Classify this search query: "${query}"`
+			`Classify this search query: "${query}"`,
+			{ timeoutMs: 20000 } // allow more time for LLM classification
 		);
 
 		const queryType = response.trim().toLowerCase().replace(/['"]/g, '');
@@ -217,7 +218,8 @@ General Guidelines:
 		const response = await fetchOpenAi(
 			OPEN_AI_MODEL_OPTIONS.o4mini,
 			prompt,
-			`Generate appropriate filter terms for this ${queryType} search query: "${query}"`
+			`Generate appropriate filter terms for this ${queryType} search query: "${query}"`,
+			{ timeoutMs: 25000 } // filter generation can take longer
 		);
 
 		// Clean the response to ensure it's valid JSON

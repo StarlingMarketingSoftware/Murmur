@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { usePathname } from 'next/navigation';
 
 export function GlobalScrollbar() {
 	const scrollThumbRef = useRef<HTMLDivElement>(null);
@@ -15,6 +17,9 @@ export function GlobalScrollbar() {
 		undefined
 	);
 	const rafRef = useRef<number | undefined>(undefined);
+	const isMobile = useIsMobile();
+	const [isMobileLandscape, setIsMobileLandscape] = useState<boolean | null>(null);
+	const pathname = usePathname();
 
 	const updateScrollbar = useCallback(() => {
 		const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
@@ -68,6 +73,29 @@ export function GlobalScrollbar() {
 			}, 1000);
 		});
 	}, [updateScrollbar]);
+
+	// Track orientation: specifically detect mobile landscape
+	useEffect(() => {
+		const checkOrientation = () => {
+			if (typeof window !== 'undefined') {
+				const isPortrait = window.innerHeight > window.innerWidth;
+				const isMobileDevice = isMobile === true;
+				setIsMobileLandscape(isMobileDevice && !isPortrait);
+			}
+		};
+
+		// Check on mount
+		checkOrientation();
+
+		// Check on resize and orientation change
+		window.addEventListener('resize', checkOrientation);
+		window.addEventListener('orientationchange', checkOrientation);
+
+		return () => {
+			window.removeEventListener('resize', checkOrientation);
+			window.removeEventListener('orientationchange', checkOrientation);
+		};
+	}, [isMobile]);
 
 	// Detect when any app dialog is open (e.g. IdentityDialog) and hide the global scrollbar
 	useEffect(() => {
@@ -194,8 +222,13 @@ export function GlobalScrollbar() {
 		updateScrollbar();
 	}, [updateScrollbar]);
 
-	// Do not render the global scrollbar while a dialog is open
-	if (isDialogOpen) {
+	// Do not render the global scrollbar while a dialog is open.
+	// Also hide on the campaign and dashboard pages when in mobile landscape orientation.
+	const isCampaignPage =
+		typeof pathname === 'string' && pathname.startsWith('/murmur/campaign');
+	const isDashboardPage =
+		typeof pathname === 'string' && pathname.startsWith('/murmur/dashboard');
+	if (isDialogOpen || ((isCampaignPage || isDashboardPage) && isMobileLandscape)) {
 		return null;
 	}
 

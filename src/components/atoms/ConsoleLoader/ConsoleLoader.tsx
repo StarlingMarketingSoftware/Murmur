@@ -2,6 +2,7 @@ import React, { FC } from 'react';
 import { ConsoleLoaderProps, useConsoleLoader } from './useConsoleLoader';
 import { GOLDEN_RATIO, INVERSE_GOLDEN } from '@/constants';
 import { cn } from '@/utils';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 export const ConsoleLoader: FC<ConsoleLoaderProps> = (props) => {
 	const {
@@ -15,29 +16,52 @@ export const ConsoleLoader: FC<ConsoleLoaderProps> = (props) => {
 		className,
 	} = useConsoleLoader(props);
 
+	const isMobile = useIsMobile();
+	const mobile = isMobile === true;
+
+	// Mobile-specific sizing that does not affect desktop
+	const paddingVertical = mobile ? baseUnit : goldenLarge * 2;
+	const paddingHorizontal = mobile ? Math.round(baseUnit * 1.25) : goldenLarge * 3;
+	const containerMinHeight = mobile ? baseUnit * 14 : baseUnit * 21;
+	const contentMinHeight = mobile ? baseUnit * 9 : baseUnit * 13;
+	const contentMarginLeft = mobile ? Math.round(baseUnit * 1.5) : baseUnit * 5;
+	const iconWidth = mobile ? Math.round(goldenSmall * 1.5) : goldenSmall * 2;
+	const iconMarginRightClass = mobile ? 'mr-2' : 'mr-3';
+	const detailTextClass = mobile
+		? 'tracking-[0.015em] text-[10px]'
+		: 'tracking-[0.015em] text-[12px]';
+	const normalTextClass = mobile
+		? 'tracking-[0.005em] text-[11px]'
+		: 'tracking-[0.005em] text-[13px]';
+	const thinkingTextSizeClass = mobile ? 'text-[10px]' : 'text-[11px]';
+	const indicatorMarginTop = mobile ? Math.round(baseUnit * 1.25) : goldenLarge;
+
 	return (
 		<div className={cn('relative', className)}>
 			{/* Main container with golden ratio padding */}
 			<div
 				style={{
-					padding: `${goldenLarge * 2}px ${goldenLarge * 3}px`,
-					minHeight: `${baseUnit * 21}px`,
+					padding: `${paddingVertical}px ${paddingHorizontal}px`,
+					minHeight: `${containerMinHeight}px`,
 				}}
 			>
 				{/* Console output area - slightly offset for visual interest */}
 				<div
-					className="font-mono text-[13px] space-y-[2px] max-w-9/10"
+					className={cn(
+						'font-mono space-y-[2px]',
+						mobile ? 'text-[11px] max-w-full' : 'text-[13px] max-w-9/10'
+					)}
 					style={{
 						lineHeight: GOLDEN_RATIO,
-						minHeight: `${baseUnit * 13}px`,
-						marginLeft: `${baseUnit * 5}px`,
+						minHeight: `${contentMinHeight}px`,
+						marginLeft: `${contentMarginLeft}px`,
 					}}
 				>
 					{logs.map((log) => (
 						<div key={log.id} style={getLogStyle(log)}>
 							<span
-								className="inline-block text-gray-400/60 mr-3"
-								style={{ width: `${goldenSmall * 2}px` }}
+								className={cn('inline-block text-gray-400/60', iconMarginRightClass)}
+								style={{ width: `${iconWidth}px` }}
 							>
 								{log.type === 'success'
 									? '✓'
@@ -48,11 +72,7 @@ export const ConsoleLoader: FC<ConsoleLoaderProps> = (props) => {
 									: '›'}
 							</span>
 							<span
-								className={cn(
-									log.type === 'detail'
-										? 'tracking-[0.015em] text-[12px]'
-										: 'tracking-[0.005em] text-[13px]'
-								)}
+								className={cn(log.type === 'detail' ? detailTextClass : normalTextClass)}
 							>
 								{log.text}
 							</span>
@@ -62,10 +82,10 @@ export const ConsoleLoader: FC<ConsoleLoaderProps> = (props) => {
 					{/* Thinking indicator or active cursor */}
 					<div className="text-gray-500" style={{ height: `${goldenSmall * 2}px` }}>
 						{isThinking ? (
-							<span className="text-gray-400 text-[11px]">
+							<span className={cn('text-gray-400', thinkingTextSizeClass)}>
 								<span
-									className="inline-block mr-3"
-									style={{ width: `${goldenSmall * 2}px` }}
+									className={cn('inline-block', iconMarginRightClass)}
+									style={{ width: `${iconWidth}px` }}
 								>
 									◆
 								</span>
@@ -86,8 +106,8 @@ export const ConsoleLoader: FC<ConsoleLoaderProps> = (props) => {
 						) : (
 							<>
 								<span
-									className="inline-block mr-3"
-									style={{ width: `${goldenSmall * 2}px` }}
+									className={cn('inline-block', iconMarginRightClass)}
+									style={{ width: `${iconWidth}px` }}
 								>
 									›
 								</span>
@@ -104,7 +124,10 @@ export const ConsoleLoader: FC<ConsoleLoaderProps> = (props) => {
 				</div>
 
 				{/* Ultra-minimal progress indicator - positioned with golden ratio */}
-				<div className="flex justify-center" style={{ marginTop: `${goldenLarge}px` }}>
+				<div
+					className="flex justify-center"
+					style={{ marginTop: `${indicatorMarginTop}px` }}
+				>
 					<div className="flex items-center" style={{ gap: `${goldenLarge}px` }}>
 						{/* Left indicator */}
 						<div className="flex gap-[3px]">

@@ -68,7 +68,10 @@ export default function RootLayout({
 				className={`${inter.variable} ${timesNewRoman.variable} ${zenAntique.variable}`}
 				suppressHydrationWarning
 			>
-				<body className={`antialiased min-h-screen flex flex-col`}>
+				<body
+					className={`antialiased min-h-screen flex flex-col`}
+					suppressHydrationWarning
+				>
 					<ThemeProvider attribute="class" defaultTheme="light">
 						<ScrollProvider>
 							<ScrollProgress />

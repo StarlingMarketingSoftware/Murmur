@@ -47,7 +47,10 @@ export const ToneSelector: FC<ToneSelectorProps> = ({ isCompact = false }) => {
 			<div
 				className={cn(
 					'flex gap-1 relative z-[100] pointer-events-auto',
-					isCompact ? 'w-full flex-wrap' : 'items-center'
+					isCompact ? 'w-full flex-wrap' : 'items-center',
+					// On very small screens, when expanded, move to its own row and wrap
+					isToneExpanded &&
+						'max-[480px]:basis-full max-[480px]:w-full max-[480px]:flex-wrap max-[480px]:mt-1'
 				)}
 			>
 				{filteredToneSelectorOptions.map((tone) => (

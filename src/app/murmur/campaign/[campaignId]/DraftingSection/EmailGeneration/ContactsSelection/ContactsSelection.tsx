@@ -1,6 +1,6 @@
 'use client';
 
-import { FC } from 'react';
+import { FC, useMemo } from 'react';
 import { ContactsSelectionProps, useContactsSelection } from './useContactsSelection';
 import { cn } from '@/utils';
 import { getStateAbbreviation } from '@/utils/string';
@@ -12,6 +12,7 @@ import {
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
+import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 
 export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 	const {
@@ -21,6 +22,12 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		handleClick,
 		areAllSelected,
 	} = useContactsSelection(props);
+
+	const { data: usedContactIds } = useGetUsedContactIds();
+	const usedContactIdsSet = useMemo(
+		() => new Set(usedContactIds || []),
+		[usedContactIds]
+	);
 
 	return (
 		<DraftingTable
@@ -60,6 +67,19 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 									<>
 										{/* Top Left - Name */}
 										<div className="pl-3 pr-1 flex items-center h-[23px]">
+											{usedContactIdsSet.has(contact.id) && (
+												<span
+													className="inline-block shrink-0 mr-2"
+													title="Used in a previous campaign"
+													style={{
+														width: '16px',
+														height: '16px',
+														borderRadius: '50%',
+														border: '1px solid #000000',
+														backgroundColor: '#DAE6FE',
+													}}
+												/>
+											)}
 											<div className="font-bold text-[11px] w-full truncate leading-tight">
 												{fullName}
 											</div>
@@ -161,6 +181,19 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 									<>
 										{/* Left column - Company vertically centered */}
 										<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
+											{usedContactIdsSet.has(contact.id) && (
+												<span
+													className="inline-block shrink-0 mr-2"
+													title="Used in a previous campaign"
+													style={{
+														width: '16px',
+														height: '16px',
+														borderRadius: '50%',
+														border: '1px solid #000000',
+														backgroundColor: '#DAE6FE',
+													}}
+												/>
+											)}
 											<div className="font-bold text-[11px] text-black w-full truncate leading-tight">
 												{contact.company || 'Contact'}
 											</div>

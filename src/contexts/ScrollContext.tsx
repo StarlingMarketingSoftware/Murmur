@@ -1,6 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 // Type definitions
 interface ScrollContextType {
@@ -36,6 +38,10 @@ export function ScrollProvider({ children }: ScrollProviderProps) {
 	});
 	const [isClient, setIsClient] = useState(false);
 
+	// Route and device detection
+	const pathname = usePathname();
+	const isMobile = useIsMobile();
+
 	useEffect(() => {
 		// Only run on client
 		setIsClient(true);
@@ -45,10 +51,35 @@ export function ScrollProvider({ children }: ScrollProviderProps) {
 		// Skip if not on client or if window is not available
 		if (!isClient || typeof window === 'undefined') return;
 
+		// If mobile on dashboard, disable Lenis smooth scrolling entirely
+		const isDashboardPage =
+			typeof pathname === 'string' && pathname.startsWith('/murmur/dashboard');
+		if (isMobile === true && isDashboardPage) {
+			// Ensure any existing Lenis instance is destroyed and classes updated
+			try {
+				if (lenisRef.current) {
+					lenisRef.current.destroy();
+					lenisRef.current = null;
+				}
+			} catch {}
+			document.documentElement.classList.remove('lenis-active');
+			document.documentElement.classList.add('no-smooth-scroll');
+			// Provide cleanup to restore defaults when leaving dashboard or switching to desktop
+			return () => {
+				document.documentElement.classList.remove('no-smooth-scroll');
+			};
+		}
+
+		// If we don't yet know if it's mobile, wait to avoid flicker
+		if (isMobile === null) return;
+
 		let lenis: any;
 		let ScrollTrigger: any;
 		let gsap: any;
 		let cleanup: (() => void) | undefined;
+
+		// Ensure CSS override is cleared when Lenis is active elsewhere
+		document.documentElement.classList.remove('no-smooth-scroll');
 
 		// Dynamically import client-only libraries
 		const initializeScroll = async () => {
@@ -146,7 +177,7 @@ export function ScrollProvider({ children }: ScrollProviderProps) {
 				cleanup();
 			}
 		};
-	}, [isClient]);
+	}, [isClient, pathname, isMobile]);
 
 	return (
 		<ScrollContext.Provider value={{ lenis: lenisRef.current, ...scrollState }}>

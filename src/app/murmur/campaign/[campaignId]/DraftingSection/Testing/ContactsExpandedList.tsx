@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, MouseEvent, useRef, useState } from 'react';
+import { FC, MouseEvent, useMemo, useRef, useState } from 'react';
 import { ContactWithName } from '@/types/contact';
 import { cn } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
@@ -12,6 +12,7 @@ import {
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
+import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 
 export interface ContactsExpandedListProps {
 	contacts: ContactWithName[];
@@ -30,6 +31,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 }) => {
 	const [selectedContactIds, setSelectedContactIds] = useState<Set<number>>(new Set());
 	const lastClickedRef = useRef<number | null>(null);
+
+	// Used contacts indicator data (IDs for current user)
+	const { data: usedContactIds } = useGetUsedContactIds();
+	const usedContactIdsSet = useMemo(
+		() => new Set(usedContactIds || []),
+		[usedContactIds]
+	);
 
 	const handleContactClick = (contact: ContactWithName, e: MouseEvent) => {
 		if (e.shiftKey && lastClickedRef.current !== null) {
@@ -79,7 +87,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 	return (
 		<div
-			className="w-[376px] h-[424px] rounded-md border-2 border-black/30 bg-[#F5DADA] px-2 pb-2 flex flex-col"
+			className="w-[376px] max-[480px]:w-[96.27vw] h-[424px] rounded-md border-2 border-black/30 bg-[#F5DADA] px-2 pb-2 flex flex-col"
 			role="region"
 			aria-label="Expanded contacts preview"
 		>
@@ -149,7 +157,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				thumbWidth={2}
 				thumbColor="#000000"
 				trackColor="transparent"
-				offsetRight={-5}
+				offsetRight={-14}
 				contentClassName="overflow-x-hidden"
 				alwaysShow
 			>
@@ -159,11 +167,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							contact.name ||
 							`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
 						const isSelected = selectedContactIds.has(contact.id);
+						const isUsed = usedContactIdsSet.has(contact.id);
 						return (
 							<div
 								key={contact.id}
 								className={cn(
-									'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full max-w-[356px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none',
+									'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full max-w-[356px] max-[480px]:max-w-none h-[49px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none',
 									isSelected && 'bg-[#EAAEAE]'
 								)}
 								onMouseDown={(e) => {
@@ -175,6 +184,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									<>
 										{/* Top Left - Name */}
 										<div className="pl-3 pr-1 flex items-center h-[23px]">
+											{isUsed && (
+												<span
+													className="inline-block shrink-0 mr-2"
+													title="Used in a previous campaign"
+													style={{
+														width: '16px',
+														height: '16px',
+														borderRadius: '50%',
+														border: '1px solid #000000',
+														backgroundColor: '#DAE6FE',
+													}}
+												/>
+											)}
 											<div className="font-bold text-[11px] w-full truncate leading-tight">
 												{fullName}
 											</div>
@@ -195,6 +217,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 										</div>
 										{/* Bottom Left - Company */}
 										<div className="pl-3 pr-1 flex items-center h-[22px]">
+											{!fullName && isUsed && (
+												<span
+													className="inline-block shrink-0 mr-2"
+													title="Used in a previous campaign"
+													style={{
+														width: '16px',
+														height: '16px',
+														borderRadius: '50%',
+														border: '1px solid #000000',
+														backgroundColor: '#DAE6FE',
+													}}
+												/>
+											)}
 											<div className="text-[11px] text-black w-full truncate leading-tight">
 												{contact.company || ''}
 											</div>
@@ -271,6 +306,19 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									<>
 										{/* Left column - Company vertically centered */}
 										<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
+											{isUsed && (
+												<span
+													className="inline-block shrink-0 mr-2"
+													title="Used in a previous campaign"
+													style={{
+														width: '16px',
+														height: '16px',
+														borderRadius: '50%',
+														border: '1px solid #000000',
+														backgroundColor: '#DAE6FE',
+													}}
+												/>
+											)}
 											<div className="font-bold text-[11px] text-black w-full truncate leading-tight">
 												{contact.company || 'Contact'}
 											</div>
@@ -430,28 +478,30 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					{Array.from({ length: Math.max(0, 7 - contacts.length) }).map((_, idx) => (
 						<div
 							key={`placeholder-${idx}`}
-							className="select-none w-full max-w-[356px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
+							className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[49px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
 						/>
 					))}
 				</div>
 			</CustomScrollbar>
 
 			{/* Footer bar */}
-			<button
-				type="button"
-				onClick={() => {
-					if (computedIsDraftDisabled) return;
-					if (onDraftSelected) onDraftSelected(Array.from(selectedContactIds));
-				}}
-				disabled={computedIsDraftDisabled}
-				className={cn(
-					'w-full max-w-[356px] h-[26px] rounded-[6px] bg-[#B5E2B5] border border-black flex items-center justify-center text-[12px] font-medium',
-					computedIsDraftDisabled && 'opacity-50 cursor-not-allowed'
-				)}
-				aria-disabled={computedIsDraftDisabled}
-			>
-				{isPendingGeneration ? 'Drafting...' : 'Draft'}
-			</button>
+			<div className="flex justify-center w-full">
+				<button
+					type="button"
+					onClick={() => {
+						if (computedIsDraftDisabled) return;
+						if (onDraftSelected) onDraftSelected(Array.from(selectedContactIds));
+					}}
+					disabled={computedIsDraftDisabled}
+					className={cn(
+						'w-full max-w-[356px] max-[480px]:max-w-none h-[26px] rounded-[6px] bg-[#B5E2B5] border border-black flex items-center justify-center text-[12px] font-medium',
+						computedIsDraftDisabled && 'opacity-50 cursor-not-allowed'
+					)}
+					aria-disabled={computedIsDraftDisabled}
+				>
+					{isPendingGeneration ? 'Drafting...' : 'Draft'}
+				</button>
+			</div>
 		</div>
 	);
 };

@@ -1,4 +1,5 @@
-import { FC, useEffect, useMemo, useState } from 'react';
+import { FC, useEffect, useMemo, useRef, useState } from 'react';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { useRouter } from 'next/navigation';
 import { IdentityDialogProps, useIdentityDialog } from './useIdentityDialog';
 import {
@@ -12,10 +13,18 @@ import { ExistingProfilesSection } from './ExistingProfilesSection';
 
 // removed Typography usage for simplified header
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/utils/ui';
 
 export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 	const router = useRouter();
 	const [isContentReady, setIsContentReady] = useState(false);
+	const tabsListRef = useRef<HTMLDivElement | null>(null);
+	const createLabelRef = useRef<HTMLSpanElement | null>(null);
+	const selectLabelRef = useRef<HTMLSpanElement | null>(null);
+	const [highlightWidthPx, setHighlightWidthPx] = useState<number>(186);
+	const [isDesktopTabsWidth, setIsDesktopTabsWidth] = useState<boolean>(true);
+	const [isLandscape, setIsLandscape] = useState<boolean>(false);
+	const isMobile = useIsMobile();
 	const {
 		// title removed from header
 		open,
@@ -65,8 +74,54 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 		}
 	}, [isPendingIdentities, identities, setShowCreatePanel]);
 
-	// Left position of highlight box inside 652px container
-	const highlightLeftPx = useMemo(() => (showCreatePanel ? 70 : 396), [showCreatePanel]);
+	// Anchor position of highlight: use center anchors so width can vary.
+	// Original desktop design (652px wide, highlight 186px) puts centers at 25% and 75%.
+	const highlightCenterPercent = useMemo(
+		() => (showCreatePanel ? '25%' : '75%'),
+		[showCreatePanel]
+	);
+
+	// Measure label width on mobile to size the highlight to the text with padding
+	useEffect(() => {
+		const measure = () => {
+			const containerWidth = tabsListRef.current?.offsetWidth ?? 0;
+			const isDesktop = containerWidth >= 652;
+			setIsDesktopTabsWidth(isDesktop);
+			if (isDesktop) {
+				// Preserve exact desktop appearance
+				setHighlightWidthPx(186);
+				return;
+			}
+			const labelEl = showCreatePanel ? createLabelRef.current : selectLabelRef.current;
+			if (!labelEl) return;
+			const labelWidth = Math.ceil(labelEl.getBoundingClientRect().width);
+			// Add horizontal padding to match capsule look; keep within container bounds
+			const desired = Math.min(
+				Math.max(labelWidth + 20, 80),
+				Math.max(containerWidth - 16, 80)
+			);
+			setHighlightWidthPx(desired);
+		};
+
+		measure();
+		window.addEventListener('resize', measure);
+		return () => window.removeEventListener('resize', measure);
+	}, [showCreatePanel]);
+
+	// Track orientation to apply landscape-specific proportional widths
+	useEffect(() => {
+		const updateOrientation = () => {
+			if (typeof window === 'undefined') return;
+			setIsLandscape(window.innerWidth > window.innerHeight);
+		};
+		updateOrientation();
+		window.addEventListener('resize', updateOrientation);
+		window.addEventListener('orientationchange', updateOrientation);
+		return () => {
+			window.removeEventListener('resize', updateOrientation);
+			window.removeEventListener('orientationchange', updateOrientation);
+		};
+	}, []);
 
 	return (
 		<Dialog
@@ -103,7 +158,13 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 					}}
 				>
 					{/* Full screen header with back button - fixed position */}
-					<div className="relative bg-background px-8 py-6 flex-shrink-0">
+					<div
+						className="relative bg-background px-8 py-6 flex-shrink-0"
+						style={{
+							paddingTop: isMobile && isLandscape ? 8 : undefined,
+							paddingBottom: isMobile && isLandscape ? 8 : undefined,
+						}}
+					>
 						{/* Back button - closes dialog if possible, otherwise navigates back */}
 						{isContentReady && (
 							<button
@@ -144,18 +205,20 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 						)}
 
 						<div className="text-center">
-							<p
-								className="mt-1"
-								style={{
-									fontFamily: 'Times New Roman, Times, serif',
-									fontSize: '21px',
-									color: '#000000',
-								}}
-							>
-								create a new{' '}
-								<span style={{ fontWeight: 700, color: '#5DAB68' }}>profile</span> or
-								select an existing one
-							</p>
+							{!(isMobile && isLandscape) && (
+								<p
+									className="mt-1 hidden sm:block"
+									style={{
+										fontFamily: 'Times New Roman, Times, serif',
+										fontSize: '21px',
+										color: '#000000',
+									}}
+								>
+									create a new{' '}
+									<span style={{ fontWeight: 700, color: '#5DAB68' }}>profile</span> or
+									select an existing one
+								</p>
+							)}
 						</div>
 					</div>
 
@@ -166,9 +229,16 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 							scrollbarWidth: 'none',
 							msOverflowStyle: 'none',
 							WebkitOverflowScrolling: 'touch',
+							paddingBottom: isMobile && isLandscape ? 0 : undefined,
 						}}
 					>
-						<div className="flex justify-center pt-6">
+						<div
+							className="flex justify-center pt-6"
+							style={{
+								paddingTop: isMobile && isLandscape ? 8 : undefined,
+								paddingBottom: isMobile && isLandscape ? 0 : undefined,
+							}}
+						>
 							<div className="w-full max-w-[1444px] px-0 mx-auto">
 								{isPendingIdentities ? (
 									<div className="h-full flex items-center justify-center" />
@@ -177,33 +247,47 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 										<Tabs
 											value={showCreatePanel ? 'create' : 'select'}
 											onValueChange={(val) => setShowCreatePanel(val === 'create')}
-											className="w-full max-w-[1444px]"
+											className={cn(
+												'w-full max-w-[1444px]',
+												isMobile && isLandscape ? '!gap-0' : undefined
+											)}
 										>
-											<div className="flex justify-center mb-4">
+											<div
+												className="flex justify-center"
+												style={{ marginBottom: isMobile && isLandscape ? 0 : 16 }}
+											>
 												<TabsList
 													className="relative !bg-transparent border border-black !shadow-none !p-0"
 													style={{
-														width: '652px',
-														height: '50px',
+														// Desktop fixed 652px. Mobile: portrait uses ~93.87vw (~352px @ 375), landscape uses 41.43vw (~353px @ 852)
+														width: isLandscape
+															? 'min(652px, 41.43vw)'
+															: 'min(652px, 93.8666667vw)',
+														height: isDesktopTabsWidth ? '50px' : '33px',
 														borderWidth: 2.45,
 														borderRadius: '9.8px',
 														borderStyle: 'solid',
 														boxShadow: 'none',
 													}}
+													ref={tabsListRef}
 												>
 													{/* Moving highlight box */}
 													<div
 														className="absolute z-10 pointer-events-none"
 														style={{
-															left: `${highlightLeftPx}px`,
+															left: highlightCenterPercent,
 															top: '50%',
-															transform: 'translateY(-50%)',
-															width: '186px',
-															height: '24px',
+															transform: 'translate(-50%, -50%)',
+															// Desktop keeps 186px; mobile uses measured text width with padding
+															width: isDesktopTabsWidth
+																? '186px'
+																: `${highlightWidthPx}px`,
+															height: isDesktopTabsWidth ? '24px' : '20px',
 															borderRadius: '9.8px',
 															border: '1.3px solid #000000',
 															background: '#DADAFC',
-															transition: 'left 0.25s ease-in-out',
+															transition:
+																'left 0.25s ease-in-out, width 0.2s ease-in-out',
 															boxShadow: 'none',
 														}}
 													/>
@@ -212,14 +296,38 @@ export const IdentityDialog: FC<IdentityDialogProps> = (props) => {
 														style={{ boxShadow: 'none' }}
 														value="create"
 													>
-														Create New Profile
+														<span
+															ref={createLabelRef}
+															className="whitespace-nowrap"
+															style={{
+																fontSize: isDesktopTabsWidth ? undefined : '12.3px',
+																fontFamily: isDesktopTabsWidth
+																	? undefined
+																	: 'Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji',
+																fontWeight: isDesktopTabsWidth ? undefined : 500,
+															}}
+														>
+															Create New Profile
+														</span>
 													</TabsTrigger>
 													<TabsTrigger
 														className="relative z-20 flex-1 !h-full font-secondary !text-[14px] sm:!text-[14px] font-medium !bg-transparent !border-0 hover:!bg-transparent focus-visible:!ring-0 focus-visible:!outline-0 !outline-none !ring-0 data-[state=active]:!bg-transparent data-[state=active]:!shadow-none data-[state=active]:!border-transparent text-black"
 														style={{ boxShadow: 'none' }}
 														value="select"
 													>
-														Select Existing Profile
+														<span
+															ref={selectLabelRef}
+															className="whitespace-nowrap"
+															style={{
+																fontSize: isDesktopTabsWidth ? undefined : '12.3px',
+																fontFamily: isDesktopTabsWidth
+																	? undefined
+																	: 'Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji',
+																fontWeight: isDesktopTabsWidth ? undefined : 500,
+															}}
+														>
+															Select Existing Profile
+														</span>
 													</TabsTrigger>
 												</TabsList>
 											</div>

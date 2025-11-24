@@ -655,10 +655,20 @@ export function applyHardcodedLocationOverrides(
 	});
 	const hit = matchingAliases.sort((a, b) => b.length - a.length)[0];
 	if (!hit) {
+		// Even when no alias is hit, if a state was parsed, allow common synonyms/abbreviations (e.g., California ↔ CA)
+		const parsedStateKey = (parsed.state || '').toLowerCase();
+		const forceStateAny =
+			parsedStateKey && STATE_SYNONYMS[parsedStateKey]
+				? STATE_SYNONYMS[parsedStateKey]
+				: undefined;
+
 		return {
 			overrides: parsed,
 			penaltyCities: [],
+			forceStateAny,
 			penaltyTerms: [],
+			strictPenalty: false,
+			forceCityExactCity: parsed.city ?? undefined,
 		};
 	}
 

@@ -1,38 +1,212 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { gsap } from 'gsap';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { useDashboard } from './useDashboard';
 import { urls } from '@/constants/urls';
 import { isProblematicBrowser } from '@/utils/browserDetection';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
+import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
+import { BookingIcon } from '@/components/atoms/_svg/BookingIcon';
+import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
+import { SearchIconMobile } from '@/components/atoms/_svg/SearchIconMobile';
+import { SearchIconResults } from '@/components/atoms/_svg/SearchIconResults';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
+import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
+import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
+import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
+import { getCityIconProps } from '@/utils/cityIcons';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import {
-	Form,
-	FormControl,
-	FormField,
-	FormItem,
-	FormLabel,
-	FormMessage,
-} from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import ConsoleLoader from '@/components/atoms/ConsoleLoader/ConsoleLoader';
 import { Card, CardContent } from '@/components/ui/card';
-import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
-import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
+
 import { useClerk } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { MobileAppComingSoon } from '@/components/molecules/MobileAppComingSoon/MobileAppComingSoon';
+import { useDebounce } from '@/hooks/useDebounce';
+import { useGetLocations } from '@/hooks/queryHooks/useContacts';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+
+const DEFAULT_STATE_SUGGESTIONS = [
+	{
+		label: 'New York',
+		promotionDescription: 'reach out to radio stations, playlists, and more',
+		generalDescription: 'contact venues, restaurants and more, to book shows',
+	},
+	{
+		label: 'Pennsylvania',
+		promotionDescription: 'reach out to radio stations, playlists, and more',
+		generalDescription: 'contact venues, restaurants and more, to book shows',
+	},
+	{
+		label: 'California',
+		promotionDescription: 'reach out to radio stations, playlists, and more',
+		generalDescription: 'contact venues, restaurants and more, to book shows',
+	},
+];
 
 const Dashboard = () => {
 	const { isSignedIn, openSignIn } = useClerk();
 	const isMobile = useIsMobile();
+	const [isMobileLandscape, setIsMobileLandscape] = useState(false);
+	const [whyValue, setWhyValue] = useState('');
+	const [whatValue, setWhatValue] = useState('');
+	const [whereValue, setWhereValue] = useState('');
+	const hasWhereValue = whereValue.trim().length > 0;
+	const isPromotion = whyValue === '[Promotion]';
+	const [activeSection, setActiveSection] = useState<'why' | 'what' | 'where' | null>(
+		null
+	);
+	const [userLocationName, setUserLocationName] = useState<string | null>(null);
+	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+
+	const debouncedWhereValue = useDebounce(whereValue, 300);
+	const { data: locationResults, isLoading: isLoadingLocations } = useGetLocations(
+		debouncedWhereValue,
+		'state-first'
+	);
+
+	useEffect(() => {
+		if (activeSection === 'where' && !userLocationName && !isLoadingLocation) {
+			setIsLoadingLocation(true);
+			if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+				navigator.geolocation.getCurrentPosition(
+					async (position) => {
+						try {
+							const { latitude, longitude } = position.coords;
+							const response = await fetch(
+								`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+							);
+							const data = await response.json();
+							const city =
+								data.address?.city ||
+								data.address?.town ||
+								data.address?.village ||
+								data.address?.hamlet;
+							const state = data.address?.state;
+
+							const stateToAbbr: Record<string, string> = {
+								Alabama: 'AL',
+								Alaska: 'AK',
+								Arizona: 'AZ',
+								Arkansas: 'AR',
+								California: 'CA',
+								Colorado: 'CO',
+								Connecticut: 'CT',
+								Delaware: 'DE',
+								Florida: 'FL',
+								Georgia: 'GA',
+								Hawaii: 'HI',
+								Idaho: 'ID',
+								Illinois: 'IL',
+								Indiana: 'IN',
+								Iowa: 'IA',
+								Kansas: 'KS',
+								Kentucky: 'KY',
+								Louisiana: 'LA',
+								Maine: 'ME',
+								Maryland: 'MD',
+								Massachusetts: 'MA',
+								Michigan: 'MI',
+								Minnesota: 'MN',
+								Mississippi: 'MS',
+								Missouri: 'MO',
+								Montana: 'MT',
+								Nebraska: 'NE',
+								Nevada: 'NV',
+								'New Hampshire': 'NH',
+								'New Jersey': 'NJ',
+								'New Mexico': 'NM',
+								'New York': 'NY',
+								'North Carolina': 'NC',
+								'North Dakota': 'ND',
+								Ohio: 'OH',
+								Oklahoma: 'OK',
+								Oregon: 'OR',
+								Pennsylvania: 'PA',
+								'Rhode Island': 'RI',
+								'South Carolina': 'SC',
+								'South Dakota': 'SD',
+								Tennessee: 'TN',
+								Texas: 'TX',
+								Utah: 'UT',
+								Vermont: 'VT',
+								Virginia: 'VA',
+								Washington: 'WA',
+								'West Virginia': 'WV',
+								Wisconsin: 'WI',
+								Wyoming: 'WY',
+							};
+
+							const stateAbbr = state ? stateToAbbr[state] || state : null;
+
+							if (city && stateAbbr) {
+								setUserLocationName(`${city}, ${stateAbbr}`);
+							} else if (city) {
+								setUserLocationName(city);
+							} else if (stateAbbr) {
+								setUserLocationName(stateAbbr);
+							} else {
+								setUserLocationName('Current Location');
+							}
+						} catch (error) {
+							console.error('Error getting location:', error);
+							setUserLocationName('Unable to find location');
+						} finally {
+							setIsLoadingLocation(false);
+						}
+					},
+					(error) => {
+						console.error('Geolocation error:', error);
+						setUserLocationName('Location access needed');
+						setIsLoadingLocation(false);
+					}
+				);
+			} else {
+				setUserLocationName('Geolocation not supported');
+				setIsLoadingLocation(false);
+			}
+		}
+	}, [activeSection, userLocationName, isLoadingLocation]);
+
+	useEffect(() => {
+		if (isMobile !== true) {
+			setIsMobileLandscape(false);
+			return;
+		}
+
+		const check = () => {
+			if (typeof window !== 'undefined') {
+				setIsMobileLandscape(window.innerWidth > window.innerHeight);
+			}
+		};
+
+		check();
+		window.addEventListener('resize', check);
+		window.addEventListener('orientationchange', check);
+		return () => {
+			window.removeEventListener('resize', check);
+			window.removeEventListener('orientationchange', check);
+		};
+	}, [isMobile]);
+
+	// Mobile-friendly sizing for hero logo and subtitle; desktop remains unchanged
+	const logoWidth = isMobile ? '190px' : '300px';
+	const logoHeight = isMobile ? '50px' : '79px';
 	const hasProblematicBrowser = isProblematicBrowser();
 	const searchContainerRef = useRef<HTMLDivElement>(null);
+	const whyInputRef = useRef<HTMLInputElement>(null);
+	const whatInputRef = useRef<HTMLInputElement>(null);
+	const whereInputRef = useRef<HTMLInputElement>(null);
 	const {
 		form,
 		onSubmit,
@@ -47,8 +221,6 @@ const Dashboard = () => {
 		tableRef,
 		selectedContacts,
 		isPendingBatchUpdateContacts,
-		isFreeTrial,
-		canSearch,
 		isError,
 		error,
 		hasSearched,
@@ -59,120 +231,99 @@ const Dashboard = () => {
 		hoveredContact,
 	} = useDashboard();
 
+	// Clear hover state on mobile to prevent stuck hover
 	useEffect(() => {
-		// Small delay to ensure DOM is ready
-		const timer = setTimeout(() => {
-			// Animate all overlays present (initial and results views)
-			const overlays = Array.from(
-				document.querySelectorAll('.search-wave-overlay')
-			) as HTMLElement[];
-			console.log('Found overlays:', overlays.length);
-			if (overlays.length === 0) {
-				console.log('No overlays found, trying again...');
-				return;
-			}
+		if (isMobile) {
+			setHoveredContact(null);
+		}
+	}, [isMobile, setHoveredContact]);
 
-			const timelines: gsap.core.Tween[] = [];
-			const enterHandlers: Array<() => void> = [];
-			const leaveHandlers: Array<() => void> = [];
+	// Combine section values into main search field
+	useEffect(() => {
+		const formattedWhere =
+			whereValue && whereValue.trim().length > 0 ? `(${whereValue})` : '';
+		const combinedSearch = [whyValue, whatValue, formattedWhere]
+			.filter(Boolean)
+			.join(' ');
+		if (combinedSearch) {
+			form.setValue('searchText', combinedSearch);
+		}
+	}, [whyValue, whatValue, whereValue, form]);
 
-			overlays.forEach((overlay, index) => {
-				console.log(`Animating overlay ${index}:`, overlay);
-				// Make sure the overlay is visible
-				gsap.set(overlay, {
-					backgroundPosition: '100% 0',
-					opacity: 1,
-					visibility: 'visible',
-				});
-				const tl = gsap.to(overlay, {
-					backgroundPosition: '-100% 0',
-					duration: 3, // 3 second loop
-					repeat: -1,
-					ease: 'none',
-					onStart: function () {
-						console.log('Animation started for overlay', index);
-					},
-				});
-				timelines.push(tl);
-
-				const container = overlay.parentElement;
-				const handleMouseEnter = () => gsap.to(tl, { timeScale: 2, duration: 0.3 });
-				const handleMouseLeave = () => gsap.to(tl, { timeScale: 1, duration: 0.3 });
-				if (container) {
-					container.addEventListener('mouseenter', handleMouseEnter);
-					container.addEventListener('mouseleave', handleMouseLeave);
-					enterHandlers.push(handleMouseEnter);
-					leaveHandlers.push(handleMouseLeave);
-				} else {
-					enterHandlers.push(() => {});
-					leaveHandlers.push(() => {});
-				}
-			});
-
-			// Store cleanup function
-			(window as any).cleanupSearchAnimations = () => {
-				overlays.forEach((overlay, i) => {
-					const container = overlay.parentElement;
-					if (container) {
-						container.removeEventListener('mouseenter', enterHandlers[i]);
-						container.removeEventListener('mouseleave', leaveHandlers[i]);
-					}
-				});
-				timelines.forEach((tl) => tl.kill());
-			};
-		}, 100); // 100ms delay
-
-		return () => {
-			clearTimeout(timer);
-			if ((window as any).cleanupSearchAnimations) {
-				(window as any).cleanupSearchAnimations();
-				delete (window as any).cleanupSearchAnimations;
+	// Handle clicks outside to deactivate sections
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as HTMLElement;
+			if (
+				!target.closest('.search-sections-container') &&
+				!target.closest('.search-dropdown-menu')
+			) {
+				setActiveSection(null);
 			}
 		};
-	}, [hasSearched]);
+
+		if (activeSection) {
+			document.addEventListener('mousedown', handleClickOutside);
+			return () => {
+				document.removeEventListener('mousedown', handleClickOutside);
+			};
+		}
+	}, [activeSection]);
+
+	// Focus input when section becomes active
+	useEffect(() => {
+		if (activeSection === 'why' && whyInputRef.current) {
+			whyInputRef.current.focus();
+		} else if (activeSection === 'what' && whatInputRef.current) {
+			whatInputRef.current.focus();
+		} else if (activeSection === 'where' && whereInputRef.current) {
+			whereInputRef.current.focus();
+		}
+	}, [activeSection]);
+
+	// Enhanced reset search that also clears section values
+	const handleEnhancedResetSearch = () => {
+		handleResetSearch();
+		setWhyValue('');
+		setWhatValue('');
+		setWhereValue('');
+		setActiveSection(null);
+	};
+
 	// Return null during initial load to prevent hydration mismatch
 	if (isMobile === null) {
 		return null;
 	}
 
-	if (isMobile) {
-		return <MobileAppComingSoon />;
-	}
+	// Reduce extra white space above the fixed mobile action button by
+	// only adding bottom padding when needed and using a smaller value on mobile
+	const bottomPadding = isMobile && hasSearched ? 'pb-[64px]' : 'pb-0 md:pb-[100px]';
 
 	return (
 		<AppLayout>
 			<div
-				className={`relative min-h-screen transition-all duration-500 dashboard-main-offset pb-[100px] w-full max-w-full ${
+				className={`relative min-h-screen transition-all duration-500 dashboard-main-offset w-full max-w-full ${bottomPadding} ${
 					hasSearched ? 'search-active' : ''
 				}`}
 			>
-				<div className="hero-wrapper flex flex-col justify-center items-center">
+				<div className="hero-wrapper flex flex-col justify-center items-center !z-[40]">
 					<div className="w-full">
 						<div
 							className="flex justify-center items-center w-full px-4"
-							style={{ marginBottom: '0.75rem' }}
+							style={{ marginBottom: '0.75rem', marginTop: '50px' }}
 						>
 							<div className="premium-hero-section flex flex-col items-center justify-center w-full max-w-[600px]">
 								<div
 									className="premium-logo-container flex items-center justify-center"
-									style={{ width: '300px', height: '79px' }}
+									style={{ width: logoWidth, height: logoHeight }}
 								>
-									<MurmurLogoNew width="300px" height="79px" />
+									<MurmurLogoNew width={logoWidth} height={logoHeight} />
 								</div>
-								<Typography
-									font="secondary"
-									className="mt-3 text-center premium-subtitle-gradient w-full"
-									style={{ fontSize: '15px', lineHeight: '1.3' }}
-									color="light"
-								>
-									Let&apos;s <strong style={{ color: '#248531' }}>start</strong> by
-									finding contacts.
-								</Typography>
 							</div>
 						</div>
 
 						<div
-							className={`search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 ${
+							className={`search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 !z-[50] ${
 								hasSearched ? 'search-bar-active' : ''
 							}`}
 						>
@@ -217,7 +368,7 @@ const Dashboard = () => {
 														<FormControl>
 															<div
 																ref={searchContainerRef}
-																className={`search-input-group ${
+																className={`search-input-group relative ${
 																	hasSearched ? 'search-input-group-active' : ''
 																}`}
 															>
@@ -229,7 +380,7 @@ const Dashboard = () => {
 																	}`}
 																>
 																	<Input
-																		className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent"
+																		className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent md:!h-[72px] md:pr-[80px]"
 																		placeholder=""
 																		style={{
 																			accentColor: 'transparent',
@@ -240,38 +391,581 @@ const Dashboard = () => {
 																		spellCheck="false"
 																		{...field}
 																	/>
-																	<div className="search-wave-overlay" />
+																	{/* New 532x64px element - Added border-black and z-20 */}
 																	<div
-																		className="custom-placeholder"
-																		aria-hidden="true"
+																		className={`search-sections-container hidden md:block absolute left-[4px] top-1/2 -translate-y-1/2 w-[532px] h-[64px] rounded-[8px] border z-20 font-secondary ${
+																			activeSection
+																				? 'bg-[#EFEFEF] border-transparent'
+																				: 'bg-white border-black'
+																		}`}
+																	>
+																		<div
+																			className={`absolute left-[172px] top-0 bottom-0 w-[2px] bg-black/10 ${
+																				activeSection ? 'hidden' : ''
+																			}`}
+																		/>
+																		<div
+																			className={`absolute left-[332px] top-0 bottom-0 w-[2px] bg-black/10 ${
+																				activeSection ? 'hidden' : ''
+																			}`}
+																		/>
+																		{/* Why Section */}
+																		<div
+																			className={`absolute left-0 top-[-1px] h-[64px] cursor-pointer border ${
+																				activeSection === 'why'
+																					? 'w-[174px] bg-white border-black z-30 rounded-[8px]'
+																					: `w-[172px] border-transparent ${
+																							activeSection
+																								? 'hover:bg-[#F9F9F9]'
+																								: 'hover:bg-black/5'
+																					  } rounded-l-[8px]`
+																			}`}
+																			onClick={() => setActiveSection('why')}
+																		>
+																			<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
+																				Why
+																			</div>
+																			<div className="absolute left-[24px] top-[42px] w-[144px] h-[12px]">
+																				{activeSection === 'why' ? (
+																					<input
+																						ref={whyInputRef}
+																						type="text"
+																						value={whyValue}
+																						onChange={(e) => setWhyValue(e.target.value)}
+																						onKeyDown={(e) => {
+																							if (e.key === 'Enter') {
+																								e.preventDefault();
+																								setActiveSection(null);
+																							}
+																						}}
+																						className="absolute top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																						style={{
+																							height: '12px',
+																							lineHeight: '12px',
+																							padding: '0',
+																							margin: '0',
+																							transform: 'translateY(-1px)',
+																							fontFamily:
+																								'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																						}}
+																						placeholder="Choose Type of Search"
+																						onClick={(e) => e.stopPropagation()}
+																					/>
+																				) : (
+																					<div
+																						className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap"
+																						style={{
+																							height: '12px',
+																							lineHeight: '12px',
+																							padding: '0',
+																							margin: '0',
+																						}}
+																					>
+																						{whyValue || 'Choose Type of Search'}
+																					</div>
+																				)}
+																			</div>
+																		</div>
+																		{/* What Section */}
+																		<div
+																			className={`absolute left-[172px] top-[-1px] h-[64px] cursor-pointer border ${
+																				activeSection === 'what'
+																					? 'w-[161px] bg-white border-black z-30 rounded-[8px]'
+																					: `w-[160px] border-transparent ${
+																							activeSection
+																								? 'hover:bg-[#F9F9F9]'
+																								: 'hover:bg-black/5'
+																					  }`
+																			}`}
+																			onClick={() => setActiveSection('what')}
+																		>
+																			<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
+																				What
+																			</div>
+																			<div className="absolute left-[24px] top-[42px] w-[124px] h-[12px]">
+																				{activeSection === 'what' ? (
+																					<input
+																						ref={whatInputRef}
+																						type="text"
+																						value={whatValue}
+																						onChange={(e) => setWhatValue(e.target.value)}
+																						onKeyDown={(e) => {
+																							if (e.key === 'Enter') {
+																								e.preventDefault();
+																								setActiveSection(null);
+																							}
+																						}}
+																						className="absolute top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																						style={{
+																							height: '12px',
+																							lineHeight: '12px',
+																							padding: '0',
+																							margin: '0',
+																							transform: 'translateY(-1px)',
+																							fontFamily:
+																								'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																						}}
+																						placeholder="Add Recipients"
+																						onClick={(e) => e.stopPropagation()}
+																					/>
+																				) : (
+																					<div
+																						className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap hover:text-black/60 transition-colors"
+																						style={{
+																							height: '12px',
+																							lineHeight: '12px',
+																							padding: '0',
+																							margin: '0',
+																						}}
+																					>
+																						{whatValue || 'Add Recipients'}
+																					</div>
+																				)}
+																			</div>
+																		</div>
+																		{/* Where Section */}
+																		<div
+																			className={`absolute left-[332px] top-[-1px] h-[64px] cursor-pointer border ${
+																				activeSection === 'where'
+																					? 'w-[201px] bg-white border-black z-30 rounded-[8px]'
+																					: `w-[200px] border-transparent ${
+																							activeSection
+																								? 'hover:bg-[#F9F9F9]'
+																								: 'hover:bg-black/5'
+																					  } rounded-r-[8px]`
+																			}`}
+																			onClick={() => setActiveSection('where')}
+																		>
+																			<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
+																				Where
+																			</div>
+																			<div className="absolute left-[24px] top-[42px] w-[156px] h-[12px]">
+																				{activeSection === 'where' ? (
+																					<div className="absolute top-0 left-0 w-full h-full flex items-center gap-[2px]">
+																						<span
+																							className="font-semibold text-black text-[12px] leading-none"
+																							style={{
+																								opacity: hasWhereValue ? 1 : 0,
+																								transform: 'translateY(-1px)',
+																							}}
+																						>
+																							(
+																						</span>
+																						<input
+																							ref={whereInputRef}
+																							type="text"
+																							value={whereValue}
+																							onChange={(e) =>
+																								setWhereValue(e.target.value)
+																							}
+																							onKeyDown={(e) => {
+																								if (e.key === 'Enter') {
+																									e.preventDefault();
+																									setActiveSection(null);
+																								}
+																							}}
+																							className="flex-1 font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																							style={{
+																								height: '12px',
+																								lineHeight: '12px',
+																								padding: '0',
+																								margin: '0',
+																								transform: 'translateY(-1px)',
+																								fontFamily:
+																									'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																							}}
+																							placeholder="Search States"
+																							onClick={(e) => e.stopPropagation()}
+																						/>
+																						<span
+																							className="font-semibold text-black text-[12px] leading-none"
+																							style={{
+																								opacity: hasWhereValue ? 1 : 0,
+																								transform: 'translateY(-1px)',
+																							}}
+																						>
+																							)
+																						</span>
+																					</div>
+																				) : (
+																					<div
+																						className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap hover:text-black/60 transition-colors"
+																						style={{
+																							height: '12px',
+																							lineHeight: '12px',
+																							padding: '0',
+																							margin: '0',
+																						}}
+																					>
+																						{hasWhereValue
+																							? `(${whereValue})`
+																							: 'Search States'}
+																					</div>
+																				)}
+																			</div>
+																		</div>
+																	</div>
+																	{/* Desktop Search Button */}
+																	<button
+																		type="submit"
+																		className="hidden md:flex absolute right-[6px] items-center justify-center w-[58px] h-[62px] transition-colors z-40 cursor-pointer group"
 																		style={{
-																			opacity:
-																				(field.value?.trim()?.length ?? 0) > 0 ? 0 : 1,
+																			top: '50%',
+																			transform: 'translateY(-50%)',
+																			backgroundColor: 'rgba(93, 171, 104, 0.49)',
+																			borderTopRightRadius: '7px',
+																			borderBottomRightRadius: '7px',
+																			borderTopLeftRadius: '0',
+																			borderBottomLeftRadius: '0',
+																			border: '1px solid #5DAB68',
+																			borderLeft: '1px solid #5DAB68',
+																		}}
+																		onMouseEnter={(e) => {
+																			e.currentTarget.style.backgroundColor =
+																				'rgba(93, 171, 104, 0.65)';
+																		}}
+																		onMouseLeave={(e) => {
+																			e.currentTarget.style.backgroundColor =
+																				'rgba(93, 171, 104, 0.49)';
 																		}}
 																	>
-																		<span className="custom-placeholder-bold">
-																			Type who you want to contact, then click generate
-																		</span>
-																		<span> </span>
-																		<span className="custom-placeholder-regular">
-																			i.e.
-																		</span>
-																		<span> </span>
-																		<span className="custom-placeholder-italic">
-																			“Music Venues in North Carolina”
-																		</span>
-																	</div>
+																		<SearchIconDesktop />
+																	</button>
+																	{/* Mobile-only submit icon inside input */}
+																	<button
+																		type="submit"
+																		className="search-input-icon-btn"
+																		aria-label="Search"
+																	>
+																		<SearchIconMobile />
+																	</button>
 																</div>
+																{activeSection === 'why' && (
+																	<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[12px] absolute top-[calc(100%+10px)] left-[4px] w-[439px] h-[173px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+																		<div
+																			className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																			onClick={() => {
+																				setWhyValue('[Promotion]');
+																				setActiveSection('what');
+																			}}
+																		>
+																			<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																				<PromotionIcon />
+																			</div>
+																			<div className="ml-[12px] flex flex-col">
+																				<div className="text-[20px] font-medium leading-none text-black font-inter">
+																					Promotion
+																				</div>
+																				<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
+																					reach out to radio stations, playlists, and more
+																					to get your music played
+																				</div>
+																			</div>
+																		</div>
+																		<div
+																			className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																			onClick={() => {
+																				setWhyValue('[Booking]');
+																				setActiveSection('what');
+																			}}
+																		>
+																			<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																				<BookingIcon />
+																			</div>
+																			<div className="ml-[12px] flex flex-col">
+																				<div className="text-[20px] font-medium leading-none text-black font-inter">
+																					Booking
+																				</div>
+																				<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
+																					contact venues, resturants and more, to book
+																					shows
+																				</div>
+																			</div>
+																		</div>
+																	</div>
+																)}
+																{activeSection === 'what' &&
+																	whyValue === '[Promotion]' && (
+																		<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] absolute top-[calc(100%+10px)] left-[176px] w-[439px] h-[92px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+																			<div
+																				className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																				onClick={() => {
+																					setWhatValue('Radio Stations');
+																					setActiveSection('where');
+																				}}
+																			>
+																				<div className="w-[38px] h-[38px] bg-[#56DA73] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																					<RadioStationsIcon />
+																				</div>
+																				<div className="ml-[12px] flex flex-col">
+																					<div className="text-[20px] font-medium leading-none text-black font-inter">
+																						Radio Stations
+																					</div>
+																					<div className="text-[12px] leading-tight text-black mt-[4px]">
+																						Reach out to radio stations
+																					</div>
+																				</div>
+																			</div>
+																		</div>
+																	)}
+																{activeSection === 'what' &&
+																	whyValue !== '[Promotion]' && (
+																		<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] absolute top-[calc(100%+10px)] left-[176px] w-[439px] h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+																			<div
+																				className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																				onClick={() => {
+																					setWhatValue('Music Venues');
+																					setActiveSection('where');
+																				}}
+																			>
+																				<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																					<MusicVenuesIcon />
+																				</div>
+																				<div className="ml-[12px] flex flex-col">
+																					<div className="text-[20px] font-medium leading-none text-black font-inter">
+																						Music Venues
+																					</div>
+																					<div className="text-[12px] leading-tight text-black mt-[4px]">
+																						Reach talent buyers for live shows
+																					</div>
+																				</div>
+																			</div>
+																			<div
+																				className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																				onClick={() => {
+																					setWhatValue('Festivals');
+																					setActiveSection('where');
+																				}}
+																			>
+																				<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																					<FestivalsIcon />
+																				</div>
+																				<div className="ml-[12px] flex flex-col">
+																					<div className="text-[20px] font-medium leading-none text-black font-inter">
+																						Festivals
+																					</div>
+																					<div className="text-[12px] leading-tight text-black mt-[4px]">
+																						Pitch your act for seasonal events
+																					</div>
+																				</div>
+																			</div>
+																			<div
+																				className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																				onClick={() => {
+																					setWhatValue('Restaurants');
+																					setActiveSection('where');
+																				}}
+																			>
+																				<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																					<RestaurantsIcon />
+																				</div>
+																				<div className="ml-[12px] flex flex-col">
+																					<div className="text-[20px] font-medium leading-none text-black font-inter">
+																						Restaurants
+																					</div>
+																					<div className="text-[12px] leading-tight text-black mt-[4px]">
+																						Land steady dinner and brunch gigs
+																					</div>
+																				</div>
+																			</div>
+																			<div
+																				className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																				onClick={() => {
+																					setWhatValue('Coffee Shops');
+																					setActiveSection('where');
+																				}}
+																			>
+																				<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																					<CoffeeShopsIcon />
+																				</div>
+																				<div className="ml-[12px] flex flex-col">
+																					<div className="text-[20px] font-medium leading-none text-black font-inter">
+																						Coffee Shops
+																					</div>
+																					<div className="text-[12px] leading-tight text-black mt-[4px]">
+																						Book intimate daytime performances
+																					</div>
+																				</div>
+																			</div>
+																			<div
+																				className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																				onClick={() => {
+																					setWhatValue('Wedding Planners');
+																					setActiveSection('where');
+																				}}
+																			>
+																				<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																					<WeddingPlannersIcon />
+																				</div>
+																				<div className="ml-[12px] flex flex-col">
+																					<div className="text-[20px] font-medium leading-none text-black font-inter">
+																						Wedding Planners
+																					</div>
+																					<div className="text-[12px] leading-tight text-black mt-[4px]">
+																						Get hired for ceremonies & receptions
+																					</div>
+																				</div>
+																			</div>
+																		</div>
+																	)}
+																{activeSection === 'where' && (
+																	<div
+																		id="where-dropdown-container"
+																		className={`search-dropdown-menu hidden md:block absolute top-[calc(100%+10px)] left-[98px] w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]`}
+																		style={{ overflow: 'visible' }}
+																	>
+																		<style jsx global>{`
+																			#where-dropdown-container .scrollbar-hide {
+																				scrollbar-width: none !important;
+																				scrollbar-color: transparent transparent !important;
+																				-ms-overflow-style: none !important;
+																			}
+																			#where-dropdown-container
+																				.scrollbar-hide::-webkit-scrollbar {
+																				display: none !important;
+																				width: 0 !important;
+																				height: 0 !important;
+																				background: transparent !important;
+																				-webkit-appearance: none !important;
+																			}
+																		`}</style>
+																		{whereValue.length >= 1 ? (
+																			<CustomScrollbar
+																				className="w-full h-full"
+																				contentClassName="flex flex-col items-center justify-start gap-[20px] py-4"
+																				thumbWidth={2}
+																				thumbColor="#000000"
+																				trackColor="transparent"
+																				offsetRight={-5}
+																			>
+																				{isLoadingLocations ? (
+																					<div className="flex items-center justify-center h-full">
+																						<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+																					</div>
+																				) : locationResults &&
+																				  locationResults.length > 0 ? (
+																					locationResults.map((loc, idx) => {
+																						const { icon, backgroundColor } =
+																							getCityIconProps(loc.city, loc.state);
+																						return (
+																							<div
+																								key={`${loc.city}-${loc.state}-${idx}`}
+																								className="w-[415px] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
+																								onClick={() => {
+																									setWhereValue(loc.label);
+																									setActiveSection(null);
+																								}}
+																							>
+																								<div
+																									className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
+																									style={{ backgroundColor }}
+																								>
+																									{icon}
+																								</div>
+																								<div className="ml-[12px] flex flex-col">
+																									<div className="text-[20px] font-medium leading-none text-black font-inter">
+																										{loc.label}
+																									</div>
+																									<div className="text-[12px] leading-tight text-black mt-[4px]">
+																										Search contacts in{' '}
+																										{loc.city || loc.state}
+																									</div>
+																								</div>
+																							</div>
+																						);
+																					})
+																				) : (
+																					<div className="text-black font-medium font-secondary">
+																						No locations found
+																					</div>
+																				)}
+																			</CustomScrollbar>
+																		) : (
+																			<div className="flex flex-col items-center justify-center gap-[20px] w-full h-full">
+																				<div
+																					className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																					onClick={() => {
+																						if (userLocationName && !isLoadingLocation) {
+																							setWhereValue(userLocationName);
+																							setActiveSection(null);
+																						}
+																					}}
+																				>
+																					<div className="w-[38px] h-[38px] bg-[#D0E6FF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																						<NearMeIcon />
+																					</div>
+																					<div className="ml-[12px] flex flex-col">
+																						<div className="text-[20px] font-medium leading-none text-black font-inter">
+																							Near Me
+																						</div>
+																						<div
+																							className={`text-[12px] leading-tight mt-[4px] select-none ${
+																								userLocationName || isLoadingLocation
+																									? 'text-black/60'
+																									: 'text-transparent'
+																							}`}
+																						>
+																							{isLoadingLocation
+																								? 'Locating...'
+																								: userLocationName || 'Placeholder'}
+																						</div>
+																					</div>
+																				</div>
+																				{DEFAULT_STATE_SUGGESTIONS.map(
+																					({
+																						label,
+																						promotionDescription,
+																						generalDescription,
+																					}) => (
+																						<div
+																							key={label}
+																							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+																							onClick={() => {
+																								setWhereValue(label);
+																								setActiveSection(null);
+																							}}
+																						>
+																							<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+																								<SuburbsIcon />
+																							</div>
+																							<div className="ml-[12px] flex flex-col">
+																								<div className="text-[20px] font-medium leading-none text-black font-inter">
+																									{label}
+																								</div>
+																								<div className="text-[12px] leading-tight text-black mt-[4px]">
+																									{isPromotion
+																										? promotionDescription
+																										: generalDescription}
+																								</div>
+																							</div>
+																						</div>
+																					)
+																				)}
+																			</div>
+																		)}
+																	</div>
+																)}
 															</div>
 														</FormControl>
-														<FormMessage />
 													</FormItem>
 												)}
 											/>
-											{!hasSearched && (
+											{false && !hasSearched && (
 												<div className="flex flex-row gap-4 items-center justify-between w-full flex-wrap">
 													<div className="flex flex-row gap-4 items-center h-[39px] justify-start flex-shrink-0">
-														<div className="exclude-contacts-box bg-[#EFEFEF] w-[227px] h-[32px] rounded-[8px] flex items-center px-4 my-auto">
+														<div
+															className="exclude-contacts-box bg-[#EFEFEF] w-[227px] h-[32px] rounded-[8px] flex items-center px-4 my-auto"
+															style={
+																isMobile
+																	? ({
+																			width: '124px',
+																			height: '16px',
+																			padding: '0 6px',
+																			borderRadius: '6px',
+																	  } as React.CSSProperties)
+																	: undefined
+															}
+														>
 															<FormField
 																control={form.control}
 																name="excludeUsedContacts"
@@ -280,7 +974,22 @@ const Dashboard = () => {
 																		<div className="leading-none flex items-center">
 																			<FormLabel
 																				className="font-bold cursor-pointer select-none whitespace-nowrap"
-																				style={{ fontSize: '14px', lineHeight: '16px' }}
+																				style={
+																					isMobile
+																						? ({
+																								fontSize: '8px',
+																								lineHeight: '10px',
+																								fontFamily:
+																									'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																								fontWeight: 700,
+																								letterSpacing: '0',
+																								whiteSpace: 'nowrap',
+																						  } as React.CSSProperties)
+																						: ({
+																								fontSize: '14px',
+																								lineHeight: '16px',
+																						  } as React.CSSProperties)
+																				}
 																			>
 																				Exclude Used Contacts
 																			</FormLabel>
@@ -306,6 +1015,14 @@ const Dashboard = () => {
 																								: '#E5E5E5',
 																							backgroundColor: 'var(--toggle-bg)',
 																							background: 'var(--toggle-bg)',
+																							...(isMobile
+																								? ({
+																										width: '13px',
+																										minWidth: '13px',
+																										height: '8px',
+																										borderRadius: '9999px',
+																								  } as React.CSSProperties)
+																								: {}),
 																						} as React.CSSProperties
 																					}
 																					data-checked={field.value}
@@ -315,11 +1032,30 @@ const Dashboard = () => {
 																					})}
 																				>
 																					<div
-																						className={`absolute top-1/2 -translate-y-1/2 transform transition-transform duration-200 ease-in-out ${
-																							field.value
-																								? 'translate-x-[10px] bg-white'
-																								: 'translate-x-0 bg-[#050505]'
-																						} left-[2px] w-[12px] h-[12px] rounded-full shadow-none drop-shadow-none`}
+																						className={`absolute transform transition-transform duration-200 ease-in-out ${
+																							field.value ? 'bg-white' : 'bg-[#050505]'
+																						} rounded-full shadow-none drop-shadow-none`}
+																						style={
+																							isMobile
+																								? ({
+																										width: '6px',
+																										height: '6px',
+																										left: '2px',
+																										top: '50%',
+																										transform: `translateX(${
+																											field.value ? 3 : 0
+																										}px) translateY(-50%)`,
+																								  } as React.CSSProperties)
+																								: ({
+																										top: '50%',
+																										left: '2px',
+																										width: '12px',
+																										height: '12px',
+																										transform: `translateX(${
+																											field.value ? 10 : 0
+																										}px) translateY(-50%)`,
+																								  } as React.CSSProperties)
+																						}
 																					/>
 																				</div>
 																			</label>
@@ -328,43 +1064,6 @@ const Dashboard = () => {
 																)}
 															/>
 														</div>
-													</div>
-													<div className="flex items-center justify-end flex-shrink-0 ml-auto">
-														{isFreeTrial ? (
-															<UpgradeSubscriptionDrawer
-																message="Importing contacts is only available on paid plans. Please upgrade your plan to proceed."
-																triggerButtonText="Import"
-																buttonVariant="light"
-																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-															/>
-														) : (
-															<ContactTSVUploadDialog
-																isAdmin={false}
-																triggerText="Import"
-																buttonVariant="light"
-																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px]"
-																fullScreen
-															/>
-														)}
-														<div className="w-[19px]"></div>
-														{!canSearch ? (
-															<UpgradeSubscriptionDrawer
-																message="Searching for contacts requires an active subscription or free trial. Please upgrade your plan to proceed."
-																triggerButtonText="Generate"
-																buttonVariant="primary-light"
-																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
-															/>
-														) : (
-															<Button
-																variant="primary-light"
-																type="submit"
-																bold
-																className="!w-[174px] !h-[39px] !text-[16px] !font-bold !rounded-[7px] gradient-button gradient-button-green"
-																isLoading={isLoadingContacts || isRefetchingContacts}
-															>
-																Generate
-															</Button>
-														)}
 													</div>
 												</div>
 											)}
@@ -383,7 +1082,7 @@ const Dashboard = () => {
 						<div className="search-query-display mt-8">
 							<div className="search-query-display-inner">
 								<button
-									onClick={handleResetSearch}
+									onClick={handleEnhancedResetSearch}
 									className="search-back-button"
 									aria-label="Back to search"
 								>
@@ -463,28 +1162,7 @@ const Dashboard = () => {
 																className="results-search-icon-btn"
 																aria-label="Search"
 															>
-																<svg
-																	width="20"
-																	height="21"
-																	viewBox="0 0 20 21"
-																	fill="none"
-																	xmlns="http://www.w3.org/2000/svg"
-																	aria-hidden="true"
-																>
-																	<path
-																		d="M12 1C15.9278 1 19 3.96996 19 7.5C19 11.03 15.9278 14 12 14C8.07223 14 5 11.03 5 7.5C5 3.96996 8.07223 1 12 1Z"
-																		stroke="#A0A0A0"
-																		strokeWidth="2"
-																	/>
-																	<line
-																		x1="7.75258"
-																		y1="11.6585"
-																		x2="0.752577"
-																		y2="19.6585"
-																		stroke="#A0A0A0"
-																		strokeWidth="2"
-																	/>
-																</svg>
+																<SearchIconResults />
 															</button>
 															<Input
 																className={`search-wave-input results-search-input !border-2 !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-[#cfcfcf] ${
@@ -501,11 +1179,9 @@ const Dashboard = () => {
 																spellCheck="false"
 																{...field}
 															/>
-															<div className="search-wave-overlay" />
 														</div>
 													</div>
 												</FormControl>
-												<FormMessage />
 											</FormItem>
 										)}
 									/>
@@ -521,7 +1197,7 @@ const Dashboard = () => {
 								</div>
 							</Form>
 						</div>
-						{hoveredContact && (
+						{hoveredContact && !isMobile && (
 							<div className="absolute inset-0 z-[90] flex items-start justify-center pointer-events-none bg-white">
 								<div className="w-full max-w-[1132px] mx-auto px-4 py-3 text-center">
 									<div className="font-secondary font-bold text-[19px] leading-tight truncate">
@@ -603,7 +1279,7 @@ const Dashboard = () => {
 								<ConsoleLoader searchQuery={activeSearchQuery} />
 							</div>
 						) : contacts && contacts.length > 0 ? (
-							<div className="flex justify-center w-full px-4">
+							<div className="flex justify-center w-full px-0 sm:px-4">
 								<div className="w-full max-w-full results-appear results-align">
 									<Card className="border-0 shadow-none !p-0 w-full">
 										<CardContent className="!p-0 w-full">
@@ -618,74 +1294,114 @@ const Dashboard = () => {
 												rowsPerPage={100}
 												displayRowsPerPage={false}
 												constrainHeight
-												useCustomScrollbar
+												useCustomScrollbar={!isMobileLandscape}
 												scrollbarOffsetRight={-5}
-												containerClassName="search-results-table w-[1209px] h-[499px] rounded-[8px] border-[#737373]"
+												containerClassName="search-results-table h-[499px] rounded-[8px] border-[#737373] md:w-[1209px]"
 												tableClassName="w-full"
 												headerClassName="[&_tr]:border-[#737373]"
 												theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
 												rowClassName="border-[#737373] row-hover-scroll"
 												hidePagination
-												onRowHover={(row) => setHoveredContact(row)}
+												onRowHover={
+													isMobile ? undefined : (row) => setHoveredContact(row)
+												}
 												headerAction={
-													<button
-														onClick={handleSelectAll}
-														className="text-[14px] font-secondary font-normal text-black hover:underline"
-														type="button"
-													>
-														{isAllSelected ? 'Deselect All' : 'Select all'}
-													</button>
+													!isMobile ? (
+														<button
+															onClick={handleSelectAll}
+															className="text-[14px] font-secondary font-normal text-black hover:underline"
+															type="button"
+														>
+															{isAllSelected ? 'Deselect All' : 'Select all'}
+														</button>
+													) : null
 												}
 												headerInlineAction={
-													<button
-														type="button"
-														onClick={handleCreateCampaign}
-														disabled={selectedContacts.length === 0}
-														className="font-secondary"
-														style={{
-															width: 'auto',
-															height: '28px',
-															background:
-																selectedContacts.length === 0
-																	? 'rgba(93, 171, 104, 0.1)'
-																	: 'rgba(93, 171, 104, 0.22)',
-															border: '2px solid #000000',
-															color:
-																selectedContacts.length === 0
-																	? 'rgba(0, 0, 0, 0.4)'
-																	: '#000000',
-															fontSize: '13px',
-															fontWeight: 500,
-															borderRadius: '8px',
-															lineHeight: 'normal',
-															display: 'flex',
-															alignItems: 'center',
-															justifyContent: 'center',
-															padding: '0 12px',
-															textAlign: 'center',
-															cursor:
-																selectedContacts.length === 0 ? 'default' : 'pointer',
-															opacity: selectedContacts.length === 0 ? 0.6 : 1,
-														}}
-													>
-														Create Campaign
-													</button>
+													isMobile ? (
+														<button
+															onClick={handleSelectAll}
+															className="text-[14px] font-secondary font-normal text-black hover:underline"
+															type="button"
+														>
+															{isAllSelected ? 'Deselect All' : 'Select all'}
+														</button>
+													) : (
+														<button
+															type="button"
+															onClick={handleCreateCampaign}
+															disabled={selectedContacts.length === 0}
+															className="font-secondary"
+															style={{
+																width: 'auto',
+																height: '28px',
+																background:
+																	selectedContacts.length === 0
+																		? 'rgba(93, 171, 104, 0.1)'
+																		: 'rgba(93, 171, 104, 0.22)',
+																border: '2px solid #000000',
+																color:
+																	selectedContacts.length === 0
+																		? 'rgba(0, 0, 0, 0.4)'
+																		: '#000000',
+																fontSize: '13px',
+																fontWeight: 500,
+																borderRadius: '8px',
+																lineHeight: 'normal',
+																display: 'flex',
+																alignItems: 'center',
+																justifyContent: 'center',
+																padding: '0 12px',
+																textAlign: 'center',
+																cursor:
+																	selectedContacts.length === 0 ? 'default' : 'pointer',
+																opacity: selectedContacts.length === 0 ? 0.6 : 1,
+															}}
+														>
+															Create Campaign
+														</button>
+													)
 												}
 											/>
 										</CardContent>
 									</Card>
-									<div className="flex items-center w-full">
-										<Button
-											onClick={handleCreateCampaign}
-											isLoading={isPendingCreateCampaign || isPendingBatchUpdateContacts}
-											variant="primary-light"
-											bold
-											className="w-full max-w-full h-[39px] mx-auto mt-5"
-											disabled={selectedContacts.length === 0}
-										>
-											Create Campaign
-										</Button>
-									</div>
+									{/* Desktop button (non-sticky) */}
+									{!isMobile && (
+										<div className="flex items-center w-full">
+											<Button
+												onClick={handleCreateCampaign}
+												isLoading={
+													isPendingCreateCampaign || isPendingBatchUpdateContacts
+												}
+												variant="primary-light"
+												bold
+												className="w-full max-w-full h-[39px] mx-auto mt-5"
+												disabled={selectedContacts.length === 0}
+											>
+												Create Campaign
+											</Button>
+										</div>
+									)}
+
+									{/* Mobile sticky button at bottom */}
+									{isMobile &&
+										typeof window !== 'undefined' &&
+										createPortal(
+											<div className="mobile-sticky-cta">
+												<Button
+													onClick={handleCreateCampaign}
+													isLoading={
+														isPendingCreateCampaign || isPendingBatchUpdateContacts
+													}
+													variant="primary-light"
+													bold
+													className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#050505] transition-colors !opacity-100 disabled:!opacity-100"
+													disabled={selectedContacts.length === 0}
+												>
+													Create Campaign
+												</Button>
+											</div>,
+											document.body
+										)}
 								</div>
 							</div>
 						) : hasSearched &&
@@ -711,8 +1427,7 @@ const Dashboard = () => {
 				)}
 
 				{!hasSearched && (
-					<div className="campaigns-table-wrapper">
-						<div className="absolute top-0 left-0 right-0 h-8 z-[5] pointer-events-none bg-gradient-to-b from-white to-transparent" />
+					<div className="campaigns-table-wrapper w-full max-w-[960px] mx-auto px-4">
 						<CampaignsTable />
 					</div>
 				)}

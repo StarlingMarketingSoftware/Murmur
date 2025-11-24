@@ -15,6 +15,7 @@ import {
 	stateBadgeColorMap,
 } from '@/constants/ui';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
+import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 
 export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	const {
@@ -39,6 +40,13 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	} = useDraftedEmails(props);
 
 	const [showConfirm, setShowConfirm] = useState(false);
+
+	// Used contacts indicator
+	const { data: usedContactIds } = useGetUsedContactIds();
+	const usedContactIdsSet = useMemo(
+		() => new Set(usedContactIds || []),
+		[usedContactIds]
+	);
 	const selectedCount = selectedDraftIds.size;
 	const hasSelection = selectedCount > 0;
 	const toCount = selectedCount; // used in confirmation details
@@ -320,6 +328,22 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									onClick={(e) => handleDraftSelect(draft, e)}
 									onDoubleClick={() => handleDraftDoubleClick(draft)}
 								>
+									{/* Used-contact indicator - vertically centered */}
+									{usedContactIdsSet.has(draft.contactId) && (
+										<span
+											className="absolute left-[8px]"
+											title="Used in a previous campaign"
+											style={{
+												top: '50%',
+												transform: 'translateY(-50%)',
+												width: '16px',
+												height: '16px',
+												borderRadius: '50%',
+												border: '1px solid #000000',
+												backgroundColor: '#DAE6FE',
+											}}
+										/>
+									)}
 									{/* Delete button */}
 									<Button
 										type="button"
@@ -423,7 +447,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									</div>
 
 									{/* Content grid */}
-									<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px]">
+									<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px] pl-[22px]">
 										{/* Row 1: Name + Location */}
 										<div className="row-start-1 col-start-1 flex items-center">
 											<div className="font-bold text-[11px] truncate leading-none">

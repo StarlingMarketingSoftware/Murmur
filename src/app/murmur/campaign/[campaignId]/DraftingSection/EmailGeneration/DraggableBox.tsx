@@ -33,15 +33,24 @@ export const DraggableBox: FC<DraggableBoxProps> = ({
 	id,
 	children,
 	className,
-	defaultPosition = { x: 0, y: 0 },
+	defaultPosition,
 	dragHandleSelector,
 	onDropOver,
 	enabled = true,
 	resetToken,
 }) => {
 	const wrapperRef = useRef<HTMLDivElement | null>(null);
-	const positionRef = useRef<{ x: number; y: number }>({ ...defaultPosition });
-	const [position, setPosition] = useState<{ x: number; y: number }>(defaultPosition);
+	// Resolve primitives first, then memoize object so identity only changes when values change
+	const defaultX = defaultPosition?.x ?? 0;
+	const defaultY = defaultPosition?.y ?? 0;
+	const resolvedDefaultPosition = useMemo(
+		() => ({ x: defaultX, y: defaultY }),
+		[defaultX, defaultY]
+	);
+	const positionRef = useRef<{ x: number; y: number }>({ ...resolvedDefaultPosition });
+	const [position, setPosition] = useState<{ x: number; y: number }>(
+		resolvedDefaultPosition
+	);
 	const [isDragging, setIsDragging] = useState(false);
 	const [stackZIndex, setStackZIndex] = useState<number>(0);
 	const startRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
@@ -97,11 +106,11 @@ export const DraggableBox: FC<DraggableBoxProps> = ({
 				}
 				onDropOver(overId);
 				// Snap back to default position when using swap-on-drop behavior
-				positionRef.current = { ...defaultPosition };
-				setPosition({ ...defaultPosition });
+				positionRef.current = { ...resolvedDefaultPosition };
+				setPosition({ ...resolvedDefaultPosition });
 			}
 		},
-		[defaultPosition, id, onPointerMove, onDropOver]
+		[id, onPointerMove, onDropOver, resolvedDefaultPosition]
 	);
 
 	const tryStartDrag = useCallback(
@@ -162,19 +171,23 @@ export const DraggableBox: FC<DraggableBoxProps> = ({
 	// When disabled, clear transform and reset position
 	useEffect(() => {
 		if (!enabled) {
-			positionRef.current = { ...defaultPosition };
-			setPosition({ ...defaultPosition });
+			const isAlreadyAtDefault =
+				positionRef.current.x === resolvedDefaultPosition.x &&
+				positionRef.current.y === resolvedDefaultPosition.y;
+			if (!isAlreadyAtDefault) {
+				positionRef.current = { ...resolvedDefaultPosition };
+				setPosition({ ...resolvedDefaultPosition });
+			}
 			setIsDragging(false);
 		}
-		// include full object for correctness (eslint satisfies)
-	}, [enabled, defaultPosition]);
+	}, [enabled, resolvedDefaultPosition]);
 
 	// External reset trigger
 	useEffect(() => {
 		if (resetToken === undefined) return;
-		positionRef.current = { ...defaultPosition };
-		setPosition({ ...defaultPosition });
-	}, [resetToken, defaultPosition]);
+		positionRef.current = { ...resolvedDefaultPosition };
+		setPosition({ ...resolvedDefaultPosition });
+	}, [resetToken, resolvedDefaultPosition]);
 
 	// Inline styles
 	const style = useMemo<React.CSSProperties>(

@@ -77,6 +77,60 @@
 	--font-zen: var(--font-zen-antique);
 }
 
+/* Mobile landscape hard sizing for campaign metric boxes and headers */
+@media (orientation: landscape) {
+	/* Metric boxes themselves */
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-draft-fill],
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-sent-fill],
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-updated-fill],
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-created-fill] {
+		width: 50px !important;
+		min-width: 50px !important;
+		max-width: 50px !important;
+		height: 15px !important;
+		min-height: 15px !important;
+	}
+
+	/* Utility width classes used by compact variant */
+	.mobile-portrait-mode .metric-width-short,
+	.mobile-portrait-mode .metric-width-long {
+		width: 50px !important;
+		min-width: 50px !important;
+		max-width: 50px !important;
+	}
+
+	/* Header label widths to match boxes */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='drafts'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='sent'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='updated'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
+		width: 50px !important;
+		min-width: 50px !important;
+		max-width: 50px !important;
+	}
+}
+
+/* Mobile landscape: hide outline/border around campaign header controls */
+@media (orientation: landscape) {
+	body.murmur-mobile [data-slot='mobile-header-controls'] {
+		border: 0 !important;
+	}
+}
+
+/* Mobile landscape: prevent clipping of the leftmost metric box in metrics column */
+@media (orientation: landscape) {
+	/* Allow metrics column to render outside cell bounds if needed (do not move layout) */
+	.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(2),
+	.mobile-portrait-mode .my-campaigns-table thead th:nth-child(2) {
+		overflow: visible !important; /* overrides table cell overflow-hidden */
+	}
+
+	/* Ensure the inner metrics container is never clipped */
+	.mobile-portrait-mode .my-campaigns-table td:nth-child(2) .metrics-grid-container {
+		overflow: visible !important;
+	}
+}
+
 :root {
 	--radius: 0.625rem;
 	--foreground: rgb(37, 37, 38); /* oklch(0.147 0.004 49.25) */
@@ -492,11 +546,10 @@ body {
 	position: relative;
 	overflow: hidden;
 	border-radius: 0.75rem;
-	padding: 1px;
+	padding: 0;
 	width: 100% !important;
 	min-width: 100% !important;
 	max-width: 100% !important;
-	background: #ffffff;
 	transition: all 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 	box-shadow: none;
 	transform: none !important;
@@ -671,7 +724,7 @@ body {
 	position: absolute;
 	top: 50%;
 	left: 1rem; /* match input padding-left */
-	right: 1rem; /* match input padding-right */
+	right: 1rem; /* desktop default; mobile overridden below */
 	transform: translateY(-50%);
 	display: inline-flex;
 	align-items: baseline;
@@ -1346,7 +1399,7 @@ body {
 		transform 0.8s cubic-bezier(0.4, 0, 0.2, 1),
 		-webkit-transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 	z-index: 20;
-	margin-top: 96px;
+	margin-top: 46px;
 	width: 100%;
 	/* Keep consistent spacing below the search area regardless of zoom */
 	margin-bottom: 40px;
@@ -1441,9 +1494,9 @@ body {
 
 /* Set a compact, scrollable height for the My Campaigns table */
 .campaigns-table-container .my-campaigns-table {
-	height: 260px !important;
-	max-height: 260px !important;
-	min-height: 260px !important; /* Force exact height */
+	height: 172px !important;
+	max-height: 172px !important;
+	min-height: 172px !important; /* Force exact height */
 	position: relative !important;
 	display: block !important; /* Ensure it's a block element */
 }
@@ -1455,9 +1508,9 @@ body {
 
 /* Override default h-[429px] class when campaigns table uses constrainHeight */
 .campaigns-table-container .my-campaigns-table.h-\[429px\] {
-	height: 260px !important;
-	max-height: 260px !important;
-	min-height: 260px !important;
+	height: 172px !important;
+	max-height: 172px !important;
+	min-height: 172px !important;
 }
 
 /* Force hide ALL native scrollbars in campaigns table and its children */
@@ -1548,7 +1601,7 @@ body {
 /* Ensure proper scrolling behavior for campaigns table with custom scrollbar */
 .campaigns-table-container .my-campaigns-table {
 	position: relative !important;
-	height: 260px !important;
+	height: 172px !important;
 }
 
 /* Ensure the scrollbar components have proper dimensions and scrolling */
@@ -1800,8 +1853,99 @@ body {
 	}
 }
 
+/* Desktop/tablet default: keep metrics header labels on one line */
+.metrics-two-line-label .metrics-force-br {
+	display: none;
+}
+/* When the <br> is hidden on desktop, insert a separating space */
+.metrics-two-line-label .metrics-force-br + span::before {
+	content: ' ';
+}
+
 /* Keep exclude contacts box consistent on smaller screens */
 @media (max-width: 640px) {
+	/* Remove the synthetic space on mobile where the <br> is visible */
+	.mobile-portrait-mode .metrics-two-line-label .metrics-force-br + span::before {
+		content: none !important;
+	}
+	/* Show forced line breaks for metrics header labels only in mobile portrait */
+	.mobile-portrait-mode .metrics-two-line-label .metrics-force-br {
+		display: inline !important;
+	}
+	/* In compact header labels, always hide forced breaks */
+	.mobile-portrait-mode
+		.metrics-header-label-compact
+		.metrics-two-line-label
+		.metrics-force-br {
+		display: none !important;
+	}
+	/* Responsive metric widths for mobile portrait */
+	.mobile-portrait-mode {
+		--metric-width-short: clamp(35px, 9vw, 64px);
+		--metric-width-long: clamp(45px, 12vw, 84px);
+	}
+
+	/* Landscape: uniform 50px width for all metric boxes */
+	@media (orientation: landscape) {
+		.mobile-portrait-mode {
+			--metric-width-short: 50px !important;
+			--metric-width-long: 50px !important;
+		}
+		.mobile-portrait-mode .my-campaigns-table .metric-box {
+			height: 15px !important;
+			min-height: 15px !important;
+		}
+
+		/* In landscape we embed delete inside each row, so remove extra right gutter */
+		.mobile-portrait-mode .mobile-campaigns-outer-container {
+			width: 100% !important;
+			margin-right: 0 !important;
+			padding-right: 0 !important;
+		}
+
+		/* Remove small gap that was used for external buttons */
+		.mobile-portrait-mode .my-campaigns-table tbody tr {
+			margin-right: 0 !important;
+		}
+
+		/* Header widths for 3 columns: name | metrics | delete */
+		.mobile-portrait-mode .my-campaigns-table thead th:first-child {
+			width: 55% !important;
+			min-width: 55% !important;
+		}
+		.mobile-portrait-mode .my-campaigns-table thead th:nth-child(2) {
+			width: auto !important;
+			min-width: 0 !important;
+		}
+		.mobile-portrait-mode .my-campaigns-table thead th:nth-child(3) {
+			width: 28px !important;
+			min-width: 28px !important;
+		}
+
+		/* Body cell sizing for 3 columns */
+		.mobile-portrait-mode .my-campaigns-table tr > td:first-child {
+			flex: 1 1 55% !important;
+		}
+		.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(2) {
+			flex: 0 1 auto !important;
+		}
+		.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(3) {
+			flex: 0 0 28px !important;
+			justify-content: flex-end !important;
+		}
+	}
+
+	/* Utility classes to apply responsive widths */
+	.mobile-portrait-mode .metric-width-short {
+		width: var(--metric-width-short) !important;
+		min-width: var(--metric-width-short) !important;
+		max-width: var(--metric-width-short) !important;
+	}
+	.mobile-portrait-mode .metric-width-long {
+		width: var(--metric-width-long) !important;
+		min-width: var(--metric-width-long) !important;
+		max-width: var(--metric-width-long) !important;
+	}
 	.exclude-contacts-box {
 		width: 227px !important;
 		min-width: 227px !important;
@@ -2042,6 +2186,53 @@ body {
 	position: relative;
 }
 
+/* Mobile portrait: ensure the results search bar fits within the viewport */
+@media (max-width: 640px) and (orientation: portrait) {
+	/* Make form a single full-width column */
+	.results-search-form {
+		grid-template-columns: 1fr !important;
+		justify-content: stretch !important;
+	}
+	/* Let the group and its container expand fluidly */
+	.results-search-input-group {
+		width: 100% !important;
+		min-width: 0 !important;
+	}
+	.results-search-input-group .search-wave-container {
+		width: 100% !important;
+		min-width: 0 !important;
+		max-width: 100% !important;
+	}
+	/* Input fills available width; keep room for left icon */
+	.results-search-input {
+		width: 100% !important;
+		max-width: 100% !important;
+		padding-left: 36px; /* icon space */
+		padding-right: 12px;
+	}
+}
+
+/* Width-based fallback for responsive mode/devtools */
+@media (max-width: 640px) {
+	.results-search-form {
+		grid-template-columns: 1fr !important;
+		justify-content: stretch !important;
+	}
+	.results-search-input-group {
+		width: 100% !important;
+		min-width: 0 !important;
+	}
+	.results-search-input-group .search-wave-container {
+		width: 100% !important;
+		min-width: 0 !important;
+		max-width: 100% !important;
+	}
+	.results-search-input {
+		width: 100% !important;
+		max-width: 100% !important;
+	}
+}
+
 .results-search-icon-btn {
 	position: absolute;
 	left: 18px;
@@ -2113,6 +2304,578 @@ body {
 .results-search-input-group .search-wave-container.search-wave-loading::after {
 	animation: none !important;
 	display: none !important;
+}
+
+/* Match My Campaigns table width to search bar on mobile portrait */
+@media (max-width: 640px) and (orientation: portrait) {
+	/* The parent dashboard wrapper has px-4, so we need to compensate */
+	.mobile-campaigns-wrapper {
+		box-sizing: border-box !important;
+		width: 100% !important;
+		max-width: 100% !important;
+		margin-left: 0 !important;
+		margin-right: 0 !important;
+		padding-left: 0 !important;
+		padding-right: 0 !important;
+		overflow: visible !important;
+	}
+
+	.campaigns-table-container {
+		box-sizing: border-box !important;
+		width: 100% !important;
+		max-width: 100% !important;
+		margin-left: 0 !important;
+		margin-right: 0 !important;
+		padding-left: 0 !important;
+		padding-right: 0 !important;
+	}
+
+	/* Remove any padding from card content on mobile so the border is flush */
+	[data-slot='card-content'] {
+		padding-left: 0 !important;
+		padding-right: 0 !important;
+	}
+
+	/* Ensure the visual border matches the search bar gutters */
+	.my-campaigns-table {
+		border-left-width: 2px !important;
+		border-right-width: 2px !important;
+		border-color: #000000 !important;
+	}
+}
+
+/* Mobile campaign name typography: Times New Roman, 14px, bold */
+@media (max-width: 640px) {
+	.campaign-name-text {
+		font-family: 'Times New Roman', 'Times', serif !important;
+		font-weight: 700 !important;
+		font-size: 14px !important;
+		line-height: 1.2 !important;
+	}
+
+	/* In portrait mode, adjust to better match metric boxes */
+	@media (orientation: portrait) {
+		.mobile-portrait-mode .campaign-name-text {
+			font-size: 13px !important;
+			line-height: 15px !important;
+		}
+	}
+}
+
+/* Mobile landscape: keep campaign name at 14px to match portrait */
+@media (orientation: landscape) {
+	.mobile-landscape-mode .campaign-name-text {
+		font-size: 14px !important;
+		line-height: 1.2 !important;
+	}
+}
+
+/* Mobile portrait: constrain campaign name column to under half width and ellipsize */
+@media (max-width: 640px) and (orientation: portrait) {
+	/* First column (campaign name) should be < 50% of row */
+	.campaigns-table-container th:nth-child(1),
+	.campaigns-table-container td:nth-child(1) {
+		width: 44% !important;
+		max-width: 44% !important;
+		min-width: 0 !important;
+	}
+
+	/* Second column (metrics) takes remaining space when delete is moved outside */
+	.campaigns-table-container th:nth-child(2),
+	.campaigns-table-container td:nth-child(2) {
+		width: 56% !important;
+		max-width: 56% !important;
+		min-width: 0 !important;
+	}
+
+	/* Allow campaign name to wrap to two lines with ellipsis */
+	.campaigns-table-container td:nth-child(1) .campaign-name-text {
+		overflow: hidden !important;
+		display: -webkit-box !important;
+		-webkit-line-clamp: 2 !important;
+		-webkit-box-orient: vertical !important;
+		line-clamp: 2 !important;
+		text-overflow: ellipsis !important;
+		white-space: normal !important;
+		padding-right: 4px !important; /* override pr-8 */
+		max-width: 100% !important;
+		margin: 0 !important; /* Ensure no vertical margins */
+	}
+
+	/* Container for mobile campaigns in portrait mode */
+	.mobile-portrait-mode {
+		position: relative;
+	}
+
+	/* Remove all possible spacing from Card component */
+	.mobile-portrait-mode .relative.border-none.bg-transparent {
+		padding: 0 !important;
+		margin: 0 !important;
+	}
+
+	/* Specific override for the campaigns table card */
+	.campaigns-table-wrapper .relative.border-none.bg-transparent {
+		padding-top: 0 !important;
+	}
+
+	/* Force the first child of card (header) to start at the very top */
+	@media (max-width: 640px) and (orientation: portrait) {
+		.campaigns-table-wrapper .relative.border-none.bg-transparent > :first-child {
+			margin-top: 0 !important;
+			padding-top: 0 !important;
+			position: relative !important;
+			top: 0 !important;
+		}
+	}
+
+	/* Target Card component directly */
+	.mobile-portrait-mode > div:first-child {
+		padding-top: 0 !important;
+		margin-top: 0 !important;
+	}
+
+	.mobile-portrait-mode .mobile-portrait-card-header {
+		padding: 0 8px 2px !important; /* Minimal bottom padding only */
+		border: 2px solid #000000 !important;
+		border-bottom: none !important;
+		border-radius: 8px 8px 0 0 !important;
+		margin: 0 !important;
+		background: #ffffff !important;
+		min-height: auto !important; /* Ensure no minimum height */
+		position: relative !important;
+		top: -1px !important; /* Pull header up slightly to compensate for any remaining space */
+	}
+
+	/* Ensure the card header slot doesn't add extra space */
+	.mobile-portrait-mode [data-slot='card-header'] {
+		padding: 0 !important;
+		margin: 0 !important;
+	}
+
+	.mobile-portrait-card-title {
+		font-family: 'Times New Roman', 'Times', serif !important;
+		font-size: 10px !important;
+		font-weight: 700 !important;
+		line-height: 1 !important; /* Tighter line height */
+		letter-spacing: 0.01em !important;
+		margin: 0 !important;
+		padding: 0 !important; /* Ensure no padding */
+		display: block !important;
+	}
+
+	/* Target the card title slot specifically */
+	.mobile-portrait-mode [data-slot='card-title'] {
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	/* Force header and content to touch with no gap */
+	.mobile-portrait-mode .mobile-portrait-card-header + * {
+		margin-top: 0 !important;
+		padding-top: 0 !important;
+	}
+
+	/* Ensure the header fills any potential gap */
+	.mobile-portrait-mode .mobile-portrait-card-header::after {
+		content: '';
+		position: absolute;
+		bottom: -2px;
+		left: 0;
+		right: 0;
+		height: 4px;
+		background: #ffffff;
+	}
+
+	.mobile-portrait-card-content {
+		padding-top: 0 !important;
+		padding-bottom: 12px !important;
+		margin-top: -3px !important; /* Pull content up more to close any gap */
+	}
+
+	/* Position the table container relatively (ensure even if wrapper class is missing) */
+	.campaigns-table-container {
+		position: relative !important;
+	}
+
+	/* Force mobile table styles in any mobile orientation when wrapper has mobile-portrait-mode */
+	/* This mirrors the portrait rules so landscape uses the same compact design */
+	.mobile-portrait-mode .my-campaigns-table {
+		border: none !important;
+	}
+
+	.mobile-portrait-mode .mobile-scroll-wrapper {
+		border: 2px solid #000000 !important;
+		border-radius: 8px !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table table {
+		display: block;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table thead {
+		display: table-header-group !important;
+		vertical-align: middle !important;
+	}
+
+	/* Ensure header row uses table layout, not the flex override for body rows */
+	.mobile-portrait-mode .my-campaigns-table thead tr {
+		display: table-row !important;
+	}
+	.mobile-portrait-mode .my-campaigns-table thead th {
+		display: table-cell !important;
+		padding: 0 !important; /* remove horizontal padding to align with body */
+		border: none !important;
+	}
+
+	/* Make header columns match body flex layout: 55% name, remaining for metrics */
+	.mobile-portrait-mode .my-campaigns-table thead th:first-child {
+		width: 55% !important;
+		min-width: 55% !important;
+	}
+	.mobile-portrait-mode .my-campaigns-table thead th:nth-child(2) {
+		width: 45% !important;
+		min-width: 45% !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table tbody {
+		display: block;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table tbody tr {
+		display: flex;
+		align-items: stretch;
+		justify-content: flex-start;
+		border: 1px solid #ffffff;
+		border-radius: 8px;
+		padding: 8px 6px;
+		margin-bottom: 8px;
+		margin-right: 3px; /* Small gap between rows and delete buttons */
+		background-color: white;
+		min-height: 44px;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table td {
+		display: flex !important;
+		align-items: center !important;
+		border: none;
+		padding: 0;
+	}
+
+	/* Constrain name area and push metrics hard right */
+	.mobile-portrait-mode .my-campaigns-table tr > td:first-child {
+		flex: 1 1 55%;
+		min-width: 0;
+		height: auto;
+		padding: 0 !important;
+		margin: 0 !important;
+	}
+	.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(2) {
+		flex: 0 0 auto;
+		margin-left: 0 !important;
+		height: auto;
+		padding: 0 !important;
+		margin-top: 0 !important;
+		margin-bottom: 0 !important;
+	}
+
+	/* Outer container that holds both scroll wrapper and external delete buttons */
+	.mobile-campaigns-outer-container {
+		position: relative !important;
+		display: flex !important;
+		flex-wrap: nowrap !important;
+		align-items: flex-start !important;
+		gap: 0 !important;
+		width: calc(100% + 24px) !important; /* Extend width to compensate for buttons */
+		margin-right: -24px !important; /* Pull container to the right */
+		/* Reserve a right gutter for the absolute delete buttons so the
+		   table border (on the scroll wrapper) remains untouched */
+		padding-right: 24px !important;
+		overflow: visible !important; /* Allow delete buttons to render outside */
+	}
+
+	/* Mobile scroll wrapper - keep exact same dimensions as before */
+	.mobile-scroll-wrapper {
+		position: relative !important;
+		height: 172px !important;
+		overflow-y: auto !important;
+		overflow-x: hidden !important;
+		-webkit-overflow-scrolling: touch !important;
+		scrollbar-width: none !important;
+		-ms-overflow-style: none !important;
+		/* Take full width minus button space */
+		width: 100% !important;
+		flex: 1 1 auto !important;
+		/* Ensure we can see the delete buttons */
+		clip-path: none !important;
+	}
+
+	/* Hide scrollbar for mobile scroll wrapper */
+	.mobile-scroll-wrapper::-webkit-scrollbar {
+		display: none !important;
+		width: 0 !important;
+		height: 0 !important;
+	}
+
+	/* Container for table only */
+	.mobile-table-wrapper {
+		position: relative !important;
+		min-height: 100% !important;
+		/* Ensure the container uses full available width */
+		width: 100% !important;
+		box-sizing: border-box !important;
+	}
+
+	/* Remove scroll from the table itself in mobile portrait mode */
+	.mobile-table-no-scroll {
+		overflow: visible !important;
+		height: auto !important;
+		max-height: none !important;
+		flex: 1 1 auto !important; /* Take remaining space after delete buttons */
+		min-width: 0 !important; /* Allow table to shrink */
+	}
+
+	.mobile-table-no-scroll > div {
+		overflow: visible !important;
+		height: auto !important;
+	}
+
+	/* Delete buttons column */
+	.mobile-delete-buttons-column {
+		position: relative !important;
+		display: flex !important;
+		flex-direction: column !important;
+		padding-top: var(
+			--delete-column-top,
+			10px
+		) !important; /* fine-tune for visual alignment */
+		padding-right: 5px !important; /* Position inside the padded area */
+		width: 20px !important;
+		align-items: center !important;
+		gap: 8px !important; /* Match the margin-bottom of table rows */
+		flex-shrink: 0 !important; /* Prevent column from shrinking */
+	}
+
+	/* External delete buttons column positioned in a fixed right gutter,
+	   outside the scroll wrapper's border */
+	.mobile-delete-buttons-external {
+		position: absolute !important;
+		top: 0 !important;
+		right: -2px !important; /* Slightly overlap to appear connected to table */
+		display: flex !important;
+		flex-direction: column !important;
+		padding-top: calc(
+			var(--delete-column-top, 10px) + 26px
+		) !important; /* Slightly lower than previous to re-align */
+		padding-left: 4px !important; /* Reduced space from table border */
+		padding-right: 4px !important;
+		width: 24px !important; /* Match the X icon size */
+		align-items: center !important;
+		gap: 8px !important; /* Match the margin-bottom of table rows */
+		/* Match the scroll wrapper height and sync scrolling */
+		height: 172px !important;
+		overflow-y: auto !important;
+		overflow-x: hidden !important;
+		scrollbar-width: none !important;
+		-ms-overflow-style: none !important;
+		z-index: 200 !important; /* Above custom scrollbar track (z 100) */
+		pointer-events: auto !important;
+		/* Force GPU acceleration for smoother scrolling */
+		will-change: scroll-position !important;
+		-webkit-transform: translateZ(0) !important;
+		transform: translateZ(0) !important;
+	}
+
+	/* Hide scrollbar for delete buttons column */
+	.mobile-delete-buttons-external::-webkit-scrollbar {
+		display: none !important;
+		width: 0 !important;
+		height: 0 !important;
+	}
+
+	/* Individual delete button container that matches row height exactly */
+	.mobile-delete-btn {
+		width: 20px !important;
+		/* Match actual row height: content + padding (12px) + border (2px) */
+		height: 58px !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		background: transparent !important;
+		border: none !important;
+		padding: 0 !important;
+		cursor: pointer !important;
+		flex-shrink: 0 !important;
+		transition: opacity 0.2s ease !important;
+		/* Account for the same visual height as rows including their borders */
+		box-sizing: border-box !important;
+	}
+
+	.mobile-delete-btn:hover {
+		opacity: 0.7 !important;
+	}
+
+	.mobile-delete-btn:active {
+		opacity: 0.5 !important;
+	}
+
+	.mobile-delete-btn svg {
+		display: block !important;
+		pointer-events: none !important;
+		width: 16px !important;
+		height: 16px !important;
+	}
+
+	/* No extra right padding needed now that delete lives in the table */
+	.mobile-portrait-mode {
+		padding-right: 0;
+	}
+
+	/* Allow horizontal overflow for buttons in mobile portrait mode */
+	.mobile-portrait-mode .campaigns-table-container {
+		overflow: visible !important;
+		position: relative !important;
+	}
+
+	/* Ensure the wrapper div for campaigns in mobile portrait also allows overflow */
+	.mobile-portrait-mode .mobile-campaigns-wrapper {
+		overflow: visible !important;
+	}
+
+	/* Ensure parent containers don't clip the buttons */
+	.mobile-portrait-mode {
+		overflow: visible !important;
+	}
+
+	.mobile-portrait-mode [data-slot='card-content'] {
+		overflow: visible !important;
+	}
+
+	.mobile-portrait-mode .card,
+	.mobile-portrait-mode [data-slot='card'],
+	.mobile-portrait-mode .relative.border-none.bg-transparent {
+		overflow: visible !important;
+	}
+
+	/* Ensure the mobile scroll wrapper doesn't cut off content */
+	.mobile-portrait-mode .mobile-scroll-wrapper {
+		/* Allow space for the external delete buttons column */
+		width: auto !important;
+		min-width: 0 !important;
+		flex: 1 1 auto !important;
+		position: relative !important;
+		/* Remove compensating margins - let parent handle padding */
+		margin-left: 0 !important;
+		margin-right: 0 !important;
+		padding-left: 0 !important;
+		padding-right: 0 !important;
+	}
+
+	/* No border on table in mobile portrait mode - border is on scroll wrapper */
+	.mobile-portrait-mode .my-campaigns-table {
+		flex-shrink: 0 !important;
+	}
+
+	/* Remove border from table in mobile portrait mode - it's on the scroll wrapper now */
+	.mobile-portrait-mode .mobile-table-no-scroll {
+		border: none !important;
+		position: relative !important;
+	}
+
+	.mobile-portrait-mode .metrics-header-grid {
+		display: flex !important;
+		gap: 7px !important;
+		padding: 0 !important;
+		margin-left: 0 !important;
+		justify-content: flex-start !important;
+		align-items: center !important;
+	}
+
+	.mobile-portrait-mode .metrics-header-label {
+		white-space: nowrap !important;
+		overflow: hidden !important;
+		text-overflow: ellipsis !important;
+		font-family: var(--font-inter) !important;
+		font-weight: 600 !important;
+	}
+
+	/* Allow two-line wrap for longer labels */
+	.mobile-portrait-mode .metrics-header-label[data-label='updated'],
+	.mobile-portrait-mode .metrics-header-label[data-label='created'] {
+		white-space: normal !important;
+		word-break: normal !important;
+		overflow: visible !important;
+		text-overflow: clip !important;
+		display: inline-block !important;
+		max-width: 48px !important;
+		line-height: 1.05 !important;
+		text-align: center !important;
+	}
+
+	/* Slightly smaller metrics header labels on mobile portrait */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label {
+		font-size: 11px !important;
+	}
+
+	.mobile-portrait-mode .metrics-grid-container {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: flex-start !important;
+		flex-wrap: nowrap !important;
+		gap: 7px !important;
+		padding: 0 0 8px !important;
+		margin-left: 0 !important;
+	}
+
+	/* Ensure the table inside scrolls properly */
+	.mobile-portrait-mode .my-campaigns-table table {
+		border-radius: 0 !important; /* Table itself doesn't need rounded corners */
+	}
+
+	/* Increase row height for My Campaigns on mobile portrait */
+	.mobile-portrait-mode .campaigns-table-container tbody tr {
+		min-height: 58px !important;
+	}
+	.mobile-portrait-mode .campaigns-table-container th,
+	.mobile-portrait-mode .campaigns-table-container td {
+		padding-top: 0 !important;
+		padding-bottom: 0 !important;
+	}
+
+	/* Delete column is hidden on mobile portrait; external overlay handles delete buttons */
+
+	/* Tighter mobile widths so columns fit without overflow */
+	/* Widths are set earlier to 44%/56% for name/metrics when delete is external */
+}
+
+/* Additional tuning for mobile landscape so metric boxes are fully visible
+   and evenly spaced without changing their sizes. We give the metrics area
+   more breathing room and pull rows slightly away from the right border. */
+@media (orientation: landscape) {
+	.mobile-portrait-mode .my-campaigns-table tbody tr {
+		/* Add more right margin so boxes don’t hug the container border */
+		margin-right: 10px !important;
+	}
+
+	/* Shrink name cell so metrics begin further left */
+	.mobile-portrait-mode .my-campaigns-table tr > td:first-child {
+		flex: 1 1 42% !important;
+	}
+
+	/* Slightly reduce name share to free space for metrics */
+	.mobile-portrait-mode .my-campaigns-table thead th:first-child {
+		width: 42% !important;
+		min-width: 42% !important;
+	}
+	.mobile-portrait-mode .my-campaigns-table thead th:nth-child(2) {
+		width: 58% !important;
+		min-width: 58% !important;
+	}
+
+	/* Keep metrics content hugging left inside its cell */
+	.mobile-portrait-mode .metrics-grid-container {
+		justify-content: flex-start !important;
+		gap: 7px !important;
+	}
 }
 
 .dark .results-search-bar-wrapper {
@@ -2526,6 +3289,21 @@ body {
 	}
 }
 
+/* Real mobile: remove outer padding so the results container can center exactly
+   without overflowing the viewport when using custom internal paddings/borders. */
+body.murmur-mobile .results-appear,
+body.murmur-mobile .results-align {
+	padding: 0 !important;
+}
+
+/* Width-based fallback for responsive mode/devtools */
+@media (max-width: 640px) {
+	.results-appear,
+	.results-align {
+		padding: 0 !important;
+	}
+}
+
 /* Table container responsive behavior */
 .table-responsive-container {
 	width: 100%;
@@ -2622,42 +3400,62 @@ body {
 
 /* Keep table in normal flow with consistent spacing */
 .campaigns-table-wrapper {
-	margin-top: -200px; /* Pull table up for better positioning */
+	margin-top: 35px; /* Push table down for better positioning on desktop */
 	position: relative;
 	z-index: 30; /* Ensure table is above other elements */
 }
 
+/* Mobile landscape: scale campaigns table wrapper width proportionally
+   Example: at 852px viewport width, table width ≈ 503px → 503/852 ≈ 59.04% */
+@media (orientation: landscape) and (max-width: 960px) {
+	.campaigns-table-wrapper {
+		width: 59.04vw !important; /* Maintain 503/852 proportion across breakpoints */
+		max-width: none !important; /* Override tailwind max-w-[960px] */
+		min-width: 0 !important;
+		box-sizing: border-box !important; /* Include padding in computed width */
+		padding-left: 0 !important; /* Neutralize px-4 so width matches proportion */
+		padding-right: 0 !important;
+	}
+}
+
+/* Override negative margin on mobile to prevent white space */
+@media (max-width: 640px) {
+	.campaigns-table-wrapper {
+		margin-top: 20px; /* Positive margin for mobile */
+	}
+}
+
 /* Dashboard main offset: default for landscape (unchanged visual) */
 .dashboard-main-offset {
-	margin-top: -164px;
+	margin-top: -64px;
 }
 
 /* Keep search results view at previous position */
 .dashboard-main-offset.search-active {
-	margin-top: -176px;
+	margin-top: -76px;
 }
 
 /* Portrait monitors: lower the dashboard to avoid top clipping */
 @media (orientation: portrait) {
 	.dashboard-main-offset {
-		margin-top: -84px;
+		margin-top: 16px;
 	}
 
 	/* Keep search results view at previous position on portrait */
 	.dashboard-main-offset.search-active {
-		margin-top: -96px;
+		margin-top: 6px;
 	}
 }
 
 /* Adjust table position for portrait orientation screens to prevent overlap */
 @media (orientation: portrait) {
 	.campaigns-table-wrapper {
-		margin-top: -100px; /* Less aggressive pull-up on portrait screens */
+		margin-top: 20px; /* Positive margin for proper spacing on portrait screens */
 	}
 
 	/* Add extra spacing between search area and table on portrait */
 	.hero-wrapper {
-		min-height: 600px !important; /* Reduce min-height on portrait */
+		min-height: auto !important; /* Allow flexible height on portrait */
 		height: auto !important; /* Allow flexible height */
 	}
 
@@ -2670,7 +3468,20 @@ body {
 /* Additional fix for tall portrait monitors (aspect ratio taller than 3:4) */
 @media (orientation: portrait) and (min-aspect-ratio: 3/4) {
 	.campaigns-table-wrapper {
-		margin-top: -50px; /* Even less pull-up for very tall portrait screens */
+		margin-top: 20px; /* Consistent positive margin for tall portrait screens */
+	}
+}
+
+/* Mobile portrait specific fix to ensure no white margin */
+@media (max-width: 640px) and (orientation: portrait) {
+	.campaigns-table-wrapper {
+		margin-top: 20px !important; /* Override any negative margins */
+	}
+
+	/* Ensure the dashboard offset doesn't interfere */
+	.dashboard-main-offset {
+		margin-top: 0;
+		padding-top: 80px;
 	}
 }
 
@@ -3037,8 +3848,8 @@ html.murmur-compact {
 
 /* --- Campaigns Table Custom Scrollbar --- */
 .my-campaigns-table {
-	height: 260px !important;
-	max-height: 260px !important;
+	height: 172px !important;
+	max-height: 172px !important;
 }
 
 .my-campaigns-table .scrollbar-hide {
@@ -3450,8 +4261,2587 @@ body,
 .search-results-table tr[data-slot='table-row']:hover td[data-slot='table-cell'] {
 	background-color: #edf5ee !important;
 }
+
+/* Disable hover effects on mobile to prevent stuck states */
+@media (max-width: 640px) {
+	.search-results-table tr[data-slot='table-row']:hover td[data-slot='table-cell'] {
+		background-color: white !important;
+	}
+	.row-hover-scroll:hover .hover-scroll-text {
+		animation: none !important;
+	}
+	/* Allow text wrapping in table cells on mobile */
+	.search-results-table td[data-slot='table-cell'] {
+		white-space: normal !important;
+	}
+}
+body.murmur-mobile
+	.search-results-table
+	tr[data-slot='table-row']:hover
+	td[data-slot='table-cell'] {
+	background-color: white !important;
+}
+body.murmur-mobile .row-hover-scroll:hover .hover-scroll-text {
+	animation: none !important;
+}
+/* Allow text wrapping in table cells on mobile */
+body.murmur-mobile .search-results-table td[data-slot='table-cell'] {
+	white-space: normal !important;
+}
 .search-results-table
 	tr[data-slot='table-row'][data-state='selected']
 	td[data-slot='table-cell'] {
 	background-color: #d6e8d9 !important;
+}
+
+/* Mobile portrait: make results container width proportional to viewport
+   At 375px viewport width, container = 349px (ratio ≈ 0.9306667) */
+@media (max-width: 640px) and (orientation: portrait) {
+	body.murmur-mobile .search-results-table {
+		/* Desired row width at 375px viewport is 349px.
+		   The visible row width is the table's content width, which is the
+		   container width minus:
+		   - 2px left + 2px right container border (from border-2)
+		   - 8px left + 8px right table padding declared in .search-results-table table[data-slot='table']
+		   We maintain a constant ratio for the row content area and then add back these
+		   fixed offsets so that the content (row) width scales proportionally. */
+		--search-results-row-ratio: 0.9306666667; /* 349 / 375 */
+		--search-results-horizontal-table-padding: 16px; /* 8px left + 8px right */
+		--search-results-container-border: 2px; /* tailwind border-2 => 2px per side */
+		width: calc(
+			var(--search-results-row-ratio) * 100vw +
+				var(--search-results-horizontal-table-padding) +
+				(var(--search-results-container-border) * 2)
+		) !important;
+		max-width: calc(
+			var(--search-results-row-ratio) * 100vw +
+				var(--search-results-horizontal-table-padding) +
+				(var(--search-results-container-border) * 2)
+		) !important;
+		margin-left: auto !important;
+		margin-right: auto !important;
+	}
+}
+
+/* Mobile: tighten vertical spacing between search result rows to 5px */
+@media (max-width: 640px) {
+	.search-results-table table[data-slot='table'] {
+		border-spacing: 0 5px !important; /* reduce from default 8px only on mobile */
+	}
+	.search-results-table thead[data-slot='table-header'] {
+		margin-bottom: -5px !important; /* keep header flush with reduced row gap */
+	}
+}
+
+/* Real mobile devices only (extra guard) */
+body.murmur-mobile .search-results-table table[data-slot='table'] {
+	border-spacing: 0 5px !important;
+}
+body.murmur-mobile .search-results-table thead[data-slot='table-header'] {
+	margin-bottom: -5px !important;
+}
+
+/* Mobile: ensure the initial dashboard search input is 41px tall */
+@media (max-width: 640px) {
+	/* Target only the hero/initial search input, not the results view */
+	.search-wave-input:not(.results-search-input) {
+		height: 41px !important;
+		font-size: 13px !important;
+	}
+}
+
+/* Match placeholder overlay typography to input size on mobile */
+.search-input-group .custom-placeholder {
+	font-size: 13px !important;
+}
+
+/* Mobile: tighten space above the initial search bar */
+body.murmur-mobile .search-bar-wrapper {
+	margin-top: 30px !important;
+}
+@media (max-width: 640px) {
+	.search-bar-wrapper {
+		margin-top: 30px;
+	}
+	/* Make room for the right icon in the initial input */
+	.search-wave-input:not(.results-search-input) {
+		padding-right: 44px !important;
+	}
+	/* Prevent placeholder text from overlapping the icon */
+	.search-input-group .custom-placeholder {
+		right: 44px !important;
+	}
+}
+
+/* Real mobile only: shrink the 'Exclude Used Contacts' toggle footprint */
+/* Also tighten spacing below the search input to exactly 3px */
+body.murmur-mobile .search-bar-wrapper [data-slot='form-item'] {
+	margin-bottom: 0 !important;
+}
+
+body.murmur-mobile .search-bar-wrapper .search-input-group {
+	margin-bottom: 0 !important;
+}
+
+/* Put the actions row (which contains the Exclude Used Contacts box) 3px below input */
+body.murmur-mobile .search-bar-wrapper .flex-wrap {
+	margin-top: 3px !important;
+	padding-top: 0 !important;
+}
+
+/* Even more explicit: when the actions row immediately follows the field */
+body.murmur-mobile .search-bar-wrapper [data-slot='form-item'] + .flex-wrap {
+	margin-top: 3px !important;
+	padding-top: 0 !important;
+}
+
+/* Be extra explicit: target only the immediate children of the form */
+body.murmur-mobile .search-bar-wrapper form > [data-slot='form-item'] {
+	margin-bottom: 0 !important;
+}
+
+body.murmur-mobile .search-bar-wrapper form > .flex-wrap {
+	margin-top: 3px !important;
+}
+
+body.murmur-mobile .exclude-contacts-box {
+	width: 124px !important;
+	min-width: 124px !important;
+	max-width: 124px !important;
+	height: 16px !important;
+	padding: 0 6px !important;
+	border-radius: 6px !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: space-between !important;
+	/* Remove vertical auto margins introduced by my-auto utility */
+	margin-top: 0 !important;
+	margin-bottom: 0 !important;
+	/* Ensure it anchors to the top of the row regardless of row alignment */
+	align-self: flex-start !important;
+}
+
+/* Ensure inner wrappers fill the container height and center content */
+body.murmur-mobile .exclude-contacts-box [data-slot='form-control'] {
+	height: 100% !important;
+	display: flex !important;
+	align-items: center !important;
+}
+
+/* The clickable label that wraps the switch should also fill and center */
+body.murmur-mobile .exclude-contacts-box [data-slot='form-control'] > label {
+	height: 100% !important;
+	display: inline-flex !important;
+	align-items: center !important;
+}
+
+body.murmur-mobile .exclude-contacts-box [data-slot='form-item'] {
+	gap: 6px !important;
+	width: 100% !important;
+	height: 100% !important;
+	align-items: center !important;
+	justify-content: space-between !important;
+}
+
+/* Sticky bottom container for mobile CTA (accounts for iOS safe area and zoom) */
+.mobile-sticky-cta {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 300; /* Above other overlays */
+}
+
+/* Ensure the mobile CTA never fades when disabled */
+.mobile-sticky-cta [data-slot='button'][disabled] {
+	opacity: 1 !important;
+}
+
+/* Respect iOS safe-area when present */
+@supports (bottom: env(safe-area-inset-bottom)) {
+	.mobile-sticky-cta {
+		bottom: env(safe-area-inset-bottom);
+		padding-bottom: env(safe-area-inset-bottom);
+	}
+}
+
+/* Label text: 8px Inter bold, allow full phrase inside 124px */
+body.murmur-mobile .exclude-contacts-box [data-slot='form-label'] {
+	font-size: 8px !important;
+	line-height: 10px !important;
+	font-weight: 700 !important;
+	font-family: var(--font-secondary), 'Inter', system-ui, -apple-system, Segoe UI, Roboto,
+		sans-serif !important;
+	white-space: nowrap !important;
+	max-width: 100px !important; /* leave space for 13px switch + gap */
+	overflow: hidden !important;
+	text-overflow: clip !important;
+}
+
+/* Switch track scaled down for mobile (13x8) */
+body.murmur-mobile .exclude-contacts-box .toggle-switch-track {
+	width: 13px !important;
+	height: 8px !important;
+	border-radius: 9999px !important;
+	flex: 0 0 13px !important; /* prevent stretching */
+	align-self: center !important; /* guard against baseline alignment issues */
+}
+
+/* Switch thumb sized to fit inside the 13x8 track */
+body.murmur-mobile .exclude-contacts-box .toggle-switch-track > div {
+	width: 6px !important;
+	height: 6px !important;
+	left: 2px !important;
+	top: 50% !important;
+	transform: translateY(-50%) !important;
+	border-radius: 9999px !important;
+}
+
+/* Checked state translation within 13px track (from 2px to 5px => +3px) */
+body.murmur-mobile .exclude-contacts-box .toggle-switch-track[data-checked='true'] > div {
+	/* Move thumb 3px to the right within 13px track (2px -> 5px center), leaving 1px breathing room */
+	transform: translateX(3px) translateY(-50%) !important;
+}
+
+/* Collapse the left controls wrapper height on mobile and top-align it */
+body.murmur-mobile .search-bar-wrapper .flex-wrap > .h-\[39px\] {
+	height: auto !important;
+	min-height: 16px !important;
+	align-self: flex-start !important;
+}
+
+/* Width-based fallback for responsive mode/devtools */
+@media (max-width: 640px) {
+	.search-bar-wrapper .flex-wrap > .h-\[39px\] {
+		height: auto !important;
+		min-height: 16px !important;
+		align-self: flex-start !important;
+	}
+	.exclude-contacts-box {
+		margin-top: 0 !important;
+		margin-bottom: 0 !important;
+		align-self: flex-start !important;
+	}
+}
+
+/* Width-based mobile fallback: ensure 3px gap below the search bar even when
+   the runtime mobile class is not present (e.g., devtools responsive mode). */
+@media (max-width: 640px) {
+	.search-bar-wrapper [data-slot='form-item'] {
+		margin-bottom: 0 !important;
+	}
+	.search-bar-wrapper .search-input-group {
+		margin-bottom: 0 !important;
+	}
+	.search-bar-wrapper form > [data-slot='form-item'] {
+		margin-bottom: 0 !important;
+	}
+	.search-bar-wrapper form > .flex-wrap {
+		margin-top: 3px !important;
+		padding-top: 0 !important;
+	}
+	/* Adjacent sibling fallback as well */
+	.search-bar-wrapper [data-slot='form-item'] + .flex-wrap {
+		margin-top: 3px !important;
+		padding-top: 0 !important;
+	}
+}
+
+/* Desktop: constrain hero search input to 603x72 with 8px radius */
+@media (min-width: 1024px) {
+	.search-bar-wrapper:not(.search-bar-active) .search-input-group {
+		width: 603px !important;
+		max-width: 603px !important;
+		min-width: 603px !important;
+		margin-left: auto !important;
+		margin-right: auto !important;
+	}
+
+	.search-bar-wrapper:not(.search-bar-active) .search-wave-container {
+		width: 100% !important;
+		min-width: 100% !important;
+		max-width: 100% !important;
+		border-radius: 8px !important;
+		background: #f2f2f2 !important;
+	}
+
+	.search-bar-wrapper:not(.search-bar-active) .search-wave-container::before {
+		background: #f2f2f2 !important;
+		border-radius: 8px !important;
+	}
+
+	.search-bar-wrapper:not(.search-bar-active)
+		.search-wave-input:not(.results-search-input) {
+		width: 100% !important;
+		height: 72px !important;
+		border-radius: 8px !important;
+		padding-left: 1.25rem !important;
+		padding-right: 1.25rem !important;
+		font-size: 1.0625rem;
+	}
+}
+
+/* Mobile-only button inside the initial search input */
+.search-input-icon-btn {
+	display: none;
+}
+
+body.murmur-mobile .search-input-icon-btn {
+	display: inline-flex;
+	position: absolute;
+	right: 12px;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 22px;
+	height: 22px;
+	align-items: center;
+	justify-content: center;
+	background: transparent;
+	border: none;
+	padding: 0;
+	margin: 0;
+	z-index: 4; /* above gradient overlay */
+	cursor: pointer;
+}
+
+/* Width-based fallback so it appears in responsive mode too */
+@media (max-width: 640px) {
+	.search-input-icon-btn {
+		display: inline-flex;
+		position: absolute;
+		right: 12px;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 22px;
+		height: 22px;
+		z-index: 4;
+	}
+}
+
+.black-scrollbar-thumb::-webkit-scrollbar-thumb {
+	background-color: black;
+}
+@media (max-width: 640px) {
+	.mobile-portrait-mode .my-campaigns-table {
+		border: none !important;
+	}
+
+	/* Apply border to the scroll wrapper instead so it stays fixed */
+	.mobile-portrait-mode .mobile-scroll-wrapper {
+		border: 2px solid #000000 !important;
+		border-radius: 8px !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table table {
+		display: block;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table thead {
+		display: table-header-group !important;
+		vertical-align: middle !important;
+	}
+
+	/* Ensure header row uses table layout, not the flex override for body rows */
+	.mobile-portrait-mode .my-campaigns-table thead tr {
+		display: table-row !important;
+	}
+	.mobile-portrait-mode .my-campaigns-table thead th {
+		display: table-cell !important;
+		padding: 0 !important; /* remove horizontal padding to align with body */
+		border: none !important;
+	}
+
+	/* Make header columns match body flex layout: 55% name, remaining for metrics */
+	.mobile-portrait-mode .my-campaigns-table thead th:first-child {
+		width: 55% !important;
+		min-width: 55% !important;
+	}
+	.mobile-portrait-mode .my-campaigns-table thead th:nth-child(2) {
+		width: 45% !important;
+		min-width: 45% !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table tbody {
+		display: block;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table tbody tr {
+		display: flex;
+		align-items: stretch;
+		justify-content: flex-start;
+		border: 1px solid #ffffff;
+		border-radius: 8px;
+		padding: 8px 6px;
+		margin-bottom: 8px;
+		margin-right: 3px; /* Small gap between rows and delete buttons */
+		background-color: white;
+		min-height: 44px;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table td {
+		display: flex !important;
+		align-items: center !important;
+		border: none;
+		padding: 0;
+	}
+
+	/* Constrain name area and push metrics hard right */
+	.mobile-portrait-mode .my-campaigns-table tr > td:first-child {
+		flex: 1 1 55%;
+		min-width: 0;
+		height: auto;
+		padding: 0 !important;
+		margin: 0 !important;
+	}
+	.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(2) {
+		flex: 0 0 auto;
+		margin-left: 0 !important;
+		height: auto;
+		padding: 0 !important;
+		margin-top: 0 !important;
+		margin-bottom: 0 !important;
+	}
+
+	.mobile-portrait-mode [data-slot='card-title'] {
+		font-size: 7px !important;
+		font-family: Inter, sans-serif !important;
+		font-weight: 500 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .campaign-name-text {
+		font-weight: bold;
+		margin: 0 !important;
+		line-height: 15px !important; /* Match metric box height */
+		display: inline-flex !important;
+		align-items: center !important;
+		height: auto !important;
+		vertical-align: middle !important;
+	}
+
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		min-width: 0 !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		max-width: 100% !important;
+		overflow: visible !important;
+		padding-right: 2px !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		margin-right: clamp(4px, 1.6vw, 10px) !important;
+		max-width: 55% !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-box {
+		padding: 0 !important;
+		font-size: 12px !important;
+		margin: 0 !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		vertical-align: middle !important;
+	}
+
+	/* Lock widths so container gap is the only spacing */
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-draft-fill],
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-sent-fill] {
+		width: var(--metric-width-short) !important;
+		height: 15px !important;
+		justify-content: center !important;
+		padding-right: 2px !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-updated-fill],
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-created-fill] {
+		width: var(--metric-width-long) !important;
+		height: 15px !important;
+		justify-content: center !important;
+		padding-right: 2px !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-separator {
+		display: none !important;
+	}
+
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		flex: 0 0 auto !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		margin-right: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-box {
+		padding: 0 !important;
+		font-size: 12px !important;
+		margin: 0 !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		vertical-align: middle !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-separator {
+		display: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: minmax(0, 0.9fr) repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 4px !important;
+		column-gap: clamp(4px, 1.6vw, 12px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		min-width: 0 !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		margin-right: clamp(4px, 1.6vw, 10px) !important;
+	}
+
+	.mobile-portrait-mode
+		.my-campaigns-table
+		.metrics-grid-container
+		> div:not(:first-child) {
+		flex: 1 1 0 !important;
+	}
+
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		margin: 0 !important;
+		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		width: auto !important;
+		justify-content: flex-start !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: 100% !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		/* existing rules cleared for consolidation */
+	}
+
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: 100% !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(65px, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 10px !important;
+		column-gap: clamp(6px, 2.5vw, 14px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		margin: 0 !important;
+		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		margin-right: clamp(6px, 2vw, 12px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(72px, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 10px !important;
+		column-gap: clamp(6px, 2.5vw, 14px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		width: 100% !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		width: auto !important;
+		margin-right: clamp(6px, 2vw, 12px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 8px !important;
+		column-gap: clamp(4px, 1.75vw, 12px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		width: 100% !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		width: auto !important;
+		min-width: auto !important;
+	}
+
+	/* Mobile landscape: force metric boxes to 50x15 regardless of viewport width */
+	@media (orientation: landscape) {
+		.mobile-portrait-mode .metric-width-short,
+		.mobile-portrait-mode .my-campaigns-table .metric-box[data-draft-fill],
+		.mobile-portrait-mode .my-campaigns-table .metric-box[data-sent-fill] {
+			width: 50px !important;
+			min-width: 50px !important;
+			max-width: 50px !important;
+		}
+
+		.mobile-portrait-mode .metric-width-long,
+		.mobile-portrait-mode .my-campaigns-table .metric-box[data-updated-fill],
+		.mobile-portrait-mode .my-campaigns-table .metric-box[data-created-fill] {
+			width: 50px !important;
+			min-width: 50px !important;
+			max-width: 50px !important;
+		}
+
+		.mobile-portrait-mode .my-campaigns-table .metric-box {
+			height: 15px !important;
+			min-height: 15px !important;
+		}
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		/* Shift slightly left so right edge isn't clipped on iPhone */
+		margin-left: 0 !important;
+		column-gap: clamp(4px, 1.5vw, 10px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: flex-start !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		margin-right: clamp(4px, 1.25vw, 8px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: auto !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-box {
+		padding: 0 !important;
+		font-size: 12px !important;
+		margin: 0 !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		vertical-align: middle !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-separator {
+		display: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: flex !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 6px !important;
+		gap: clamp(6px, 2vw, 14px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		flex: 0 0 auto !important;
+		margin-right: clamp(8px, 2.5vw, 18px) !important;
+	}
+
+	.mobile-portrait-mode
+		.my-campaigns-table
+		.metrics-grid-container
+		> div:not(:first-child) {
+		flex: 1 1 0 !important;
+	}
+
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		margin: 0 !important;
+		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		width: auto !important;
+		justify-content: flex-start !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: 100% !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		/* existing rules cleared for consolidation */
+	}
+
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: 100% !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(65px, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 10px !important;
+		column-gap: clamp(6px, 2.5vw, 14px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		margin: 0 !important;
+		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		margin-right: clamp(6px, 2vw, 12px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(72px, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 10px !important;
+		column-gap: clamp(6px, 2.5vw, 14px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		width: 100% !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		width: auto !important;
+		margin-right: clamp(6px, 2vw, 12px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 8px !important;
+		column-gap: clamp(4px, 1.75vw, 12px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		width: 100% !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		width: auto !important;
+		min-width: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 6px !important;
+		column-gap: clamp(4px, 1.5vw, 10px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: flex-start !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		margin-right: clamp(4px, 1.25vw, 8px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: auto !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-box {
+		padding: 0 !important;
+		font-size: 12px !important;
+		margin: 0 !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		vertical-align: middle !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-separator {
+		display: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: flex !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 6px !important;
+		gap: clamp(6px, 2vw, 14px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		flex: 0 0 auto !important;
+		margin-right: clamp(8px, 2.5vw, 18px) !important;
+	}
+
+	.mobile-portrait-mode
+		.my-campaigns-table
+		.metrics-grid-container
+		> div:not(:first-child) {
+		flex: 1 1 0 !important;
+	}
+
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		margin: 0 !important;
+		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		width: auto !important;
+		justify-content: flex-start !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: 100% !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		/* existing rules cleared for consolidation */
+	}
+
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: 100% !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(65px, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 10px !important;
+		column-gap: clamp(6px, 2.5vw, 14px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		margin: 0 !important;
+		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		margin-right: clamp(6px, 2vw, 12px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(72px, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 10px !important;
+		column-gap: clamp(6px, 2.5vw, 14px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		width: 100% !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		width: auto !important;
+		margin-right: clamp(6px, 2vw, 12px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 8px !important;
+		column-gap: clamp(4px, 1.75vw, 12px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		width: 100% !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		width: auto !important;
+		min-width: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 6px !important;
+		column-gap: clamp(4px, 1.5vw, 10px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: flex-start !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		margin-right: clamp(4px, 1.25vw, 8px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: auto !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-box {
+		padding: 0 !important;
+		font-size: 12px !important;
+		margin: 0 !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		vertical-align: middle !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-separator {
+		display: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: flex !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 6px !important;
+		gap: clamp(6px, 2vw, 14px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		flex: 0 0 auto !important;
+		margin-right: clamp(8px, 2.5vw, 18px) !important;
+	}
+
+	.mobile-portrait-mode
+		.my-campaigns-table
+		.metrics-grid-container
+		> div:not(:first-child) {
+		flex: 1 1 0 !important;
+	}
+
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		margin: 0 !important;
+		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		width: auto !important;
+		justify-content: flex-start !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: 100% !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		/* existing rules cleared for consolidation */
+	}
+
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: 100% !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(65px, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 10px !important;
+		column-gap: clamp(6px, 2.5vw, 14px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		margin: 0 !important;
+		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		margin-right: clamp(6px, 2vw, 12px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(72px, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 10px !important;
+		column-gap: clamp(6px, 2.5vw, 14px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		width: 100% !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		width: auto !important;
+		margin-right: clamp(6px, 2vw, 12px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 8px !important;
+		column-gap: clamp(4px, 1.75vw, 12px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		width: 100% !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		width: auto !important;
+		min-width: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 6px !important;
+		column-gap: clamp(4px, 1.5vw, 10px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: flex-start !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		margin-right: clamp(4px, 1.25vw, 8px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: auto !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-box {
+		padding: 0 !important;
+		font-size: 12px !important;
+		margin: 0 !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		vertical-align: middle !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-separator {
+		display: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: flex !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 6px !important;
+		gap: clamp(6px, 2vw, 14px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		flex: 0 0 auto !important;
+		margin-right: clamp(8px, 2.5vw, 18px) !important;
+	}
+
+	.mobile-portrait-mode
+		.my-campaigns-table
+		.metrics-grid-container
+		> div:not(:first-child) {
+		flex: 1 1 0 !important;
+	}
+
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		margin: 0 !important;
+		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		width: auto !important;
+		justify-content: flex-start !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: 100% !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		/* existing rules cleared for consolidation */
+	}
+
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: 100% !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(65px, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 10px !important;
+		column-gap: clamp(6px, 2.5vw, 14px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		margin: 0 !important;
+		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		margin-right: clamp(6px, 2vw, 12px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(72px, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 10px !important;
+		column-gap: clamp(6px, 2.5vw, 14px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		width: 100% !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		width: auto !important;
+		margin-right: clamp(6px, 2vw, 12px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 8px !important;
+		column-gap: clamp(4px, 1.75vw, 12px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		width: 100% !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		width: auto !important;
+		min-width: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 6px !important;
+		column-gap: clamp(4px, 1.5vw, 10px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: flex-start !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		margin-right: clamp(4px, 1.25vw, 8px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: auto !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-box {
+		padding: 0 !important;
+		font-size: 12px !important;
+		margin: 0 !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		vertical-align: middle !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-separator {
+		display: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: flex !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 6px !important;
+		gap: clamp(6px, 2vw, 14px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		flex: 0 0 auto !important;
+		margin-right: clamp(8px, 2.5vw, 18px) !important;
+	}
+
+	.mobile-portrait-mode
+		.my-campaigns-table
+		.metrics-grid-container
+		> div:not(:first-child) {
+		flex: 1 1 0 !important;
+	}
+
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		margin: 0 !important;
+		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		width: auto !important;
+		justify-content: flex-start !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: 100% !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child,
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		/* existing rules cleared for consolidation */
+	}
+
+	/* Removed duplicate metrics-grid-container rule - see consolidated rule at line ~6040 */
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: 100% !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(65px, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 10px !important;
+		column-gap: clamp(6px, 2.5vw, 14px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		margin: 0 !important;
+		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		margin-right: clamp(6px, 2vw, 12px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(72px, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 10px !important;
+		column-gap: clamp(6px, 2.5vw, 14px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		width: 100% !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		width: auto !important;
+		margin-right: clamp(6px, 2vw, 12px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 8px !important;
+		column-gap: clamp(4px, 1.75vw, 12px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		width: 100% !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		width: auto !important;
+		min-width: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 6px !important;
+		column-gap: clamp(4px, 1.5vw, 10px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: flex-start !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		margin-right: clamp(4px, 1.25vw, 8px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+		width: auto !important;
+		max-width: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-box {
+		padding: 0 !important;
+		font-size: 12px !important;
+		margin: 0 !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		vertical-align: middle !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-separator {
+		display: none !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: flex !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 6px !important;
+		gap: clamp(6px, 2vw, 14px) !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		flex: 0 0 auto !important;
+		margin-right: clamp(8px, 2.5vw, 18px) !important;
+	}
+
+	.mobile-portrait-mode
+		.my-campaigns-table
+		.metrics-grid-container
+		> div:not(:first-child) {
+		flex: 1 1 0 !important;
+		justify-content: center !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-box {
+		padding: 0 !important;
+		font-size: 12px !important;
+		margin: 0 !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		vertical-align: middle !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-separator {
+		display: none !important;
+	}
+
+	/* Mobile portrait metrics layout */
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-auto-flow: column !important;
+		grid-template-columns: repeat(4, max-content) !important;
+		align-items: center !important;
+		justify-content: space-between !important;
+		width: 100% !important;
+		margin-left: 4px !important;
+		column-gap: clamp(6px, 2vw, 12px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: minmax(0, 0.8fr) repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 4px !important;
+		column-gap: clamp(3px, 1.2vw, 10px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		min-width: 0 !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		margin-right: clamp(2px, 1vw, 8px) !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+		align-items: center !important;
+		width: 100% !important;
+		margin-left: 0 !important;
+		column-gap: 7px !important;
+		flex-wrap: nowrap !important;
+		height: auto !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		flex: 0 0 auto !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+	}
+
+	.mobile-portrait-mode
+		.my-campaigns-table
+		.metrics-grid-container
+		> div:not(:first-child) {
+		justify-content: center !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-box {
+		padding: 0 !important;
+		font-size: 12px !important;
+		margin: 0 !important;
+		display: inline-flex !important;
+		align-items: center !important;
+		vertical-align: middle !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metric-separator {
+		display: none !important;
+	}
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+	align-items: center !important;
+	justify-content: space-between !important;
+	width: 100% !important;
+	margin-left: 10px !important;
+	gap: clamp(8px, 3vw, 18px) !important;
+	grid-template-columns: none !important;
+	height: auto !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+	align-items: center !important;
+	flex: 0 0 auto !important;
+}
+
+.mobile-portrait-mode
+	.my-campaigns-table
+	.metrics-grid-container
+	> div:not(:first-child) {
+	flex: 1 1 0 !important;
+	justify-content: center !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+	display: flex !important;
+	align-items: center !important;
+	justify-content: space-between !important;
+	width: 100% !important;
+	padding-left: 10px !important;
+	gap: clamp(8px, 3vw, 18px) !important;
+	grid-template-columns: none !important;
+	height: auto !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+	align-items: center !important;
+	flex: 0 0 auto !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+	flex: 0 0 auto !important;
+}
+
+.mobile-portrait-mode
+	.my-campaigns-table
+	.metrics-grid-container
+	> div:not(:first-child) {
+	flex: 1 1 0 !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+	display: grid !important;
+	grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+	align-items: center !important;
+	width: 100% !important;
+	margin-left: 10px !important;
+	column-gap: clamp(8px, 3vw, 18px) !important;
+	height: auto !important;
+	grid-template-columns: auto repeat(3, minmax(90px, 1fr)) !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+	margin: 0 !important;
+	padding: 0 !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	min-width: 0 !important;
+	overflow: visible !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+	width: auto !important;
+	justify-content: flex-start !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+	width: 100% !important;
+	max-width: none !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container,
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div,
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child,
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+	/* existing rules cleared for consolidation */
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+	display: grid !important;
+	grid-template-columns: auto repeat(3, minmax(90px, 1fr)) !important;
+	align-items: center !important;
+	width: 100% !important;
+	margin-left: 10px !important;
+	column-gap: clamp(8px, 3vw, 18px) !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	margin: 0 !important;
+	padding: 0 !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+	justify-content: flex-start !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+	width: 100% !important;
+	max-width: none !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+	display: grid !important;
+	grid-template-columns: auto repeat(3, minmax(65px, 1fr)) !important;
+	align-items: center !important;
+	width: 100% !important;
+	margin-left: 10px !important;
+	column-gap: clamp(6px, 2.5vw, 14px) !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+	margin: 0 !important;
+	padding: 0 !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+	justify-content: flex-start !important;
+	margin-right: clamp(6px, 2vw, 12px) !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+	display: grid !important;
+	grid-template-columns: auto repeat(3, minmax(72px, 1fr)) !important;
+	align-items: center !important;
+	width: 100% !important;
+	margin-left: 10px !important;
+	column-gap: clamp(6px, 2.5vw, 14px) !important;
+	height: auto !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	width: 100% !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+	justify-content: flex-start !important;
+	width: auto !important;
+	margin-right: clamp(6px, 2vw, 12px) !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+	display: grid !important;
+	grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+	align-items: center !important;
+	width: 100% !important;
+	margin-left: 8px !important;
+	column-gap: clamp(4px, 1.75vw, 12px) !important;
+	height: auto !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	width: 100% !important;
+	min-width: 0 !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+	justify-content: flex-start !important;
+	width: auto !important;
+	min-width: auto !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+	display: grid !important;
+	grid-template-columns: auto repeat(3, minmax(0, 1fr)) !important;
+	align-items: center !important;
+	width: 100% !important;
+	margin-left: 6px !important;
+	column-gap: clamp(4px, 1.5vw, 10px) !important;
+	height: auto !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+	display: flex !important;
+	align-items: center !important;
+	justify-content: flex-start !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	min-width: 0 !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+	margin-right: clamp(4px, 1.25vw, 8px) !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > .w-full {
+	width: auto !important;
+	max-width: none !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metric-box {
+	padding: 0 !important;
+	font-size: 12px !important;
+	margin: 0 !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	vertical-align: middle !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metric-separator {
+	display: none !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+	display: flex !important;
+	align-items: center !important;
+	width: 100% !important;
+	margin-left: 6px !important;
+	gap: clamp(6px, 2vw, 14px) !important;
+	height: auto !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+	display: flex !important;
+	align-items: center !important;
+	margin: 0 !important;
+	padding: 0 !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+	flex: 0 0 auto !important;
+	margin-right: clamp(8px, 2.5vw, 18px) !important;
+}
+
+.mobile-portrait-mode
+	.my-campaigns-table
+	.metrics-grid-container
+	> div:not(:first-child) {
+	flex: 1 1 0 !important;
+	justify-content: center !important;
+	min-width: 0 !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metric-box {
+	padding: 0 !important;
+	font-size: 12px !important;
+	margin: 0 !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	vertical-align: middle !important;
+}
+
+.mobile-portrait-mode .my-campaigns-table .metric-separator {
+	display: none !important;
+}
+
+/* Mobile portrait metrics layout - CONSOLIDATED RULE */
+
+/* Final mobile-portrait enforcement to normalize spacing */
+@media (max-width: 640px) {
+	/* CONSOLIDATED RULE - Ensures exactly 7px gap between all metric boxes */
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: flex-start !important;
+		flex-wrap: nowrap !important;
+		gap: 7px !important; /* Fixed 7px gap between all boxes */
+		/* Pull metrics slightly left to avoid right-edge clipping on iPhone */
+		margin-left: -10px !important;
+		padding-left: 0 !important;
+		/* Give a tiny right inset so the last box never kisses the border on iPhone */
+		padding-right: 6px !important;
+		width: 100% !important;
+		height: auto !important;
+	}
+
+	/* Ensure child divs don't add extra margins that could affect spacing */
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		margin: 0 !important; /* No margins - let parent gap handle spacing */
+		padding: 0 !important;
+		flex: 0 0 auto !important;
+		min-width: 0 !important;
+	}
+
+	/* First child (if needed for different alignment) */
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+		margin-right: 0 !important; /* No extra margin - parent gap handles it */
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		flex: 0 0 auto !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		width: auto !important;
+		min-width: 0 !important;
+	}
+
+	/* Remove any extra margin added earlier to the first metric wrapper */
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		margin-right: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(2) {
+		margin-left: 0 !important;
+	}
+
+	/* Explicit override: prevent non-first metric wrappers from flexing/centering */
+	.mobile-portrait-mode
+		.my-campaigns-table
+		.metrics-grid-container
+		> div:not(:first-child) {
+		flex: 0 0 auto !important;
+		justify-content: flex-start !important;
+	}
+
+	/* Consistent 1px dividers between metric boxes (mobile portrait)
+	   Use border-left on the second+ item to avoid double rendering and subpixel blur. */
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container {
+		--metric-gap: 7px;
+		display: flex !important;
+		gap: 0 !important; /* emulate gap with margin/padding so divider stays centered */
+		column-gap: 0 !important;
+		row-gap: 0 !important;
+	}
+
+	.mobile-portrait-mode .my-campaigns-table .metrics-grid-container > div {
+		position: relative !important;
+	}
+
+	.mobile-portrait-mode
+		.my-campaigns-table
+		.metrics-grid-container
+		> div:not(:first-child) {
+		/* Split the visual gap evenly around a crisp 1px divider */
+		margin-left: calc((var(--metric-gap, 7px) - 1px) / 2) !important;
+		padding-left: calc((var(--metric-gap, 7px) - 1px) / 2) !important;
+		border-left: 1px solid #000000 !important;
+	}
+
+	/* Hide any DOM-based separators to prevent double-thick lines */
+	.mobile-portrait-mode .my-campaigns-table .metric-separator {
+		display: none !important;
+	}
+
+	/* Fix header alignment to match body flexbox layout */
+	.mobile-portrait-mode .metrics-header-grid {
+		display: flex !important;
+		gap: 7px !important;
+		padding: 0 !important; /* no extra padding so labels start flush */
+		margin-left: 0 !important;
+		justify-content: flex-start !important;
+		align-items: center !important;
+	}
+
+	/* Align header grid with metric boxes in campaigns table */
+	.mobile-portrait-mode .my-campaigns-table .metrics-header-grid {
+		/* Shift header labels to track the body metrics position */
+		margin-left: -10px !important;
+		padding-right: 6px !important; /* mirror body padding-right to avoid clipping */
+	}
+
+	/* Allow the metrics cell to let content extend left a few pixels */
+	.mobile-portrait-mode .my-campaigns-table tr > td:nth-child(2) {
+		overflow: visible !important;
+	}
+
+	/* Prevent clipping: allow metrics header cell to show negatively-shifted labels */
+	.mobile-portrait-mode .campaigns-table-container thead th:nth-child(2) {
+		overflow: visible !important;
+	}
+
+	/* Match header label widths to metric box widths */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label {
+		flex: 0 0 auto !important;
+		text-align: center !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		font-size: 11px !important; /* Updated to 11px for better readability */
+	}
+
+	/* First two labels (Drafts, Sent) - responsive short width */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='drafts'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='sent'] {
+		width: var(--metric-width-short) !important;
+		min-width: var(--metric-width-short) !important;
+		max-width: var(--metric-width-short) !important;
+	}
+
+	/* Align Drafts label to the left edge of metric box below */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='drafts'] {
+		margin-left: 0 !important; /* Use container shift for alignment */
+		justify-content: flex-start !important; /* Align text to left edge */
+		padding-left: 0 !important; /* Ensure no internal padding */
+	}
+
+	/* Align Sent label to the left edge of metric box below */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='sent'] {
+		margin-left: 0 !important; /* Use container shift for alignment */
+		justify-content: flex-start !important; /* Align text to left edge */
+		padding-left: 3px !important; /* Nudge text 3px to the right */
+	}
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='updated'] {
+		margin-left: 2px !important;
+	}
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
+		margin-left: 2px !important;
+	}
+
+	/* Force two-line wrap and left alignment for Updated Last / Created On, keeping box widths */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='updated'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
+		white-space: normal !important; /* allow wrapping at spaces */
+		word-break: normal !important; /* wrap on spaces only */
+		overflow: visible !important;
+		text-overflow: clip !important;
+		text-align: left !important;
+		justify-content: flex-start !important; /* left-align inside flex container */
+		align-items: flex-start !important;
+		line-height: 1.05 !important;
+		padding-right: 10px !important; /* reduce inner text width to encourage wrapping */
+	}
+
+	/* Ensure forced <br> stays visible for Updated/Created even in compact labels */
+	.mobile-portrait-mode
+		.metrics-header-grid
+		.metrics-header-label[data-label='updated']
+		.metrics-two-line-label
+		.metrics-force-br,
+	.mobile-portrait-mode
+		.metrics-header-grid
+		.metrics-header-label[data-label='created']
+		.metrics-two-line-label
+		.metrics-force-br {
+		display: inline !important;
+	}
+
+	/* Last two labels (Updated Last, Created On) - responsive long width */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='updated'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
+		width: var(--metric-width-long) !important;
+		min-width: var(--metric-width-long) !important;
+		max-width: var(--metric-width-long) !important;
+	}
+
+	/* Normalize header label offsets to align with boxes */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='drafts'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='sent'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='updated'],
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
+		margin-left: 0 !important;
+		padding-right: 0 !important;
+		justify-content: flex-start !important;
+		text-align: left !important;
+	}
+}
+
+/* Mobile landscape: evenly space 4 metric boxes per row in campaigns table */
+.mobile-landscape-mode .my-campaigns-table .metrics-grid-container {
+	display: flex !important;
+	align-items: center !important;
+	justify-content: flex-start !important; /* keep even internal spacing via gap */
+	flex-wrap: nowrap !important;
+	gap: 7px !important; /* even spacing between all four metric boxes */
+	margin-left: auto !important; /* push the whole group to the right */
+	margin-right: var(
+		--metrics-delete-gap,
+		6px
+	) !important; /* a little space before delete */
+	padding-left: 0 !important;
+	width: auto !important; /* shrink to content so margin-left:auto takes effect */
+}
+
+.mobile-landscape-mode .my-campaigns-table .metrics-grid-container > div {
+	flex: 0 0 auto !important; /* prevent stretching that causes zero-gap clumping */
+	margin: 0 !important;
+	padding: 0 !important;
+	justify-content: center !important;
+}
+
+.mobile-landscape-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+	margin-right: 0 !important; /* remove oversized gap after first box */
+	justify-content: flex-start !important;
+}
+
+.mobile-landscape-mode .mobile-campaigns-outer-container {
+	/* Remove reserved gutter used only for portrait external delete column */
+	padding-right: 0 !important;
+	margin-right: 0 !important;
+	width: 100% !important;
+}
+
+.mobile-landscape-mode .my-campaigns-table thead th:first-child {
+	width: 55% !important;
+	min-width: 55% !important;
+}
+.mobile-landscape-mode .my-campaigns-table thead th:nth-child(2) {
+	width: auto !important;
+	min-width: 0 !important;
+}
+.mobile-landscape-mode .my-campaigns-table thead th:nth-child(3) {
+	width: 20px !important; /* match the X icon width */
+	min-width: 20px !important;
+}
+
+.mobile-landscape-mode .my-campaigns-table tr > td:first-child {
+	flex: 0 1 55% !important;
+}
+.mobile-landscape-mode .my-campaigns-table tr > td:nth-child(2) {
+	flex: 1 1 auto !important; /* fill all space between name and delete */
+	margin-left: 0 !important; /* let flex grow handle the push */
+	justify-content: flex-end !important; /* keep metric group hugging delete column */
+}
+.mobile-landscape-mode .my-campaigns-table tr > td:nth-child(3) {
+	flex: 0 0 20px !important; /* match icon */
+	justify-content: flex-end !important;
+}
+
+.mobile-landscape-mode .my-campaigns-table thead th:nth-child(2),
+.mobile-landscape-mode .my-campaigns-table tr > td:nth-child(2) {
+	/* Ensure a hard buffer so metrics never sit under the delete column */
+	padding-right: 16px !important;
+}
+
+.mobile-landscape-mode .my-campaigns-table tr > td:nth-child(2) {
+	margin-left: 0 !important; /* avoid creating a huge gap before metrics */
+	justify-content: flex-end !important; /* keep boxes hugging the right edge */
+}
+
+.mobile-landscape-mode .my-campaigns-table tbody tr {
+	margin-right: 0 !important; /* no extra gap on the row's right side in landscape */
+	padding-right: 0 !important; /* sit flush against delete column */
+}
+
+.mobile-landscape-mode .my-campaigns-table .metric-separator {
+	display: none !important; /* rely on flex gap for spacing */
+}
+
+/* Render a single 1px 54% black divider below the header on mobile landscape */
+.mobile-landscape-mode .my-campaigns-table thead {
+	position: relative !important;
+	z-index: 2 !important;
+}
+.mobile-landscape-mode .my-campaigns-table thead::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 1px;
+	background: rgba(0, 0, 0, 0.54);
+	pointer-events: none;
+}
+
+/* Force white dividers for rows and header in mobile landscape */
+.mobile-landscape-mode .my-campaigns-table tbody tr {
+	/* Override Tailwind row borders (border, border-t, border-gray-200) */
+	border-color: #ffffff !important;
+	border-top-color: #ffffff !important;
+	border-bottom-color: #ffffff !important;
+}
+
+.mobile-landscape-mode .my-campaigns-table thead th {
+	/* Header bottom divider should also be white */
+	border-bottom-color: #ffffff !important;
+}
+
+/* Match header spacing/widths to body metrics in landscape */
+.mobile-landscape-mode .metrics-header-grid {
+	display: flex !important;
+	align-items: center !important;
+	justify-content: flex-start !important;
+	gap: 7px !important;
+	margin-left: auto !important; /* align header labels with right-shifted boxes */
+	margin-right: var(
+		--metrics-delete-gap,
+		6px
+	) !important; /* match body spacing before delete */
+	padding-left: 0 !important;
+	width: auto !important;
+}
+
+.mobile-landscape-mode .metrics-header-grid .metrics-header-label {
+	flex: 0 0 auto !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: flex-start !important;
+	text-align: left !important;
+}
+
+.mobile-landscape-mode .metrics-header-grid .metrics-header-label[data-label='drafts'],
+.mobile-landscape-mode .metrics-header-grid .metrics-header-label[data-label='sent'] {
+	width: var(--metric-width-short) !important;
+	min-width: var(--metric-width-short) !important;
+	max-width: var(--metric-width-short) !important;
+}
+
+.mobile-landscape-mode .metrics-header-grid .metrics-header-label[data-label='updated'],
+.mobile-landscape-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
+	width: var(--metric-width-long) !important;
+	min-width: var(--metric-width-long) !important;
+	max-width: var(--metric-width-long) !important;
+}
+
+/* Force two-line header labels for Updated/Created in mobile landscape */
+.mobile-landscape-mode .metrics-header-grid .metrics-header-label[data-label='updated'],
+.mobile-landscape-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
+	white-space: normal !important; /* allow wrapping */
+	word-break: normal !important; /* wrap on spaces */
+	text-align: left !important; /* left align over metric boxes */
+	justify-content: flex-start !important;
+	align-items: flex-start !important;
+	line-height: 1.05 !important;
+}
+
+/* Show forced <br> in landscape for metrics header two-line labels */
+.mobile-landscape-mode .metrics-header-grid .metrics-two-line-label .metrics-force-br {
+	display: inline !important;
+}
+
+/* Remove synthetic space when <br> is visible in landscape */
+.mobile-landscape-mode
+	.metrics-header-grid
+	.metrics-two-line-label
+	.metrics-force-br
+	+ span::before {
+	content: none !important;
+}
+
+/* --- Mobile landscape alignment for campaigns metrics header and boxes --- */
+@media (orientation: landscape) {
+	/* Use the same fixed grid for header labels and metric boxes */
+	.mobile-portrait-mode .my-campaigns-table thead th:nth-child(2) .metrics-header-grid,
+	.mobile-portrait-mode .my-campaigns-table td:nth-child(2) .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: repeat(4, 50px) !important;
+		column-gap: 7px !important;
+		justify-content: start !important;
+		align-items: center !important;
+		margin-left: 0 !important; /* override earlier negative shift */
+		width: auto !important;
+	}
+
+	/* Ensure metric boxes' declared width includes the border so 50px matches labels */
+	.mobile-portrait-mode .my-campaigns-table .metric-box {
+		box-sizing: border-box !important;
+	}
+
+	/* Header labels: lock widths and center text over each 50px column */
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label {
+		width: 50px !important;
+		min-width: 50px !important;
+		max-width: 50px !important;
+		justify-content: flex-start !important;
+		text-align: left !important;
+		padding-left: 0 !important;
+		margin-left: 0 !important;
+	}
+}
+
+/* Final spacing/layout fix for mobile landscape metrics
+   - Reserve three fixed 50px columns on the right for metrics 2-4
+   - Let the left-most metric expand leftward (auto column)
+   - Keep the whole metrics group right-aligned via margin-left:auto above
+   - Add explicit 8px gaps so boxes never touch */
+@media (orientation: landscape) {
+	.mobile-landscape-mode .my-campaigns-table .metrics-grid-container {
+		display: grid !important;
+		grid-template-columns: auto 50px 50px 50px !important;
+		column-gap: 8px !important;
+		margin-left: 0 !important;
+		/* Pull the entire metrics group left so it's clear of the delete icon */
+		transform: translateX(-45px) !important;
+	}
+
+	.mobile-landscape-mode .my-campaigns-table .metrics-grid-container > div {
+		justify-content: center !important;
+		min-width: 0 !important;
+	}
+
+	.mobile-landscape-mode .my-campaigns-table .metrics-grid-container > div:first-child {
+		justify-content: flex-start !important;
+	}
+
+	/* Keep header labels aligned with the shifted metric boxes */
+	.mobile-landscape-mode .metrics-header-grid {
+		margin-left: 0 !important;
+		/* match the body translate so labels align with boxes */
+		transform: translateX(-45px) !important;
+		/* match body gap exactly */
+		column-gap: 8px !important;
+	}
+
+	/* Reinstate vertical dividers between metric boxes in mobile landscape
+	   without shifting layout. Lines are centered inside the 8px column gap. */
+	.mobile-landscape-mode .my-campaigns-table .metrics-grid-container > div {
+		position: relative !important;
+		overflow: visible !important;
+	}
+	.mobile-landscape-mode
+		.my-campaigns-table
+		.metrics-grid-container
+		> div:not(:first-child)::before {
+		content: '';
+		position: absolute;
+		left: -4.5px; /* center within 8px column gap, adjusted for pixel alignment */
+		top: 50%;
+		transform: translateY(-50%) translateZ(0); /* force GPU rendering */
+		width: 1px;
+		height: 17px;
+		background-color: #000000;
+		pointer-events: none;
+		z-index: 1;
+		/* Prevent sub-pixel rendering issues */
+		will-change: transform;
+		backface-visibility: hidden;
+		-webkit-backface-visibility: hidden;
+		/* Force crisp edges */
+		image-rendering: -webkit-optimize-contrast;
+		image-rendering: crisp-edges;
+		/* Ensure pixel-perfect rendering */
+		transform-origin: center center;
+	}
+
+	/* Additional fixes for specific breakpoints where dividers appear thick */
+	@media (min-width: 840px) and (max-width: 850px),
+		(min-width: 880px) and (max-width: 890px) {
+		.mobile-landscape-mode
+			.my-campaigns-table
+			.metrics-grid-container
+			> div:not(:first-child)::before {
+			/* Force exact pixel alignment at problematic breakpoints */
+			left: -4px;
+			transform: translateY(-8.5px) translateZ(0); /* exact pixel position */
+		}
+	}
 }

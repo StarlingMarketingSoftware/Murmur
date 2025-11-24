@@ -23,7 +23,16 @@ import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingS
 import { HybridBlock } from '@prisma/client';
 import { HybridPromptInputProps, useHybridPromptInput } from './useHybridPromptInput';
 import { cn } from '@/utils';
-import React, { useState, FC, Fragment, useRef, useEffect, useMemo } from 'react';
+import React, {
+	useState,
+	FC,
+	Fragment,
+	useRef,
+	useEffect,
+	useMemo,
+	useLayoutEffect,
+} from 'react';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
 import { ParagraphSlider } from '@/components/atoms/ParagraphSlider/ParagraphSlider';
@@ -96,11 +105,21 @@ const SortableAIBlock = ({
 		block.value === HybridBlock.action ||
 		block.value === HybridBlock.text;
 
+	// Detect if the Manual tab is selected (all blocks are Text)
+	const isManualModeSelected =
+		(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
+		form
+			.getValues('hybridBlockPrompts')
+			.every((b: { type: HybridBlock }) => b.type === HybridBlock.text);
+
 	// Watch the field value to determine if text block is empty
 	const fieldValue = form.watch(`hybridBlockPrompts.${fieldIndex}.value`);
 	const isTextBlockEmpty = isTextBlock && !fieldValue;
 	// Only show red styling if the field has been touched and is empty
 	const shouldShowRedStyling = isTextBlockEmpty && hasBeenTouched;
+
+	// Mobile detection for conditional placeholder shortening
+	const isMobile = useIsMobile();
 
 	// Get the border color for the block
 	const getBorderColor = () => {
@@ -114,7 +133,12 @@ const SortableAIBlock = ({
 	if (isCollapsed && isHybridBlock) {
 		return (
 			<div
-				className={cn('flex justify-end', showTestPreview ? 'w-[426px]' : 'w-[868px]')}
+				className={cn(
+					'flex justify-end',
+					showTestPreview
+						? 'w-[426px] max-[480px]:w-[89.8vw]'
+						: 'w-[93.7vw] max-w-[868px]'
+				)}
 			>
 				<Button
 					type="button"
@@ -134,6 +158,19 @@ const SortableAIBlock = ({
 		<div
 			ref={setNodeRef}
 			style={style}
+			data-block-type={
+				isFullAutomatedBlock
+					? 'full'
+					: isIntroductionBlock
+					? 'introduction'
+					: isResearchBlock
+					? 'research'
+					: isActionBlock
+					? 'action'
+					: isTextBlock
+					? 'text'
+					: 'other'
+			}
 			className={cn(
 				'relative rounded-md overflow-hidden',
 				isIntroductionBlock && 'border-2 border-[#6673FF] bg-background',
@@ -145,19 +182,23 @@ const SortableAIBlock = ({
 					'border-2 border-gray-300 bg-background',
 				isTextBlock
 					? showTestPreview
-						? 'w-[426px] min-h-[44px]'
-						: 'w-[868px] min-h-[80px]'
+						? 'w-[426px] max-[480px]:w-[89.33vw] min-h-[44px]'
+						: 'w-[89.33vw] max-w-[868px] min-h-[80px]'
 					: isCompactBlock
 					? showTestPreview
-						? `w-[426px] ${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'}`
-						: `w-[868px] ${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'}`
+						? `w-[426px] max-[480px]:w-[89.33vw] ${
+								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
+						  }`
+						: `w-[89.33vw] max-w-[868px] ${
+								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
+						  }`
 					: isFullAutomatedBlock
 					? showTestPreview
-						? 'w-[426px]'
-						: 'w-[868px]'
+						? 'w-[426px] max-[480px]:w-[89.33vw]'
+						: 'w-[89.33vw] max-w-[868px]'
 					: showTestPreview
-					? 'w-[426px]'
-					: 'w-[868px]',
+					? 'w-[426px] max-[480px]:w-[89.33vw]'
+					: 'w-[89.33vw] max-w-[868px]',
 				!isIntroductionBlock &&
 					!isResearchBlock &&
 					!isActionBlock &&
@@ -182,16 +223,21 @@ const SortableAIBlock = ({
 				<div
 					{...attributes}
 					{...listeners}
+					data-drag-handle
 					className={cn(
 						'absolute top-0 left-0 cursor-move z-[1]',
 						isTextBlock
 							? showTestPreview
 								? 'h-[44px] w-[80px]'
-								: 'h-[80px] w-[172px]'
+								: 'h-[80px] w-[90px]'
 							: isCompactBlock
 							? showTestPreview
-								? `${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'} w-[80px]`
-								: `${isAdvancedEnabled ? 'h-[78px]' : 'h-[31px]'} w-[90px]`
+								? `${
+										isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
+								  } w-[80px]`
+								: `${
+										isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
+								  } w-[90px]`
 							: 'h-12',
 						isFullAutomatedBlock
 							? 'w-[172px]'
@@ -207,7 +253,7 @@ const SortableAIBlock = ({
 						isCompactBlock
 							? isAdvancedEnabled
 								? 'p-0 h-full'
-								: 'p-2 h-full'
+								: 'p-2 h-full max-[480px]:py-[2px]'
 							: isFullAutomatedBlock || isTextBlock
 							? 'px-4 pt-2 pb-4'
 							: 'p-4'
@@ -299,9 +345,11 @@ const SortableAIBlock = ({
 														(isIntroductionBlock || isResearchBlock || isActionBlock) &&
 															'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
 														'pl-0',
-														'pr-12'
+														'pr-12',
+														// Make placeholder text much smaller on mobile portrait when in Manual mode
+														isManualModeSelected && 'max-[480px]:placeholder:text-[10px]'
 													)}
-													rows={1}
+													rows={isMobile ? 2 : 1}
 													{...fieldProps}
 													onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
 														const target = e.currentTarget;
@@ -357,10 +405,14 @@ const SortableAIBlock = ({
 																: (block as { label: string }).label}
 														</span>
 													</div>
-													<div className="flex-1 flex items-center pl-0 pr-12">
-														<span className="text-sm font-inter italic text-[#5d5d5d]">
-															{isResearchBlock && showTestPreview
-																? 'Automated Research'
+													<div className="flex-1 min-w-0 flex items-center pl-0 pr-12 overflow-hidden">
+														<span className="text-sm max-[480px]:text-[10px] font-inter italic text-[#5d5d5d] truncate">
+															{isResearchBlock
+																? isMobile
+																	? 'Automatic Research'
+																	: showTestPreview
+																	? 'Automated Research'
+																	: block.placeholder
 																: block.placeholder}
 														</span>
 													</div>
@@ -462,8 +514,12 @@ const SortableAIBlock = ({
 															<input
 																type="text"
 																placeholder={
-																	isResearchBlock && showTestPreview
-																		? 'Automated Research'
+																	isResearchBlock
+																		? isMobile
+																			? 'Automatic Research'
+																			: showTestPreview
+																			? 'Automated Research'
+																			: block.placeholder
 																		: block.placeholder
 																}
 																onClick={(e) => e.stopPropagation()}
@@ -474,14 +530,14 @@ const SortableAIBlock = ({
 																	!isAdvancedEnabled
 																}
 																className={cn(
-																	'flex-1 outline-none text-sm',
+																	'flex-1 outline-none text-sm max-[480px]:text-[10px] truncate min-w-0',
 																	isIntroductionBlock || isResearchBlock || isActionBlock
 																		? '!bg-[#DADAFC]'
 																		: 'bg-white placeholder:text-gray-400',
 																	(isIntroductionBlock ||
 																		isResearchBlock ||
 																		isActionBlock) &&
-																		'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
+																		'font-inter placeholder:italic placeholder:text-[#5d5d5d] max-[480px]:placeholder:text-[10px]',
 																	'pl-0',
 																	isIntroductionBlock || isResearchBlock || isActionBlock
 																		? 'pr-24'
@@ -561,7 +617,9 @@ const SortableAIBlock = ({
 									className={cn(
 										'flex gap-2 min-h-7 items-center relative z-20',
 										isFullAutomatedBlock || isTextBlock ? 'mb-1' : 'mb-2',
-										isFullAutomatedBlock && showTestPreview && testMessage && 'flex-wrap'
+										isFullAutomatedBlock && showTestPreview && testMessage && 'flex-wrap',
+										// On mobile portrait, allow the header to wrap so the tone selector can move to a second row
+										isFullAutomatedBlock && 'max-[480px]:flex-wrap max-[480px]:gap-y-1'
 									)}
 								>
 									{!isTextBlock ? (
@@ -609,7 +667,7 @@ const SortableAIBlock = ({
 											<>
 												<div className={isFullAutomatedBlock ? 'relative' : ''}>
 													{showCustomPlaceholder && (
-														<div className="absolute inset-0 pointer-events-none py-2 pr-10 text-[#505050] text-base md:text-sm">
+														<div className="absolute inset-0 pointer-events-none py-2 pr-10 text-[#505050] text-base md:text-sm max-[480px]:text-[10px] z-10">
 															<div className="space-y-3">
 																<div>
 																	<p>Prompt Murmur here.</p>
@@ -618,7 +676,7 @@ const SortableAIBlock = ({
 																		emails based on your instructions.
 																	</p>
 																</div>
-																<div>
+																<div className="full-auto-placeholder-example">
 																	<p>Ex.</p>
 																	<p>
 																		&ldquo;Compose a professional booking pitch email.
@@ -641,11 +699,13 @@ const SortableAIBlock = ({
 														}
 														onClick={(e) => e.stopPropagation()}
 														className={cn(
-															'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0',
+															'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 max-[480px]:placeholder:text-[10px]',
 															isIntroductionBlock
 																? '!bg-[#DADAFC] [&]:!bg-[#DADAFC]'
 																: 'bg-white',
-															isFullAutomatedBlock ? 'h-[195px] px-0 resize-none' : '',
+															isFullAutomatedBlock
+																? 'h-[195px] px-0 resize-none full-auto-textarea'
+																: '',
 															shouldShowRedStyling ? 'placeholder:text-[#A20000]' : '',
 															(isIntroductionBlock || isResearchBlock || isActionBlock) &&
 																'font-inter placeholder:italic placeholder:text-[#5d5d5d]'
@@ -761,6 +821,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		isPendingGeneration,
 		isTest,
 		contact,
+		onGoToDrafting,
 	} = useHybridPromptInput(props);
 
 	const { compactLeftOnly } = props;
@@ -958,6 +1019,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const fullModeButtonRef = useRef<HTMLButtonElement>(null);
 	const hybridModeButtonRef = useRef<HTMLButtonElement>(null);
 	const manualModeButtonRef = useRef<HTMLButtonElement>(null);
+	const mainContainerRef = useRef<HTMLDivElement>(null);
+	const headerSectionRef = useRef<HTMLDivElement>(null);
+	const modeDividerRef = useRef<HTMLDivElement>(null);
+	const [overlayTopPx, setOverlayTopPx] = useState<number | null>(null);
 
 	const [highlightStyle, setHighlightStyle] = useState({
 		left: 0,
@@ -1076,21 +1141,69 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		}
 	};
 
+	const isMobile = useIsMobile();
+
+	// Mobile-only: measure to start overlay exactly at the big divider line under Mode
+	useLayoutEffect(() => {
+		if (!isMobile || showTestPreview) {
+			setOverlayTopPx(null);
+			return;
+		}
+		const recalc = () => {
+			const container = mainContainerRef.current;
+			const headerSection = headerSectionRef.current;
+			const divider = modeDividerRef.current;
+			if (!container) return;
+			const containerRect = container.getBoundingClientRect();
+			// Account for the container's border so our absolutely positioned overlay,
+			// which is positioned relative to the padding edge, starts exactly at the
+			// visual divider line without leaving a gap on mobile.
+			const borderTopWidth = container.clientTop || 0;
+			let startBelow = 0;
+			if (divider) {
+				const dividerRect = divider.getBoundingClientRect();
+				startBelow = dividerRect.bottom - containerRect.top;
+			} else if (headerSection) {
+				const headerRect = headerSection.getBoundingClientRect();
+				startBelow = headerRect.bottom - containerRect.top;
+			} else {
+				return;
+			}
+			// Subtract the borderTop so the overlay's top aligns to the inside edge.
+			// Using round avoids sub-pixel gaps on some DPRs.
+			const nextTop = Math.max(0, Math.round(startBelow - borderTopWidth));
+			setOverlayTopPx(nextTop);
+		};
+		recalc();
+		window.addEventListener('resize', recalc);
+		window.addEventListener('orientationchange', recalc);
+		return () => {
+			window.removeEventListener('resize', recalc);
+			window.removeEventListener('orientationchange', recalc);
+		};
+	}, [isMobile, showTestPreview, fields.length, selectedModeKey]);
 	return (
-		<div className={compactLeftOnly ? '' : 'flex justify-center'}>
+		<div
+			className={cn(
+				compactLeftOnly ? '' : 'flex justify-center',
+				!showTestPreview && 'max-[480px]:pb-[60px]'
+			)}
+			data-hpi-root
+		>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
 				<Droppable id="droppable">
 					<DraggableBox
 						id="main-drafting"
 						dragHandleSelector="[data-root-drag-handle]"
-						enabled={!showTestPreview}
+						enabled={isMobile === false && !showTestPreview}
 						onDropOver={() => {}}
 					>
 						<div
+							ref={mainContainerRef}
 							className={`${
 								compactLeftOnly
 									? ''
-									: 'w-[892px] min-h-[686px] transition mb-4 flex mx-auto '
+									: 'w-[96.27vw] max-w-[892px] min-h-[686px] transition mb-4 flex mx-auto '
 							}	${
 								showTestPreview
 									? 'flex-row gap-[40px] justify-center items-start'
@@ -1098,7 +1211,30 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									? 'flex-col'
 									: 'flex-col border-[3px] border-black rounded-md bg-white min-h-[686px]'
 							}	relative overflow-visible`}
+							data-hpi-container
 						>
+							{/* Mobile-only gradient background overlay starting under Mode divider */}
+							{isMobile && !showTestPreview && overlayTopPx !== null && (
+								<div
+									style={{
+										position: 'absolute',
+										left: 0,
+										right: 0,
+										top: overlayTopPx,
+										bottom: 0,
+										background:
+											'linear-gradient(to bottom, rgba(222,242,225,0.71) 0%, rgba(222,242,225,0.5) 40%, rgba(222,242,225,0.25) 80%, rgba(222,242,225,0.15) 100%)',
+										pointerEvents: 'none',
+										zIndex: 0,
+										// Square off the top corners so the fill meets the border flush on mobile
+										borderTopLeftRadius: 0,
+										borderTopRightRadius: 0,
+										// Preserve the container's rounded bottoms
+										borderBottomLeftRadius: 'inherit',
+										borderBottomRightRadius: 'inherit',
+									}}
+								/>
+							)}
 							{/* Left side - Content area (draggable when testing) */}
 							<DraggableBox
 								id="test-left-panel"
@@ -1108,7 +1244,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									if (overId === 'test-preview-panel') setIsPanelsReversed((p) => !p);
 								}}
 								className={cn(
-									showTestPreview ? (isPanelsReversed ? 'order-2' : 'order-1') : ''
+									showTestPreview ? (isPanelsReversed ? 'order-2' : 'order-1') : '',
+									// Hide the main drafting panel on mobile when Test Preview is open
+									isMobile && showTestPreview && 'hidden',
+									'relative z-10'
 								)}
 							>
 								<div
@@ -1118,14 +1257,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											? 'w-[457px] shrink-0 h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-white'
 											: compactLeftOnly
 											? 'w-[350px]'
-											: 'w-full min-h-0 pt-[10px] px-0 pb-0 flex-1'
+											: 'w-full min-h-0 pt-[10px] max-[480px]:pt-[1px] px-0 pb-0 flex-1',
+
+										'relative z-10'
 									)}
+									data-hpi-left-panel
 								>
 									{/* Removed explicit drag bar; header below acts as the drag handle */}
 									{/* Subject header inside the box */}
 									<div
+										ref={headerSectionRef}
 										className={cn(
-											'pt-0 pb-0 bg-white',
+											'pt-0 pb-0',
 											showTestPreview && '-mx-[18px] px-[18px] rounded-t-[8px]'
 										)}
 									>
@@ -1133,22 +1276,22 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											className={cn(
 												'h-[36px] flex items-center relative z-20',
 												showTestPreview
-													? 'w-[426px] mx-auto pl-[8px]'
-													: 'w-[868px] mx-auto pl-[8px]'
+													? 'w-[426px] max-[480px]:w-[89.8vw] mx-auto pl-[8px] max-[480px]:pl-[6px]'
+													: 'w-[93.7vw] max-w-[868px] mx-auto pl-[8px] max-[480px]:pl-[6px]'
 											)}
 											data-left-drag-handle
 											data-root-drag-handle
 										>
 											<span
 												className={cn(
-													'font-inter font-semibold text-[17px] mr-[56px] text-black'
+													'font-inter font-semibold text-[17px] max-[480px]:text-[20px] mr-[56px] max-[480px]:mr-[22px] text-black'
 												)}
 											>
 												Mode
 											</span>
 											<div
 												ref={modeContainerRef}
-												className="relative flex items-center gap-[67px]"
+												className="relative flex items-center gap-[67px] max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:ml-[2px] flex-1 max-[480px]:w-auto max-[480px]:pr-[4.4vw]"
 											>
 												<DndContext
 													onDragEnd={handleHighlightDragEnd}
@@ -1167,7 +1310,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													variant="ghost"
 													type="button"
 													className={cn(
-														'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
+														'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
 														selectedModeKey !== 'none' &&
 															form
 																.getValues('hybridBlockPrompts')
@@ -1184,7 +1327,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													variant="ghost"
 													type="button"
 													className={cn(
-														'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
+														'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
 														selectedModeKey !== 'none' &&
 															!form
 																.getValues('hybridBlockPrompts')
@@ -1204,7 +1347,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													variant="ghost"
 													type="button"
 													className={cn(
-														'!p-0 h-fit !m-0 text-[11.7px] font-inter font-semibold bg-transparent z-20',
+														'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
 														selectedModeKey !== 'none' &&
 															(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
 															form
@@ -1225,6 +1368,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<div className="h-[2px] bg-black -mx-[18px]" />
 												)}
 												<div
+													ref={modeDividerRef}
 													className={cn('h-[2px] bg-black', showTestPreview && 'hidden')}
 												/>
 												{showTestPreview && <div className="h-2" />}
@@ -1237,7 +1381,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												rules={{ required: form.watch('isAiSubject') }}
 												render={({ field }) => (
 													<FormItem
-														className={cn(showTestPreview ? 'w-[426px]' : 'w-[868px]')}
+														className={cn(
+															showTestPreview
+																? 'w-[426px] max-[480px]:w-[89.33vw]'
+																: 'w-[89.33vw] max-w-[868px]',
+															// On mobile portrait, remove default mb-6 to tighten spacing under subject
+															'max-[480px]:mb-0'
+														)}
 													>
 														<div
 															className={cn(
@@ -1255,7 +1405,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	className={cn(
 																		showTestPreview ? 'text-xs' : 'text-sm',
 																		'font-inter font-medium text-[#AFAFAF] hover:underline',
-																		showTestPreview ? 'mr-[12px]' : 'relative top-[4px]'
+																		showTestPreview ? 'mr-[12px]' : 'relative top-[4px]',
+																		// Hide on mobile portrait
+																		'max-[480px]:hidden',
+																		// Hide in mobile landscape view of the campaign page
+																		'mobile-landscape-hide'
 																	)}
 																>
 																	Clear All
@@ -1265,19 +1419,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<FormControl>
 															<div
 																className={cn(
-																	'flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden',
-																	form.watch('isAiSubject') && 'bg-[#F1F1F1]'
+																	'flex items-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar',
+																	form.watch('isAiSubject') ? 'bg-[#F1F1F1]' : 'bg-white'
 																)}
 															>
 																<div
 																	className={cn(
 																		'pl-2 flex items-center h-full shrink-0 w-[120px]',
-																		form.watch('isAiSubject')
-																			? 'bg-transparent'
-																			: 'bg-white'
+																		'bg-white'
 																	)}
 																>
-																	<span className="font-inter font-semibold text-[17px] text-black">
+																	<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
 																		{form.watch('isAiSubject')
 																			? 'Auto Subject'
 																			: 'Subject'}
@@ -1297,7 +1449,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	}}
 																	disabled={isHandwrittenMode}
 																	className={cn(
-																		'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0',
+																		'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 subject-toggle',
 																		form.watch('isAiSubject')
 																			? 'w-auto px-3 justify-center bg-[#5dab68] text-white'
 																			: 'w-[100px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8] -translate-x-[30px]',
@@ -1311,23 +1463,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	<span className="absolute right-0 h-full border-r border-black"></span>
 																</button>
 
-																<div
-																	className={cn(
-																		'flex-grow h-full',
-																		form.watch('isAiSubject')
-																			? 'bg-transparent'
-																			: 'bg-white'
-																	)}
-																>
+																<div className={cn('flex-grow h-full', 'bg-white')}>
 																	<Input
 																		{...field}
 																		className={cn(
-																			'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0',
+																			'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0',
 																			form.watch('isAiSubject')
 																				? '!text-[#969696] placeholder:!text-[#969696]'
 																				: shouldShowSubjectRedStyling
 																				? '!text-[#A20000] placeholder:!text-[#A20000]'
-																				: '!text-black placeholder:!text-black'
+																				: '!text-black placeholder:!text-black',
+																			!form.watch('isAiSubject') && 'max-[480px]:pl-2'
 																		)}
 																		placeholder={
 																			form.watch('isAiSubject')
@@ -1361,9 +1507,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											/>
 										</div>
 									</div>
-									<div className="flex-1 flex flex-col">
+									<div className="flex-1 flex flex-col" data-hpi-content>
 										{/* Content area */}
-										<div className="pt-[16px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
+										<div className="pt-[16px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
 											{fields.length === 0 && (
 												<span className="text-gray-300 font-primary text-[12px]">
 													Add blocks here to build your prompt...
@@ -1463,7 +1609,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															<div
 																className={cn(
 																	'flex justify-end',
-																	showTestPreview ? 'w-[426px]' : 'w-[868px]'
+																	showTestPreview
+																		? 'w-[426px] max-[480px]:w-[89.8vw]'
+																		: 'w-[93.7vw] max-w-[868px]'
 																)}
 															>
 																<Button
@@ -1507,7 +1655,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 														return (
 															<Fragment key={field.id}>
-																<div className={cn(index === 0 && '-mt-2')}>
+																<div
+																	className={cn(index === 0 && '-mt-2 max-[480px]:mt-0')}
+																>
 																	<SortableAIBlock
 																		id={field.id}
 																		fieldIndex={index}
@@ -1528,7 +1678,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			'flex relative z-30',
 																			showTestPreview
 																				? 'justify-start w-full'
-																				: 'justify-end -mr-[102px] w-[868px]'
+																				: 'justify-end -mr-[102px] w-[93.7vw] max-w-[868px] max-[480px]:-mr-[2vw]'
 																		)}
 																		style={{ transform: 'translateY(-12px)' }}
 																	>
@@ -1536,7 +1686,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			type="button"
 																			onClick={() => handleAddTextBlockAt(index)}
 																			className={cn(
-																				'w-[52px] h-[20px] bg-background hover:bg-stone-100 active:bg-stone-200 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600',
+																				'w-[52px] h-[20px] bg-background hover:bg-stone-100 active:bg-stone-200 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600 max-[480px]:translate-x-[6px]',
 																				showTestPreview &&
 																					'absolute left-0 -translate-x-[calc(100%+5px)]'
 																			)}
@@ -1569,8 +1719,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<FormItem className="mb-[9px]">
 														<div
 															className={cn(
-																`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
-																showTestPreview ? 'w-[426px]' : 'w-[868px]'
+																`min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2`,
+																showTestPreview
+																	? 'w-[426px] max-[480px]:w-[89.33vw]'
+																	: 'w-[89.33vw] max-w-[868px]'
 															)}
 														>
 															<FormLabel className="text-base font-semibold font-secondary">
@@ -1579,7 +1731,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															<FormControl>
 																<Textarea
 																	placeholder="Enter your signature..."
-																	className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white"
+																	className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white max-[480px]:text-[10px] signature-textarea"
 																	style={{
 																		fontFamily: form.watch('font') || 'Arial',
 																	}}
@@ -1603,7 +1755,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 							{/* Bottom-anchored footer with Signature and Test */}
 							{!showTestPreview && (
-								<div className="flex flex-col items-center px-3 mt-auto">
+								<div className="flex flex-col items-center px-3 mt-auto" data-hpi-footer>
 									{/* Signature Block - always visible; positioned above Test with fixed gap */}
 									<FormField
 										control={form.control}
@@ -1616,9 +1768,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											>
 												<div
 													className={cn(
-														`min-h-[57px] border-2 border-gray-400 rounded-md bg-background px-4 py-2`,
-														showTestPreview ? 'w-[426px]' : 'w-[868px]'
+														`min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2`,
+														showTestPreview
+															? 'w-[426px] max-[480px]:w-[89.33vw]'
+															: 'w-[89.33vw] max-w-[868px]'
 													)}
+													data-hpi-signature-card
 												>
 													<FormLabel className="text-base font-semibold font-secondary">
 														Signature
@@ -1626,7 +1781,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<FormControl>
 														<Textarea
 															placeholder="Enter your signature..."
-															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white"
+															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white max-[480px]:text-[10px] signature-textarea"
 															style={{
 																fontFamily: form.watch('font') || 'Arial',
 															}}
@@ -1646,41 +1801,88 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 									{/* Test button and notices (hidden in compact mode) */}
 									{compactLeftOnly ? null : (
-										<div className={cn('w-full', showTestPreview && 'hidden')}>
-											<div className="flex justify-center mb-4 w-full">
-												<Button
-													type="button"
-													onClick={() => {
-														setShowTestPreview?.(true);
-														handleGenerateTestDrafts?.();
-														setHasAttemptedTest(true);
-													}}
-													disabled={isGenerationDisabled?.()}
-													className={cn(
-														'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
-														showTestPreview ? 'w-[426px]' : 'w-[868px]',
-														isGenerationDisabled?.()
-															? 'opacity-50 cursor-not-allowed'
-															: 'opacity-100'
-													)}
-												>
-													{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
-												</Button>
+										<>
+											<div
+												className={cn(
+													'w-full',
+													showTestPreview && 'hidden',
+													'max-[480px]:hidden'
+												)}
+											>
+												<div className="flex justify-center mb-4 w-full">
+													<Button
+														type="button"
+														onClick={() => {
+															setShowTestPreview?.(true);
+															handleGenerateTestDrafts?.();
+															setHasAttemptedTest(true);
+														}}
+														disabled={isGenerationDisabled?.()}
+														className={cn(
+															'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
+															showTestPreview
+																? 'w-[426px] max-[480px]:w-[89.8vw]'
+																: 'w-[93.7vw] max-w-[868px]',
+															isGenerationDisabled?.()
+																? 'opacity-50 cursor-not-allowed'
+																: 'opacity-100'
+														)}
+													>
+														{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+													</Button>
+												</div>
+												{hasEmptyTextBlocks && (
+													<div
+														className={cn(
+															hasTouchedEmptyTextBlocks || hasAttemptedTest
+																? 'text-destructive'
+																: 'text-black',
+															'text-sm font-medium -mt-2 mb-2',
+															showTestPreview
+																? 'w-[426px] max-[480px]:w-[89.8vw]'
+																: 'w-[93.7vw] max-w-[868px]'
+														)}
+													>
+														Fill in all text blocks in order to compose an email.
+													</div>
+												)}
 											</div>
-											{hasEmptyTextBlocks && (
-												<div
-													className={cn(
-														hasTouchedEmptyTextBlocks || hasAttemptedTest
-															? 'text-destructive'
-															: 'text-black',
-														'text-sm font-medium -mt-2 mb-2',
-														showTestPreview ? 'w-[426px]' : 'w-[868px]'
-													)}
-												>
-													Fill in all text blocks in order to compose an email.
+
+											{/* Mobile sticky Test button at page bottom */}
+											{!showTestPreview && (
+												<div className="hidden max-[480px]:block mobile-sticky-test-button">
+													<div className="fixed bottom-0 left-0 right-0 z-40">
+														<div className="flex w-full">
+															<Button
+																type="button"
+																onClick={() => {
+																	setShowTestPreview?.(true);
+																	handleGenerateTestDrafts?.();
+																	setHasAttemptedTest(true);
+																}}
+																disabled={isGenerationDisabled?.()}
+																className={cn(
+																	'h-[53px] flex-1 rounded-none bg-[#5DAB68] text-white font-times font-bold cursor-pointer flex items-center justify-center font-primary border-2 border-black border-r-0',
+																	isGenerationDisabled?.()
+																		? 'opacity-50 cursor-not-allowed'
+																		: 'opacity-100'
+																)}
+															>
+																{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+															</Button>
+															<button
+																type="button"
+																onClick={() => onGoToDrafting?.()}
+																className="h-[53px] w-[92px] bg-[#EEEEEE] text-black font-inter text-[16px] leading-none border-2 border-[#626262] rounded-none flex-shrink-0 border-l-[#626262]"
+															>
+																<span className="block">Go to</span>
+																<span className="block">Drafting</span>
+															</button>
+														</div>
+													</div>
 												</div>
 											)}
-										</div>
+										</>
 									)}
 								</div>
 							)}
@@ -1690,9 +1892,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								: showTestPreview && (
 										<div
 											className={cn(
-												'w-[461px] shrink-0',
+												'w-[461px] max-[480px]:w-[96.27vw] shrink-0',
 												isPanelsReversed ? 'order-1' : 'order-2'
 											)}
+											data-test-preview-wrapper
 										>
 											<DraggableBox
 												id="test-preview-panel"
@@ -1717,6 +1920,30 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													contact={contact}
 												/>
 											</DraggableBox>
+											{/* Mobile sticky footer with Back to Testing and Go to Drafting */}
+											<div className="hidden max-[480px]:block mobile-landscape-sticky-preview-footer">
+												<div className="fixed bottom-0 left-0 right-0 z-40">
+													<div className="flex w-full">
+														<Button
+															type="button"
+															onClick={() => setShowTestPreview?.(false)}
+															className={cn(
+																'h-[53px] flex-1 rounded-none bg-[#5DAB68] text-white font-times font-bold cursor-pointer flex items-center justify-center font-primary border-2 border-black border-r-0'
+															)}
+														>
+															Back to Testing
+														</Button>
+														<button
+															type="button"
+															onClick={() => onGoToDrafting?.()}
+															className="h-[53px] w-[92px] bg-[#EEEEEE] text-black font-inter text-[16px] leading-none border-2 border-[#626262] rounded-none flex-shrink-0 border-l-[#626262]"
+														>
+															<span className="block">Go to</span>
+															<span className="block">Drafting</span>
+														</button>
+													</div>
+												</div>
+											</div>
 										</div>
 								  )}
 						</div>
