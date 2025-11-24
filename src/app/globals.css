@@ -3999,7 +3999,7 @@ body,
 	/* Allow the custom 2px scrollbar to render outside the border */
 	overflow: visible !important;
 	border-radius: 8px !important;
-	background-color: #AFD6EF !important;
+	background-color: #afd6ef !important;
 }
 
 .search-results-table .scrollbar-hide {
@@ -4169,12 +4169,6 @@ body,
 	box-shadow: inset 0 0 0 100vmax #d6e8d9 !important;
 }
 
-/* macOS/Safari: eliminate hairline gaps by using separate borders and no spacing */
-.search-results-table table[data-slot='table'] {
-	border-collapse: separate !important;
-	border-spacing: 0 !important;
-}
-
 /* Keep borders visible so fill stays inside the stroke */
 .search-results-table
 	[data-slot='table-row'][data-state='selected']
@@ -4185,7 +4179,7 @@ body,
 /* --- Search Results Table Card UI --- */
 .search-results-table table[data-slot='table'] {
 	border-collapse: separate !important;
-	border-spacing: 0 8px !important; /* vertical gap between rows only */
+	border-spacing: 0 6px !important; /* vertical gap between rows only */
 	padding: 0 8px !important;
 }
 
@@ -4195,7 +4189,7 @@ body,
 	/* Collapse header vertical footprint for in-box sticky header layout */
 	height: 0 !important;
 	margin: 0 !important;
-	margin-bottom: -8px !important; /* cancel table border-spacing below header */
+	margin-bottom: -6px !important; /* cancel table border-spacing below header */
 }
 
 .search-results-table thead tr[data-slot='table-row'] {
@@ -4322,22 +4316,22 @@ body.murmur-mobile .search-results-table td[data-slot='table-cell'] {
 	}
 }
 
-/* Mobile: tighten vertical spacing between search result rows to 5px */
+/* Mobile: tighten vertical spacing between search result rows to 6px */
 @media (max-width: 640px) {
 	.search-results-table table[data-slot='table'] {
-		border-spacing: 0 5px !important; /* reduce from default 8px only on mobile */
+		border-spacing: 0 6px !important; /* vertical spacing between rows */
 	}
 	.search-results-table thead[data-slot='table-header'] {
-		margin-bottom: -5px !important; /* keep header flush with reduced row gap */
+		margin-bottom: -6px !important; /* keep header flush with reduced row gap */
 	}
 }
 
 /* Real mobile devices only (extra guard) */
 body.murmur-mobile .search-results-table table[data-slot='table'] {
-	border-spacing: 0 5px !important;
+	border-spacing: 0 6px !important;
 }
 body.murmur-mobile .search-results-table thead[data-slot='table-header'] {
-	margin-bottom: -5px !important;
+	margin-bottom: -6px !important;
 }
 
 /* Mobile: ensure the initial dashboard search input is 41px tall */
