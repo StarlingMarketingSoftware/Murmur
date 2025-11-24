@@ -54,7 +54,7 @@ const Dashboard = () => {
 	const debouncedWhereValue = useDebounce(whereValue, 300);
 	const { data: locationResults, isLoading: isLoadingLocations } = useGetLocations(
 		debouncedWhereValue,
-		whyValue === '[Promotion]' ? 'state' : undefined
+		'state'
 	);
 
 	useEffect(() => {
@@ -556,7 +556,7 @@ const Dashboard = () => {
 																								fontFamily:
 																									'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
 																							}}
-																							placeholder="Search Destinations"
+																							placeholder="Search States"
 																							onClick={(e) => e.stopPropagation()}
 																						/>
 																						<span
@@ -581,7 +581,7 @@ const Dashboard = () => {
 																					>
 																						{hasWhereValue
 																							? `(${whereValue})`
-																							: 'Search Destinations'}
+																							: 'Search States'}
 																					</div>
 																				)}
 																			</div>
@@ -849,7 +849,8 @@ const Dashboard = () => {
 																										{loc.label}
 																									</div>
 																									<div className="text-[12px] leading-tight text-black mt-[4px]">
-																										Search contacts in {loc.city}
+																										Search contacts in{' '}
+																										{loc.city || loc.state}
 																									</div>
 																								</div>
 																							</div>
