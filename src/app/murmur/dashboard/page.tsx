@@ -1297,10 +1297,11 @@ const Dashboard = () => {
 												useCustomScrollbar={!isMobileLandscape}
 												scrollbarOffsetRight={-5}
 												containerClassName="search-results-table h-[571px] rounded-[8px] border-[#737373] md:w-[1004px]"
-												tableClassName="w-full"
+												tableClassName="w-[calc(100%-1rem)] mx-auto border-separate border-spacing-y-2"
 												headerClassName="[&_tr]:border-[#737373]"
 												theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
-												rowClassName="border-[#737373] row-hover-scroll"
+												rowClassName="border-[#737373] row-hover-scroll bg-white odd:bg-white even:bg-white rounded-[8px] [&>td:first-child]:rounded-l-[8px] [&>td:last-child]:rounded-r-[8px] [&>td]:border-y [&>td:first-child]:border-l [&>td:last-child]:border-r border-none"
+												stickyHeaderClassName="bg-[#AFD6EF]"
 												hidePagination
 												onRowHover={
 													isMobile ? undefined : (row) => setHoveredContact(row)

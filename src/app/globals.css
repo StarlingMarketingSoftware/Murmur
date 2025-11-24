@@ -3999,7 +3999,7 @@ body,
 	/* Allow the custom 2px scrollbar to render outside the border */
 	overflow: visible !important;
 	border-radius: 8px !important;
-	background-color: transparent !important; /* Body tint applied to inner scroller for uniform color */
+	background-color: #AFD6EF !important;
 }
 
 .search-results-table .scrollbar-hide {
@@ -4008,8 +4008,7 @@ body,
 	overflow-x: hidden !important;
 	scrollbar-width: none !important;
 	-ms-overflow-style: none !important;
-	/* Visible composite of #AFD6EF at 25% over white */
-	background-color: #ebf5fb !important;
+	background-color: transparent !important;
 }
 
 .search-results-table .scrollbar-hide::-webkit-scrollbar {
