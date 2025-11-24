@@ -1296,7 +1296,7 @@ const Dashboard = () => {
 												constrainHeight
 												useCustomScrollbar={!isMobileLandscape}
 												scrollbarOffsetRight={-5}
-												containerClassName="search-results-table h-[499px] rounded-[8px] border-[#737373] md:w-[1209px]"
+												containerClassName="search-results-table h-[571px] rounded-[8px] border-[#737373] md:w-[1004px]"
 												tableClassName="w-full"
 												headerClassName="[&_tr]:border-[#737373]"
 												theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
@@ -1374,7 +1374,7 @@ const Dashboard = () => {
 												}
 												variant="primary-light"
 												bold
-												className="w-full max-w-full h-[39px] mx-auto mt-5"
+												className="w-full md:w-[984px] h-[39px] mx-auto mt-5"
 												disabled={selectedContacts.length === 0}
 											>
 												Create Campaign
