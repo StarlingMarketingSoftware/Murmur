@@ -1151,21 +1151,14 @@ const Dashboard = () => {
 												<FormControl>
 													<div className="results-search-input-group">
 														<div
-															className={`search-wave-container ${
+															className={`search-wave-container relative ${
 																isLoadingContacts || isRefetchingContacts
 																	? 'search-wave-loading'
 																	: ''
 															}`}
 														>
-															<button
-																type="submit"
-																className="results-search-icon-btn"
-																aria-label="Search"
-															>
-																<SearchIconResults />
-															</button>
 															<Input
-																className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black ${
+																className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black !pr-[60px] ${
 																	field.value === activeSearchQuery &&
 																	(field.value?.trim()?.length ?? 0) > 0
 																		? 'text-center'
@@ -1179,6 +1172,27 @@ const Dashboard = () => {
 																spellCheck="false"
 																{...field}
 															/>
+															<button
+																type="submit"
+																className="absolute right-[6px] top-1/2 -translate-y-1/2 flex items-center justify-center transition-colors cursor-pointer z-20 hover:bg-[#a3d9a5]"
+																style={{
+																	width: '48px',
+																	height: '37px',
+																	backgroundColor: '#B8E4BE',
+																	border: '1px solid #5DAB68',
+																	borderTopRightRadius: '6px',
+																	borderBottomRightRadius: '6px',
+																	borderTopLeftRadius: '0',
+																	borderBottomLeftRadius: '0',
+																}}
+																aria-label="Search"
+															>
+																<div
+																	style={{ transform: 'scale(0.75)', display: 'flex' }}
+																>
+																	<SearchIconDesktop />
+																</div>
+															</button>
 														</div>
 													</div>
 												</FormControl>
