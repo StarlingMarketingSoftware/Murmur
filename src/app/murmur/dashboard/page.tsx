@@ -1374,10 +1374,17 @@ const Dashboard = () => {
 												}
 												variant="primary-light"
 												bold
-												className="w-[984px] h-[39px] mx-auto mt-5 !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000]"
+												className="relative w-[984px] h-[39px] mx-auto mt-5 !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
 												disabled={selectedContacts.length === 0}
 											>
-												Add to Campaign
+												<span className="relative z-20">Add to Campaign</span>
+												<div className="pointer-events-none absolute inset-y-0 right-0 w-[65px] z-10 flex items-center justify-center bg-[#74D178]">
+													<span className="text-black text-[14px] font-medium">All</span>
+												</div>
+												<span
+													aria-hidden="true"
+													className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+												/>
 											</Button>
 										</div>
 									)}
