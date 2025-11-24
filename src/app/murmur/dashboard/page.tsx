@@ -1368,17 +1368,25 @@ const Dashboard = () => {
 									{!isMobile && (
 										<div className="flex items-center justify-center w-full">
 											<Button
-												onClick={handleCreateCampaign}
 												isLoading={
 													isPendingCreateCampaign || isPendingBatchUpdateContacts
 												}
 												variant="primary-light"
 												bold
 												className="relative w-[984px] h-[39px] mx-auto mt-5 !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
-												disabled={selectedContacts.length === 0}
+												onClick={() => {
+													if (selectedContacts.length === 0) return;
+													handleCreateCampaign();
+												}}
 											>
 												<span className="relative z-20">Add to Campaign</span>
-												<div className="pointer-events-none absolute inset-y-0 right-0 w-[65px] z-10 flex items-center justify-center bg-[#74D178]">
+												<div
+													className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+													onClick={(e) => {
+														e.stopPropagation();
+														handleSelectAll();
+													}}
+												>
 													<span className="text-black text-[14px] font-medium">All</span>
 												</div>
 												<span
