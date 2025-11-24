@@ -194,132 +194,145 @@ function getSuggestionScore(
 	return score;
 }
 
-export async function GET(req: NextRequest) {
-	try {
-		const { userId } = await auth();
-		if (!userId) {
-			return apiUnauthorized();
+function buildStateSearchTerms(cleanQuery: string): string[] {
+	const terms = [cleanQuery];
+
+	if (cleanQuery.includes(',')) {
+		const parts = cleanQuery.split(',');
+		const statePart = parts[parts.length - 1].trim();
+
+		let fullState = abbreviationToState[statePart.toUpperCase()];
+		if (!fullState && statePart.length > 2) {
+			fullState = statePart;
 		}
 
-		const { searchParams } = new URL(req.url);
-		const query = searchParams.get('query');
-		const mode = searchParams.get('mode'); // 'state' or undefined
+		if (fullState) {
+			terms.push(fullState);
+		} else if (statePart.length > 0) {
+			terms.push(statePart);
+		}
+	}
 
-		if (!query || query.length < 1) {
-			return apiResponse([]);
+	if (cleanQuery.length === 2) {
+		const fullState = abbreviationToState[cleanQuery.toUpperCase()];
+		if (fullState) terms.push(fullState);
+	}
+
+	const possibleAbbr = stateAbbreviations[cleanQuery.toLowerCase()];
+	if (possibleAbbr) terms.push(possibleAbbr);
+
+	return Array.from(new Set(terms.filter(Boolean)));
+}
+
+function buildCitySearchTerms(cleanQuery: string): string[] {
+	const terms = [cleanQuery];
+
+	if (cleanQuery.includes(',')) {
+		const parts = cleanQuery.split(',');
+		const cityPart = parts[0].trim();
+		const statePart = parts[parts.length - 1].trim();
+
+		let fullState = abbreviationToState[statePart.toUpperCase()];
+		if (!fullState && statePart.length > 2) {
+			fullState = statePart;
 		}
 
-		const cleanQuery = query.trim();
-		const searchTerms = [cleanQuery];
-
-		// If mode is 'state', we prioritize state matching and return distinct states
-		if (mode === 'state') {
-			// Check for comma to handle "City, State" inputs (e.g. "Philadelphia, PA" -> search "PA" -> "Pennsylvania")
-			if (cleanQuery.includes(',')) {
-				const parts = cleanQuery.split(',');
-				const statePart = parts[parts.length - 1].trim();
-
-				// Try to resolve state part to full name
-				let fullState = abbreviationToState[statePart.toUpperCase()];
-
-				// If no abbreviation found, but it looks like a state name (longer than 2 chars), use it
-				if (!fullState && statePart.length > 2) {
-					fullState = statePart;
-				}
-
-				if (fullState) {
-					searchTerms.push(fullState);
-				} else if (statePart.length > 0) {
-					searchTerms.push(statePart);
-				}
-			}
-
-			// Handle abbreviations in query
-			if (cleanQuery.length === 2) {
-				const fullState = abbreviationToState[cleanQuery.toUpperCase()];
-				if (fullState) searchTerms.push(fullState);
-			}
-			const possibleAbbr = stateAbbreviations[cleanQuery.toLowerCase()];
-			if (possibleAbbr) searchTerms.push(possibleAbbr);
-
-			// Handle "State, USA" or similar logic if needed, but usually just state name
-			// We search where state starts with query
-			const stateResults = await prisma.contact.findMany({
-				where: {
-					OR: searchTerms.flatMap((term) => [
-						{ state: { startsWith: term, mode: 'insensitive' } },
-						{ state: { contains: term, mode: 'insensitive' } },
-					]),
-					state: { not: null },
-				},
-				select: {
-					state: true,
-				},
-				distinct: ['state'],
-				take: 20,
-			});
-
-			const locations = stateResults
-				.filter((r) => r.state)
-				.map((r) => ({
-					city: '',
-					state: r.state!,
-					label: r.state!, // Just display state name
-				}));
-
-			return apiResponse(locations);
+		if (fullState) {
+			terms.push(fullState);
+		} else if (statePart.length > 0) {
+			terms.push(statePart);
 		}
 
-		// DEFAULT MODE (City Search)
-
-		// Check for comma to handle "City, State" inputs
-		if (cleanQuery.includes(',')) {
-			const parts = cleanQuery.split(',');
-			const cityPart = parts[0].trim();
-			const statePart = parts[parts.length - 1].trim();
-
-			// Try to resolve state part to full name
-			// e.g. "NY" -> "New York"
-			let fullState = abbreviationToState[statePart.toUpperCase()];
-
-			// If no abbreviation found, but it looks like a state name (longer than 2 chars), use it
-			if (!fullState && statePart.length > 2) {
-				fullState = statePart;
-			}
-
-			if (fullState) {
-				searchTerms.push(fullState);
-			} else if (statePart.length > 0) {
-				// Fallback: add the raw part if it might be a partial state name
-				searchTerms.push(statePart);
-			}
-
-			// Also add the city part to search terms to be robust
-			if (cityPart.length > 0) {
-				searchTerms.push(cityPart);
-			}
+		if (cityPart.length > 0) {
+			terms.push(cityPart);
 		}
+	}
 
-		// If query is 2 chars (likely abbreviation), add the full state name to search
-		if (cleanQuery.length === 2) {
-			const fullState = abbreviationToState[cleanQuery.toUpperCase()];
-			if (fullState) {
-				searchTerms.push(fullState);
-			}
+	if (cleanQuery.length === 2) {
+		const fullState = abbreviationToState[cleanQuery.toUpperCase()];
+		if (fullState) {
+			terms.push(fullState);
 		}
+	}
 
-		// If query matches a full state name, add the abbreviation to search
-		const possibleAbbr = stateAbbreviations[cleanQuery.toLowerCase()];
-		if (possibleAbbr) {
-			searchTerms.push(possibleAbbr);
-		}
+	const possibleAbbr = stateAbbreviations[cleanQuery.toLowerCase()];
+	if (possibleAbbr) {
+		terms.push(possibleAbbr);
+	}
 
-		// Prioritize results that START with the query
-		const startsWithResults = await prisma.contact.findMany({
+	return Array.from(new Set(terms.filter(Boolean)));
+}
+
+async function fetchStateSuggestions(cleanQuery: string) {
+	const searchTerms = buildStateSearchTerms(cleanQuery);
+
+	const stateResults = await prisma.contact.findMany({
+		where: {
+			OR: searchTerms.flatMap((term) => [
+				{ state: { startsWith: term, mode: 'insensitive' } },
+				{ state: { contains: term, mode: 'insensitive' } },
+			]),
+			state: { not: null },
+		},
+		select: {
+			state: true,
+		},
+		distinct: ['state'],
+		take: 20,
+	});
+
+	return stateResults
+		.filter((r) => r.state)
+		.map((r) => ({
+			city: '',
+			state: r.state!,
+			label: r.state!,
+		}));
+}
+
+interface CitySuggestionOptions {
+	requireKnownCity?: boolean;
+}
+
+async function fetchCitySuggestions(
+	cleanQuery: string,
+	options: CitySuggestionOptions = {}
+) {
+	const searchTerms = buildCitySearchTerms(cleanQuery);
+
+	const startsWithResults = await prisma.contact.findMany({
+		where: {
+			OR: searchTerms.flatMap((term) => [
+				{ city: { startsWith: term, mode: 'insensitive' } },
+				{ state: { startsWith: term, mode: 'insensitive' } },
+			]),
+			city: { not: null },
+			state: { not: null },
+		},
+		select: {
+			city: true,
+			state: true,
+		},
+		distinct: ['city', 'state'],
+		take: 20,
+	});
+
+	startsWithResults.sort((a, b) => {
+		const aIsCity = isCity(a.city!, a.state!);
+		const bIsCity = isCity(b.city!, b.state!);
+		if (aIsCity && !bIsCity) return -1;
+		if (!aIsCity && bIsCity) return 1;
+		return 0;
+	});
+
+	let finalResults = [...startsWithResults];
+
+	if (finalResults.length < 10) {
+		const containsResults = await prisma.contact.findMany({
 			where: {
 				OR: searchTerms.flatMap((term) => [
-					{ city: { startsWith: term, mode: 'insensitive' } },
-					{ state: { startsWith: term, mode: 'insensitive' } },
+					{ city: { contains: term, mode: 'insensitive' } },
+					{ state: { contains: term, mode: 'insensitive' } },
 				]),
 				city: { not: null },
 				state: { not: null },
@@ -329,11 +342,10 @@ export async function GET(req: NextRequest) {
 				state: true,
 			},
 			distinct: ['city', 'state'],
-			take: 20, // Increased take to allow for sorting
+			take: 20,
 		});
 
-		// Initial sort for startsWith results: Cities first
-		startsWithResults.sort((a, b) => {
+		containsResults.sort((a, b) => {
 			const aIsCity = isCity(a.city!, a.state!);
 			const bIsCity = isCity(b.city!, b.state!);
 			if (aIsCity && !bIsCity) return -1;
@@ -341,78 +353,75 @@ export async function GET(req: NextRequest) {
 			return 0;
 		});
 
-		let finalResults = [...startsWithResults];
+		finalResults = [...finalResults, ...containsResults];
+	}
 
-		// If we have fewer than 10 results, fetch those that CONTAIN the query
-		if (finalResults.length < 10) {
-			const containsResults = await prisma.contact.findMany({
-				where: {
-					OR: searchTerms.flatMap((term) => [
-						{ city: { contains: term, mode: 'insensitive' } },
-						{ state: { contains: term, mode: 'insensitive' } },
-					]),
-					city: { not: null },
-					state: { not: null },
-				},
-				select: {
-					city: true,
-					state: true,
-				},
-				distinct: ['city', 'state'],
-				take: 20,
-			});
+	finalResults.sort(
+		(a, b) =>
+			getSuggestionScore(b as { city: string | null; state: string | null }, cleanQuery) -
+			getSuggestionScore(a as { city: string | null; state: string | null }, cleanQuery)
+	);
 
-			// Initial sort for contains results: Cities first
-			containsResults.sort((a, b) => {
-				const aIsCity = isCity(a.city!, a.state!);
-				const bIsCity = isCity(b.city!, b.state!);
-				if (aIsCity && !bIsCity) return -1;
-				if (!aIsCity && bIsCity) return 1;
-				return 0;
-			});
+	const seen = new Set<string>();
+	const locations = [];
 
-			finalResults = [...finalResults, ...containsResults];
+	for (const r of finalResults) {
+		if (!r.city || !r.state) continue;
+		if (options.requireKnownCity && !isCity(r.city, r.state)) continue;
+
+		const key = `${r.city.toLowerCase()}-${r.state.toLowerCase()}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+
+		const city = r.city;
+		const rawState = r.state;
+		const stateAbbr = getStateAbbreviation(rawState);
+
+		locations.push({
+			city,
+			state: rawState,
+			label: `${city}, ${stateAbbr}`,
+		});
+
+		if (locations.length >= 10) break;
+	}
+
+	return locations;
+}
+
+export async function GET(req: NextRequest) {
+	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
 		}
 
-		// Strong re-sort of combined results using a scoring function that:
-		// - strongly prefers marquee cities (NYC, LA, Philadelphia, Nashville)
-		// - prefers city startsWith > state startsWith > contains
-		// - always prefers city results over non-city locations
-		finalResults.sort(
-			(a, b) =>
-				getSuggestionScore(
-					b as { city: string | null; state: string | null },
-					cleanQuery
-				) -
-				getSuggestionScore(a as { city: string | null; state: string | null }, cleanQuery)
-		);
+		const { searchParams } = new URL(req.url);
+		const query = searchParams.get('query');
+		const mode = searchParams.get('mode'); // 'state', 'state-first', or undefined
 
-		// Format and deduplicate results
-		const seen = new Set<string>();
-		const locations = [];
-
-		for (const r of finalResults) {
-			if (!r.city || !r.state) continue;
-
-			const key = `${r.city.toLowerCase()}-${r.state.toLowerCase()}`;
-			if (!seen.has(key)) {
-				seen.add(key);
-
-				const city = r.city;
-				const rawState = r.state;
-				const stateAbbr = getStateAbbreviation(rawState);
-
-				locations.push({
-					city,
-					state: rawState,
-					label: `${city}, ${stateAbbr}`,
-				});
-			}
-
-			if (locations.length >= 10) break;
+		if (!query || query.length < 1) {
+			return apiResponse([]);
 		}
 
-		return apiResponse(locations);
+		const cleanQuery = query.trim();
+
+		if (mode === 'state-first') {
+			const [stateLocations, cityLocations] = await Promise.all([
+				fetchStateSuggestions(cleanQuery),
+				fetchCitySuggestions(cleanQuery, { requireKnownCity: true }),
+			]);
+
+			return apiResponse([...stateLocations, ...cityLocations]);
+		}
+
+		if (mode === 'state') {
+			const stateLocations = await fetchStateSuggestions(cleanQuery);
+			return apiResponse(stateLocations);
+		}
+
+		const cityLocations = await fetchCitySuggestions(cleanQuery);
+		return apiResponse(cityLocations);
 	} catch (error) {
 		return handleApiError(error);
 	}

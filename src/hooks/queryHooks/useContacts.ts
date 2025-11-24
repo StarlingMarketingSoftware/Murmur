@@ -332,7 +332,7 @@ export interface LocationResult {
 	label: string;
 }
 
-export const useGetLocations = (query: string, mode?: 'state') => {
+export const useGetLocations = (query: string, mode?: 'state' | 'state-first') => {
 	return useQuery<LocationResult[]>({
 		queryKey: ['locations', query, mode],
 		queryFn: async () => {
