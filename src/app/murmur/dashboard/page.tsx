@@ -1296,7 +1296,7 @@ const Dashboard = () => {
 												constrainHeight
 												useCustomScrollbar={!isMobileLandscape}
 												scrollbarOffsetRight={-5}
-												containerClassName="search-results-table h-[499px] rounded-[8px] border-[#737373] md:w-[1209px]"
+												containerClassName="search-results-table h-[571px] rounded-[8px] border-[#737373] md:w-[1004px]"
 												tableClassName="w-full"
 												headerClassName="[&_tr]:border-[#737373]"
 												theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
@@ -1366,7 +1366,7 @@ const Dashboard = () => {
 									</Card>
 									{/* Desktop button (non-sticky) */}
 									{!isMobile && (
-										<div className="flex items-center w-full">
+										<div className="flex items-center justify-center w-full">
 											<Button
 												onClick={handleCreateCampaign}
 												isLoading={
@@ -1374,10 +1374,10 @@ const Dashboard = () => {
 												}
 												variant="primary-light"
 												bold
-												className="w-full max-w-full h-[39px] mx-auto mt-5"
+												className="w-[984px] h-[39px] mx-auto mt-5 !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000]"
 												disabled={selectedContacts.length === 0}
 											>
-												Create Campaign
+												Add to Campaign
 											</Button>
 										</div>
 									)}
@@ -1394,10 +1394,10 @@ const Dashboard = () => {
 													}
 													variant="primary-light"
 													bold
-													className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#050505] transition-colors !opacity-100 disabled:!opacity-100"
+													className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] transition-colors !opacity-100 disabled:!opacity-100"
 													disabled={selectedContacts.length === 0}
 												>
-													Create Campaign
+													Add to Campaign
 												</Button>
 											</div>,
 											document.body
