@@ -378,7 +378,7 @@ export const useDashboard = () => {
 								<div className="flex items-center gap-2">
 									{renderUsedIndicator()}
 									<div className="flex flex-col justify-center py-1 h-[2.75rem]">
-										<div className="truncate font-bold font-primary text-[16px]">
+										<div className="truncate font-bold font-secondary text-[15px]">
 											<TableCellTooltip
 												text={textToShow}
 												maxLength={MAX_CELL_LENGTH}
