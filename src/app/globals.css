@@ -2153,8 +2153,8 @@ body {
 }
 
 .results-search-input {
-	height: 35px;
-	width: 597px !important;
+	height: 49px;
+	width: 499px !important;
 	border: 2px solid #cfcfcf !important;
 	color: #7f7f7f !important;
 	padding-left: 48px; /* reserve more space for left icon */
@@ -2180,9 +2180,9 @@ body {
 
 /* Fix container width for results-only input */
 .results-search-input-group .search-wave-container {
-	width: 597px !important;
-	min-width: 597px !important;
-	max-width: 597px !important;
+	width: 499px !important;
+	min-width: 499px !important;
+	max-width: 499px !important;
 	position: relative;
 }
 

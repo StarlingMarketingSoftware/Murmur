@@ -1114,7 +1114,7 @@ const Dashboard = () => {
 					)}
 
 				{hasSearched && !isLoadingContacts && !isRefetchingContacts && (
-					<div className="results-search-bar-wrapper w-full max-w-[650px] mx-auto px-4 relative">
+					<div className="results-search-bar-wrapper w-full max-w-[531px] mx-auto px-4 relative">
 						<div
 							className={`results-search-bar-inner ${hoveredContact ? 'invisible' : ''}`}
 						>
