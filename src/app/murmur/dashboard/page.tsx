@@ -1165,7 +1165,7 @@ const Dashboard = () => {
 																<SearchIconResults />
 															</button>
 															<Input
-																className={`search-wave-input results-search-input !h-[49px] !border-2 !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black ${
+																className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black ${
 																	field.value === activeSearchQuery &&
 																	(field.value?.trim()?.length ?? 0) > 0
 																		? 'text-center'
