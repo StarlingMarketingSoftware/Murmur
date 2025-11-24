@@ -4235,8 +4235,8 @@ body,
 
 .search-results-table td[data-slot='table-cell'] {
 	background-color: white;
-	border-top: 1px solid #000;
-	border-bottom: 1px solid #000;
+	border-top: 2px solid #000;
+	border-bottom: 2px solid #000;
 	padding-top: 4px !important;
 	padding-bottom: 4px !important;
 	/* Create a clipping context so selection fill never bleeds outside */
@@ -4246,13 +4246,13 @@ body,
 }
 
 .search-results-table td[data-slot='table-cell']:first-child {
-	border-left: 1px solid #000;
+	border-left: 2px solid #000;
 	border-top-left-radius: 8px;
 	border-bottom-left-radius: 8px;
 }
 
 .search-results-table td[data-slot='table-cell']:last-child {
-	border-right: 1px solid #000;
+	border-right: 2px solid #000;
 	border-top-right-radius: 8px;
 	border-bottom-right-radius: 8px;
 }
