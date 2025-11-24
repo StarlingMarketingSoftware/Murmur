@@ -154,6 +154,58 @@ const STATE_NAME_TO_CANONICAL = US_STATE_METADATA.reduce<Record<string, string>>
 	{}
 );
 
+const STATE_FUZZY_MAX_DISTANCE = 2;
+const STATE_FUZZY_MIN_LENGTH = 5;
+
+const levenshteinDistance = (a: string, b: string): number => {
+	if (a === b) return 0;
+	if (a.length === 0) return b.length;
+	if (b.length === 0) return a.length;
+
+	const prevRow: number[] = Array.from({ length: b.length + 1 }, (_, idx) => idx);
+	const currRow: number[] = new Array(b.length + 1).fill(0);
+
+	for (let i = 1; i <= a.length; i++) {
+		currRow[0] = i;
+		const charA = a[i - 1];
+		for (let j = 1; j <= b.length; j++) {
+			const charB = b[j - 1];
+			const cost = charA === charB ? 0 : 1;
+			currRow[j] = Math.min(
+				currRow[j - 1] + 1, // insertion
+				prevRow[j] + 1, // deletion
+				prevRow[j - 1] + cost // substitution
+			);
+		}
+		for (let j = 0; j <= b.length; j++) {
+			prevRow[j] = currRow[j];
+		}
+	}
+
+	return prevRow[b.length];
+};
+
+const detectStateByFuzzyMatch = (value: string): string | null => {
+	const normalized = value.toLowerCase();
+	if (normalized.length < STATE_FUZZY_MIN_LENGTH) {
+		return null;
+	}
+
+	let bestMatch: { name: string; distance: number } | null = null;
+	for (const state of US_STATE_METADATA) {
+		const distance = levenshteinDistance(normalized, state.name.toLowerCase());
+		if (!bestMatch || distance < bestMatch.distance) {
+			bestMatch = { name: state.name, distance };
+			if (distance === 0) break;
+		}
+	}
+
+	if (bestMatch && bestMatch.distance <= STATE_FUZZY_MAX_DISTANCE) {
+		return bestMatch.name;
+	}
+	return null;
+};
+
 const COUNTRY_ALIASES: Record<string, string> = {
 	usa: 'United States of America',
 	us: 'United States of America',
@@ -185,7 +237,8 @@ const detectStateFromValue = (value: string | null | undefined): string | null =
 	if (STATE_NAME_TO_CANONICAL[lower]) {
 		return STATE_NAME_TO_CANONICAL[lower];
 	}
-	return null;
+	const fuzzy = detectStateByFuzzyMatch(cleaned);
+	return fuzzy ?? null;
 };
 
 const normalizeCountryValue = (value: string | null | undefined): string | null => {
