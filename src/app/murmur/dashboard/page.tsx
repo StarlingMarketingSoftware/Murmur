@@ -1357,7 +1357,7 @@ const Dashboard = () => {
 																opacity: selectedContacts.length === 0 ? 0.6 : 1,
 															}}
 														>
-															Create Campaign
+															Add to Campaign
 														</button>
 													)
 												}
@@ -1374,10 +1374,14 @@ const Dashboard = () => {
 												}
 												variant="primary-light"
 												bold
-												className="w-full md:w-[984px] h-[39px] mx-auto mt-5"
+												className="w-full md:w-[984px] h-[39px] mx-auto mt-5 !bg-[#5DAB68] !text-white !opacity-100 border border-[#000000] relative"
 												disabled={selectedContacts.length === 0}
 											>
-												Create Campaign
+												Add to Campaign
+												<div className="absolute right-[65px] top-0 bottom-0 w-[2px] bg-[#349A37]" />
+												<div className="absolute right-0 top-0 bottom-0 w-[65px] flex items-center justify-center text-black font-normal bg-[#74D178] rounded-r-[calc(var(--radius)-1px)] font-inter">
+													All
+												</div>
 											</Button>
 										</div>
 									)}
@@ -1397,7 +1401,7 @@ const Dashboard = () => {
 													className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#050505] transition-colors !opacity-100 disabled:!opacity-100"
 													disabled={selectedContacts.length === 0}
 												>
-													Create Campaign
+													Add to Campaign
 												</Button>
 											</div>,
 											document.body
