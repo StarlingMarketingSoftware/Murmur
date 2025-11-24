@@ -1295,8 +1295,8 @@ const Dashboard = () => {
 												displayRowsPerPage={false}
 												constrainHeight
 												useCustomScrollbar={!isMobileLandscape}
-												scrollbarOffsetRight={-5}
-												containerClassName="search-results-table h-[571px] rounded-[8px] border-[#737373] md:w-[1004px]"
+												scrollbarOffsetRight={-7}
+												containerClassName="search-results-table h-[571px] rounded-[8px] border-[#143883] md:w-[1004px] border-[3px]"
 												tableClassName="w-[calc(100%-1rem)] md:w-[985px] mx-auto border-separate border-spacing-y-[6px]"
 												headerClassName="[&_tr]:border-[#737373]"
 												theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
