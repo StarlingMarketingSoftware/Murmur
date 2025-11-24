@@ -12,7 +12,6 @@ import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
 import { BookingIcon } from '@/components/atoms/_svg/BookingIcon';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import { SearchIconMobile } from '@/components/atoms/_svg/SearchIconMobile';
-import { SearchIconResults } from '@/components/atoms/_svg/SearchIconResults';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
@@ -1163,6 +1162,10 @@ const Dashboard = () => {
 																	(field.value?.trim()?.length ?? 0) > 0
 																		? 'text-center'
 																		: 'text-left'
+																} ${
+																	!isMobile
+																		? 'text-transparent placeholder:text-transparent'
+																		: ''
 																}`}
 																placeholder='Refine your search... e.g. "Music venues in North Carolina"'
 																style={{ accentColor: 'transparent' }}
@@ -1172,6 +1175,61 @@ const Dashboard = () => {
 																spellCheck="false"
 																{...field}
 															/>
+															{!isMobile && (
+																<div
+																	className="absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center bg-white border border-black rounded-[6px] z-10 overflow-hidden group"
+																	style={{
+																		width: 'calc(100% - 66px)',
+																		height: '37px',
+																	}}
+																>
+																	<div className="flex-1 flex items-center justify-center border-r border-transparent group-hover:border-black/10 h-full min-w-0 relative px-1 transition-colors duration-200">
+																		<input
+																			value={whyValue.replace(/[\[\]]/g, '')}
+																			onChange={(e) => setWhyValue(e.target.value)}
+																			className="w-full h-full text-center bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0"
+																			placeholder="Why"
+																			onFocus={(e) => {
+																				const target = e.target;
+																				setTimeout(
+																					() => target.setSelectionRange(0, 0),
+																					0
+																				);
+																			}}
+																		/>
+																	</div>
+																	<div className="flex-1 flex items-center justify-center border-r border-transparent group-hover:border-black/10 h-full min-w-0 relative px-1 transition-colors duration-200">
+																		<input
+																			value={whatValue}
+																			onChange={(e) => setWhatValue(e.target.value)}
+																			className="w-full h-full text-center bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0"
+																			placeholder="What"
+																			onFocus={(e) => {
+																				const target = e.target;
+																				setTimeout(
+																					() => target.setSelectionRange(0, 0),
+																					0
+																				);
+																			}}
+																		/>
+																	</div>
+																	<div className="flex-1 flex items-center justify-center h-full min-w-0 relative px-1">
+																		<input
+																			value={whereValue}
+																			onChange={(e) => setWhereValue(e.target.value)}
+																			className="w-full h-full text-center bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0"
+																			placeholder="Where"
+																			onFocus={(e) => {
+																				const target = e.target;
+																				setTimeout(
+																					() => target.setSelectionRange(0, 0),
+																					0
+																				);
+																			}}
+																		/>
+																	</div>
+																</div>
+															)}
 															<button
 																type="submit"
 																className="absolute right-[6px] top-1/2 -translate-y-1/2 flex items-center justify-center transition-colors cursor-pointer z-20 hover:bg-[#a3d9a5]"
