@@ -360,10 +360,10 @@ export async function GET(req: NextRequest) {
 					state: queryJson.state ?? parsed?.state ?? null,
 					country: queryJson.country ?? parsed?.country ?? null,
 					restOfQuery:
-						typeof queryJson.restOfQuery === 'string'
-							? queryJson.restOfQuery
-							: typeof parsed?.restOfQuery === 'string'
+						typeof parsed?.restOfQuery === 'string'
 							? parsed.restOfQuery
+							: typeof queryJson.restOfQuery === 'string'
+							? queryJson.restOfQuery
 							: rawQueryForParsing,
 				};
 			} catch (e) {
@@ -588,6 +588,19 @@ export async function GET(req: NextRequest) {
 				};
 
 				const prioritized = results.sort((a, b) => {
+					const targetCityLc = (forceCityExactCity || queryJson.city || '')
+						.trim()
+						.toLowerCase();
+					const aCityMatch =
+						targetCityLc.length > 0 &&
+						(a.city || '').trim().toLowerCase() === targetCityLc;
+					const bCityMatch =
+						targetCityLc.length > 0 &&
+						(b.city || '').trim().toLowerCase() === targetCityLc;
+					// First, prioritize exact city matches (e.g., "New York")
+					if (aCityMatch && !bCityMatch) return -1;
+					if (!aCityMatch && bCityMatch) return 1;
+
 					const aStateTitle = isStateLabelAfterPrefix(a.title);
 					const bStateTitle = isStateLabelAfterPrefix(b.title);
 					if (aStateTitle && !bStateTitle) return -1;
@@ -772,6 +785,19 @@ export async function GET(req: NextRequest) {
 				};
 
 				const prioritized = results.sort((a, b) => {
+					const targetCityLc = (forceCityExactCity || queryJson.city || '')
+						.trim()
+						.toLowerCase();
+					const aCityMatch =
+						targetCityLc.length > 0 &&
+						(a.city || '').trim().toLowerCase() === targetCityLc;
+					const bCityMatch =
+						targetCityLc.length > 0 &&
+						(b.city || '').trim().toLowerCase() === targetCityLc;
+					// First, prioritize exact city matches
+					if (aCityMatch && !bCityMatch) return -1;
+					if (!aCityMatch && bCityMatch) return 1;
+
 					const aStateTitle = isStateLabelAfterPrefix(a.title);
 					const bStateTitle = isStateLabelAfterPrefix(b.title);
 					if (aStateTitle && !bStateTitle) return -1;
@@ -874,8 +900,23 @@ export async function GET(req: NextRequest) {
 				? filterContactsByTitlePrefix(results, bookingTitlePrefix)
 				: results;
 
+			// Reorder to put exact city matches first when a target city is known
+			const targetCityLc = (forceCityExactCity || queryJson.city || '')
+				.trim()
+				.toLowerCase();
+			const orderedResults =
+				targetCityLc.length === 0
+					? filteredResults
+					: filteredResults.slice().sort((a, b) => {
+							const aCityMatch = (a.city || '').trim().toLowerCase() === targetCityLc;
+							const bCityMatch = (b.city || '').trim().toLowerCase() === targetCityLc;
+							if (aCityMatch && !bCityMatch) return -1;
+							if (!aCityMatch && bCityMatch) return 1;
+							return 0;
+					  });
+
 			if (filteredResults.length > 0 || !useVectorSearch) {
-				return apiResponse(filteredResults.slice(0, finalLimit));
+				return apiResponse(orderedResults.slice(0, finalLimit));
 			}
 			// When vector search is requested but Prisma lacks matches, fall through
 			// so Elasticsearch/vector logic below can attempt to satisfy the query.

@@ -668,6 +668,7 @@ export function applyHardcodedLocationOverrides(
 			forceStateAny,
 			penaltyTerms: [],
 			strictPenalty: false,
+			forceCityExactCity: parsed.city ?? undefined,
 		};
 	}
 
