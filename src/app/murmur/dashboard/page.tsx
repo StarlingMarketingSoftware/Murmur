@@ -222,7 +222,11 @@ const Dashboard = () => {
 
 	// Combine section values into main search field
 	useEffect(() => {
-		const combinedSearch = [whyValue, whatValue, whereValue].filter(Boolean).join(' ');
+		const formattedWhere =
+			whereValue && whereValue.trim().length > 0 ? `(${whereValue})` : '';
+		const combinedSearch = [whyValue, whatValue, formattedWhere]
+			.filter(Boolean)
+			.join(' ');
 		if (combinedSearch) {
 			form.setValue('searchText', combinedSearch);
 		}

@@ -84,6 +84,178 @@ const filterContactsByTitlePrefix = <T extends { title?: string | null }>(
 	);
 };
 
+const US_STATE_METADATA = [
+	{ abbr: 'AL', name: 'Alabama' },
+	{ abbr: 'AK', name: 'Alaska' },
+	{ abbr: 'AZ', name: 'Arizona' },
+	{ abbr: 'AR', name: 'Arkansas' },
+	{ abbr: 'CA', name: 'California' },
+	{ abbr: 'CO', name: 'Colorado' },
+	{ abbr: 'CT', name: 'Connecticut' },
+	{ abbr: 'DE', name: 'Delaware' },
+	{ abbr: 'FL', name: 'Florida' },
+	{ abbr: 'GA', name: 'Georgia' },
+	{ abbr: 'HI', name: 'Hawaii' },
+	{ abbr: 'ID', name: 'Idaho' },
+	{ abbr: 'IL', name: 'Illinois' },
+	{ abbr: 'IN', name: 'Indiana' },
+	{ abbr: 'IA', name: 'Iowa' },
+	{ abbr: 'KS', name: 'Kansas' },
+	{ abbr: 'KY', name: 'Kentucky' },
+	{ abbr: 'LA', name: 'Louisiana' },
+	{ abbr: 'ME', name: 'Maine' },
+	{ abbr: 'MD', name: 'Maryland' },
+	{ abbr: 'MA', name: 'Massachusetts' },
+	{ abbr: 'MI', name: 'Michigan' },
+	{ abbr: 'MN', name: 'Minnesota' },
+	{ abbr: 'MS', name: 'Mississippi' },
+	{ abbr: 'MO', name: 'Missouri' },
+	{ abbr: 'MT', name: 'Montana' },
+	{ abbr: 'NE', name: 'Nebraska' },
+	{ abbr: 'NV', name: 'Nevada' },
+	{ abbr: 'NH', name: 'New Hampshire' },
+	{ abbr: 'NJ', name: 'New Jersey' },
+	{ abbr: 'NM', name: 'New Mexico' },
+	{ abbr: 'NY', name: 'New York' },
+	{ abbr: 'NC', name: 'North Carolina' },
+	{ abbr: 'ND', name: 'North Dakota' },
+	{ abbr: 'OH', name: 'Ohio' },
+	{ abbr: 'OK', name: 'Oklahoma' },
+	{ abbr: 'OR', name: 'Oregon' },
+	{ abbr: 'PA', name: 'Pennsylvania' },
+	{ abbr: 'RI', name: 'Rhode Island' },
+	{ abbr: 'SC', name: 'South Carolina' },
+	{ abbr: 'SD', name: 'South Dakota' },
+	{ abbr: 'TN', name: 'Tennessee' },
+	{ abbr: 'TX', name: 'Texas' },
+	{ abbr: 'UT', name: 'Utah' },
+	{ abbr: 'VT', name: 'Vermont' },
+	{ abbr: 'VA', name: 'Virginia' },
+	{ abbr: 'WA', name: 'Washington' },
+	{ abbr: 'WV', name: 'West Virginia' },
+	{ abbr: 'WI', name: 'Wisconsin' },
+	{ abbr: 'WY', name: 'Wyoming' },
+	{ abbr: 'DC', name: 'District of Columbia' },
+] as const;
+
+const STATE_ABBR_TO_NAME = US_STATE_METADATA.reduce<Record<string, string>>(
+	(acc, state) => {
+		acc[state.abbr] = state.name;
+		return acc;
+	},
+	{}
+);
+
+const STATE_NAME_TO_CANONICAL = US_STATE_METADATA.reduce<Record<string, string>>(
+	(acc, state) => {
+		acc[state.name.toLowerCase()] = state.name;
+		return acc;
+	},
+	{}
+);
+
+const COUNTRY_ALIASES: Record<string, string> = {
+	usa: 'United States of America',
+	us: 'United States of America',
+	'u.s.': 'United States of America',
+	'u.s.a.': 'United States of America',
+	'united states': 'United States of America',
+	'united states of america': 'United States of America',
+	america: 'United States of America',
+};
+
+const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim();
+
+const toTitleCase = (value: string): string =>
+	value
+		.split(' ')
+		.filter(Boolean)
+		.map((segment) => segment[0].toUpperCase() + segment.slice(1).toLowerCase())
+		.join(' ');
+
+const detectStateFromValue = (value: string | null | undefined): string | null => {
+	if (!value) return null;
+	const cleaned = normalizeWhitespace(value);
+	if (!cleaned) return null;
+	const upper = cleaned.toUpperCase();
+	if (STATE_ABBR_TO_NAME[upper]) {
+		return STATE_ABBR_TO_NAME[upper];
+	}
+	const lower = cleaned.toLowerCase();
+	if (STATE_NAME_TO_CANONICAL[lower]) {
+		return STATE_NAME_TO_CANONICAL[lower];
+	}
+	return null;
+};
+
+const normalizeCountryValue = (value: string | null | undefined): string | null => {
+	if (!value) return null;
+	const cleaned = normalizeWhitespace(value);
+	if (!cleaned) return null;
+	const alias = COUNTRY_ALIASES[cleaned.toLowerCase()];
+	if (alias) return alias;
+	return toTitleCase(cleaned);
+};
+
+type ParentheticalLocation = {
+	city: string | null;
+	state: string | null;
+	country: string | null;
+	restOfQuery: string;
+	originalText: string;
+};
+
+const extractParentheticalLocation = (query: string): ParentheticalLocation | null => {
+	if (!query) return null;
+	const match = /\(([^)]+)\)/.exec(query);
+	if (!match) return null;
+	const locationText = match[1]?.trim() ?? '';
+	if (!locationText) return null;
+	const restOfQuery = normalizeWhitespace(query.replace(match[0], ' '));
+	const parts = locationText
+		.split(',')
+		.map((part) => normalizeWhitespace(part))
+		.filter(Boolean);
+
+	let city: string | null = null;
+	let state: string | null = null;
+	let country: string | null = null;
+
+	if (parts.length === 1) {
+		const stateCandidate = detectStateFromValue(parts[0]);
+		if (stateCandidate) {
+			state = stateCandidate;
+		} else if (COUNTRY_ALIASES[parts[0].toLowerCase()]) {
+			country = normalizeCountryValue(parts[0]);
+		} else {
+			city = toTitleCase(parts[0]);
+		}
+	} else if (parts.length === 2) {
+		const [first, second] = parts;
+		const stateCandidate = detectStateFromValue(second);
+		if (stateCandidate) {
+			city = toTitleCase(first);
+			state = stateCandidate;
+		} else {
+			city = toTitleCase(first);
+			country = normalizeCountryValue(second);
+		}
+	} else if (parts.length >= 3) {
+		city = toTitleCase(parts[0]);
+		const potentialState = detectStateFromValue(parts[1]);
+		state = potentialState ?? toTitleCase(parts[1]);
+		country = normalizeCountryValue(parts[parts.length - 1]);
+	}
+
+	return {
+		city,
+		state,
+		country,
+		restOfQuery,
+		originalText: locationText,
+	};
+};
+
 export async function GET(req: NextRequest) {
 	try {
 		const { userId } = await auth();
@@ -121,6 +293,7 @@ export async function GET(req: NextRequest) {
 			location,
 			excludeUsedContacts,
 		} = validatedFilters.data;
+		let locationFilter = location ?? null;
 
 		let locationResponse: string | null = null;
 		const rawQuery = query || '';
@@ -133,7 +306,25 @@ export async function GET(req: NextRequest) {
 			: isBookingSearch
 			? rawQuery.replace(/^\s*\[booking\]\s*/i, '')
 			: rawQuery;
-		if (process.env.OPEN_AI_API_KEY && rawQuery) {
+		const parentheticalLocation = extractParentheticalLocation(rawQueryForParsing);
+		if (parentheticalLocation && !locationFilter) {
+			locationFilter = parentheticalLocation.originalText;
+		}
+		const queryForLocationParsing =
+			parentheticalLocation?.restOfQuery ?? rawQueryForParsing;
+		let queryJson: {
+			city: string | null;
+			state: string | null;
+			country: string | null;
+			restOfQuery: string;
+		} = {
+			city: parentheticalLocation?.city ?? null,
+			state: parentheticalLocation?.state ?? null,
+			country: parentheticalLocation?.country ?? null,
+			restOfQuery: queryForLocationParsing,
+		};
+
+		if (process.env.OPEN_AI_API_KEY && queryForLocationParsing) {
 			try {
 				locationResponse = await fetchOpenAi(
 					OPEN_AI_MODEL_OPTIONS.o4mini,
@@ -149,7 +340,7 @@ export async function GET(req: NextRequest) {
                     - Return a valid JSON string that can be parsed by a JSON.parse() in JavaScript. 
                     - There are some place names that can also be a word (such as buffalo steak house in new york) (Buffalo is a city in New York but it is also a general word for an animal). Use the context of the query to determine if the word is a place name or not.
                     - Return the JSON string and nothing else.`,
-					rawQueryForParsing
+					queryForLocationParsing
 				);
 			} catch (openAiError) {
 				console.error('OpenAI location parsing failed:', openAiError);
@@ -161,26 +352,17 @@ export async function GET(req: NextRequest) {
 		}
 
 		// Parse location via LLM with a fast timeout and graceful fallback or no-LLM fallback
-		let queryJson: {
-			city: string | null;
-			state: string | null;
-			country: string | null;
-			restOfQuery: string;
-		} = {
-			city: null,
-			state: null,
-			country: null,
-			restOfQuery: rawQueryForParsing,
-		};
 		if (locationResponse) {
 			try {
 				const parsed = JSON.parse(stripBothSidesOfBraces(locationResponse));
 				queryJson = {
-					city: parsed?.city ?? null,
-					state: parsed?.state ?? null,
-					country: parsed?.country ?? null,
+					city: queryJson.city ?? parsed?.city ?? null,
+					state: queryJson.state ?? parsed?.state ?? null,
+					country: queryJson.country ?? parsed?.country ?? null,
 					restOfQuery:
-						typeof parsed?.restOfQuery === 'string'
+						typeof queryJson.restOfQuery === 'string'
+							? queryJson.restOfQuery
+							: typeof parsed?.restOfQuery === 'string'
 							? parsed.restOfQuery
 							: rawQueryForParsing,
 				};
@@ -789,7 +971,7 @@ export async function GET(req: NextRequest) {
 			const caseInsensitiveMode = 'insensitive' as const;
 			// Build location OR conditions only when parsed parts are present to satisfy Prisma types
 			const locationOr: Prisma.ContactWhereInput[] = [];
-			if (location) {
+			if (locationFilter) {
 				if (queryJson.city) {
 					locationOr.push(
 						{ city: { contains: queryJson.city, mode: caseInsensitiveMode } },
@@ -872,7 +1054,7 @@ export async function GET(req: NextRequest) {
 						? [{ emailValidationStatus: { equals: verificationStatus } }]
 						: []),
 					// Location condition (must match at least one location field)
-					...(location && locationOr.length > 0 ? [{ OR: locationOr }] : []),
+					...(locationFilter && locationOr.length > 0 ? [{ OR: locationOr }] : []),
 					// Strict city/state enforcement when we have forceCityExactCity from preprocessing (e.g., Philadelphia)
 					...(strictLocationAnd.length > 0 ? strictLocationAnd : []),
 					// Exclude used contacts condition
