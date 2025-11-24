@@ -448,11 +448,26 @@ export async function GET(req: NextRequest) {
 					});
 				}
 
+				// Strict city matching when present
+				const cityStrictAnd: Prisma.ContactWhereInput[] = [];
+				if (forceCityExactCity) {
+					cityStrictAnd.push({
+						city: { equals: forceCityExactCity, mode: 'insensitive' },
+					});
+				} else if (forceCityAny && forceCityAny.length > 0) {
+					cityStrictAnd.push({
+						OR: forceCityAny.map((c) => ({
+							city: { equals: c, mode: 'insensitive' },
+						})),
+					});
+				}
+
 				const results = await prisma.contact.findMany({
 					where: {
 						AND: [
 							baseWhere,
 							...stateStrictAnd,
+							...cityStrictAnd,
 							{ title: { mode: 'insensitive', startsWith: 'Music Venues' } },
 						],
 					},
@@ -645,11 +660,26 @@ export async function GET(req: NextRequest) {
 					});
 				}
 
+				// Strict city matching when present
+				const cityStrictAnd: Prisma.ContactWhereInput[] = [];
+				if (forceCityExactCity) {
+					cityStrictAnd.push({
+						city: { equals: forceCityExactCity, mode: 'insensitive' },
+					});
+				} else if (forceCityAny && forceCityAny.length > 0) {
+					cityStrictAnd.push({
+						OR: forceCityAny.map((c) => ({
+							city: { equals: c, mode: 'insensitive' },
+						})),
+					});
+				}
+
 				const results = await prisma.contact.findMany({
 					where: {
 						AND: [
 							baseWhere,
 							...stateStrictAnd,
+							...cityStrictAnd,
 							{ title: { mode: 'insensitive', startsWith: 'Music Festivals' } },
 						],
 					},
@@ -809,6 +839,337 @@ export async function GET(req: NextRequest) {
 			}
 		}
 
+		// Strict "Restaurants" filter: when query mentions "restaurant(s)", only return titles starting with "Restaurants"
+		{
+			const mentionsRestaurants = /\brestaurants?\b/i.test(rawQueryForParsing);
+			if (mentionsRestaurants) {
+				const finalLimit = Math.max(
+					1,
+					Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200)
+				);
+				const fetchTake = Math.min(finalLimit * 4, 500);
+
+				const baseWhere: Prisma.ContactWhereInput = {
+					id: addedContactIds.length > 0 ? { notIn: addedContactIds } : undefined,
+					emailValidationStatus: verificationStatus
+						? {
+								equals: verificationStatus,
+						  }
+						: undefined,
+				};
+
+				// Respect strict state if present (exact or any-of synonyms)
+				const stateStrictAnd: Prisma.ContactWhereInput[] = [];
+				if (forceStateAny && forceStateAny.length > 0) {
+					stateStrictAnd.push({
+						OR: forceStateAny.map((s) => ({
+							state: { equals: s, mode: 'insensitive' },
+						})),
+					});
+				} else if (queryJson.state) {
+					stateStrictAnd.push({
+						state: { equals: queryJson.state, mode: 'insensitive' },
+					});
+				}
+
+				// Strict city matching when present
+				const cityStrictAnd: Prisma.ContactWhereInput[] = [];
+				if (forceCityExactCity) {
+					cityStrictAnd.push({
+						city: { equals: forceCityExactCity, mode: 'insensitive' },
+					});
+				} else if (forceCityAny && forceCityAny.length > 0) {
+					cityStrictAnd.push({
+						OR: forceCityAny.map((c) => ({
+							city: { equals: c, mode: 'insensitive' },
+						})),
+					});
+				}
+
+				const results = await prisma.contact.findMany({
+					where: {
+						AND: [
+							baseWhere,
+							...stateStrictAnd,
+							...cityStrictAnd,
+							{ title: { mode: 'insensitive', startsWith: 'Restaurants' } },
+						],
+					},
+					orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+					take: fetchTake,
+				});
+
+				// If not enough exact "Restaurants" prefix matches, try broader title-based fallbacks
+				if (results.length < finalLimit) {
+					const filler = await prisma.contact.findMany({
+						where: {
+							AND: [
+								baseWhere,
+								...stateStrictAnd,
+								...cityStrictAnd,
+								{
+									OR: [
+										{ title: { mode: 'insensitive', startsWith: 'Restaurant' } }, // singular
+										{ title: { mode: 'insensitive', contains: 'restaurant' } }, // general containment
+									],
+								},
+							],
+						},
+						orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+						take: Math.max(0, fetchTake - results.length),
+					});
+					const seen = new Set(results.map((c) => c.id));
+					for (const c of filler) {
+						if (seen.has(c.id)) continue;
+						results.push(c);
+						seen.add(c.id);
+						if (results.length >= fetchTake) break;
+					}
+				}
+
+				// Special inclusion rule: if searching for Philadelphia, PA, also include contacts
+				// with address containing "Philadelphia" and state "Pennsylvania", even if city differs.
+				{
+					const isPhillyCity =
+						(forceCityExactCity &&
+							forceCityExactCity.trim().toLowerCase() === 'philadelphia') ||
+						(queryJson.city && queryJson.city.trim().toLowerCase() === 'philadelphia');
+					const hasPaState =
+						(forceStateAny &&
+							forceStateAny.map((s) => s.toLowerCase()).includes('pennsylvania')) ||
+						(queryJson.state && queryJson.state.trim().toLowerCase() === 'pennsylvania');
+
+					if (isPhillyCity && hasPaState && results.length < fetchTake) {
+						const phillyAddressExtras = await prisma.contact.findMany({
+							where: {
+								AND: [
+									baseWhere,
+									{ state: { equals: 'Pennsylvania', mode: 'insensitive' } },
+									{ address: { contains: 'Philadelphia', mode: 'insensitive' } },
+								],
+							},
+							orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+							take: Math.max(0, fetchTake - results.length),
+						});
+						const seen = new Set(results.map((c) => c.id));
+						for (const c of phillyAddressExtras) {
+							if (seen.has(c.id)) continue;
+							results.push(c);
+							seen.add(c.id);
+							if (results.length >= fetchTake) break;
+						}
+					}
+				}
+
+				// Prioritize exact state-label titles: "Restaurants <STATE or ABBR>"
+				const STATE_NAMES = [
+					'Alabama',
+					'Alaska',
+					'Arizona',
+					'Arkansas',
+					'California',
+					'Colorado',
+					'Connecticut',
+					'Delaware',
+					'Florida',
+					'Georgia',
+					'Hawaii',
+					'Idaho',
+					'Illinois',
+					'Indiana',
+					'Iowa',
+					'Kansas',
+					'Kentucky',
+					'Louisiana',
+					'Maine',
+					'Maryland',
+					'Massachusetts',
+					'Michigan',
+					'Minnesota',
+					'Mississippi',
+					'Missouri',
+					'Montana',
+					'Nebraska',
+					'Nevada',
+					'New Hampshire',
+					'New Jersey',
+					'New Mexico',
+					'New York',
+					'North Carolina',
+					'North Dakota',
+					'Ohio',
+					'Oklahoma',
+					'Oregon',
+					'Pennsylvania',
+					'Rhode Island',
+					'South Carolina',
+					'South Dakota',
+					'Tennessee',
+					'Texas',
+					'Utah',
+					'Vermont',
+					'Virginia',
+					'Washington',
+					'West Virginia',
+					'Wisconsin',
+					'Wyoming',
+					'District of Columbia',
+				];
+				const STATE_ABBRS = [
+					'AL',
+					'AK',
+					'AZ',
+					'AR',
+					'CA',
+					'CO',
+					'CT',
+					'DE',
+					'FL',
+					'GA',
+					'HI',
+					'ID',
+					'IL',
+					'IN',
+					'IA',
+					'KS',
+					'KY',
+					'LA',
+					'ME',
+					'MD',
+					'MA',
+					'MI',
+					'MN',
+					'MS',
+					'MO',
+					'MT',
+					'NE',
+					'NV',
+					'NH',
+					'NJ',
+					'NM',
+					'NY',
+					'NC',
+					'ND',
+					'OH',
+					'OK',
+					'OR',
+					'PA',
+					'RI',
+					'SC',
+					'SD',
+					'TN',
+					'TX',
+					'UT',
+					'VT',
+					'VA',
+					'WA',
+					'WV',
+					'WI',
+					'WY',
+					'DC',
+				];
+				const STATE_NAME_SET = new Set(STATE_NAMES.map((s) => s.toLowerCase()));
+				const STATE_ABBR_SET = new Set(STATE_ABBRS);
+
+				const isStateLabelAfterPrefix = (title: string | null | undefined): boolean => {
+					if (!title) return false;
+					const trimmed = title.trim();
+					const m = /^restaurants?\b(.*)$/i.exec(trimmed);
+					if (!m) return false;
+					let rest = m[1].trim();
+					// Remove common separators right after prefix
+					rest = rest.replace(/^[-–—:|,()\[\]]+/, '').trim();
+					// Collapse repeated whitespace
+					rest = rest.replace(/\s+/g, ' ').trim();
+					if (!rest) return false;
+					// Match exact state label
+					if (STATE_NAME_SET.has(rest.toLowerCase())) return true;
+					if (STATE_ABBR_SET.has(rest.toUpperCase())) return true;
+					return false;
+				};
+
+				// Extract canonical state name if title matches "Restaurants <STATE or ABBR>"
+				const extractStateLabelAfterPrefix = (
+					title: string | null | undefined
+				): string | null => {
+					if (!title) return null;
+					const trimmed = title.trim();
+					const m = /^restaurants?\b(.*)$/i.exec(trimmed);
+					if (!m) return null;
+					let rest = m[1].trim();
+					rest = rest.replace(/^[-–—:|,()\[\]]+/, '').trim();
+					rest = rest.replace(/\s+/g, ' ').trim();
+					if (!rest) return null;
+					// Normalize to canonical state using shared helper (accepts abbr or name)
+					const canonical = detectStateFromValue(rest);
+					return canonical ?? null;
+				};
+
+				// Precompute target states (normalized) for matching preference when available
+				const targetStatesCanonical: string[] = (() => {
+					const candidates: string[] = [];
+					if (forceStateAny && forceStateAny.length > 0) {
+						for (const s of forceStateAny) {
+							const canon = detectStateFromValue(s);
+							if (canon) candidates.push(canon);
+						}
+					} else if (queryJson.state) {
+						const canon = detectStateFromValue(queryJson.state);
+						if (canon) candidates.push(canon);
+					}
+					return candidates;
+				})();
+				const targetStateSetLc = new Set(
+					targetStatesCanonical.map((s) => s.toLowerCase())
+				);
+
+				// If nothing matched at all, fall through to downstream booking/vector logic
+				if (results.length === 0) {
+					// no early return
+				} else {
+					const prioritized = results.sort((a, b) => {
+						// 1) Prefer titles of the form "Restaurants <STATE or ABBR>"
+						const aStateCanonical = extractStateLabelAfterPrefix(a.title);
+						const bStateCanonical = extractStateLabelAfterPrefix(b.title);
+						const aHasStateLabel = !!aStateCanonical;
+						const bHasStateLabel = !!bStateCanonical;
+						if (aHasStateLabel && !bHasStateLabel) return -1;
+						if (!aHasStateLabel && bHasStateLabel) return 1;
+						// When both have state labels and a target state is known, prefer matches
+						if (aHasStateLabel && bHasStateLabel && targetStateSetLc.size > 0) {
+							const aMatchesTarget = targetStateSetLc.has(aStateCanonical!.toLowerCase());
+							const bMatchesTarget = targetStateSetLc.has(bStateCanonical!.toLowerCase());
+							if (aMatchesTarget && !bMatchesTarget) return -1;
+							if (!aMatchesTarget && bMatchesTarget) return 1;
+						}
+
+						// 2) Then prioritize exact city matches if a target city is known
+						const targetCityLc = (forceCityExactCity || queryJson.city || '')
+							.trim()
+							.toLowerCase();
+						const aCityMatch =
+							targetCityLc.length > 0 &&
+							(a.city || '').trim().toLowerCase() === targetCityLc;
+						const bCityMatch =
+							targetCityLc.length > 0 &&
+							(b.city || '').trim().toLowerCase() === targetCityLc;
+						// Prioritize exact city matches (e.g., "New York")
+						if (aCityMatch && !bCityMatch) return -1;
+						if (!aCityMatch && bCityMatch) return 1;
+
+						// 3) Fallback: simple presence of a state label after prefix
+						const aStateTitle = isStateLabelAfterPrefix(a.title);
+						const bStateTitle = isStateLabelAfterPrefix(b.title);
+						if (aStateTitle && !bStateTitle) return -1;
+						if (!aStateTitle && bStateTitle) return 1;
+						return 0;
+					});
+
+					return apiResponse(prioritized.slice(0, finalLimit));
+				}
+			}
+		}
+
 		// Special-case: Booking searches - filter to specific title prefixes and respect strict state if present
 		if (isBookingSearch) {
 			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200));
@@ -836,6 +1197,20 @@ export async function GET(req: NextRequest) {
 				});
 			}
 
+			// Strict city matching when present
+			const cityStrictAnd: Prisma.ContactWhereInput[] = [];
+			if (forceCityExactCity) {
+				cityStrictAnd.push({
+					city: { equals: forceCityExactCity, mode: 'insensitive' },
+				});
+			} else if (forceCityAny && forceCityAny.length > 0) {
+				cityStrictAnd.push({
+					OR: forceCityAny.map((c) => ({
+						city: { equals: c, mode: 'insensitive' },
+					})),
+				});
+			}
+
 			const defaultTitlePrefixes = [
 				'Music Venues',
 				'Restaurants',
@@ -858,6 +1233,7 @@ export async function GET(req: NextRequest) {
 					AND: [
 						baseWhere,
 						...stateStrictAnd,
+						...cityStrictAnd,
 						{
 							OR: effectivePrefixes.map((p) => ({
 								title: { mode: 'insensitive', startsWith: p },
@@ -877,6 +1253,7 @@ export async function GET(req: NextRequest) {
 						AND: [
 							baseWhere,
 							...stateStrictAnd,
+							...cityStrictAnd,
 							{
 								OR: effectivePrefixes.map((p) => ({
 									title: { mode: 'insensitive', contains: p },
@@ -952,12 +1329,27 @@ export async function GET(req: NextRequest) {
 				});
 			}
 
+			// Strict city matching when present
+			const cityStrictAnd: Prisma.ContactWhereInput[] = [];
+			if (forceCityExactCity) {
+				cityStrictAnd.push({
+					city: { equals: forceCityExactCity, mode: 'insensitive' },
+				});
+			} else if (forceCityAny && forceCityAny.length > 0) {
+				cityStrictAnd.push({
+					OR: forceCityAny.map((c) => ({
+						city: { equals: c, mode: 'insensitive' },
+					})),
+				});
+			}
+
 			// Fetch contacts with title indicating Radio Stations first
 			const primary = await prisma.contact.findMany({
 				where: {
 					AND: [
 						baseWhere,
 						...stateStrictAnd,
+						...cityStrictAnd,
 						{
 							OR: [
 								{ title: radioTitleWhere },
@@ -978,6 +1370,7 @@ export async function GET(req: NextRequest) {
 						AND: [
 							baseWhere,
 							...stateStrictAnd,
+							...cityStrictAnd,
 							{
 								OR: [
 									{ headline: { mode: 'insensitive', contains: 'radio' } },
@@ -1004,11 +1397,17 @@ export async function GET(req: NextRequest) {
 		}
 
 		const substringSearch = async (): Promise<Contact[]> => {
-			const searchTerms: string[] =
-				query
-					?.toLowerCase()
-					.split(/\s+/)
-					.filter((term) => term.length > 0) || [];
+			// For booking-style queries, ignore directive tokens (e.g. "[booking]")
+			// and raw parenthetical locations when building search terms. Use the
+			// cleaned, non-location portion of the query instead so we don't require
+			// impossible literal matches like "[booking]" or "(philadelphia, pa)".
+			const baseSearch = isBookingSearch
+				? (queryJson?.restOfQuery || rawQueryForParsing || '').toLowerCase()
+				: (query || '').toLowerCase();
+
+			const searchTerms: string[] = baseSearch
+				.split(/\s+/)
+				.filter((term) => term.length > 0);
 			const caseInsensitiveMode = 'insensitive' as const;
 			// Build location OR conditions only when parsed parts are present to satisfy Prisma types
 			const locationOr: Prisma.ContactWhereInput[] = [];
