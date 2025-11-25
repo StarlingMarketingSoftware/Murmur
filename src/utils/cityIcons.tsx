@@ -48,6 +48,10 @@ import {
 	NewHampshireIcon,
 	NEW_HAMPSHIRE_BACKGROUND,
 } from '@/components/atoms/_svg/NewHampshireIcon';
+import {
+	NewJerseyIcon,
+	NEW_JERSEY_BACKGROUND,
+} from '@/components/atoms/_svg/NewJerseyIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -299,6 +303,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <NewHampshireIcon />,
 				backgroundColor: NEW_HAMPSHIRE_BACKGROUND,
+			};
+		}
+
+		// Check for New Jersey
+		if (normalizedState === 'new jersey' || normalizedState === 'nj') {
+			return {
+				icon: <NewJerseyIcon />,
+				backgroundColor: NEW_JERSEY_BACKGROUND,
 			};
 		}
 	}
