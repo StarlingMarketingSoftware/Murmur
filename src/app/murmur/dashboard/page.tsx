@@ -658,6 +658,22 @@ const Dashboard = () => {
 		setActiveSection(null);
 	};
 
+	// Apply full-width background for map view using body class,
+	// so the search bar and other content stay above it.
+	useEffect(() => {
+		if (typeof document === 'undefined') return;
+
+		if (isMapView) {
+			document.body.classList.add('murmur-map-view');
+		} else {
+			document.body.classList.remove('murmur-map-view');
+		}
+
+		return () => {
+			document.body.classList.remove('murmur-map-view');
+		};
+	}, [isMapView]);
+
 	// Return null during initial load to prevent hydration mismatch
 	if (isMobile === null) {
 		return null;
