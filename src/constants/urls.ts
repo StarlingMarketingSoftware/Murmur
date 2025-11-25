@@ -86,6 +86,9 @@ export const urls = {
 			bulkUpdate: {
 				index: '/api/contacts/bulk-update',
 			},
+			geocode: {
+				index: '/api/contacts/geocode',
+			},
 			detail: ((id) => `/api/contacts/${id}`) as DetailRoute,
 		},
 		emails: {

@@ -35,6 +35,7 @@ import { useGetLocations } from '@/hooks/queryHooks/useContacts';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
+import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -1375,6 +1376,19 @@ const Dashboard = () => {
 						) : contacts && contacts.length > 0 ? (
 							<div className="flex justify-center w-full px-0 sm:px-4 relative">
 								<div className="w-full max-w-full results-appear results-align">
+									{/* Google Maps showing contact locations */}
+									<div className="w-full md:w-[1004px] mx-auto mb-4">
+										<div
+											className="w-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden"
+											style={{ height: '280px' }}
+										>
+											<SearchResultsMap
+												contacts={contacts}
+												selectedContacts={selectedContacts}
+												onMarkerClick={(contact) => setHoveredContact(contact)}
+											/>
+										</div>
+									</div>
 									<Card className="border-0 shadow-none !p-0 w-full !my-0">
 										<CardContent className="!p-0 w-full">
 											<CustomTable
