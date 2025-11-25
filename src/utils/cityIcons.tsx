@@ -68,6 +68,10 @@ import {
 import { OhioIcon, OHIO_BACKGROUND } from '@/components/atoms/_svg/OhioIcon';
 import { OklahomaIcon, OKLAHOMA_BACKGROUND } from '@/components/atoms/_svg/OklahomaIcon';
 import { OregonIcon, OREGON_BACKGROUND } from '@/components/atoms/_svg/OregonIcon';
+import {
+	PennsylvaniaIcon,
+	PENNSYLVANIA_BACKGROUND,
+} from '@/components/atoms/_svg/PennsylvaniaIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -383,6 +387,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <OregonIcon />,
 				backgroundColor: OREGON_BACKGROUND,
+			};
+		}
+
+		// Check for Pennsylvania
+		if (normalizedState === 'pennsylvania' || normalizedState === 'pa') {
+			return {
+				icon: <PennsylvaniaIcon />,
+				backgroundColor: PENNSYLVANIA_BACKGROUND,
 			};
 		}
 	}
