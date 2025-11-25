@@ -57,6 +57,10 @@ import {
 	NEW_MEXICO_BACKGROUND,
 } from '@/components/atoms/_svg/NewMexicoIcon';
 import { NewYorkIcon, NEW_YORK_BACKGROUND } from '@/components/atoms/_svg/NewYorkIcon';
+import {
+	NorthCarolinaIcon,
+	NORTH_CAROLINA_BACKGROUND,
+} from '@/components/atoms/_svg/NorthCarolinaIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -332,6 +336,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <NewYorkIcon />,
 				backgroundColor: NEW_YORK_BACKGROUND,
+			};
+		}
+
+		// Check for North Carolina
+		if (normalizedState === 'north carolina' || normalizedState === 'nc') {
+			return {
+				icon: <NorthCarolinaIcon />,
+				backgroundColor: NORTH_CAROLINA_BACKGROUND,
 			};
 		}
 	}
