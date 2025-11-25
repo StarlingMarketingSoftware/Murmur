@@ -1512,18 +1512,44 @@ const Dashboard = () => {
 								{!isMobile &&
 									(() => {
 										// Parse metadata sections [1], [2], etc.
+										// Only includes sequential sections starting from [1] that have meaningful content
 										const parseMetadataSections = (
 											metadata: string | null | undefined
 										) => {
 											if (!metadata) return {};
-											const sections: Record<string, string> = {};
+
+											// First, extract all sections
+											const allSections: Record<string, string> = {};
 											const regex = /\[(\d+)\]\s*([\s\S]*?)(?=\[\d+\]|$)/g;
 											let match;
 											while ((match = regex.exec(metadata)) !== null) {
 												const sectionNum = match[1];
 												const content = match[2].trim();
-												sections[sectionNum] = content;
+												allSections[sectionNum] = content;
 											}
+
+											// Filter to only sequential sections starting from 1, with meaningful content
+											const sections: Record<string, string> = {};
+											let expectedNum = 1;
+
+											while (allSections[String(expectedNum)]) {
+												const content = allSections[String(expectedNum)];
+												// Check if content has meaningful text (not just punctuation/whitespace)
+												// Remove common punctuation and whitespace to check for actual content
+												const meaningfulContent = content
+													.replace(/[.\s,;:!?'"()\-–—]/g, '')
+													.trim();
+
+												// Require at least 5 characters of meaningful content
+												if (meaningfulContent.length < 5) {
+													// Stop if we hit a section without meaningful content
+													break;
+												}
+
+												sections[String(expectedNum)] = content;
+												expectedNum++;
+											}
+
 											return sections;
 										};
 										const metadataSections = parseMetadataSections(
