@@ -1694,9 +1694,9 @@ const Dashboard = () => {
 														}}
 													>
 														{metadataSections['1'] && (
-															<div className="w-full h-full p-2 overflow-hidden">
+															<div className="w-full h-full px-2 flex items-center overflow-hidden">
 																<div
-																	className="text-[12px] leading-[1.4] text-black font-inter"
+																	className="w-full text-[12px] leading-[1.3] text-black font-inter"
 																	style={{
 																		display: '-webkit-box',
 																		WebkitLineClamp: 2,
@@ -1751,9 +1751,9 @@ const Dashboard = () => {
 														}}
 													>
 														{metadataSections['2'] && (
-															<div className="w-full h-full p-2 overflow-hidden">
+															<div className="w-full h-full px-2 flex items-center overflow-hidden">
 																<div
-																	className="text-[12px] leading-[1.4] text-black font-inter"
+																	className="w-full text-[12px] leading-[1.3] text-black font-inter"
 																	style={{
 																		display: '-webkit-box',
 																		WebkitLineClamp: 2,
@@ -1808,9 +1808,9 @@ const Dashboard = () => {
 														}}
 													>
 														{metadataSections['3'] && (
-															<div className="w-full h-full p-2 overflow-hidden">
+															<div className="w-full h-full px-2 flex items-center overflow-hidden">
 																<div
-																	className="text-[12px] leading-[1.4] text-black font-inter"
+																	className="w-full text-[12px] leading-[1.3] text-black font-inter"
 																	style={{
 																		display: '-webkit-box',
 																		WebkitLineClamp: 2,
@@ -1865,9 +1865,9 @@ const Dashboard = () => {
 														}}
 													>
 														{metadataSections['4'] && (
-															<div className="w-full h-full p-2 overflow-hidden">
+															<div className="w-full h-full px-2 flex items-center overflow-hidden">
 																<div
-																	className="text-[12px] leading-[1.4] text-black font-inter"
+																	className="w-full text-[12px] leading-[1.3] text-black font-inter"
 																	style={{
 																		display: '-webkit-box',
 																		WebkitLineClamp: 2,
@@ -1922,9 +1922,9 @@ const Dashboard = () => {
 														}}
 													>
 														{metadataSections['5'] && (
-															<div className="w-full h-full p-2 overflow-hidden">
+															<div className="w-full h-full px-2 flex items-center overflow-hidden">
 																<div
-																	className="text-[12px] leading-[1.4] text-black font-inter"
+																	className="w-full text-[12px] leading-[1.3] text-black font-inter"
 																	style={{
 																		display: '-webkit-box',
 																		WebkitLineClamp: 2,
@@ -1937,7 +1937,7 @@ const Dashboard = () => {
 															</div>
 														)}
 													</div>
-												</div>
+												</div>{' '}
 												{/* Summary box at bottom */}
 												<div
 													id="research-summary-box"
