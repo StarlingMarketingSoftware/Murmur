@@ -100,6 +100,10 @@ import {
 	WestVirginiaIcon,
 	WEST_VIRGINIA_BACKGROUND,
 } from '@/components/atoms/_svg/WestVirginiaIcon';
+import {
+	WisconsinIcon,
+	WISCONSIN_BACKGROUND,
+} from '@/components/atoms/_svg/WisconsinIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -503,6 +507,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <WestVirginiaIcon />,
 				backgroundColor: WEST_VIRGINIA_BACKGROUND,
+			};
+		}
+
+		// Check for Wisconsin
+		if (normalizedState === 'wisconsin' || normalizedState === 'wi') {
+			return {
+				icon: <WisconsinIcon />,
+				backgroundColor: WISCONSIN_BACKGROUND,
 			};
 		}
 	}
