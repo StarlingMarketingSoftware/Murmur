@@ -80,6 +80,10 @@ import {
 	SouthCarolinaIcon,
 	SOUTH_CAROLINA_BACKGROUND,
 } from '@/components/atoms/_svg/SouthCarolinaIcon';
+import {
+	SouthDakotaIcon,
+	SOUTH_DAKOTA_BACKGROUND,
+} from '@/components/atoms/_svg/SouthDakotaIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -419,6 +423,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <SouthCarolinaIcon />,
 				backgroundColor: SOUTH_CAROLINA_BACKGROUND,
+			};
+		}
+
+		// Check for South Dakota
+		if (normalizedState === 'south dakota' || normalizedState === 'sd') {
+			return {
+				icon: <SouthDakotaIcon />,
+				backgroundColor: SOUTH_DAKOTA_BACKGROUND,
 			};
 		}
 	}
