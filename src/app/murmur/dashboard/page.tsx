@@ -838,15 +838,6 @@ const Dashboard = () => {
 																			<div className="absolute left-[24px] top-[42px] w-[156px] h-[12px]">
 																				{activeSection === 'where' ? (
 																					<div className="absolute top-0 left-0 w-full h-full flex items-center gap-[2px]">
-																						<span
-																							className="font-semibold text-black text-[12px] leading-none"
-																							style={{
-																								opacity: hasWhereValue ? 1 : 0,
-																								transform: 'translateY(-1px)',
-																							}}
-																						>
-																							(
-																						</span>
 																						<input
 																							ref={whereInputRef}
 																							type="text"
@@ -873,15 +864,6 @@ const Dashboard = () => {
 																							placeholder="Search States"
 																							onClick={(e) => e.stopPropagation()}
 																						/>
-																						<span
-																							className="font-semibold text-black text-[12px] leading-none"
-																							style={{
-																								opacity: hasWhereValue ? 1 : 0,
-																								transform: 'translateY(-1px)',
-																							}}
-																						>
-																							)
-																						</span>
 																					</div>
 																				) : (
 																					<div
@@ -893,9 +875,7 @@ const Dashboard = () => {
 																							margin: '0',
 																						}}
 																					>
-																						{hasWhereValue
-																							? `(${whereValue})`
-																							: 'Search States'}
+																						{hasWhereValue ? whereValue : 'Search States'}
 																					</div>
 																				)}
 																			</div>
