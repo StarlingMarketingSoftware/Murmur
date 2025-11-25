@@ -19,7 +19,6 @@ import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
-import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
@@ -273,7 +272,7 @@ const Dashboard = () => {
 								trackColor="transparent"
 								offsetRight={-5}
 							>
-								{isLoadingLocations ? (
+								{isLoadingLocations || debouncedWhereValue !== whereValue ? (
 									<div className="flex items-center justify-center h-full">
 										<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
 									</div>
@@ -347,28 +346,34 @@ const Dashboard = () => {
 									</div>
 								</div>
 								{DEFAULT_STATE_SUGGESTIONS.map(
-									({ label, promotionDescription, generalDescription }) => (
-										<div
-											key={label}
-											className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-											onClick={() => {
-												setWhereValue(label);
-												setActiveSection(null);
-											}}
-										>
-											<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-												<SuburbsIcon />
-											</div>
-											<div className="ml-[12px] flex flex-col">
-												<div className="text-[20px] font-medium leading-none text-black font-inter">
-													{label}
+									({ label, promotionDescription, generalDescription }) => {
+										const { icon, backgroundColor } = getCityIconProps('', label);
+										return (
+											<div
+												key={label}
+												className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+												onClick={() => {
+													setWhereValue(label);
+													setActiveSection(null);
+												}}
+											>
+												<div
+													className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
+													style={{ backgroundColor }}
+												>
+													{icon}
 												</div>
-												<div className="text-[12px] leading-tight text-black mt-[4px]">
-													{isPromotion ? promotionDescription : generalDescription}
+												<div className="ml-[12px] flex flex-col">
+													<div className="text-[20px] font-medium leading-none text-black font-inter">
+														{label}
+													</div>
+													<div className="text-[12px] leading-tight text-black mt-[4px]">
+														{isPromotion ? promotionDescription : generalDescription}
+													</div>
 												</div>
 											</div>
-										</div>
-									)
+										);
+									}
 								)}
 							</div>
 						)}
@@ -833,15 +838,6 @@ const Dashboard = () => {
 																			<div className="absolute left-[24px] top-[42px] w-[156px] h-[12px]">
 																				{activeSection === 'where' ? (
 																					<div className="absolute top-0 left-0 w-full h-full flex items-center gap-[2px]">
-																						<span
-																							className="font-semibold text-black text-[12px] leading-none"
-																							style={{
-																								opacity: hasWhereValue ? 1 : 0,
-																								transform: 'translateY(-1px)',
-																							}}
-																						>
-																							(
-																						</span>
 																						<input
 																							ref={whereInputRef}
 																							type="text"
@@ -868,15 +864,6 @@ const Dashboard = () => {
 																							placeholder="Search States"
 																							onClick={(e) => e.stopPropagation()}
 																						/>
-																						<span
-																							className="font-semibold text-black text-[12px] leading-none"
-																							style={{
-																								opacity: hasWhereValue ? 1 : 0,
-																								transform: 'translateY(-1px)',
-																							}}
-																						>
-																							)
-																						</span>
 																					</div>
 																				) : (
 																					<div
@@ -888,9 +875,7 @@ const Dashboard = () => {
 																							margin: '0',
 																						}}
 																					>
-																						{hasWhereValue
-																							? `(${whereValue})`
-																							: 'Search States'}
+																						{hasWhereValue ? whereValue : 'Search States'}
 																					</div>
 																				)}
 																			</div>
