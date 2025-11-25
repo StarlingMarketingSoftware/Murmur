@@ -19,6 +19,7 @@ import { IdahoIcon, IDAHO_BACKGROUND } from '@/components/atoms/_svg/IdahoIcon';
 import { IllinoisIcon, ILLINOIS_BACKGROUND } from '@/components/atoms/_svg/IllinoisIcon';
 import { IndianaIcon, INDIANA_BACKGROUND } from '@/components/atoms/_svg/IndianaIcon';
 import { IowaIcon, IOWA_BACKGROUND } from '@/components/atoms/_svg/IowaIcon';
+import { KansasIcon, KANSAS_BACKGROUND } from '@/components/atoms/_svg/KansasIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -158,6 +159,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <IowaIcon />,
 				backgroundColor: IOWA_BACKGROUND,
+			};
+		}
+
+		// Check for Kansas
+		if (normalizedState === 'kansas' || normalizedState === 'ks') {
+			return {
+				icon: <KansasIcon />,
+				backgroundColor: KANSAS_BACKGROUND,
 			};
 		}
 	}
