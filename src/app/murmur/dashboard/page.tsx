@@ -582,6 +582,7 @@ const Dashboard = () => {
 		isMapView,
 		setIsMapView,
 		isSearchPending,
+		usedContactIdsSet,
 	} = useDashboard();
 
 	// Clear hover state on mobile to prevent stuck hover
@@ -1541,6 +1542,192 @@ const Dashboard = () => {
 																	contacts={contacts || []}
 																	selectedContacts={selectedContacts}
 																/>
+																{/* Search Results overlay box on the right side */}
+																<div
+																	className="absolute top-[10px] right-[10px] rounded-[12px] shadow-lg flex flex-col"
+																	style={{
+																		width: '390px',
+																		height: '801px',
+																		maxHeight: 'calc(100% - 20px)',
+																		backgroundColor: '#AFD6EF',
+																		border: '3px solid #143883',
+																	}}
+																>
+																	{/* Scrollable contact list */}
+																	<div className="flex-1 overflow-y-auto p-[6px] space-y-[6px]">
+																		{(contacts || []).map((contact) => {
+																			const isSelected = selectedContacts.includes(
+																				contact.id
+																			);
+																			const isUsed = usedContactIdsSet.has(contact.id);
+																			const firstName = contact.firstName || '';
+																			const lastName = contact.lastName || '';
+																			const fullName =
+																				contact.name || `${firstName} ${lastName}`.trim();
+																			const company = contact.company || '';
+																			const headline =
+																				contact.headline || contact.title || '';
+																			const stateAbbr =
+																				getStateAbbreviation(contact.state || '') || '';
+																			const city = contact.city || '';
+
+																			return (
+																				<div
+																					key={contact.id}
+																					className={`cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[378px] h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none ${
+																						isSelected ? 'bg-[#EAAEAE]' : 'bg-white'
+																					}`}
+																					onClick={() => {
+																						if (isSelected) {
+																							setSelectedContacts(
+																								selectedContacts.filter(
+																									(id) => id !== contact.id
+																								)
+																							);
+																						} else {
+																							setSelectedContacts([
+																								...selectedContacts,
+																								contact.id,
+																							]);
+																						}
+																					}}
+																				>
+																					{fullName ? (
+																						<>
+																							{/* Top Left - Name */}
+																							<div className="pl-3 pr-1 flex items-center h-[23px]">
+																								{isUsed && (
+																									<span
+																										className="inline-block shrink-0 mr-2"
+																										title="Used in a previous campaign"
+																										style={{
+																											width: '16px',
+																											height: '16px',
+																											borderRadius: '50%',
+																											border: '1px solid #000000',
+																											backgroundColor: '#DAE6FE',
+																										}}
+																									/>
+																								)}
+																								<div className="font-bold text-[11px] w-full truncate leading-tight">
+																									{fullName}
+																								</div>
+																							</div>
+																							{/* Top Right - Title/Headline */}
+																							<div className="pr-2 pl-1 flex items-center h-[23px]">
+																								{headline ? (
+																									<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																										<span className="text-[10px] text-black leading-none truncate">
+																											{headline}
+																										</span>
+																									</div>
+																								) : (
+																									<div className="w-full" />
+																								)}
+																							</div>
+																							{/* Bottom Left - Company */}
+																							<div className="pl-3 pr-1 flex items-center h-[22px]">
+																								<div className="text-[11px] text-black w-full truncate leading-tight">
+																									{company}
+																								</div>
+																							</div>
+																							{/* Bottom Right - Location */}
+																							<div className="pr-2 pl-1 flex items-center h-[22px]">
+																								{city || stateAbbr ? (
+																									<div className="flex items-center gap-1 w-full">
+																										{stateAbbr && (
+																											<span
+																												className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																												style={{
+																													backgroundColor:
+																														stateBadgeColorMap[
+																															stateAbbr
+																														] || 'transparent',
+																													borderColor: '#000000',
+																												}}
+																											>
+																												{stateAbbr}
+																											</span>
+																										)}
+																										{city && (
+																											<span className="text-[10px] text-black leading-none truncate">
+																												{city}
+																											</span>
+																										)}
+																									</div>
+																								) : (
+																									<div className="w-full" />
+																								)}
+																							</div>
+																						</>
+																					) : (
+																						<>
+																							{/* No name - Company spans left column */}
+																							<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
+																								{isUsed && (
+																									<span
+																										className="inline-block shrink-0 mr-2"
+																										title="Used in a previous campaign"
+																										style={{
+																											width: '16px',
+																											height: '16px',
+																											borderRadius: '50%',
+																											border: '1px solid #000000',
+																											backgroundColor: '#DAE6FE',
+																										}}
+																									/>
+																								)}
+																								<div className="font-bold text-[11px] w-full truncate leading-tight">
+																									{company || '—'}
+																								</div>
+																							</div>
+																							{/* Top Right - Title/Headline */}
+																							<div className="pr-2 pl-1 flex items-center h-[23px]">
+																								{headline ? (
+																									<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																										<span className="text-[10px] text-black leading-none truncate">
+																											{headline}
+																										</span>
+																									</div>
+																								) : (
+																									<div className="w-full" />
+																								)}
+																							</div>
+																							{/* Bottom Right - Location */}
+																							<div className="pr-2 pl-1 flex items-center h-[22px]">
+																								{city || stateAbbr ? (
+																									<div className="flex items-center gap-1 w-full">
+																										{stateAbbr && (
+																											<span
+																												className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																												style={{
+																													backgroundColor:
+																														stateBadgeColorMap[
+																															stateAbbr
+																														] || 'transparent',
+																													borderColor: '#000000',
+																												}}
+																											>
+																												{stateAbbr}
+																											</span>
+																										)}
+																										{city && (
+																											<span className="text-[10px] text-black leading-none truncate">
+																												{city}
+																											</span>
+																										)}
+																									</div>
+																								) : (
+																									<div className="w-full" />
+																								)}
+																							</div>
+																						</>
+																					)}
+																				</div>
+																			);
+																		})}
+																	</div>
+																</div>
 																{/* Create Campaign button overlaid on map - only show when not loading */}
 																{!isMobile &&
 																	!(
