@@ -1,13 +1,65 @@
+import { AlabamaIcon, ALABAMA_BACKGROUND } from '@/components/atoms/_svg/AlabamaIcon';
+import { AlaskaIcon, ALASKA_BACKGROUND } from '@/components/atoms/_svg/AlaskaIcon';
+import { ArizonaIcon, ARIZONA_BACKGROUND } from '@/components/atoms/_svg/ArizonaIcon';
+import { ArkansasIcon, ARKANSAS_BACKGROUND } from '@/components/atoms/_svg/ArkansasIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
 
 export const getCityIconProps = (city: string, state: string) => {
+	const normalizedCity = city.trim().toLowerCase();
+	const normalizedState = state.trim().toLowerCase();
 	const locationKey = `${city.trim()}, ${state.trim()}`.toLowerCase();
 	const isCity = CITY_LOCATIONS_SET.has(locationKey);
 
+	// If it's a recognized city, always use the CityIcon
+	if (isCity) {
+		return {
+			icon: <CityIcon />,
+			backgroundColor: '#9F9FEE',
+		};
+	}
+
+	// State-only selection (no city specified) - use state-specific icons
+	const isStateOnly = !normalizedCity || normalizedCity === normalizedState;
+
+	if (isStateOnly) {
+		// Check for Alabama
+		if (normalizedState === 'alabama' || normalizedState === 'al') {
+			return {
+				icon: <AlabamaIcon />,
+				backgroundColor: ALABAMA_BACKGROUND,
+			};
+		}
+
+		// Check for Alaska
+		if (normalizedState === 'alaska' || normalizedState === 'ak') {
+			return {
+				icon: <AlaskaIcon />,
+				backgroundColor: ALASKA_BACKGROUND,
+			};
+		}
+
+		// Check for Arizona
+		if (normalizedState === 'arizona' || normalizedState === 'az') {
+			return {
+				icon: <ArizonaIcon />,
+				backgroundColor: ARIZONA_BACKGROUND,
+			};
+		}
+
+		// Check for Arkansas
+		if (normalizedState === 'arkansas' || normalizedState === 'ar') {
+			return {
+				icon: <ArkansasIcon />,
+				backgroundColor: ARKANSAS_BACKGROUND,
+			};
+		}
+	}
+
+	// Default: non-city locations use SuburbsIcon
 	return {
-		icon: isCity ? <CityIcon /> : <SuburbsIcon />,
-		backgroundColor: isCity ? '#9F9FEE' : '#9DCBFF',
+		icon: <SuburbsIcon />,
+		backgroundColor: '#9DCBFF',
 	};
 };
