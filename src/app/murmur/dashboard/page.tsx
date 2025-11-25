@@ -19,7 +19,6 @@ import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
-import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
@@ -347,28 +346,34 @@ const Dashboard = () => {
 									</div>
 								</div>
 								{DEFAULT_STATE_SUGGESTIONS.map(
-									({ label, promotionDescription, generalDescription }) => (
-										<div
-											key={label}
-											className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-											onClick={() => {
-												setWhereValue(label);
-												setActiveSection(null);
-											}}
-										>
-											<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-												<SuburbsIcon />
-											</div>
-											<div className="ml-[12px] flex flex-col">
-												<div className="text-[20px] font-medium leading-none text-black font-inter">
-													{label}
+									({ label, promotionDescription, generalDescription }) => {
+										const { icon, backgroundColor } = getCityIconProps('', label);
+										return (
+											<div
+												key={label}
+												className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+												onClick={() => {
+													setWhereValue(label);
+													setActiveSection(null);
+												}}
+											>
+												<div
+													className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
+													style={{ backgroundColor }}
+												>
+													{icon}
 												</div>
-												<div className="text-[12px] leading-tight text-black mt-[4px]">
-													{isPromotion ? promotionDescription : generalDescription}
+												<div className="ml-[12px] flex flex-col">
+													<div className="text-[20px] font-medium leading-none text-black font-inter">
+														{label}
+													</div>
+													<div className="text-[12px] leading-tight text-black mt-[4px]">
+														{isPromotion ? promotionDescription : generalDescription}
+													</div>
 												</div>
 											</div>
-										</div>
-									)
+										);
+									}
 								)}
 							</div>
 						)}
