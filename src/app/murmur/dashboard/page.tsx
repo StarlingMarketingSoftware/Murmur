@@ -548,6 +548,21 @@ const Dashboard = () => {
 		}
 	}, [isMobile, setHoveredContact]);
 
+	// Lock body scroll when in map view
+	useEffect(() => {
+		if (isMapView) {
+			document.body.style.overflow = 'hidden';
+			document.body.style.height = '100vh';
+		} else {
+			document.body.style.overflow = '';
+			document.body.style.height = '';
+		}
+		return () => {
+			document.body.style.overflow = '';
+			document.body.style.height = '';
+		};
+	}, [isMapView]);
+
 	// Combine section values into main search field
 	useEffect(() => {
 		const formattedWhere =
@@ -1285,15 +1300,15 @@ const Dashboard = () => {
 									{/* Generate action removed; awaiting left-side SVG submit icon */}
 								</form>
 								{!isMapView && (
-								<div className="w-full text-center mt-2">
-									<span
-										className="font-secondary"
-										style={{ fontSize: '13px', fontWeight: 400, color: '#7f7f7f' }}
-									>
-										Select who you want to contact.
-									</span>
-								</div>
-							)}
+									<div className="w-full text-center mt-2">
+										<span
+											className="font-secondary"
+											style={{ fontSize: '13px', fontWeight: 400, color: '#7f7f7f' }}
+										>
+											Select who you want to contact.
+										</span>
+									</div>
+								)}
 							</Form>
 						</div>
 						{hoveredContact && !isMobile && (
@@ -1383,7 +1398,7 @@ const Dashboard = () => {
 									{isMapView ? (
 										<>
 											{/* Fullscreen Map View */}
-											{/* Header divider line and Close button */}
+											{/* Header divider lines and Close button */}
 											{typeof window !== 'undefined' &&
 												createPortal(
 													<>
@@ -1425,7 +1440,7 @@ const Dashboard = () => {
 												{/* Fullscreen map container */}
 												<div
 													className="w-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden"
-													style={{ height: 'calc(100vh - 240px)', minHeight: '500px' }}
+													style={{ height: 'calc(100vh - 160px)' }}
 												>
 													<SearchResultsMap
 														contacts={contacts}
@@ -1457,7 +1472,9 @@ const Dashboard = () => {
 																handleSelectAll();
 															}}
 														>
-															<span className="text-black text-[14px] font-medium">All</span>
+															<span className="text-black text-[14px] font-medium">
+																All
+															</span>
 														</div>
 														<span
 															aria-hidden="true"
@@ -1481,134 +1498,138 @@ const Dashboard = () => {
 													Map
 												</button>
 											</div>
-								<Card className="border-0 shadow-none !p-0 w-full !my-0">
-									<CardContent className="!p-0 w-full">
-										<CustomTable
-												initialSelectAll={false}
-												isSelectable
-												setSelectedRows={setSelectedContacts}
-												data={contacts}
-												columns={columns}
-												searchable={false}
-												tableRef={tableRef}
-												rowsPerPage={100}
-												displayRowsPerPage={false}
-												constrainHeight
-												useCustomScrollbar={!isMobileLandscape}
-												scrollbarOffsetRight={-7}
-												containerClassName="search-results-table h-[571px] rounded-[8px] border-[#143883] md:w-[1004px] border-[3px]"
-												tableClassName="w-[calc(100%-12px)] mx-auto border-separate border-spacing-y-[6px]"
-												headerClassName="[&_tr]:border-[#737373]"
-												theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
-												rowClassName="border-[#737373] row-hover-scroll bg-white odd:bg-white even:bg-white rounded-[8px] [&>td:first-child]:rounded-l-[8px] [&>td:last-child]:rounded-r-[8px] [&>td]:border-y-2 [&>td:first-child]:border-l-2 [&>td:last-child]:border-r-2 border-none !h-[58px] min-h-[58px] [&>td]:!h-[58px] [&>td]:!py-0"
-												stickyHeaderClassName="bg-[#AFD6EF]"
-												hidePagination
-												onRowHover={
-													isMobile ? undefined : (row) => setHoveredContact(row)
-												}
-												headerAction={
-													!isMobile ? (
-														<button
-															type="button"
-															onClick={handleCreateCampaign}
-															disabled={selectedContacts.length === 0}
-															className="font-secondary"
-															style={{
-																width: '127px',
-																height: '31px',
-																background:
-																	selectedContacts.length === 0
-																		? 'rgba(93, 171, 104, 0.1)'
-																		: '#B8E4BE',
-																border: '2px solid #000000',
-																color:
-																	selectedContacts.length === 0
-																		? 'rgba(0, 0, 0, 0.4)'
-																		: '#000000',
-																fontSize: '13px',
-																fontWeight: 500,
-																borderRadius: '8px',
-																lineHeight: 'normal',
-																display: 'flex',
-																alignItems: 'center',
-																justifyContent: 'center',
-																padding: '0',
-																textAlign: 'center',
-																whiteSpace: 'nowrap',
-																cursor:
-																	selectedContacts.length === 0 ? 'default' : 'pointer',
-																opacity: selectedContacts.length === 0 ? 0.6 : 1,
+											<Card className="border-0 shadow-none !p-0 w-full !my-0">
+												<CardContent className="!p-0 w-full">
+													<CustomTable
+														initialSelectAll={false}
+														isSelectable
+														setSelectedRows={setSelectedContacts}
+														data={contacts}
+														columns={columns}
+														searchable={false}
+														tableRef={tableRef}
+														rowsPerPage={100}
+														displayRowsPerPage={false}
+														constrainHeight
+														useCustomScrollbar={!isMobileLandscape}
+														scrollbarOffsetRight={-7}
+														containerClassName="search-results-table h-[571px] rounded-[8px] border-[#143883] md:w-[1004px] border-[3px]"
+														tableClassName="w-[calc(100%-12px)] mx-auto border-separate border-spacing-y-[6px]"
+														headerClassName="[&_tr]:border-[#737373]"
+														theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
+														rowClassName="border-[#737373] row-hover-scroll bg-white odd:bg-white even:bg-white rounded-[8px] [&>td:first-child]:rounded-l-[8px] [&>td:last-child]:rounded-r-[8px] [&>td]:border-y-2 [&>td:first-child]:border-l-2 [&>td:last-child]:border-r-2 border-none !h-[58px] min-h-[58px] [&>td]:!h-[58px] [&>td]:!py-0"
+														stickyHeaderClassName="bg-[#AFD6EF]"
+														hidePagination
+														onRowHover={
+															isMobile ? undefined : (row) => setHoveredContact(row)
+														}
+														headerAction={
+															!isMobile ? (
+																<button
+																	type="button"
+																	onClick={handleCreateCampaign}
+																	disabled={selectedContacts.length === 0}
+																	className="font-secondary"
+																	style={{
+																		width: '127px',
+																		height: '31px',
+																		background:
+																			selectedContacts.length === 0
+																				? 'rgba(93, 171, 104, 0.1)'
+																				: '#B8E4BE',
+																		border: '2px solid #000000',
+																		color:
+																			selectedContacts.length === 0
+																				? 'rgba(0, 0, 0, 0.4)'
+																				: '#000000',
+																		fontSize: '13px',
+																		fontWeight: 500,
+																		borderRadius: '8px',
+																		lineHeight: 'normal',
+																		display: 'flex',
+																		alignItems: 'center',
+																		justifyContent: 'center',
+																		padding: '0',
+																		textAlign: 'center',
+																		whiteSpace: 'nowrap',
+																		cursor:
+																			selectedContacts.length === 0
+																				? 'default'
+																				: 'pointer',
+																		opacity: selectedContacts.length === 0 ? 0.6 : 1,
+																	}}
+																>
+																	Create Campaign
+																</button>
+															) : null
+														}
+														headerInlineAction={
+															<button
+																onClick={handleSelectAll}
+																className="text-[14px] font-secondary font-normal text-black hover:underline"
+																type="button"
+															>
+																{isAllSelected ? 'Deselect All' : 'Select all'}
+															</button>
+														}
+													/>
+												</CardContent>
+											</Card>
+											{/* Desktop button (non-sticky) */}
+											{!isMobile && (
+												<div className="flex items-center justify-center w-full">
+													<Button
+														isLoading={
+															isPendingCreateCampaign || isPendingBatchUpdateContacts
+														}
+														variant="primary-light"
+														bold
+														className="relative w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
+														onClick={() => {
+															if (selectedContacts.length === 0) return;
+															handleCreateCampaign();
+														}}
+													>
+														<span className="relative z-20">Add to Campaign</span>
+														<div
+															className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+															onClick={(e) => {
+																e.stopPropagation();
+																handleSelectAll();
 															}}
 														>
-															Create Campaign
-														</button>
-													) : null
-												}
-												headerInlineAction={
-													<button
-														onClick={handleSelectAll}
-														className="text-[14px] font-secondary font-normal text-black hover:underline"
-														type="button"
-													>
-														{isAllSelected ? 'Deselect All' : 'Select all'}
-													</button>
-												}
-											/>
-										</CardContent>
-									</Card>
-									{/* Desktop button (non-sticky) */}
-									{!isMobile && (
-										<div className="flex items-center justify-center w-full">
-											<Button
-												isLoading={
-													isPendingCreateCampaign || isPendingBatchUpdateContacts
-												}
-												variant="primary-light"
-												bold
-												className="relative w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
-												onClick={() => {
-													if (selectedContacts.length === 0) return;
-													handleCreateCampaign();
-												}}
-											>
-												<span className="relative z-20">Add to Campaign</span>
-												<div
-													className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
-													onClick={(e) => {
-														e.stopPropagation();
-														handleSelectAll();
-													}}
-												>
-													<span className="text-black text-[14px] font-medium">All</span>
+															<span className="text-black text-[14px] font-medium">
+																All
+															</span>
+														</div>
+														<span
+															aria-hidden="true"
+															className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+														/>
+													</Button>
 												</div>
-												<span
-													aria-hidden="true"
-													className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
-												/>
-											</Button>
-										</div>
-									)}
+											)}
 
-									{/* Mobile sticky button at bottom */}
-									{isMobile &&
-										typeof window !== 'undefined' &&
-										createPortal(
-											<div className="mobile-sticky-cta">
-												<Button
-													onClick={handleCreateCampaign}
-													isLoading={
-														isPendingCreateCampaign || isPendingBatchUpdateContacts
-													}
-													variant="primary-light"
-													bold
-													className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] transition-colors !opacity-100 disabled:!opacity-100"
-													disabled={selectedContacts.length === 0}
-												>
-													Add to Campaign
-												</Button>
-											</div>,
-											document.body
-										)}
+											{/* Mobile sticky button at bottom */}
+											{isMobile &&
+												typeof window !== 'undefined' &&
+												createPortal(
+													<div className="mobile-sticky-cta">
+														<Button
+															onClick={handleCreateCampaign}
+															isLoading={
+																isPendingCreateCampaign || isPendingBatchUpdateContacts
+															}
+															variant="primary-light"
+															bold
+															className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] transition-colors !opacity-100 disabled:!opacity-100"
+															disabled={selectedContacts.length === 0}
+														>
+															Add to Campaign
+														</Button>
+													</div>,
+													document.body
+												)}
 										</>
 									)}
 								</div>
