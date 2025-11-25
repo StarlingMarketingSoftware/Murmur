@@ -16,6 +16,9 @@ import { FloridaIcon, FLORIDA_BACKGROUND } from '@/components/atoms/_svg/Florida
 import { GeorgiaIcon, GEORGIA_BACKGROUND } from '@/components/atoms/_svg/GeorgiaIcon';
 import { HawaiiIcon, HAWAII_BACKGROUND } from '@/components/atoms/_svg/HawaiiIcon';
 import { IdahoIcon, IDAHO_BACKGROUND } from '@/components/atoms/_svg/IdahoIcon';
+import { IllinoisIcon, ILLINOIS_BACKGROUND } from '@/components/atoms/_svg/IllinoisIcon';
+import { IndianaIcon, INDIANA_BACKGROUND } from '@/components/atoms/_svg/IndianaIcon';
+import { IowaIcon, IOWA_BACKGROUND } from '@/components/atoms/_svg/IowaIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -131,6 +134,30 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <IdahoIcon />,
 				backgroundColor: IDAHO_BACKGROUND,
+			};
+		}
+
+		// Check for Illinois
+		if (normalizedState === 'illinois' || normalizedState === 'il') {
+			return {
+				icon: <IllinoisIcon />,
+				backgroundColor: ILLINOIS_BACKGROUND,
+			};
+		}
+
+		// Check for Indiana
+		if (normalizedState === 'indiana' || normalizedState === 'in') {
+			return {
+				icon: <IndianaIcon />,
+				backgroundColor: INDIANA_BACKGROUND,
+			};
+		}
+
+		// Check for Iowa
+		if (normalizedState === 'iowa' || normalizedState === 'ia') {
+			return {
+				icon: <IowaIcon />,
+				backgroundColor: IOWA_BACKGROUND,
 			};
 		}
 	}
