@@ -77,10 +77,17 @@ const Dashboard = () => {
 	);
 
 	const renderDesktopSearchDropdowns = () => {
-		return (
+		const dropdownContent = (
 			<>
 				{activeSection === 'why' && (
-					<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[12px] absolute top-[calc(100%+10px)] left-[4px] w-[439px] h-[173px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+					<div
+						className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[12px] w-[439px] h-[173px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
+						style={
+							isMapView
+								? { position: 'fixed', top: '118px', left: 'calc(50% - 220px)' }
+								: { position: 'absolute', top: 'calc(100% + 10px)', left: '4px' }
+						}
+					>
 						<div
 							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 							onClick={() => {
@@ -123,7 +130,14 @@ const Dashboard = () => {
 					</div>
 				)}
 				{activeSection === 'what' && whyValue === '[Promotion]' && (
-					<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] absolute top-[calc(100%+10px)] left-[176px] w-[439px] h-[92px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+					<div
+						className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] w-[439px] h-[92px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
+						style={
+							isMapView
+								? { position: 'fixed', top: '118px', left: 'calc(50% - 60px)' }
+								: { position: 'absolute', top: 'calc(100% + 10px)', left: '176px' }
+						}
+					>
 						<div
 							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 							onClick={() => {
@@ -146,7 +160,14 @@ const Dashboard = () => {
 					</div>
 				)}
 				{activeSection === 'what' && whyValue !== '[Promotion]' && (
-					<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] absolute top-[calc(100%+10px)] left-[176px] w-[439px] h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+					<div
+						className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] w-[439px] h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
+						style={
+							isMapView
+								? { position: 'fixed', top: '118px', left: 'calc(50% - 60px)' }
+								: { position: 'absolute', top: 'calc(100% + 10px)', left: '176px' }
+						}
+					>
 						<div
 							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 							onClick={() => {
@@ -247,8 +268,22 @@ const Dashboard = () => {
 				{activeSection === 'where' && (
 					<div
 						id="where-dropdown-container"
-						className={`search-dropdown-menu hidden md:block absolute top-[calc(100%+10px)] left-[98px] w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]`}
-						style={{ overflow: 'visible' }}
+						className={`search-dropdown-menu hidden md:block w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]`}
+						style={
+							isMapView
+								? {
+										position: 'fixed',
+										top: '118px',
+										left: 'calc(50% - 120px)',
+										overflow: 'visible',
+								  }
+								: {
+										position: 'absolute',
+										top: 'calc(100% + 10px)',
+										left: '98px',
+										overflow: 'visible',
+								  }
+						}
 					>
 						<style jsx global>{`
 							#where-dropdown-container .scrollbar-hide {
@@ -382,6 +417,13 @@ const Dashboard = () => {
 				)}
 			</>
 		);
+
+		// When in map view, render dropdowns via portal to escape the stacking context
+		if (isMapView && typeof window !== 'undefined') {
+			return createPortal(dropdownContent, document.body);
+		}
+
+		return dropdownContent;
 	};
 
 	useEffect(() => {
@@ -1397,92 +1439,101 @@ const Dashboard = () => {
 								<div className="w-full max-w-full results-appear results-align">
 									{isMapView ? (
 										<>
-											{/* Fullscreen Map View */}
-											{/* Header divider lines and Close button */}
+											{/* Fullscreen Map View - rendered via portal for true full-page positioning */}
 											{typeof window !== 'undefined' &&
 												createPortal(
 													<>
-														{/* Close text in top right */}
-														<button
-															type="button"
-															onClick={() => setIsMapView(false)}
-															style={{
-																position: 'fixed',
-																top: '8px',
-																right: '16px',
-																zIndex: 101,
-																background: 'transparent',
-																border: 'none',
-																fontSize: '14px',
-																fontWeight: 500,
-																color: '#000',
-																cursor: 'pointer',
-															}}
-														>
-															Close
-														</button>
-														{/* Divider line */}
+														{/* Header bar with Close button - at very top of page */}
 														<div
 															style={{
 																position: 'fixed',
-																top: '37px',
+																top: '0px',
 																left: '0px',
 																right: '0px',
-																height: '1px',
-																backgroundColor: 'black',
+																height: '36px',
+																backgroundColor: 'white',
 																zIndex: 100,
+																display: 'flex',
+																alignItems: 'center',
+																justifyContent: 'flex-end',
+																borderBottom: '1px solid black',
 															}}
-														/>
+														>
+															<button
+																type="button"
+																onClick={() => setIsMapView(false)}
+																style={{
+																	background: 'transparent',
+																	border: 'none',
+																	fontSize: '14px',
+																	fontWeight: 500,
+																	color: '#000',
+																	cursor: 'pointer',
+																	paddingRight: '8px',
+																}}
+															>
+																Close
+															</button>
+														</div>
+														{/* Map container */}
+														<div
+															style={{
+																position: 'fixed',
+																top: '120px',
+																left: '9px',
+																right: '9px',
+																bottom: '9px',
+																zIndex: 99,
+															}}
+														>
+															<div className="w-full h-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden relative">
+																<SearchResultsMap
+																	contacts={contacts}
+																	selectedContacts={selectedContacts}
+																	onMarkerClick={(contact) => setHoveredContact(contact)}
+																/>
+																{/* Create Campaign button overlaid on map */}
+																{!isMobile && (
+																	<div className="absolute bottom-[10px] left-[10px] right-[10px]">
+																		<Button
+																			isLoading={
+																				isPendingCreateCampaign ||
+																				isPendingBatchUpdateContacts
+																			}
+																			variant="primary-light"
+																			bold
+																			className="relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
+																			onClick={() => {
+																				if (selectedContacts.length === 0) return;
+																				handleCreateCampaign();
+																			}}
+																		>
+																			<span className="relative z-20">
+																				Add to Campaign
+																			</span>
+																			<div
+																				className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+																				onClick={(e) => {
+																					e.stopPropagation();
+																					handleSelectAll();
+																				}}
+																			>
+																				<span className="text-black text-[14px] font-medium">
+																					All
+																				</span>
+																			</div>
+																			<span
+																				aria-hidden="true"
+																				className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+																			/>
+																		</Button>
+																	</div>
+																)}
+															</div>
+														</div>
 													</>,
 													document.body
 												)}
-											<div className="w-full md:w-[1004px] mx-auto">
-												{/* Fullscreen map container */}
-												<div
-													className="w-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden"
-													style={{ height: 'calc(100vh - 160px)' }}
-												>
-													<SearchResultsMap
-														contacts={contacts}
-														selectedContacts={selectedContacts}
-														onMarkerClick={(contact) => setHoveredContact(contact)}
-													/>
-												</div>
-											</div>
-											{/* Create Campaign button for map view */}
-											{!isMobile && (
-												<div className="flex items-center justify-center w-full">
-													<Button
-														isLoading={
-															isPendingCreateCampaign || isPendingBatchUpdateContacts
-														}
-														variant="primary-light"
-														bold
-														className="relative w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
-														onClick={() => {
-															if (selectedContacts.length === 0) return;
-															handleCreateCampaign();
-														}}
-													>
-														<span className="relative z-20">Add to Campaign</span>
-														<div
-															className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
-															onClick={(e) => {
-																e.stopPropagation();
-																handleSelectAll();
-															}}
-														>
-															<span className="text-black text-[14px] font-medium">
-																All
-															</span>
-														</div>
-														<span
-															aria-hidden="true"
-															className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
-														/>
-													</Button>
-												</div>
-											)}
 										</>
 									) : (
 										<>
