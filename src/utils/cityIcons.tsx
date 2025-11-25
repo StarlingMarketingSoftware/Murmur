@@ -52,6 +52,10 @@ import {
 	NewJerseyIcon,
 	NEW_JERSEY_BACKGROUND,
 } from '@/components/atoms/_svg/NewJerseyIcon';
+import {
+	NewMexicoIcon,
+	NEW_MEXICO_BACKGROUND,
+} from '@/components/atoms/_svg/NewMexicoIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -311,6 +315,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <NewJerseyIcon />,
 				backgroundColor: NEW_JERSEY_BACKGROUND,
+			};
+		}
+
+		// Check for New Mexico
+		if (normalizedState === 'new mexico' || normalizedState === 'nm') {
+			return {
+				icon: <NewMexicoIcon />,
+				backgroundColor: NEW_MEXICO_BACKGROUND,
 			};
 		}
 	}
