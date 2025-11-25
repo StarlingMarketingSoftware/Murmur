@@ -44,6 +44,10 @@ import { MissouriIcon, MISSOURI_BACKGROUND } from '@/components/atoms/_svg/Misso
 import { MontanaIcon, MONTANA_BACKGROUND } from '@/components/atoms/_svg/MontanaIcon';
 import { NebraskaIcon, NEBRASKA_BACKGROUND } from '@/components/atoms/_svg/NebraskaIcon';
 import { NevadaIcon, NEVADA_BACKGROUND } from '@/components/atoms/_svg/NevadaIcon';
+import {
+	NewHampshireIcon,
+	NEW_HAMPSHIRE_BACKGROUND,
+} from '@/components/atoms/_svg/NewHampshireIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -287,6 +291,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <NevadaIcon />,
 				backgroundColor: NEVADA_BACKGROUND,
+			};
+		}
+
+		// Check for New Hampshire
+		if (normalizedState === 'new hampshire' || normalizedState === 'nh') {
+			return {
+				icon: <NewHampshireIcon />,
+				backgroundColor: NEW_HAMPSHIRE_BACKGROUND,
 			};
 		}
 	}
