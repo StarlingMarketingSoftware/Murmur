@@ -608,6 +608,17 @@ const Dashboard = () => {
 				className={`relative min-h-screen transition-all duration-500 dashboard-main-offset w-full max-w-full ${bottomPadding} ${
 					hasSearched ? 'search-active' : ''
 				}`}
+				style={
+					hasSearched
+						? {
+								transform: 'scale(0.9)',
+								transformOrigin: 'top left',
+								width: '111.11%',
+								maxWidth: '111.11%',
+								minHeight: '111.11vh',
+						  }
+						: undefined
+				}
 			>
 				<div className="hero-wrapper flex flex-col justify-center items-center !z-[40]">
 					<div className="w-full">
