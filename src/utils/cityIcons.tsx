@@ -11,6 +11,7 @@ import {
 	ConnecticutIcon,
 	CONNECTICUT_BACKGROUND,
 } from '@/components/atoms/_svg/ConnecticutIcon';
+import { DelawareIcon, DELAWARE_BACKGROUND } from '@/components/atoms/_svg/DelawareIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -86,6 +87,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <ConnecticutIcon />,
 				backgroundColor: CONNECTICUT_BACKGROUND,
+			};
+		}
+
+		// Check for Delaware
+		if (normalizedState === 'delaware' || normalizedState === 'de') {
+			return {
+				icon: <DelawareIcon />,
+				backgroundColor: DELAWARE_BACKGROUND,
 			};
 		}
 	}
