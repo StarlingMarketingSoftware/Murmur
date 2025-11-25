@@ -1512,7 +1512,7 @@ const Dashboard = () => {
 																/>
 																{/* Create Campaign button overlaid on map */}
 																{!isMobile && (
-																	<div className="absolute bottom-[10px] left-[10px] right-[10px]">
+																	<div className="absolute bottom-[10px] left-[10px] right-[10px] flex justify-center">
 																		<Button
 																			isLoading={
 																				isPendingCreateCampaign ||
@@ -1520,7 +1520,16 @@ const Dashboard = () => {
 																			}
 																			variant="primary-light"
 																			bold
-																			className="relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
+																			className={`relative w-full max-w-[420px] h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
+																				selectedContacts.length === 0
+																					? 'opacity-[0.62]'
+																					: 'opacity-100'
+																			}`}
+																			style={
+																				selectedContacts.length === 0
+																					? { filter: 'grayscale(100%)' }
+																					: undefined
+																			}
 																			onClick={() => {
 																				if (selectedContacts.length === 0) return;
 																				handleCreateCampaign();
