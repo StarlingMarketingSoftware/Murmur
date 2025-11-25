@@ -88,6 +88,7 @@ import {
 	TennesseeIcon,
 	TENNESSEE_BACKGROUND,
 } from '@/components/atoms/_svg/TennesseeIcon';
+import { TexasIcon, TEXAS_BACKGROUND } from '@/components/atoms/_svg/TexasIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -443,6 +444,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <TennesseeIcon />,
 				backgroundColor: TENNESSEE_BACKGROUND,
+			};
+		}
+
+		// Check for Texas
+		if (normalizedState === 'texas' || normalizedState === 'tx') {
+			return {
+				icon: <TexasIcon />,
+				backgroundColor: TEXAS_BACKGROUND,
 			};
 		}
 	}
