@@ -26,6 +26,7 @@ import {
 	LOUISIANA_BACKGROUND,
 } from '@/components/atoms/_svg/LouisianaIcon';
 import { MaineIcon, MAINE_BACKGROUND } from '@/components/atoms/_svg/MaineIcon';
+import { MarylandIcon, MARYLAND_BACKGROUND } from '@/components/atoms/_svg/MarylandIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -197,6 +198,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <MaineIcon />,
 				backgroundColor: MAINE_BACKGROUND,
+			};
+		}
+
+		// Check for Maryland
+		if (normalizedState === 'maryland' || normalizedState === 'md') {
+			return {
+				icon: <MarylandIcon />,
+				backgroundColor: MARYLAND_BACKGROUND,
 			};
 		}
 	}
