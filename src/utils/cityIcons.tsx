@@ -72,6 +72,10 @@ import {
 	PennsylvaniaIcon,
 	PENNSYLVANIA_BACKGROUND,
 } from '@/components/atoms/_svg/PennsylvaniaIcon';
+import {
+	RhodeIslandIcon,
+	RHODE_ISLAND_BACKGROUND,
+} from '@/components/atoms/_svg/RhodeIslandIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -395,6 +399,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <PennsylvaniaIcon />,
 				backgroundColor: PENNSYLVANIA_BACKGROUND,
+			};
+		}
+
+		// Check for Rhode Island
+		if (normalizedState === 'rhode island' || normalizedState === 'ri') {
+			return {
+				icon: <RhodeIslandIcon />,
+				backgroundColor: RHODE_ISLAND_BACKGROUND,
 			};
 		}
 	}
