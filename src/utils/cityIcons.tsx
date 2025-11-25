@@ -40,6 +40,8 @@ import {
 	MississippiIcon,
 	MISSISSIPPI_BACKGROUND,
 } from '@/components/atoms/_svg/MississippiIcon';
+import { MissouriIcon, MISSOURI_BACKGROUND } from '@/components/atoms/_svg/MissouriIcon';
+import { MontanaIcon, MONTANA_BACKGROUND } from '@/components/atoms/_svg/MontanaIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -251,6 +253,22 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <MississippiIcon />,
 				backgroundColor: MISSISSIPPI_BACKGROUND,
+			};
+		}
+
+		// Check for Missouri
+		if (normalizedState === 'missouri' || normalizedState === 'mo') {
+			return {
+				icon: <MissouriIcon />,
+				backgroundColor: MISSOURI_BACKGROUND,
+			};
+		}
+
+		// Check for Montana
+		if (normalizedState === 'montana' || normalizedState === 'mt') {
+			return {
+				icon: <MontanaIcon />,
+				backgroundColor: MONTANA_BACKGROUND,
 			};
 		}
 	}
