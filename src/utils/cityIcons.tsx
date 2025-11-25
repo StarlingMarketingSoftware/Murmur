@@ -91,6 +91,11 @@ import {
 import { TexasIcon, TEXAS_BACKGROUND } from '@/components/atoms/_svg/TexasIcon';
 import { UtahIcon, UTAH_BACKGROUND } from '@/components/atoms/_svg/UtahIcon';
 import { VermontIcon, VERMONT_BACKGROUND } from '@/components/atoms/_svg/VermontIcon';
+import { VirginiaIcon, VIRGINIA_BACKGROUND } from '@/components/atoms/_svg/VirginiaIcon';
+import {
+	WashingtonIcon,
+	WASHINGTON_BACKGROUND,
+} from '@/components/atoms/_svg/WashingtonIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -470,6 +475,22 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <VermontIcon />,
 				backgroundColor: VERMONT_BACKGROUND,
+			};
+		}
+
+		// Check for Virginia
+		if (normalizedState === 'virginia' || normalizedState === 'va') {
+			return {
+				icon: <VirginiaIcon />,
+				backgroundColor: VIRGINIA_BACKGROUND,
+			};
+		}
+
+		// Check for Washington
+		if (normalizedState === 'washington' || normalizedState === 'wa') {
+			return {
+				icon: <WashingtonIcon />,
+				backgroundColor: WASHINGTON_BACKGROUND,
 			};
 		}
 	}
