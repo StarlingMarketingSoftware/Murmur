@@ -1530,13 +1530,19 @@ const Dashboard = () => {
 											hoveredContact?.metadata
 										);
 
+										// Check if there are any parsed sections
+										const hasAnyParsedSections = Object.keys(metadataSections).length > 0;
+
+										// Use smaller height if no parsed sections
+										const containerHeight = hasAnyParsedSections ? '630px' : '423px';
+
 										return (
 											<div
 												className="hidden xl:block absolute top-0"
 												style={{
 													left: 'calc(50% + 502px + 33px)',
 													width: '375px',
-													height: '630px',
+													height: containerHeight,
 													backgroundColor: '#D8E5FB',
 													border: '2px solid black',
 													borderRadius: '7px',
@@ -1653,302 +1659,90 @@ const Dashboard = () => {
 														height: '1px',
 													}}
 												/>
-												{/* Research result box 1 */}
-												<div
-													className="absolute"
-													style={{
-														top: '76px',
-														left: '50%',
-														transform: 'translateX(-50%)',
-														width: '360px',
-														height: '52px',
-														backgroundColor: '#158BCF',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-													}}
-												>
-													{/* [1] indicator */}
-													<div
-														className="absolute font-inter font-bold"
-														style={{
-															top: '4.5px',
-															left: '8px',
-															fontSize: '11.5px',
-															color: '#000000',
-														}}
-													>
-														[1]
-													</div>
-													{/* Inner content box */}
-													<div
-														className="absolute overflow-hidden"
-														style={{
-															top: '50%',
-															transform: 'translateY(-50%)',
-															right: '10px',
-															width: '319px',
-															height: '43px',
-															backgroundColor: '#FFFFFF',
-															border: '1px solid #000000',
-															borderRadius: '6px',
-														}}
-													>
-														{metadataSections['1'] && (
-															<div className="w-full h-full px-2 flex items-center overflow-hidden">
-																<div
-																	className="w-full text-[12px] leading-[1.3] text-black font-inter"
-																	style={{
-																		display: '-webkit-box',
-																		WebkitLineClamp: 2,
-																		WebkitBoxOrient: 'vertical',
-																		overflow: 'hidden',
-																	}}
-																>
-																	{metadataSections['1']}
+												{/* Research result boxes - only show if data exists */}
+												{(() => {
+													const boxConfigs = [
+														{ key: '1', color: '#158BCF' },
+														{ key: '2', color: '#43AEEC' },
+														{ key: '3', color: '#7CC9F6' },
+														{ key: '4', color: '#AADAF6' },
+														{ key: '5', color: '#D7F0FF' },
+													];
+
+													// Filter to only boxes that have data
+													const visibleBoxes = boxConfigs.filter(
+														(config) => metadataSections[config.key]
+													);
+
+													return visibleBoxes.map((config, index) => (
+														<div
+															key={config.key}
+															className="absolute"
+															style={{
+																top: `${76 + index * 65}px`,
+																left: '50%',
+																transform: 'translateX(-50%)',
+																width: '360px',
+																height: '52px',
+																backgroundColor: config.color,
+																border: '2px solid #000000',
+																borderRadius: '8px',
+															}}
+														>
+															{/* Section indicator */}
+															<div
+																className="absolute font-inter font-bold"
+																style={{
+																	top: '4.5px',
+																	left: '8px',
+																	fontSize: '11.5px',
+																	color: '#000000',
+																}}
+															>
+																[{config.key}]
+															</div>
+															{/* Inner content box */}
+															<div
+																className="absolute overflow-hidden"
+																style={{
+																	top: '50%',
+																	transform: 'translateY(-50%)',
+																	right: '10px',
+																	width: '319px',
+																	height: '43px',
+																	backgroundColor: '#FFFFFF',
+																	border: '1px solid #000000',
+																	borderRadius: '6px',
+																}}
+															>
+																<div className="w-full h-full px-2 flex items-center overflow-hidden">
+																	<div
+																		className="w-full text-[12px] leading-[1.3] text-black font-inter"
+																		style={{
+																			display: '-webkit-box',
+																			WebkitLineClamp: 2,
+																			WebkitBoxOrient: 'vertical',
+																			overflow: 'hidden',
+																		}}
+																	>
+																		{metadataSections[config.key]}
+																	</div>
 																</div>
 															</div>
-														)}
-													</div>
-												</div>
-												{/* Research result box 2 */}
-												<div
-													className="absolute"
-													style={{
-														top: '141px',
-														left: '50%',
-														transform: 'translateX(-50%)',
-														width: '360px',
-														height: '52px',
-														backgroundColor: '#43AEEC',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-													}}
-												>
-													{/* [2] indicator */}
-													<div
-														className="absolute font-inter font-bold"
-														style={{
-															top: '4.5px',
-															left: '8px',
-															fontSize: '11.5px',
-															color: '#000000',
-														}}
-													>
-														[2]
-													</div>
-													{/* Inner content box */}
-													<div
-														className="absolute overflow-hidden"
-														style={{
-															top: '50%',
-															transform: 'translateY(-50%)',
-															right: '10px',
-															width: '319px',
-															height: '43px',
-															backgroundColor: '#FFFFFF',
-															border: '1px solid #000000',
-															borderRadius: '6px',
-														}}
-													>
-														{metadataSections['2'] && (
-															<div className="w-full h-full px-2 flex items-center overflow-hidden">
-																<div
-																	className="w-full text-[12px] leading-[1.3] text-black font-inter"
-																	style={{
-																		display: '-webkit-box',
-																		WebkitLineClamp: 2,
-																		WebkitBoxOrient: 'vertical',
-																		overflow: 'hidden',
-																	}}
-																>
-																	{metadataSections['2']}
-																</div>
-															</div>
-														)}
-													</div>
-												</div>
-												{/* Research result box 3 */}
-												<div
-													className="absolute"
-													style={{
-														top: '206px',
-														left: '50%',
-														transform: 'translateX(-50%)',
-														width: '360px',
-														height: '52px',
-														backgroundColor: '#7CC9F6',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-													}}
-												>
-													{/* [3] indicator */}
-													<div
-														className="absolute font-inter font-bold"
-														style={{
-															top: '4.5px',
-															left: '8px',
-															fontSize: '11.5px',
-															color: '#000000',
-														}}
-													>
-														[3]
-													</div>
-													{/* Inner content box */}
-													<div
-														className="absolute overflow-hidden"
-														style={{
-															top: '50%',
-															transform: 'translateY(-50%)',
-															right: '10px',
-															width: '319px',
-															height: '43px',
-															backgroundColor: '#FFFFFF',
-															border: '1px solid #000000',
-															borderRadius: '6px',
-														}}
-													>
-														{metadataSections['3'] && (
-															<div className="w-full h-full px-2 flex items-center overflow-hidden">
-																<div
-																	className="w-full text-[12px] leading-[1.3] text-black font-inter"
-																	style={{
-																		display: '-webkit-box',
-																		WebkitLineClamp: 2,
-																		WebkitBoxOrient: 'vertical',
-																		overflow: 'hidden',
-																	}}
-																>
-																	{metadataSections['3']}
-																</div>
-															</div>
-														)}
-													</div>
-												</div>
-												{/* Research result box 4 */}
-												<div
-													className="absolute"
-													style={{
-														top: '271px',
-														left: '50%',
-														transform: 'translateX(-50%)',
-														width: '360px',
-														height: '52px',
-														backgroundColor: '#AADAF6',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-													}}
-												>
-													{/* [4] indicator */}
-													<div
-														className="absolute font-inter font-bold"
-														style={{
-															top: '4.5px',
-															left: '8px',
-															fontSize: '11.5px',
-															color: '#000000',
-														}}
-													>
-														[4]
-													</div>
-													{/* Inner content box */}
-													<div
-														className="absolute overflow-hidden"
-														style={{
-															top: '50%',
-															transform: 'translateY(-50%)',
-															right: '10px',
-															width: '319px',
-															height: '43px',
-															backgroundColor: '#FFFFFF',
-															border: '1px solid #000000',
-															borderRadius: '6px',
-														}}
-													>
-														{metadataSections['4'] && (
-															<div className="w-full h-full px-2 flex items-center overflow-hidden">
-																<div
-																	className="w-full text-[12px] leading-[1.3] text-black font-inter"
-																	style={{
-																		display: '-webkit-box',
-																		WebkitLineClamp: 2,
-																		WebkitBoxOrient: 'vertical',
-																		overflow: 'hidden',
-																	}}
-																>
-																	{metadataSections['4']}
-																</div>
-															</div>
-														)}
-													</div>
-												</div>
-												{/* Research result box 5 */}
-												<div
-													className="absolute"
-													style={{
-														top: '336px',
-														left: '50%',
-														transform: 'translateX(-50%)',
-														width: '360px',
-														height: '52px',
-														backgroundColor: '#D7F0FF',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-													}}
-												>
-													{/* [5] indicator */}
-													<div
-														className="absolute font-inter font-bold"
-														style={{
-															top: '4.5px',
-															left: '8px',
-															fontSize: '11.5px',
-															color: '#000000',
-														}}
-													>
-														[5]
-													</div>
-													{/* Inner content box */}
-													<div
-														className="absolute overflow-hidden"
-														style={{
-															top: '50%',
-															transform: 'translateY(-50%)',
-															right: '10px',
-															width: '319px',
-															height: '43px',
-															backgroundColor: '#FFFFFF',
-															border: '1px solid #000000',
-															borderRadius: '6px',
-														}}
-													>
-														{metadataSections['5'] && (
-															<div className="w-full h-full px-2 flex items-center overflow-hidden">
-																<div
-																	className="w-full text-[12px] leading-[1.3] text-black font-inter"
-																	style={{
-																		display: '-webkit-box',
-																		WebkitLineClamp: 2,
-																		WebkitBoxOrient: 'vertical',
-																		overflow: 'hidden',
-																	}}
-																>
-																	{metadataSections['5']}
-																</div>
-															</div>
-														)}
-													</div>
-												</div>{' '}
+														</div>
+													));
+												})()}
 												{/* Summary box at bottom */}
 												<div
 													id="research-summary-box"
 													className="absolute"
 													style={{
-														bottom: '24px',
+														bottom: hasAnyParsedSections ? '14px' : '8px',
 														left: '50%',
 														transform: 'translateX(-50%)',
 														width: '360px',
-														height: '197px',
-														backgroundColor: '#E9F7FF',
+														height: hasAnyParsedSections ? '197px' : '336px',
+														backgroundColor: hasAnyParsedSections ? '#E9F7FF' : '#158BCF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 													}}
@@ -1969,11 +1763,19 @@ const Dashboard = () => {
 													<div
 														className="absolute overflow-hidden"
 														style={{
-															top: '50%',
-															left: '50%',
-															transform: 'translate(-50%, -50%)',
+															...(hasAnyParsedSections
+																? {
+																		top: '50%',
+																		left: '50%',
+																		transform: 'translate(-50%, -50%)',
+																  }
+																: {
+																		bottom: '9px',
+																		left: '50%',
+																		transform: 'translateX(-50%)',
+																  }),
 															width: '350px',
-															height: '182px',
+															height: hasAnyParsedSections ? '182px' : '299px',
 															backgroundColor: '#FFFFFF',
 															border: '1px solid #000000',
 															borderRadius: '6px',
