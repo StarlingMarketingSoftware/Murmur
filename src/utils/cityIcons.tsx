@@ -31,6 +31,7 @@ import {
 	MassachusettsIcon,
 	MASSACHUSETTS_BACKGROUND,
 } from '@/components/atoms/_svg/MassachusettsIcon';
+import { MichiganIcon, MICHIGAN_BACKGROUND } from '@/components/atoms/_svg/MichiganIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -218,6 +219,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <MassachusettsIcon />,
 				backgroundColor: MASSACHUSETTS_BACKGROUND,
+			};
+		}
+
+		// Check for Michigan
+		if (normalizedState === 'michigan' || normalizedState === 'mi') {
+			return {
+				icon: <MichiganIcon />,
+				backgroundColor: MICHIGAN_BACKGROUND,
 			};
 		}
 	}
