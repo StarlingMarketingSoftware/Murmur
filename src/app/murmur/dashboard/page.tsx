@@ -1511,6 +1511,9 @@ const Dashboard = () => {
 								{/* Right-side box */}
 								{!isMobile &&
 									(() => {
+										// Only show when a contact is hovered
+										if (!hoveredContact) return null;
+
 										// Parse metadata sections [1], [2], etc.
 										// Only includes sequential sections starting from [1] that have meaningful content
 										const parseMetadataSections = (
@@ -1548,6 +1551,11 @@ const Dashboard = () => {
 
 												sections[String(expectedNum)] = content;
 												expectedNum++;
+											}
+
+											// Only return sections if there are at least 3 valid sequential sections
+											if (Object.keys(sections).length < 3) {
+												return {};
 											}
 
 											return sections;
