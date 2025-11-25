@@ -104,6 +104,7 @@ import {
 	WisconsinIcon,
 	WISCONSIN_BACKGROUND,
 } from '@/components/atoms/_svg/WisconsinIcon';
+import { WyomingIcon, WYOMING_BACKGROUND } from '@/components/atoms/_svg/WyomingIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -515,6 +516,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <WisconsinIcon />,
 				backgroundColor: WISCONSIN_BACKGROUND,
+			};
+		}
+
+		// Check for Wyoming
+		if (normalizedState === 'wyoming' || normalizedState === 'wy') {
+			return {
+				icon: <WyomingIcon />,
+				backgroundColor: WYOMING_BACKGROUND,
 			};
 		}
 	}
