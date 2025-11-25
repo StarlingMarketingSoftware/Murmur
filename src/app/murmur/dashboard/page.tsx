@@ -34,6 +34,8 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useGetLocations } from '@/hooks/queryHooks/useContacts';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import { getStateAbbreviation } from '@/utils/string';
+import { stateBadgeColorMap } from '@/constants/ui';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -1514,12 +1516,135 @@ const Dashboard = () => {
 											left: 'calc(50% + 502px + 33px)',
 											width: '375px',
 											height: '630px',
-											backgroundColor: 'white',
+											backgroundColor: '#D8E5FB',
 											border: '2px solid black',
 											borderRadius: '7px',
+											overflow: 'hidden',
 										}}
 									>
-										{/* Content for the right-side box */}
+										<div
+											className="absolute top-0 left-0 w-full"
+											style={{
+												height: '24px',
+												backgroundColor: '#E8EFFF',
+											}}
+										/>
+										<div className="absolute top-[12px] left-[16px] -translate-y-1/2 z-10">
+											<span className="font-secondary font-bold text-[14px] leading-none text-black">
+												Research
+											</span>
+										</div>
+										<div
+											className="absolute left-0 w-full bg-black z-10"
+											style={{
+												top: '24px',
+												height: '2px',
+											}}
+										/>
+										<div
+											className="absolute left-0 w-full bg-[#FFFFFF]"
+											style={{
+												top: '26px',
+												height: '40px',
+											}}
+										>
+											{hoveredContact && (
+												<div className="w-full h-full px-3 flex items-center justify-between overflow-hidden">
+													<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
+														<div className="font-inter font-bold text-[16px] leading-none truncate text-black">
+															{(() => {
+																const fullName = `${hoveredContact.firstName || ''} ${
+																	hoveredContact.lastName || ''
+																}`.trim();
+																const nameToDisplay =
+																	fullName ||
+																	hoveredContact.name ||
+																	hoveredContact.company ||
+																	'Unknown';
+																return nameToDisplay;
+															})()}
+														</div>
+														{/* Only show company if we are displaying a person's name above, and it's different from the company name */}
+														{(() => {
+															const fullName = `${hoveredContact.firstName || ''} ${
+																hoveredContact.lastName || ''
+															}`.trim();
+															const hasName =
+																fullName.length > 0 ||
+																(hoveredContact.name && hoveredContact.name.length > 0);
+															// If we are showing the company as the main title (because no name), don't show it again here
+															if (!hasName) return null;
+
+															return (
+																<div className="text-[12px] leading-tight truncate text-black mt-[2px]">
+																	{hoveredContact.company || ''}
+																</div>
+															);
+														})()}
+													</div>
+
+													<div className="flex items-center gap-3 flex-shrink-0">
+														<div className="flex flex-col items-end gap-[2px] max-w-[140px]">
+															<div className="flex items-center gap-1 w-full justify-end overflow-hidden">
+																{(() => {
+																	const stateAbbr =
+																		getStateAbbreviation(hoveredContact.state || '') ||
+																		'';
+																	if (stateAbbr && stateBadgeColorMap[stateAbbr]) {
+																		return (
+																			<span
+																				className="inline-flex items-center justify-center h-[16px] px-[6px] rounded-[4px] border border-black text-[11px] font-bold leading-none flex-shrink-0"
+																				style={{
+																					backgroundColor: stateBadgeColorMap[stateAbbr],
+																				}}
+																			>
+																				{stateAbbr}
+																			</span>
+																		);
+																	}
+																	return null;
+																})()}
+																{hoveredContact.city && (
+																	<span className="text-[13px] leading-none text-black truncate">
+																		{hoveredContact.city}
+																	</span>
+																)}
+															</div>
+															{(hoveredContact.title || hoveredContact.headline) && (
+																<div className="px-2 py-[2px] rounded-[8px] bg-[#E8EFFF] border border-black max-w-full truncate">
+																	<span className="text-[10px] leading-none text-black block truncate">
+																		{hoveredContact.title || hoveredContact.headline}
+																	</span>
+																</div>
+															)}
+														</div>
+														<svg
+															width="16"
+															height="16"
+															viewBox="0 0 14 14"
+															fill="none"
+															xmlns="http://www.w3.org/2000/svg"
+															className="text-[#C00000] flex-shrink-0"
+														>
+															<path
+																d="M13 1L1 13M1 1L13 13"
+																stroke="currentColor"
+																strokeWidth="2"
+																strokeLinecap="round"
+																strokeLinejoin="round"
+															/>
+														</svg>
+													</div>
+												</div>
+											)}
+										</div>
+										<div
+											className="absolute left-0 w-full bg-black z-10"
+											style={{
+												top: '66px',
+												height: '1px',
+											}}
+										/>
 									</div>
 								)}
 							</div>
