@@ -1836,6 +1836,7 @@ const Dashboard = () => {
 										</div>
 										{/* Summary box at bottom */}
 										<div
+											id="research-summary-box"
 											className="absolute"
 											style={{
 												bottom: '24px',
@@ -1848,9 +1849,21 @@ const Dashboard = () => {
 												borderRadius: '8px',
 											}}
 										>
+											<style>{`
+											#research-summary-box *::-webkit-scrollbar {
+												display: none !important;
+												width: 0 !important;
+												height: 0 !important;
+												background: transparent !important;
+											}
+											#research-summary-box * {
+												scrollbar-width: none !important;
+												-ms-overflow-style: none !important;
+											}
+										`}</style>
 											{/* Inner content box */}
 											<div
-												className="absolute"
+												className="absolute overflow-hidden"
 												style={{
 													top: '50%',
 													left: '50%',
@@ -1861,7 +1874,20 @@ const Dashboard = () => {
 													border: '1px solid #000000',
 													borderRadius: '6px',
 												}}
-											/>
+											>
+												{hoveredContact?.metadata ? (
+													<div className="w-full h-full p-3 overflow-hidden">
+														<div
+															className="text-[15px] leading-[1.5] text-black font-inter font-normal whitespace-pre-wrap overflow-y-scroll h-full"
+															style={{
+																wordBreak: 'break-word',
+															}}
+														>
+															{hoveredContact.metadata}
+														</div>
+													</div>
+												) : null}
+											</div>
 										</div>
 									</div>
 								)}
