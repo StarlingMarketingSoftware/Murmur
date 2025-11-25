@@ -74,6 +74,308 @@ const Dashboard = () => {
 		'state-first'
 	);
 
+	const renderDesktopSearchDropdowns = () => {
+		return (
+			<>
+				{activeSection === 'why' && (
+					<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[12px] absolute top-[calc(100%+10px)] left-[4px] w-[439px] h-[173px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+						<div
+							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setWhyValue('[Promotion]');
+								setActiveSection('what');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<PromotionIcon />
+							</div>
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Promotion
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
+									reach out to radio stations, playlists, and more to get your music
+									played
+								</div>
+							</div>
+						</div>
+						<div
+							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setWhyValue('[Booking]');
+								setActiveSection('what');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<BookingIcon />
+							</div>
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Booking
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
+									contact venues, resturants and more, to book shows
+								</div>
+							</div>
+						</div>
+					</div>
+				)}
+				{activeSection === 'what' && whyValue === '[Promotion]' && (
+					<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] absolute top-[calc(100%+10px)] left-[176px] w-[439px] h-[92px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+						<div
+							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setWhatValue('Radio Stations');
+								setActiveSection('where');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#56DA73] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<RadioStationsIcon />
+							</div>
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Radio Stations
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px]">
+									Reach out to radio stations
+								</div>
+							</div>
+						</div>
+					</div>
+				)}
+				{activeSection === 'what' && whyValue !== '[Promotion]' && (
+					<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] absolute top-[calc(100%+10px)] left-[176px] w-[439px] h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+						<div
+							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setWhatValue('Music Venues');
+								setActiveSection('where');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<MusicVenuesIcon />
+							</div>
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Music Venues
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px]">
+									Reach talent buyers for live shows
+								</div>
+							</div>
+						</div>
+						<div
+							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setWhatValue('Festivals');
+								setActiveSection('where');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<FestivalsIcon />
+							</div>
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Festivals
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px]">
+									Pitch your act for seasonal events
+								</div>
+							</div>
+						</div>
+						<div
+							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setWhatValue('Restaurants');
+								setActiveSection('where');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<RestaurantsIcon />
+							</div>
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Restaurants
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px]">
+									Land steady dinner and brunch gigs
+								</div>
+							</div>
+						</div>
+						<div
+							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setWhatValue('Coffee Shops');
+								setActiveSection('where');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<CoffeeShopsIcon />
+							</div>
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Coffee Shops
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px]">
+									Book intimate daytime performances
+								</div>
+							</div>
+						</div>
+						<div
+							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setWhatValue('Wedding Planners');
+								setActiveSection('where');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<WeddingPlannersIcon />
+							</div>
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Wedding Planners
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px]">
+									Get hired for ceremonies & receptions
+								</div>
+							</div>
+						</div>
+					</div>
+				)}
+				{activeSection === 'where' && (
+					<div
+						id="where-dropdown-container"
+						className={`search-dropdown-menu hidden md:block absolute top-[calc(100%+10px)] left-[98px] w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]`}
+						style={{ overflow: 'visible' }}
+					>
+						<style jsx global>{`
+							#where-dropdown-container .scrollbar-hide {
+								scrollbar-width: none !important;
+								scrollbar-color: transparent transparent !important;
+								-ms-overflow-style: none !important;
+							}
+							#where-dropdown-container .scrollbar-hide::-webkit-scrollbar {
+								display: none !important;
+								width: 0 !important;
+								height: 0 !important;
+								background: transparent !important;
+								-webkit-appearance: none !important;
+							}
+						`}</style>
+						{whereValue.length >= 1 ? (
+							<CustomScrollbar
+								className="w-full h-full"
+								contentClassName="flex flex-col items-center justify-start gap-[20px] py-4"
+								thumbWidth={2}
+								thumbColor="#000000"
+								trackColor="transparent"
+								offsetRight={-5}
+							>
+								{isLoadingLocations ? (
+									<div className="flex items-center justify-center h-full">
+										<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+									</div>
+								) : locationResults && locationResults.length > 0 ? (
+									locationResults.map((loc, idx) => {
+										const { icon, backgroundColor } = getCityIconProps(
+											loc.city,
+											loc.state
+										);
+										return (
+											<div
+												key={`${loc.city}-${loc.state}-${idx}`}
+												className="w-[415px] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
+												onClick={() => {
+													setWhereValue(loc.label);
+													setActiveSection(null);
+												}}
+											>
+												<div
+													className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
+													style={{ backgroundColor }}
+												>
+													{icon}
+												</div>
+												<div className="ml-[12px] flex flex-col">
+													<div className="text-[20px] font-medium leading-none text-black font-inter">
+														{loc.label}
+													</div>
+													<div className="text-[12px] leading-tight text-black mt-[4px]">
+														Search contacts in {loc.city || loc.state}
+													</div>
+												</div>
+											</div>
+										);
+									})
+								) : (
+									<div className="text-black font-medium font-secondary">
+										No locations found
+									</div>
+								)}
+							</CustomScrollbar>
+						) : (
+							<div className="flex flex-col items-center justify-center gap-[20px] w-full h-full">
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										if (userLocationName && !isLoadingLocation) {
+											setWhereValue(userLocationName);
+											setActiveSection(null);
+										}
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#D0E6FF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<NearMeIcon />
+									</div>
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Near Me
+										</div>
+										<div
+											className={`text-[12px] leading-tight mt-[4px] select-none ${
+												userLocationName || isLoadingLocation
+													? 'text-black/60'
+													: 'text-transparent'
+											}`}
+										>
+											{isLoadingLocation
+												? 'Locating...'
+												: userLocationName || 'Placeholder'}
+										</div>
+									</div>
+								</div>
+								{DEFAULT_STATE_SUGGESTIONS.map(
+									({ label, promotionDescription, generalDescription }) => (
+										<div
+											key={label}
+											className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+											onClick={() => {
+												setWhereValue(label);
+												setActiveSection(null);
+											}}
+										>
+											<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+												<SuburbsIcon />
+											</div>
+											<div className="ml-[12px] flex flex-col">
+												<div className="text-[20px] font-medium leading-none text-black font-inter">
+													{label}
+												</div>
+												<div className="text-[12px] leading-tight text-black mt-[4px]">
+													{isPromotion ? promotionDescription : generalDescription}
+												</div>
+											</div>
+										</div>
+									)
+								)}
+							</div>
+						)}
+					</div>
+				)}
+			</>
+		);
+	};
+
 	useEffect(() => {
 		if (activeSection === 'where' && !userLocationName && !isLoadingLocation) {
 			setIsLoadingLocation(true);
@@ -203,7 +505,6 @@ const Dashboard = () => {
 	const logoHeight = isMobile ? '50px' : '79px';
 	const hasProblematicBrowser = isProblematicBrowser();
 	const searchContainerRef = useRef<HTMLDivElement>(null);
-	const whyInputRef = useRef<HTMLInputElement>(null);
 	const whatInputRef = useRef<HTMLInputElement>(null);
 	const whereInputRef = useRef<HTMLInputElement>(null);
 	const {
@@ -255,7 +556,10 @@ const Dashboard = () => {
 			const target = event.target as HTMLElement;
 			if (
 				!target.closest('.search-sections-container') &&
-				!target.closest('.search-dropdown-menu')
+				!target.closest('.search-dropdown-menu') &&
+				!target.closest('.mini-search-section-why') &&
+				!target.closest('.mini-search-section-what') &&
+				!target.closest('.mini-search-section-where')
 			) {
 				setActiveSection(null);
 			}
@@ -269,11 +573,9 @@ const Dashboard = () => {
 		}
 	}, [activeSection]);
 
-	// Focus input when section becomes active
+	// Focus input when section becomes active (only for free-text sections)
 	useEffect(() => {
-		if (activeSection === 'why' && whyInputRef.current) {
-			whyInputRef.current.focus();
-		} else if (activeSection === 'what' && whatInputRef.current) {
+		if (activeSection === 'what' && whatInputRef.current) {
 			whatInputRef.current.focus();
 		} else if (activeSection === 'where' && whereInputRef.current) {
 			whereInputRef.current.focus();
@@ -425,44 +727,21 @@ const Dashboard = () => {
 																				Why
 																			</div>
 																			<div className="absolute left-[24px] top-[42px] w-[144px] h-[12px]">
-																				{activeSection === 'why' ? (
-																					<input
-																						ref={whyInputRef}
-																						type="text"
-																						value={whyValue}
-																						onChange={(e) => setWhyValue(e.target.value)}
-																						onKeyDown={(e) => {
-																							if (e.key === 'Enter') {
-																								e.preventDefault();
-																								setActiveSection(null);
-																							}
-																						}}
-																						className="absolute top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
-																						style={{
-																							height: '12px',
-																							lineHeight: '12px',
-																							padding: '0',
-																							margin: '0',
-																							transform: 'translateY(-1px)',
-																							fontFamily:
-																								'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																						}}
-																						placeholder="Choose Type of Search"
-																						onClick={(e) => e.stopPropagation()}
-																					/>
-																				) : (
-																					<div
-																						className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap"
-																						style={{
-																							height: '12px',
-																							lineHeight: '12px',
-																							padding: '0',
-																							margin: '0',
-																						}}
-																					>
-																						{whyValue || 'Choose Type of Search'}
-																					</div>
-																				)}
+																				<div
+																					className="absolute top-0 left-0 font-semibold text-[12px] whitespace-nowrap"
+																					style={{
+																						height: '12px',
+																						lineHeight: '12px',
+																						padding: '0',
+																						margin: '0',
+																						color:
+																							whyValue && whyValue.trim().length > 0
+																								? '#000000'
+																								: 'rgba(0, 0, 0, 0.42)',
+																					}}
+																				>
+																					{whyValue || 'Choose Type of Search'}
+																				</div>
 																			</div>
 																		</div>
 																		{/* What Section */}
@@ -639,311 +918,7 @@ const Dashboard = () => {
 																		<SearchIconMobile />
 																	</button>
 																</div>
-																{activeSection === 'why' && (
-																	<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[12px] absolute top-[calc(100%+10px)] left-[4px] w-[439px] h-[173px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
-																		<div
-																			className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-																			onClick={() => {
-																				setWhyValue('[Promotion]');
-																				setActiveSection('what');
-																			}}
-																		>
-																			<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																				<PromotionIcon />
-																			</div>
-																			<div className="ml-[12px] flex flex-col">
-																				<div className="text-[20px] font-medium leading-none text-black font-inter">
-																					Promotion
-																				</div>
-																				<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
-																					reach out to radio stations, playlists, and more
-																					to get your music played
-																				</div>
-																			</div>
-																		</div>
-																		<div
-																			className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-																			onClick={() => {
-																				setWhyValue('[Booking]');
-																				setActiveSection('what');
-																			}}
-																		>
-																			<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																				<BookingIcon />
-																			</div>
-																			<div className="ml-[12px] flex flex-col">
-																				<div className="text-[20px] font-medium leading-none text-black font-inter">
-																					Booking
-																				</div>
-																				<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
-																					contact venues, resturants and more, to book
-																					shows
-																				</div>
-																			</div>
-																		</div>
-																	</div>
-																)}
-																{activeSection === 'what' &&
-																	whyValue === '[Promotion]' && (
-																		<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] absolute top-[calc(100%+10px)] left-[176px] w-[439px] h-[92px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
-																			<div
-																				className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-																				onClick={() => {
-																					setWhatValue('Radio Stations');
-																					setActiveSection('where');
-																				}}
-																			>
-																				<div className="w-[38px] h-[38px] bg-[#56DA73] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																					<RadioStationsIcon />
-																				</div>
-																				<div className="ml-[12px] flex flex-col">
-																					<div className="text-[20px] font-medium leading-none text-black font-inter">
-																						Radio Stations
-																					</div>
-																					<div className="text-[12px] leading-tight text-black mt-[4px]">
-																						Reach out to radio stations
-																					</div>
-																				</div>
-																			</div>
-																		</div>
-																	)}
-																{activeSection === 'what' &&
-																	whyValue !== '[Promotion]' && (
-																		<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] absolute top-[calc(100%+10px)] left-[176px] w-[439px] h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
-																			<div
-																				className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-																				onClick={() => {
-																					setWhatValue('Music Venues');
-																					setActiveSection('where');
-																				}}
-																			>
-																				<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																					<MusicVenuesIcon />
-																				</div>
-																				<div className="ml-[12px] flex flex-col">
-																					<div className="text-[20px] font-medium leading-none text-black font-inter">
-																						Music Venues
-																					</div>
-																					<div className="text-[12px] leading-tight text-black mt-[4px]">
-																						Reach talent buyers for live shows
-																					</div>
-																				</div>
-																			</div>
-																			<div
-																				className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-																				onClick={() => {
-																					setWhatValue('Festivals');
-																					setActiveSection('where');
-																				}}
-																			>
-																				<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																					<FestivalsIcon />
-																				</div>
-																				<div className="ml-[12px] flex flex-col">
-																					<div className="text-[20px] font-medium leading-none text-black font-inter">
-																						Festivals
-																					</div>
-																					<div className="text-[12px] leading-tight text-black mt-[4px]">
-																						Pitch your act for seasonal events
-																					</div>
-																				</div>
-																			</div>
-																			<div
-																				className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-																				onClick={() => {
-																					setWhatValue('Restaurants');
-																					setActiveSection('where');
-																				}}
-																			>
-																				<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																					<RestaurantsIcon />
-																				</div>
-																				<div className="ml-[12px] flex flex-col">
-																					<div className="text-[20px] font-medium leading-none text-black font-inter">
-																						Restaurants
-																					</div>
-																					<div className="text-[12px] leading-tight text-black mt-[4px]">
-																						Land steady dinner and brunch gigs
-																					</div>
-																				</div>
-																			</div>
-																			<div
-																				className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-																				onClick={() => {
-																					setWhatValue('Coffee Shops');
-																					setActiveSection('where');
-																				}}
-																			>
-																				<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																					<CoffeeShopsIcon />
-																				</div>
-																				<div className="ml-[12px] flex flex-col">
-																					<div className="text-[20px] font-medium leading-none text-black font-inter">
-																						Coffee Shops
-																					</div>
-																					<div className="text-[12px] leading-tight text-black mt-[4px]">
-																						Book intimate daytime performances
-																					</div>
-																				</div>
-																			</div>
-																			<div
-																				className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-																				onClick={() => {
-																					setWhatValue('Wedding Planners');
-																					setActiveSection('where');
-																				}}
-																			>
-																				<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																					<WeddingPlannersIcon />
-																				</div>
-																				<div className="ml-[12px] flex flex-col">
-																					<div className="text-[20px] font-medium leading-none text-black font-inter">
-																						Wedding Planners
-																					</div>
-																					<div className="text-[12px] leading-tight text-black mt-[4px]">
-																						Get hired for ceremonies & receptions
-																					</div>
-																				</div>
-																			</div>
-																		</div>
-																	)}
-																{activeSection === 'where' && (
-																	<div
-																		id="where-dropdown-container"
-																		className={`search-dropdown-menu hidden md:block absolute top-[calc(100%+10px)] left-[98px] w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]`}
-																		style={{ overflow: 'visible' }}
-																	>
-																		<style jsx global>{`
-																			#where-dropdown-container .scrollbar-hide {
-																				scrollbar-width: none !important;
-																				scrollbar-color: transparent transparent !important;
-																				-ms-overflow-style: none !important;
-																			}
-																			#where-dropdown-container
-																				.scrollbar-hide::-webkit-scrollbar {
-																				display: none !important;
-																				width: 0 !important;
-																				height: 0 !important;
-																				background: transparent !important;
-																				-webkit-appearance: none !important;
-																			}
-																		`}</style>
-																		{whereValue.length >= 1 ? (
-																			<CustomScrollbar
-																				className="w-full h-full"
-																				contentClassName="flex flex-col items-center justify-start gap-[20px] py-4"
-																				thumbWidth={2}
-																				thumbColor="#000000"
-																				trackColor="transparent"
-																				offsetRight={-5}
-																			>
-																				{isLoadingLocations ? (
-																					<div className="flex items-center justify-center h-full">
-																						<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-																					</div>
-																				) : locationResults &&
-																				  locationResults.length > 0 ? (
-																					locationResults.map((loc, idx) => {
-																						const { icon, backgroundColor } =
-																							getCityIconProps(loc.city, loc.state);
-																						return (
-																							<div
-																								key={`${loc.city}-${loc.state}-${idx}`}
-																								className="w-[415px] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
-																								onClick={() => {
-																									setWhereValue(loc.label);
-																									setActiveSection(null);
-																								}}
-																							>
-																								<div
-																									className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
-																									style={{ backgroundColor }}
-																								>
-																									{icon}
-																								</div>
-																								<div className="ml-[12px] flex flex-col">
-																									<div className="text-[20px] font-medium leading-none text-black font-inter">
-																										{loc.label}
-																									</div>
-																									<div className="text-[12px] leading-tight text-black mt-[4px]">
-																										Search contacts in{' '}
-																										{loc.city || loc.state}
-																									</div>
-																								</div>
-																							</div>
-																						);
-																					})
-																				) : (
-																					<div className="text-black font-medium font-secondary">
-																						No locations found
-																					</div>
-																				)}
-																			</CustomScrollbar>
-																		) : (
-																			<div className="flex flex-col items-center justify-center gap-[20px] w-full h-full">
-																				<div
-																					className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-																					onClick={() => {
-																						if (userLocationName && !isLoadingLocation) {
-																							setWhereValue(userLocationName);
-																							setActiveSection(null);
-																						}
-																					}}
-																				>
-																					<div className="w-[38px] h-[38px] bg-[#D0E6FF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																						<NearMeIcon />
-																					</div>
-																					<div className="ml-[12px] flex flex-col">
-																						<div className="text-[20px] font-medium leading-none text-black font-inter">
-																							Near Me
-																						</div>
-																						<div
-																							className={`text-[12px] leading-tight mt-[4px] select-none ${
-																								userLocationName || isLoadingLocation
-																									? 'text-black/60'
-																									: 'text-transparent'
-																							}`}
-																						>
-																							{isLoadingLocation
-																								? 'Locating...'
-																								: userLocationName || 'Placeholder'}
-																						</div>
-																					</div>
-																				</div>
-																				{DEFAULT_STATE_SUGGESTIONS.map(
-																					({
-																						label,
-																						promotionDescription,
-																						generalDescription,
-																					}) => (
-																						<div
-																							key={label}
-																							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-																							onClick={() => {
-																								setWhereValue(label);
-																								setActiveSection(null);
-																							}}
-																						>
-																							<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-																								<SuburbsIcon />
-																							</div>
-																							<div className="ml-[12px] flex flex-col">
-																								<div className="text-[20px] font-medium leading-none text-black font-inter">
-																									{label}
-																								</div>
-																								<div className="text-[12px] leading-tight text-black mt-[4px]">
-																									{isPromotion
-																										? promotionDescription
-																										: generalDescription}
-																								</div>
-																							</div>
-																						</div>
-																					)
-																				)}
-																			</div>
-																		)}
-																	</div>
-																)}
+																{renderDesktopSearchDropdowns()}
 															</div>
 														</FormControl>
 													</FormItem>
@@ -1158,6 +1133,8 @@ const Dashboard = () => {
 														>
 															<Input
 																className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black !pr-[60px] ${
+																	activeSection ? '!bg-[#F3F3F3]' : '!bg-white'
+																} ${
 																	field.value === activeSearchQuery &&
 																	(field.value?.trim()?.length ?? 0) > 0
 																		? 'text-center'
@@ -1177,34 +1154,62 @@ const Dashboard = () => {
 															/>
 															{!isMobile && (
 																<div
-																	className="absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center bg-white border border-black rounded-[6px] z-10 overflow-hidden group"
+																	className={`absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center rounded-[6px] z-10 group ${
+																		activeSection
+																			? 'bg-[#F3F3F3] border border-transparent'
+																			: 'bg-white border border-black'
+																	}`}
 																	style={{
 																		width: 'calc(100% - 66px)',
-																		height: '37px',
+																		height: '38px',
 																	}}
 																>
-																	<div className="flex-1 flex items-center justify-center border-r border-transparent group-hover:border-black/10 h-full min-w-0 relative px-1 transition-colors duration-200">
-																		<input
-																			value={whyValue.replace(/[\[\]]/g, '')}
-																			onChange={(e) => setWhyValue(e.target.value)}
-																			className="w-full h-full text-center bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0"
-																			placeholder="Why"
-																			onFocus={(e) => {
-																				const target = e.target;
-																				setTimeout(
-																					() => target.setSelectionRange(0, 0),
-																					0
-																				);
-																			}}
-																		/>
+																	<div
+																		className={`flex-1 flex items-center justify-start border-r border-transparent ${
+																			!activeSection ? 'group-hover:border-black/10' : ''
+																		} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-why`}
+																		onClick={() => setActiveSection('why')}
+																	>
+																		{activeSection === 'why' && (
+																			<div
+																				className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
+																				style={{
+																					width: '117px',
+																					height: '38px',
+																					borderTopLeftRadius: '6px',
+																					borderBottomLeftRadius: '6px',
+																				}}
+																			/>
+																		)}
+																		<div className="w-full h-full flex items-center text-left text-[13px] font-bold font-secondary truncate p-0 relative z-10 cursor-pointer">
+																			{whyValue ? whyValue.replace(/[\[\]]/g, '') : 'Why'}
+																		</div>
 																	</div>
-																	<div className="flex-1 flex items-center justify-center border-r border-transparent group-hover:border-black/10 h-full min-w-0 relative px-1 transition-colors duration-200">
+																	<div
+																		className={`flex-1 flex items-center justify-start border-r border-transparent ${
+																			!activeSection ? 'group-hover:border-black/10' : ''
+																		} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-what`}
+																	>
+																		{activeSection === 'what' && (
+																			<div
+																				className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
+																				style={{
+																					width: '144px',
+																					height: '38px',
+																					borderTopLeftRadius: '6px',
+																					borderBottomLeftRadius: '6px',
+																					borderTopRightRadius: '6px',
+																					borderBottomRightRadius: '6px',
+																				}}
+																			/>
+																		)}
 																		<input
 																			value={whatValue}
 																			onChange={(e) => setWhatValue(e.target.value)}
-																			className="w-full h-full text-center bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0"
+																			className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
 																			placeholder="What"
 																			onFocus={(e) => {
+																				setActiveSection('what');
 																				const target = e.target;
 																				setTimeout(
 																					() => target.setSelectionRange(0, 0),
@@ -1213,16 +1218,34 @@ const Dashboard = () => {
 																			}}
 																		/>
 																	</div>
-																	<div className="flex-1 flex items-center justify-center h-full min-w-0 relative px-1">
+																	<div className="flex-1 flex items-center justify-end h-full min-w-0 relative pr-[29px] pl-[16px] mini-search-section-where">
+																		{activeSection === 'where' && (
+																			<div
+																				className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
+																				style={{
+																					width: '143px',
+																					height: '38px',
+																					borderTopLeftRadius: '6px',
+																					borderBottomLeftRadius: '6px',
+																					borderTopRightRadius: '6px',
+																					borderBottomRightRadius: '6px',
+																				}}
+																			/>
+																		)}
 																		<input
 																			value={whereValue}
 																			onChange={(e) => setWhereValue(e.target.value)}
-																			className="w-full h-full text-center bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0"
+																			className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
 																			placeholder="Where"
 																			onFocus={(e) => {
+																				setActiveSection('where');
 																				const target = e.target;
 																				setTimeout(
-																					() => target.setSelectionRange(0, 0),
+																					() =>
+																						target.setSelectionRange(
+																							0,
+																							target.value.length
+																						),
 																					0
 																				);
 																			}}
@@ -1252,6 +1275,7 @@ const Dashboard = () => {
 																</div>
 															</button>
 														</div>
+														{renderDesktopSearchDropdowns()}
 													</div>
 												</FormControl>
 											</FormItem>

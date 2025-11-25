@@ -2123,7 +2123,7 @@ body {
 .results-search-bar-wrapper {
 	position: sticky;
 	top: 0;
-	z-index: 10;
+	z-index: 200;
 	padding-top: 0.75rem;
 	padding-bottom: 0.75rem;
 	background: transparent;
@@ -2150,6 +2150,7 @@ body {
 	align-items: center;
 	width: auto;
 	min-width: 0;
+	position: relative;
 }
 
 .results-search-input {
