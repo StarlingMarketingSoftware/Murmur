@@ -15,6 +15,7 @@ import { DelawareIcon, DELAWARE_BACKGROUND } from '@/components/atoms/_svg/Delaw
 import { FloridaIcon, FLORIDA_BACKGROUND } from '@/components/atoms/_svg/FloridaIcon';
 import { GeorgiaIcon, GEORGIA_BACKGROUND } from '@/components/atoms/_svg/GeorgiaIcon';
 import { HawaiiIcon, HAWAII_BACKGROUND } from '@/components/atoms/_svg/HawaiiIcon';
+import { IdahoIcon, IDAHO_BACKGROUND } from '@/components/atoms/_svg/IdahoIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -122,6 +123,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <HawaiiIcon />,
 				backgroundColor: HAWAII_BACKGROUND,
+			};
+		}
+
+		// Check for Idaho
+		if (normalizedState === 'idaho' || normalizedState === 'id') {
+			return {
+				icon: <IdahoIcon />,
+				backgroundColor: IDAHO_BACKGROUND,
 			};
 		}
 	}
