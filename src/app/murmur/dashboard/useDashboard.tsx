@@ -207,6 +207,8 @@ export const useDashboard = () => {
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? false);
 		setLimit(50);
 		setHasSearched(true);
+		// Default to map view when a search is performed
+		setIsMapView(true);
 		// The query will automatically run when the state updates enable it
 	};
 
