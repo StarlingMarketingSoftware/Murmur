@@ -36,6 +36,10 @@ import {
 	MinnesotaIcon,
 	MINNESOTA_BACKGROUND,
 } from '@/components/atoms/_svg/MinnesotaIcon';
+import {
+	MississippiIcon,
+	MISSISSIPPI_BACKGROUND,
+} from '@/components/atoms/_svg/MississippiIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -239,6 +243,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <MinnesotaIcon />,
 				backgroundColor: MINNESOTA_BACKGROUND,
+			};
+		}
+
+		// Check for Mississippi
+		if (normalizedState === 'mississippi' || normalizedState === 'ms') {
+			return {
+				icon: <MississippiIcon />,
+				backgroundColor: MISSISSIPPI_BACKGROUND,
 			};
 		}
 	}
