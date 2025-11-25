@@ -6,6 +6,11 @@ import {
 	CaliforniaIcon,
 	CALIFORNIA_BACKGROUND,
 } from '@/components/atoms/_svg/CaliforniaIcon';
+import { ColoradoIcon, COLORADO_BACKGROUND } from '@/components/atoms/_svg/ColoradoIcon';
+import {
+	ConnecticutIcon,
+	CONNECTICUT_BACKGROUND,
+} from '@/components/atoms/_svg/ConnecticutIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -65,6 +70,22 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <CaliforniaIcon />,
 				backgroundColor: CALIFORNIA_BACKGROUND,
+			};
+		}
+
+		// Check for Colorado
+		if (normalizedState === 'colorado' || normalizedState === 'co') {
+			return {
+				icon: <ColoradoIcon />,
+				backgroundColor: COLORADO_BACKGROUND,
+			};
+		}
+
+		// Check for Connecticut
+		if (normalizedState === 'connecticut' || normalizedState === 'ct') {
+			return {
+				icon: <ConnecticutIcon />,
+				backgroundColor: CONNECTICUT_BACKGROUND,
 			};
 		}
 	}
