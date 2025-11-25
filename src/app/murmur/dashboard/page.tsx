@@ -1381,17 +1381,45 @@ const Dashboard = () => {
 									{isMapView ? (
 										<>
 											{/* Fullscreen Map View */}
+											{/* Header divider line and Close button */}
+											{typeof window !== 'undefined' &&
+												createPortal(
+													<>
+														{/* Close text in top right */}
+														<button
+															type="button"
+															onClick={() => setIsMapView(false)}
+															style={{
+																position: 'fixed',
+																top: '8px',
+																right: '16px',
+																zIndex: 101,
+																background: 'transparent',
+																border: 'none',
+																fontSize: '14px',
+																fontWeight: 500,
+																color: '#000',
+																cursor: 'pointer',
+															}}
+														>
+															Close
+														</button>
+														{/* Divider line */}
+														<div
+															style={{
+																position: 'fixed',
+																top: '37px',
+																left: '0px',
+																right: '0px',
+																height: '1px',
+																backgroundColor: 'black',
+																zIndex: 100,
+															}}
+														/>
+													</>,
+													document.body
+												)}
 											<div className="w-full md:w-[1004px] mx-auto">
-												{/* Table button to go back */}
-												<div className="w-full flex justify-end mb-2 relative z-[80]">
-													<button
-														type="button"
-														onClick={() => setIsMapView(false)}
-														className="px-6 py-1.5 bg-white border-2 border-black rounded-[8px] text-[14px] font-medium font-secondary hover:bg-gray-50 transition-colors"
-													>
-														Table
-													</button>
-												</div>
 												{/* Fullscreen map container */}
 												<div
 													className="w-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden"
