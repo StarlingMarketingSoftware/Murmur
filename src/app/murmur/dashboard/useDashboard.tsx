@@ -94,6 +94,7 @@ export const useDashboard = () => {
 	const [usedContactIdsSet, setUsedContactIdsSet] = useState<Set<number>>(new Set());
 	const [hoveredText, setHoveredText] = useState('');
 	const [hoveredContact, setHoveredContact] = useState<ContactWithName | null>(null);
+	const [isMapView, setIsMapView] = useState(false);
 
 	const {
 		data: contacts,
@@ -717,5 +718,7 @@ export const useDashboard = () => {
 		hoveredText,
 		hoveredContact,
 		setHoveredContact,
+		isMapView,
+		setIsMapView,
 	};
 };

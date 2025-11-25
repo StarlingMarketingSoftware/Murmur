@@ -537,6 +537,8 @@ const Dashboard = () => {
 		isAllSelected,
 		setHoveredContact,
 		hoveredContact,
+		isMapView,
+		setIsMapView,
 	} = useDashboard();
 
 	// Clear hover state on mobile to prevent stuck hover
@@ -1376,22 +1378,81 @@ const Dashboard = () => {
 						) : contacts && contacts.length > 0 ? (
 							<div className="flex justify-center w-full px-0 sm:px-4 relative">
 								<div className="w-full max-w-full results-appear results-align">
-									{/* Google Maps showing contact locations */}
-									<div className="w-full md:w-[1004px] mx-auto mb-4">
-										<div
-											className="w-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden"
-											style={{ height: '280px' }}
-										>
-											<SearchResultsMap
-												contacts={contacts}
-												selectedContacts={selectedContacts}
-												onMarkerClick={(contact) => setHoveredContact(contact)}
-											/>
-										</div>
-									</div>
-									<Card className="border-0 shadow-none !p-0 w-full !my-0">
-										<CardContent className="!p-0 w-full">
-											<CustomTable
+									{isMapView ? (
+										<>
+											{/* Fullscreen Map View */}
+											<div className="w-full md:w-[1004px] mx-auto">
+												{/* Table button to go back */}
+												<div className="w-full flex justify-end mb-2 relative z-[80]">
+													<button
+														type="button"
+														onClick={() => setIsMapView(false)}
+														className="px-6 py-1.5 bg-white border-2 border-black rounded-[8px] text-[14px] font-medium font-secondary hover:bg-gray-50 transition-colors"
+													>
+														Table
+													</button>
+												</div>
+												{/* Fullscreen map container */}
+												<div
+													className="w-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden"
+													style={{ height: 'calc(100vh - 240px)', minHeight: '500px' }}
+												>
+													<SearchResultsMap
+														contacts={contacts}
+														selectedContacts={selectedContacts}
+														onMarkerClick={(contact) => setHoveredContact(contact)}
+													/>
+												</div>
+											</div>
+											{/* Create Campaign button for map view */}
+											{!isMobile && (
+												<div className="flex items-center justify-center w-full">
+													<Button
+														isLoading={
+															isPendingCreateCampaign || isPendingBatchUpdateContacts
+														}
+														variant="primary-light"
+														bold
+														className="relative w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
+														onClick={() => {
+															if (selectedContacts.length === 0) return;
+															handleCreateCampaign();
+														}}
+													>
+														<span className="relative z-20">Add to Campaign</span>
+														<div
+															className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+															onClick={(e) => {
+																e.stopPropagation();
+																handleSelectAll();
+															}}
+														>
+															<span className="text-black text-[14px] font-medium">All</span>
+														</div>
+														<span
+															aria-hidden="true"
+															className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+														/>
+													</Button>
+												</div>
+											)}
+										</>
+									) : (
+										<>
+											{/* Table View (default) */}
+											{/* Map button positioned above table on the right */}
+											<div className="w-full md:w-[1004px] mx-auto flex justify-end mb-[-10px] relative z-[80]">
+												<button
+													type="button"
+													onClick={() => setIsMapView(true)}
+													className="px-6 py-1.5 bg-white border-2 border-black rounded-[8px] text-[14px] font-medium font-secondary hover:bg-gray-50 transition-colors"
+												>
+													Map
+												</button>
+											</div>
+								<Card className="border-0 shadow-none !p-0 w-full !my-0">
+									<CardContent className="!p-0 w-full">
+										<CustomTable
 												initialSelectAll={false}
 												isSelectable
 												setSelectedRows={setSelectedContacts}
@@ -1517,6 +1578,8 @@ const Dashboard = () => {
 											</div>,
 											document.body
 										)}
+										</>
+									)}
 								</div>
 								{/* Right-side box */}
 								{!isMobile &&
