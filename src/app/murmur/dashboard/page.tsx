@@ -1441,11 +1441,12 @@ const Dashboard = () => {
 										<>
 											{/* Table View (default) */}
 											{/* Map button positioned above table on the right */}
-											<div className="w-full md:w-[1004px] mx-auto flex justify-end mb-[-10px] relative z-[80]">
+											<div className="w-full md:w-[1004px] mx-auto flex justify-end mb-[4px] relative z-[80]">
 												<button
 													type="button"
 													onClick={() => setIsMapView(true)}
-													className="px-6 py-1.5 bg-white border-2 border-black rounded-[8px] text-[14px] font-medium font-secondary hover:bg-gray-50 transition-colors"
+													className="bg-white border-2 border-black rounded-[8px] text-[14px] font-medium font-secondary hover:bg-gray-50 transition-colors flex items-center justify-center cursor-pointer"
+													style={{ width: '105px', height: '22px' }}
 												>
 													Map
 												</button>
