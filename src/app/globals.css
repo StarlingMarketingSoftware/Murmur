@@ -2123,7 +2123,7 @@ body {
 .results-search-bar-wrapper {
 	position: sticky;
 	top: 0;
-	z-index: 10;
+	z-index: 200;
 	padding-top: 0.75rem;
 	padding-bottom: 0.75rem;
 	background: transparent;
@@ -2150,11 +2150,12 @@ body {
 	align-items: center;
 	width: auto;
 	min-width: 0;
+	position: relative;
 }
 
 .results-search-input {
-	height: 35px;
-	width: 597px !important;
+	height: 49px;
+	width: 499px !important;
 	border: 2px solid #cfcfcf !important;
 	color: #7f7f7f !important;
 	padding-left: 48px; /* reserve more space for left icon */
@@ -2180,9 +2181,9 @@ body {
 
 /* Fix container width for results-only input */
 .results-search-input-group .search-wave-container {
-	width: 597px !important;
-	min-width: 597px !important;
-	max-width: 597px !important;
+	width: 499px !important;
+	min-width: 499px !important;
+	max-width: 499px !important;
 	position: relative;
 }
 
@@ -3999,7 +4000,7 @@ body,
 	/* Allow the custom 2px scrollbar to render outside the border */
 	overflow: visible !important;
 	border-radius: 8px !important;
-	background-color: transparent !important; /* Body tint applied to inner scroller for uniform color */
+	background-color: #afd6ef !important;
 }
 
 .search-results-table .scrollbar-hide {
@@ -4008,8 +4009,7 @@ body,
 	overflow-x: hidden !important;
 	scrollbar-width: none !important;
 	-ms-overflow-style: none !important;
-	/* Visible composite of #AFD6EF at 25% over white */
-	background-color: #ebf5fb !important;
+	background-color: transparent !important;
 }
 
 .search-results-table .scrollbar-hide::-webkit-scrollbar {
@@ -4170,12 +4170,6 @@ body,
 	box-shadow: inset 0 0 0 100vmax #d6e8d9 !important;
 }
 
-/* macOS/Safari: eliminate hairline gaps by using separate borders and no spacing */
-.search-results-table table[data-slot='table'] {
-	border-collapse: separate !important;
-	border-spacing: 0 !important;
-}
-
 /* Keep borders visible so fill stays inside the stroke */
 .search-results-table
 	[data-slot='table-row'][data-state='selected']
@@ -4186,17 +4180,17 @@ body,
 /* --- Search Results Table Card UI --- */
 .search-results-table table[data-slot='table'] {
 	border-collapse: separate !important;
-	border-spacing: 0 8px !important; /* vertical gap between rows only */
-	padding: 0 8px !important;
+	border-spacing: 0 6px !important; /* vertical gap between rows only */
+	padding: 0 !important;
 }
 
 .search-results-table thead[data-slot='table-header'] {
 	display: block !important;
-	padding: 0 8px !important;
+	padding: 0 !important;
 	/* Collapse header vertical footprint for in-box sticky header layout */
 	height: 0 !important;
 	margin: 0 !important;
-	margin-bottom: -8px !important; /* cancel table border-spacing below header */
+	margin-bottom: -6px !important; /* cancel table border-spacing below header */
 }
 
 .search-results-table thead tr[data-slot='table-row'] {
@@ -4216,7 +4210,7 @@ body,
 
 .search-results-table tbody[data-slot='table-body'] {
 	display: block !important;
-	padding: 0 8px !important;
+	padding: 0 !important;
 }
 
 .search-results-table tr[data-slot='table-row'],
@@ -4236,8 +4230,8 @@ body,
 
 .search-results-table td[data-slot='table-cell'] {
 	background-color: white;
-	border-top: 1px solid #000;
-	border-bottom: 1px solid #000;
+	border-top: 2px solid #000;
+	border-bottom: 2px solid #000;
 	padding-top: 4px !important;
 	padding-bottom: 4px !important;
 	/* Create a clipping context so selection fill never bleeds outside */
@@ -4247,13 +4241,13 @@ body,
 }
 
 .search-results-table td[data-slot='table-cell']:first-child {
-	border-left: 1px solid #000;
+	border-left: 2px solid #000;
 	border-top-left-radius: 8px;
 	border-bottom-left-radius: 8px;
 }
 
 .search-results-table td[data-slot='table-cell']:last-child {
-	border-right: 1px solid #000;
+	border-right: 2px solid #000;
 	border-top-right-radius: 8px;
 	border-bottom-right-radius: 8px;
 }
@@ -4323,22 +4317,22 @@ body.murmur-mobile .search-results-table td[data-slot='table-cell'] {
 	}
 }
 
-/* Mobile: tighten vertical spacing between search result rows to 5px */
+/* Mobile: tighten vertical spacing between search result rows to 6px */
 @media (max-width: 640px) {
 	.search-results-table table[data-slot='table'] {
-		border-spacing: 0 5px !important; /* reduce from default 8px only on mobile */
+		border-spacing: 0 6px !important; /* vertical spacing between rows */
 	}
 	.search-results-table thead[data-slot='table-header'] {
-		margin-bottom: -5px !important; /* keep header flush with reduced row gap */
+		margin-bottom: -6px !important; /* keep header flush with reduced row gap */
 	}
 }
 
 /* Real mobile devices only (extra guard) */
 body.murmur-mobile .search-results-table table[data-slot='table'] {
-	border-spacing: 0 5px !important;
+	border-spacing: 0 6px !important;
 }
 body.murmur-mobile .search-results-table thead[data-slot='table-header'] {
-	margin-bottom: -5px !important;
+	margin-bottom: -6px !important;
 }
 
 /* Mobile: ensure the initial dashboard search input is 41px tall */
