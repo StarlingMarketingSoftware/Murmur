@@ -95,6 +95,8 @@ export const useDashboard = () => {
 	const [hoveredText, setHoveredText] = useState('');
 	const [hoveredContact, setHoveredContact] = useState<ContactWithName | null>(null);
 	const [isMapView, setIsMapView] = useState(false);
+	// Immediate search pending state - set true instantly on search click
+	const [isSearchPending, setIsSearchPending] = useState(false);
 
 	const {
 		data: contacts,
@@ -116,6 +118,13 @@ export const useDashboard = () => {
 	});
 	const { mutateAsync: importApolloContacts, isPending: isPendingImportApolloContacts } =
 		useCreateApolloContacts({});
+
+	// Clear search pending state when loading finishes
+	useEffect(() => {
+		if (!isLoadingContacts && !isRefetchingContacts && isSearchPending) {
+			setIsSearchPending(false);
+		}
+	}, [isLoadingContacts, isRefetchingContacts, isSearchPending]);
 
 	// Initialize selected contacts as empty (no contacts selected by default)
 	useEffect(() => {
@@ -202,6 +211,8 @@ export const useDashboard = () => {
 			return;
 		}
 
+		// Set search pending immediately for instant UI feedback
+		setIsSearchPending(true);
 		// Update search parameters
 		setActiveSearchQuery(data.searchText);
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? false);
@@ -722,5 +733,6 @@ export const useDashboard = () => {
 		setHoveredContact,
 		isMapView,
 		setIsMapView,
+		isSearchPending,
 	};
 };

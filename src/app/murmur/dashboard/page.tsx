@@ -581,6 +581,7 @@ const Dashboard = () => {
 		hoveredContact,
 		isMapView,
 		setIsMapView,
+		isSearchPending,
 	} = useDashboard();
 
 	// Clear hover state on mobile to prevent stuck hover
@@ -769,7 +770,9 @@ const Dashboard = () => {
 															>
 																<div
 																	className={`search-wave-container ${
-																		isLoadingContacts || isRefetchingContacts
+																		isSearchPending ||
+																		isLoadingContacts ||
+																		isRefetchingContacts
 																			? 'search-wave-loading'
 																			: ''
 																	}`}
@@ -1127,7 +1130,7 @@ const Dashboard = () => {
 				{hasSearched &&
 					activeSearchQuery &&
 					!isMapView &&
-					(isLoadingContacts || isRefetchingContacts) && (
+					(isSearchPending || isLoadingContacts || isRefetchingContacts) && (
 						<div className="search-query-display mt-8">
 							<div className="search-query-display-inner">
 								<button
@@ -1201,7 +1204,9 @@ const Dashboard = () => {
 													<div className="results-search-input-group">
 														<div
 															className={`search-wave-container relative ${
-																isLoadingContacts || isRefetchingContacts
+																isSearchPending ||
+																isLoadingContacts ||
+																isRefetchingContacts
 																	? 'search-wave-loading'
 																	: ''
 															}`}
@@ -1447,7 +1452,8 @@ const Dashboard = () => {
 									</CardContent>
 								</Card>
 							</div>
-						) : isLoadingContacts ||
+						) : isSearchPending ||
+						  isLoadingContacts ||
 						  isRefetchingContacts ||
 						  (contacts && contacts.length > 0) ? (
 							<div className="flex justify-center w-full px-0 sm:px-4 relative">
@@ -1494,12 +1500,15 @@ const Dashboard = () => {
 															</button>
 														</div>
 														{/* Console loader overlay - positioned below header where search bar would be */}
-														{(isLoadingContacts || isRefetchingContacts) && (
+														{(isSearchPending ||
+															isLoadingContacts ||
+															isRefetchingContacts) && (
 															<div
 																style={{
 																	position: 'fixed',
 																	top: '36px',
 																	left: '0px',
+																	right: '0px',
 																	height: '84px',
 																	backgroundColor: '#AFD6EF',
 																	zIndex: 101,
@@ -1534,7 +1543,11 @@ const Dashboard = () => {
 																/>
 																{/* Create Campaign button overlaid on map - only show when not loading */}
 																{!isMobile &&
-																	!(isLoadingContacts || isRefetchingContacts) && (
+																	!(
+																		isSearchPending ||
+																		isLoadingContacts ||
+																		isRefetchingContacts
+																	) && (
 																		<div className="absolute bottom-[10px] left-[10px] right-[10px] flex justify-center">
 																			<Button
 																				isLoading={
