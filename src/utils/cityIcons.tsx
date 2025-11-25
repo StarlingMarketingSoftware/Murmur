@@ -65,6 +65,7 @@ import {
 	NorthDakotaIcon,
 	NORTH_DAKOTA_BACKGROUND,
 } from '@/components/atoms/_svg/NorthDakotaIcon';
+import { OhioIcon, OHIO_BACKGROUND } from '@/components/atoms/_svg/OhioIcon';
 import { CityIcon } from '@/components/atoms/_svg/CityIcon';
 import { SuburbsIcon } from '@/components/atoms/_svg/SuburbsIcon';
 import { CITY_LOCATIONS_SET } from '@/constants/cityLocations';
@@ -356,6 +357,14 @@ export const getCityIconProps = (city: string, state: string) => {
 			return {
 				icon: <NorthDakotaIcon />,
 				backgroundColor: NORTH_DAKOTA_BACKGROUND,
+			};
+		}
+
+		// Check for Ohio
+		if (normalizedState === 'ohio' || normalizedState === 'oh') {
+			return {
+				icon: <OhioIcon />,
+				backgroundColor: OHIO_BACKGROUND,
 			};
 		}
 	}
