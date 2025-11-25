@@ -1284,6 +1284,7 @@ const Dashboard = () => {
 									/>
 									{/* Generate action removed; awaiting left-side SVG submit icon */}
 								</form>
+								{!isMapView && (
 								<div className="w-full text-center mt-2">
 									<span
 										className="font-secondary"
@@ -1292,6 +1293,7 @@ const Dashboard = () => {
 										Select who you want to contact.
 									</span>
 								</div>
+							)}
 							</Form>
 						</div>
 						{hoveredContact && !isMobile && (
