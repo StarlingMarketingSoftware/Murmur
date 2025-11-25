@@ -1375,9 +1375,9 @@ const Dashboard = () => {
 								<ConsoleLoader searchQuery={activeSearchQuery} />
 							</div>
 						) : contacts && contacts.length > 0 ? (
-							<div className="flex justify-center w-full px-0 sm:px-4">
+							<div className="flex justify-center w-full px-0 sm:px-4 relative">
 								<div className="w-full max-w-full results-appear results-align">
-									<Card className="border-0 shadow-none !p-0 w-full">
+									<Card className="border-0 shadow-none !p-0 w-full !my-0">
 										<CardContent className="!p-0 w-full">
 											<CustomTable
 												initialSelectAll={false}
@@ -1461,7 +1461,7 @@ const Dashboard = () => {
 												}
 												variant="primary-light"
 												bold
-												className="relative w-[984px] h-[39px] mx-auto mt-5 !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
+												className="relative w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
 												onClick={() => {
 													if (selectedContacts.length === 0) return;
 													handleCreateCampaign();
@@ -1506,6 +1506,22 @@ const Dashboard = () => {
 											document.body
 										)}
 								</div>
+								{/* Right-side box */}
+								{!isMobile && (
+									<div
+										className="hidden xl:block absolute top-0"
+										style={{
+											left: 'calc(50% + 502px + 33px)',
+											width: '375px',
+											height: '630px',
+											backgroundColor: 'white',
+											border: '2px solid black',
+											borderRadius: '7px',
+										}}
+									>
+										{/* Content for the right-side box */}
+									</div>
+								)}
 							</div>
 						) : hasSearched &&
 						  (contacts === undefined ||
