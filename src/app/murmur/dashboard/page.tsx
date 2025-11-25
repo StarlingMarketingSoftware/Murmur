@@ -1369,7 +1369,7 @@ const Dashboard = () => {
 								)}
 							</Form>
 						</div>
-						{hoveredContact && !isMobile && (
+						{hoveredContact && !isMobile && !isMapView && (
 							<div className="absolute inset-0 z-[90] flex items-start justify-center pointer-events-none bg-white">
 								<div className="w-full max-w-[1132px] mx-auto px-4 py-3 text-center">
 									<div className="font-secondary font-bold text-[19px] leading-tight truncate">
@@ -1477,7 +1477,10 @@ const Dashboard = () => {
 														>
 															<button
 																type="button"
-																onClick={() => setIsMapView(false)}
+																onClick={() => {
+																	setIsMapView(false);
+																	setHoveredContact(null);
+																}}
 																style={{
 																	background: 'transparent',
 																	border: 'none',
@@ -1506,7 +1509,6 @@ const Dashboard = () => {
 																<SearchResultsMap
 																	contacts={contacts}
 																	selectedContacts={selectedContacts}
-																	onMarkerClick={(contact) => setHoveredContact(contact)}
 																/>
 																{/* Create Campaign button overlaid on map */}
 																{!isMobile && (
