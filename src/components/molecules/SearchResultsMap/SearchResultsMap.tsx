@@ -142,51 +142,99 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[geocodedCoords]
 	);
 
+	// Track if we've done the initial bounds fit
+	const hasFitBoundsRef = useRef(false);
+	// Track the last contacts count to detect when results change
+	const lastContactsCountRef = useRef(0);
+
+	// Helper to fit map bounds with padding
+	const fitMapToBounds = useCallback(
+		(mapInstance: google.maps.Map, contactsList: ContactWithName[]) => {
+			if (contactsList.length === 0) return;
+
+			const bounds = new google.maps.LatLngBounds();
+			let hasValidCoords = false;
+
+			contactsList.forEach((contact) => {
+				const coords = getContactCoords(contact);
+				if (coords) {
+					bounds.extend(coords);
+					hasValidCoords = true;
+				}
+			});
+
+			if (!hasValidCoords) return;
+
+			// Fit bounds with padding
+			mapInstance.fitBounds(bounds, {
+				top: 50,
+				right: 50,
+				bottom: 50,
+				left: 50,
+			});
+
+			// Prevent too much zoom on single marker or very close markers
+			const listener = google.maps.event.addListener(mapInstance, 'idle', () => {
+				const currentZoom = mapInstance.getZoom();
+				if (currentZoom && currentZoom > 14) {
+					mapInstance.setZoom(14);
+				}
+				google.maps.event.removeListener(listener);
+			});
+		},
+		[getContactCoords]
+	);
+
 	const onLoad = useCallback(
-		(map: google.maps.Map) => {
-			setMap(map);
+		(mapInstance: google.maps.Map) => {
+			setMap(mapInstance);
 
-			// Calculate and fit bounds when map loads
+			// Fit bounds on initial load if we have contacts
 			if (contactsWithCoords.length > 0) {
-				const bounds = new google.maps.LatLngBounds();
-				contactsWithCoords.forEach((contact) => {
-					const coords = getContactCoords(contact);
-					if (coords) {
-						bounds.extend(coords);
-					}
-				});
-
-				map.fitBounds(bounds);
-				// Prevent too much zoom on single marker
-				const listener = google.maps.event.addListener(map, 'idle', () => {
-					const currentZoom = map.getZoom();
-					if (currentZoom && currentZoom > 12) {
-						map.setZoom(12);
-					}
-					google.maps.event.removeListener(listener);
-				});
+				fitMapToBounds(mapInstance, contactsWithCoords);
+				hasFitBoundsRef.current = true;
+				lastContactsCountRef.current = contactsWithCoords.length;
 			}
 		},
-		[contactsWithCoords, getContactCoords]
+		[contactsWithCoords, fitMapToBounds]
 	);
 
 	const onUnmount = useCallback(() => {
 		setMap(null);
+		hasFitBoundsRef.current = false;
+		lastContactsCountRef.current = 0;
 	}, []);
 
-	// Refit bounds when geocoded coordinates change
+	// Fit bounds when contacts with coordinates change
 	useEffect(() => {
-		if (map && geocodedCoords.size > 0 && contactsWithCoords.length > 0) {
-			const bounds = new google.maps.LatLngBounds();
-			contactsWithCoords.forEach((contact) => {
-				const coords = getContactCoords(contact);
-				if (coords) {
-					bounds.extend(coords);
-				}
-			});
-			map.fitBounds(bounds);
+		if (!map || contactsWithCoords.length === 0) return;
+
+		// Fit bounds if:
+		// 1. We haven't fit bounds yet (initial load after geocoding)
+		// 2. The number of contacts with coords has increased (more were geocoded)
+		// 3. The contacts list changed significantly (new search)
+		const shouldFitBounds =
+			!hasFitBoundsRef.current ||
+			contactsWithCoords.length > lastContactsCountRef.current ||
+			Math.abs(contactsWithCoords.length - lastContactsCountRef.current) > 5;
+
+		if (shouldFitBounds) {
+			fitMapToBounds(map, contactsWithCoords);
+			hasFitBoundsRef.current = true;
+			lastContactsCountRef.current = contactsWithCoords.length;
 		}
-	}, [map, geocodedCoords.size, contactsWithCoords, getContactCoords]);
+	}, [map, contactsWithCoords, fitMapToBounds]);
+
+	// Reset bounds tracking when contacts prop changes significantly (new search)
+	useEffect(() => {
+		const previousCount = lastContactsCountRef.current;
+
+		// If the contact IDs are completely different, reset the tracking
+		if (previousCount > 0 && contactsWithCoords.length === 0) {
+			hasFitBoundsRef.current = false;
+			lastContactsCountRef.current = 0;
+		}
+	}, [contacts, contactsWithCoords.length]);
 
 	const handleMarkerClick = (contact: ContactWithName) => {
 		setSelectedMarker(contact);
@@ -215,6 +263,33 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	};
 
+	// Compute initial center based on contacts (if available)
+	// Must be before early returns to satisfy React hooks rules
+	const initialCenter = useMemo(() => {
+		if (contactsWithCoords.length === 0) return defaultCenter;
+
+		// Calculate centroid of all contact coordinates
+		let sumLat = 0;
+		let sumLng = 0;
+		let count = 0;
+
+		contactsWithCoords.forEach((contact) => {
+			const coords = getContactCoords(contact);
+			if (coords) {
+				sumLat += coords.lat;
+				sumLng += coords.lng;
+				count++;
+			}
+		});
+
+		if (count === 0) return defaultCenter;
+
+		return {
+			lat: sumLat / count,
+			lng: sumLng / count,
+		};
+	}, [contactsWithCoords, getContactCoords]);
+
 	if (loadError) {
 		return (
 			<div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg">
@@ -237,8 +312,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	return (
 		<GoogleMap
 			mapContainerStyle={mapContainerStyle}
-			center={defaultCenter}
-			zoom={4}
+			center={initialCenter}
+			zoom={contactsWithCoords.length > 0 ? 10 : 4}
 			onLoad={onLoad}
 			onUnmount={onUnmount}
 			options={mapOptions}
