@@ -272,7 +272,7 @@ const Dashboard = () => {
 								trackColor="transparent"
 								offsetRight={-5}
 							>
-								{isLoadingLocations ? (
+								{isLoadingLocations || debouncedWhereValue !== whereValue ? (
 									<div className="flex items-center justify-center h-full">
 										<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
 									</div>
