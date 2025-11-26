@@ -163,7 +163,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					</div>
 
 					{/* Placeholder content for future tabs */}
-					{(view === 'sent' || view === 'inbox' || view === 'all') && (
+					{(view === 'contacts' ||
+						view === 'sent' ||
+						view === 'inbox' ||
+						view === 'all') && (
 						<div className="flex items-center justify-center min-h-[300px] text-gray-400">
 							{/* Blank for now */}
 						</div>

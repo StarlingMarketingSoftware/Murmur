@@ -22,7 +22,7 @@ const Murmur = () => {
 		silentLoad ? 'search' : 'campaign'
 	);
 	const [activeView, setActiveView] = useState<
-		'testing' | 'drafting' | 'sent' | 'inbox' | 'all'
+		'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'
 	>('testing');
 
 	if (isPendingCampaign || !campaign) {
@@ -122,6 +122,18 @@ const Murmur = () => {
 					<div className="mt-4 flex justify-center mobile-landscape-hide">
 						<div className="w-full max-w-[1250px] px-6">
 							<div className="flex gap-6 justify-center">
+								<button
+									type="button"
+									className={cn(
+										'font-inter text-[20px] max-[480px]:text-[12px] max-[480px]:font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										activeView === 'contacts'
+											? 'text-black font-semibold'
+											: 'text-[#6B6B6B] hover:text-black'
+									)}
+									onClick={() => setActiveView('contacts')}
+								>
+									Contacts
+								</button>
 								<button
 									type="button"
 									className={cn(
