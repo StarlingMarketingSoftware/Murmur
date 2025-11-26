@@ -219,6 +219,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									selectedContactIds={contactsTabSelectedIds}
 									setSelectedContactIds={setContactsTabSelectedIds}
 									handleContactSelection={handleContactsTabSelection}
+									campaign={campaign}
 								/>
 							</div>
 						)}

@@ -13,6 +13,7 @@ interface DraftingTableProps {
 	isPending: boolean;
 	title: string;
 	footer?: ReactNode;
+	topContent?: ReactNode;
 }
 export const DraftingTable: FC<DraftingTableProps> = ({
 	title,
@@ -24,6 +25,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	noDataDescription,
 	isPending,
 	footer,
+	topContent,
 }) => {
 	const isContacts = title === 'Contacts';
 	const isCompactHeader = isContacts || title === 'Drafts' || title === 'Sent';
@@ -111,7 +113,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							<div className="text-sm font-inter font-medium text-black">{title}</div>
 						</div>
 					)}
-					{hasData && !isSent && (
+					{hasData && !isSent && !(isContacts && topContent) && (
 						<div
 							style={{
 								transform: isCompactHeader
@@ -133,10 +135,25 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					)}
 				</div>
 
+				{/* Top content area (e.g., mini searchbar for contacts) */}
+				{isContacts && topContent && (
+					<div
+						style={{
+							position: 'absolute',
+							top: '35px',
+							left: 0,
+							right: 0,
+							zIndex: 5,
+						}}
+					>
+						{topContent}
+					</div>
+				)}
+
 				{/* Content area */}
 				<CustomScrollbar
 					className="flex-1 drafting-table-content"
-					style={{ marginTop: isContacts ? '105px' : 0 }}
+					style={{ marginTop: isContacts && topContent ? '115px' : isContacts ? '105px' : 0 }}
 					thumbWidth={2}
 					thumbColor="#000000"
 					trackColor="transparent"

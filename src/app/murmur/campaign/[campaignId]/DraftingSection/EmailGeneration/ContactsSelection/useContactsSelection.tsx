@@ -1,4 +1,5 @@
 import { ContactWithName } from '@/types/contact';
+import { CampaignWithRelations } from '@/types';
 import { Dispatch, MouseEvent, SetStateAction, useRef } from 'react';
 
 export interface ContactsSelectionProps {
@@ -9,6 +10,7 @@ export interface ContactsSelectionProps {
 	generationProgress?: number;
 	cancelGeneration?: () => void;
 	generationTotal?: number;
+	campaign?: CampaignWithRelations;
 }
 
 export const useContactsSelection = (props: ContactsSelectionProps) => {

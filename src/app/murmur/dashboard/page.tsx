@@ -619,6 +619,62 @@ const Dashboard = () => {
 		}
 	}, [whyValue, whatValue, whereValue, form]);
 
+	// Check for pending search from contacts page searchbar
+	useEffect(() => {
+		const pendingSearch = sessionStorage.getItem('murmur_pending_search');
+		if (pendingSearch) {
+			// Clear the pending search immediately to prevent re-triggering
+			sessionStorage.removeItem('murmur_pending_search');
+			
+			// Parse the search query: "[Why] What in Where"
+			const whyMatch = pendingSearch.match(/^\[(Booking|Promotion)\]/i);
+			const inMatch = pendingSearch.match(/\s+in\s+(.+)$/i);
+			
+			let parsedWhy = '';
+			let parsedWhat = '';
+			let parsedWhere = '';
+			
+			if (whyMatch) {
+				parsedWhy = `[${whyMatch[1]}]`;
+			}
+			
+			if (inMatch) {
+				parsedWhere = inMatch[1].trim();
+				// Get the "what" part - everything after [Why] and before " in "
+				let whatPart = pendingSearch;
+				if (whyMatch) {
+					whatPart = whatPart.replace(whyMatch[0], '').trim();
+				}
+				whatPart = whatPart.replace(/\s+in\s+.+$/i, '').trim();
+				parsedWhat = whatPart;
+			} else {
+				// No "in" found, the whole thing minus [Why] is the "what"
+				let whatPart = pendingSearch;
+				if (whyMatch) {
+					whatPart = whatPart.replace(whyMatch[0], '').trim();
+				}
+				parsedWhat = whatPart;
+			}
+			
+			// Set the values
+			if (parsedWhy) setWhyValue(parsedWhy);
+			if (parsedWhat) setWhatValue(parsedWhat);
+			if (parsedWhere) setWhereValue(parsedWhere);
+			
+			// Set the form value and submit after a short delay to allow state to update
+			setTimeout(() => {
+				const formattedWhere = parsedWhere ? `(${parsedWhere})` : '';
+				const combinedSearch = [parsedWhy, parsedWhat, formattedWhere]
+					.filter(Boolean)
+					.join(' ');
+				if (combinedSearch) {
+					form.setValue('searchText', combinedSearch);
+					form.handleSubmit(onSubmit)();
+				}
+			}, 100);
+		}
+	}, [form, onSubmit]);
+
 	// Handle clicks outside to deactivate sections
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
