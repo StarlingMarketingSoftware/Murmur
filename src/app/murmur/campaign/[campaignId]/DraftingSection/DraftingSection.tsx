@@ -7,10 +7,17 @@ import { EmailGeneration } from './EmailGeneration/EmailGeneration';
 import { cn } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import DraftingStatusPanel from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftingStatusPanel';
-// removed unused DraftingMode/HybridBlock imports after moving mode toggles inside
+import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
+import { useGetContacts } from '@/hooks/queryHooks/useContacts';
+import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { EmailStatus } from '@/constants/prismaEnums';
 
-export const DraftingSection: FC<DraftingSectionProps> = (props) => {
-	const { view = 'testing', goToDrafting } = props;
+interface ExtendedDraftingSectionProps extends DraftingSectionProps {
+	onOpenIdentityDialog?: () => void;
+}
+
+export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
+	const { view = 'testing', goToDrafting, onOpenIdentityDialog } = props;
 	const {
 		campaign,
 		contacts,
@@ -39,6 +46,27 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 
 	const isMobile = useIsMobile();
 
+	// Get contact and email counts for the header box
+	const contactListIds = campaign?.userContactLists?.map((l) => l.id) || [];
+	const { data: headerContacts } = useGetContacts({
+		filters: { contactListIds },
+		enabled: contactListIds.length > 0,
+	});
+	const { data: headerEmails } = useGetEmails({
+		filters: { campaignId: campaign?.id },
+	});
+
+	const contactsCount = headerContacts?.length || 0;
+	const draftCount = (headerEmails || []).filter(
+		(e) => e.status === EmailStatus.draft
+	).length;
+	const sentCount = (headerEmails || []).filter(
+		(e) => e.status === EmailStatus.sent
+	).length;
+
+	const toListNames = campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
+	const fromName = campaign?.identity?.name || '';
+
 	return (
 		<div className="mb-30 flex flex-col items-center">
 			<Form {...form}>
@@ -49,6 +77,26 @@ export const DraftingSection: FC<DraftingSectionProps> = (props) => {
 					></div>
 					{view !== 'drafting' && (
 						<div className="relative">
+							{/* Desktop: Campaign header box positioned to the left */}
+							{!isMobile && (
+								<div
+									className="absolute hidden lg:block"
+									style={{
+										right: 'calc(50% + 446px + 24px)',
+										top: '0',
+									}}
+								>
+									<CampaignHeaderBox
+										campaignName={campaign?.name || 'Untitled Campaign'}
+										toListNames={toListNames}
+										fromName={fromName}
+										contactsCount={contactsCount}
+										draftCount={draftCount}
+										sentCount={sentCount}
+										onFromClick={onOpenIdentityDialog}
+									/>
+								</div>
+							)}
 							<HybridPromptInput
 								trackFocusedField={trackFocusedField}
 								testMessage={campaign?.testMessage}

@@ -3,34 +3,13 @@
 import { useCampaignDetail } from './useCampaignDetail';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { IdentityDialog } from '@/components/organisms/_dialogs/IdentityDialog/IdentityDialog';
-import { CampaignName } from '@/components/organisms/CampaignName/CampaignName';
-import { Typography } from '@/components/ui/typography';
 import { DraftingSection } from './DraftingSection/DraftingSection';
 import { useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import Link from 'next/link';
 import { cn } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { useGetContacts } from '@/hooks/queryHooks/useContacts';
-import { useGetEmails } from '@/hooks/queryHooks/useEmails';
-import { EmailStatus } from '@/constants/prismaEnums';
-import { useEffect, useRef, useState } from 'react';
-
-// Fixed metric fills for header boxes
-const getDraftFillColor = (value: number): string => {
-	void value;
-	return '#FFE3AA';
-};
-
-const getSentFillColor = (value: number): string => {
-	void value;
-	return '#B0E0A6';
-};
-
-const getContactsFillColor = (value: number): string => {
-	void value;
-	return '#F5DADA';
-};
+import { useState } from 'react';
 
 const Murmur = () => {
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
@@ -42,76 +21,7 @@ const Murmur = () => {
 	const [identityDialogOrigin, setIdentityDialogOrigin] = useState<'campaign' | 'search'>(
 		silentLoad ? 'search' : 'campaign'
 	);
-	const [isIdentityInfoOpen, setIsIdentityInfoOpen] = useState(false);
 	const [activeView, setActiveView] = useState<'testing' | 'drafting'>('testing');
-
-	// Track orientation to fine-tune mobile landscape spacing
-	const [isLandscape, setIsLandscape] = useState(false);
-
-	// Measure campaign title width on desktop to position the To/From block just to its right
-	const titleRef = useRef<HTMLDivElement | null>(null);
-	const [titleWidth, setTitleWidth] = useState<number>(0);
-	useEffect(() => {
-		if (!titleRef.current) return;
-		const node = titleRef.current;
-		const measure = () => {
-			try {
-				const rect = node.getBoundingClientRect();
-				setTitleWidth(rect?.width || 0);
-			} catch {
-				setTitleWidth(0);
-			}
-		};
-		measure();
-		const ro =
-			typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => measure()) : null;
-		if (ro) ro.observe(node);
-		window.addEventListener('resize', measure);
-		return () => {
-			window.removeEventListener('resize', measure);
-			if (ro) ro.disconnect();
-		};
-	}, [campaign?.id]);
-
-	// Watch for orientation changes so we can reduce header top padding in landscape
-	useEffect(() => {
-		if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-		const mq = window.matchMedia('(orientation: landscape)');
-		const update = () => setIsLandscape(Boolean(mq.matches));
-		update();
-		const handler = (ev: MediaQueryListEvent) => setIsLandscape(ev.matches);
-		// Support older Safari
-		if (typeof mq.addEventListener === 'function') {
-			mq.addEventListener('change', handler);
-		} else if (typeof mq.addListener === 'function') {
-			mq.addListener(handler);
-		}
-		return () => {
-			if (typeof mq.removeEventListener === 'function') {
-				mq.removeEventListener('change', handler);
-			} else if (typeof mq.removeListener === 'function') {
-				mq.removeListener(handler);
-			}
-		};
-	}, []);
-
-	// Header counts
-	const contactListIds = campaign?.userContactLists?.map((l) => l.id) || [];
-	const { data: headerContacts } = useGetContacts({
-		filters: { contactListIds },
-		enabled: contactListIds.length > 0,
-	});
-	const { data: headerEmails } = useGetEmails({
-		filters: { campaignId: campaign?.id },
-	});
-
-	const contactsCount = headerContacts?.length || 0;
-	const draftCount = (headerEmails || []).filter(
-		(e) => e.status === EmailStatus.draft
-	).length;
-	const sentCount = (headerEmails || []).filter(
-		(e) => e.status === EmailStatus.sent
-	).length;
 
 	if (isPendingCampaign || !campaign) {
 		return silentLoad ? null : <Spinner />;
@@ -126,10 +36,13 @@ const Murmur = () => {
 	// ensures a premium, smooth transition with no scale effects.
 	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
 	return (
-		<>
-			{/* Header section with white background */}
-			<div className="bg-white" data-slot="campaign-header">
-				<div className="relative">
+		<div
+			className="min-h-screen"
+			style={{ backgroundColor: isMobile ? '#FFFFFF' : 'rgba(222, 242, 241, 0.43)' }}
+		>
+			{/* Minimal header - just Back to Home link */}
+			<div data-slot="campaign-header">
+				<div className="relative h-[50px]">
 					<Link
 						href={urls.murmur.dashboard.index}
 						prefetch
@@ -145,7 +58,7 @@ const Murmur = () => {
 							}
 						}}
 						style={{
-							top: '41px',
+							top: '50%',
 							transform: 'translateY(-50%)',
 							gap: '20px',
 							fontWeight: 400,
@@ -166,489 +79,11 @@ const Murmur = () => {
 						</svg>
 						<span>Back to Home</span>
 					</Link>
-					{isMobile && !shouldHideContent && null}
-					<div
-						className={cn(
-							'max-w-[1250px] mx-auto lg:w-9/10',
-							isMobile ? (isLandscape ? 'w-full' : 'w-9/10') : 'w-9/10'
-						)}
-					>
-						<div
-							className={cn(
-								'transition-opacity duration-200',
-								shouldHideContent
-									? 'opacity-0 pointer-events-none select-none'
-									: 'opacity-100'
-							)}
-						>
-							<div
-								className="flex flex-col items-center"
-								style={{
-									paddingTop: isMobile ? (isLandscape ? '6px' : '18px') : '12px',
-									paddingBottom: isMobile ? (isLandscape ? '6px' : undefined) : '8px',
-								}}
-							>
-								<div
-									className={cn(
-										isMobile
-											? 'mx-auto flex items-center justify-between mobile-header-row'
-											: 'relative w-full flex items-center justify-center'
-									)}
-									style={
-										isMobile ? { width: isLandscape ? '100%' : '94.67%' } : undefined
-									}
-								>
-									{/* Slight mobile-only vertical nudge to sit closer to the box */}
-									<div
-										className="campaign-title-landscape"
-										ref={titleRef}
-										style={
-											isMobile
-												? {
-														transform: isLandscape
-															? 'translateY(0px) scale(0.6)'
-															: 'translateY(3px)',
-														transformOrigin: isLandscape ? 'left center' : undefined,
-												  }
-												: undefined
-										}
-									>
-										<CampaignName campaign={campaign} />
-									</div>
-
-									{/* Desktop: place To/From to the right side of the title */}
-									{!isMobile && (
-										<div
-											className="absolute top-1/2 -translate-y-1/2 flex flex-col items-start gap-[6px]"
-											style={{ left: '50%', marginLeft: `${titleWidth / 2 + 72}px` }}
-										>
-											<div className="flex items-center">
-												<Link
-													href={urls.murmur.dashboard.index}
-													prefetch
-													onClick={(e) => {
-														e.preventDefault();
-														if (typeof window !== 'undefined') {
-															window.location.assign(urls.murmur.dashboard.index);
-														}
-													}}
-													className="block relative z-[100]"
-												>
-													<div
-														className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]"
-														style={{
-															width: '36.06px',
-															height: '14.21px',
-															borderRadius: '5.55px',
-														}}
-													>
-														<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
-															To
-														</span>
-													</div>
-												</Link>
-												<Typography
-													className="ml-2 text-gray-600 font-inter font-extralight"
-													style={{ fontSize: '11.79px' }}
-												>
-													{campaign?.userContactLists
-														?.map((list) => list.name)
-														.join(', ') || 'No recipients selected'}
-												</Typography>
-											</div>
-
-											<div className="flex items-start">
-												<button
-													type="button"
-													onClick={() => {
-														setIdentityDialogOrigin('campaign');
-														setIsIdentityDialogOpen(true);
-													}}
-													className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969]"
-													style={{
-														width: '36.06px',
-														height: '14.21px',
-														borderRadius: '5.55px',
-													}}
-												>
-													<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
-														From
-													</span>
-												</button>
-												<div className="ml-2 flex flex-col items-start">
-													<button
-														type="button"
-														className="text-gray-600 font-inter font-extralight hover:underline cursor-pointer text-left"
-														style={{ fontSize: '11.79px' }}
-														onClick={() => setIsIdentityInfoOpen((open) => !open)}
-														aria-expanded={isIdentityInfoOpen}
-													>
-														{campaign?.identity?.name}
-													</button>
-													{isIdentityInfoOpen && (
-														<div className="mt-1 text-left">
-															{campaign?.identity?.email && (
-																<div
-																	className="text-gray-600 font-inter font-extralight"
-																	style={{ fontSize: '11.79px' }}
-																>
-																	{campaign.identity.email}
-																</div>
-															)}
-															{campaign?.identity?.website && (
-																<a
-																	href={
-																		(campaign.identity.website || '').startsWith('http')
-																			? campaign.identity.website
-																			: `https://${campaign.identity.website}`
-																	}
-																	target="_blank"
-																	rel="noopener noreferrer"
-																	className="text-gray-600 font-inter font-extralight hover:underline break-all"
-																	style={{ fontSize: '11.79px' }}
-																>
-																	{campaign.identity.website}
-																</a>
-															)}
-														</div>
-													)}
-												</div>
-											</div>
-										</div>
-									)}
-
-									{/* Mobile landscape metrics centered overlay */}
-									{isMobile && (
-										<div className="mobile-landscape-metrics-center" aria-hidden="true">
-											<div
-												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-												style={{
-													backgroundColor: getContactsFillColor(contactsCount),
-													borderWidth: '1.3px',
-													width: '84px',
-													height: '20px',
-													fontSize: '11.7px',
-												}}
-											>
-												{`${String(contactsCount).padStart(2, '0')} contacts`}
-											</div>
-											<div
-												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-												style={{
-													backgroundColor: getDraftFillColor(draftCount),
-													borderWidth: '1.3px',
-													width: '84px',
-													height: '20px',
-													fontSize: '11.7px',
-													opacity: draftCount === 0 ? 0.5 : 1,
-												}}
-											>
-												{draftCount === 0
-													? 'drafts'
-													: `${String(draftCount).padStart(2, '0')} drafts`}
-											</div>
-											<div
-												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-												style={{
-													backgroundColor: getSentFillColor(sentCount),
-													borderWidth: '1.3px',
-													width: '84px',
-													height: '20px',
-													fontSize: '11.7px',
-													opacity: sentCount === 0 ? 0.5 : 1,
-												}}
-											>
-												{sentCount === 0
-													? 'sent'
-													: `${String(sentCount).padStart(2, '0')} sent`}
-											</div>
-										</div>
-									)}
-
-									{/* Mobile landscape inline controls: hidden by default; shown via CSS in landscape */}
-									{isMobile && (
-										<div className="mobile-landscape-inline-controls">
-											{/* To */}
-											<Link
-												href={urls.murmur.dashboard.index}
-												prefetch
-												onClick={(e) => {
-													e.preventDefault();
-													if (typeof window !== 'undefined') {
-														window.location.assign(urls.murmur.dashboard.index);
-													}
-												}}
-												className="block"
-											>
-												<div
-													className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969] pill-mini"
-													style={{
-														width: '36.06px',
-														height: '14.21px',
-														borderRadius: '5.55px',
-													}}
-												>
-													<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
-														To
-													</span>
-												</div>
-											</Link>
-
-											{/* From */}
-											<button
-												type="button"
-												onClick={() => {
-													setIdentityDialogOrigin('campaign');
-													setIsIdentityDialogOpen(true);
-												}}
-												className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969] pill-mini"
-												style={{
-													width: '36.06px',
-													height: '14.21px',
-													borderRadius: '5.55px',
-												}}
-											>
-												<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
-													From
-												</span>
-											</button>
-
-											{/* Inline view tabs */}
-											<div className="flex items-center gap-3 ml-2">
-												<button
-													type="button"
-													className={cn(
-														'font-inter text-[16px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-														activeView === 'testing'
-															? 'text-black font-semibold'
-															: 'text-[#6B6B6B] hover:text-black'
-													)}
-													onClick={() => setActiveView('testing')}
-												>
-													Testing
-												</button>
-												<button
-													type="button"
-													className={cn(
-														'font-inter text-[16px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-														activeView === 'drafting'
-															? 'text-black font-semibold'
-															: 'text-[#6B6B6B] hover:text-black'
-													)}
-													onClick={() => setActiveView('drafting')}
-												>
-													Drafting
-												</button>
-												{/* Home button moved into right controls (landscape) */}
-												<button
-													onClick={() => {
-														if (typeof window !== 'undefined') {
-															window.location.assign(urls.murmur.dashboard.index);
-														}
-													}}
-													title="Home"
-													aria-label="Back to Home"
-													className="inline-flex items-center justify-center rounded-[6px] bg-[#EEEEEE] text-black shadow-[0_2px_10px_rgba(0,0,0,0.15)] active:scale-95 transition-all duration-200 ml-2"
-													style={{
-														width: '23px',
-														height: '17px',
-														WebkitTapHighlightColor: 'transparent',
-													}}
-												>
-													<svg
-														width="11"
-														height="11"
-														viewBox="0 0 11 11"
-														fill="none"
-														xmlns="http://www.w3.org/2000/svg"
-													>
-														<path
-															d="M8.0564 5.64955V8.90431H2.80971V5.64955H8.0564ZM9.20009 4.50586H1.66602V10.048H9.20009V4.50586Z"
-															fill="black"
-														/>
-														<path
-															d="M5.43871 1.74879L8.05729 4.40787H2.84396L5.4411 1.74879M5.43395 0.114258L0.127686 5.55157H10.7879L5.43633 0.114258H5.43395Z"
-															fill="black"
-														/>
-													</svg>
-												</button>
-											</div>
-										</div>
-									)}
-									{isMobile && !shouldHideContent && null}
-								</div>
-
-								{/* Mobile Layout - Single Container with all elements (portrait only) */}
-								{isMobile ? (
-									<div
-										data-slot="mobile-header-controls"
-										className="flex items-center justify-between px-1 border border-[#000000] bg-white"
-										style={{
-											marginTop: '14px',
-											height: '29px',
-											width: '94.67%', // This will be 355px on 375px viewport
-											maxWidth: '100%',
-											borderWidth: '1.3px',
-											gap: '3px',
-										}}
-									>
-										{/* Contacts box - keeping exact styling */}
-										<div
-											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-											style={{
-												backgroundColor: getContactsFillColor(contactsCount),
-												borderWidth: '1.3px',
-												width: '84px',
-												height: '20px',
-												fontSize: '11.7px',
-											}}
-										>
-											{`${String(contactsCount).padStart(2, '0')} contacts`}
-										</div>
-
-										{/* Drafts box - keeping exact styling */}
-										<div
-											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-											style={{
-												backgroundColor: getDraftFillColor(draftCount),
-												borderWidth: '1.3px',
-												width: '84px',
-												height: '20px',
-												fontSize: '11.7px',
-												opacity: draftCount === 0 ? 0.5 : 1,
-											}}
-										>
-											{draftCount === 0
-												? 'drafts'
-												: `${String(draftCount).padStart(2, '0')} drafts`}
-										</div>
-
-										{/* Sent box - keeping exact styling */}
-										<div
-											className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-											style={{
-												backgroundColor: getSentFillColor(sentCount),
-												borderWidth: '1.3px',
-												width: '84px',
-												height: '20px',
-												fontSize: '11.7px',
-												opacity: sentCount === 0 ? 0.5 : 1,
-											}}
-										>
-											{sentCount === 0
-												? 'sent'
-												: `${String(sentCount).padStart(2, '0')} sent`}
-										</div>
-
-										{/* To button - keeping exact gray styling */}
-										<Link
-											href={urls.murmur.dashboard.index}
-											prefetch
-											onClick={(e) => {
-												e.preventDefault();
-												if (typeof window !== 'undefined') {
-													window.location.assign(urls.murmur.dashboard.index);
-												}
-											}}
-											className="block"
-										>
-											<div
-												className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969]"
-												style={{
-													width: '36.06px',
-													height: '14.21px',
-													borderRadius: '5.55px',
-												}}
-											>
-												<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
-													To
-												</span>
-											</div>
-										</Link>
-
-										{/* From button - keeping exact gray styling */}
-										<button
-											type="button"
-											onClick={() => {
-												setIdentityDialogOrigin('campaign');
-												setIsIdentityDialogOpen(true);
-											}}
-											className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969]"
-											style={{
-												width: '36.06px',
-												height: '14.21px',
-												borderRadius: '5.55px',
-											}}
-										>
-											<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
-												From
-											</span>
-										</button>
-									</div>
-								) : (
-									/* Desktop Layout - metrics below title only */
-									<div
-										className="flex flex-col items-center"
-										style={{ marginTop: '11px' }}
-									>
-										<div className="flex items-center gap-5" style={{ marginTop: '0px' }}>
-											<div
-												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-												style={{
-													backgroundColor: getContactsFillColor(contactsCount),
-													borderWidth: '1.3px',
-													minWidth: '80.38px',
-													height: '19px',
-													fontSize: '11.7px',
-												}}
-											>
-												{`${String(contactsCount).padStart(2, '0')} contacts`}
-											</div>
-											<div
-												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-												style={{
-													backgroundColor: getDraftFillColor(draftCount),
-													borderWidth: '1.3px',
-													minWidth: '80.38px',
-													height: '19px',
-													fontSize: '11.7px',
-													opacity: draftCount === 0 ? 0.5 : 1,
-												}}
-											>
-												{draftCount === 0
-													? 'drafts'
-													: `${String(draftCount).padStart(2, '0')} drafts`}
-											</div>
-											<div
-												className="metric-box inline-flex items-center justify-center rounded-[8px] border border-[#000000] px-2.5 leading-none truncate font-inter font-semibold"
-												style={{
-													backgroundColor: getSentFillColor(sentCount),
-													borderWidth: '1.3px',
-													minWidth: '80.38px',
-													height: '19px',
-													fontSize: '11.7px',
-													opacity: sentCount === 0 ? 0.5 : 1,
-												}}
-											>
-												{sentCount === 0
-													? 'sent'
-													: `${String(sentCount).padStart(2, '0')} sent`}
-											</div>
-										</div>
-									</div>
-								)}
-							</div>
-						</div>
-					</div>
 				</div>
 			</div>
 
-			{/* Container with background that starts after the divider */}
-			<div
-				data-slot="campaign-content"
-				className="relative min-h-screen mt-2 md:mt-0 border-t-0 md:border-t-2 border-black"
-				style={{ backgroundColor: isMobile ? '#FFFFFF' : 'rgba(222, 242, 241, 0.43)' }}
-			>
+			{/* Main content container */}
+			<div data-slot="campaign-content" className="relative">
 				{shouldHideContent && (
 					<div
 						className={cn(
@@ -718,6 +153,10 @@ const Murmur = () => {
 							campaign={campaign}
 							view={activeView}
 							goToDrafting={() => setActiveView('drafting')}
+							onOpenIdentityDialog={() => {
+								setIdentityDialogOrigin('campaign');
+								setIsIdentityDialogOpen(true);
+							}}
 						/>
 					</div>
 					{/* using this to hide the default boxes in the drafting tab so we can add in a UI specific to mobile
@@ -1123,7 +562,7 @@ const Murmur = () => {
 					`}</style>
 				</div>
 			</div>
-		</>
+		</div>
 	);
 };
 
