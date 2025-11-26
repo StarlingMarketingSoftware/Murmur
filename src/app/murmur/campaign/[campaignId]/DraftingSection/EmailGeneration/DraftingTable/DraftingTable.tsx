@@ -51,7 +51,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				}}
 				className="text-[12px] font-inter font-medium text-black"
 			>
-				{isContacts ? '' : isDrafts ? '3' : isSent ? '4' : ''}
+				{isContacts ? '' : isDrafts ? '' : isSent ? '' : ''}
 			</div>
 			{/* Top-left text label */}
 			<div
@@ -59,7 +59,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				style={{ position: 'absolute', top: '-20px', left: '2px', pointerEvents: 'none' }}
 				className="text-[12px] font-inter font-medium text-black"
 			>
-				{isContacts ? '' : isDrafts ? 'Drafts' : isSent ? 'Sent' : title}
+				{isContacts ? '' : isDrafts ? '' : isSent ? '' : title}
 			</div>
 			{/* Container box with header */}
 			<div
@@ -181,7 +181,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							{Array.from({ length: 6 }).map((_, idx) => (
 								<div
 									key={idx}
-									className="select-none w-[489px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
+									className={`select-none w-[489px] ${
+										isDrafts || isSent ? 'h-[97px]' : 'h-[64px]'
+									} overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2`}
 								/>
 							))}
 						</div>
