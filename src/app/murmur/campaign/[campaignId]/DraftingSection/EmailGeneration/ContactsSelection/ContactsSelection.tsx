@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useMemo, useState } from 'react';
+import { FC, useMemo, useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ContactsSelectionProps, useContactsSelection } from './useContactsSelection';
 import { cn } from '@/utils';
@@ -85,8 +85,24 @@ const MiniSearchBar: FC<{
 	debouncedWhereValue,
 	onSearch,
 }) => {
+	const containerRef = useRef<HTMLDivElement>(null);
+
+	// Handle clicks outside to deselect active section
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+				setActiveSection(null);
+			}
+		};
+
+		if (activeSection) {
+			document.addEventListener('mousedown', handleClickOutside);
+			return () => document.removeEventListener('mousedown', handleClickOutside);
+		}
+	}, [activeSection, setActiveSection]);
+
 	return (
-		<div className="relative">
+		<div className="relative" ref={containerRef}>
 			<div
 				className="w-[489px] h-[49px] bg-white rounded-[8px] border-2 border-black flex items-center relative"
 				style={{ marginBottom: '4px' }}
@@ -184,7 +200,7 @@ const MiniSearchBar: FC<{
 						height: '38px',
 						backgroundColor: '#B8E4BE',
 						border: '1px solid #5DAB68',
-						borderRadius: '6px',
+						borderRadius: '0 6px 6px 0',
 					}}
 					aria-label="Search"
 					onClick={onSearch}
