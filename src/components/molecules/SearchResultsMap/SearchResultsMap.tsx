@@ -5,8 +5,8 @@ import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-m
 import { ContactWithName } from '@/types/contact';
 import { useGeocodeContacts } from '@/hooks/queryHooks/useContacts';
 import {
-	mapTooltipIconUrl,
-	MAP_TOOLTIP_WIDTH,
+	generateMapTooltipIconUrl,
+	calculateTooltipWidth,
 	MAP_TOOLTIP_HEIGHT,
 	MAP_TOOLTIP_ANCHOR_X,
 	MAP_TOOLTIP_ANCHOR_Y,
@@ -274,15 +274,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [isLoaded]);
 
-	// Hover tooltip icon - anchored at the pointer tip (bottom left area)
-	const hoverMarkerIcon = useMemo(() => {
-		if (!isLoaded) return undefined;
-		return {
-			url: mapTooltipIconUrl,
-			scaledSize: new google.maps.Size(MAP_TOOLTIP_WIDTH, MAP_TOOLTIP_HEIGHT),
-			anchor: new google.maps.Point(MAP_TOOLTIP_ANCHOR_X, MAP_TOOLTIP_ANCHOR_Y),
-		};
-	}, [isLoaded]);
+	// Generate hover tooltip icon with contact name and company
+	const getHoverMarkerIcon = useCallback(
+		(contact: ContactWithName) => {
+			if (!isLoaded) return undefined;
+
+			// Get name - use firstName/lastName, fall back to name field
+			const name =
+				`${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
+				contact.name ||
+				'';
+			const company = contact.company || '';
+			const width = calculateTooltipWidth(name, company);
+
+			return {
+				url: generateMapTooltipIconUrl(name, company),
+				scaledSize: new google.maps.Size(width, MAP_TOOLTIP_HEIGHT),
+				anchor: new google.maps.Point(MAP_TOOLTIP_ANCHOR_X, MAP_TOOLTIP_ANCHOR_Y),
+			};
+		},
+		[isLoaded]
+	);
 
 	// Compute initial center based on contacts (if available)
 	// Must be before early returns to satisfy React hooks rules
@@ -371,7 +383,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							<MarkerF
 								position={coords}
 								onClick={() => handleMarkerClick(contact)}
-								icon={hoverMarkerIcon}
+								icon={getHoverMarkerIcon(contact)}
 								clickable={false}
 								zIndex={2}
 							/>

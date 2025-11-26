@@ -1,20 +1,73 @@
-// Map marker hover tooltip SVG - used as data URL for Google Maps markers
-export const mapTooltipSvg = `<svg width="194" height="56" viewBox="0 0 194 56" fill="none" xmlns="http://www.w3.org/2000/svg">
-<mask id="path-1-inside-1_244_5830" fill="white">
-<path d="M186 0C190.418 2.57703e-07 194 3.58172 194 8V38C194 42.4183 190.418 46 186 46H35.4326L23.5 56L11.5674 46H8C3.58172 46 8.05347e-08 42.4183 0 38V8C4.50994e-07 3.58172 3.58172 0 8 0H186Z"/>
-</mask>
-<path d="M186 0C190.418 2.57703e-07 194 3.58172 194 8V38C194 42.4183 190.418 46 186 46H35.4326L23.5 56L11.5674 46H8C3.58172 46 8.05347e-08 42.4183 0 38V8C4.50994e-07 3.58172 3.58172 0 8 0H186Z" fill="#0E8530"/>
-<path d="M186 0V-2V0ZM194 8H196H194ZM194 38H196H194ZM35.4326 46V44H34.7054L34.148 44.4671L35.4326 46ZM23.5 56L22.2154 57.5329L23.5 58.6095L24.7846 57.5329L23.5 56ZM11.5674 46L12.852 44.4671L12.2946 44H11.5674V46ZM8 46V48V46ZM0 38H-2H0ZM0 8H-2H0ZM186 0V2C189.314 2 192 4.68629 192 8H194H196C196 2.47715 191.523 -2 186 -2V0ZM194 8H192V38H194H196V8H194ZM194 38H192C192 41.3137 189.314 44 186 44V46V48C191.523 48 196 43.5228 196 38H194ZM186 46V44H35.4326V46V48H186V46ZM35.4326 46L34.148 44.4671L22.2154 54.4671L23.5 56L24.7846 57.5329L36.7172 47.5329L35.4326 46ZM23.5 56L24.7846 54.4671L12.852 44.4671L11.5674 46L10.2828 47.5329L22.2154 57.5329L23.5 56ZM11.5674 46V44H8V46V48H11.5674V46ZM8 46V44C4.68629 44 2 41.3137 2 38H0H-2C-2 43.5228 2.47715 48 8 48V46ZM0 38H2V8H0H-2V38H0ZM0 8H2C2 4.68629 4.68629 2 8 2V0V-2C2.47715 -2 -2 2.47715 -2 8H0ZM8 0V2H186V0V-2H8V0Z" fill="black" mask="url(#path-1-inside-1_244_5830)"/>
+// Generates a map marker hover tooltip SVG with contact name and company
+export const generateMapTooltipSvg = (name: string, company: string): string => {
+	// Escape special characters for SVG/XML
+	const escapeSvgText = (text: string) =>
+		text
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&apos;');
+
+	const hasName = name && name.trim().length > 0;
+	const hasCompany = company && company.trim().length > 0;
+
+	// If no name, show company as the primary bold text
+	const primaryText = escapeSvgText(hasName ? name : hasCompany ? company : 'Unknown');
+	// Only show secondary text if we have both name and company
+	const secondaryText = hasName && hasCompany ? escapeSvgText(company) : '';
+
+	// Calculate width based on text length (approximate)
+	const primaryWidth = primaryText.length * 10 + 40;
+	const secondaryWidth = secondaryText ? secondaryText.length * 7.5 + 40 : 0;
+	const innerWidth = Math.max(160, Math.min(350, Math.max(primaryWidth, secondaryWidth)));
+
+	// Add padding for stroke (2px stroke = 1px on each side)
+	const strokePadding = 2;
+	const svgWidth = innerWidth + strokePadding * 2;
+	const svgHeight = 56 + strokePadding;
+
+	// If only one line of text, center it vertically
+	const primaryY = secondaryText ? 18 : 27;
+
+	// Offset all coordinates by strokePadding to center the shape
+	const offsetX = strokePadding;
+	const offsetY = strokePadding;
+
+	return `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M${innerWidth - 8 + offsetX} ${offsetY}C${innerWidth - 3.582 + offsetX} ${offsetY} ${innerWidth + offsetX} ${3.58172 + offsetY} ${innerWidth + offsetX} ${8 + offsetY}V${38 + offsetY}C${innerWidth + offsetX} ${42.4183 + offsetY} ${innerWidth - 3.582 + offsetX} ${46 + offsetY} ${innerWidth - 8 + offsetX} ${46 + offsetY}H${35.4326 + offsetX}L${23.5 + offsetX} ${56 + offsetY}L${11.5674 + offsetX} ${46 + offsetY}H${8 + offsetX}C${3.58172 + offsetX} ${46 + offsetY} ${offsetX} ${42.4183 + offsetY} ${offsetX} ${38 + offsetY}V${8 + offsetY}C${offsetX} ${3.58172 + offsetY} ${3.58172 + offsetX} ${offsetY} ${8 + offsetX} ${offsetY}H${innerWidth - 8 + offsetX}Z" fill="#0E8530" stroke="black" stroke-width="2"/>
+<text x="${18 + offsetX}" y="${primaryY + offsetY}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">${primaryText}</text>
+${secondaryText ? `<text x="${18 + offsetX}" y="${36 + offsetY}" font-family="Arial, sans-serif" font-size="13" fill="white">${secondaryText}</text>` : ''}
 </svg>`;
+};
 
-// Data URL for use in Google Maps markers
-export const mapTooltipIconUrl = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(mapTooltipSvg)}`;
+// Generate data URL for use in Google Maps markers
+export const generateMapTooltipIconUrl = (name: string, company: string): string => {
+	return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(generateMapTooltipSvg(name, company))}`;
+};
 
-// Dimensions for scaling
-export const MAP_TOOLTIP_WIDTH = 194;
-export const MAP_TOOLTIP_HEIGHT = 56;
+// Stroke padding added to SVG dimensions
+const STROKE_PADDING = 2;
 
-// Anchor point (pointer tip position)
-export const MAP_TOOLTIP_ANCHOR_X = 23.5;
-export const MAP_TOOLTIP_ANCHOR_Y = 56;
+// Calculate width based on text (for Google Maps sizing)
+export const calculateTooltipWidth = (name: string, company: string): number => {
+	const hasName = name && name.trim().length > 0;
+	const hasCompany = company && company.trim().length > 0;
+
+	const primaryText = hasName ? name : hasCompany ? company : 'Unknown';
+	const secondaryText = hasName && hasCompany ? company : '';
+
+	const primaryWidth = primaryText.length * 10 + 40;
+	const secondaryWidth = secondaryText ? secondaryText.length * 7.5 + 40 : 0;
+	const innerWidth = Math.max(160, Math.min(350, Math.max(primaryWidth, secondaryWidth)));
+	// Add padding for stroke on both sides
+	return innerWidth + STROKE_PADDING * 2;
+};
+
+// Fixed height (includes stroke padding)
+export const MAP_TOOLTIP_HEIGHT = 56 + STROKE_PADDING;
+
+// Anchor point (pointer tip position, adjusted for stroke padding)
+export const MAP_TOOLTIP_ANCHOR_X = 23.5 + STROKE_PADDING;
+export const MAP_TOOLTIP_ANCHOR_Y = 56 + STROKE_PADDING;
 
