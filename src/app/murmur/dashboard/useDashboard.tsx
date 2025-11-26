@@ -230,12 +230,23 @@ export const useDashboard = () => {
 	};
 
 	const handleSelectAll = () => {
-		if (!contacts || !tableInstance) return;
+		if (!contacts || contacts.length === 0) return;
 
+		// In table view, use the table instance so checkbox UI stays in sync
+		if (!isMapView && tableInstance) {
+			if (isAllSelected) {
+				tableInstance.toggleAllRowsSelected(false);
+			} else {
+				tableInstance.toggleAllRowsSelected(true);
+			}
+			return;
+		}
+
+		// In map view (or when no table instance), toggle via selectedContacts state
 		if (isAllSelected) {
-			tableInstance.toggleAllRowsSelected(false);
+			setSelectedContacts([]);
 		} else {
-			tableInstance.toggleAllRowsSelected(true);
+			setSelectedContacts(contacts.map((contact) => contact.id));
 		}
 	};
 

@@ -1554,6 +1554,19 @@ const Dashboard = () => {
 																		overflow: 'hidden',
 																	}}
 																>
+																	{/* Header area for right-hand panel (same color as panel) */}
+																	<div className="w-full h-[49px] flex-shrink-0 bg-[#AFD6EF] flex items-center justify-center px-4 relative">
+																		<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
+																			{selectedContacts.length} selected
+																		</span>
+																		<button
+																			type="button"
+																			onClick={handleSelectAll}
+																			className="font-secondary text-[12px] font-medium text-black hover:underline absolute right-[10px] top-1/2 translate-y-[4px]"
+																		>
+																			{isAllSelected ? 'Deselect All' : 'Select all'}
+																		</button>
+																	</div>
 																	{/* Scrollable contact list */}
 																	<CustomScrollbar
 																		className="flex-1 h-full"
@@ -1583,9 +1596,12 @@ const Dashboard = () => {
 																			return (
 																				<div
 																					key={contact.id}
-																					className={`cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none ${
-																						isSelected ? 'bg-[#EAAEAE]' : 'bg-white'
-																					}`}
+																					className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none"
+																					style={{
+																						backgroundColor: isSelected
+																							? '#C9EAFF'
+																							: '#FFFFFF',
+																					}}
 																					onClick={() => {
 																						if (isSelected) {
 																							setSelectedContacts(
