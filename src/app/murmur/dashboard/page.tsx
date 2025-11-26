@@ -1551,10 +1551,19 @@ const Dashboard = () => {
 																		maxHeight: 'calc(100% - 20px)',
 																		backgroundColor: '#AFD6EF',
 																		border: '3px solid #143883',
+																		overflow: 'hidden',
 																	}}
 																>
 																	{/* Scrollable contact list */}
-																	<div className="flex-1 overflow-y-auto p-[6px] space-y-[6px]">
+																	<CustomScrollbar
+																		className="flex-1 h-full"
+																		contentClassName="p-[6px] space-y-[7px]"
+																		thumbWidth={2}
+																		thumbColor="#000000"
+																		trackColor="transparent"
+																		offsetRight={-6}
+																		disableOverflowClass
+																	>
 																		{(contacts || []).map((contact) => {
 																			const isSelected = selectedContacts.includes(
 																				contact.id
@@ -1574,7 +1583,7 @@ const Dashboard = () => {
 																			return (
 																				<div
 																					key={contact.id}
-																					className={`cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[378px] h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none ${
+																					className={`cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none ${
 																						isSelected ? 'bg-[#EAAEAE]' : 'bg-white'
 																					}`}
 																					onClick={() => {
@@ -1726,7 +1735,7 @@ const Dashboard = () => {
 																				</div>
 																			);
 																		})}
-																	</div>
+																	</CustomScrollbar>
 																</div>
 																{/* Create Campaign button overlaid on map - only show when not loading */}
 																{!isMobile &&
