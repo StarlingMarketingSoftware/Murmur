@@ -137,7 +137,7 @@ const SortableAIBlock = ({
 					'flex justify-end',
 					showTestPreview
 						? 'w-[426px] max-[480px]:w-[89.8vw]'
-						: 'w-[93.7vw] max-w-[868px]'
+						: 'w-[93.7vw] max-w-[475px]'
 				)}
 			>
 				<Button
@@ -183,22 +183,22 @@ const SortableAIBlock = ({
 				isTextBlock
 					? showTestPreview
 						? 'w-[426px] max-[480px]:w-[89.33vw] min-h-[44px]'
-						: 'w-[89.33vw] max-w-[868px] min-h-[80px]'
+						: 'w-[89.33vw] max-w-[475px] min-h-[80px]'
 					: isCompactBlock
 					? showTestPreview
 						? `w-[426px] max-[480px]:w-[89.33vw] ${
 								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
 						  }`
-						: `w-[89.33vw] max-w-[868px] ${
+						: `w-[89.33vw] max-w-[475px] ${
 								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
 						  }`
 					: isFullAutomatedBlock
 					? showTestPreview
 						? 'w-[426px] max-[480px]:w-[89.33vw]'
-						: 'w-[89.33vw] max-w-[868px]'
+						: 'w-[89.33vw] max-w-[475px]'
 					: showTestPreview
 					? 'w-[426px] max-[480px]:w-[89.33vw]'
-					: 'w-[89.33vw] max-w-[868px]',
+					: 'w-[89.33vw] max-w-[475px]',
 				!isIntroductionBlock &&
 					!isResearchBlock &&
 					!isActionBlock &&
@@ -1203,13 +1203,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							className={`${
 								compactLeftOnly
 									? ''
-									: 'w-[96.27vw] max-w-[892px] min-h-[686px] transition mb-4 flex mx-auto '
+									: 'w-[96.27vw] max-w-[499px] min-h-[703px] transition mb-4 flex mx-auto '
 							}	${
 								showTestPreview
 									? 'flex-row gap-[40px] justify-center items-start'
 									: compactLeftOnly
 									? 'flex-col'
-									: 'flex-col border-[3px] border-black rounded-md bg-white min-h-[686px]'
+									: 'flex-col border-[3px] border-black rounded-md bg-white min-h-[703px]'
 							}	relative overflow-visible`}
 							data-hpi-container
 						>
@@ -1277,7 +1277,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												'h-[36px] flex items-center relative z-20',
 												showTestPreview
 													? 'w-[426px] max-[480px]:w-[89.8vw] mx-auto pl-[8px] max-[480px]:pl-[6px]'
-													: 'w-[93.7vw] max-w-[868px] mx-auto pl-[8px] max-[480px]:pl-[6px]'
+													: 'w-[93.7vw] max-w-[475px] mx-auto pl-[8px] max-[480px]:pl-[6px]'
 											)}
 											data-left-drag-handle
 											data-root-drag-handle
@@ -1384,7 +1384,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														className={cn(
 															showTestPreview
 																? 'w-[426px] max-[480px]:w-[89.33vw]'
-																: 'w-[89.33vw] max-w-[868px]',
+																: 'w-[89.33vw] max-w-[475px]',
 															// On mobile portrait, remove default mb-6 to tighten spacing under subject
 															'max-[480px]:mb-0'
 														)}
@@ -1611,7 +1611,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	'flex justify-end',
 																	showTestPreview
 																		? 'w-[426px] max-[480px]:w-[89.8vw]'
-																		: 'w-[93.7vw] max-w-[868px]'
+																		: 'w-[93.7vw] max-w-[475px]'
 																)}
 															>
 																<Button
@@ -1678,7 +1678,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			'flex relative z-30',
 																			showTestPreview
 																				? 'justify-start w-full'
-																				: 'justify-end -mr-[102px] w-[93.7vw] max-w-[868px] max-[480px]:-mr-[2vw]'
+																				: 'justify-end -mr-[102px] w-[93.7vw] max-w-[475px] max-[480px]:-mr-[2vw]'
 																		)}
 																		style={{ transform: 'translateY(-12px)' }}
 																	>
@@ -1722,7 +1722,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																`min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2`,
 																showTestPreview
 																	? 'w-[426px] max-[480px]:w-[89.33vw]'
-																	: 'w-[89.33vw] max-w-[868px]'
+																	: 'w-[89.33vw] max-w-[475px]'
 															)}
 														>
 															<FormLabel className="text-base font-semibold font-secondary">
@@ -1771,7 +1771,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														`min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2`,
 														showTestPreview
 															? 'w-[426px] max-[480px]:w-[89.33vw]'
-															: 'w-[89.33vw] max-w-[868px]'
+															: 'w-[89.33vw] max-w-[475px]'
 													)}
 													data-hpi-signature-card
 												>
@@ -1822,7 +1822,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
 															showTestPreview
 																? 'w-[426px] max-[480px]:w-[89.8vw]'
-																: 'w-[93.7vw] max-w-[868px]',
+																: 'w-[93.7vw] max-w-[475px]',
 															isGenerationDisabled?.()
 																? 'opacity-50 cursor-not-allowed'
 																: 'opacity-100'
@@ -1840,7 +1840,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															'text-sm font-medium -mt-2 mb-2',
 															showTestPreview
 																? 'w-[426px] max-[480px]:w-[89.8vw]'
-																: 'w-[93.7vw] max-w-[868px]'
+																: 'w-[93.7vw] max-w-[475px]'
 														)}
 													>
 														Fill in all text blocks in order to compose an email.

@@ -121,7 +121,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<div
 									className="absolute hidden lg:block"
 									style={{
-										right: 'calc(50% + 446px + 24px)',
+										right: 'calc(50% + 250px + 24px)',
 										top: '0',
 									}}
 								>
@@ -151,7 +151,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							<div
 								className="absolute hidden lg:block"
 								style={{
-									left: 'calc(50% + 446px + 50px)',
+									left: 'calc(50% + 250px + 50px)',
 									top: '0',
 								}}
 							>
