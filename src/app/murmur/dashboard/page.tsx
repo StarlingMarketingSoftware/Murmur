@@ -1835,7 +1835,7 @@ const Dashboard = () => {
 																					width: '310px',
 																					height: containerHeight,
 																					maxHeight: 'calc(100% - 20px)',
-																					backgroundColor: '#D8E5FB',
+																					backgroundColor: 'rgba(216, 229, 251, 0.8)',
 																					border: '2px solid #143883',
 																					overflow: 'hidden',
 																				}}
@@ -1845,7 +1845,7 @@ const Dashboard = () => {
 																					className="absolute top-0 left-0 w-full flex items-center px-[12px]"
 																					style={{
 																						height: '22px',
-																						backgroundColor: '#E8EFFF',
+																						backgroundColor: 'transparent',
 																					}}
 																				>
 																					<span className="font-secondary font-bold text-[12px] leading-none text-black">
