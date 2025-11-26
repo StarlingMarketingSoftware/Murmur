@@ -87,6 +87,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									}}
 								>
 									<CampaignHeaderBox
+										campaignId={campaign?.id}
 										campaignName={campaign?.name || 'Untitled Campaign'}
 										toListNames={toListNames}
 										fromName={fromName}

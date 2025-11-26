@@ -1,11 +1,13 @@
 'use client';
 
-import { FC } from 'react';
+import { FC, useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
 import { cn } from '@/utils';
+import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 
 interface CampaignHeaderBoxProps {
+	campaignId: number;
 	campaignName: string;
 	toListNames: string;
 	fromName: string;
@@ -20,6 +22,7 @@ const getDraftFillColor = (): string => '#FFE3AA';
 const getSentFillColor = (): string => '#B0E0A6';
 
 export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
+	campaignId,
 	campaignName,
 	toListNames,
 	fromName,
@@ -28,9 +31,55 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	sentCount,
 	onFromClick,
 }) => {
+	const [isEditing, setIsEditing] = useState(false);
+	const [editedName, setEditedName] = useState(campaignName);
+	const inputRef = useRef<HTMLInputElement>(null);
+
+	const { mutate: editCampaign } = useEditCampaign({
+		suppressToasts: true,
+		onSuccess: () => {
+			setIsEditing(false);
+		},
+	});
+
+	// Focus input when entering edit mode
+	useEffect(() => {
+		if (isEditing && inputRef.current) {
+			inputRef.current.focus();
+			inputRef.current.select();
+		}
+	}, [isEditing]);
+
+	// Sync editedName when campaignName prop changes
+	useEffect(() => {
+		setEditedName(campaignName);
+	}, [campaignName]);
+
+	const handleSave = () => {
+		if (editedName.trim() && editedName !== campaignName) {
+			editCampaign({
+				id: campaignId,
+				data: { name: editedName.trim() },
+			});
+		} else {
+			setEditedName(campaignName);
+			setIsEditing(false);
+		}
+	};
+
+	const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			handleSave();
+		} else if (e.key === 'Escape') {
+			setEditedName(campaignName);
+			setIsEditing(false);
+		}
+	};
+
 	return (
 		<div
-			className="bg-white border-[2px] border-black rounded-[8px] flex flex-col justify-between px-3 py-2 box-border"
+			className="bg-white border-[2px] border-black rounded-[8px] flex flex-col px-3 pt-0 pb-1 box-border"
 			style={{
 				width: '374px',
 				height: '71px',
@@ -41,13 +90,37 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 			}}
 		>
 			{/* Campaign Title */}
-			<div className="font-inter font-semibold text-[18px] leading-tight truncate text-black italic">
-				{campaignName}
+			<div className="h-[26px] overflow-hidden flex-shrink-0">
+				{isEditing ? (
+					<input
+						ref={inputRef}
+						type="text"
+						value={editedName}
+						onChange={(e) => setEditedName(e.target.value)}
+						onBlur={handleSave}
+						onKeyDown={handleKeyDown}
+						className="font-normal text-[26px] leading-none text-black bg-transparent border-none outline-none p-0 m-0 w-full h-[26px]"
+						style={{ fontFamily: 'Times New Roman, Times, serif' }}
+					/>
+				) : (
+					<div
+						className="font-normal text-[26px] leading-none truncate text-black cursor-text h-[26px]"
+						style={{ fontFamily: 'Times New Roman, Times, serif' }}
+						onClick={() => setIsEditing(true)}
+						title="Click to edit"
+					>
+						{campaignName}
+					</div>
+				)}
 			</div>
 
+			{/* Spacer above To/From */}
+			<div className="flex-1" />
+
 			{/* To/From Row */}
-			<div className="flex items-center gap-4 text-[11px]">
-				<div className="flex items-center gap-1">
+			<div className="flex items-center text-[11px] flex-shrink-0">
+				{/* To section - left half */}
+				<div className="flex items-center gap-1 w-1/2">
 					<Link
 						href={urls.murmur.dashboard.index}
 						prefetch
@@ -60,10 +133,10 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 						className="block"
 					>
 						<div
-							className="bg-[#EEEEEE] flex items-center justify-center px-2 transition-colors group hover:bg-[#696969] rounded-[4px]"
-							style={{ height: '14px' }}
+							className="bg-[#EEEEEE] flex items-center justify-start pl-1 transition-colors group hover:bg-[#696969] rounded-[6px]"
+							style={{ width: '41px', height: '13px' }}
 						>
-							<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
+							<span className="font-inter font-normal text-[13px] leading-none text-black transition-colors group-hover:text-white">
 								To
 							</span>
 						</div>
@@ -73,14 +146,15 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					</span>
 				</div>
 
-				<div className="flex items-center gap-1">
+				{/* From section - right half, starting at midpoint */}
+				<div className="flex items-center gap-1 w-1/2">
 					<button
 						type="button"
 						onClick={onFromClick}
-						className="bg-[#EEEEEE] flex items-center justify-center px-2 cursor-pointer transition-colors group hover:bg-[#696969] rounded-[4px]"
-						style={{ height: '14px' }}
+						className="bg-[#EEEEEE] flex items-center justify-start pl-1 cursor-pointer transition-colors group hover:bg-[#696969] rounded-[6px]"
+						style={{ width: '41px', height: '13px' }}
 					>
-						<span className="font-inter font-normal text-[10px] leading-none text-black transition-colors group-hover:text-white">
+						<span className="font-inter font-normal text-[13px] leading-none text-black transition-colors group-hover:text-white">
 							From
 						</span>
 					</button>
@@ -91,48 +165,47 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 				</div>
 			</div>
 
+			{/* Spacer below To/From */}
+			<div className="flex-1" />
+
 			{/* Metrics Row */}
-			<div className="flex items-center gap-2">
+			<div className="flex items-center" style={{ gap: '20px' }}>
 				<div
-					className="inline-flex items-center justify-center rounded-[6px] border border-black px-2 leading-none truncate font-inter font-semibold"
+					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold"
 					style={{
 						backgroundColor: getContactsFillColor(),
 						borderWidth: '1px',
-						height: '17px',
+						width: '80px',
+						height: '15px',
 						fontSize: '10px',
 					}}
 				>
 					{`${String(contactsCount).padStart(2, '0')} Contacts`}
 				</div>
 				<div
-					className={cn(
-						'inline-flex items-center justify-center rounded-[6px] border border-black px-2 leading-none truncate font-inter font-semibold',
-						draftCount === 0 && 'opacity-50'
-					)}
+					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold"
 					style={{
 						backgroundColor: getDraftFillColor(),
 						borderWidth: '1px',
-						height: '17px',
+						width: '80px',
+						height: '15px',
 						fontSize: '10px',
 					}}
 				>
 					{draftCount === 0 ? 'Drafts' : `${String(draftCount).padStart(2, '0')} Drafts`}
 				</div>
 				<div
-					className={cn(
-						'inline-flex items-center justify-center rounded-[6px] border border-black px-2 leading-none truncate font-inter font-semibold',
-						sentCount === 0 && 'opacity-50'
-					)}
+					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold"
 					style={{
 						backgroundColor: getSentFillColor(),
 						borderWidth: '1px',
-						height: '17px',
+						width: '80px',
+						height: '15px',
 						fontSize: '10px',
 					}}
 				>
 					{sentCount === 0 ? 'Sent' : `${String(sentCount).padStart(2, '0')} Sent`}
 				</div>
-
 			</div>
 		</div>
 	);
