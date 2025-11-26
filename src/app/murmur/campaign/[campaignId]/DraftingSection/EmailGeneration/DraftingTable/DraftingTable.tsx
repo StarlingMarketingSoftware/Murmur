@@ -81,9 +81,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					background: isContacts
 						? 'linear-gradient(to bottom, #ffffff 26px, #EB8586 26px)'
 						: isDrafts
-						? '#FFD383'
+						? 'linear-gradient(to bottom, #ffffff 26px, #FFD383 26px)'
 						: isSent
-						? '#5AB477'
+						? 'linear-gradient(to bottom, #ffffff 26px, #5AB477 26px)'
 						: 'white',
 				}}
 			>
@@ -102,9 +102,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						backgroundColor: isContacts
 							? 'transparent'
 							: isDrafts
-							? '#FFD383'
+							? 'transparent'
 							: isSent
-							? '#5AB477'
+							? 'transparent'
 							: 'white',
 					}}
 				>
@@ -119,6 +119,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 								transform: isCompactHeader
 									? isContacts
 										? 'translateY(103px)'
+										: isDrafts || isSent
+										? 'translateY(30px)'
 										: 'translateY(-2px)'
 									: 'translateY(6px)',
 							}}
@@ -153,7 +155,16 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				{/* Content area */}
 				<CustomScrollbar
 					className="flex-1 drafting-table-content"
-					style={{ marginTop: isContacts && topContent ? '115px' : isContacts ? '105px' : 0 }}
+					style={{
+						marginTop:
+							isContacts && topContent
+								? '115px'
+								: isContacts
+								? '105px'
+								: isDrafts || isSent
+								? '32px'
+								: 0,
+					}}
 					thumbWidth={2}
 					thumbColor="#000000"
 					trackColor="transparent"
@@ -166,7 +177,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					) : hasData ? (
 						children
 					) : isDrafts || isSent ? (
-						<div className="overflow-visible w-full flex flex-col gap-2 items-center py-2">
+						<div className="overflow-visible w-full flex flex-col gap-2 items-center">
 							{Array.from({ length: 6 }).map((_, idx) => (
 								<div
 									key={idx}
