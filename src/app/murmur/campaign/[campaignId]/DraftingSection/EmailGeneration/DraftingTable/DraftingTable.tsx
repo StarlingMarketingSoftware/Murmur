@@ -55,26 +55,188 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 			</div>
 			{/* New Contacts Pill */}
 			{isContacts && (
-				<div
-					style={{
-						position: 'absolute',
-						top: '3px',
-						left: '21px',
-						width: '72px',
-						height: '22px',
-						backgroundColor: '#F5DADA',
-						border: '2px solid #8D5B5B',
-						borderRadius: '11px',
-						display: 'flex',
-						alignItems: 'center',
-						justifyContent: 'center',
-						zIndex: 10,
-					}}
-				>
-					<span className="text-[13px] font-bold font-secondary text-black leading-none mt-[1px]">
-						Contacts
-					</span>
-				</div>
+				<>
+					<div
+						style={{
+							position: 'absolute',
+							top: '3px',
+							left: '21px',
+							width: '72px',
+							height: '22px',
+							backgroundColor: '#F5DADA',
+							border: '2px solid #8D5B5B',
+							borderRadius: '11px',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							zIndex: 10,
+						}}
+					>
+						<span className="text-[13px] font-semibold font-inter text-black leading-none">
+							Contacts
+						</span>
+					</div>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '117px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '176px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '235px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+				</>
+			)}
+
+			{/* New Drafts Pill */}
+			{isDrafts && (
+				<>
+					<div
+						style={{
+							position: 'absolute',
+							top: '3px',
+							left: '69px',
+							width: '72px',
+							height: '22px',
+							backgroundColor: '#FFECDC',
+							border: '2px solid #A8833A',
+							borderRadius: '11px',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							zIndex: 10,
+						}}
+					>
+						<span className="text-[13px] font-semibold font-inter text-black leading-none">
+							Drafts
+						</span>
+					</div>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '36px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '176px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '235px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+				</>
+			)}
+
+			{/* New Sent Pill */}
+			{isSent && (
+				<>
+					<div
+						style={{
+							position: 'absolute',
+							top: '3px',
+							left: '137px',
+							width: '72px',
+							height: '22px',
+							backgroundColor: '#DBF6D4',
+							border: '2px solid #19670F',
+							borderRadius: '11px',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							zIndex: 10,
+						}}
+					>
+						<span className="text-[13px] font-semibold font-inter text-black leading-none">
+							Sent
+						</span>
+					</div>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '102px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '36px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '235px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+				</>
 			)}
 
 			{/* Top-left text label */}
