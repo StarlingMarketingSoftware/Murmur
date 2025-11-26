@@ -1826,7 +1826,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														}}
 														disabled={isGenerationDisabled?.()}
 														className={cn(
-															'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
+															'h-[28px] bg-white border-[3px] border-[#349A37] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center transition-all hover:bg-primary/20 active:bg-primary/20 p-0',
 															showTestPreview
 																? 'w-[426px] max-[480px]:w-[89.8vw]'
 																: 'w-[93.7vw] max-w-[475px]',
@@ -1835,7 +1835,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																: 'opacity-100'
 														)}
 													>
-														{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+														{isPendingGeneration && isTest ? 'Testing...' : 'Generate Test'}
 													</Button>
 												</div>
 												{hasEmptyTextBlocks && (
