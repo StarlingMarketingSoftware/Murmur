@@ -1465,7 +1465,7 @@ const Dashboard = () => {
 											{typeof window !== 'undefined' &&
 												createPortal(
 													<>
-														{/* Header bar with Close button - at very top of page */}
+														{/* Header bar at very top of page */}
 														<div
 															style={{
 																position: 'fixed',
@@ -1475,30 +1475,24 @@ const Dashboard = () => {
 																height: '36px',
 																backgroundColor: 'white',
 																zIndex: 100,
+																borderBottom: '1px solid black',
 																display: 'flex',
 																alignItems: 'center',
-																justifyContent: 'flex-end',
-																borderBottom: '1px solid black',
+																justifyContent: 'flex-start',
 															}}
 														>
-															<button
-																type="button"
-																onClick={() => {
-																	setIsMapView(false);
-																	setHoveredContact(null);
-																}}
+															<span
 																style={{
-																	background: 'transparent',
-																	border: 'none',
-																	fontSize: '14px',
-																	fontWeight: 500,
-																	color: '#000',
-																	cursor: 'pointer',
-																	paddingRight: '8px',
+																	marginLeft: '10px',
+																	fontFamily:
+																		'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																	fontSize: '13px',
+																	fontWeight: 600,
+																	lineHeight: '1',
 																}}
 															>
-																Close
-															</button>
+																Search
+															</span>
 														</div>
 														{/* Console loader overlay - positioned below header where search bar would be */}
 														{(isSearchPending ||
@@ -1556,6 +1550,26 @@ const Dashboard = () => {
 																>
 																	{/* Header area for right-hand panel (same color as panel) */}
 																	<div className="w-full h-[49px] flex-shrink-0 bg-[#AFD6EF] flex items-center justify-center px-4 relative">
+																		{/* Map label button in top-left of panel header */}
+																		<button
+																			type="button"
+																			onClick={() => setIsMapView(false)}
+																			className="absolute left-[10px] top-[7px] flex items-center justify-center cursor-pointer"
+																			style={{
+																				width: '53px',
+																				height: '19px',
+																				backgroundColor: '#CDEFC3',
+																				borderRadius: '4px',
+																				border: '2px solid #000000',
+																				fontFamily:
+																					'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																				fontSize: '13px',
+																				fontWeight: 600,
+																				lineHeight: '1',
+																			}}
+																		>
+																			Map
+																		</button>
 																		<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
 																			{selectedContacts.length} selected
 																		</span>
