@@ -278,17 +278,15 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		form.watch('signature') || `Thank you,\n${campaign.identity?.name || ''}`;
 
 	const getDraftingModeBasedOnBlocks = useCallback(() => {
-		const hasFullAutomatedBlock = form
-			.getValues('hybridBlockPrompts')
-			?.some((block) => block.type === 'full_automated');
+		const blocks = form.getValues('hybridBlockPrompts');
+		
+		const hasFullAutomatedBlock = blocks?.some((block) => block.type === 'full_automated');
 
 		if (hasFullAutomatedBlock) {
 			return DraftingMode.ai;
 		}
 
-		const isOnlyTextBlocks = form
-			.getValues('hybridBlockPrompts')
-			?.every((block) => block.type === 'text');
+		const isOnlyTextBlocks = blocks?.every((block) => block.type === 'text');
 
 		if (isOnlyTextBlocks) {
 			return DraftingMode.handwritten;
@@ -1254,10 +1252,32 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	};
 
 	const handleGenerateDrafts = async (contactIds?: number[]) => {
+		// Check if email template is set up before attempting to draft
+		const values = form.getValues();
+		const fullAutomatedBlock = values.hybridBlockPrompts?.find(
+			(block) => block.type === 'full_automated'
+		);
+		const hybridBlocks = values.hybridBlockPrompts?.filter(
+			(block) => block.type !== 'full_automated' && !block.isCollapsed
+		);
+
+		if (draftingMode === DraftingMode.ai) {
+			const fullAiPrompt = fullAutomatedBlock?.value || '';
+			if (!fullAiPrompt || fullAiPrompt.trim() === '') {
+				toast.error('Please set up your email template on the Testing tab first.');
+				return;
+			}
+		} else if (draftingMode === DraftingMode.hybrid) {
+			if (!hybridBlocks || hybridBlocks.length === 0) {
+				toast.error('Please set up your email template on the Testing tab first.');
+				return;
+			}
+		}
+		
 		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
-			batchGenerateFullAiDrafts(contactIds);
+			await batchGenerateFullAiDrafts(contactIds);
 		} else if (draftingMode === DraftingMode.handwritten) {
-			batchGenerateHandWrittenDrafts(contactIds);
+			await batchGenerateHandWrittenDrafts(contactIds);
 		}
 	};
 

@@ -11,6 +11,8 @@ export interface ContactsSelectionProps {
 	cancelGeneration?: () => void;
 	generationTotal?: number;
 	campaign?: CampaignWithRelations;
+	onDraftEmails?: (contactIds: number[]) => Promise<void>;
+	isDraftingDisabled?: boolean;
 }
 
 export const useContactsSelection = (props: ContactsSelectionProps) => {

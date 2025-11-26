@@ -220,6 +220,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									setSelectedContactIds={setContactsTabSelectedIds}
 									handleContactSelection={handleContactsTabSelection}
 									campaign={campaign}
+									onDraftEmails={async (ids) => {
+										await handleGenerateDrafts(ids);
+									}}
+									isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
 								/>
 							</div>
 						)}
