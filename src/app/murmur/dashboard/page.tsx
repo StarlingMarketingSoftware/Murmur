@@ -1537,6 +1537,30 @@ const Dashboard = () => {
 																<SearchResultsMap
 																	contacts={contacts || []}
 																	selectedContacts={selectedContacts}
+																	onToggleSelection={(contactId) => {
+																		if (selectedContacts.includes(contactId)) {
+																			setSelectedContacts(
+																				selectedContacts.filter((id) => id !== contactId)
+																			);
+																		} else {
+																			setSelectedContacts([
+																				...selectedContacts,
+																				contactId,
+																			]);
+																		}
+																		// Scroll to the contact in the side panel
+																		setTimeout(() => {
+																			const contactElement = document.querySelector(
+																				`[data-contact-id="${contactId}"]`
+																			);
+																			if (contactElement) {
+																				contactElement.scrollIntoView({
+																					behavior: 'smooth',
+																					block: 'center',
+																				});
+																			}
+																		}, 50);
+																	}}
 																/>
 																{/* Search Results overlay box on the right side */}
 																<div
@@ -1585,8 +1609,8 @@ const Dashboard = () => {
 																	</div>
 																	{/* Scrollable contact list */}
 																	<CustomScrollbar
-																		className="flex-1 h-full"
-																		contentClassName="p-[6px] space-y-[7px]"
+																		className="flex-1 min-h-0"
+																		contentClassName="p-[6px] pb-[14px] space-y-[7px]"
 																		thumbWidth={2}
 																		thumbColor="#000000"
 																		trackColor="transparent"
@@ -1612,6 +1636,7 @@ const Dashboard = () => {
 																			return (
 																				<div
 																					key={contact.id}
+																					data-contact-id={contact.id}
 																					className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none"
 																					style={{
 																						backgroundColor: isSelected

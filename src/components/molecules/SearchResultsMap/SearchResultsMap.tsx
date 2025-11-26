@@ -158,6 +158,7 @@ interface SearchResultsMapProps {
 	contacts: ContactWithName[];
 	selectedContacts: number[];
 	onMarkerClick?: (contact: ContactWithName) => void;
+	onToggleSelection?: (contactId: number) => void;
 }
 
 const mapContainerStyle = {
@@ -194,6 +195,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
 	selectedContacts,
 	onMarkerClick,
+	onToggleSelection,
 }) => {
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
@@ -203,6 +205,30 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		Map<number, { lat: number; lng: number }>
 	>(new Map());
 	const geocodedIdsRef = useRef<Set<number>>(new Set());
+	// Timeout ref for auto-hiding research panel
+	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+	// Clear timeout when panel is closed or component unmounts
+	useEffect(() => {
+		return () => {
+			if (researchPanelTimeoutRef.current) {
+				clearTimeout(researchPanelTimeoutRef.current);
+			}
+		};
+	}, []);
+
+	const handleResearchPanelMouseEnter = useCallback(() => {
+		if (researchPanelTimeoutRef.current) {
+			clearTimeout(researchPanelTimeoutRef.current);
+			researchPanelTimeoutRef.current = null;
+		}
+	}, []);
+
+	const handleResearchPanelMouseLeave = useCallback(() => {
+		researchPanelTimeoutRef.current = setTimeout(() => {
+			setSelectedMarker(null);
+		}, 5000);
+	}, []);
 
 	const { isLoaded, loadError } = useJsApiLoader({
 		googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
@@ -389,6 +415,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const handleMarkerClick = (contact: ContactWithName) => {
 		setSelectedMarker(contact);
 		onMarkerClick?.(contact);
+		// Toggle selection when clicking on a marker
+		onToggleSelection?.(contact.id);
 	};
 
 	// Default red dot marker
@@ -562,12 +590,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						className="relative"
 						style={{
 							width: '320px',
-							backgroundColor: '#D8E5FB',
+							backgroundColor: 'rgba(216, 229, 251, 0.8)',
 							border: '2px solid black',
 							borderRadius: '7px',
 							overflow: 'hidden',
 							boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
 						}}
+						onMouseEnter={handleResearchPanelMouseEnter}
+						onMouseLeave={handleResearchPanelMouseLeave}
 					>
 						{/* Close button */}
 						<button
@@ -580,7 +610,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						{/* Header */}
 						<div
 							className="w-full"
-							style={{ height: '20px', backgroundColor: '#E8EFFF' }}
+							style={{ height: '20px', backgroundColor: 'rgba(232, 239, 255, 0.8)' }}
 						/>
 						<div className="absolute top-[10px] left-[12px] -translate-y-1/2 z-10">
 							<span className="font-bold text-[12px] leading-none text-black">
@@ -673,10 +703,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 							const metadataSections = parseMetadataSections(selectedMarker.metadata);
 							const boxConfigs = [
-								{ key: '1', color: '#158BCF' },
-								{ key: '2', color: '#43AEEC' },
-								{ key: '3', color: '#7CC9F6' },
-								{ key: '4', color: '#AADAF6' },
+								{ key: '1', color: 'rgba(21, 139, 207, 0.8)' },
+								{ key: '2', color: 'rgba(67, 174, 236, 0.8)' },
+								{ key: '3', color: 'rgba(124, 201, 246, 0.8)' },
+								{ key: '4', color: 'rgba(170, 218, 246, 0.8)' },
 							];
 							const visibleBoxes = boxConfigs.filter(
 								(config) => metadataSections[config.key]
@@ -697,7 +727,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 												style={{
 													width: '100%',
 													minHeight: '60px',
-													backgroundColor: '#158BCF',
+													backgroundColor: 'rgba(21, 139, 207, 0.8)',
 													border: '2px solid #000000',
 													borderRadius: '6px',
 												}}
