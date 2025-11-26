@@ -572,8 +572,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						{/* Close button */}
 						<button
 							onClick={() => setSelectedMarker(null)}
-							className="absolute top-1 right-1 z-20 w-5 h-5 flex items-center justify-center rounded-full bg-white/80 hover:bg-white border border-black/30 transition-colors"
-							style={{ fontSize: '12px', lineHeight: 1 }}
+							className="absolute top-[10px] -translate-y-1/2 right-2 z-20 flex items-center justify-center text-black/60 hover:text-black transition-colors"
+							style={{ fontSize: '14px', lineHeight: 1, fontWeight: 500 }}
 						>
 							×
 						</button>
