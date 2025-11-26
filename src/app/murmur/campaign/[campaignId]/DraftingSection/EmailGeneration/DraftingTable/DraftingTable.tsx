@@ -184,7 +184,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 									className={`select-none w-[489px] ${
 										isDrafts || isSent ? 'h-[97px]' : 'h-[64px]'
 									} overflow-hidden rounded-[8px] border-2 border-[#000000] ${
-										isDrafts ? 'bg-[#FFDC9E]' : 'bg-white'
+										isDrafts ? 'bg-[#FFDC9E]' : isSent ? 'bg-[#5AB477]' : 'bg-white'
 									} p-2`}
 								/>
 							))}
