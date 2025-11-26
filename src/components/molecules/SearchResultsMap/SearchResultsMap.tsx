@@ -713,34 +713,33 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 														-ms-overflow-style: none !important;
 													}
 												`}</style>
-												<CustomScrollbar
+												<div
 													className="absolute"
 													style={{
 														top: '4px',
 														bottom: '4px',
 														left: '6px',
 														right: '6px',
+														backgroundColor: '#FFFFFF',
+														border: '1px solid #000000',
+														borderRadius: '4px',
+														overflow: 'hidden',
 													}}
-													thumbWidth={2}
-													thumbColor="#000000"
-													offsetRight={-14}
-													contentClassName="scrollbar-hide"
 												>
-													<div
-														className="h-full"
-														style={{
-															backgroundColor: '#FFFFFF',
-															border: '1px solid #000000',
-															borderRadius: '4px',
-														}}
+													<CustomScrollbar
+														className="w-full h-full"
+														thumbWidth={2}
+														thumbColor="#000000"
+														offsetRight={-14}
+														contentClassName="scrollbar-hide"
 													>
 														<div className="px-2 py-1">
 															<div className="w-full text-[10px] leading-[1.3] text-black font-inter">
 																{selectedMarker.metadata}
 															</div>
 														</div>
-													</div>
-												</CustomScrollbar>
+													</CustomScrollbar>
+												</div>
 											</div>
 										</div>
 									);
