@@ -3,7 +3,8 @@ import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
 import { Form } from '@/components/ui/form';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
-import { EmailGeneration } from './EmailGeneration/EmailGeneration';
+// EmailGeneration kept available but not used in current view
+// import { EmailGeneration } from './EmailGeneration/EmailGeneration';
 import { cn } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import DraftingStatusPanel from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftingStatusPanel';
@@ -13,6 +14,8 @@ import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { ContactsSelection } from './EmailGeneration/ContactsSelection/ContactsSelection';
 import { SentEmails } from './EmailGeneration/SentEmails/SentEmails';
+import { DraftedEmails } from './EmailGeneration/DraftedEmails/DraftedEmails';
+import { EmailWithRelations } from '@/types';
 
 interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	onOpenIdentityDialog?: () => void;
@@ -33,13 +36,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		trackFocusedField,
 		handleGenerateDrafts,
 		generationProgress,
-		setGenerationProgress,
-		cancelGeneration,
-		isFirstLoad,
+		// These are kept available for future use but not in current view:
+		// setGenerationProgress,
+		// cancelGeneration,
+		// isFirstLoad,
+		// scrollToEmailStructure,
 		draftingRef,
 		emailStructureRef,
-		scrollToEmailStructure,
-		// draftingMode,
 		isLivePreviewVisible,
 		livePreviewContactId,
 		livePreviewMessage,
@@ -64,6 +67,24 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		});
 	};
 
+	// State for drafts selection in the Drafts tab
+	const [draftsTabSelectedIds, setDraftsTabSelectedIds] = useState<Set<number>>(
+		new Set()
+	);
+	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
+	const [, setIsDraftDialogOpen] = useState(false);
+	const handleDraftSelection = (draftId: number) => {
+		setDraftsTabSelectedIds((prev) => {
+			const next = new Set(prev);
+			if (next.has(draftId)) {
+				next.delete(draftId);
+			} else {
+				next.add(draftId);
+			}
+			return next;
+		});
+	};
+
 	// Get contact and email counts for the header box
 	const contactListIds = campaign?.userContactLists?.map((l) => l.id) || [];
 	const { data: headerContacts } = useGetContacts({
@@ -75,15 +96,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	});
 
 	const contactsCount = headerContacts?.length || 0;
-	const draftCount = (headerEmails || []).filter(
-		(e) => e.status === EmailStatus.draft
-	).length;
+	const draftEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.draft);
+	const draftCount = draftEmails.length;
 	const sentEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.sent);
 	const sentCount = sentEmails.length;
 
 	const toListNames =
 		campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
 	const fromName = campaign?.identity?.name || '';
+	const fromEmail = campaign?.identity?.email || '';
 
 	return (
 		<div className="mb-30 flex flex-col items-center">
@@ -158,24 +179,29 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						ref={draftingRef}
 						className={cn('transition-opacity duration-500 ease-in-out')}
 					>
+						{/* Drafts tab - show only the drafts table centered */}
 						{view === 'drafting' && (
-							<EmailGeneration
-								campaign={campaign}
-								contacts={contacts || []}
-								isGenerationDisabled={isGenerationDisabled}
-								isPendingGeneration={isPendingGeneration}
-								isTest={isTest}
-								form={form}
-								handleGenerateDrafts={handleGenerateDrafts}
-								generationProgress={generationProgress}
-								setGenerationProgress={setGenerationProgress}
-								cancelGeneration={cancelGeneration}
-								isFirstLoad={isFirstLoad}
-								scrollToEmailStructure={scrollToEmailStructure}
-								isLivePreviewVisible={isLivePreviewVisible}
-								livePreviewContactId={livePreviewContactId}
-								livePreviewMessage={livePreviewMessage}
-							/>
+							<div className="flex items-center justify-center min-h-[300px]">
+								<DraftedEmails
+									contacts={contacts || []}
+									selectedDraftIds={draftsTabSelectedIds}
+									selectedDraft={selectedDraft}
+									setSelectedDraft={setSelectedDraft}
+									setIsDraftDialogOpen={setIsDraftDialogOpen}
+									handleDraftSelection={handleDraftSelection}
+									draftEmails={draftEmails}
+									isPendingEmails={isPendingEmails}
+									setSelectedDraftIds={setDraftsTabSelectedIds}
+									onSend={async () => {
+										// Send functionality - placeholder
+									}}
+									isSendingDisabled={false}
+									isFreeTrial={false}
+									fromName={fromName}
+									fromEmail={fromEmail}
+									subject={form.watch('subject')}
+								/>
+							</div>
 						)}
 					</div>
 
@@ -205,8 +231,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						</div>
 					)}
 
-					{/* Mobile-only: show the Drafting status panel inside the Drafting tab */}
-					{view === 'drafting' && isMobile && (
+					{/* Mobile-only: show the Drafting status panel inside the Drafting tab - disabled for now */}
+					{/* {view === 'drafting' && isMobile && (
 						<div className="mt-6 lg:hidden w-screen max-w-none px-3 flex justify-center">
 							<DraftingStatusPanel
 								campaign={campaign}
@@ -225,7 +251,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								}}
 							/>
 						</div>
-					)}
+					)} */}
 				</form>
 			</Form>
 
