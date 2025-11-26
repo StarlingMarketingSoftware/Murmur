@@ -1762,7 +1762,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 							{/* Bottom-anchored footer with Signature and Test */}
 							{!showTestPreview && (
-								<div className="flex flex-col items-center px-3 mt-auto" data-hpi-footer>
+								<div className="flex flex-col items-center mt-auto w-full" data-hpi-footer>
 									{/* Signature Block - always visible; positioned above Test with fixed gap */}
 									<FormField
 										control={form.control}
@@ -1811,12 +1811,28 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										<>
 											<div
 												className={cn(
-													'w-full',
+													'w-full flex flex-col items-center',
 													showTestPreview && 'hidden',
 													'max-[480px]:hidden'
 												)}
 											>
-												<div className="flex justify-center mb-4 w-full">
+												{hasEmptyTextBlocks && (
+													<div
+														className={cn(
+															hasTouchedEmptyTextBlocks || hasAttemptedTest
+																? 'text-destructive'
+																: 'text-black',
+															'text-sm font-medium mb-2',
+															showTestPreview
+																? 'w-[426px] max-[480px]:w-[89.8vw]'
+																: 'w-[93.7vw] max-w-[475px]'
+														)}
+													>
+														Fill in all text blocks in order to compose an email.
+													</div>
+												)}
+												<div className="w-full h-[2px] bg-black" />
+												<div className="w-full h-[41px] flex items-center justify-center">
 													<Button
 														type="button"
 														onClick={() => {
@@ -1838,21 +1854,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														{isPendingGeneration && isTest ? 'Testing...' : 'Generate Test'}
 													</Button>
 												</div>
-												{hasEmptyTextBlocks && (
-													<div
-														className={cn(
-															hasTouchedEmptyTextBlocks || hasAttemptedTest
-																? 'text-destructive'
-																: 'text-black',
-															'text-sm font-medium -mt-2 mb-2',
-															showTestPreview
-																? 'w-[426px] max-[480px]:w-[89.8vw]'
-																: 'w-[93.7vw] max-w-[475px]'
-														)}
-													>
-														Fill in all text blocks in order to compose an email.
-													</div>
-												)}
 											</div>
 
 											{/* Mobile sticky Test button at page bottom */}
