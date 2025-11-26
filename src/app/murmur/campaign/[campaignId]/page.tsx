@@ -22,7 +22,7 @@ const Murmur = () => {
 		silentLoad ? 'search' : 'campaign'
 	);
 	const [activeView, setActiveView] = useState<
-		'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'
+		'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'
 	>('testing');
 
 	if (isPendingCampaign || !campaign) {
@@ -40,7 +40,7 @@ const Murmur = () => {
 	return (
 		<div
 			className="min-h-screen"
-			style={{ backgroundColor: isMobile ? '#FFFFFF' : 'rgba(222, 242, 241, 0.43)' }}
+			style={{ backgroundColor: 'rgba(222, 242, 225, 0.43)' }}
 		>
 			{/* Minimal header - just Back to Home link */}
 			<div data-slot="campaign-header">
@@ -119,15 +119,27 @@ const Murmur = () => {
 					/>
 
 					{/* View tabs - text-only Inter font (hidden in mobile landscape via local styles) */}
-					<div className="mt-4 flex justify-center mobile-landscape-hide">
+					<div className="mt-2 flex justify-center mobile-landscape-hide">
 						<div className="w-full max-w-[1250px] px-6">
-							<div className="flex gap-6 justify-center">
+							<div className="flex gap-12 justify-center">
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[20px] max-[480px]:text-[12px] max-[480px]:font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										activeView === 'search'
+											? 'text-black'
+											: 'text-[#6B6B6B] hover:text-black'
+									)}
+									onClick={() => setActiveView('search')}
+								>
+									Search
+								</button>
+								<button
+									type="button"
+									className={cn(
+										'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'contacts'
-											? 'text-black font-semibold'
+											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
 									)}
 									onClick={() => setActiveView('contacts')}
@@ -137,9 +149,9 @@ const Murmur = () => {
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[20px] max-[480px]:text-[12px] max-[480px]:font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'testing'
-											? 'text-black font-semibold'
+											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
 									)}
 									onClick={() => setActiveView('testing')}
@@ -149,9 +161,9 @@ const Murmur = () => {
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[20px] max-[480px]:text-[12px] max-[480px]:font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'drafting'
-											? 'text-black font-semibold'
+											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
 									)}
 									onClick={() => setActiveView('drafting')}
@@ -161,9 +173,9 @@ const Murmur = () => {
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[20px] max-[480px]:text-[12px] max-[480px]:font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'sent'
-											? 'text-black font-semibold'
+											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
 									)}
 									onClick={() => setActiveView('sent')}
@@ -173,9 +185,9 @@ const Murmur = () => {
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[20px] max-[480px]:text-[12px] max-[480px]:font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'inbox'
-											? 'text-black font-semibold'
+											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
 									)}
 									onClick={() => setActiveView('inbox')}
@@ -185,9 +197,9 @@ const Murmur = () => {
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[20px] max-[480px]:text-[12px] max-[480px]:font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'all'
-											? 'text-black font-semibold'
+											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
 									)}
 									onClick={() => setActiveView('all')}

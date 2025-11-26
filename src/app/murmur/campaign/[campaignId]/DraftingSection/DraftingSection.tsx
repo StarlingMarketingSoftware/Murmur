@@ -163,7 +163,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					</div>
 
 					{/* Placeholder content for future tabs */}
-					{(view === 'contacts' ||
+					{(view === 'search' ||
+						view === 'contacts' ||
 						view === 'sent' ||
 						view === 'inbox' ||
 						view === 'all') && (
