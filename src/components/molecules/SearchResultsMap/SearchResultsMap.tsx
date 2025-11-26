@@ -1,9 +1,16 @@
 'use client';
 
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
 import { ContactWithName } from '@/types/contact';
 import { useGeocodeContacts } from '@/hooks/queryHooks/useContacts';
+import {
+	mapTooltipIconUrl,
+	MAP_TOOLTIP_WIDTH,
+	MAP_TOOLTIP_HEIGHT,
+	MAP_TOOLTIP_ANCHOR_X,
+	MAP_TOOLTIP_ANCHOR_Y,
+} from '@/components/atoms/_svg/MapTooltipIcon';
 
 interface SearchResultsMapProps {
 	contacts: ContactWithName[];
@@ -46,6 +53,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	onMarkerClick,
 }) => {
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
+	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
 	const [map, setMap] = useState<google.maps.Map | null>(null);
 	// Local state for newly geocoded coordinates (updates before query refetch)
 	const [geocodedCoords, setGeocodedCoords] = useState<
@@ -240,17 +248,41 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		onMarkerClick?.(contact);
 	};
 
-	const markerIcon = useMemo(
-		() => ({
+	// Default red dot marker with larger invisible hit area
+	const defaultMarkerIcon = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
 			path: google.maps.SymbolPath.CIRCLE,
 			fillColor: '#D21E1F',
 			fillOpacity: 1,
 			strokeColor: '#FFFFFF',
 			strokeWeight: 3,
 			scale: 8,
-		}),
-		[]
-	);
+		};
+	}, [isLoaded]);
+
+	// Invisible larger marker for hover hit area
+	const invisibleHitAreaIcon = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: 'transparent',
+			fillOpacity: 0,
+			strokeColor: 'transparent',
+			strokeWeight: 0,
+			scale: 16, // Larger than visible dot (8) for easier hover
+		};
+	}, [isLoaded]);
+
+	// Hover tooltip icon - anchored at the pointer tip (bottom left area)
+	const hoverMarkerIcon = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			url: mapTooltipIconUrl,
+			scaledSize: new google.maps.Size(MAP_TOOLTIP_WIDTH, MAP_TOOLTIP_HEIGHT),
+			anchor: new google.maps.Point(MAP_TOOLTIP_ANCHOR_X, MAP_TOOLTIP_ANCHOR_Y),
+		};
+	}, [isLoaded]);
 
 	// Compute initial center based on contacts (if available)
 	// Must be before early returns to satisfy React hooks rules
@@ -311,15 +343,40 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			{contactsWithCoords.map((contact) => {
 				const coords = getContactCoords(contact);
 				if (!coords) return null;
+				const isHovered = hoveredMarkerId === contact.id;
 				return (
-					<MarkerF
-						key={contact.id}
-						position={coords}
-						onClick={() => handleMarkerClick(contact)}
-						icon={markerIcon}
-						animation={undefined}
-						clickable={true}
-					/>
+					<Fragment key={contact.id}>
+						{/* Invisible larger hit area for hover detection - this controls all hover state */}
+						<MarkerF
+							position={coords}
+							icon={invisibleHitAreaIcon}
+							onMouseOver={() => setHoveredMarkerId(contact.id)}
+							onMouseOut={() => setHoveredMarkerId(null)}
+							onClick={() => handleMarkerClick(contact)}
+							clickable={true}
+							zIndex={3}
+						/>
+						{/* Red dot - only when NOT hovered */}
+						{!isHovered && (
+							<MarkerF
+								position={coords}
+								onClick={() => handleMarkerClick(contact)}
+								icon={defaultMarkerIcon}
+								clickable={false}
+								zIndex={1}
+							/>
+						)}
+						{/* Hover tooltip - only when hovered */}
+						{isHovered && (
+							<MarkerF
+								position={coords}
+								onClick={() => handleMarkerClick(contact)}
+								icon={hoverMarkerIcon}
+								clickable={false}
+								zIndex={2}
+							/>
+						)}
+					</Fragment>
 				);
 			})}
 
