@@ -53,6 +53,30 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 			>
 				{isContacts ? '' : isDrafts ? '' : isSent ? '' : ''}
 			</div>
+			{/* New Contacts Pill */}
+			{isContacts && (
+				<div
+					style={{
+						position: 'absolute',
+						top: '3px',
+						left: '21px',
+						width: '72px',
+						height: '22px',
+						backgroundColor: '#F5DADA',
+						border: '2px solid #8D5B5B',
+						borderRadius: '11px',
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						zIndex: 10,
+					}}
+				>
+					<span className="text-[13px] font-bold font-secondary text-black leading-none mt-[1px]">
+						Contacts
+					</span>
+				</div>
+			)}
+
 			{/* Top-left text label */}
 			<div
 				data-drafting-top-label
