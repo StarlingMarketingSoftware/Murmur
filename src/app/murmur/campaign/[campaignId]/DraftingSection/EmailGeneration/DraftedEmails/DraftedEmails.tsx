@@ -62,7 +62,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 			: 'Unknown Contact';
 
 		return (
-			<div style={{ width: '376px', height: '474px', position: 'relative' }}>
+			<div style={{ width: '499px', height: '703px', position: 'relative' }}>
 				{/* Container box with header - matching the table view */}
 				<div
 					style={{
@@ -224,7 +224,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								<div
 									className="flex items-stretch rounded-[6px] overflow-hidden"
 									style={{
-										width: '366px',
+										width: '489px',
 										height: '28px',
 										border: '1px solid #000000',
 										backgroundColor: 'transparent',
@@ -316,7 +316,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								<div
 									key={draft.id}
 									className={cn(
-										'cursor-pointer transition-colors relative select-none w-[366px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
+										'cursor-pointer transition-colors relative select-none w-[489px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
 										isSelected && 'bg-[#FFDF9F]'
 									)}
 									onMouseDown={(e) => {
@@ -489,7 +489,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						{Array.from({ length: Math.max(0, 6 - draftEmails.length) }).map((_, idx) => (
 							<div
 								key={`draft-placeholder-${idx}`}
-								className="select-none w-[366px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
+								className="select-none w-[489px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
 							/>
 						))}
 					</div>
