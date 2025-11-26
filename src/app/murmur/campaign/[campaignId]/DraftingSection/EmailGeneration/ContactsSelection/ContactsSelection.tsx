@@ -954,13 +954,35 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 				onClick={handleDraftEmails}
 				disabled={isButtonDisabled}
 				className={cn(
-					'mt-4 flex items-center justify-center gap-2 rounded-[8px] font-inter font-semibold text-[14px] transition-all duration-200',
+					'mt-4 relative flex items-center justify-center gap-2 rounded-[8px] font-inter font-semibold text-[14px] transition-all duration-200',
 					isButtonDisabled
 						? 'bg-[#E0E0E0] text-[#888888] border-2 border-[#888888] cursor-not-allowed'
 						: 'bg-[#F2C7C7] text-black border-[3px] border-[#9A3434] hover:bg-[#E8B5B5] cursor-pointer'
 				)}
 				style={{ width: '475px', height: '40px' }}
 			>
+				{/* Right section - Select All */}
+				<div
+					className={cn(
+						'absolute top-0 bottom-0 right-0 rounded-r-[5px] flex items-center justify-center cursor-pointer transition-colors',
+						isButtonDisabled ? 'bg-[#CCCCCC]' : 'bg-[#D17474] hover:bg-[#C16666]'
+					)}
+					style={{ width: '60px' }}
+					onClick={(e) => {
+						e.stopPropagation();
+						handleClick();
+					}}
+				>
+					<span className="text-[17px] font-inter font-normal text-black">All</span>
+				</div>
+				{/* Vertical divider line */}
+				<div
+					className={cn(
+						'absolute top-0 bottom-0 w-[2px]',
+						isButtonDisabled ? 'bg-[#888888]' : 'bg-[#9A3434]'
+					)}
+					style={{ right: '60px' }}
+				/>
 				{isDrafting ? (
 					<>
 						<div className="animate-spin rounded-full h-4 w-4 border-2 border-black border-t-transparent" />
