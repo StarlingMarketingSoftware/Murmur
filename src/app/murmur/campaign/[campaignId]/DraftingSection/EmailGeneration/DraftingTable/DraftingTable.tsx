@@ -33,9 +33,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	const isDrafts = title === 'Drafts';
 	const isSent = title === 'Sent';
 
-	const boxWidth = isContacts || isDrafts ? '499px' : '376px';
-	const boxHeight = isContacts || isDrafts ? '703px' : '474px';
-	const contentWidth = isContacts || isDrafts ? 'w-[489px]' : 'w-[366px]';
+	const boxWidth = isContacts || isDrafts || isSent ? '499px' : '376px';
+	const boxHeight = isContacts || isDrafts || isSent ? '703px' : '474px';
+	const contentWidth = isContacts || isDrafts || isSent ? 'w-[489px]' : 'w-[366px]';
 
 	return (
 		<div style={{ width: boxWidth, height: boxHeight, position: 'relative' }}>
@@ -165,21 +165,12 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						</div>
 					) : hasData ? (
 						children
-					) : isDrafts ? (
+					) : isDrafts || isSent ? (
 						<div className="overflow-visible w-full flex flex-col gap-2 items-center py-2">
 							{Array.from({ length: 6 }).map((_, idx) => (
 								<div
 									key={idx}
 									className="select-none w-[489px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
-								/>
-							))}
-						</div>
-					) : isSent ? (
-						<div className="overflow-visible w-full flex flex-col gap-2 items-center py-2">
-							{Array.from({ length: 6 }).map((_, idx) => (
-								<div
-									key={idx}
-									className="select-none w-[366px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
 								/>
 							))}
 						</div>
