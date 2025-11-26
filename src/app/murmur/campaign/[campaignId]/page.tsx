@@ -21,7 +21,9 @@ const Murmur = () => {
 	const [identityDialogOrigin, setIdentityDialogOrigin] = useState<'campaign' | 'search'>(
 		silentLoad ? 'search' : 'campaign'
 	);
-	const [activeView, setActiveView] = useState<'testing' | 'drafting'>('testing');
+	const [activeView, setActiveView] = useState<
+		'testing' | 'drafting' | 'sent' | 'inbox' | 'all'
+	>('testing');
 
 	if (isPendingCampaign || !campaign) {
 		return silentLoad ? null : <Spinner />;
@@ -130,7 +132,7 @@ const Murmur = () => {
 									)}
 									onClick={() => setActiveView('testing')}
 								>
-									Testing
+									Writing
 								</button>
 								<button
 									type="button"
@@ -142,7 +144,43 @@ const Murmur = () => {
 									)}
 									onClick={() => setActiveView('drafting')}
 								>
-									Drafting
+									Drafts
+								</button>
+								<button
+									type="button"
+									className={cn(
+										'font-inter text-[20px] max-[480px]:text-[12px] max-[480px]:font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										activeView === 'sent'
+											? 'text-black font-semibold'
+											: 'text-[#6B6B6B] hover:text-black'
+									)}
+									onClick={() => setActiveView('sent')}
+								>
+									Sent
+								</button>
+								<button
+									type="button"
+									className={cn(
+										'font-inter text-[20px] max-[480px]:text-[12px] max-[480px]:font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										activeView === 'inbox'
+											? 'text-black font-semibold'
+											: 'text-[#6B6B6B] hover:text-black'
+									)}
+									onClick={() => setActiveView('inbox')}
+								>
+									Inbox
+								</button>
+								<button
+									type="button"
+									className={cn(
+										'font-inter text-[20px] max-[480px]:text-[12px] max-[480px]:font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										activeView === 'all'
+											? 'text-black font-semibold'
+											: 'text-[#6B6B6B] hover:text-black'
+									)}
+									onClick={() => setActiveView('all')}
+								>
+									All
 								</button>
 							</div>
 						</div>

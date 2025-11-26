@@ -64,7 +64,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		(e) => e.status === EmailStatus.sent
 	).length;
 
-	const toListNames = campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
+	const toListNames =
+		campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
 	const fromName = campaign?.identity?.name || '';
 
 	return (
@@ -75,7 +76,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						ref={emailStructureRef}
 						className="mb-[4px] flex justify-between items-center"
 					></div>
-					{view !== 'drafting' && (
+					{view === 'testing' && (
 						<div className="relative">
 							{/* Desktop: Campaign header box positioned to the left */}
 							{!isMobile && (
@@ -140,7 +141,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						ref={draftingRef}
 						className={cn('transition-opacity duration-500 ease-in-out')}
 					>
-						{view !== 'testing' && (
+						{view === 'drafting' && (
 							<EmailGeneration
 								campaign={campaign}
 								contacts={contacts || []}
@@ -160,6 +161,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							/>
 						)}
 					</div>
+
+					{/* Placeholder content for future tabs */}
+					{(view === 'sent' || view === 'inbox' || view === 'all') && (
+						<div className="flex items-center justify-center min-h-[300px] text-gray-400">
+							{/* Blank for now */}
+						</div>
+					)}
 
 					{/* Mobile-only: show the Drafting status panel inside the Drafting tab */}
 					{view === 'drafting' && isMobile && (

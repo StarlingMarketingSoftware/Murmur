@@ -45,7 +45,7 @@ import { ContactWithName } from '@/types/contact';
 
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
-	view?: 'testing' | 'drafting';
+	view?: 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 	goToDrafting?: () => void;
 }
 
