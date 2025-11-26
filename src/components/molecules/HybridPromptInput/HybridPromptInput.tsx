@@ -1257,12 +1257,19 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											? 'w-[457px] shrink-0 h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-white'
 											: compactLeftOnly
 											? 'w-[350px]'
-											: 'w-full min-h-0 pt-[10px] max-[480px]:pt-[1px] px-0 pb-0 flex-1',
+											: 'w-full min-h-0 pt-0 max-[480px]:pt-[1px] px-0 pb-0 flex-1',
 
 										'relative z-10'
 									)}
 									data-hpi-left-panel
 								>
+									{!showTestPreview && !compactLeftOnly && (
+										<div className="w-full h-[17px] border-b-[2px] border-black flex items-center px-[9px]">
+											<span className="font-inter font-bold text-[12px] leading-none text-black">
+												Writing
+											</span>
+										</div>
+									)}
 									{/* Removed explicit drag bar; header below acts as the drag handle */}
 									{/* Subject header inside the box */}
 									<div
@@ -1274,7 +1281,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									>
 										<div
 											className={cn(
-												'h-[36px] flex items-center relative z-20',
+												'h-[42px] flex items-center relative z-20',
 												showTestPreview
 													? 'w-[426px] max-[480px]:w-[89.8vw] mx-auto pl-[8px] max-[480px]:pl-[6px]'
 													: 'w-[93.7vw] max-w-[475px] mx-auto pl-[8px] max-[480px]:pl-[6px]'
