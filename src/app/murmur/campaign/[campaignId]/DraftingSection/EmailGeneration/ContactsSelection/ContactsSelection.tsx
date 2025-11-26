@@ -630,7 +630,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						<div
 							key={contact.id}
 							className={cn(
-								'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[489px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none row-hover-scroll',
+								'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[489px] h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none row-hover-scroll',
 								selectedContactIds.has(contact.id) ? 'bg-[#EAAEAE]' : ''
 							)}
 							onMouseDown={(e) => {
@@ -652,7 +652,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 									return (
 										<>
 											{/* Top Left - Name */}
-											<div className="pl-3 pr-1 flex items-center h-[23px]">
+											<div className="pl-3 pr-1 flex items-center h-[24px]">
 												{usedContactIdsSet.has(contact.id) && (
 													<span
 														className="inline-block shrink-0 mr-2"
@@ -672,7 +672,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 											</div>
 
 											{/* Top Right - Title */}
-											<div className="pr-2 pl-1 flex items-center h-[23px]">
+											<div className="pr-2 pl-1 flex items-center h-[24px]">
 												{contact.headline ? (
 													<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
 														<ScrollableText
@@ -687,14 +687,14 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 											</div>
 
 											{/* Bottom Left - Company */}
-											<div className="pl-3 pr-1 flex items-center h-[22px]">
+											<div className="pl-3 pr-1 flex items-center h-[24px]">
 												<div className="text-[11px] text-black w-full truncate leading-tight">
 													{contact.company || ''}
 												</div>
 											</div>
 
 											{/* Bottom Right - Location */}
-											<div className="pr-2 pl-1 flex items-center h-[22px]">
+											<div className="pr-2 pl-1 flex items-center h-[24px]">
 												{contact.city || contact.state ? (
 													<div className="flex items-center gap-1 w-full">
 														{(() => {
@@ -789,7 +789,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 											{contact.headline ? (
 												<>
 													{/* Top Right - Title */}
-													<div className="pr-2 pl-1 flex items-center h-[23px]">
+													<div className="pr-2 pl-1 flex items-center h-[24px]">
 														<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
 															<ScrollableText
 																text={contact.headline}
@@ -799,7 +799,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 													</div>
 
 													{/* Bottom Right - Location */}
-													<div className="pr-2 pl-1 flex items-center h-[22px]">
+													<div className="pr-2 pl-1 flex items-center h-[24px]">
 														{contact.city || contact.state ? (
 															<div className="flex items-center gap-1 w-full">
 																{(() => {
@@ -939,10 +939,10 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 							})()}
 						</div>
 					))}
-					{Array.from({ length: Math.max(0, 7 - contacts.length) }).map((_, idx) => (
+					{Array.from({ length: Math.max(0, 9 - contacts.length) }).map((_, idx) => (
 						<div
 							key={`placeholder-${idx}`}
-							className="select-none w-[489px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
+							className="select-none w-[489px] h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#EB8586]"
 						/>
 					))}
 				</div>
