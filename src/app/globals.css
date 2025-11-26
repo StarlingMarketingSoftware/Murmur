@@ -3676,6 +3676,19 @@ body.murmur-page footer {
 	display: none !important;
 }
 
+/* Full-width background for murmur dashboard map view.
+   Uses a vertical gradient so the top 36px (map header) stay white,
+   and everything below is the AFD6EF blue. */
+body.murmur-page.murmur-map-view {
+	background: linear-gradient(
+		to bottom,
+		#ffffff 0,
+		#ffffff 36px,
+		#afd6ef 36px,
+		#afd6ef 100%
+	);
+}
+
 /* Also ensure the hero wrapper can contain the growing search bar */
 .dashboard-container:not(.search-active) .hero-wrapper {
 	/* Allow hero to grow with viewport height to contain search bar */

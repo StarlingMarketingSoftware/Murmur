@@ -94,6 +94,9 @@ export const useDashboard = () => {
 	const [usedContactIdsSet, setUsedContactIdsSet] = useState<Set<number>>(new Set());
 	const [hoveredText, setHoveredText] = useState('');
 	const [hoveredContact, setHoveredContact] = useState<ContactWithName | null>(null);
+	const [isMapView, setIsMapView] = useState(false);
+	// Immediate search pending state - set true instantly on search click
+	const [isSearchPending, setIsSearchPending] = useState(false);
 
 	const {
 		data: contacts,
@@ -115,6 +118,13 @@ export const useDashboard = () => {
 	});
 	const { mutateAsync: importApolloContacts, isPending: isPendingImportApolloContacts } =
 		useCreateApolloContacts({});
+
+	// Clear search pending state when loading finishes
+	useEffect(() => {
+		if (!isLoadingContacts && !isRefetchingContacts && isSearchPending) {
+			setIsSearchPending(false);
+		}
+	}, [isLoadingContacts, isRefetchingContacts, isSearchPending]);
 
 	// Initialize selected contacts as empty (no contacts selected by default)
 	useEffect(() => {
@@ -201,11 +211,15 @@ export const useDashboard = () => {
 			return;
 		}
 
+		// Set search pending immediately for instant UI feedback
+		setIsSearchPending(true);
 		// Update search parameters
 		setActiveSearchQuery(data.searchText);
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? false);
 		setLimit(50);
 		setHasSearched(true);
+		// Default to map view when a search is performed
+		setIsMapView(true);
 		// The query will automatically run when the state updates enable it
 	};
 
@@ -216,12 +230,23 @@ export const useDashboard = () => {
 	};
 
 	const handleSelectAll = () => {
-		if (!contacts || !tableInstance) return;
+		if (!contacts || contacts.length === 0) return;
 
+		// In table view, use the table instance so checkbox UI stays in sync
+		if (!isMapView && tableInstance) {
+			if (isAllSelected) {
+				tableInstance.toggleAllRowsSelected(false);
+			} else {
+				tableInstance.toggleAllRowsSelected(true);
+			}
+			return;
+		}
+
+		// In map view (or when no table instance), toggle via selectedContacts state
 		if (isAllSelected) {
-			tableInstance.toggleAllRowsSelected(false);
+			setSelectedContacts([]);
 		} else {
-			tableInstance.toggleAllRowsSelected(true);
+			setSelectedContacts(contacts.map((contact) => contact.id));
 		}
 	};
 
@@ -717,5 +742,8 @@ export const useDashboard = () => {
 		hoveredText,
 		hoveredContact,
 		setHoveredContact,
+		isMapView,
+		setIsMapView,
+		isSearchPending,
 	};
 };

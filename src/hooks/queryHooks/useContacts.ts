@@ -351,3 +351,61 @@ export const useGetLocations = (query: string, mode?: 'state' | 'state-first') =
 		staleTime: 1000 * 60 * 5, // 5 minutes
 	});
 };
+
+export interface GeocodeContactsResult {
+	message: string;
+	processed: number;
+	success: number;
+	failed: number;
+	geocoded: { id: number; latitude: number; longitude: number }[];
+	errors: { id: number; error: string }[];
+}
+
+export const useGeocodeContacts = (options: CustomMutationOptions = {}) => {
+	const {
+		suppressToasts = true,
+		onSuccess: onSuccessCallback,
+	} = options;
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (contactIds: number[]): Promise<GeocodeContactsResult> => {
+			const response = await _fetch(urls.api.contacts.geocode.index, 'POST', {
+				contactIds,
+				limit: contactIds.length,
+			});
+			if (!response.ok) {
+				let errorMessage = 'Failed to geocode contacts';
+				try {
+					const errorData = await response.json();
+					errorMessage = errorData.error || errorMessage;
+				} catch {
+					try {
+						const textError = await response.text();
+						errorMessage = textError || `HTTP ${response.status} error`;
+					} catch {
+						errorMessage = `HTTP ${response.status} error`;
+					}
+				}
+				throw new Error(errorMessage);
+			}
+
+			return response.json();
+		},
+		onSuccess: (data) => {
+			// Invalidate contacts query to refresh with new coordinates
+			if (data.success > 0) {
+				queryClient.invalidateQueries({ queryKey: QUERY_KEYS.list() });
+			}
+			if (!suppressToasts && data.success > 0) {
+				toast.success(`Geocoded ${data.success} contacts`);
+			}
+			onSuccessCallback?.();
+		},
+		onError: (error) => {
+			if (!suppressToasts) {
+				toast.error(error.message || 'Failed to geocode contacts');
+			}
+		},
+	});
+};

@@ -35,6 +35,7 @@ import { useGetLocations } from '@/hooks/queryHooks/useContacts';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
+import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -76,10 +77,17 @@ const Dashboard = () => {
 	);
 
 	const renderDesktopSearchDropdowns = () => {
-		return (
+		const dropdownContent = (
 			<>
 				{activeSection === 'why' && (
-					<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[12px] absolute top-[calc(100%+10px)] left-[4px] w-[439px] h-[173px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+					<div
+						className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[12px] w-[439px] h-[173px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
+						style={
+							isMapView
+								? { position: 'fixed', top: '118px', left: 'calc(50% - 220px)' }
+								: { position: 'absolute', top: 'calc(100% + 10px)', left: '4px' }
+						}
+					>
 						<div
 							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 							onClick={() => {
@@ -122,7 +130,14 @@ const Dashboard = () => {
 					</div>
 				)}
 				{activeSection === 'what' && whyValue === '[Promotion]' && (
-					<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] absolute top-[calc(100%+10px)] left-[176px] w-[439px] h-[92px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+					<div
+						className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] w-[439px] h-[92px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
+						style={
+							isMapView
+								? { position: 'fixed', top: '118px', left: 'calc(50% - 60px)' }
+								: { position: 'absolute', top: 'calc(100% + 10px)', left: '176px' }
+						}
+					>
 						<div
 							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 							onClick={() => {
@@ -145,7 +160,14 @@ const Dashboard = () => {
 					</div>
 				)}
 				{activeSection === 'what' && whyValue !== '[Promotion]' && (
-					<div className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] absolute top-[calc(100%+10px)] left-[176px] w-[439px] h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]">
+					<div
+						className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] w-[439px] h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
+						style={
+							isMapView
+								? { position: 'fixed', top: '118px', left: 'calc(50% - 60px)' }
+								: { position: 'absolute', top: 'calc(100% + 10px)', left: '176px' }
+						}
+					>
 						<div
 							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 							onClick={() => {
@@ -246,8 +268,22 @@ const Dashboard = () => {
 				{activeSection === 'where' && (
 					<div
 						id="where-dropdown-container"
-						className={`search-dropdown-menu hidden md:block absolute top-[calc(100%+10px)] left-[98px] w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[60]`}
-						style={{ overflow: 'visible' }}
+						className={`search-dropdown-menu hidden md:block w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]`}
+						style={
+							isMapView
+								? {
+										position: 'fixed',
+										top: '118px',
+										left: 'calc(50% - 120px)',
+										overflow: 'visible',
+								  }
+								: {
+										position: 'absolute',
+										top: 'calc(100% + 10px)',
+										left: '98px',
+										overflow: 'visible',
+								  }
+						}
 					>
 						<style jsx global>{`
 							#where-dropdown-container .scrollbar-hide {
@@ -381,6 +417,13 @@ const Dashboard = () => {
 				)}
 			</>
 		);
+
+		// When in map view, render dropdowns via portal to escape the stacking context
+		if (isMapView && typeof window !== 'undefined') {
+			return createPortal(dropdownContent, document.body);
+		}
+
+		return dropdownContent;
 	};
 
 	useEffect(() => {
@@ -536,6 +579,10 @@ const Dashboard = () => {
 		isAllSelected,
 		setHoveredContact,
 		hoveredContact,
+		isMapView,
+		setIsMapView,
+		isSearchPending,
+		usedContactIdsSet,
 	} = useDashboard();
 
 	// Clear hover state on mobile to prevent stuck hover
@@ -544,6 +591,21 @@ const Dashboard = () => {
 			setHoveredContact(null);
 		}
 	}, [isMobile, setHoveredContact]);
+
+	// Lock body scroll when in map view
+	useEffect(() => {
+		if (isMapView) {
+			document.body.style.overflow = 'hidden';
+			document.body.style.height = '100vh';
+		} else {
+			document.body.style.overflow = '';
+			document.body.style.height = '';
+		}
+		return () => {
+			document.body.style.overflow = '';
+			document.body.style.height = '';
+		};
+	}, [isMapView]);
 
 	// Combine section values into main search field
 	useEffect(() => {
@@ -597,6 +659,22 @@ const Dashboard = () => {
 		setWhereValue('');
 		setActiveSection(null);
 	};
+
+	// Apply full-width background for map view using body class,
+	// so the search bar and other content stay above it.
+	useEffect(() => {
+		if (typeof document === 'undefined') return;
+
+		if (isMapView) {
+			document.body.classList.add('murmur-map-view');
+		} else {
+			document.body.classList.remove('murmur-map-view');
+		}
+
+		return () => {
+			document.body.classList.remove('murmur-map-view');
+		};
+	}, [isMapView]);
 
 	// Return null during initial load to prevent hydration mismatch
 	if (isMobile === null) {
@@ -693,7 +771,9 @@ const Dashboard = () => {
 															>
 																<div
 																	className={`search-wave-container ${
-																		isLoadingContacts || isRefetchingContacts
+																		isSearchPending ||
+																		isLoadingContacts ||
+																		isRefetchingContacts
 																			? 'search-wave-loading'
 																			: ''
 																	}`}
@@ -1047,10 +1127,11 @@ const Dashboard = () => {
 					</div>
 				</div>
 
-				{/* Search query display with back button */}
+				{/* Search query display with back button - hidden when in map view */}
 				{hasSearched &&
 					activeSearchQuery &&
-					(isLoadingContacts || isRefetchingContacts) && (
+					!isMapView &&
+					(isSearchPending || isLoadingContacts || isRefetchingContacts) && (
 						<div className="search-query-display mt-8">
 							<div className="search-query-display-inner">
 								<button
@@ -1088,7 +1169,9 @@ const Dashboard = () => {
 				{hasSearched && !isLoadingContacts && !isRefetchingContacts && (
 					<div className="results-search-bar-wrapper w-full max-w-[531px] mx-auto px-4 relative">
 						<div
-							className={`results-search-bar-inner ${hoveredContact ? 'invisible' : ''}`}
+							className={`results-search-bar-inner ${
+								hoveredContact && !isMapView ? 'invisible' : ''
+							}`}
 						>
 							<Form {...form}>
 								<form
@@ -1124,7 +1207,9 @@ const Dashboard = () => {
 													<div className="results-search-input-group">
 														<div
 															className={`search-wave-container relative ${
-																isLoadingContacts || isRefetchingContacts
+																isSearchPending ||
+																isLoadingContacts ||
+																isRefetchingContacts
 																	? 'search-wave-loading'
 																	: ''
 															}`}
@@ -1281,17 +1366,19 @@ const Dashboard = () => {
 									/>
 									{/* Generate action removed; awaiting left-side SVG submit icon */}
 								</form>
-								<div className="w-full text-center mt-2">
-									<span
-										className="font-secondary"
-										style={{ fontSize: '13px', fontWeight: 400, color: '#7f7f7f' }}
-									>
-										Select who you want to contact.
-									</span>
-								</div>
+								{!isMapView && (
+									<div className="w-full text-center mt-2">
+										<span
+											className="font-secondary"
+											style={{ fontSize: '13px', fontWeight: 400, color: '#7f7f7f' }}
+										>
+											Select who you want to contact.
+										</span>
+									</div>
+								)}
 							</Form>
 						</div>
-						{hoveredContact && !isMobile && (
+						{hoveredContact && !isMobile && !isMapView && (
 							<div className="absolute inset-0 z-[90] flex items-start justify-center pointer-events-none bg-white">
 								<div className="w-full max-w-[1132px] mx-auto px-4 py-3 text-center">
 									<div className="font-secondary font-bold text-[19px] leading-tight truncate">
@@ -1368,141 +1455,877 @@ const Dashboard = () => {
 									</CardContent>
 								</Card>
 							</div>
-						) : isLoadingContacts || isRefetchingContacts ? (
-							<div className="mt-10 w-full px-4 py-8">
-								<ConsoleLoader searchQuery={activeSearchQuery} />
-							</div>
-						) : contacts && contacts.length > 0 ? (
+						) : isSearchPending ||
+						  isLoadingContacts ||
+						  isRefetchingContacts ||
+						  (contacts && contacts.length > 0) ? (
 							<div className="flex justify-center w-full px-0 sm:px-4 relative">
 								<div className="w-full max-w-full results-appear results-align">
-									<Card className="border-0 shadow-none !p-0 w-full !my-0">
-										<CardContent className="!p-0 w-full">
-											<CustomTable
-												initialSelectAll={false}
-												isSelectable
-												setSelectedRows={setSelectedContacts}
-												data={contacts}
-												columns={columns}
-												searchable={false}
-												tableRef={tableRef}
-												rowsPerPage={100}
-												displayRowsPerPage={false}
-												constrainHeight
-												useCustomScrollbar={!isMobileLandscape}
-												scrollbarOffsetRight={-7}
-												containerClassName="search-results-table h-[571px] rounded-[8px] border-[#143883] md:w-[1004px] border-[3px]"
-												tableClassName="w-[calc(100%-12px)] mx-auto border-separate border-spacing-y-[6px]"
-												headerClassName="[&_tr]:border-[#737373]"
-												theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
-												rowClassName="border-[#737373] row-hover-scroll bg-white odd:bg-white even:bg-white rounded-[8px] [&>td:first-child]:rounded-l-[8px] [&>td:last-child]:rounded-r-[8px] [&>td]:border-y-2 [&>td:first-child]:border-l-2 [&>td:last-child]:border-r-2 border-none !h-[58px] min-h-[58px] [&>td]:!h-[58px] [&>td]:!py-0"
-												stickyHeaderClassName="bg-[#AFD6EF]"
-												hidePagination
-												onRowHover={
-													isMobile ? undefined : (row) => setHoveredContact(row)
-												}
-												headerAction={
-													!isMobile ? (
-														<button
-															type="button"
-															onClick={handleCreateCampaign}
-															disabled={selectedContacts.length === 0}
-															className="font-secondary"
+									{isMapView ? (
+										<>
+											{/* Fullscreen Map View - rendered via portal for true full-page positioning */}
+											{typeof window !== 'undefined' &&
+												createPortal(
+													<>
+														{/* Header bar at very top of page */}
+														<div
 															style={{
-																width: '127px',
-																height: '31px',
-																background:
-																	selectedContacts.length === 0
-																		? 'rgba(93, 171, 104, 0.1)'
-																		: '#B8E4BE',
-																border: '2px solid #000000',
-																color:
-																	selectedContacts.length === 0
-																		? 'rgba(0, 0, 0, 0.4)'
-																		: '#000000',
-																fontSize: '13px',
-																fontWeight: 500,
-																borderRadius: '8px',
-																lineHeight: 'normal',
+																position: 'fixed',
+																top: '0px',
+																left: '0px',
+																right: '0px',
+																height: '36px',
+																backgroundColor: 'white',
+																zIndex: 100,
+																borderBottom: '1px solid black',
 																display: 'flex',
 																alignItems: 'center',
-																justifyContent: 'center',
-																padding: '0',
-																textAlign: 'center',
-																whiteSpace: 'nowrap',
-																cursor:
-																	selectedContacts.length === 0 ? 'default' : 'pointer',
-																opacity: selectedContacts.length === 0 ? 0.6 : 1,
+																justifyContent: 'flex-start',
 															}}
 														>
-															Create Campaign
-														</button>
-													) : null
-												}
-												headerInlineAction={
-													<button
-														onClick={handleSelectAll}
-														className="text-[14px] font-secondary font-normal text-black hover:underline"
-														type="button"
-													>
-														{isAllSelected ? 'Deselect All' : 'Select all'}
-													</button>
-												}
-											/>
-										</CardContent>
-									</Card>
-									{/* Desktop button (non-sticky) */}
-									{!isMobile && (
-										<div className="flex items-center justify-center w-full">
-											<Button
-												isLoading={
-													isPendingCreateCampaign || isPendingBatchUpdateContacts
-												}
-												variant="primary-light"
-												bold
-												className="relative w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
-												onClick={() => {
-													if (selectedContacts.length === 0) return;
-													handleCreateCampaign();
-												}}
-											>
-												<span className="relative z-20">Add to Campaign</span>
-												<div
-													className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
-													onClick={(e) => {
-														e.stopPropagation();
-														handleSelectAll();
-													}}
-												>
-													<span className="text-black text-[14px] font-medium">All</span>
-												</div>
-												<span
-													aria-hidden="true"
-													className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
-												/>
-											</Button>
-										</div>
-									)}
+															<span
+																style={{
+																	marginLeft: '10px',
+																	fontFamily:
+																		'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																	fontSize: '13px',
+																	fontWeight: 600,
+																	lineHeight: '1',
+																}}
+															>
+																Search
+															</span>
+														</div>
+														{/* Console loader overlay - positioned below header where search bar would be */}
+														{(isSearchPending ||
+															isLoadingContacts ||
+															isRefetchingContacts) && (
+															<div
+																style={{
+																	position: 'fixed',
+																	top: '36px',
+																	left: '0px',
+																	right: '0px',
+																	height: '84px',
+																	backgroundColor: '#AFD6EF',
+																	zIndex: 101,
+																	display: 'flex',
+																	alignItems: 'center',
+																	justifyContent: 'center',
+																	borderBottom: '1px solid black',
+																	overflow: 'hidden',
+																}}
+															>
+																<ConsoleLoader
+																	searchQuery={activeSearchQuery}
+																	className="w-full max-w-[800px] scale-[0.65] origin-center"
+																/>
+															</div>
+														)}
+														{/* Background fill for map area only (below header/search bar) */}
+														<div
+															style={{
+																position: 'fixed',
+																top: '120px',
+																left: 0,
+																right: 0,
+																bottom: 0,
+																backgroundColor: '#AFD6EF',
+																zIndex: 98,
+															}}
+														/>
+														{/* Map container */}
+														<div
+															style={{
+																position: 'fixed',
+																top: '120px',
+																left: '9px',
+																right: '9px',
+																bottom: '9px',
+																zIndex: 99,
+															}}
+														>
+															<div className="w-full h-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden relative">
+																<SearchResultsMap
+																	contacts={contacts || []}
+																	selectedContacts={selectedContacts}
+																	onToggleSelection={(contactId) => {
+																		if (selectedContacts.includes(contactId)) {
+																			setSelectedContacts(
+																				selectedContacts.filter((id) => id !== contactId)
+																			);
+																		} else {
+																			setSelectedContacts([
+																				...selectedContacts,
+																				contactId,
+																			]);
+																		}
+																		// Scroll to the contact in the side panel
+																		setTimeout(() => {
+																			const contactElement = document.querySelector(
+																				`[data-contact-id="${contactId}"]`
+																			);
+																			if (contactElement) {
+																				contactElement.scrollIntoView({
+																					behavior: 'smooth',
+																					block: 'center',
+																				});
+																			}
+																		}, 50);
+																	}}
+																/>
+																{/* Search Results overlay box on the right side - hidden while loading */}
+																{!(
+																	isSearchPending ||
+																	isLoadingContacts ||
+																	isRefetchingContacts
+																) && (
+																	<div
+																		className="absolute top-[10px] right-[10px] rounded-[12px] shadow-lg flex flex-col"
+																		style={{
+																			width: '390px',
+																			height: '801px',
+																			maxHeight: 'calc(100% - 20px)',
+																			backgroundColor: '#AFD6EF',
+																			border: '3px solid #143883',
+																			overflow: 'hidden',
+																		}}
+																	>
+																		{/* Header area for right-hand panel (same color as panel) */}
+																		<div className="w-full h-[49px] flex-shrink-0 bg-[#AFD6EF] flex items-center justify-center px-4 relative">
+																			{/* Map label button in top-left of panel header */}
+																			<button
+																				type="button"
+																				onClick={() => setIsMapView(false)}
+																				className="absolute left-[10px] top-[7px] flex items-center justify-center cursor-pointer"
+																				style={{
+																					width: '53px',
+																					height: '19px',
+																					backgroundColor: '#CDEFC3',
+																					borderRadius: '4px',
+																					border: '2px solid #000000',
+																					fontFamily:
+																						'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																					fontSize: '13px',
+																					fontWeight: 600,
+																					lineHeight: '1',
+																				}}
+																			>
+																				Map
+																			</button>
+																			<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
+																				{selectedContacts.length} selected
+																			</span>
+																			<button
+																				type="button"
+																				onClick={handleSelectAll}
+																				className="font-secondary text-[12px] font-medium text-black hover:underline absolute right-[10px] top-1/2 translate-y-[4px]"
+																			>
+																				{isAllSelected ? 'Deselect All' : 'Select all'}
+																			</button>
+																		</div>
+																		{/* Scrollable contact list */}
+																		<CustomScrollbar
+																			className="flex-1 min-h-0"
+																			contentClassName="p-[6px] pb-[14px] space-y-[7px]"
+																			thumbWidth={2}
+																			thumbColor="#000000"
+																			trackColor="transparent"
+																			offsetRight={-6}
+																			disableOverflowClass
+																		>
+																			{(contacts || []).map((contact) => {
+																				const isSelected = selectedContacts.includes(
+																					contact.id
+																				);
+																				const isUsed = usedContactIdsSet.has(contact.id);
+																				const firstName = contact.firstName || '';
+																				const lastName = contact.lastName || '';
+																				const fullName =
+																					contact.name ||
+																					`${firstName} ${lastName}`.trim();
+																				const company = contact.company || '';
+																				const headline =
+																					contact.headline || contact.title || '';
+																				const stateAbbr =
+																					getStateAbbreviation(contact.state || '') || '';
+																				const city = contact.city || '';
 
-									{/* Mobile sticky button at bottom */}
-									{isMobile &&
-										typeof window !== 'undefined' &&
-										createPortal(
-											<div className="mobile-sticky-cta">
-												<Button
-													onClick={handleCreateCampaign}
-													isLoading={
-														isPendingCreateCampaign || isPendingBatchUpdateContacts
-													}
-													variant="primary-light"
-													bold
-													className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] transition-colors !opacity-100 disabled:!opacity-100"
-													disabled={selectedContacts.length === 0}
+																				return (
+																					<div
+																						key={contact.id}
+																						data-contact-id={contact.id}
+																						className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none"
+																						style={{
+																							backgroundColor: isSelected
+																								? '#C9EAFF'
+																								: '#FFFFFF',
+																						}}
+																						onClick={() => {
+																							if (isSelected) {
+																								setSelectedContacts(
+																									selectedContacts.filter(
+																										(id) => id !== contact.id
+																									)
+																								);
+																							} else {
+																								setSelectedContacts([
+																									...selectedContacts,
+																									contact.id,
+																								]);
+																							}
+																						}}
+																						onMouseEnter={() =>
+																							setHoveredContact(contact)
+																						}
+																						onMouseLeave={() => setHoveredContact(null)}
+																					>
+																						{fullName ? (
+																							<>
+																								{/* Top Left - Name */}
+																								<div className="pl-3 pr-1 flex items-center h-[23px]">
+																									{isUsed && (
+																										<span
+																											className="inline-block shrink-0 mr-2"
+																											title="Used in a previous campaign"
+																											style={{
+																												width: '16px',
+																												height: '16px',
+																												borderRadius: '50%',
+																												border: '1px solid #000000',
+																												backgroundColor: '#DAE6FE',
+																											}}
+																										/>
+																									)}
+																									<div className="font-bold text-[11px] w-full truncate leading-tight">
+																										{fullName}
+																									</div>
+																								</div>
+																								{/* Top Right - Title/Headline */}
+																								<div className="pr-2 pl-1 flex items-center h-[23px]">
+																									{headline ? (
+																										<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																											<span className="text-[10px] text-black leading-none truncate">
+																												{headline}
+																											</span>
+																										</div>
+																									) : (
+																										<div className="w-full" />
+																									)}
+																								</div>
+																								{/* Bottom Left - Company */}
+																								<div className="pl-3 pr-1 flex items-center h-[22px]">
+																									<div className="text-[11px] text-black w-full truncate leading-tight">
+																										{company}
+																									</div>
+																								</div>
+																								{/* Bottom Right - Location */}
+																								<div className="pr-2 pl-1 flex items-center h-[22px]">
+																									{city || stateAbbr ? (
+																										<div className="flex items-center gap-1 w-full">
+																											{stateAbbr && (
+																												<span
+																													className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																													style={{
+																														backgroundColor:
+																															stateBadgeColorMap[
+																																stateAbbr
+																															] || 'transparent',
+																														borderColor: '#000000',
+																													}}
+																												>
+																													{stateAbbr}
+																												</span>
+																											)}
+																											{city && (
+																												<span className="text-[10px] text-black leading-none truncate">
+																													{city}
+																												</span>
+																											)}
+																										</div>
+																									) : (
+																										<div className="w-full" />
+																									)}
+																								</div>
+																							</>
+																						) : (
+																							<>
+																								{/* No name - Company spans left column */}
+																								<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
+																									{isUsed && (
+																										<span
+																											className="inline-block shrink-0 mr-2"
+																											title="Used in a previous campaign"
+																											style={{
+																												width: '16px',
+																												height: '16px',
+																												borderRadius: '50%',
+																												border: '1px solid #000000',
+																												backgroundColor: '#DAE6FE',
+																											}}
+																										/>
+																									)}
+																									<div className="font-bold text-[11px] w-full truncate leading-tight">
+																										{company || '—'}
+																									</div>
+																								</div>
+																								{/* Top Right - Title/Headline */}
+																								<div className="pr-2 pl-1 flex items-center h-[23px]">
+																									{headline ? (
+																										<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																											<span className="text-[10px] text-black leading-none truncate">
+																												{headline}
+																											</span>
+																										</div>
+																									) : (
+																										<div className="w-full" />
+																									)}
+																								</div>
+																								{/* Bottom Right - Location */}
+																								<div className="pr-2 pl-1 flex items-center h-[22px]">
+																									{city || stateAbbr ? (
+																										<div className="flex items-center gap-1 w-full">
+																											{stateAbbr && (
+																												<span
+																													className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																													style={{
+																														backgroundColor:
+																															stateBadgeColorMap[
+																																stateAbbr
+																															] || 'transparent',
+																														borderColor: '#000000',
+																													}}
+																												>
+																													{stateAbbr}
+																												</span>
+																											)}
+																											{city && (
+																												<span className="text-[10px] text-black leading-none truncate">
+																													{city}
+																												</span>
+																											)}
+																										</div>
+																									) : (
+																										<div className="w-full" />
+																									)}
+																								</div>
+																							</>
+																						)}
+																					</div>
+																				);
+																			})}
+																		</CustomScrollbar>
+																	</div>
+																)}
+																{/* Research panel - appears to left of search results when hovering (compact) - hidden while loading */}
+																{!(
+																	isSearchPending ||
+																	isLoadingContacts ||
+																	isRefetchingContacts
+																) &&
+																	hoveredContact &&
+																	(() => {
+																		// Parse metadata sections [1], [2], etc.
+																		const parseMetadataSections = (
+																			metadata: string | null | undefined
+																		) => {
+																			if (!metadata) return {};
+
+																			const allSections: Record<string, string> = {};
+																			const regex =
+																				/\[(\d+)\]\s*([\s\S]*?)(?=\[\d+\]|$)/g;
+																			let match;
+																			while ((match = regex.exec(metadata)) !== null) {
+																				const sectionNum = match[1];
+																				const content = match[2].trim();
+																				allSections[sectionNum] = content;
+																			}
+
+																			const sections: Record<string, string> = {};
+																			let expectedNum = 1;
+
+																			while (allSections[String(expectedNum)]) {
+																				const content = allSections[String(expectedNum)];
+																				const meaningfulContent = content
+																					.replace(/[.\s,;:!?'"()\-–—]/g, '')
+																					.trim();
+
+																				if (meaningfulContent.length < 5) {
+																					break;
+																				}
+
+																				sections[String(expectedNum)] = content;
+																				expectedNum++;
+																			}
+
+																			if (Object.keys(sections).length < 3) {
+																				return {};
+																			}
+
+																			return sections;
+																		};
+																		const metadataSections = parseMetadataSections(
+																			hoveredContact?.metadata
+																		);
+
+																		const hasAnyParsedSections =
+																			Object.keys(metadataSections).length > 0;
+																		const numSections =
+																			Object.keys(metadataSections).length;
+																		// Slightly larger: header(22) + contact(34) + divider(1) + sections(50 each) + summary(125) + padding
+																		const containerHeight = hasAnyParsedSections
+																			? `${22 + 34 + 1 + numSections * 52 + 130 + 10}px`
+																			: '340px';
+
+																		return (
+																			<div
+																				className="absolute rounded-[8px] shadow-lg flex flex-col"
+																				style={{
+																					top: '68px',
+																					right: '410px',
+																					width: '310px',
+																					height: containerHeight,
+																					maxHeight: 'calc(100% - 20px)',
+																					backgroundColor: 'rgba(216, 229, 251, 0.8)',
+																					border: '2px solid #143883',
+																					overflow: 'hidden',
+																				}}
+																			>
+																				{/* Header */}
+																				<div
+																					className="absolute top-0 left-0 w-full flex items-center px-[12px]"
+																					style={{
+																						height: '22px',
+																						backgroundColor: 'transparent',
+																					}}
+																				>
+																					<span className="font-secondary font-bold text-[12px] leading-none text-black">
+																						Research
+																					</span>
+																				</div>
+																				<div
+																					className="absolute left-0 w-full bg-black z-10"
+																					style={{ top: '22px', height: '1px' }}
+																				/>
+																				{/* Contact info bar */}
+																				<div
+																					className="absolute left-0 w-full bg-[#FFFFFF]"
+																					style={{ top: '23px', height: '34px' }}
+																				>
+																					<div className="w-full h-full px-[12px] flex items-center justify-between overflow-hidden">
+																						<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
+																							<div className="font-inter font-bold text-[13px] leading-none truncate text-black">
+																								{(() => {
+																									const fullName = `${
+																										hoveredContact.firstName || ''
+																									} ${
+																										hoveredContact.lastName || ''
+																									}`.trim();
+																									return (
+																										fullName ||
+																										hoveredContact.name ||
+																										hoveredContact.company ||
+																										'Unknown'
+																									);
+																								})()}
+																							</div>
+																							{(() => {
+																								const fullName = `${
+																									hoveredContact.firstName || ''
+																								} ${
+																									hoveredContact.lastName || ''
+																								}`.trim();
+																								const hasName =
+																									fullName.length > 0 ||
+																									(hoveredContact.name &&
+																										hoveredContact.name.length > 0);
+																								if (!hasName || !hoveredContact.company)
+																									return null;
+																								return (
+																									<div className="text-[10px] leading-tight truncate text-black/70 mt-[1px]">
+																										{hoveredContact.company}
+																									</div>
+																								);
+																							})()}
+																						</div>
+																						<div className="flex items-center gap-1 flex-shrink-0">
+																							{(() => {
+																								const stateAbbr =
+																									getStateAbbreviation(
+																										hoveredContact.state || ''
+																									) || '';
+																								if (
+																									stateAbbr &&
+																									stateBadgeColorMap[stateAbbr]
+																								) {
+																									return (
+																										<span
+																											className="inline-flex items-center justify-center h-[15px] px-[5px] rounded-[3px] border border-black text-[10px] font-bold leading-none"
+																											style={{
+																												backgroundColor:
+																													stateBadgeColorMap[stateAbbr],
+																											}}
+																										>
+																											{stateAbbr}
+																										</span>
+																									);
+																								}
+																								return null;
+																							})()}
+																							{(hoveredContact.title ||
+																								hoveredContact.headline) && (
+																								<div className="px-[5px] py-[2px] rounded-[5px] bg-[#E8EFFF] border border-black max-w-[90px] truncate">
+																									<span className="text-[9px] leading-none text-black block truncate">
+																										{hoveredContact.title ||
+																											hoveredContact.headline}
+																									</span>
+																								</div>
+																							)}
+																						</div>
+																					</div>
+																				</div>
+																				<div
+																					className="absolute left-0 w-full bg-black z-10"
+																					style={{ top: '57px', height: '1px' }}
+																				/>
+																				{/* Research result boxes */}
+																				{(() => {
+																					const boxConfigs = [
+																						{ key: '1', color: '#158BCF' },
+																						{ key: '2', color: '#43AEEC' },
+																						{ key: '3', color: '#7CC9F6' },
+																						{ key: '4', color: '#AADAF6' },
+																						{ key: '5', color: '#D7F0FF' },
+																					];
+
+																					const visibleBoxes = boxConfigs.filter(
+																						(config) => metadataSections[config.key]
+																					);
+
+																					return visibleBoxes.map((config, index) => (
+																						<div
+																							key={config.key}
+																							className="absolute"
+																							style={{
+																								top: `${64 + index * 52}px`,
+																								left: '50%',
+																								transform: 'translateX(-50%)',
+																								width: '292px',
+																								height: '44px',
+																								backgroundColor: config.color,
+																								border: '1px solid #000000',
+																								borderRadius: '6px',
+																							}}
+																						>
+																							<div
+																								className="absolute font-inter font-bold"
+																								style={{
+																									top: '4px',
+																									left: '6px',
+																									fontSize: '10px',
+																									color: '#000000',
+																								}}
+																							>
+																								[{config.key}]
+																							</div>
+																							<div
+																								className="absolute overflow-hidden"
+																								style={{
+																									top: '50%',
+																									transform: 'translateY(-50%)',
+																									right: '6px',
+																									width: '262px',
+																									height: '34px',
+																									backgroundColor: '#FFFFFF',
+																									border: '1px solid #000000',
+																									borderRadius: '5px',
+																								}}
+																							>
+																								<div className="w-full h-full px-[6px] flex items-center overflow-hidden">
+																									<div
+																										className="w-full text-[10px] leading-[1.25] text-black font-inter"
+																										style={{
+																											display: '-webkit-box',
+																											WebkitLineClamp: 2,
+																											WebkitBoxOrient: 'vertical',
+																											overflow: 'hidden',
+																										}}
+																									>
+																										{metadataSections[config.key]}
+																									</div>
+																								</div>
+																							</div>
+																						</div>
+																					));
+																				})()}
+																				{/* Summary box at bottom */}
+																				<div
+																					id="map-research-summary-box"
+																					className="absolute"
+																					style={{
+																						bottom: '6px',
+																						left: '50%',
+																						transform: 'translateX(-50%)',
+																						width: '292px',
+																						height: hasAnyParsedSections
+																							? '120px'
+																							: '265px',
+																						backgroundColor: hasAnyParsedSections
+																							? '#E9F7FF'
+																							: '#158BCF',
+																						border: '1px solid #000000',
+																						borderRadius: '6px',
+																					}}
+																				>
+																					<style>{`
+					#map-research-summary-box *::-webkit-scrollbar {
+						display: none !important;
+						width: 0 !important;
+						height: 0 !important;
+						background: transparent !important;
+					}
+					#map-research-summary-box * {
+						scrollbar-width: none !important;
+						-ms-overflow-style: none !important;
+					}
+				`}</style>
+																					<div
+																						className="absolute overflow-hidden"
+																						style={{
+																							top: '50%',
+																							left: '50%',
+																							transform: 'translate(-50%, -50%)',
+																							width: '282px',
+																							height: hasAnyParsedSections
+																								? '110px'
+																								: '255px',
+																							backgroundColor: '#FFFFFF',
+																							border: '1px solid #000000',
+																							borderRadius: '5px',
+																						}}
+																					>
+																						{hoveredContact?.metadata ? (
+																							<div className="w-full h-full p-2 overflow-hidden">
+																								<div
+																									className="text-[11px] leading-[1.4] text-black font-inter font-normal whitespace-pre-wrap overflow-y-scroll h-full"
+																									style={{
+																										wordBreak: 'break-word',
+																									}}
+																								>
+																									{hoveredContact.metadata}
+																								</div>
+																							</div>
+																						) : null}
+																					</div>
+																				</div>
+																			</div>
+																		);
+																	})()}
+																{/* Create Campaign button overlaid on map - only show when not loading */}
+																{!isMobile &&
+																	!(
+																		isSearchPending ||
+																		isLoadingContacts ||
+																		isRefetchingContacts
+																	) && (
+																		<div className="absolute bottom-[10px] left-[10px] right-[10px] flex justify-center">
+																			<Button
+																				isLoading={
+																					isPendingCreateCampaign ||
+																					isPendingBatchUpdateContacts
+																				}
+																				variant="primary-light"
+																				bold
+																				className={`relative w-full max-w-[420px] h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
+																					selectedContacts.length === 0
+																						? 'opacity-[0.62]'
+																						: 'opacity-100'
+																				}`}
+																				style={
+																					selectedContacts.length === 0
+																						? { filter: 'grayscale(100%)' }
+																						: undefined
+																				}
+																				onClick={() => {
+																					if (selectedContacts.length === 0) return;
+																					handleCreateCampaign();
+																				}}
+																			>
+																				<span className="relative z-20">
+																					Add to Campaign
+																				</span>
+																				<div
+																					className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+																					onClick={(e) => {
+																						e.stopPropagation();
+																						handleSelectAll();
+																					}}
+																				>
+																					<span className="text-black text-[14px] font-medium">
+																						All
+																					</span>
+																				</div>
+																				<span
+																					aria-hidden="true"
+																					className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+																				/>
+																			</Button>
+																		</div>
+																	)}
+															</div>
+														</div>
+													</>,
+													document.body
+												)}
+										</>
+									) : (
+										<>
+											{/* Table View (default) */}
+											{/* Map button positioned above table on the right */}
+											<div className="w-full md:w-[1004px] mx-auto flex justify-end mb-[4px] relative z-[80]">
+												<button
+													type="button"
+													onClick={() => setIsMapView(true)}
+													className="bg-white border-2 border-black rounded-[8px] text-[14px] font-medium font-secondary hover:bg-gray-50 transition-colors flex items-center justify-center cursor-pointer"
+													style={{ width: '105px', height: '22px' }}
 												>
-													Add to Campaign
-												</Button>
-											</div>,
-											document.body
-										)}
+													Map
+												</button>
+											</div>
+											<Card className="border-0 shadow-none !p-0 w-full !my-0">
+												<CardContent className="!p-0 w-full">
+													<CustomTable
+														initialSelectAll={false}
+														isSelectable
+														setSelectedRows={setSelectedContacts}
+														data={contacts}
+														columns={columns}
+														searchable={false}
+														tableRef={tableRef}
+														rowsPerPage={100}
+														displayRowsPerPage={false}
+														constrainHeight
+														useCustomScrollbar={!isMobileLandscape}
+														scrollbarOffsetRight={-7}
+														containerClassName="search-results-table h-[571px] rounded-[8px] border-[#143883] md:w-[1004px] border-[3px]"
+														tableClassName="w-[calc(100%-12px)] mx-auto border-separate border-spacing-y-[6px]"
+														headerClassName="[&_tr]:border-[#737373]"
+														theadCellClassName="border-[#737373] font-secondary text-[14px] font-medium"
+														rowClassName="border-[#737373] row-hover-scroll bg-white odd:bg-white even:bg-white rounded-[8px] [&>td:first-child]:rounded-l-[8px] [&>td:last-child]:rounded-r-[8px] [&>td]:border-y-2 [&>td:first-child]:border-l-2 [&>td:last-child]:border-r-2 border-none !h-[58px] min-h-[58px] [&>td]:!h-[58px] [&>td]:!py-0"
+														stickyHeaderClassName="bg-[#AFD6EF]"
+														hidePagination
+														onRowHover={
+															isMobile ? undefined : (row) => setHoveredContact(row)
+														}
+														headerAction={
+															!isMobile ? (
+																<button
+																	type="button"
+																	onClick={handleCreateCampaign}
+																	disabled={selectedContacts.length === 0}
+																	className="font-secondary"
+																	style={{
+																		width: '127px',
+																		height: '31px',
+																		background:
+																			selectedContacts.length === 0
+																				? 'rgba(93, 171, 104, 0.1)'
+																				: '#B8E4BE',
+																		border: '2px solid #000000',
+																		color:
+																			selectedContacts.length === 0
+																				? 'rgba(0, 0, 0, 0.4)'
+																				: '#000000',
+																		fontSize: '13px',
+																		fontWeight: 500,
+																		borderRadius: '8px',
+																		lineHeight: 'normal',
+																		display: 'flex',
+																		alignItems: 'center',
+																		justifyContent: 'center',
+																		padding: '0',
+																		textAlign: 'center',
+																		whiteSpace: 'nowrap',
+																		cursor:
+																			selectedContacts.length === 0
+																				? 'default'
+																				: 'pointer',
+																		opacity: selectedContacts.length === 0 ? 0.6 : 1,
+																	}}
+																>
+																	Create Campaign
+																</button>
+															) : null
+														}
+														headerInlineAction={
+															<button
+																onClick={handleSelectAll}
+																className="text-[14px] font-secondary font-normal text-black hover:underline"
+																type="button"
+															>
+																{isAllSelected ? 'Deselect All' : 'Select all'}
+															</button>
+														}
+													/>
+												</CardContent>
+											</Card>
+											{/* Desktop button (non-sticky) */}
+											{!isMobile && (
+												<div className="flex items-center justify-center w-full">
+													<Button
+														isLoading={
+															isPendingCreateCampaign || isPendingBatchUpdateContacts
+														}
+														variant="primary-light"
+														bold
+														className="relative w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
+														onClick={() => {
+															if (selectedContacts.length === 0) return;
+															handleCreateCampaign();
+														}}
+													>
+														<span className="relative z-20">Add to Campaign</span>
+														<div
+															className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+															onClick={(e) => {
+																e.stopPropagation();
+																handleSelectAll();
+															}}
+														>
+															<span className="text-black text-[14px] font-medium">
+																All
+															</span>
+														</div>
+														<span
+															aria-hidden="true"
+															className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+														/>
+													</Button>
+												</div>
+											)}
+
+											{/* Mobile sticky button at bottom */}
+											{isMobile &&
+												typeof window !== 'undefined' &&
+												createPortal(
+													<div className="mobile-sticky-cta">
+														<Button
+															onClick={handleCreateCampaign}
+															isLoading={
+																isPendingCreateCampaign || isPendingBatchUpdateContacts
+															}
+															variant="primary-light"
+															bold
+															className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] transition-colors !opacity-100 disabled:!opacity-100"
+															disabled={selectedContacts.length === 0}
+														>
+															Add to Campaign
+														</Button>
+													</div>,
+													document.body
+												)}
+										</>
+									)}
 								</div>
 								{/* Right-side box */}
 								{!isMobile &&
