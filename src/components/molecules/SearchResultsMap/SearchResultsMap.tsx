@@ -43,7 +43,6 @@ const mapOptions: google.maps.MapOptions = {
 
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
-	selectedContacts,
 	onMarkerClick,
 }) => {
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
@@ -241,27 +240,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		onMarkerClick?.(contact);
 	};
 
-	const getMarkerIcon = (contact: ContactWithName, isSelected: boolean) => {
-		const isContactSelected = selectedContacts.includes(contact.id);
-
-		// Selected contacts get green, unselected get gray
-		const fillColor = isContactSelected ? '#5DAB68' : '#9CA3AF';
-		const strokeColor = isSelected
-			? '#000000'
-			: isContactSelected
-			? '#3d8b4a'
-			: '#6B7280';
-		const scale = isSelected ? 1.3 : 1;
-
-		return {
+	const markerIcon = useMemo(
+		() => ({
 			path: google.maps.SymbolPath.CIRCLE,
-			fillColor,
+			fillColor: '#D21E1F',
 			fillOpacity: 1,
-			strokeColor,
-			strokeWeight: isSelected ? 3 : 2,
-			scale: 8 * scale,
-		};
-	};
+			strokeColor: '#FFFFFF',
+			strokeWeight: 3,
+			scale: 8,
+		}),
+		[]
+	);
 
 	// Compute initial center based on contacts (if available)
 	// Must be before early returns to satisfy React hooks rules
@@ -327,7 +316,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						key={contact.id}
 						position={coords}
 						onClick={() => handleMarkerClick(contact)}
-						icon={getMarkerIcon(contact, selectedMarker?.id === contact.id)}
+						icon={markerIcon}
+						animation={undefined}
+						clickable={true}
 					/>
 				);
 			})}
