@@ -489,7 +489,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						{Array.from({ length: Math.max(0, 6 - draftEmails.length) }).map((_, idx) => (
 							<div
 								key={`draft-placeholder-${idx}`}
-								className="select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
+								className="select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#FFDC9E] p-2"
 							/>
 						))}
 					</div>

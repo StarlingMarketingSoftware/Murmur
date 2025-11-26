@@ -81,7 +81,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					background: isContacts
 						? 'linear-gradient(to bottom, #ffffff 26px, #EB8586 26px)'
 						: isDrafts
-						? 'linear-gradient(to bottom, #ffffff 26px, #FFD383 26px)'
+						? 'linear-gradient(to bottom, #ffffff 26px, #FFDC9E 26px)'
 						: isSent
 						? 'linear-gradient(to bottom, #ffffff 26px, #5AB477 26px)'
 						: 'white',
@@ -183,7 +183,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 									key={idx}
 									className={`select-none w-[489px] ${
 										isDrafts || isSent ? 'h-[97px]' : 'h-[64px]'
-									} overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2`}
+									} overflow-hidden rounded-[8px] border-2 border-[#000000] ${
+										isDrafts ? 'bg-[#FFDC9E]' : 'bg-white'
+									} p-2`}
 								/>
 							))}
 						</div>
@@ -213,7 +215,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							backgroundColor: isContacts
 								? '#EB8586'
 								: isDrafts
-								? '#FFD383'
+								? '#FFDC9E'
 								: isSent
 								? '#5AB477'
 								: 'white',
