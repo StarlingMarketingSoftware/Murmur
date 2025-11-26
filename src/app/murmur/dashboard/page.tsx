@@ -1169,7 +1169,9 @@ const Dashboard = () => {
 				{hasSearched && !isLoadingContacts && !isRefetchingContacts && (
 					<div className="results-search-bar-wrapper w-full max-w-[531px] mx-auto px-4 relative">
 						<div
-							className={`results-search-bar-inner ${hoveredContact ? 'invisible' : ''}`}
+							className={`results-search-bar-inner ${
+								hoveredContact && !isMapView ? 'invisible' : ''
+							}`}
 						>
 							<Form {...form}>
 								<form
@@ -1630,6 +1632,8 @@ const Dashboard = () => {
 																							]);
 																						}
 																					}}
+																					onMouseEnter={() => setHoveredContact(contact)}
+																					onMouseLeave={() => setHoveredContact(null)}
 																				>
 																					{fullName ? (
 																						<>
@@ -1767,6 +1771,305 @@ const Dashboard = () => {
 																		})}
 																	</CustomScrollbar>
 																</div>
+																{/* Research panel - appears to left of search results when hovering (compact) */}
+																{hoveredContact &&
+																	(() => {
+																		// Parse metadata sections [1], [2], etc.
+																		const parseMetadataSections = (
+																			metadata: string | null | undefined
+																		) => {
+																			if (!metadata) return {};
+
+																			const allSections: Record<string, string> = {};
+																			const regex =
+																				/\[(\d+)\]\s*([\s\S]*?)(?=\[\d+\]|$)/g;
+																			let match;
+																			while ((match = regex.exec(metadata)) !== null) {
+																				const sectionNum = match[1];
+																				const content = match[2].trim();
+																				allSections[sectionNum] = content;
+																			}
+
+																			const sections: Record<string, string> = {};
+																			let expectedNum = 1;
+
+																			while (allSections[String(expectedNum)]) {
+																				const content = allSections[String(expectedNum)];
+																				const meaningfulContent = content
+																					.replace(/[.\s,;:!?'"()\-–—]/g, '')
+																					.trim();
+
+																				if (meaningfulContent.length < 5) {
+																					break;
+																				}
+
+																				sections[String(expectedNum)] = content;
+																				expectedNum++;
+																			}
+
+																			if (Object.keys(sections).length < 3) {
+																				return {};
+																			}
+
+																			return sections;
+																		};
+																		const metadataSections = parseMetadataSections(
+																			hoveredContact?.metadata
+																		);
+
+																		const hasAnyParsedSections =
+																			Object.keys(metadataSections).length > 0;
+																		const numSections =
+																			Object.keys(metadataSections).length;
+																		// Slightly larger: header(22) + contact(34) + divider(1) + sections(50 each) + summary(125) + padding
+																		const containerHeight = hasAnyParsedSections
+																			? `${22 + 34 + 1 + numSections * 52 + 130 + 10}px`
+																			: '340px';
+
+																		return (
+																			<div
+																				className="absolute rounded-[8px] shadow-lg flex flex-col"
+																				style={{
+																					top: '68px',
+																					right: '410px',
+																					width: '310px',
+																					height: containerHeight,
+																					maxHeight: 'calc(100% - 20px)',
+																					backgroundColor: '#D8E5FB',
+																					border: '2px solid #143883',
+																					overflow: 'hidden',
+																				}}
+																			>
+																				{/* Header */}
+																				<div
+																					className="absolute top-0 left-0 w-full flex items-center px-[12px]"
+																					style={{
+																						height: '22px',
+																						backgroundColor: '#E8EFFF',
+																					}}
+																				>
+																					<span className="font-secondary font-bold text-[12px] leading-none text-black">
+																						Research
+																					</span>
+																				</div>
+																				<div
+																					className="absolute left-0 w-full bg-black z-10"
+																					style={{ top: '22px', height: '1px' }}
+																				/>
+																				{/* Contact info bar */}
+																				<div
+																					className="absolute left-0 w-full bg-[#FFFFFF]"
+																					style={{ top: '23px', height: '34px' }}
+																				>
+																					<div className="w-full h-full px-[12px] flex items-center justify-between overflow-hidden">
+																						<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
+																							<div className="font-inter font-bold text-[13px] leading-none truncate text-black">
+																								{(() => {
+																									const fullName = `${
+																										hoveredContact.firstName || ''
+																									} ${
+																										hoveredContact.lastName || ''
+																									}`.trim();
+																									return (
+																										fullName ||
+																										hoveredContact.name ||
+																										hoveredContact.company ||
+																										'Unknown'
+																									);
+																								})()}
+																							</div>
+																							{(() => {
+																								const fullName = `${
+																									hoveredContact.firstName || ''
+																								} ${
+																									hoveredContact.lastName || ''
+																								}`.trim();
+																								const hasName =
+																									fullName.length > 0 ||
+																									(hoveredContact.name &&
+																										hoveredContact.name.length > 0);
+																								if (!hasName || !hoveredContact.company)
+																									return null;
+																								return (
+																									<div className="text-[10px] leading-tight truncate text-black/70 mt-[1px]">
+																										{hoveredContact.company}
+																									</div>
+																								);
+																							})()}
+																						</div>
+																						<div className="flex items-center gap-1 flex-shrink-0">
+																							{(() => {
+																								const stateAbbr =
+																									getStateAbbreviation(
+																										hoveredContact.state || ''
+																									) || '';
+																								if (
+																									stateAbbr &&
+																									stateBadgeColorMap[stateAbbr]
+																								) {
+																									return (
+																										<span
+																											className="inline-flex items-center justify-center h-[15px] px-[5px] rounded-[3px] border border-black text-[10px] font-bold leading-none"
+																											style={{
+																												backgroundColor:
+																													stateBadgeColorMap[stateAbbr],
+																											}}
+																										>
+																											{stateAbbr}
+																										</span>
+																									);
+																								}
+																								return null;
+																							})()}
+																							{(hoveredContact.title ||
+																								hoveredContact.headline) && (
+																								<div className="px-[5px] py-[2px] rounded-[5px] bg-[#E8EFFF] border border-black max-w-[90px] truncate">
+																									<span className="text-[9px] leading-none text-black block truncate">
+																										{hoveredContact.title ||
+																											hoveredContact.headline}
+																									</span>
+																								</div>
+																							)}
+																						</div>
+																					</div>
+																				</div>
+																				<div
+																					className="absolute left-0 w-full bg-black z-10"
+																					style={{ top: '57px', height: '1px' }}
+																				/>
+																				{/* Research result boxes */}
+																				{(() => {
+																					const boxConfigs = [
+																						{ key: '1', color: '#158BCF' },
+																						{ key: '2', color: '#43AEEC' },
+																						{ key: '3', color: '#7CC9F6' },
+																						{ key: '4', color: '#AADAF6' },
+																						{ key: '5', color: '#D7F0FF' },
+																					];
+
+																					const visibleBoxes = boxConfigs.filter(
+																						(config) => metadataSections[config.key]
+																					);
+
+																					return visibleBoxes.map((config, index) => (
+																						<div
+																							key={config.key}
+																							className="absolute"
+																							style={{
+																								top: `${64 + index * 52}px`,
+																								left: '50%',
+																								transform: 'translateX(-50%)',
+																								width: '292px',
+																								height: '44px',
+																								backgroundColor: config.color,
+																								border: '1px solid #000000',
+																								borderRadius: '6px',
+																							}}
+																						>
+																							<div
+																								className="absolute font-inter font-bold"
+																								style={{
+																									top: '4px',
+																									left: '6px',
+																									fontSize: '10px',
+																									color: '#000000',
+																								}}
+																							>
+																								[{config.key}]
+																							</div>
+																							<div
+																								className="absolute overflow-hidden"
+																								style={{
+																									top: '50%',
+																									transform: 'translateY(-50%)',
+																									right: '6px',
+																									width: '262px',
+																									height: '34px',
+																									backgroundColor: '#FFFFFF',
+																									border: '1px solid #000000',
+																									borderRadius: '5px',
+																								}}
+																							>
+																								<div className="w-full h-full px-[6px] flex items-center overflow-hidden">
+																									<div
+																										className="w-full text-[10px] leading-[1.25] text-black font-inter"
+																										style={{
+																											display: '-webkit-box',
+																											WebkitLineClamp: 2,
+																											WebkitBoxOrient: 'vertical',
+																											overflow: 'hidden',
+																										}}
+																									>
+																										{metadataSections[config.key]}
+																									</div>
+																								</div>
+																							</div>
+																						</div>
+																					));
+																				})()}
+																				{/* Summary box at bottom */}
+																				<div
+																					id="map-research-summary-box"
+																					className="absolute"
+																					style={{
+																						bottom: '6px',
+																						left: '50%',
+																						transform: 'translateX(-50%)',
+																						width: '292px',
+																						height: hasAnyParsedSections
+																							? '120px'
+																							: '265px',
+																						backgroundColor: hasAnyParsedSections
+																							? '#E9F7FF'
+																							: '#158BCF',
+																						border: '1px solid #000000',
+																						borderRadius: '6px',
+																					}}
+																				>
+																					<style>{`
+					#map-research-summary-box *::-webkit-scrollbar {
+						display: none !important;
+						width: 0 !important;
+						height: 0 !important;
+						background: transparent !important;
+					}
+					#map-research-summary-box * {
+						scrollbar-width: none !important;
+						-ms-overflow-style: none !important;
+					}
+				`}</style>
+																					<div
+																						className="absolute overflow-hidden"
+																						style={{
+																							top: '50%',
+																							left: '50%',
+																							transform: 'translate(-50%, -50%)',
+																							width: '282px',
+																							height: hasAnyParsedSections
+																								? '110px'
+																								: '255px',
+																							backgroundColor: '#FFFFFF',
+																							border: '1px solid #000000',
+																							borderRadius: '5px',
+																						}}
+																					>
+																						{hoveredContact?.metadata ? (
+																							<div className="w-full h-full p-2 overflow-hidden">
+																								<div
+																									className="text-[11px] leading-[1.4] text-black font-inter font-normal whitespace-pre-wrap overflow-y-scroll h-full"
+																									style={{
+																										wordBreak: 'break-word',
+																									}}
+																								>
+																									{hoveredContact.metadata}
+																								</div>
+																							</div>
+																						) : null}
+																					</div>
+																				</div>
+																			</div>
+																		);
+																	})()}
 																{/* Create Campaign button overlaid on map - only show when not loading */}
 																{!isMobile &&
 																	!(
