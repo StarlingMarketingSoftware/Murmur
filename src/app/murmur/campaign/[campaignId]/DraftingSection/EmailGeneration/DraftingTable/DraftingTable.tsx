@@ -30,8 +30,13 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	const showTitle = !isContacts && title !== 'Drafts' && title !== 'Sent';
 	const isDrafts = title === 'Drafts';
 	const isSent = title === 'Sent';
+
+	const boxWidth = isContacts ? '499px' : '376px';
+	const boxHeight = isContacts ? '703px' : '474px';
+	const contentWidth = isContacts ? 'w-[489px]' : 'w-[366px]';
+
 	return (
-		<div style={{ width: '376px', height: '474px', position: 'relative' }}>
+		<div style={{ width: boxWidth, height: boxHeight, position: 'relative' }}>
 			{/* Centered number above block */}
 			<div
 				data-drafting-top-number
@@ -44,7 +49,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				}}
 				className="text-[12px] font-inter font-medium text-black"
 			>
-				{isContacts ? '1' : isDrafts ? '3' : isSent ? '4' : ''}
+				{isContacts ? '' : isDrafts ? '3' : isSent ? '4' : ''}
 			</div>
 			{/* Top-left text label */}
 			<div
@@ -52,7 +57,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				style={{ position: 'absolute', top: '-20px', left: '2px', pointerEvents: 'none' }}
 				className="text-[12px] font-inter font-medium text-black"
 			>
-				{isContacts ? 'Contacts' : isDrafts ? 'Drafts' : isSent ? 'Sent' : title}
+				{isContacts ? '' : isDrafts ? 'Drafts' : isSent ? 'Sent' : title}
 			</div>
 			{/* Container box with header */}
 			<div
@@ -61,7 +66,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					width: '100%',
 					height: '100%',
 					border: isContacts
-						? '2px solid #5D5B5B'
+						? '2px solid #000000'
 						: isDrafts
 						? '2px solid #A8833A'
 						: isSent
@@ -71,8 +76,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					position: 'relative',
 					display: 'flex',
 					flexDirection: 'column',
-					backgroundColor: isContacts
-						? '#EB8586'
+					background: isContacts
+						? 'linear-gradient(to bottom, #ffffff 26px, #EB8586 26px)'
 						: isDrafts
 						? '#FFD383'
 						: isSent
@@ -93,7 +98,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						alignItems: 'center',
 						height: isCompactHeader ? '20px' : '48px',
 						backgroundColor: isContacts
-							? '#EB8586'
+							? 'transparent'
 							: isDrafts
 							? '#FFD383'
 							: isSent
@@ -109,7 +114,11 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					{hasData && !isSent && (
 						<div
 							style={{
-								transform: isCompactHeader ? 'translateY(-2px)' : 'translateY(6px)',
+								transform: isCompactHeader
+									? isContacts
+										? 'translateY(103px)'
+										: 'translateY(-2px)'
+									: 'translateY(6px)',
 							}}
 						>
 							<Button
@@ -127,6 +136,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				{/* Content area */}
 				<CustomScrollbar
 					className="flex-1 drafting-table-content"
+					style={{ marginTop: isContacts ? '105px' : 0 }}
 					thumbWidth={2}
 					thumbColor="#000000"
 					trackColor="transparent"
@@ -152,7 +162,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							{Array.from({ length: 7 }).map((_, idx) => (
 								<div
 									key={idx}
-									className="select-none w-[366px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
+									className={`select-none ${contentWidth} h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white`}
 								/>
 							))}
 						</div>

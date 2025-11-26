@@ -44,7 +44,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 					<div
 						key={contact.id}
 						className={cn(
-							'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[366px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none row-hover-scroll',
+							'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[489px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none row-hover-scroll',
 							selectedContactIds.has(contact.id) ? 'bg-[#EAAEAE]' : ''
 						)}
 						onMouseDown={(e) => {
@@ -355,7 +355,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 				{Array.from({ length: Math.max(0, 7 - contacts.length) }).map((_, idx) => (
 					<div
 						key={`placeholder-${idx}`}
-						className="select-none w-[366px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
+						className="select-none w-[489px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
 					/>
 				))}
 			</div>
