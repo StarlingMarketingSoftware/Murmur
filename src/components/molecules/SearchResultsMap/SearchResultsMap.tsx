@@ -1,7 +1,7 @@
 'use client';
 
 import { FC, Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, MarkerF, OverlayView } from '@react-google-maps/api';
 import { ContactWithName } from '@/types/contact';
 import { useGeocodeContacts } from '@/hooks/queryHooks/useContacts';
 import {
@@ -11,6 +11,148 @@ import {
 	MAP_TOOLTIP_ANCHOR_X,
 	MAP_TOOLTIP_ANCHOR_Y,
 } from '@/components/atoms/_svg/MapTooltipIcon';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+
+// State badge colors matching dashboard
+const stateBadgeColorMap: Record<string, string> = {
+	AL: '#E57373',
+	AK: '#64B5F6',
+	AZ: '#FFD54F',
+	AR: '#81C784',
+	CA: '#BA68C8',
+	CO: '#4DD0E1',
+	CT: '#FF8A65',
+	DE: '#A1887F',
+	FL: '#4DB6AC',
+	GA: '#7986CB',
+	HI: '#F06292',
+	ID: '#AED581',
+	IL: '#FFB74D',
+	IN: '#90A4AE',
+	IA: '#DCE775',
+	KS: '#FFF176',
+	KY: '#4FC3F7',
+	LA: '#CE93D8',
+	ME: '#80CBC4',
+	MD: '#FFCC80',
+	MA: '#B39DDB',
+	MI: '#80DEEA',
+	MN: '#C5E1A5',
+	MS: '#EF9A9A',
+	MO: '#BCAAA4',
+	MT: '#B0BEC5',
+	NE: '#E6EE9C',
+	NV: '#FFE082',
+	NH: '#81D4FA',
+	NJ: '#F48FB1',
+	NM: '#FFAB91',
+	NY: '#9FA8DA',
+	NC: '#A5D6A7',
+	ND: '#CFD8DC',
+	OH: '#FFF59D',
+	OK: '#FF8A80',
+	OR: '#80CBC4',
+	PA: '#EA80FC',
+	RI: '#8C9EFF',
+	SC: '#FFCDD2',
+	SD: '#E1BEE7',
+	TN: '#DCEDC8',
+	TX: '#FFE0B2',
+	UT: '#B2EBF2',
+	VT: '#C8E6C9',
+	VA: '#D1C4E9',
+	WA: '#B2DFDB',
+	WV: '#FFE57F',
+	WI: '#F8BBD9',
+	WY: '#FFCCBC',
+	DC: '#E0E0E0',
+};
+
+// Helper to get state abbreviation
+const getStateAbbreviation = (state: string): string | null => {
+	if (!state) return null;
+	const upper = state.toUpperCase().trim();
+	if (upper.length === 2 && stateBadgeColorMap[upper]) return upper;
+	const stateMap: Record<string, string> = {
+		ALABAMA: 'AL',
+		ALASKA: 'AK',
+		ARIZONA: 'AZ',
+		ARKANSAS: 'AR',
+		CALIFORNIA: 'CA',
+		COLORADO: 'CO',
+		CONNECTICUT: 'CT',
+		DELAWARE: 'DE',
+		FLORIDA: 'FL',
+		GEORGIA: 'GA',
+		HAWAII: 'HI',
+		IDAHO: 'ID',
+		ILLINOIS: 'IL',
+		INDIANA: 'IN',
+		IOWA: 'IA',
+		KANSAS: 'KS',
+		KENTUCKY: 'KY',
+		LOUISIANA: 'LA',
+		MAINE: 'ME',
+		MARYLAND: 'MD',
+		MASSACHUSETTS: 'MA',
+		MICHIGAN: 'MI',
+		MINNESOTA: 'MN',
+		MISSISSIPPI: 'MS',
+		MISSOURI: 'MO',
+		MONTANA: 'MT',
+		NEBRASKA: 'NE',
+		NEVADA: 'NV',
+		'NEW HAMPSHIRE': 'NH',
+		'NEW JERSEY': 'NJ',
+		'NEW MEXICO': 'NM',
+		'NEW YORK': 'NY',
+		'NORTH CAROLINA': 'NC',
+		'NORTH DAKOTA': 'ND',
+		OHIO: 'OH',
+		OKLAHOMA: 'OK',
+		OREGON: 'OR',
+		PENNSYLVANIA: 'PA',
+		'RHODE ISLAND': 'RI',
+		'SOUTH CAROLINA': 'SC',
+		'SOUTH DAKOTA': 'SD',
+		TENNESSEE: 'TN',
+		TEXAS: 'TX',
+		UTAH: 'UT',
+		VERMONT: 'VT',
+		VIRGINIA: 'VA',
+		WASHINGTON: 'WA',
+		'WEST VIRGINIA': 'WV',
+		WISCONSIN: 'WI',
+		WYOMING: 'WY',
+		'DISTRICT OF COLUMBIA': 'DC',
+	};
+	return stateMap[upper] || null;
+};
+
+// Parse metadata sections [1], [2], etc.
+// Returns sections if at least 1 valid section exists (more lenient than dashboard's 3)
+const parseMetadataSections = (
+	metadata: string | null | undefined
+): Record<string, string> => {
+	if (!metadata) return {};
+	const allSections: Record<string, string> = {};
+	const regex = /\[(\d+)\]\s*([\s\S]*?)(?=\[\d+\]|$)/g;
+	let match;
+	while ((match = regex.exec(metadata)) !== null) {
+		allSections[match[1]] = match[2].trim();
+	}
+	const sections: Record<string, string> = {};
+	let expectedNum = 1;
+	while (allSections[String(expectedNum)]) {
+		const content = allSections[String(expectedNum)];
+		const meaningfulContent = content.replace(/[.\s,;:!?'"()\-–—]/g, '').trim();
+		if (meaningfulContent.length < 5) break;
+		sections[String(expectedNum)] = content;
+		expectedNum++;
+	}
+	// Return sections if we have at least 1 valid section
+	return Object.keys(sections).length >= 1 ? sections : {};
+};
 
 interface SearchResultsMapProps {
 	contacts: ContactWithName[];
@@ -408,34 +550,292 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			})}
 
 			{selectedMarker && selectedMarkerCoords && (
-				<InfoWindowF
+				<OverlayView
 					position={selectedMarkerCoords}
-					onCloseClick={() => setSelectedMarker(null)}
+					mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+					getPixelPositionOffset={(width, height) => ({
+						x: -(width / 2),
+						y: -height - 20,
+					})}
 				>
-					<div className="p-2 max-w-[200px]">
-						<div className="font-bold text-sm text-black">
-							{`${selectedMarker.firstName || ''} ${
-								selectedMarker.lastName || ''
-							}`.trim() ||
-								selectedMarker.name ||
-								selectedMarker.company ||
-								'Unknown'}
+					<div
+						className="relative"
+						style={{
+							width: '320px',
+							backgroundColor: '#D8E5FB',
+							border: '2px solid black',
+							borderRadius: '7px',
+							overflow: 'hidden',
+							boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+						}}
+					>
+						{/* Close button */}
+						<button
+							onClick={() => setSelectedMarker(null)}
+							className="absolute top-1 right-1 z-20 w-5 h-5 flex items-center justify-center rounded-full bg-white/80 hover:bg-white border border-black/30 transition-colors"
+							style={{ fontSize: '12px', lineHeight: 1 }}
+						>
+							×
+						</button>
+						{/* Header */}
+						<div
+							className="w-full"
+							style={{ height: '20px', backgroundColor: '#E8EFFF' }}
+						/>
+						<div className="absolute top-[10px] left-[12px] -translate-y-1/2 z-10">
+							<span className="font-bold text-[12px] leading-none text-black">
+								Research
+							</span>
 						</div>
-						{selectedMarker.company && (
-							<div className="text-xs text-gray-600 mt-1">{selectedMarker.company}</div>
-						)}
-						{(selectedMarker.city || selectedMarker.state) && (
-							<div className="text-xs text-gray-500 mt-1">
-								{[selectedMarker.city, selectedMarker.state].filter(Boolean).join(', ')}
+						<div
+							className="absolute left-0 w-full bg-black z-10"
+							style={{ top: '20px', height: '2px' }}
+						/>
+						{/* Name/Company section */}
+						<div className="w-full bg-white" style={{ height: '36px', marginTop: '2px' }}>
+							<div className="w-full h-full px-3 flex items-center justify-between overflow-hidden">
+								<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
+									<div className="font-inter font-bold text-[13px] leading-none truncate text-black">
+										{(() => {
+											const fullName = `${selectedMarker.firstName || ''} ${
+												selectedMarker.lastName || ''
+											}`.trim();
+											return (
+												fullName ||
+												selectedMarker.name ||
+												selectedMarker.company ||
+												'Unknown'
+											);
+										})()}
+									</div>
+									{(() => {
+										const fullName = `${selectedMarker.firstName || ''} ${
+											selectedMarker.lastName || ''
+										}`.trim();
+										const hasName =
+											fullName.length > 0 ||
+											(selectedMarker.name && selectedMarker.name.length > 0);
+										if (!hasName) return null;
+										return (
+											<div className="text-[11px] leading-tight truncate text-black mt-[2px]">
+												{selectedMarker.company || ''}
+											</div>
+										);
+									})()}
+								</div>
+								<div className="flex items-center gap-2 flex-shrink-0">
+									<div className="flex flex-col items-end gap-[2px] max-w-[120px]">
+										<div className="flex items-center gap-1 w-full justify-end overflow-hidden">
+											{(() => {
+												const stateAbbr =
+													getStateAbbreviation(selectedMarker.state || '') || '';
+												if (stateAbbr && stateBadgeColorMap[stateAbbr]) {
+													return (
+														<span
+															className="inline-flex items-center justify-center h-[14px] px-[5px] rounded-[3px] border border-black text-[10px] font-bold leading-none flex-shrink-0"
+															style={{ backgroundColor: stateBadgeColorMap[stateAbbr] }}
+														>
+															{stateAbbr}
+														</span>
+													);
+												}
+												return null;
+											})()}
+											{selectedMarker.city && (
+												<span className="text-[11px] leading-none text-black truncate">
+													{selectedMarker.city}
+												</span>
+											)}
+										</div>
+										{(selectedMarker.title || selectedMarker.headline) && (
+											<div className="px-1.5 py-[1px] rounded-[6px] bg-[#E8EFFF] border border-black max-w-full truncate">
+												<span className="text-[9px] leading-none text-black block truncate">
+													{selectedMarker.title || selectedMarker.headline}
+												</span>
+											</div>
+										)}
+									</div>
+								</div>
 							</div>
-						)}
-						{selectedMarker.title && (
-							<div className="text-xs text-gray-500 mt-1 italic">
-								{selectedMarker.title}
-							</div>
-						)}
+						</div>
+						<div
+							className="absolute left-0 w-full bg-black z-10"
+							style={{ top: '58px', height: '1px' }}
+						/>
+						{/* Research boxes */}
+						{(() => {
+							// Debug: log the metadata to console
+							console.log('Contact metadata:', {
+								id: selectedMarker.id,
+								metadata: selectedMarker.metadata,
+								hasMetadata: !!selectedMarker.metadata,
+							});
+
+							const metadataSections = parseMetadataSections(selectedMarker.metadata);
+							const boxConfigs = [
+								{ key: '1', color: '#158BCF' },
+								{ key: '2', color: '#43AEEC' },
+								{ key: '3', color: '#7CC9F6' },
+								{ key: '4', color: '#AADAF6' },
+							];
+							const visibleBoxes = boxConfigs.filter(
+								(config) => metadataSections[config.key]
+							);
+
+							// If no parsed sections but raw metadata exists, show raw metadata
+							if (visibleBoxes.length === 0) {
+								if (
+									selectedMarker.metadata &&
+									selectedMarker.metadata.trim().length > 0
+								) {
+									// Show raw metadata in a single box if it doesn't match [1], [2] format
+									return (
+										<div className="p-2">
+											<div
+												id="map-research-scroll-container"
+												className="relative"
+												style={{
+													width: '100%',
+													minHeight: '60px',
+													backgroundColor: '#158BCF',
+													border: '2px solid #000000',
+													borderRadius: '6px',
+												}}
+											>
+												<style>{`
+													#map-research-scroll-container *::-webkit-scrollbar {
+														display: none !important;
+														width: 0 !important;
+														height: 0 !important;
+													}
+													#map-research-scroll-container * {
+														scrollbar-width: none !important;
+														-ms-overflow-style: none !important;
+													}
+												`}</style>
+												<CustomScrollbar
+													className="absolute"
+													style={{
+														top: '4px',
+														bottom: '4px',
+														left: '6px',
+														right: '6px',
+													}}
+													thumbWidth={2}
+													thumbColor="#000000"
+													offsetRight={-14}
+													contentClassName="scrollbar-hide"
+												>
+													<div
+														className="h-full"
+														style={{
+															backgroundColor: '#FFFFFF',
+															border: '1px solid #000000',
+															borderRadius: '4px',
+														}}
+													>
+														<div className="px-2 py-1">
+															<div className="w-full text-[10px] leading-[1.3] text-black font-inter">
+																{selectedMarker.metadata}
+															</div>
+														</div>
+													</div>
+												</CustomScrollbar>
+											</div>
+										</div>
+									);
+								}
+								return (
+									<div className="px-3 py-4 text-center text-[11px] text-gray-500 italic">
+										No research data available for this contact
+									</div>
+								);
+							}
+
+							return (
+								<div className="p-2 flex flex-col gap-2">
+									{visibleBoxes.map((config) => (
+										<div
+											key={config.key}
+											className="relative"
+											style={{
+												width: '100%',
+												minHeight: '44px',
+												backgroundColor: config.color,
+												border: '2px solid #000000',
+												borderRadius: '6px',
+											}}
+										>
+											<div
+												className="absolute font-inter font-bold"
+												style={{
+													top: '4px',
+													left: '6px',
+													fontSize: '10px',
+													color: '#000000',
+												}}
+											>
+												[{config.key}]
+											</div>
+											<div
+												className="absolute overflow-hidden"
+												style={{
+													top: '50%',
+													transform: 'translateY(-50%)',
+													right: '6px',
+													width: 'calc(100% - 36px)',
+													minHeight: '36px',
+													maxHeight: '36px',
+													backgroundColor: '#FFFFFF',
+													border: '1px solid #000000',
+													borderRadius: '4px',
+												}}
+											>
+												<div className="w-full h-full px-2 flex items-center overflow-hidden">
+													<div
+														className="w-full text-[10px] leading-[1.3] text-black font-inter"
+														style={{
+															display: '-webkit-box',
+															WebkitLineClamp: 2,
+															WebkitBoxOrient: 'vertical',
+															overflow: 'hidden',
+														}}
+													>
+														{metadataSections[config.key]}
+													</div>
+												</div>
+											</div>
+										</div>
+									))}
+								</div>
+							);
+						})()}
+						{/* Pointer triangle */}
+						<div
+							className="absolute left-1/2 -translate-x-1/2"
+							style={{
+								bottom: '-10px',
+								width: 0,
+								height: 0,
+								borderLeft: '10px solid transparent',
+								borderRight: '10px solid transparent',
+								borderTop: '10px solid #D8E5FB',
+							}}
+						/>
+						<div
+							className="absolute left-1/2 -translate-x-1/2"
+							style={{
+								bottom: '-14px',
+								width: 0,
+								height: 0,
+								borderLeft: '12px solid transparent',
+								borderRight: '12px solid transparent',
+								borderTop: '12px solid black',
+								zIndex: -1,
+							}}
+						/>
 					</div>
-				</InfoWindowF>
+				</OverlayView>
 			)}
 
 			{/* Geocoding indicator */}
