@@ -10,12 +10,17 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import DraftingStatusPanel from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftingStatusPanel';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
-import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { useEditEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { ContactsSelection } from './EmailGeneration/ContactsSelection/ContactsSelection';
 import { SentEmails } from './EmailGeneration/SentEmails/SentEmails';
 import { DraftedEmails } from './EmailGeneration/DraftedEmails/DraftedEmails';
-import { EmailWithRelations } from '@/types';
+import { EmailWithRelations, StripeSubscriptionStatus } from '@/types';
+import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
+import { useEditUser } from '@/hooks/queryHooks/useUsers';
+import { useMe } from '@/hooks/useMe';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	onOpenIdentityDialog?: () => void;
@@ -48,6 +53,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		livePreviewMessage,
 		livePreviewSubject,
 	} = useDraftingSection(props);
+
+	const { user, subscriptionTier, isFreeTrial } = useMe();
+	const queryClient = useQueryClient();
+	const { mutateAsync: sendMailgunMessage } = useSendMailgunMessage({
+		suppressToasts: true,
+	});
+	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
+	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 
 	const isMobile = useIsMobile();
 
@@ -100,6 +113,102 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const draftCount = draftEmails.length;
 	const sentEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.sent);
 	const sentCount = sentEmails.length;
+
+	const isSendingDisabled = isFreeTrial || (user?.sendingCredits || 0) === 0;
+
+	const handleSendDrafts = async () => {
+		const selectedDrafts =
+			draftsTabSelectedIds.size > 0
+				? draftEmails.filter((d) => draftsTabSelectedIds.has(d.id))
+				: draftEmails;
+
+		if (selectedDrafts.length === 0) {
+			toast.error('No drafts selected to send.');
+			return;
+		}
+
+		if (!campaign?.identity?.email || !campaign?.identity?.name) {
+			toast.error('Please create an Identity before sending emails.');
+			return;
+		}
+
+		if (
+			!subscriptionTier &&
+			user?.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING
+		) {
+			toast.error('Please upgrade to a paid plan to send emails.');
+			return;
+		}
+
+		const sendingCredits = user?.sendingCredits || 0;
+		const emailsToSend = selectedDrafts.length;
+
+		if (sendingCredits === 0) {
+			toast.error(
+				'You have run out of sending credits. Please upgrade your subscription.'
+			);
+			return;
+		}
+
+		const emailsWeCanSend = Math.min(emailsToSend, sendingCredits);
+		const emailsToProcess = selectedDrafts.slice(0, emailsWeCanSend);
+
+		let successfulSends = 0;
+
+		for (let i = 0; i < emailsToProcess.length; i++) {
+			const email = emailsToProcess[i];
+
+			try {
+				const res = await sendMailgunMessage({
+					subject: email.subject,
+					message: email.message,
+					recipientEmail: email.contact.email,
+					senderEmail: campaign.identity?.email,
+					senderName: campaign.identity?.name,
+					originEmail:
+						user?.customDomain && user?.customDomain !== ''
+							? user?.customDomain
+							: user?.murmurEmail,
+				});
+
+				if (res.success) {
+					await updateEmail({
+						id: email.id.toString(),
+						data: {
+							status: EmailStatus.sent,
+							sentAt: new Date(),
+						},
+					});
+					successfulSends++;
+					queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id] });
+				}
+			} catch (error) {
+				console.error('Failed to send email:', error);
+			}
+		}
+
+		if (user && successfulSends > 0) {
+			const newCreditBalance = Math.max(0, sendingCredits - successfulSends);
+			await editUser({
+				clerkId: user.clerkId,
+				data: { sendingCredits: newCreditBalance },
+			});
+		}
+
+		setDraftsTabSelectedIds(new Set());
+
+		if (successfulSends === emailsToSend) {
+			toast.success(`All ${successfulSends} emails sent successfully!`);
+		} else if (successfulSends > 0) {
+			if (emailsWeCanSend < emailsToSend) {
+				toast.warning(`Sent ${successfulSends} emails before running out of credits.`);
+			} else {
+				toast.warning(`${successfulSends} of ${emailsToSend} emails sent successfully.`);
+			}
+		} else {
+			toast.error('Failed to send emails. Please try again.');
+		}
+	};
 
 	const toListNames =
 		campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
@@ -198,11 +307,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										draftEmails={draftEmails}
 										isPendingEmails={isPendingEmails}
 										setSelectedDraftIds={setDraftsTabSelectedIds}
-										onSend={async () => {
-											// Send functionality - placeholder
-										}}
-										isSendingDisabled={false}
-										isFreeTrial={false}
+										onSend={handleSendDrafts}
+										isSendingDisabled={isSendingDisabled}
+										isFreeTrial={isFreeTrial || false}
 										fromName={fromName}
 										fromEmail={fromEmail}
 										subject={form.watch('subject')}
