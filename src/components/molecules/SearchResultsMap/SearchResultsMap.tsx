@@ -50,6 +50,7 @@ const mapOptions: google.maps.MapOptions = {
 
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
+	selectedContacts,
 	onMarkerClick,
 }) => {
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
@@ -248,12 +249,25 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		onMarkerClick?.(contact);
 	};
 
-	// Default red dot marker with larger invisible hit area
+	// Default red dot marker
 	const defaultMarkerIcon = useMemo(() => {
 		if (!isLoaded) return undefined;
 		return {
 			path: google.maps.SymbolPath.CIRCLE,
 			fillColor: '#D21E1F',
+			fillOpacity: 1,
+			strokeColor: '#FFFFFF',
+			strokeWeight: 3,
+			scale: 8,
+		};
+	}, [isLoaded]);
+
+	// Selected green dot marker
+	const selectedMarkerIcon = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: '#0E8530',
 			fillOpacity: 1,
 			strokeColor: '#FFFFFF',
 			strokeWeight: 3,
@@ -356,6 +370,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const coords = getContactCoords(contact);
 				if (!coords) return null;
 				const isHovered = hoveredMarkerId === contact.id;
+				const isSelected = selectedContacts.includes(contact.id);
 				return (
 					<Fragment key={contact.id}>
 						{/* Invisible larger hit area for hover detection - this controls all hover state */}
@@ -368,12 +383,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							clickable={true}
 							zIndex={3}
 						/>
-						{/* Red dot - only when NOT hovered */}
+						{/* Dot marker - only when NOT hovered, green if selected, red if not */}
 						{!isHovered && (
 							<MarkerF
 								position={coords}
 								onClick={() => handleMarkerClick(contact)}
-								icon={defaultMarkerIcon}
+								icon={isSelected ? selectedMarkerIcon : defaultMarkerIcon}
 								clickable={false}
 								zIndex={1}
 							/>
