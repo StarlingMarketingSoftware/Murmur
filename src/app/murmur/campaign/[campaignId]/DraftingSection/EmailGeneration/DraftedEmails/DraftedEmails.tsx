@@ -165,7 +165,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	}
 
 	return (
-		<>
+		<div className="flex flex-col gap-2 items-center">
 			{/* Right table - Generated Drafts */}
 			<DraftingTable
 				handleClick={handleSelectAllDrafts}
@@ -177,128 +177,6 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				noDataDescription='Click "Generate Drafts" to create emails for the selected contacts'
 				isPending={isPendingEmails}
 				title="Drafts"
-				footer={
-					draftEmails.length > 0 ? (
-						<div className="w-full flex flex-col gap-2">
-							{/* Inline confirmation details */}
-							<div className={cn('w-full', !showConfirm && 'hidden')}>
-								<div
-									className="grid w-full gap-x-3 gap-y-1 items-start"
-									style={{ gridTemplateColumns: '120px 1fr' }}
-								>
-									<div className="text-[12px] leading-tight font-semibold text-[#000000] font-secondary whitespace-nowrap">
-										To:
-									</div>
-									<div className="text-[12px] leading-tight text-[#000000] font-secondary min-w-0 break-words pl-1">
-										{toCount} emails selected
-									</div>
-
-									<div className="text-[12px] leading-tight font-semibold text-[#000000] font-secondary whitespace-nowrap">
-										From:
-									</div>
-									<div className="text-[12px] leading-tight text-[#000000] font-secondary min-w-0 break-words pl-1">
-										{props.fromName || ''}
-									</div>
-
-									<div className="text-[12px] leading-tight font-semibold text-[#000000] font-secondary whitespace-nowrap">
-										Return Address:
-									</div>
-									<div className="text-[12px] leading-tight text-[#000000] font-secondary min-w-0 break-all pl-1">
-										{props.fromEmail || ''}
-									</div>
-
-									{subjectPreview && (
-										<>
-											<div className="text-[12px] leading-tight font-semibold text-[#000000] font-secondary whitespace-nowrap">
-												Subject:
-											</div>
-											<div className="text-[12px] leading-tight text-[#000000] font-secondary min-w-0 break-words pl-1">
-												{subjectPreview}
-											</div>
-										</>
-									)}
-								</div>
-							</div>
-
-							<div className="w-full flex items-center justify-center">
-								<div
-									className="flex items-stretch rounded-[6px] overflow-hidden"
-									style={{
-										width: '489px',
-										height: '28px',
-										border: '1px solid #000000',
-										backgroundColor: 'transparent',
-									}}
-								>
-									{props.isSendingDisabled ? (
-										<UpgradeSubscriptionDrawer
-											triggerButtonText={
-												showConfirm
-													? 'Click to Confirm and Send'
-													: hasSelection
-													? `Send ${selectedCount} Selected`
-													: 'Send'
-											}
-											buttonVariant="primary"
-											className={cn(
-												'flex-1 h-full !rounded-none !border-0 !bg-[#68C575] !text-black !font-inter !font-medium !text-[14px] !flex !items-center !justify-center border-r border-[#000000]',
-												hasSelection
-													? 'hover:!bg-[#5FA968] active:!bg-[#569D60]'
-													: '!opacity-50 !cursor-not-allowed pointer-events-none'
-											)}
-											message={
-												props.isFreeTrial
-													? `Your free trial subscription does not include the ability to send emails. To send the emails\'ve drafted, please upgrade your subscription to the paid version.`
-													: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
-											}
-										/>
-									) : (
-										<Button
-											type="button"
-											className={cn(
-												'flex-1 h-full rounded-none font-inter font-medium text-[14px] flex items-center justify-center transition-all duration-200 border-r border-[#000000]',
-												showConfirm
-													? 'bg-[#68C575] text-black'
-													: hasSelection
-													? 'bg-[#68C575] text-black hover:bg-[#5FA968] active:bg-[#569D60]'
-													: 'bg-[#68C575] text-black opacity-50 cursor-not-allowed'
-											)}
-											onClick={async () => {
-												if (!hasSelection) return;
-												if (!showConfirm) {
-													setShowConfirm(true);
-													setTimeout(() => setShowConfirm(false), 10000);
-													return;
-												}
-												setShowConfirm(false);
-												await props.onSend();
-											}}
-											disabled={!hasSelection}
-										>
-											{showConfirm
-												? 'Click to Confirm and Send'
-												: hasSelection
-												? `Send ${selectedCount} Selected`
-												: 'Send'}
-										</Button>
-									)}
-									<Button
-										type="button"
-										variant="ghost"
-										className="w-[56px] h-full rounded-none text-black font-inter font-medium text-[14px]"
-										onClick={() => {
-											handleSelectAllDrafts();
-											setShowConfirm(true);
-											setTimeout(() => setShowConfirm(false), 10000);
-										}}
-									>
-										All
-									</Button>
-								</div>
-							</div>
-						</div>
-					) : null
-				}
 			>
 				<>
 					<div className="overflow-visible w-full flex flex-col gap-2 items-center">
@@ -501,6 +379,126 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					</div>
 				)}
 			</DraftingTable>
-		</>
+			{draftEmails.length > 0 && (
+				<div className="w-[499px] flex flex-col gap-2">
+					{/* Inline confirmation details */}
+					<div className={cn('w-full', !showConfirm && 'hidden')}>
+						<div
+							className="grid w-full gap-x-3 gap-y-1 items-start"
+							style={{ gridTemplateColumns: '120px 1fr' }}
+						>
+							<div className="text-[12px] leading-tight font-semibold text-[#000000] font-secondary whitespace-nowrap">
+								To:
+							</div>
+							<div className="text-[12px] leading-tight text-[#000000] font-secondary min-w-0 break-words pl-1">
+								{toCount} emails selected
+							</div>
+
+							<div className="text-[12px] leading-tight font-semibold text-[#000000] font-secondary whitespace-nowrap">
+								From:
+							</div>
+							<div className="text-[12px] leading-tight text-[#000000] font-secondary min-w-0 break-words pl-1">
+								{props.fromName || ''}
+							</div>
+
+							<div className="text-[12px] leading-tight font-semibold text-[#000000] font-secondary whitespace-nowrap">
+								Return Address:
+							</div>
+							<div className="text-[12px] leading-tight text-[#000000] font-secondary min-w-0 break-all pl-1">
+								{props.fromEmail || ''}
+							</div>
+
+							{subjectPreview && (
+								<>
+									<div className="text-[12px] leading-tight font-semibold text-[#000000] font-secondary whitespace-nowrap">
+										Subject:
+									</div>
+									<div className="text-[12px] leading-tight text-[#000000] font-secondary min-w-0 break-words pl-1">
+										{subjectPreview}
+									</div>
+								</>
+							)}
+						</div>
+					</div>
+
+					<div className="w-full flex items-center justify-center">
+						<div
+							className="flex items-stretch rounded-[6px] overflow-hidden"
+							style={{
+								width: '100%',
+								height: '28px',
+								border: '1px solid #000000',
+								backgroundColor: 'transparent',
+							}}
+						>
+							{props.isSendingDisabled ? (
+								<UpgradeSubscriptionDrawer
+									triggerButtonText={
+										showConfirm
+											? 'Click to Confirm and Send'
+											: hasSelection
+											? `Send ${selectedCount} Selected`
+											: 'Send'
+									}
+									buttonVariant="primary"
+									className={cn(
+										'flex-1 h-full !rounded-none !border-0 !bg-[#68C575] !text-black !font-inter !font-medium !text-[14px] !flex !items-center !justify-center border-r border-[#000000]',
+										hasSelection
+											? 'hover:!bg-[#5FA968] active:!bg-[#569D60]'
+											: '!opacity-50 !cursor-not-allowed pointer-events-none'
+									)}
+									message={
+										props.isFreeTrial
+											? `Your free trial subscription does not include the ability to send emails. To send the emails\'ve drafted, please upgrade your subscription to the paid version.`
+											: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
+									}
+								/>
+							) : (
+								<Button
+									type="button"
+									className={cn(
+										'flex-1 h-full rounded-none font-inter font-medium text-[14px] flex items-center justify-center transition-all duration-200 border-r border-[#000000]',
+										showConfirm
+											? 'bg-[#68C575] text-black'
+											: hasSelection
+											? 'bg-[#68C575] text-black hover:bg-[#5FA968] active:bg-[#569D60]'
+											: 'bg-[#68C575] text-black opacity-50 cursor-not-allowed'
+									)}
+									onClick={async () => {
+										if (!hasSelection) return;
+										if (!showConfirm) {
+											setShowConfirm(true);
+											setTimeout(() => setShowConfirm(false), 10000);
+											return;
+										}
+										setShowConfirm(false);
+										await props.onSend();
+									}}
+									disabled={!hasSelection}
+								>
+									{showConfirm
+										? 'Click to Confirm and Send'
+										: hasSelection
+										? `Send ${selectedCount} Selected`
+										: 'Send'}
+								</Button>
+							)}
+							<Button
+								type="button"
+								variant="ghost"
+								className="w-[56px] h-full rounded-none text-black font-inter font-medium text-[14px]"
+								onClick={() => {
+									handleSelectAllDrafts();
+									setShowConfirm(true);
+									setTimeout(() => setShowConfirm(false), 10000);
+								}}
+							>
+								All
+							</Button>
+						</div>
+					</div>
+				</div>
+			)}
+		</div>
 	);
 };
