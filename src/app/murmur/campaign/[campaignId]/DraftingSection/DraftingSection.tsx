@@ -109,151 +109,156 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	return (
 		<div className="mb-30 flex flex-col items-center">
 			<Form {...form}>
-				<form className="flex flex-col items-center">
+				<form className="flex flex-col items-center w-full">
 					<div
 						ref={emailStructureRef}
 						className="mb-[4px] flex justify-between items-center"
 					></div>
-					{view === 'testing' && (
-						<div className="relative">
-							{/* Desktop: Campaign header box positioned to the left */}
-							{!isMobile && (
-								<div
-									className="absolute hidden lg:block"
-									style={{
-										right: 'calc(50% + 250px + 24px)',
-										top: '0',
-									}}
-								>
-									<CampaignHeaderBox
-										campaignId={campaign?.id}
-										campaignName={campaign?.name || 'Untitled Campaign'}
-										toListNames={toListNames}
-										fromName={fromName}
-										contactsCount={contactsCount}
-										draftCount={draftCount}
-										sentCount={sentCount}
-										onFromClick={onOpenIdentityDialog}
-									/>
-								</div>
-							)}
-							<HybridPromptInput
-								trackFocusedField={trackFocusedField}
-								testMessage={campaign?.testMessage}
-								handleGenerateTestDrafts={handleGenerateTestDrafts}
-								isGenerationDisabled={isGenerationDisabled}
-								isPendingGeneration={isPendingGeneration}
-								isTest={isTest}
-								contact={contacts?.[0]}
-								onGoToDrafting={goToDrafting}
-							/>
-							{/* Right panel for Testing view - positioned absolutely */}
-							{false && (
-								<div
-									className="absolute hidden lg:block"
-									style={{
-										left: 'calc(50% + 250px + 50px)',
-										top: '0',
-									}}
-								>
-									<DraftingStatusPanel
-										campaign={campaign}
-										contacts={contacts || []}
-										form={form}
-										generationProgress={generationProgress}
-										onOpenDrafting={goToDrafting}
-										isGenerationDisabled={isGenerationDisabled}
-										isPendingGeneration={isPendingGeneration}
-										isLivePreviewVisible={isLivePreviewVisible}
-										livePreviewContactId={livePreviewContactId || undefined}
-										livePreviewSubject={livePreviewSubject}
-										livePreviewMessage={livePreviewMessage}
-										onDraftSelectedContacts={async (ids) => {
-											await handleGenerateDrafts(ids);
-										}}
-									/>
-								</div>
-							)}
-						</div>
-					)}
 
-					<div
-						ref={draftingRef}
-						className={cn('transition-opacity duration-500 ease-in-out')}
-					>
-						{/* Drafts tab - show only the drafts table centered */}
-						{view === 'drafting' && (
-							<div className="flex items-center justify-center min-h-[300px]">
-								<DraftedEmails
-									contacts={contacts || []}
-									selectedDraftIds={draftsTabSelectedIds}
-									selectedDraft={selectedDraft}
-									setSelectedDraft={setSelectedDraft}
-									setIsDraftDialogOpen={setIsDraftDialogOpen}
-									handleDraftSelection={handleDraftSelection}
-									draftEmails={draftEmails}
-									isPendingEmails={isPendingEmails}
-									setSelectedDraftIds={setDraftsTabSelectedIds}
-									onSend={async () => {
-										// Send functionality - placeholder
-									}}
-									isSendingDisabled={false}
-									isFreeTrial={false}
+					{/* Main content wrapper to anchor the persistent Header Box */}
+					<div className="relative w-full flex flex-col items-center">
+						{/* Persistent Campaign Header Box for specific tabs */}
+						{!isMobile && ['testing', 'contacts', 'drafting', 'sent'].includes(view) && (
+							<div
+								className="absolute hidden lg:block"
+								style={{
+									right: 'calc(50% + 250px + 24px)',
+									top: '29px',
+								}}
+							>
+								<CampaignHeaderBox
+									campaignId={campaign?.id}
+									campaignName={campaign?.name || 'Untitled Campaign'}
+									toListNames={toListNames}
 									fromName={fromName}
-									fromEmail={fromEmail}
-									subject={form.watch('subject')}
+									contactsCount={contactsCount}
+									draftCount={draftCount}
+									sentCount={sentCount}
+									onFromClick={onOpenIdentityDialog}
 								/>
 							</div>
 						)}
+
+						{view === 'testing' && (
+							<div className="relative">
+								<HybridPromptInput
+									trackFocusedField={trackFocusedField}
+									testMessage={campaign?.testMessage}
+									handleGenerateTestDrafts={handleGenerateTestDrafts}
+									isGenerationDisabled={isGenerationDisabled}
+									isPendingGeneration={isPendingGeneration}
+									isTest={isTest}
+									contact={contacts?.[0]}
+									onGoToDrafting={goToDrafting}
+								/>
+								{/* Right panel for Testing view - positioned absolutely */}
+								{false && (
+									<div
+										className="absolute hidden lg:block"
+										style={{
+											left: 'calc(50% + 250px + 50px)',
+											top: '0',
+										}}
+									>
+										<DraftingStatusPanel
+											campaign={campaign}
+											contacts={contacts || []}
+											form={form}
+											generationProgress={generationProgress}
+											onOpenDrafting={goToDrafting}
+											isGenerationDisabled={isGenerationDisabled}
+											isPendingGeneration={isPendingGeneration}
+											isLivePreviewVisible={isLivePreviewVisible}
+											livePreviewContactId={livePreviewContactId || undefined}
+											livePreviewSubject={livePreviewSubject}
+											livePreviewMessage={livePreviewMessage}
+											onDraftSelectedContacts={async (ids) => {
+												await handleGenerateDrafts(ids);
+											}}
+										/>
+									</div>
+								)}
+							</div>
+						)}
+
+						<div
+							ref={draftingRef}
+							className={cn('transition-opacity duration-500 ease-in-out')}
+						>
+							{/* Drafts tab - show only the drafts table centered */}
+							{view === 'drafting' && (
+								<div className="flex items-center justify-center min-h-[300px]">
+									<DraftedEmails
+										contacts={contacts || []}
+										selectedDraftIds={draftsTabSelectedIds}
+										selectedDraft={selectedDraft}
+										setSelectedDraft={setSelectedDraft}
+										setIsDraftDialogOpen={setIsDraftDialogOpen}
+										handleDraftSelection={handleDraftSelection}
+										draftEmails={draftEmails}
+										isPendingEmails={isPendingEmails}
+										setSelectedDraftIds={setDraftsTabSelectedIds}
+										onSend={async () => {
+											// Send functionality - placeholder
+										}}
+										isSendingDisabled={false}
+										isFreeTrial={false}
+										fromName={fromName}
+										fromEmail={fromEmail}
+										subject={form.watch('subject')}
+									/>
+								</div>
+							)}
+						</div>
+
+						{/* Contacts tab - show the contacts table */}
+						{view === 'contacts' && (
+							<div className="flex items-center justify-center min-h-[300px]">
+								<ContactsSelection
+									contacts={contacts || []}
+									selectedContactIds={contactsTabSelectedIds}
+									setSelectedContactIds={setContactsTabSelectedIds}
+									handleContactSelection={handleContactsTabSelection}
+								/>
+							</div>
+						)}
+
+						{/* Sent tab - show the sent emails table */}
+						{view === 'sent' && (
+							<div className="flex items-center justify-center min-h-[300px]">
+								<SentEmails emails={sentEmails} isPendingEmails={isPendingEmails} />
+							</div>
+						)}
+
+						{/* Placeholder content for future tabs */}
+						{(view === 'search' || view === 'inbox' || view === 'all') && (
+							<div className="flex items-center justify-center min-h-[300px] text-gray-400">
+								{/* Blank for now */}
+							</div>
+						)}
+
+						{/* Mobile-only: show the Drafting status panel inside the Drafting tab - disabled for now */}
+						{/* {view === 'drafting' && isMobile && (
+							<div className="mt-6 lg:hidden w-screen max-w-none px-3 flex justify-center">
+								<DraftingStatusPanel
+									campaign={campaign}
+									contacts={contacts || []}
+									form={form}
+									generationProgress={generationProgress}
+									onOpenDrafting={goToDrafting}
+									isGenerationDisabled={isGenerationDisabled}
+									isPendingGeneration={isPendingGeneration}
+									isLivePreviewVisible={isLivePreviewVisible}
+									livePreviewContactId={livePreviewContactId || undefined}
+									livePreviewSubject={livePreviewSubject}
+									livePreviewMessage={livePreviewMessage}
+									onDraftSelectedContacts={async (ids) => {
+										await handleGenerateDrafts(ids);
+									}}
+								/>
+							</div>
+						)} */}
 					</div>
-
-					{/* Contacts tab - show the contacts table */}
-					{view === 'contacts' && (
-						<div className="flex items-center justify-center min-h-[300px]">
-							<ContactsSelection
-								contacts={contacts || []}
-								selectedContactIds={contactsTabSelectedIds}
-								setSelectedContactIds={setContactsTabSelectedIds}
-								handleContactSelection={handleContactsTabSelection}
-							/>
-						</div>
-					)}
-
-					{/* Sent tab - show the sent emails table */}
-					{view === 'sent' && (
-						<div className="flex items-center justify-center min-h-[300px]">
-							<SentEmails emails={sentEmails} isPendingEmails={isPendingEmails} />
-						</div>
-					)}
-
-					{/* Placeholder content for future tabs */}
-					{(view === 'search' || view === 'inbox' || view === 'all') && (
-						<div className="flex items-center justify-center min-h-[300px] text-gray-400">
-							{/* Blank for now */}
-						</div>
-					)}
-
-					{/* Mobile-only: show the Drafting status panel inside the Drafting tab - disabled for now */}
-					{/* {view === 'drafting' && isMobile && (
-						<div className="mt-6 lg:hidden w-screen max-w-none px-3 flex justify-center">
-							<DraftingStatusPanel
-								campaign={campaign}
-								contacts={contacts || []}
-								form={form}
-								generationProgress={generationProgress}
-								onOpenDrafting={goToDrafting}
-								isGenerationDisabled={isGenerationDisabled}
-								isPendingGeneration={isPendingGeneration}
-								isLivePreviewVisible={isLivePreviewVisible}
-								livePreviewContactId={livePreviewContactId || undefined}
-								livePreviewSubject={livePreviewSubject}
-								livePreviewMessage={livePreviewMessage}
-								onDraftSelectedContacts={async (ids) => {
-									await handleGenerateDrafts(ids);
-								}}
-							/>
-						</div>
-					)} */}
 				</form>
 			</Form>
 
