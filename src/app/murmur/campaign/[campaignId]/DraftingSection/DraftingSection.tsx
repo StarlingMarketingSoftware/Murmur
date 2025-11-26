@@ -148,30 +148,32 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								onGoToDrafting={goToDrafting}
 							/>
 							{/* Right panel for Testing view - positioned absolutely */}
-							<div
-								className="absolute hidden lg:block"
-								style={{
-									left: 'calc(50% + 250px + 50px)',
-									top: '0',
-								}}
-							>
-								<DraftingStatusPanel
-									campaign={campaign}
-									contacts={contacts || []}
-									form={form}
-									generationProgress={generationProgress}
-									onOpenDrafting={goToDrafting}
-									isGenerationDisabled={isGenerationDisabled}
-									isPendingGeneration={isPendingGeneration}
-									isLivePreviewVisible={isLivePreviewVisible}
-									livePreviewContactId={livePreviewContactId || undefined}
-									livePreviewSubject={livePreviewSubject}
-									livePreviewMessage={livePreviewMessage}
-									onDraftSelectedContacts={async (ids) => {
-										await handleGenerateDrafts(ids);
+							{false && (
+								<div
+									className="absolute hidden lg:block"
+									style={{
+										left: 'calc(50% + 250px + 50px)',
+										top: '0',
 									}}
-								/>
-							</div>
+								>
+									<DraftingStatusPanel
+										campaign={campaign}
+										contacts={contacts || []}
+										form={form}
+										generationProgress={generationProgress}
+										onOpenDrafting={goToDrafting}
+										isGenerationDisabled={isGenerationDisabled}
+										isPendingGeneration={isPendingGeneration}
+										isLivePreviewVisible={isLivePreviewVisible}
+										livePreviewContactId={livePreviewContactId || undefined}
+										livePreviewSubject={livePreviewSubject}
+										livePreviewMessage={livePreviewMessage}
+										onDraftSelectedContacts={async (ids) => {
+											await handleGenerateDrafts(ids);
+										}}
+									/>
+								</div>
+							)}
 						</div>
 					)}
 
