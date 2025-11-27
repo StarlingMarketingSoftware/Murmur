@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
 		const mailgunData = await mg.messages.create('murmurmailbox.com', {
 			'h:Reply-To': originEmail,
-			'h:Sender': `${senderName.replaceAll(' ', '')}@booking-management.com`,
+			'h:Sender': originEmail,
 			'h:X-Mailgun-Dkim-Signature': 'yes',
 			'h:Message-ID': `<${Date.now()}.${Math.random().toString(36).slice(2)}@${
 				originEmail.split('@')[1]
