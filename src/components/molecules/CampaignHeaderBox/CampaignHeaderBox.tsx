@@ -3,7 +3,6 @@
 import { FC, useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
-import { cn } from '@/utils';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 
 interface CampaignHeaderBoxProps {

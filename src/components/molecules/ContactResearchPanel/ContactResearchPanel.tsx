@@ -19,7 +19,6 @@ const parseMetadataSections = (metadata: string | null | undefined) => {
 	const allSections: Record<string, string> = {};
 	const regex = /\[(\d+)\]\s*([\s\S]*?)(?=\[\d+\]|$)/g;
 	let match;
-	// eslint-disable-next-line no-cond-assign
 	while ((match = regex.exec(metadata)) !== null) {
 		const sectionNum = match[1];
 		const content = match[2].trim();
@@ -61,14 +60,15 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	className,
 	style,
 }) => {
+	// useMemo must be called before any early returns to satisfy React Hooks rules
+	const metadataSections = useMemo(
+		() => parseMetadataSections(contact?.metadata),
+		[contact?.metadata]
+	);
+
 	if (!contact || !contact.metadata || contact.metadata.trim().length === 0) {
 		return null;
 	}
-
-	const metadataSections = useMemo(
-		() => parseMetadataSections(contact.metadata),
-		[contact.metadata]
-	);
 
 	const hasAnyParsedSections = Object.keys(metadataSections).length > 0;
 	const containerHeight = hasAnyParsedSections ? '630px' : '423px';
