@@ -36,6 +36,7 @@ import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
+import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -618,6 +619,62 @@ const Dashboard = () => {
 			form.setValue('searchText', combinedSearch);
 		}
 	}, [whyValue, whatValue, whereValue, form]);
+
+	// Check for pending search from contacts page searchbar
+	useEffect(() => {
+		const pendingSearch = sessionStorage.getItem('murmur_pending_search');
+		if (pendingSearch) {
+			// Clear the pending search immediately to prevent re-triggering
+			sessionStorage.removeItem('murmur_pending_search');
+			
+			// Parse the search query: "[Why] What in Where"
+			const whyMatch = pendingSearch.match(/^\[(Booking|Promotion)\]/i);
+			const inMatch = pendingSearch.match(/\s+in\s+(.+)$/i);
+			
+			let parsedWhy = '';
+			let parsedWhat = '';
+			let parsedWhere = '';
+			
+			if (whyMatch) {
+				parsedWhy = `[${whyMatch[1]}]`;
+			}
+			
+			if (inMatch) {
+				parsedWhere = inMatch[1].trim();
+				// Get the "what" part - everything after [Why] and before " in "
+				let whatPart = pendingSearch;
+				if (whyMatch) {
+					whatPart = whatPart.replace(whyMatch[0], '').trim();
+				}
+				whatPart = whatPart.replace(/\s+in\s+.+$/i, '').trim();
+				parsedWhat = whatPart;
+			} else {
+				// No "in" found, the whole thing minus [Why] is the "what"
+				let whatPart = pendingSearch;
+				if (whyMatch) {
+					whatPart = whatPart.replace(whyMatch[0], '').trim();
+				}
+				parsedWhat = whatPart;
+			}
+			
+			// Set the values
+			if (parsedWhy) setWhyValue(parsedWhy);
+			if (parsedWhat) setWhatValue(parsedWhat);
+			if (parsedWhere) setWhereValue(parsedWhere);
+			
+			// Set the form value and submit after a short delay to allow state to update
+			setTimeout(() => {
+				const formattedWhere = parsedWhere ? `(${parsedWhere})` : '';
+				const combinedSearch = [parsedWhy, parsedWhat, formattedWhere]
+					.filter(Boolean)
+					.join(' ');
+				if (combinedSearch) {
+					form.setValue('searchText', combinedSearch);
+					form.handleSubmit(onSubmit)();
+				}
+			}, 100);
+		}
+	}, [form, onSubmit]);
 
 	// Handle clicks outside to deactivate sections
 	useEffect(() => {
@@ -2328,329 +2385,16 @@ const Dashboard = () => {
 									)}
 								</div>
 								{/* Right-side box */}
-								{!isMobile &&
-									(() => {
-										// Only show when a contact is hovered
-										if (!hoveredContact) return null;
-
-										// Parse metadata sections [1], [2], etc.
-										// Only includes sequential sections starting from [1] that have meaningful content
-										const parseMetadataSections = (
-											metadata: string | null | undefined
-										) => {
-											if (!metadata) return {};
-
-											// First, extract all sections
-											const allSections: Record<string, string> = {};
-											const regex = /\[(\d+)\]\s*([\s\S]*?)(?=\[\d+\]|$)/g;
-											let match;
-											while ((match = regex.exec(metadata)) !== null) {
-												const sectionNum = match[1];
-												const content = match[2].trim();
-												allSections[sectionNum] = content;
-											}
-
-											// Filter to only sequential sections starting from 1, with meaningful content
-											const sections: Record<string, string> = {};
-											let expectedNum = 1;
-
-											while (allSections[String(expectedNum)]) {
-												const content = allSections[String(expectedNum)];
-												// Check if content has meaningful text (not just punctuation/whitespace)
-												// Remove common punctuation and whitespace to check for actual content
-												const meaningfulContent = content
-													.replace(/[.\s,;:!?'"()\-–—]/g, '')
-													.trim();
-
-												// Require at least 5 characters of meaningful content
-												if (meaningfulContent.length < 5) {
-													// Stop if we hit a section without meaningful content
-													break;
-												}
-
-												sections[String(expectedNum)] = content;
-												expectedNum++;
-											}
-
-											// Only return sections if there are at least 3 valid sequential sections
-											if (Object.keys(sections).length < 3) {
-												return {};
-											}
-
-											return sections;
-										};
-										const metadataSections = parseMetadataSections(
-											hoveredContact?.metadata
-										);
-
-										// Check if there are any parsed sections
-										const hasAnyParsedSections = Object.keys(metadataSections).length > 0;
-
-										// Use smaller height if no parsed sections
-										const containerHeight = hasAnyParsedSections ? '630px' : '423px';
-
-										return (
-											<div
-												className="hidden xl:block absolute top-0"
-												style={{
-													left: 'calc(50% + 502px + 33px)',
-													width: '375px',
-													height: containerHeight,
-													backgroundColor: '#D8E5FB',
-													border: '2px solid black',
-													borderRadius: '7px',
-													overflow: 'hidden',
-												}}
-											>
-												<div
-													className="absolute top-0 left-0 w-full"
-													style={{
-														height: '24px',
-														backgroundColor: '#E8EFFF',
-													}}
-												/>
-												<div className="absolute top-[12px] left-[16px] -translate-y-1/2 z-10">
-													<span className="font-secondary font-bold text-[14px] leading-none text-black">
-														Research
-													</span>
-												</div>
-												<div
-													className="absolute left-0 w-full bg-black z-10"
-													style={{
-														top: '24px',
-														height: '2px',
-													}}
-												/>
-												<div
-													className="absolute left-0 w-full bg-[#FFFFFF]"
-													style={{
-														top: '26px',
-														height: '40px',
-													}}
-												>
-													{hoveredContact && (
-														<div className="w-full h-full px-3 flex items-center justify-between overflow-hidden">
-															<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
-																<div className="font-inter font-bold text-[16px] leading-none truncate text-black">
-																	{(() => {
-																		const fullName = `${hoveredContact.firstName || ''} ${
-																			hoveredContact.lastName || ''
-																		}`.trim();
-																		const nameToDisplay =
-																			fullName ||
-																			hoveredContact.name ||
-																			hoveredContact.company ||
-																			'Unknown';
-																		return nameToDisplay;
-																	})()}
-																</div>
-																{/* Only show company if we are displaying a person's name above, and it's different from the company name */}
-																{(() => {
-																	const fullName = `${hoveredContact.firstName || ''} ${
-																		hoveredContact.lastName || ''
-																	}`.trim();
-																	const hasName =
-																		fullName.length > 0 ||
-																		(hoveredContact.name &&
-																			hoveredContact.name.length > 0);
-																	// If we are showing the company as the main title (because no name), don't show it again here
-																	if (!hasName) return null;
-
-																	return (
-																		<div className="text-[12px] leading-tight truncate text-black mt-[2px]">
-																			{hoveredContact.company || ''}
-																		</div>
-																	);
-																})()}
-															</div>
-
-															<div className="flex items-center gap-3 flex-shrink-0">
-																<div className="flex flex-col items-end gap-[2px] max-w-[140px]">
-																	<div className="flex items-center gap-1 w-full justify-end overflow-hidden">
-																		{(() => {
-																			const stateAbbr =
-																				getStateAbbreviation(
-																					hoveredContact.state || ''
-																				) || '';
-																			if (stateAbbr && stateBadgeColorMap[stateAbbr]) {
-																				return (
-																					<span
-																						className="inline-flex items-center justify-center h-[16px] px-[6px] rounded-[4px] border border-black text-[11px] font-bold leading-none flex-shrink-0"
-																						style={{
-																							backgroundColor:
-																								stateBadgeColorMap[stateAbbr],
-																						}}
-																					>
-																						{stateAbbr}
-																					</span>
-																				);
-																			}
-																			return null;
-																		})()}
-																		{hoveredContact.city && (
-																			<span className="text-[13px] leading-none text-black truncate">
-																				{hoveredContact.city}
-																			</span>
-																		)}
-																	</div>
-																	{(hoveredContact.title || hoveredContact.headline) && (
-																		<div className="px-2 py-[2px] rounded-[8px] bg-[#E8EFFF] border border-black max-w-full truncate">
-																			<span className="text-[10px] leading-none text-black block truncate">
-																				{hoveredContact.title || hoveredContact.headline}
-																			</span>
-																		</div>
-																	)}
-																</div>
-															</div>
-														</div>
-													)}
-												</div>
-												<div
-													className="absolute left-0 w-full bg-black z-10"
-													style={{
-														top: '66px',
-														height: '1px',
-													}}
-												/>
-												{/* Research result boxes - only show if data exists */}
-												{(() => {
-													const boxConfigs = [
-														{ key: '1', color: '#158BCF' },
-														{ key: '2', color: '#43AEEC' },
-														{ key: '3', color: '#7CC9F6' },
-														{ key: '4', color: '#AADAF6' },
-														{ key: '5', color: '#D7F0FF' },
-													];
-
-													// Filter to only boxes that have data
-													const visibleBoxes = boxConfigs.filter(
-														(config) => metadataSections[config.key]
-													);
-
-													return visibleBoxes.map((config, index) => (
-														<div
-															key={config.key}
-															className="absolute"
-															style={{
-																top: `${76 + index * 65}px`,
-																left: '50%',
-																transform: 'translateX(-50%)',
-																width: '360px',
-																height: '52px',
-																backgroundColor: config.color,
-																border: '2px solid #000000',
-																borderRadius: '8px',
-															}}
-														>
-															{/* Section indicator */}
-															<div
-																className="absolute font-inter font-bold"
-																style={{
-																	top: '4.5px',
-																	left: '8px',
-																	fontSize: '11.5px',
-																	color: '#000000',
-																}}
-															>
-																[{config.key}]
-															</div>
-															{/* Inner content box */}
-															<div
-																className="absolute overflow-hidden"
-																style={{
-																	top: '50%',
-																	transform: 'translateY(-50%)',
-																	right: '10px',
-																	width: '319px',
-																	height: '43px',
-																	backgroundColor: '#FFFFFF',
-																	border: '1px solid #000000',
-																	borderRadius: '6px',
-																}}
-															>
-																<div className="w-full h-full px-2 flex items-center overflow-hidden">
-																	<div
-																		className="w-full text-[12px] leading-[1.3] text-black font-inter"
-																		style={{
-																			display: '-webkit-box',
-																			WebkitLineClamp: 2,
-																			WebkitBoxOrient: 'vertical',
-																			overflow: 'hidden',
-																		}}
-																	>
-																		{metadataSections[config.key]}
-																	</div>
-																</div>
-															</div>
-														</div>
-													));
-												})()}
-												{/* Summary box at bottom */}
-												<div
-													id="research-summary-box"
-													className="absolute"
-													style={{
-														bottom: hasAnyParsedSections ? '14px' : '8px',
-														left: '50%',
-														transform: 'translateX(-50%)',
-														width: '360px',
-														height: hasAnyParsedSections ? '197px' : '336px',
-														backgroundColor: hasAnyParsedSections ? '#E9F7FF' : '#158BCF',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-													}}
-												>
-													<style>{`
-											#research-summary-box *::-webkit-scrollbar {
-												display: none !important;
-												width: 0 !important;
-												height: 0 !important;
-												background: transparent !important;
-											}
-											#research-summary-box * {
-												scrollbar-width: none !important;
-												-ms-overflow-style: none !important;
-											}
-										`}</style>
-													{/* Inner content box */}
-													<div
-														className="absolute overflow-hidden"
-														style={{
-															...(hasAnyParsedSections
-																? {
-																		top: '50%',
-																		left: '50%',
-																		transform: 'translate(-50%, -50%)',
-																  }
-																: {
-																		bottom: '9px',
-																		left: '50%',
-																		transform: 'translateX(-50%)',
-																  }),
-															width: '350px',
-															height: hasAnyParsedSections ? '182px' : '299px',
-															backgroundColor: '#FFFFFF',
-															border: '1px solid #000000',
-															borderRadius: '6px',
-														}}
-													>
-														{hoveredContact?.metadata ? (
-															<div className="w-full h-full p-3 overflow-hidden">
-																<div
-																	className="text-[15px] leading-[1.5] text-black font-inter font-normal whitespace-pre-wrap overflow-y-scroll h-full"
-																	style={{
-																		wordBreak: 'break-word',
-																	}}
-																>
-																	{hoveredContact.metadata}
-																</div>
-															</div>
-														) : null}
-													</div>
-												</div>
-											</div>
-										);
-									})()}
+								{!isMobile && hoveredContact && (
+									<div
+										className="hidden xl:block absolute top-0"
+										style={{
+											left: 'calc(50% + 502px + 33px)',
+										}}
+									>
+										<ContactResearchPanel contact={hoveredContact} />
+									</div>
+								)}
 							</div>
 						) : hasSearched &&
 						  (contacts === undefined ||

@@ -1,4 +1,5 @@
 import { ContactWithName } from '@/types/contact';
+import { CampaignWithRelations } from '@/types';
 import { Dispatch, MouseEvent, SetStateAction, useRef } from 'react';
 
 export interface ContactsSelectionProps {
@@ -6,9 +7,13 @@ export interface ContactsSelectionProps {
 	selectedContactIds: Set<number>;
 	setSelectedContactIds: Dispatch<SetStateAction<Set<number>>>;
 	handleContactSelection: (contactId: number, event?: React.MouseEvent) => void;
+	onContactHover?: (contact: ContactWithName | null) => void;
 	generationProgress?: number;
 	cancelGeneration?: () => void;
 	generationTotal?: number;
+	campaign?: CampaignWithRelations;
+	onDraftEmails?: (contactIds: number[]) => Promise<void>;
+	isDraftingDisabled?: boolean;
 }
 
 export const useContactsSelection = (props: ContactsSelectionProps) => {

@@ -265,7 +265,27 @@ export const useDashboard = () => {
 
 		await batchUpdateContacts({ updates });
 
-		const defaultName = capitalize(activeSearchQuery);
+		// Generate a clean campaign name from the search query
+		const generateCampaignName = (searchQuery: string): string => {
+			// Remove [booking] or [promotion] prefix (case insensitive)
+			let cleanedQuery = searchQuery.replace(/^\[(booking|promotion)\]\s*/i, '');
+
+			// Extract location from parentheses at the end
+			const locationMatch = cleanedQuery.match(/\(([^)]+)\)\s*$/);
+			const location = locationMatch ? locationMatch[1] : null;
+
+			// Remove the parentheses and content from the query
+			cleanedQuery = cleanedQuery.replace(/\s*\([^)]+\)\s*$/, '').trim();
+
+			// If we found a location, format as "[search term] in [location]"
+			if (location) {
+				return capitalize(`${cleanedQuery} in ${location}`);
+			}
+
+			return capitalize(cleanedQuery);
+		};
+
+		const defaultName = generateCampaignName(activeSearchQuery);
 		if (currentTab === 'search') {
 			const newUserContactList = await createContactList({
 				name: defaultName,

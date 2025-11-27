@@ -11,13 +11,19 @@ import {
 	stateBadgeColorMap,
 } from '@/constants/ui';
 import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
+import { ContactWithName } from '@/types/contact';
 
 interface SentEmailsProps {
 	emails: EmailWithRelations[];
 	isPendingEmails: boolean;
+	onContactHover?: (contact: ContactWithName | null) => void;
 }
 
-export const SentEmails: FC<SentEmailsProps> = ({ emails, isPendingEmails }) => {
+export const SentEmails: FC<SentEmailsProps> = ({
+	emails,
+	isPendingEmails,
+	onContactHover,
+}) => {
 	const { data: usedContactIds } = useGetUsedContactIds();
 	const usedContactIdsSet = useMemo(
 		() => new Set(usedContactIds || []),
@@ -42,12 +48,27 @@ export const SentEmails: FC<SentEmailsProps> = ({ emails, isPendingEmails }) => 
 						  'Contact'
 						: 'Unknown Contact';
 
+					const contactForResearch: ContactWithName | null = contact
+						? ({
+								...(contact as any),
+								name: (contact as any).name ?? null,
+						  } as ContactWithName)
+						: null;
+
 					return (
 						<div
 							key={email.id}
 							className={cn(
-								'transition-colors relative select-none w-[366px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2'
+								'transition-colors relative select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2'
 							)}
+							onMouseEnter={() => {
+								if (contactForResearch && onContactHover) {
+									onContactHover(contactForResearch);
+								}
+							}}
+							onMouseLeave={() => {
+								onContactHover?.(null);
+							}}
 						>
 							{/* Used-contact indicator - vertically centered */}
 							{usedContactIdsSet.has(email.contactId) && (
@@ -175,7 +196,7 @@ export const SentEmails: FC<SentEmailsProps> = ({ emails, isPendingEmails }) => 
 				{Array.from({ length: Math.max(0, 6 - emails.length) }).map((_, idx) => (
 					<div
 						key={`sent-placeholder-${idx}`}
-						className="select-none w-[366px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
+						className="select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#5AB477] p-2"
 					/>
 				))}
 			</div>
