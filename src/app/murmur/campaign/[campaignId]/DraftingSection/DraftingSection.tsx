@@ -237,7 +237,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						className="mb-[4px] flex justify-between items-center"
 					></div>
 
-					{/* Main content wrapper to anchor the persistent Header Box */}
+				{/* Main content wrapper to anchor the persistent Header Box */}
 					<div className="relative w-full flex flex-col items-center">
 						{/* Persistent Campaign Header Box for specific tabs */}
 						{!isMobile && ['testing', 'contacts', 'drafting', 'sent'].includes(view) && (
@@ -263,23 +263,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<div
 									style={{
 										width: '373px',
-										height: '318px',
+										height: '373px',
+										// Fixed-height mini structure that uses the compact layout
+										// inside; no scaling, just a tighter signature area.
 										overflow: 'hidden',
 									}}
 								>
-									<div style={{ transform: 'scale(0.67)', transformOrigin: 'top left', width: '557px' }}>
-										<MiniEmailStructure
-											form={form}
-											onDraft={() => handleGenerateDrafts(contacts?.map((c) => c.id) || [])}
-											isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
-											isPendingGeneration={isPendingGeneration}
-											generationProgress={generationProgress}
-											generationTotal={contacts?.length || 0}
-											hideTopChrome
-											hideFooter
-											fullWidthMobile
-										/>
-									</div>
+									<MiniEmailStructure
+										form={form}
+										onDraft={() => handleGenerateDrafts(contacts?.map((c) => c.id) || [])}
+										isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+										isPendingGeneration={isPendingGeneration}
+										generationProgress={generationProgress}
+										generationTotal={contacts?.length || 0}
+										hideTopChrome
+										hideFooter
+										fullWidthMobile
+									/>
 								</div>
 							</div>
 						)}

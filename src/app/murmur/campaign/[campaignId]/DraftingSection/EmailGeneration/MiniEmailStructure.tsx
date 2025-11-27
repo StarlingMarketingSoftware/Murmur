@@ -445,12 +445,22 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		form.setValue('signature', value, { shouldDirty: true });
 	};
 
+	// Compact signature layout is used for the pinned mini version on the
+	// left side of the campaign page (where footer + chrome are hidden).
+	// There we want normal-sized controls, but a thinner, tighter signature.
+	const isCompactSignature = hideFooter && hideTopChrome;
+
 	return (
 		<div
 			ref={rootRef}
 			style={{
 				width: fullWidthMobile ? '100%' : '376px',
-				height: isMobilePortrait || isMobileLandscape ? 'auto' : '474px',
+				height:
+					isMobilePortrait || isMobileLandscape
+						? 'auto'
+						: isCompactSignature
+						? '373px'
+						: '474px',
 				position: 'relative',
 				overflow: 'visible',
 			}}
@@ -1003,7 +1013,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 
 				{/* Signature - fixed at bottom (outside scroll) for non-mobile only */}
 				<div
-					className={cn('px-0 pb-2 max-[480px]:hidden', 'mt-3')}
+					className={cn(
+						'px-0 pb-2 max-[480px]:hidden',
+						isCompactSignature ? 'mt-1' : 'mt-3'
+					)}
 					style={{ display: isMobileLandscape ? 'none' : undefined }}
 				>
 					<div
@@ -1016,7 +1029,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						<textarea
 							className={cn(
 								'w-full text-[12px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none max-[480px]:h-[40px] signature-textarea',
-								hybridBlocks.some((b) => b.type === 'full_automated')
+								isCompactSignature
+									? hybridBlocks.some((b) => b.type === 'full_automated')
+										? 'h-[28px]'
+										: 'h-[36px]'
+									: hybridBlocks.some((b) => b.type === 'full_automated')
 									? 'h-[40px]'
 									: 'h-[58px]'
 							)}
