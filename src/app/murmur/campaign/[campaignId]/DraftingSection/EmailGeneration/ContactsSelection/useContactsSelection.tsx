@@ -7,6 +7,7 @@ export interface ContactsSelectionProps {
 	selectedContactIds: Set<number>;
 	setSelectedContactIds: Dispatch<SetStateAction<Set<number>>>;
 	handleContactSelection: (contactId: number, event?: React.MouseEvent) => void;
+	onContactClick?: (contact: ContactWithName | null) => void;
 	onContactHover?: (contact: ContactWithName | null) => void;
 	generationProgress?: number;
 	cancelGeneration?: () => void;

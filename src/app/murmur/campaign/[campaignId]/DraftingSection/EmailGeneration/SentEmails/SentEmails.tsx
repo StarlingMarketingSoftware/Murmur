@@ -16,12 +16,14 @@ import { ContactWithName } from '@/types/contact';
 interface SentEmailsProps {
 	emails: EmailWithRelations[];
 	isPendingEmails: boolean;
+	onContactClick?: (contact: ContactWithName | null) => void;
 	onContactHover?: (contact: ContactWithName | null) => void;
 }
 
 export const SentEmails: FC<SentEmailsProps> = ({
 	emails,
 	isPendingEmails,
+	onContactClick,
 	onContactHover,
 }) => {
 	const { data: usedContactIds } = useGetUsedContactIds();
@@ -59,15 +61,20 @@ export const SentEmails: FC<SentEmailsProps> = ({
 						<div
 							key={email.id}
 							className={cn(
-								'transition-colors relative select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2'
+								'cursor-pointer transition-colors relative select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2'
 							)}
 							onMouseEnter={() => {
-								if (contactForResearch && onContactHover) {
-									onContactHover(contactForResearch);
+								if (contactForResearch) {
+									onContactHover?.(contactForResearch);
 								}
 							}}
 							onMouseLeave={() => {
 								onContactHover?.(null);
+							}}
+							onClick={() => {
+								if (contactForResearch) {
+									onContactClick?.(contactForResearch);
+								}
 							}}
 						>
 							{/* Used-contact indicator - vertically centered */}
