@@ -2434,6 +2434,9 @@ const Dashboard = () => {
 
 const InboxSection = () => {
 	const { data: inboundEmails, isLoading, error } = useGetInboundEmails();
+	const [selectedEmailId, setSelectedEmailId] = useState<number | null>(null);
+
+	const selectedEmail = inboundEmails?.find((email) => email.id === selectedEmailId);
 
 	if (isLoading) {
 		return (
@@ -2511,72 +2514,134 @@ const InboxSection = () => {
 		<div className="w-full max-w-[998px] mx-auto px-4 mt-8 mb-8">
 			<Typography variant="h3" className="mb-4">Inbox</Typography>
 			<div 
-				className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden"
+				className="flex flex-col items-center overflow-y-auto overflow-x-hidden"
 				style={{
 					width: '998px',
 					height: '558px',
 					border: '2px solid #000000',
 					borderRadius: '8px',
 					padding: '16px',
-					paddingTop: '73px',
+					paddingTop: selectedEmail ? '16px' : '73px',
 					backgroundColor: '#4CA9DB',
 				}}
 			>
-				{inboundEmails.map((email) => (
+				{selectedEmail ? (
+					/* Expanded Email View Inside Box */
 					<div 
-						key={email.id} 
-						className="bg-white hover:bg-gray-50 cursor-pointer px-4 flex items-center"
+						className="w-full h-full overflow-y-auto"
 						style={{
 							width: '967px',
-							height: '78px',
 							border: '2px solid #000000',
 							borderRadius: '8px',
 							backgroundColor: '#FFFFFF',
+							padding: '20px',
 						}}
 					>
-						<div className="flex justify-between items-center gap-4 w-full">
-							<div className="flex-1 min-w-0">
-								<div className="flex items-center gap-2 mb-1">
-									<span className="font-medium truncate">
-										{email.senderName || email.sender}
-									</span>
-									{email.contact && (
-										<span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-											{email.contact.name}
-										</span>
-									)}
-									{email.campaign && (
-										<span className="text-xs text-gray-500">
-											• {email.campaign.name}
+						<div className="flex justify-between items-start mb-4">
+							<div>
+								<div className="text-lg font-bold">
+									{selectedEmail.subject || '(No Subject)'}
+								</div>
+								<div className="text-sm text-gray-600 mt-1">
+									From: {selectedEmail.senderName || selectedEmail.sender}
+									{selectedEmail.contact && (
+										<span className="ml-2 text-xs bg-gray-100 px-2 py-0.5 rounded">
+											{selectedEmail.contact.name}
 										</span>
 									)}
 								</div>
-								<div className="text-sm font-medium truncate">
-									{email.subject || '(No Subject)'}
+								<div className="text-xs text-gray-400 mt-1">
+									{selectedEmail.receivedAt ? new Date(selectedEmail.receivedAt).toLocaleString() : ''}
 								</div>
-								<div className="text-sm text-gray-500 truncate">
-									{email.strippedText?.slice(0, 80) || email.bodyPlain?.slice(0, 80) || ''}
+								{selectedEmail.campaign && (
+									<div className="text-xs text-gray-500 mt-1">
+										Campaign: {selectedEmail.campaign.name}
+									</div>
+								)}
+							</div>
+							<button
+								onClick={() => setSelectedEmailId(null)}
+								className="text-gray-500 hover:text-gray-700 text-xl font-bold px-2"
+							>
+								×
+							</button>
+						</div>
+						<div className="border-t pt-4 text-sm">
+							{selectedEmail.bodyHtml ? (
+								<div 
+									dangerouslySetInnerHTML={{ __html: selectedEmail.bodyHtml }}
+									className="prose prose-sm max-w-none"
+								/>
+							) : (
+								<div className="whitespace-pre-wrap">
+									{selectedEmail.strippedText || selectedEmail.bodyPlain || 'No content'}
 								</div>
-							</div>
-							<div className="text-xs text-gray-400 whitespace-nowrap">
-								{email.receivedAt ? new Date(email.receivedAt).toLocaleDateString() : ''}
-							</div>
+							)}
 						</div>
 					</div>
-				))}
-				{Array.from({ length: Math.max(0, 5 - inboundEmails.length) }).map((_, idx) => (
-					<div
-						key={`inbox-placeholder-${idx}`}
-						className="select-none"
-						style={{
-							width: '967px',
-							height: '78px',
-							border: '2px solid #000000',
-							borderRadius: '8px',
-							backgroundColor: '#FFFFFF',
-						}}
-					/>
-				))}
+				) : (
+					/* Email List View */
+					<>
+						{inboundEmails.map((email) => (
+							<div 
+								key={email.id} 
+								className="bg-white hover:bg-gray-50 cursor-pointer px-4 flex items-center mb-2"
+								style={{
+									width: '967px',
+									height: '78px',
+									minHeight: '78px',
+									border: '2px solid #000000',
+									borderRadius: '8px',
+									backgroundColor: '#FFFFFF',
+								}}
+								onClick={() => setSelectedEmailId(email.id)}
+							>
+								<div className="flex justify-between items-center gap-4 w-full">
+									<div className="flex-1 min-w-0">
+										<div className="flex items-center gap-2 mb-1">
+											<span className="font-medium truncate">
+												{email.senderName || email.sender}
+											</span>
+											{email.contact && (
+												<span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+													{email.contact.name}
+												</span>
+											)}
+											{email.campaign && (
+												<span className="text-xs text-gray-500">
+													• {email.campaign.name}
+												</span>
+											)}
+										</div>
+										<div className="text-sm font-medium truncate">
+											{email.subject || '(No Subject)'}
+										</div>
+										<div className="text-sm text-gray-500 truncate">
+											{email.strippedText?.slice(0, 80) || email.bodyPlain?.slice(0, 80) || ''}
+										</div>
+									</div>
+									<div className="text-xs text-gray-400 whitespace-nowrap">
+										{email.receivedAt ? new Date(email.receivedAt).toLocaleDateString() : ''}
+									</div>
+								</div>
+							</div>
+						))}
+						{Array.from({ length: Math.max(0, 5 - inboundEmails.length) }).map((_, idx) => (
+							<div
+								key={`inbox-placeholder-${idx}`}
+								className="select-none mb-2"
+								style={{
+									width: '967px',
+									height: '78px',
+									minHeight: '78px',
+									border: '2px solid #000000',
+									borderRadius: '8px',
+									backgroundColor: '#FFFFFF',
+								}}
+							/>
+						))}
+					</>
+				)}
 			</div>
 		</div>
 	);
