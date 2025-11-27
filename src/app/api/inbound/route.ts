@@ -163,11 +163,12 @@ export async function POST(req: NextRequest) {
 			}
 		}
 
-		// Try to find associated user by recipient email (murmurEmail field)
+		// Try to find associated user by recipient email
+		// In production, the murmur reply-to domain may be stored as either `murmurEmail` or `replyToEmail`
 		const recipientEmail = recipient.toLowerCase().split(',')[0].trim();
 		const user = await prisma.user.findFirst({
 			where: {
-				murmurEmail: recipientEmail,
+				OR: [{ murmurEmail: recipientEmail }, { replyToEmail: recipientEmail }],
 			},
 		});
 
