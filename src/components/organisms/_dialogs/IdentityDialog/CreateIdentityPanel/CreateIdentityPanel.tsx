@@ -13,14 +13,10 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { ControllerRenderProps, FormProvider } from 'react-hook-form';
-import { CheckCircleIcon } from 'lucide-react';
-import { Typography } from '@/components/ui/typography';
 import React, { FC, useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import InfoTooltip from '@/components/atoms/InfoTooltip/InfoTooltip';
 import { cn } from '@/utils/ui';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
@@ -56,26 +52,11 @@ const StyledInput: FC<StyledInputProps> = ({
 };
 
 export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
-	const {
-		onSubmit,
-		form,
-		handleSendEmailVerificationCode,
-		isPendingCreateEmailVerificationCode,
-		isEmailVerificationCodeSent,
-		handleVerifyCode,
-		isPendingVerifyCode,
-		isCodeVerified,
-		countdownSeconds,
-		countdownTotal,
-		minutesRemaining,
-		isCodeExpired,
-		isPendingSubmit,
-	} = useCreateIdentityPanel(props);
+	const { onSubmit, form, isPendingSubmit } = useCreateIdentityPanel(props);
 
 	const isMobile = useIsMobile();
 	const [isLandscape, setIsLandscape] = useState(false);
 	const [viewportHeight, setViewportHeight] = useState<number | null>(null);
-	const [hasScrollableContent, setHasScrollableContent] = useState(false);
 	const containerRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -93,65 +74,23 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 		};
 	}, []);
 
-	// Check if content is scrollable
-	useEffect(() => {
-		const checkScrollable = () => {
-			// Add a small delay to ensure DOM is updated
-			setTimeout(() => {
-				if (containerRef.current) {
-					// Find the scrollable element within CustomScrollbar
-					const scrollableElement = containerRef.current.querySelector(
-						'.custom-scrollbar-content'
-					);
-					if (scrollableElement) {
-						const { scrollHeight, clientHeight } = scrollableElement as HTMLElement;
-						const isScrollable = scrollHeight > clientHeight;
-						setHasScrollableContent(isScrollable);
-					}
-				}
-			}, 100);
-		};
-
-		checkScrollable();
-		window.addEventListener('resize', checkScrollable);
-
-		// Also check when verification code section appears/disappears
-		let observer: ResizeObserver | null = null;
-		const setupObserver = () => {
-			if (containerRef.current) {
-				observer = new ResizeObserver(checkScrollable);
-				observer.observe(containerRef.current);
-			}
-		};
-
-		// Setup observer after a delay to ensure ref is attached
-		setTimeout(setupObserver, 200);
-
-		return () => {
-			window.removeEventListener('resize', checkScrollable);
-			if (observer) {
-				observer.disconnect();
-			}
-		};
-	}, [isMobile, isLandscape, isEmailVerificationCodeSent, isCodeVerified]);
-
 	// Detect short landscape heights to compress layout further
 	const isShortLandscape = isMobile && isLandscape && (viewportHeight ?? Infinity) <= 420;
 	const isVeryShortLandscape =
 		isMobile && isLandscape && (viewportHeight ?? Infinity) <= 360;
 
-	// Panel height compresses with viewport height in landscape
+	// Panel height - simplified since we have fewer fields now
 	const panelHeightStyle =
 		isMobile && isLandscape
 			? {
-					height: isVeryShortLandscape ? 'min(280px, 45vh)' : 'min(280px, 50vh)',
-					maxHeight: isVeryShortLandscape ? 'min(280px, 45vh)' : 'min(280px, 50vh)',
-					minHeight: '200px',
+					height: isVeryShortLandscape ? 'min(200px, 45vh)' : 'min(220px, 50vh)',
+					maxHeight: isVeryShortLandscape ? 'min(200px, 45vh)' : 'min(220px, 50vh)',
+					minHeight: '150px',
 			  }
 			: {
-					height: '326.05px',
-					maxHeight: '326.05px',
-					minHeight: '200px',
+					height: '220px',
+					maxHeight: '220px',
+					minHeight: '150px',
 			  };
 
 	// Adjust spacing between form fields when height is constrained
@@ -160,6 +99,9 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 		: isShortLandscape
 		? 'space-y-3'
 		: 'space-y-4';
+
+	// Check if form is valid for submit button
+	const isFormValid = form.watch('name')?.trim().length > 0;
 
 	return (
 		<FormProvider {...form}>
@@ -173,9 +115,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 					<div
 						ref={containerRef}
 						className={cn(
-							'box-border w-full rounded-[8.81px] border-[2.2px] border-[#000000] relative',
-							// Add subtle shadow when content is scrollable
-							hasScrollableContent ? 'shadow-inner' : ''
+							'box-border w-full rounded-[8.81px] border-[2.2px] border-[#000000] relative'
 						)}
 						style={{
 							backgroundColor: '#F4F9FF',
@@ -186,9 +126,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 							className="w-full h-full rounded-[6px]"
 							contentClassName={cn(
 								'scrollbar-hide',
-								isVeryShortLandscape ? 'p-3' : 'p-4',
-								// Add right padding when scrollbar is visible to prevent overlap
-								hasScrollableContent ? 'pr-6' : ''
+								isVeryShortLandscape ? 'p-3' : 'p-4'
 							)}
 							disableOverflowClass
 							thumbWidth={2}
@@ -235,173 +173,6 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 										</FormItem>
 									)}
 								/>
-								<FormField
-									control={form.control}
-									name="email"
-									render={({ field }) => (
-										<FormItem>
-											<div className="flex items-start gap-2">
-												<FormLabel className="font-secondary text-[14px]">
-													Email Address*
-												</FormLabel>
-												<InfoTooltip message="This is the address where you will receive your responses." />
-											</div>
-											<FormControl>
-												<div className="flex gap-2 items-center">
-													<div className="flex-1 relative">
-														<StyledInput
-															field={field}
-															width={
-																isMobile && isLandscape
-																	? 'w-full'
-																	: 'w-full md:w-[510.01px]'
-															}
-															paddingRight="32px"
-															disabled={isCodeVerified}
-														/>
-														{isCodeVerified && (
-															<CheckCircleIcon className="absolute top-1/2 -translate-y-1/2 right-2 stroke-primary" />
-														)}
-													</div>
-													<Button
-														className="whitespace-nowrap w-[100.24px] h-[44.06px] rounded-[7.28px] border-[0.91px] border-[#000000] !bg-[rgba(93,171,104,0.47)] text-black flex items-center justify-center font-secondary focus-visible:!ring-0 focus:!ring-0 !ring-0 focus-visible:!ring-transparent !ring-transparent focus-visible:!outline-none focus:!outline-none !outline-none focus-visible:!border-[#000000] focus:!border-[#000000] !shadow-none focus:!shadow-none active:!shadow-none"
-														variant={isCodeVerified ? 'light' : 'light'}
-														type="button"
-														onClick={(e) => {
-															e.preventDefault();
-															handleSendEmailVerificationCode();
-														}}
-														isLoading={
-															isPendingCreateEmailVerificationCode || isPendingVerifyCode
-														}
-														disabled={!field.value || !!form.formState.errors.email}
-													>
-														{isCodeVerified
-															? 'Reset'
-															: isEmailVerificationCodeSent && !isCodeExpired
-															? 'Resend'
-															: 'Verify'}
-													</Button>
-												</div>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
-								/>
-								{isEmailVerificationCodeSent &&
-									!isCodeVerified &&
-									!(isMobile && isLandscape) && (
-										<FormField
-											control={form.control}
-											name="verificationCode"
-											render={({ field }) => (
-												<FormItem
-													className={cn(
-														'mt-1 mb-4',
-														isVeryShortLandscape
-															? 'mt-0.5 mb-2'
-															: isShortLandscape
-															? 'mt-0.5 mb-3'
-															: ''
-													)}
-												>
-													<FormLabel className="font-secondary text-[14px]">
-														Verification Code
-													</FormLabel>
-													<div
-														className={cn(
-															'box-border w-full rounded-[8px] border-[2px] border-[#000000] flex flex-col items-center justify-center',
-															isVeryShortLandscape
-																? 'h-[90px]'
-																: isShortLandscape
-																? 'h-[100px]'
-																: 'h-[120px]'
-														)}
-														style={{ borderStyle: 'solid' }}
-													>
-														<FormControl>
-															<InputOTP
-																maxLength={6}
-																pattern="[0-9]*"
-																{...field}
-																disabled={isCodeExpired}
-																onChange={(value) => {
-																	field.onChange(value);
-																	handleVerifyCode(value);
-																}}
-															>
-																<InputOTPGroup className="gap-1.5">
-																	<InputOTPSlot
-																		index={0}
-																		className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
-																	/>
-																	<InputOTPSlot
-																		index={1}
-																		className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
-																	/>
-																	<InputOTPSlot
-																		index={2}
-																		className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
-																	/>
-																	<InputOTPSlot
-																		index={3}
-																		className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
-																	/>
-																	<InputOTPSlot
-																		index={4}
-																		className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
-																	/>
-																	<InputOTPSlot
-																		index={5}
-																		className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
-																	/>
-																</InputOTPGroup>
-															</InputOTP>
-														</FormControl>
-														{countdownSeconds !== null && !isCodeVerified && (
-															<div
-																className={cn(
-																	'flex flex-col items-center',
-																	isVeryShortLandscape
-																		? 'mt-2'
-																		: isShortLandscape
-																		? 'mt-3'
-																		: 'mt-5'
-																)}
-															>
-																{/* Red base bar with gray overlay that grows from right to left */}
-																<div className="relative w-[199px] h-[6px] bg-[#8F0A0A] rounded-full overflow-hidden">
-																	<div
-																		className="absolute right-0 top-0 h-full bg-[#EDD8D8]"
-																		style={{
-																			width: `${Math.max(
-																				0,
-																				Math.min(
-																					100,
-																					((countdownTotal - countdownSeconds) /
-																						countdownTotal) *
-																						100
-																				)
-																			)}%`,
-																			transition: 'width 1s linear',
-																		}}
-																	/>
-																</div>
-																<Typography
-																	font="secondary"
-																	className="mt-1 text-black"
-																	style={{ fontSize: '16.12px', fontWeight: 400 }}
-																>
-																	{minutesRemaining ?? 0}m
-																</Typography>
-															</div>
-														)}
-													</div>
-													<FormMessage />
-												</FormItem>
-											)}
-										/>
-									)}
 							</div>
 						</CustomScrollbar>
 					</div>
@@ -421,7 +192,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 						}}
 					>
 						<Button
-							disabled={!isCodeVerified}
+							disabled={!isFormValid}
 							isLoading={isPendingSubmit}
 							type="submit"
 							className={cn(
@@ -442,113 +213,6 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 						</Button>
 					</div>
 
-					{/* Verification code section for mobile landscape - after Save button */}
-					{isEmailVerificationCodeSent && !isCodeVerified && isMobile && isLandscape && (
-						<div className="mt-4">
-							<FormField
-								control={form.control}
-								name="verificationCode"
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel className="font-secondary text-[14px]">
-											Verification Code
-										</FormLabel>
-										<div
-											className={cn(
-												'box-border w-full rounded-[8px] border-[2px] border-[#000000] flex flex-col items-center justify-center',
-												isVeryShortLandscape
-													? 'h-[90px]'
-													: isShortLandscape
-													? 'h-[100px]'
-													: 'h-[120px]'
-											)}
-											style={{ borderStyle: 'solid', backgroundColor: '#FFFFFF' }}
-										>
-											<FormControl>
-												<InputOTP
-													maxLength={6}
-													pattern="[0-9]*"
-													{...field}
-													disabled={isCodeExpired}
-													onChange={(value) => {
-														field.onChange(value);
-														handleVerifyCode(value);
-													}}
-												>
-													<InputOTPGroup className="gap-1.5">
-														<InputOTPSlot
-															index={0}
-															className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
-														/>
-														<InputOTPSlot
-															index={1}
-															className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
-														/>
-														<InputOTPSlot
-															index={2}
-															className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
-														/>
-														<InputOTPSlot
-															index={3}
-															className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
-														/>
-														<InputOTPSlot
-															index={4}
-															className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
-														/>
-														<InputOTPSlot
-															index={5}
-															className="box-border !w-[29px] !h-[33px] !aspect-auto !border-[1px] !border-[#000000] !rounded-[8px] first:!rounded-[8px] last:!rounded-[8px] !text-base !border-l data-[active=true]:!ring-0 data-[active=true]:!ring-transparent data-[active=true]:!border-[#000000] !outline-none focus:!outline-none focus:!ring-0 focus:!border-[#000000]"
-														/>
-													</InputOTPGroup>
-												</InputOTP>
-											</FormControl>
-											{countdownSeconds !== null && !isCodeVerified && (
-												<div
-													className={cn(
-														'flex flex-col items-center',
-														isVeryShortLandscape
-															? 'mt-2'
-															: isShortLandscape
-															? 'mt-3'
-															: 'mt-5'
-													)}
-												>
-													{/* Red base bar with gray overlay that grows from right to left */}
-													<div className="relative w-[199px] h-[6px] bg-[#8F0A0A] rounded-full overflow-hidden">
-														<div
-															className="absolute right-0 top-0 h-full bg-[#EDD8D8]"
-															style={{
-																width: `${Math.max(
-																	0,
-																	Math.min(
-																		100,
-																		((countdownTotal - countdownSeconds) /
-																			countdownTotal) *
-																			100
-																	)
-																)}%`,
-																transition: 'width 1s linear',
-															}}
-														/>
-													</div>
-													<Typography
-														font="secondary"
-														className="mt-1 text-black"
-														style={{ fontSize: '16.12px', fontWeight: 400 }}
-													>
-														{minutesRemaining ?? 0}m
-													</Typography>
-												</div>
-											)}
-										</div>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-						</div>
-					)}
-
 					{/* Spacer to prevent overlap with mobile sticky CTA (portrait only) */}
 					{isMobile && !isLandscape ? <div className="md:hidden h-[64px]" /> : null}
 
@@ -566,7 +230,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 									}}
 								>
 									<Button
-										disabled={!isCodeVerified}
+										disabled={!isFormValid}
 										isLoading={isPendingSubmit}
 										onClick={(e) => {
 											e.stopPropagation();
@@ -578,7 +242,7 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 										}}
 										className="w-full h-[53px] min-h-[53px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#050505] transition-colors !opacity-100 disabled:!opacity-100"
 										style={{
-											pointerEvents: isCodeVerified ? 'auto' : 'none',
+											pointerEvents: isFormValid ? 'auto' : 'none',
 										}}
 									>
 										Save and continue
