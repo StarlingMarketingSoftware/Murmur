@@ -18,6 +18,7 @@ export interface ContactTSVUploadDialogProps {
 	buttonVariant?: ButtonVariants['variant'];
 	className?: string;
 	fullScreen?: boolean;
+	asTextTrigger?: boolean;
 }
 
 type ContactInput = PostBatchContactData['contacts'][number];
