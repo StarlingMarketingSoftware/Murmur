@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
 		const mailgunSignature = formData.get('signature') as string;
 
 		// Parse headers if available
-		let headers: Record<string, unknown> | null = null;
+		let headers: Record<string, unknown> = {};
 		const messageHeaders = formData.get('message-headers') as string;
 		if (messageHeaders) {
 			try {
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
 		}
 
 		// Parse attachments info if available
-		let attachments: Record<string, unknown> | null = null;
+		let attachments: Record<string, unknown> = {};
 		const attachmentCount = formData.get('attachment-count') as string;
 		if (attachmentCount && parseInt(attachmentCount) > 0) {
 			attachments = {

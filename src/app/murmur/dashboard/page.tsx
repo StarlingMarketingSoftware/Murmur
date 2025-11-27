@@ -1244,12 +1244,11 @@ const Dashboard = () => {
 											style={{
 												width: '85px',
 												height: '17px',
-												borderWidth: activeTab === 'inbox' ? '2px' : '0',
+												borderWidth: '0',
 												borderStyle: 'solid',
 												borderColor: '#000000',
 												borderRadius: '10px',
-												backgroundColor:
-													activeTab === 'inbox' ? '#DAE6FE' : 'transparent',
+												backgroundColor: 'transparent',
 											}}
 										>
 											Inbox
@@ -2623,7 +2622,10 @@ const InboxSection = () => {
 				subject: replySubject,
 				message: replyMessage,
 				senderEmail: senderEmail,
-				senderName: user?.name || 'Murmur User',
+				senderName:
+					user?.firstName && user?.lastName
+						? `${user.firstName} ${user.lastName}`
+						: user?.firstName || 'Murmur User',
 				originEmail: senderEmail,
 			});
 
@@ -2739,7 +2741,9 @@ const InboxSection = () => {
 									From: {selectedEmail.senderName || selectedEmail.sender}
 									{selectedEmail.contact && (
 										<span className="ml-2 text-xs bg-gray-100 px-2 py-0.5 rounded">
-											{selectedEmail.contact.name}
+											{selectedEmail.contact.firstName && selectedEmail.contact.lastName
+												? `${selectedEmail.contact.firstName} ${selectedEmail.contact.lastName}`
+												: selectedEmail.contact.firstName || selectedEmail.contact.email}
 										</span>
 									)}
 								</div>
@@ -2827,7 +2831,9 @@ const InboxSection = () => {
 											</span>
 											{email.contact && (
 												<span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-													{email.contact.name}
+													{email.contact.firstName && email.contact.lastName
+														? `${email.contact.firstName} ${email.contact.lastName}`
+														: email.contact.firstName || email.contact.email}
 												</span>
 											)}
 											{email.campaign && (
