@@ -17,6 +17,14 @@ export type EmailWithRelations = Prisma.EmailGetPayload<{
 	};
 }>;
 
+export type InboundEmailWithRelations = Prisma.InboundEmailGetPayload<{
+	include: {
+		contact: true;
+		campaign: true;
+		originalEmail: true;
+	};
+}>;
+
 export type TestDraftEmail = {
 	subject: string;
 	message: string;

@@ -95,6 +95,10 @@ export const urls = {
 			index: '/api/emails',
 			detail: ((id) => `/api/emails/${id}`) as DetailRoute,
 		},
+		inboundEmails: {
+			index: '/api/inbound',
+			detail: ((id) => `/api/inbound/${id}`) as DetailRoute,
+		},
 		emailVerificationCodes: {
 			index: '/api/email-verification-codes',
 		},
