@@ -11,6 +11,7 @@ const postMailgunSchema = z.object({
 	senderEmail: z.string().email(),
 	senderName: z.string().min(1),
 	originEmail: z.string().email().optional().nullable(),
+	replyToEmail: z.string().email().optional(),
 });
 export type PostMailgunData = z.infer<typeof postMailgunSchema>;
 
@@ -25,9 +26,9 @@ export async function POST(request: Request) {
 			recipientEmail,
 			subject,
 			message,
-			senderEmail,
 			senderName,
 			originEmail: specifiedOriginEmail,
+			replyToEmail,
 		} = validatedData.data;
 
 		const mailgun = new Mailgun(FormData);
@@ -41,8 +42,8 @@ export async function POST(request: Request) {
 		const originEmail = specifiedOriginEmail ?? 'postmaster@murmurmailbox.com';
 
 		const mailgunData = await mg.messages.create('murmurmailbox.com', {
-			'h:Reply-To': senderEmail,
-			'h:Sender': senderEmail,
+			'h:Reply-To': replyToEmail ?? originEmail,
+			'h:Sender': originEmail,
 			'h:X-Mailgun-Dkim-Signature': 'yes',
 			'h:Message-ID': `<${Date.now()}.${Math.random().toString(36).slice(2)}@${
 				originEmail.split('@')[1]

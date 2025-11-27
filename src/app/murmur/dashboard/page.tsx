@@ -32,6 +32,9 @@ import { useClerk } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useGetLocations } from '@/hooks/queryHooks/useContacts';
+import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
+import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
+import { useMe } from '@/hooks/useMe';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
@@ -68,6 +71,7 @@ const Dashboard = () => {
 	const [activeSection, setActiveSection] = useState<'why' | 'what' | 'where' | null>(
 		null
 	);
+	const [activeTab, setActiveTab] = useState<'search' | 'inbox'>('search');
 	const [userLocationName, setUserLocationName] = useState<string | null>(null);
 	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
@@ -626,19 +630,19 @@ const Dashboard = () => {
 		if (pendingSearch) {
 			// Clear the pending search immediately to prevent re-triggering
 			sessionStorage.removeItem('murmur_pending_search');
-			
+
 			// Parse the search query: "[Why] What in Where"
 			const whyMatch = pendingSearch.match(/^\[(Booking|Promotion)\]/i);
 			const inMatch = pendingSearch.match(/\s+in\s+(.+)$/i);
-			
+
 			let parsedWhy = '';
 			let parsedWhat = '';
 			let parsedWhere = '';
-			
+
 			if (whyMatch) {
 				parsedWhy = `[${whyMatch[1]}]`;
 			}
-			
+
 			if (inMatch) {
 				parsedWhere = inMatch[1].trim();
 				// Get the "what" part - everything after [Why] and before " in "
@@ -656,12 +660,12 @@ const Dashboard = () => {
 				}
 				parsedWhat = whatPart;
 			}
-			
+
 			// Set the values
 			if (parsedWhy) setWhyValue(parsedWhy);
 			if (parsedWhat) setWhatValue(parsedWhat);
 			if (parsedWhere) setWhereValue(parsedWhere);
-			
+
 			// Set the form value and submit after a short delay to allow state to update
 			setTimeout(() => {
 				const formattedWhere = parsedWhere ? `(${parsedWhere})` : '';
@@ -760,11 +764,18 @@ const Dashboard = () => {
 						: undefined
 				}
 			>
-				<div className="hero-wrapper flex flex-col justify-center items-center !z-[40]">
+				<div
+					className={`hero-wrapper flex flex-col items-center !z-[40] ${
+						activeTab === 'inbox' ? 'justify-start pt-[100px]' : 'justify-center'
+					}`}
+				>
 					<div className="w-full">
 						<div
 							className="flex justify-center items-center w-full px-4"
-							style={{ marginBottom: '0.75rem', marginTop: '50px' }}
+							style={{
+								marginBottom: '0.75rem',
+								marginTop: activeTab === 'inbox' ? '0px' : '50px',
+							}}
 						>
 							<div className="premium-hero-section flex flex-col items-center justify-center w-full max-w-[600px]">
 								<div
@@ -779,7 +790,7 @@ const Dashboard = () => {
 						<div
 							className={`search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 !z-[50] ${
 								hasSearched ? 'search-bar-active' : ''
-							}`}
+							} ${activeTab === 'inbox' ? 'hidden' : ''}`}
 						>
 							<div className="search-bar-inner">
 								{hasSearched && activeSearchQuery && (
@@ -1181,6 +1192,141 @@ const Dashboard = () => {
 								)}
 							</div>
 						</div>
+
+						{/* Box 92px below searchbar - only show when on search tab */}
+						{activeTab === 'search' && (
+							<div className="flex justify-center" style={{ marginTop: '92px' }}>
+								<div
+									className="flex items-center"
+									style={{
+										width: '288px',
+										height: '36px',
+										borderWidth: '3px',
+										borderStyle: 'solid',
+										borderColor: '#7A7A7A',
+										borderRadius: '10px',
+									}}
+								>
+									<span
+										className="flex items-center justify-center cursor-pointer"
+										style={{
+											flex: 1,
+											height: '100%',
+										}}
+										onClick={() => setActiveTab('search')}
+									>
+										<span
+											className="flex items-center justify-center font-medium"
+											style={{
+												width: '85px',
+												height: '17px',
+												borderWidth: activeTab === 'search' ? '2px' : '0',
+												borderStyle: 'solid',
+												borderColor: '#000000',
+												borderRadius: '10px',
+												backgroundColor:
+													activeTab === 'search' ? '#DAE6FE' : 'transparent',
+											}}
+										>
+											Search
+										</span>
+									</span>
+									<span
+										className="flex items-center justify-center cursor-pointer"
+										style={{
+											flex: 1,
+											height: '100%',
+										}}
+										onClick={() => setActiveTab('inbox')}
+									>
+										<span
+											className="flex items-center justify-center font-medium"
+											style={{
+												width: '85px',
+												height: '17px',
+												borderWidth: '0',
+												borderStyle: 'solid',
+												borderColor: '#000000',
+												borderRadius: '10px',
+												backgroundColor: 'transparent',
+											}}
+										>
+											Inbox
+										</span>
+									</span>
+								</div>
+							</div>
+						)}
+						{/* Inbox view - show inbox section and toggle right after logo */}
+						{activeTab === 'inbox' && (
+							<>
+								<InboxSection />
+								{/* Toggle below inbox */}
+								<div
+									className="flex justify-center"
+									style={{ marginTop: '16px', marginBottom: '20px' }}
+								>
+									<div
+										className="flex items-center"
+										style={{
+											width: '288px',
+											height: '36px',
+											borderWidth: '3px',
+											borderStyle: 'solid',
+											borderColor: '#7A7A7A',
+											borderRadius: '10px',
+										}}
+									>
+										<span
+											className="flex items-center justify-center cursor-pointer"
+											style={{
+												flex: 1,
+												height: '100%',
+											}}
+											onClick={() => setActiveTab('search')}
+										>
+											<span
+												className="flex items-center justify-center font-medium"
+												style={{
+													width: '85px',
+													height: '17px',
+													borderWidth: '0',
+													borderStyle: 'solid',
+													borderColor: '#000000',
+													borderRadius: '10px',
+													backgroundColor: 'transparent',
+												}}
+											>
+												Search
+											</span>
+										</span>
+										<span
+											className="flex items-center justify-center cursor-pointer"
+											style={{
+												flex: 1,
+												height: '100%',
+											}}
+											onClick={() => setActiveTab('inbox')}
+										>
+											<span
+												className="flex items-center justify-center font-medium"
+												style={{
+													width: '85px',
+													height: '17px',
+													borderWidth: '2px',
+													borderStyle: 'solid',
+													borderColor: '#000000',
+													borderRadius: '10px',
+													backgroundColor: '#DAE6FE',
+												}}
+											>
+												Inbox
+											</span>
+										</span>
+									</div>
+								</div>
+							</>
+						)}
 					</div>
 				</div>
 
@@ -1188,6 +1334,7 @@ const Dashboard = () => {
 				{hasSearched &&
 					activeSearchQuery &&
 					!isMapView &&
+					activeTab === 'search' &&
 					(isSearchPending || isLoadingContacts || isRefetchingContacts) && (
 						<div className="search-query-display mt-8">
 							<div className="search-query-display-inner">
@@ -1223,268 +1370,277 @@ const Dashboard = () => {
 						</div>
 					)}
 
-				{hasSearched && !isLoadingContacts && !isRefetchingContacts && (
-					<div className="results-search-bar-wrapper w-full max-w-[531px] mx-auto px-4 relative">
-						<div
-							className={`results-search-bar-inner ${
-								hoveredContact && !isMapView ? 'invisible' : ''
-							}`}
-						>
-							<Form {...form}>
-								<form
-									onSubmit={(e) => {
-										e.preventDefault();
-										if (!isSignedIn) {
-											if (hasProblematicBrowser) {
-												console.log(
-													'[Dashboard] Edge/Safari detected, navigating to sign-in page'
-												);
-												if (typeof window !== 'undefined') {
-													sessionStorage.setItem(
-														'redirectAfterSignIn',
-														window.location.pathname
+				{hasSearched &&
+					!isLoadingContacts &&
+					!isRefetchingContacts &&
+					activeTab === 'search' && (
+						<div className="results-search-bar-wrapper w-full max-w-[531px] mx-auto px-4 relative">
+							<div
+								className={`results-search-bar-inner ${
+									hoveredContact && !isMapView ? 'invisible' : ''
+								}`}
+							>
+								<Form {...form}>
+									<form
+										onSubmit={(e) => {
+											e.preventDefault();
+											if (!isSignedIn) {
+												if (hasProblematicBrowser) {
+													console.log(
+														'[Dashboard] Edge/Safari detected, navigating to sign-in page'
 													);
+													if (typeof window !== 'undefined') {
+														sessionStorage.setItem(
+															'redirectAfterSignIn',
+															window.location.pathname
+														);
+													}
+													window.location.href = urls.signIn.index;
+												} else {
+													openSignIn();
 												}
-												window.location.href = urls.signIn.index;
 											} else {
-												openSignIn();
+												form.handleSubmit(onSubmit)(e);
 											}
-										} else {
-											form.handleSubmit(onSubmit)(e);
-										}
-									}}
-									className="results-search-form"
-								>
-									<FormField
-										control={form.control}
-										name="searchText"
-										render={({ field }) => (
-											<FormItem className="w-full">
-												<FormControl>
-													<div className="results-search-input-group">
-														<div
-															className={`search-wave-container relative ${
-																isSearchPending ||
-																isLoadingContacts ||
-																isRefetchingContacts
-																	? 'search-wave-loading'
-																	: ''
-															}`}
-														>
-															<Input
-																className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black !pr-[60px] ${
-																	activeSection ? '!bg-[#F3F3F3]' : '!bg-white'
-																} ${
-																	field.value === activeSearchQuery &&
-																	(field.value?.trim()?.length ?? 0) > 0
-																		? 'text-center'
-																		: 'text-left'
-																} ${
-																	!isMobile
-																		? 'text-transparent placeholder:text-transparent'
+										}}
+										className="results-search-form"
+									>
+										<FormField
+											control={form.control}
+											name="searchText"
+											render={({ field }) => (
+												<FormItem className="w-full">
+													<FormControl>
+														<div className="results-search-input-group">
+															<div
+																className={`search-wave-container relative ${
+																	isSearchPending ||
+																	isLoadingContacts ||
+																	isRefetchingContacts
+																		? 'search-wave-loading'
 																		: ''
 																}`}
-																placeholder='Refine your search... e.g. "Music venues in North Carolina"'
-																style={{ accentColor: 'transparent' }}
-																autoComplete="off"
-																autoCorrect="off"
-																autoCapitalize="off"
-																spellCheck="false"
-																{...field}
-															/>
-															{!isMobile && (
-																<div
-																	className={`absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center rounded-[6px] z-10 group ${
-																		activeSection
-																			? 'bg-[#F3F3F3] border border-transparent'
-																			: 'bg-white border border-black'
+															>
+																<Input
+																	className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black !pr-[60px] ${
+																		activeSection ? '!bg-[#F3F3F3]' : '!bg-white'
+																	} ${
+																		field.value === activeSearchQuery &&
+																		(field.value?.trim()?.length ?? 0) > 0
+																			? 'text-center'
+																			: 'text-left'
+																	} ${
+																		!isMobile
+																			? 'text-transparent placeholder:text-transparent'
+																			: ''
 																	}`}
-																	style={{
-																		width: 'calc(100% - 66px)',
-																		height: '38px',
-																	}}
-																>
+																	placeholder='Refine your search... e.g. "Music venues in North Carolina"'
+																	style={{ accentColor: 'transparent' }}
+																	autoComplete="off"
+																	autoCorrect="off"
+																	autoCapitalize="off"
+																	spellCheck="false"
+																	{...field}
+																/>
+																{!isMobile && (
 																	<div
-																		className={`flex-1 flex items-center justify-start border-r border-transparent ${
-																			!activeSection ? 'group-hover:border-black/10' : ''
-																		} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-why`}
-																		onClick={() => setActiveSection('why')}
+																		className={`absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center rounded-[6px] z-10 group ${
+																			activeSection
+																				? 'bg-[#F3F3F3] border border-transparent'
+																				: 'bg-white border border-black'
+																		}`}
+																		style={{
+																			width: 'calc(100% - 66px)',
+																			height: '38px',
+																		}}
 																	>
-																		{activeSection === 'why' && (
-																			<div
-																				className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
-																				style={{
-																					width: '117px',
-																					height: '38px',
-																					borderTopLeftRadius: '6px',
-																					borderBottomLeftRadius: '6px',
+																		<div
+																			className={`flex-1 flex items-center justify-start border-r border-transparent ${
+																				!activeSection
+																					? 'group-hover:border-black/10'
+																					: ''
+																			} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-why`}
+																			onClick={() => setActiveSection('why')}
+																		>
+																			{activeSection === 'why' && (
+																				<div
+																					className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
+																					style={{
+																						width: '117px',
+																						height: '38px',
+																						borderTopLeftRadius: '6px',
+																						borderBottomLeftRadius: '6px',
+																					}}
+																				/>
+																			)}
+																			<div className="w-full h-full flex items-center text-left text-[13px] font-bold font-secondary truncate p-0 relative z-10 cursor-pointer">
+																				{whyValue
+																					? whyValue.replace(/[\[\]]/g, '')
+																					: 'Why'}
+																			</div>
+																		</div>
+																		<div
+																			className={`flex-1 flex items-center justify-start border-r border-transparent ${
+																				!activeSection
+																					? 'group-hover:border-black/10'
+																					: ''
+																			} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-what`}
+																		>
+																			{activeSection === 'what' && (
+																				<div
+																					className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
+																					style={{
+																						width: '144px',
+																						height: '38px',
+																						borderTopLeftRadius: '6px',
+																						borderBottomLeftRadius: '6px',
+																						borderTopRightRadius: '6px',
+																						borderBottomRightRadius: '6px',
+																					}}
+																				/>
+																			)}
+																			<input
+																				value={whatValue}
+																				onChange={(e) => setWhatValue(e.target.value)}
+																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+																				placeholder="What"
+																				onFocus={(e) => {
+																					setActiveSection('what');
+																					const target = e.target;
+																					setTimeout(
+																						() => target.setSelectionRange(0, 0),
+																						0
+																					);
 																				}}
 																			/>
-																		)}
-																		<div className="w-full h-full flex items-center text-left text-[13px] font-bold font-secondary truncate p-0 relative z-10 cursor-pointer">
-																			{whyValue ? whyValue.replace(/[\[\]]/g, '') : 'Why'}
+																		</div>
+																		<div className="flex-1 flex items-center justify-end h-full min-w-0 relative pr-[29px] pl-[16px] mini-search-section-where">
+																			{activeSection === 'where' && (
+																				<div
+																					className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
+																					style={{
+																						width: '143px',
+																						height: '38px',
+																						borderTopLeftRadius: '6px',
+																						borderBottomLeftRadius: '6px',
+																						borderTopRightRadius: '6px',
+																						borderBottomRightRadius: '6px',
+																					}}
+																				/>
+																			)}
+																			<input
+																				value={whereValue}
+																				onChange={(e) => setWhereValue(e.target.value)}
+																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+																				placeholder="Where"
+																				onFocus={(e) => {
+																					setActiveSection('where');
+																					const target = e.target;
+																					setTimeout(
+																						() =>
+																							target.setSelectionRange(
+																								0,
+																								target.value.length
+																							),
+																						0
+																					);
+																				}}
+																			/>
 																		</div>
 																	</div>
-																	<div
-																		className={`flex-1 flex items-center justify-start border-r border-transparent ${
-																			!activeSection ? 'group-hover:border-black/10' : ''
-																		} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-what`}
-																	>
-																		{activeSection === 'what' && (
-																			<div
-																				className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
-																				style={{
-																					width: '144px',
-																					height: '38px',
-																					borderTopLeftRadius: '6px',
-																					borderBottomLeftRadius: '6px',
-																					borderTopRightRadius: '6px',
-																					borderBottomRightRadius: '6px',
-																				}}
-																			/>
-																		)}
-																		<input
-																			value={whatValue}
-																			onChange={(e) => setWhatValue(e.target.value)}
-																			className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
-																			placeholder="What"
-																			onFocus={(e) => {
-																				setActiveSection('what');
-																				const target = e.target;
-																				setTimeout(
-																					() => target.setSelectionRange(0, 0),
-																					0
-																				);
-																			}}
-																		/>
-																	</div>
-																	<div className="flex-1 flex items-center justify-end h-full min-w-0 relative pr-[29px] pl-[16px] mini-search-section-where">
-																		{activeSection === 'where' && (
-																			<div
-																				className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
-																				style={{
-																					width: '143px',
-																					height: '38px',
-																					borderTopLeftRadius: '6px',
-																					borderBottomLeftRadius: '6px',
-																					borderTopRightRadius: '6px',
-																					borderBottomRightRadius: '6px',
-																				}}
-																			/>
-																		)}
-																		<input
-																			value={whereValue}
-																			onChange={(e) => setWhereValue(e.target.value)}
-																			className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
-																			placeholder="Where"
-																			onFocus={(e) => {
-																				setActiveSection('where');
-																				const target = e.target;
-																				setTimeout(
-																					() =>
-																						target.setSelectionRange(
-																							0,
-																							target.value.length
-																						),
-																					0
-																				);
-																			}}
-																		/>
-																	</div>
-																</div>
-															)}
-															<button
-																type="submit"
-																className="absolute right-[6px] top-1/2 -translate-y-1/2 flex items-center justify-center transition-colors cursor-pointer z-20 hover:bg-[#a3d9a5]"
-																style={{
-																	width: '48px',
-																	height: '37px',
-																	backgroundColor: '#B8E4BE',
-																	border: '1px solid #5DAB68',
-																	borderTopRightRadius: '6px',
-																	borderBottomRightRadius: '6px',
-																	borderTopLeftRadius: '0',
-																	borderBottomLeftRadius: '0',
-																}}
-																aria-label="Search"
-															>
-																<div
-																	style={{ transform: 'scale(0.75)', display: 'flex' }}
+																)}
+																<button
+																	type="submit"
+																	className="absolute right-[6px] top-1/2 -translate-y-1/2 flex items-center justify-center transition-colors cursor-pointer z-20 hover:bg-[#a3d9a5]"
+																	style={{
+																		width: '48px',
+																		height: '37px',
+																		backgroundColor: '#B8E4BE',
+																		border: '1px solid #5DAB68',
+																		borderTopRightRadius: '6px',
+																		borderBottomRightRadius: '6px',
+																		borderTopLeftRadius: '0',
+																		borderBottomLeftRadius: '0',
+																	}}
+																	aria-label="Search"
 																>
-																	<SearchIconDesktop />
-																</div>
-															</button>
+																	<div
+																		style={{ transform: 'scale(0.75)', display: 'flex' }}
+																	>
+																		<SearchIconDesktop />
+																	</div>
+																</button>
+															</div>
+															{renderDesktopSearchDropdowns()}
 														</div>
-														{renderDesktopSearchDropdowns()}
-													</div>
-												</FormControl>
-											</FormItem>
-										)}
-									/>
-									{/* Generate action removed; awaiting left-side SVG submit icon */}
-								</form>
-								{!isMapView && (
-									<div className="w-full text-center mt-2">
-										<span
-											className="font-secondary"
-											style={{ fontSize: '13px', fontWeight: 400, color: '#7f7f7f' }}
-										>
-											Select who you want to contact.
-										</span>
-									</div>
-								)}
-							</Form>
-						</div>
-						{hoveredContact && !isMobile && !isMapView && (
-							<div className="absolute inset-0 z-[90] flex items-start justify-center pointer-events-none bg-white">
-								<div className="w-full max-w-[1132px] mx-auto px-4 py-3 text-center">
-									<div className="font-secondary font-bold text-[19px] leading-tight truncate">
-										{`${hoveredContact.firstName || ''} ${
-											hoveredContact.lastName || ''
-										}`.trim() ||
-											hoveredContact.name ||
-											hoveredContact.company ||
-											'—'}
-									</div>
-									<div className="mt-1 w-full flex justify-center">
-										<div
-											className="inline-flex items-center justify-center h-[19px] rounded-[8px] px-2 whitespace-nowrap"
-											style={{
-												backgroundColor: '#E8EFFF',
-												border: '0.7px solid #000000',
-											}}
-										>
-											<span className="text-[14px] leading-none font-secondary font-medium">
-												{hoveredContact.title || '—'}
+													</FormControl>
+												</FormItem>
+											)}
+										/>
+										{/* Generate action removed; awaiting left-side SVG submit icon */}
+									</form>
+									{!isMapView && (
+										<div className="w-full text-center mt-2">
+											<span
+												className="font-secondary"
+												style={{ fontSize: '13px', fontWeight: 400, color: '#7f7f7f' }}
+											>
+												Select who you want to contact.
 											</span>
 										</div>
-									</div>
-									{((hoveredContact.firstName && hoveredContact.firstName.length > 0) ||
-										(hoveredContact.lastName && hoveredContact.lastName.length > 0) ||
-										(hoveredContact.name && hoveredContact.name.length > 0)) &&
-									hoveredContact.company ? (
+									)}
+								</Form>
+							</div>
+							{hoveredContact && !isMobile && !isMapView && (
+								<div className="absolute inset-0 z-[90] flex items-start justify-center pointer-events-none bg-white">
+									<div className="w-full max-w-[1132px] mx-auto px-4 py-3 text-center">
+										<div className="font-secondary font-bold text-[19px] leading-tight truncate">
+											{`${hoveredContact.firstName || ''} ${
+												hoveredContact.lastName || ''
+											}`.trim() ||
+												hoveredContact.name ||
+												hoveredContact.company ||
+												'—'}
+										</div>
+										<div className="mt-1 w-full flex justify-center">
+											<div
+												className="inline-flex items-center justify-center h-[19px] rounded-[8px] px-2 whitespace-nowrap"
+												style={{
+													backgroundColor: '#E8EFFF',
+													border: '0.7px solid #000000',
+												}}
+											>
+												<span className="text-[14px] leading-none font-secondary font-medium">
+													{hoveredContact.title || '—'}
+												</span>
+											</div>
+										</div>
+										{((hoveredContact.firstName && hoveredContact.firstName.length > 0) ||
+											(hoveredContact.lastName && hoveredContact.lastName.length > 0) ||
+											(hoveredContact.name && hoveredContact.name.length > 0)) &&
+										hoveredContact.company ? (
+											<div
+												className="mt-1 text-[14px] leading-tight truncate"
+												style={{ color: '#838383' }}
+											>
+												{hoveredContact.company}
+											</div>
+										) : null}
 										<div
 											className="mt-1 text-[14px] leading-tight truncate"
 											style={{ color: '#838383' }}
 										>
-											{hoveredContact.company}
+											{[hoveredContact.city, hoveredContact.state]
+												.filter(Boolean)
+												.join(', ') || '—'}
 										</div>
-									) : null}
-									<div
-										className="mt-1 text-[14px] leading-tight truncate"
-										style={{ color: '#838383' }}
-									>
-										{[hoveredContact.city, hoveredContact.state]
-											.filter(Boolean)
-											.join(', ') || '—'}
 									</div>
 								</div>
-							</div>
-						)}
-					</div>
-				)}
+							)}
+						</div>
+					)}
 
-				{activeSearchQuery && (
+				{activeSearchQuery && activeTab === 'search' && (
 					<>
 						{isError ? (
 							<div className="mt-10 w-full px-4">
@@ -2418,13 +2574,311 @@ const Dashboard = () => {
 					</>
 				)}
 
-				{!hasSearched && (
+				{!hasSearched && activeTab === 'search' && (
 					<div className="campaigns-table-wrapper w-full max-w-[960px] mx-auto px-4">
 						<CampaignsTable />
 					</div>
 				)}
 			</div>
 		</AppLayout>
+	);
+};
+
+const InboxSection = () => {
+	const { data: inboundEmails, isLoading, error } = useGetInboundEmails();
+	const [selectedEmailId, setSelectedEmailId] = useState<number | null>(null);
+	const [replyMessage, setReplyMessage] = useState('');
+	const [isSending, setIsSending] = useState(false);
+
+	const { user } = useMe();
+	const { mutateAsync: sendMailgunMessage } = useSendMailgunMessage({
+		successMessage: 'Reply sent successfully',
+		errorMessage: 'Failed to send reply',
+	});
+
+	const selectedEmail = inboundEmails?.find((email) => email.id === selectedEmailId);
+
+	const handleSendReply = async () => {
+		if (!selectedEmail || !replyMessage.trim()) return;
+
+		const senderEmail =
+			user?.customDomain && user?.customDomain !== ''
+				? user?.customDomain
+				: user?.murmurEmail;
+
+		if (!senderEmail) {
+			console.error('No sender email configured');
+			return;
+		}
+
+		setIsSending(true);
+		try {
+			const replySubject = selectedEmail.subject?.startsWith('Re:')
+				? selectedEmail.subject
+				: `Re: ${selectedEmail.subject || '(No Subject)'}`;
+
+			await sendMailgunMessage({
+				recipientEmail: selectedEmail.sender,
+				subject: replySubject,
+				message: replyMessage,
+				senderEmail: senderEmail,
+				senderName:
+					user?.firstName && user?.lastName
+						? `${user.firstName} ${user.lastName}`
+						: user?.firstName || 'Murmur User',
+				originEmail: senderEmail,
+			});
+
+			setReplyMessage('');
+		} catch (error) {
+			console.error('Failed to send reply:', error);
+		} finally {
+			setIsSending(false);
+		}
+	};
+
+	if (isLoading) {
+		return (
+			<div className="w-full max-w-[998px] mx-auto px-4">
+				<div
+					className="flex items-center justify-center"
+					style={{
+						width: '998px',
+						height: '400px',
+						border: '2px solid #000000',
+						borderRadius: '8px',
+					}}
+				>
+					<div className="text-gray-500">Loading emails...</div>
+				</div>
+			</div>
+		);
+	}
+
+	if (error) {
+		return (
+			<div className="w-full max-w-[998px] mx-auto px-4">
+				<div
+					className="flex items-center justify-center"
+					style={{
+						width: '998px',
+						height: '400px',
+						border: '2px solid #000000',
+						borderRadius: '8px',
+					}}
+				>
+					<div className="text-red-500">Failed to load emails</div>
+				</div>
+			</div>
+		);
+	}
+
+	if (!inboundEmails || inboundEmails.length === 0) {
+		return (
+			<div className="w-full max-w-[998px] mx-auto px-4">
+				<div
+					className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden"
+					style={{
+						width: '998px',
+						height: '400px',
+						border: '2px solid #000000',
+						borderRadius: '8px',
+						padding: '16px',
+						paddingTop: '40px',
+						backgroundColor: '#4CA9DB',
+					}}
+				>
+					{Array.from({ length: 3 }).map((_, idx) => (
+						<div
+							key={`inbox-placeholder-${idx}`}
+							className="select-none"
+							style={{
+								width: '967px',
+								height: '78px',
+								border: '2px solid #000000',
+								borderRadius: '8px',
+								backgroundColor: '#FFFFFF',
+							}}
+						/>
+					))}
+				</div>
+			</div>
+		);
+	}
+
+	return (
+		<div className="w-full max-w-[998px] mx-auto px-4">
+			<div
+				className="flex flex-col items-center overflow-y-auto overflow-x-hidden"
+				style={{
+					width: '998px',
+					height: '558px',
+					border: '2px solid #000000',
+					borderRadius: '8px',
+					padding: '16px',
+					paddingTop: selectedEmail ? '16px' : '40px',
+					backgroundColor: '#4CA9DB',
+				}}
+			>
+				{selectedEmail ? (
+					/* Expanded Email View Inside Box */
+					<div
+						className="w-full h-full overflow-y-auto"
+						style={{
+							width: '967px',
+							border: '2px solid #000000',
+							borderRadius: '8px',
+							backgroundColor: '#FFFFFF',
+							padding: '20px',
+						}}
+					>
+						<div className="flex justify-between items-start mb-4">
+							<div>
+								<div className="text-lg font-bold">
+									{selectedEmail.subject || '(No Subject)'}
+								</div>
+								<div className="text-sm text-gray-600 mt-1">
+									From: {selectedEmail.senderName || selectedEmail.sender}
+									{selectedEmail.contact && (
+										<span className="ml-2 text-xs bg-gray-100 px-2 py-0.5 rounded">
+											{selectedEmail.contact.firstName && selectedEmail.contact.lastName
+												? `${selectedEmail.contact.firstName} ${selectedEmail.contact.lastName}`
+												: selectedEmail.contact.firstName || selectedEmail.contact.email}
+										</span>
+									)}
+								</div>
+								<div className="text-xs text-gray-400 mt-1">
+									{selectedEmail.receivedAt
+										? new Date(selectedEmail.receivedAt).toLocaleString()
+										: ''}
+								</div>
+								{selectedEmail.campaign && (
+									<div className="text-xs text-gray-500 mt-1">
+										Campaign: {selectedEmail.campaign.name}
+									</div>
+								)}
+							</div>
+							<button
+								onClick={() => {
+									setSelectedEmailId(null);
+									setReplyMessage('');
+								}}
+								className="text-gray-500 hover:text-gray-700 text-xl font-bold px-2"
+							>
+								×
+							</button>
+						</div>
+						<div className="border-t pt-4 text-sm">
+							{selectedEmail.bodyHtml ? (
+								<div
+									dangerouslySetInnerHTML={{ __html: selectedEmail.bodyHtml }}
+									className="prose prose-sm max-w-none"
+								/>
+							) : (
+								<div className="whitespace-pre-wrap">
+									{selectedEmail.strippedText || selectedEmail.bodyPlain || 'No content'}
+								</div>
+							)}
+						</div>
+
+						{/* Reply Box */}
+						<div className="border-t mt-4 pt-4">
+							<div className="text-sm font-medium mb-2">Reply</div>
+							<textarea
+								value={replyMessage}
+								onChange={(e) => setReplyMessage(e.target.value)}
+								placeholder="Type your reply..."
+								className="w-full p-3 border-2 border-black rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+								rows={4}
+								disabled={isSending}
+							/>
+							<div className="flex justify-end mt-2">
+								<Button
+									onClick={handleSendReply}
+									disabled={!replyMessage.trim() || isSending}
+									className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+								>
+									{isSending ? 'Sending...' : 'Send Reply'}
+								</Button>
+							</div>
+						</div>
+					</div>
+				) : (
+					/* Email List View */
+					<>
+						{inboundEmails.map((email) => (
+							<div
+								key={email.id}
+								className="bg-white hover:bg-gray-50 cursor-pointer px-4 flex items-center mb-2"
+								style={{
+									width: '967px',
+									height: '78px',
+									minHeight: '78px',
+									border: '2px solid #000000',
+									borderRadius: '8px',
+									backgroundColor: '#FFFFFF',
+								}}
+								onClick={() => {
+									setSelectedEmailId(email.id);
+									setReplyMessage('');
+								}}
+							>
+								<div className="flex justify-between items-center gap-4 w-full">
+									<div className="flex-1 min-w-0">
+										<div className="flex items-center gap-2 mb-1">
+											<span className="font-medium truncate">
+												{email.senderName || email.sender}
+											</span>
+											{email.contact && (
+												<span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+													{email.contact.firstName && email.contact.lastName
+														? `${email.contact.firstName} ${email.contact.lastName}`
+														: email.contact.firstName || email.contact.email}
+												</span>
+											)}
+											{email.campaign && (
+												<span className="text-xs text-gray-500">
+													• {email.campaign.name}
+												</span>
+											)}
+										</div>
+										<div className="text-sm font-medium truncate">
+											{email.subject || '(No Subject)'}
+										</div>
+										<div className="text-sm text-gray-500 truncate">
+											{email.strippedText?.slice(0, 80) ||
+												email.bodyPlain?.slice(0, 80) ||
+												''}
+										</div>
+									</div>
+									<div className="text-xs text-gray-400 whitespace-nowrap">
+										{email.receivedAt
+											? new Date(email.receivedAt).toLocaleDateString()
+											: ''}
+									</div>
+								</div>
+							</div>
+						))}
+						{Array.from({ length: Math.max(0, 5 - inboundEmails.length) }).map(
+							(_, idx) => (
+								<div
+									key={`inbox-placeholder-${idx}`}
+									className="select-none mb-2"
+									style={{
+										width: '967px',
+										height: '78px',
+										minHeight: '78px',
+										border: '2px solid #000000',
+										borderRadius: '8px',
+										backgroundColor: '#FFFFFF',
+									}}
+								/>
+							)
+						)}
+					</>
+				)}
+			</div>
+		</div>
 	);
 };
 

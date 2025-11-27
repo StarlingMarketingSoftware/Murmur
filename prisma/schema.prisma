@@ -10,6 +10,7 @@ datasource db {
 model User {
   clerkId                  String            @unique
   email                    String            @unique
+  replyToEmail             String?           @unique
   createdAt                DateTime          @default(now())
   updatedAt                DateTime          @updatedAt
   firstName                String?
@@ -36,6 +37,7 @@ model User {
   identities               Identity[]
   signatures               Signature[]
   userContactLists         UserContactList[]
+  inboundEmails            InboundEmail[]
 }
 
 model ContactList {
@@ -110,6 +112,7 @@ model Contact {
   Email                    Email[]
   campaigns                Campaign[]              @relation("CampaignToContact")
   userContactLists         UserContactList[]       @relation("ContactToUserContactList")
+  inboundEmails            InboundEmail[]
 
   @@unique([email, contactListId])
   @@index([contactListId])
@@ -130,6 +133,7 @@ model Email {
   campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   contact    Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
   user       User        @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  replies    InboundEmail[] @relation("EmailReplies")
 
   @@index([campaignId])
 }
@@ -165,6 +169,7 @@ model Campaign {
   contacts              Contact[]         @relation("CampaignToContact")
   contactLists          ContactList[]     @relation("CampaignToContactList")
   userContactLists      UserContactList[] @relation("CampaignToUserContactList")
+  inboundEmails         InboundEmail[]
 
   @@index([userId])
 }
@@ -236,6 +241,57 @@ model Lead {
   email     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model InboundEmail {
+  id                Int                 @id @default(autoincrement())
+  sender            String
+  senderName        String?
+  recipient         String
+  to                String?
+  from              String?
+  subject           String?
+  date              String?
+  mimeVersion       String?
+  inReplyTo         String?
+  userAgent         String?
+  references        String?
+  contentType       String?
+  messageHeaders    Json?
+  received          String?
+  messageId         String              @unique
+  bodyPlain         String?
+  bodyHtml          String?
+  strippedText      String?
+  strippedHtml      String?
+  strippedSignature String?
+  attachments       Json?
+  attachmentCount   Int?
+  contentIdMap      Json?
+  mailgunVariables  Json?
+  token             String?
+  timestamp         Int?
+  signature         String?
+  userId            String?
+  user              User?               @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  contactId         Int?
+  contact           Contact?            @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  originalEmailId   Int?
+  originalEmail     Email?              @relation("EmailReplies", fields: [originalEmailId], references: [id], onDelete: SetNull)
+  campaignId        Int?
+  campaign          Campaign?           @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  receivedAt        DateTime            @default(now())
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([userId])
+  @@index([recipient])
+  @@index([sender])
+  @@index([contactId])
+  @@index([campaignId])
+  @@index([receivedAt])
+  @@index([messageId])
+  @@index([inReplyTo])
 }
 
 enum EmailStatus {
