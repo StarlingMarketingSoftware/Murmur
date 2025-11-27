@@ -79,7 +79,7 @@ export async function POST(req: Request) {
 				},
 			});
 
-			const murmurEmail = generateMurmurEmail(first_name, last_name, newUser.id);
+			const murmurEmail = generateMurmurEmail(first_name, last_name);
 			await prisma.user.update({
 				where: { id: newUser.id },
 				data: { murmurEmail },
@@ -103,7 +103,7 @@ export async function POST(req: Request) {
 			});
 
 			// Regenerate murmurEmail if name changed
-			const newMurmurEmail = generateMurmurEmail(first_name, last_name, updatedUser.id);
+			const newMurmurEmail = generateMurmurEmail(first_name, last_name);
 			if (updatedUser.murmurEmail !== newMurmurEmail) {
 				await prisma.user.update({
 					where: { id: updatedUser.id },

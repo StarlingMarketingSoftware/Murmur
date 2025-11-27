@@ -24,19 +24,15 @@ function sanitizeNameForEmail(name: string | null): string {
  */
 export const generateMurmurEmail = (
 	firstName: string | null,
-	lastName: string | null,
-	userId: number | string
+	lastName: string | null
 ): string => {
 	const firstNamePart = sanitizeNameForEmail(firstName);
 	const lastNamePart = sanitizeNameForEmail(lastName);
 
 	// Combine the parts and ensure we have at least some characters
-	let localPart = firstNamePart + lastNamePart;
+	const localPart = firstNamePart || 'user';
+	const domainLabel = lastNamePart || 'user';
 
 	// If after sanitization we have no valid characters, use a default
-	if (!localPart || localPart.length === 0) {
-		localPart = 'user';
-	}
-
-	return `${localPart}@${userId}.murmurmailbox.com`;
+	return `${localPart}@${domainLabel}.booking-management.com`;
 };
