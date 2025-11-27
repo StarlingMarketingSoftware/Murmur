@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
 			data: {
 				messageId: cleanMessageId,
 				sender: senderEmail || sender,
-				senderName,
+				sender: senderName,
 				recipient: recipientEmail,
 				subject,
 				bodyPlain,

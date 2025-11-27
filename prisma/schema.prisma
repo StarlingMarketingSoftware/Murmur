@@ -245,6 +245,7 @@ model Lead {
 model InboundEmail {
   id                Int                 @id @default(autoincrement())
   sender            String
+  senderName        String?
   recipient         String
   to                String?
   from              String?
