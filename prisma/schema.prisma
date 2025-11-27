@@ -244,49 +244,42 @@ model Lead {
 
 model InboundEmail {
   id                Int                 @id @default(autoincrement())
-  messageId         String              @unique
-  
-  // Sender information
   sender            String
-  senderName        String?
-  
-  // Recipient information
   recipient         String
-  
-  // Email content
+  to                String?
+  from              String?
   subject           String?
+  date              String?
+  mimeVersion       String?
+  inReplyTo         String?
+  userAgent         String?
+  references        String?
+  contentType       String?
+  messageHeaders    Json?
+  received          String?
+  messageId         String              @unique
   bodyPlain         String?
   bodyHtml          String?
   strippedText      String?
+  strippedHtml      String?
   strippedSignature String?
-  
-  // Metadata from Mailgun
-  headers           Json?
   attachments       Json?
-  
-  // Mailgun verification
-  mailgunTimestamp  Int?
-  mailgunToken      String?
-  mailgunSignature  String?
-  
-  // Processing status
+  attachmentCount   Int?
+  contentIdMap      Json?
+  mailgunVariables  Json?
+  token             String?
+  timestamp         Int?
+  signature         String?
   status            InboundEmailStatus  @default(pending)
   processedAt       DateTime?
-  
-  // Relationships
   userId            String?
   user              User?               @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
-  
   contactId         Int?
   contact           Contact?            @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  
   originalEmailId   Int?
   originalEmail     Email?              @relation("EmailReplies", fields: [originalEmailId], references: [id], onDelete: SetNull)
-  
   campaignId        Int?
   campaign          Campaign?           @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  
-  // Timestamps
   receivedAt        DateTime            @default(now())
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
@@ -298,6 +291,8 @@ model InboundEmail {
   @@index([campaignId])
   @@index([status])
   @@index([receivedAt])
+  @@index([messageId])
+  @@index([inReplyTo])
 }
 
 enum EmailStatus {
