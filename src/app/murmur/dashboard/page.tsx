@@ -40,6 +40,7 @@ import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
+import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -559,6 +560,7 @@ const Dashboard = () => {
 	const logoWidth = isMobile ? '190px' : '300px';
 	const logoHeight = isMobile ? '50px' : '79px';
 	const hasProblematicBrowser = isProblematicBrowser();
+	const { user } = useMe();
 	const searchContainerRef = useRef<HTMLDivElement>(null);
 	const whatInputRef = useRef<HTMLInputElement>(null);
 	const whereInputRef = useRef<HTMLInputElement>(null);
@@ -1193,6 +1195,17 @@ const Dashboard = () => {
 							</div>
 						</div>
 
+						{/* TSV upload is always visible on the search tab, before any search is made */}
+						{activeTab === 'search' && (
+							<div className="mt-2 w-full max-w-[532px] mx-auto flex justify-start pl-1">
+								<ContactTSVUploadDialog
+									isAdmin={user?.role === 'admin'}
+									triggerText="Import"
+									asTextTrigger
+								/>
+							</div>
+						)}
+
 						{/* Box 92px below searchbar - only show when on search tab */}
 						{activeTab === 'search' && (
 							<div className="flex justify-center" style={{ marginTop: '92px' }}>
@@ -1374,7 +1387,7 @@ const Dashboard = () => {
 					!isLoadingContacts &&
 					!isRefetchingContacts &&
 					activeTab === 'search' && (
-						<div className="results-search-bar-wrapper w-full max-w-[531px] mx-auto px-4 relative">
+						<div className="results-search-bar-wrapper w-full max-w-[650px] mx-auto px-4 relative">
 							<div
 								className={`results-search-bar-inner ${
 									hoveredContact && !isMapView ? 'invisible' : ''
@@ -1580,13 +1593,20 @@ const Dashboard = () => {
 										{/* Generate action removed; awaiting left-side SVG submit icon */}
 									</form>
 									{!isMapView && (
-										<div className="w-full text-center mt-2">
+										<div className="w-full flex flex-col items-center gap-2 mt-2">
 											<span
-												className="font-secondary"
+												className="font-secondary text-center"
 												style={{ fontSize: '13px', fontWeight: 400, color: '#7f7f7f' }}
 											>
-												Select who you want to contact.
+												Select who you want to contact, or upload your own contacts via TSV.
 											</span>
+											<div className="flex justify-center">
+												<ContactTSVUploadDialog
+													isAdmin={user?.role === 'admin'}
+													triggerText="Import"
+													asTextTrigger
+												/>
+											</div>
 										</div>
 									)}
 								</Form>
