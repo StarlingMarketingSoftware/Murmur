@@ -32,6 +32,7 @@ import { useClerk } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useGetLocations } from '@/hooks/queryHooks/useContacts';
+import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
@@ -2423,8 +2424,161 @@ const Dashboard = () => {
 						<CampaignsTable />
 					</div>
 				)}
+
+				{/* Basic Inbox Section */}
+				<InboxSection />
 			</div>
 		</AppLayout>
+	);
+};
+
+const InboxSection = () => {
+	const { data: inboundEmails, isLoading, error } = useGetInboundEmails();
+
+	if (isLoading) {
+		return (
+			<div className="w-full max-w-[998px] mx-auto px-4 mt-8">
+				<Typography variant="h3" className="mb-4">Inbox</Typography>
+				<div 
+					className="flex items-center justify-center"
+					style={{
+						width: '998px',
+						height: '558px',
+						border: '2px solid #000000',
+						borderRadius: '8px',
+					}}
+				>
+					<div className="text-gray-500">Loading emails...</div>
+				</div>
+			</div>
+		);
+	}
+
+	if (error) {
+		return (
+			<div className="w-full max-w-[998px] mx-auto px-4 mt-8">
+				<Typography variant="h3" className="mb-4">Inbox</Typography>
+				<div 
+					className="flex items-center justify-center"
+					style={{
+						width: '998px',
+						height: '558px',
+						border: '2px solid #000000',
+						borderRadius: '8px',
+					}}
+				>
+					<div className="text-red-500">Failed to load emails</div>
+				</div>
+			</div>
+		);
+	}
+
+	if (!inboundEmails || inboundEmails.length === 0) {
+		return (
+			<div className="w-full max-w-[998px] mx-auto px-4 mt-8 mb-8">
+				<Typography variant="h3" className="mb-4">Inbox</Typography>
+				<div 
+					className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden"
+					style={{
+						width: '998px',
+						height: '558px',
+						border: '2px solid #000000',
+						borderRadius: '8px',
+						padding: '16px',
+						paddingTop: '73px',
+						backgroundColor: '#4CA9DB',
+					}}
+				>
+					{Array.from({ length: 5 }).map((_, idx) => (
+						<div
+							key={`inbox-placeholder-${idx}`}
+							className="select-none"
+							style={{
+								width: '967px',
+								height: '78px',
+								border: '2px solid #000000',
+								borderRadius: '8px',
+								backgroundColor: '#FFFFFF',
+							}}
+						/>
+					))}
+				</div>
+			</div>
+		);
+	}
+
+	return (
+		<div className="w-full max-w-[998px] mx-auto px-4 mt-8 mb-8">
+			<Typography variant="h3" className="mb-4">Inbox</Typography>
+			<div 
+				className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden"
+				style={{
+					width: '998px',
+					height: '558px',
+					border: '2px solid #000000',
+					borderRadius: '8px',
+					padding: '16px',
+					paddingTop: '73px',
+					backgroundColor: '#4CA9DB',
+				}}
+			>
+				{inboundEmails.map((email) => (
+					<div 
+						key={email.id} 
+						className="bg-white hover:bg-gray-50 cursor-pointer px-4 flex items-center"
+						style={{
+							width: '967px',
+							height: '78px',
+							border: '2px solid #000000',
+							borderRadius: '8px',
+							backgroundColor: '#FFFFFF',
+						}}
+					>
+						<div className="flex justify-between items-center gap-4 w-full">
+							<div className="flex-1 min-w-0">
+								<div className="flex items-center gap-2 mb-1">
+									<span className="font-medium truncate">
+										{email.senderName || email.sender}
+									</span>
+									{email.contact && (
+										<span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+											{email.contact.name}
+										</span>
+									)}
+									{email.campaign && (
+										<span className="text-xs text-gray-500">
+											• {email.campaign.name}
+										</span>
+									)}
+								</div>
+								<div className="text-sm font-medium truncate">
+									{email.subject || '(No Subject)'}
+								</div>
+								<div className="text-sm text-gray-500 truncate">
+									{email.strippedText?.slice(0, 80) || email.bodyPlain?.slice(0, 80) || ''}
+								</div>
+							</div>
+							<div className="text-xs text-gray-400 whitespace-nowrap">
+								{email.receivedAt ? new Date(email.receivedAt).toLocaleDateString() : ''}
+							</div>
+						</div>
+					</div>
+				))}
+				{Array.from({ length: Math.max(0, 5 - inboundEmails.length) }).map((_, idx) => (
+					<div
+						key={`inbox-placeholder-${idx}`}
+						className="select-none"
+						style={{
+							width: '967px',
+							height: '78px',
+							border: '2px solid #000000',
+							borderRadius: '8px',
+							backgroundColor: '#FFFFFF',
+						}}
+					/>
+				))}
+			</div>
+		</div>
 	);
 };
 
