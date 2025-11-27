@@ -10,7 +10,7 @@ datasource db {
 model User {
   clerkId                  String            @unique
   email                    String            @unique
-  replyToEmail             String            @unique
+  replyToEmail             String            @unique @default(email)
   createdAt                DateTime          @default(now())
   updatedAt                DateTime          @updatedAt
   firstName                String?
