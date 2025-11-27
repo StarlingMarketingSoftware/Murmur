@@ -23,6 +23,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ContactWithName } from '@/types/contact';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
+import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
 
 interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	onOpenIdentityDialog?: () => void;
@@ -241,10 +242,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* Persistent Campaign Header Box for specific tabs */}
 						{!isMobile && ['testing', 'contacts', 'drafting', 'sent'].includes(view) && (
 							<div
-								className="absolute hidden lg:block"
+								className="absolute hidden lg:flex flex-col"
 								style={{
 									right: 'calc(50% + 250px + 24px)',
 									top: '29px',
+									gap: '16px',
 								}}
 							>
 								<CampaignHeaderBox
@@ -257,6 +259,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									sentCount={sentCount}
 									onFromClick={onOpenIdentityDialog}
 								/>
+								{/* Mini Email Structure below CampaignHeaderBox */}
+								<div
+									style={{
+										width: '373px',
+										height: '318px',
+										overflow: 'hidden',
+									}}
+								>
+									<div style={{ transform: 'scale(0.67)', transformOrigin: 'top left', width: '557px' }}>
+										<MiniEmailStructure
+											form={form}
+											onDraft={() => handleGenerateDrafts(contacts?.map((c) => c.id) || [])}
+											isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+											isPendingGeneration={isPendingGeneration}
+											generationProgress={generationProgress}
+											generationTotal={contacts?.length || 0}
+											hideTopChrome
+											hideFooter
+											fullWidthMobile
+										/>
+									</div>
+								</div>
 							</div>
 						)}
 

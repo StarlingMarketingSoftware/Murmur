@@ -530,7 +530,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									</svg>
 								</div>
 							)}
-							<div className="flex items-center gap-4 mb-1 w-[357px] mx-auto">
+							<div className="flex items-center gap-4 mb-1 w-[95%] mx-auto">
 								<span className="font-inter font-semibold text-[13px]">Mode</span>
 								<div ref={modeContainerRef} className="relative flex items-center gap-6">
 									<div
@@ -596,7 +596,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						</div>
 
 						{/* Auto Subject */}
-						<div className="mb-3 w-[357px] max-[480px]:w-[89.33vw] mx-auto">
+						<div className="mb-3 w-[95%] max-[480px]:w-[89.33vw] mx-auto">
 							<div
 								className={cn(
 									'flex items-center h-[25px] rounded-[8px] border-2 border-black overflow-hidden',
@@ -673,7 +673,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													blockRefs.current[b.id] = el;
 												}}
 												className={cn(
-													'rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden relative w-[357px] max-[480px]:w-[89.33vw] mx-auto',
+													'rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden relative w-[95%] max-[480px]:w-[89.33vw] mx-auto',
 													isExpanded ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]',
 													!isExpanded && isMobileLandscape && 'h-[24px]'
 												)}
@@ -790,7 +790,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									<Fragment key={b.id}>
 										<div
 											className={cn(
-												'rounded-[8px] border-2 bg-white px-2 py-1 relative w-[357px] max-[480px]:w-[89.33vw] mx-auto',
+												'rounded-[8px] border-2 bg-white px-2 py-1 relative w-[95%] max-[480px]:w-[89.33vw] mx-auto',
 												b.type === 'full_automated' && 'mini-full-auto-card'
 											)}
 											style={{
@@ -947,7 +947,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											<div
 												key={`mini-ph-${slot}`}
 												className={cn(
-													'w-[357px] max-[480px]:w-[89.33vw] mx-auto h-[31px] max-[480px]:h-[24px] flex items-center justify-end',
+													'w-[95%] max-[480px]:w-[89.33vw] mx-auto h-[31px] max-[480px]:h-[24px] flex items-center justify-end',
 													isMobileLandscape && 'h-[24px]'
 												)}
 											>
@@ -985,7 +985,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							style={{ display: isMobileLandscape ? 'block' : undefined }}
 						>
 							<div
-								className="rounded-[8px] border-2 bg-white px-2 py-2 w-[357px] max-[480px]:w-[89.33vw] mx-auto"
+								className="rounded-[8px] border-2 bg-white px-2 py-2 w-[95%] max-[480px]:w-[89.33vw] mx-auto"
 								style={{ borderColor: '#969696' }}
 							>
 								<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
@@ -1007,7 +1007,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					style={{ display: isMobileLandscape ? 'none' : undefined }}
 				>
 					<div
-						className="rounded-[8px] border-2 bg-white px-2 py-2 w-[357px] max-[480px]:w-[89.33vw] mx-auto"
+						className="rounded-[8px] border-2 bg-white px-2 py-2 w-[95%] max-[480px]:w-[89.33vw] mx-auto"
 						style={{ borderColor: '#969696' }}
 					>
 						<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
@@ -1034,7 +1034,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							onClick={onDraft}
 							disabled={isDraftDisabled}
 							className={cn(
-								'w-[357px] !h-[28px] mx-auto !rounded-[4px] border border-black bg-[#68C575] text-black font-inter font-medium text-[14px] flex items-center justify-center'
+								'w-[95%] !h-[28px] mx-auto !rounded-[4px] border border-black bg-[#68C575] text-black font-inter font-medium text-[14px] flex items-center justify-center'
 							)}
 						>
 							{isPendingGeneration ? 'Drafting...' : 'Draft'}
