@@ -33,6 +33,8 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useGetLocations } from '@/hooks/queryHooks/useContacts';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
+import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
+import { useMe } from '@/hooks/useMe';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
@@ -2435,8 +2437,51 @@ const Dashboard = () => {
 const InboxSection = () => {
 	const { data: inboundEmails, isLoading, error } = useGetInboundEmails();
 	const [selectedEmailId, setSelectedEmailId] = useState<number | null>(null);
+	const [replyMessage, setReplyMessage] = useState('');
+	const [isSending, setIsSending] = useState(false);
+
+	const { user } = useMe();
+	const { mutateAsync: sendMailgunMessage } = useSendMailgunMessage({
+		successMessage: 'Reply sent successfully',
+		errorMessage: 'Failed to send reply',
+	});
 
 	const selectedEmail = inboundEmails?.find((email) => email.id === selectedEmailId);
+
+	const handleSendReply = async () => {
+		if (!selectedEmail || !replyMessage.trim()) return;
+
+		const senderEmail = user?.customDomain && user?.customDomain !== ''
+			? user?.customDomain
+			: user?.murmurEmail;
+
+		if (!senderEmail) {
+			console.error('No sender email configured');
+			return;
+		}
+
+		setIsSending(true);
+		try {
+			const replySubject = selectedEmail.subject?.startsWith('Re:') 
+				? selectedEmail.subject 
+				: `Re: ${selectedEmail.subject || '(No Subject)'}`;
+
+			await sendMailgunMessage({
+				recipientEmail: selectedEmail.sender,
+				subject: replySubject,
+				message: replyMessage,
+				senderEmail: senderEmail,
+				senderName: user?.name || 'Murmur User',
+				originEmail: senderEmail,
+			});
+
+			setReplyMessage('');
+		} catch (error) {
+			console.error('Failed to send reply:', error);
+		} finally {
+			setIsSending(false);
+		}
+	};
 
 	if (isLoading) {
 		return (
@@ -2560,7 +2605,10 @@ const InboxSection = () => {
 								)}
 							</div>
 							<button
-								onClick={() => setSelectedEmailId(null)}
+								onClick={() => {
+									setSelectedEmailId(null);
+									setReplyMessage('');
+								}}
 								className="text-gray-500 hover:text-gray-700 text-xl font-bold px-2"
 							>
 								×
@@ -2578,6 +2626,28 @@ const InboxSection = () => {
 								</div>
 							)}
 						</div>
+
+						{/* Reply Box */}
+						<div className="border-t mt-4 pt-4">
+							<div className="text-sm font-medium mb-2">Reply</div>
+							<textarea
+								value={replyMessage}
+								onChange={(e) => setReplyMessage(e.target.value)}
+								placeholder="Type your reply..."
+								className="w-full p-3 border-2 border-black rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+								rows={4}
+								disabled={isSending}
+							/>
+							<div className="flex justify-end mt-2">
+								<Button
+									onClick={handleSendReply}
+									disabled={!replyMessage.trim() || isSending}
+									className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+								>
+									{isSending ? 'Sending...' : 'Send Reply'}
+								</Button>
+							</div>
+						</div>
 					</div>
 				) : (
 					/* Email List View */
@@ -2594,7 +2664,10 @@ const InboxSection = () => {
 									borderRadius: '8px',
 									backgroundColor: '#FFFFFF',
 								}}
-								onClick={() => setSelectedEmailId(email.id)}
+								onClick={() => {
+									setSelectedEmailId(email.id);
+									setReplyMessage('');
+								}}
 							>
 								<div className="flex justify-between items-center gap-4 w-full">
 									<div className="flex-1 min-w-0">
