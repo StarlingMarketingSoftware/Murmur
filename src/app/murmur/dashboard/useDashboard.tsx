@@ -94,6 +94,9 @@ export const useDashboard = () => {
 	const [usedContactIdsSet, setUsedContactIdsSet] = useState<Set<number>>(new Set());
 	const [hoveredText, setHoveredText] = useState('');
 	const [hoveredContact, setHoveredContact] = useState<ContactWithName | null>(null);
+	const [isMapView, setIsMapView] = useState(false);
+	// Immediate search pending state - set true instantly on search click
+	const [isSearchPending, setIsSearchPending] = useState(false);
 
 	const {
 		data: contacts,
@@ -115,6 +118,13 @@ export const useDashboard = () => {
 	});
 	const { mutateAsync: importApolloContacts, isPending: isPendingImportApolloContacts } =
 		useCreateApolloContacts({});
+
+	// Clear search pending state when loading finishes
+	useEffect(() => {
+		if (!isLoadingContacts && !isRefetchingContacts && isSearchPending) {
+			setIsSearchPending(false);
+		}
+	}, [isLoadingContacts, isRefetchingContacts, isSearchPending]);
 
 	// Initialize selected contacts as empty (no contacts selected by default)
 	useEffect(() => {
@@ -201,11 +211,15 @@ export const useDashboard = () => {
 			return;
 		}
 
+		// Set search pending immediately for instant UI feedback
+		setIsSearchPending(true);
 		// Update search parameters
 		setActiveSearchQuery(data.searchText);
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? false);
 		setLimit(50);
 		setHasSearched(true);
+		// Default to map view when a search is performed
+		setIsMapView(true);
 		// The query will automatically run when the state updates enable it
 	};
 
@@ -216,12 +230,23 @@ export const useDashboard = () => {
 	};
 
 	const handleSelectAll = () => {
-		if (!contacts || !tableInstance) return;
+		if (!contacts || contacts.length === 0) return;
 
+		// In table view, use the table instance so checkbox UI stays in sync
+		if (!isMapView && tableInstance) {
+			if (isAllSelected) {
+				tableInstance.toggleAllRowsSelected(false);
+			} else {
+				tableInstance.toggleAllRowsSelected(true);
+			}
+			return;
+		}
+
+		// In map view (or when no table instance), toggle via selectedContacts state
 		if (isAllSelected) {
-			tableInstance.toggleAllRowsSelected(false);
+			setSelectedContacts([]);
 		} else {
-			tableInstance.toggleAllRowsSelected(true);
+			setSelectedContacts(contacts.map((contact) => contact.id));
 		}
 	};
 
@@ -240,7 +265,27 @@ export const useDashboard = () => {
 
 		await batchUpdateContacts({ updates });
 
-		const defaultName = capitalize(activeSearchQuery);
+		// Generate a clean campaign name from the search query
+		const generateCampaignName = (searchQuery: string): string => {
+			// Remove [booking] or [promotion] prefix (case insensitive)
+			let cleanedQuery = searchQuery.replace(/^\[(booking|promotion)\]\s*/i, '');
+
+			// Extract location from parentheses at the end
+			const locationMatch = cleanedQuery.match(/\(([^)]+)\)\s*$/);
+			const location = locationMatch ? locationMatch[1] : null;
+
+			// Remove the parentheses and content from the query
+			cleanedQuery = cleanedQuery.replace(/\s*\([^)]+\)\s*$/, '').trim();
+
+			// If we found a location, format as "[search term] in [location]"
+			if (location) {
+				return capitalize(`${cleanedQuery} in ${location}`);
+			}
+
+			return capitalize(cleanedQuery);
+		};
+
+		const defaultName = generateCampaignName(activeSearchQuery);
 		if (currentTab === 'search') {
 			const newUserContactList = await createContactList({
 				name: defaultName,
@@ -378,7 +423,7 @@ export const useDashboard = () => {
 								<div className="flex items-center gap-2">
 									{renderUsedIndicator()}
 									<div className="flex flex-col justify-center py-1 h-[2.75rem]">
-										<div className="truncate font-bold font-primary text-[16px]">
+										<div className="truncate font-bold font-inter text-[15px]">
 											<TableCellTooltip
 												text={textToShow}
 												maxLength={MAX_CELL_LENGTH}
@@ -394,7 +439,7 @@ export const useDashboard = () => {
 							<div className="flex items-start gap-2">
 								{renderUsedIndicator()}
 								<div className="flex flex-col gap-0.5 py-1">
-									<div className="truncate font-bold font-primary text-[16px]">
+									<div className="truncate font-bold font-inter text-[15px]">
 										<TableCellTooltip
 											text={textToShow}
 											maxLength={MAX_CELL_LENGTH}
@@ -414,7 +459,7 @@ export const useDashboard = () => {
 						<div className="flex items-center gap-2">
 							{renderUsedIndicator()}
 							<div className="flex flex-col gap-0.5 py-1">
-								<div className="truncate font-bold font-primary text-[16px]">
+								<div className="truncate font-bold font-inter text-[15px]">
 									<TableCellTooltip
 										text={nameValue}
 										maxLength={MAX_CELL_LENGTH}
@@ -717,5 +762,8 @@ export const useDashboard = () => {
 		hoveredText,
 		hoveredContact,
 		setHoveredContact,
+		isMapView,
+		setIsMapView,
+		isSearchPending,
 	};
 };

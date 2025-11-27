@@ -19,6 +19,8 @@ interface CustomScrollbarProps {
 	onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
 	/** When true, fall back to the native browser scrollbar. */
 	nativeScroll?: boolean;
+	/** When true, prevent any horizontal scrolling/overflow inside the scroll container. */
+	lockHorizontalScroll?: boolean;
 }
 
 export function CustomScrollbar({
@@ -34,6 +36,7 @@ export function CustomScrollbar({
 	disableOverflowClass = false,
 	onScroll,
 	nativeScroll = false,
+	lockHorizontalScroll = false,
 }: CustomScrollbarProps) {
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const scrollThumbRef = useRef<HTMLDivElement>(null);
@@ -214,8 +217,8 @@ export function CustomScrollbar({
 						// Hide native scrollbar
 						scrollbarWidth: 'none',
 						msOverflowStyle: 'none',
-						// Allow side content to render outside horizontally (e.g., external buttons)
-						overflowX: 'visible',
+						// Control horizontal overflow/scrolling
+						overflowX: lockHorizontalScroll ? 'hidden' : 'visible',
 						overflowY: 'auto',
 						// Prevent scroll chaining to parent/page and improve mobile scroll behavior
 						overscrollBehavior: 'contain',

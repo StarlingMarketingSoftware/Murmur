@@ -86,11 +86,18 @@ export const urls = {
 			bulkUpdate: {
 				index: '/api/contacts/bulk-update',
 			},
+			geocode: {
+				index: '/api/contacts/geocode',
+			},
 			detail: ((id) => `/api/contacts/${id}`) as DetailRoute,
 		},
 		emails: {
 			index: '/api/emails',
 			detail: ((id) => `/api/emails/${id}`) as DetailRoute,
+		},
+		inboundEmails: {
+			index: '/api/inbound',
+			detail: ((id) => `/api/inbound/${id}`) as DetailRoute,
 		},
 		emailVerificationCodes: {
 			index: '/api/email-verification-codes',

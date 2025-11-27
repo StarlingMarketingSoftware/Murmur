@@ -137,7 +137,7 @@ const SortableAIBlock = ({
 					'flex justify-end',
 					showTestPreview
 						? 'w-[426px] max-[480px]:w-[89.8vw]'
-						: 'w-[93.7vw] max-w-[868px]'
+						: 'w-[93.7vw] max-w-[475px]'
 				)}
 			>
 				<Button
@@ -183,22 +183,22 @@ const SortableAIBlock = ({
 				isTextBlock
 					? showTestPreview
 						? 'w-[426px] max-[480px]:w-[89.33vw] min-h-[44px]'
-						: 'w-[89.33vw] max-w-[868px] min-h-[80px]'
+						: 'w-[89.33vw] max-w-[475px] min-h-[80px]'
 					: isCompactBlock
 					? showTestPreview
 						? `w-[426px] max-[480px]:w-[89.33vw] ${
 								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
 						  }`
-						: `w-[89.33vw] max-w-[868px] ${
+						: `w-[89.33vw] max-w-[475px] ${
 								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
 						  }`
 					: isFullAutomatedBlock
 					? showTestPreview
 						? 'w-[426px] max-[480px]:w-[89.33vw]'
-						: 'w-[89.33vw] max-w-[868px]'
+						: 'w-[89.33vw] max-w-[475px]'
 					: showTestPreview
 					? 'w-[426px] max-[480px]:w-[89.33vw]'
-					: 'w-[89.33vw] max-w-[868px]',
+					: 'w-[89.33vw] max-w-[475px]',
 				!isIntroductionBlock &&
 					!isResearchBlock &&
 					!isActionBlock &&
@@ -1203,14 +1203,19 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							className={`${
 								compactLeftOnly
 									? ''
-									: 'w-[96.27vw] max-w-[892px] min-h-[686px] transition mb-4 flex mx-auto '
+									: 'w-[96.27vw] max-w-[499px] min-h-[703px] transition mb-4 flex mx-auto '
 							}	${
 								showTestPreview
 									? 'flex-row gap-[40px] justify-center items-start'
 									: compactLeftOnly
 									? 'flex-col'
-									: 'flex-col border-[3px] border-black rounded-md bg-white min-h-[686px]'
+									: 'flex-col border-[3px] border-black rounded-md bg-[#A6E2A8] min-h-[703px]'
 							}	relative overflow-visible`}
+							style={
+								!showTestPreview && !compactLeftOnly
+									? { backgroundColor: '#A6E2A8' }
+									: undefined
+							}
 							data-hpi-container
 						>
 							{/* Mobile-only gradient background overlay starting under Mode divider */}
@@ -1257,12 +1262,19 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											? 'w-[457px] shrink-0 h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-white'
 											: compactLeftOnly
 											? 'w-[350px]'
-											: 'w-full min-h-0 pt-[10px] max-[480px]:pt-[1px] px-0 pb-0 flex-1',
+											: 'w-full min-h-0 pt-0 max-[480px]:pt-[1px] px-0 pb-0 flex-1',
 
 										'relative z-10'
 									)}
 									data-hpi-left-panel
 								>
+									{!showTestPreview && !compactLeftOnly && (
+										<div className="w-full h-[17px] border-b-[2px] border-black flex items-center px-[9px] bg-white rounded-t-[calc(0.375rem-3px)]">
+											<span className="font-inter font-bold text-[12px] leading-none text-black">
+												Writing
+											</span>
+										</div>
+									)}
 									{/* Removed explicit drag bar; header below acts as the drag handle */}
 									{/* Subject header inside the box */}
 									<div
@@ -1273,107 +1285,114 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										)}
 									>
 										<div
-											className={cn(
-												'h-[36px] flex items-center relative z-20',
-												showTestPreview
-													? 'w-[426px] max-[480px]:w-[89.8vw] mx-auto pl-[8px] max-[480px]:pl-[6px]'
-													: 'w-[93.7vw] max-w-[868px] mx-auto pl-[8px] max-[480px]:pl-[6px]'
-											)}
-											data-left-drag-handle
-											data-root-drag-handle
+											className={!showTestPreview && !compactLeftOnly ? 'bg-white' : ''}
 										>
-											<span
-												className={cn(
-													'font-inter font-semibold text-[17px] max-[480px]:text-[20px] mr-[56px] max-[480px]:mr-[22px] text-black'
-												)}
-											>
-												Mode
-											</span>
 											<div
-												ref={modeContainerRef}
-												className="relative flex items-center gap-[67px] max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:ml-[2px] flex-1 max-[480px]:w-auto max-[480px]:pr-[4.4vw]"
-											>
-												<DndContext
-													onDragEnd={handleHighlightDragEnd}
-													modifiers={[restrictToHorizontalAxisAndBounds]}
-												>
-													{selectedModeKey !== 'none' && (
-														<DraggableHighlight
-															style={highlightStyle}
-															isInitialRender={isInitialRender}
-															mode={selectedModeKey as 'full' | 'hybrid' | 'manual'}
-														/>
-													)}
-												</DndContext>
-												<Button
-													ref={fullModeButtonRef}
-													variant="ghost"
-													type="button"
-													className={cn(
-														'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
-														selectedModeKey !== 'none' &&
-															form
-																.getValues('hybridBlockPrompts')
-																?.some((b) => b.type === HybridBlock.full_automated)
-															? 'text-black'
-															: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
-													)}
-													onClick={switchToFull}
-												>
-													Full Auto
-												</Button>
-												<Button
-													ref={hybridModeButtonRef}
-													variant="ghost"
-													type="button"
-													className={cn(
-														'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
-														selectedModeKey !== 'none' &&
-															!form
-																.getValues('hybridBlockPrompts')
-																?.some((b) => b.type === HybridBlock.full_automated) &&
-															!form
-																.getValues('hybridBlockPrompts')
-																?.every((b) => b.type === HybridBlock.text)
-															? 'text-black'
-															: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
-													)}
-													onClick={switchToHybrid}
-												>
-													Hybrid
-												</Button>
-												<Button
-													ref={manualModeButtonRef}
-													variant="ghost"
-													type="button"
-													className={cn(
-														'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
-														selectedModeKey !== 'none' &&
-															(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
-															form
-																.getValues('hybridBlockPrompts')
-																?.every((b) => b.type === HybridBlock.text)
-															? 'text-black'
-															: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
-													)}
-													onClick={switchToManual}
-												>
-													Manual
-												</Button>
-											</div>
-										</div>
-										{compactLeftOnly ? null : (
-											<>
-												{showTestPreview && (
-													<div className="h-[2px] bg-black -mx-[18px]" />
+												className={cn(
+													'h-[42px] flex items-center relative z-20',
+													showTestPreview
+														? 'w-[426px] max-[480px]:w-[89.8vw] mx-auto pl-[8px] max-[480px]:pl-[6px]'
+														: 'w-[93.7vw] max-w-[475px] mx-auto pl-[8px] max-[480px]:pl-[6px]'
 												)}
+												data-left-drag-handle
+												data-root-drag-handle
+											>
+												<span
+													className={cn(
+														'font-inter font-semibold text-[17px] max-[480px]:text-[20px] mr-[56px] max-[480px]:mr-[22px] text-black'
+													)}
+												>
+													Mode
+												</span>
 												<div
-													ref={modeDividerRef}
-													className={cn('h-[2px] bg-black', showTestPreview && 'hidden')}
-												/>
-												{showTestPreview && <div className="h-2" />}
-											</>
-										)}
+													ref={modeContainerRef}
+													className="relative flex items-center gap-[67px] max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:ml-[2px] flex-1 max-[480px]:w-auto max-[480px]:pr-[4.4vw]"
+												>
+													<DndContext
+														onDragEnd={handleHighlightDragEnd}
+														modifiers={[restrictToHorizontalAxisAndBounds]}
+													>
+														{selectedModeKey !== 'none' && (
+															<DraggableHighlight
+																style={highlightStyle}
+																isInitialRender={isInitialRender}
+																mode={selectedModeKey as 'full' | 'hybrid' | 'manual'}
+															/>
+														)}
+													</DndContext>
+													<Button
+														ref={fullModeButtonRef}
+														variant="ghost"
+														type="button"
+														className={cn(
+															'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
+															selectedModeKey !== 'none' &&
+																form
+																	.getValues('hybridBlockPrompts')
+																	?.some((b) => b.type === HybridBlock.full_automated)
+																? 'text-black'
+																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
+														)}
+														onClick={switchToFull}
+													>
+														Full Auto
+													</Button>
+													<Button
+														ref={hybridModeButtonRef}
+														variant="ghost"
+														type="button"
+														className={cn(
+															'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
+															selectedModeKey !== 'none' &&
+																!form
+																	.getValues('hybridBlockPrompts')
+																	?.some((b) => b.type === HybridBlock.full_automated) &&
+																!form
+																	.getValues('hybridBlockPrompts')
+																	?.every((b) => b.type === HybridBlock.text)
+																? 'text-black'
+																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
+														)}
+														onClick={switchToHybrid}
+													>
+														Hybrid
+													</Button>
+													<Button
+														ref={manualModeButtonRef}
+														variant="ghost"
+														type="button"
+														className={cn(
+															'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
+															selectedModeKey !== 'none' &&
+																(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
+																form
+																	.getValues('hybridBlockPrompts')
+																	?.every((b) => b.type === HybridBlock.text)
+																? 'text-black'
+																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
+														)}
+														onClick={switchToManual}
+													>
+														Manual
+													</Button>
+												</div>
+											</div>
+											{compactLeftOnly ? null : (
+												<>
+													{showTestPreview && (
+														<div className="h-[2px] bg-black -mx-[18px]" />
+													)}
+													<div
+														ref={modeDividerRef}
+														className={cn(
+															'h-[2px] bg-black',
+															showTestPreview && 'hidden'
+														)}
+													/>
+													{showTestPreview && <div className="h-2" />}
+												</>
+											)}
+										</div>
 										<div className="flex flex-col items-center">
 											<FormField
 												control={form.control}
@@ -1384,7 +1403,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														className={cn(
 															showTestPreview
 																? 'w-[426px] max-[480px]:w-[89.33vw]'
-																: 'w-[89.33vw] max-w-[868px]',
+																: 'w-[89.33vw] max-w-[475px]',
 															// On mobile portrait, remove default mb-6 to tighten spacing under subject
 															'max-[480px]:mb-0'
 														)}
@@ -1611,7 +1630,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	'flex justify-end',
 																	showTestPreview
 																		? 'w-[426px] max-[480px]:w-[89.8vw]'
-																		: 'w-[93.7vw] max-w-[868px]'
+																		: 'w-[93.7vw] max-w-[475px]'
 																)}
 															>
 																<Button
@@ -1678,7 +1697,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			'flex relative z-30',
 																			showTestPreview
 																				? 'justify-start w-full'
-																				: 'justify-end -mr-[102px] w-[93.7vw] max-w-[868px] max-[480px]:-mr-[2vw]'
+																				: 'justify-end -mr-[102px] w-[93.7vw] max-w-[475px] max-[480px]:-mr-[2vw]'
 																		)}
 																		style={{ transform: 'translateY(-12px)' }}
 																	>
@@ -1722,7 +1741,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																`min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2`,
 																showTestPreview
 																	? 'w-[426px] max-[480px]:w-[89.33vw]'
-																	: 'w-[89.33vw] max-w-[868px]'
+																	: 'w-[89.33vw] max-w-[475px]'
 															)}
 														>
 															<FormLabel className="text-base font-semibold font-secondary">
@@ -1755,7 +1774,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 							{/* Bottom-anchored footer with Signature and Test */}
 							{!showTestPreview && (
-								<div className="flex flex-col items-center px-3 mt-auto" data-hpi-footer>
+								<div
+									className="flex flex-col items-center mt-auto w-full"
+									data-hpi-footer
+								>
 									{/* Signature Block - always visible; positioned above Test with fixed gap */}
 									<FormField
 										control={form.control}
@@ -1771,7 +1793,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														`min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2`,
 														showTestPreview
 															? 'w-[426px] max-[480px]:w-[89.33vw]'
-															: 'w-[89.33vw] max-w-[868px]'
+															: 'w-[89.33vw] max-w-[475px]'
 													)}
 													data-hpi-signature-card
 												>
@@ -1804,12 +1826,28 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										<>
 											<div
 												className={cn(
-													'w-full',
+													'w-full flex flex-col items-center',
 													showTestPreview && 'hidden',
 													'max-[480px]:hidden'
 												)}
 											>
-												<div className="flex justify-center mb-4 w-full">
+												{hasEmptyTextBlocks && (
+													<div
+														className={cn(
+															hasTouchedEmptyTextBlocks || hasAttemptedTest
+																? 'text-destructive'
+																: 'text-black',
+															'text-sm font-medium mb-2',
+															showTestPreview
+																? 'w-[426px] max-[480px]:w-[89.8vw]'
+																: 'w-[93.7vw] max-w-[475px]'
+														)}
+													>
+														Fill in all text blocks in order to compose an email.
+													</div>
+												)}
+												<div className="w-full h-[2px] bg-black" />
+												<div className="w-full h-[41px] flex items-center justify-center bg-white rounded-b-[calc(0.375rem-3px)]">
 													<Button
 														type="button"
 														onClick={() => {
@@ -1819,33 +1857,20 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														}}
 														disabled={isGenerationDisabled?.()}
 														className={cn(
-															'h-[42px] bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20',
+															'h-[28px] bg-white border-[3px] border-[#349A37] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center transition-all hover:bg-primary/20 active:bg-primary/20 p-0',
 															showTestPreview
 																? 'w-[426px] max-[480px]:w-[89.8vw]'
-																: 'w-[93.7vw] max-w-[868px]',
+																: 'w-[93.7vw] max-w-[475px]',
 															isGenerationDisabled?.()
 																? 'opacity-50 cursor-not-allowed'
 																: 'opacity-100'
 														)}
 													>
-														{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+														{isPendingGeneration && isTest
+															? 'Testing...'
+															: 'Generate Test'}
 													</Button>
 												</div>
-												{hasEmptyTextBlocks && (
-													<div
-														className={cn(
-															hasTouchedEmptyTextBlocks || hasAttemptedTest
-																? 'text-destructive'
-																: 'text-black',
-															'text-sm font-medium -mt-2 mb-2',
-															showTestPreview
-																? 'w-[426px] max-[480px]:w-[89.8vw]'
-																: 'w-[93.7vw] max-w-[868px]'
-														)}
-													>
-														Fill in all text blocks in order to compose an email.
-													</div>
-												)}
 											</div>
 
 											{/* Mobile sticky Test button at page bottom */}

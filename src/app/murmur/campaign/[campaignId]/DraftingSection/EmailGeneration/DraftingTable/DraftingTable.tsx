@@ -13,6 +13,7 @@ interface DraftingTableProps {
 	isPending: boolean;
 	title: string;
 	footer?: ReactNode;
+	topContent?: ReactNode;
 }
 export const DraftingTable: FC<DraftingTableProps> = ({
 	title,
@@ -24,14 +25,20 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	noDataDescription,
 	isPending,
 	footer,
+	topContent,
 }) => {
 	const isContacts = title === 'Contacts';
 	const isCompactHeader = isContacts || title === 'Drafts' || title === 'Sent';
 	const showTitle = !isContacts && title !== 'Drafts' && title !== 'Sent';
 	const isDrafts = title === 'Drafts';
 	const isSent = title === 'Sent';
+
+	const boxWidth = isContacts || isDrafts || isSent ? '499px' : '376px';
+	const boxHeight = isContacts || isDrafts || isSent ? '703px' : '474px';
+	const contentWidth = isContacts || isDrafts || isSent ? 'w-[489px]' : 'w-[366px]';
+
 	return (
-		<div style={{ width: '376px', height: '474px', position: 'relative' }}>
+		<div style={{ width: boxWidth, height: boxHeight, position: 'relative' }}>
 			{/* Centered number above block */}
 			<div
 				data-drafting-top-number
@@ -44,15 +51,201 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				}}
 				className="text-[12px] font-inter font-medium text-black"
 			>
-				{isContacts ? '1' : isDrafts ? '3' : isSent ? '4' : ''}
+				{isContacts ? '' : isDrafts ? '' : isSent ? '' : ''}
 			</div>
+			{/* New Contacts Pill */}
+			{isContacts && (
+				<>
+					<div
+						style={{
+							position: 'absolute',
+							top: '3px',
+							left: '21px',
+							width: '72px',
+							height: '22px',
+							backgroundColor: '#F5DADA',
+							border: '2px solid #8D5B5B',
+							borderRadius: '11px',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							zIndex: 10,
+						}}
+					>
+						<span className="text-[13px] font-semibold font-inter text-black leading-none">
+							Contacts
+						</span>
+					</div>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '117px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '176px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '235px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+				</>
+			)}
+
+			{/* New Drafts Pill */}
+			{isDrafts && (
+				<>
+					<div
+						style={{
+							position: 'absolute',
+							top: '3px',
+							left: '69px',
+							width: '72px',
+							height: '22px',
+							backgroundColor: '#FFECDC',
+							border: '2px solid #A8833A',
+							borderRadius: '11px',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							zIndex: 10,
+						}}
+					>
+						<span className="text-[13px] font-semibold font-inter text-black leading-none">
+							Drafts
+						</span>
+					</div>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '36px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '176px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '235px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+				</>
+			)}
+
+			{/* New Sent Pill */}
+			{isSent && (
+				<>
+					<div
+						style={{
+							position: 'absolute',
+							top: '3px',
+							left: '137px',
+							width: '72px',
+							height: '22px',
+							backgroundColor: '#DBF6D4',
+							border: '2px solid #19670F',
+							borderRadius: '11px',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							zIndex: 10,
+						}}
+					>
+						<span className="text-[13px] font-semibold font-inter text-black leading-none">
+							Sent
+						</span>
+					</div>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '102px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '36px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+					<div
+						style={{
+							position: 'absolute',
+							top: '10px',
+							left: '235px',
+							width: '9px',
+							height: '9px',
+							borderRadius: '50%',
+							backgroundColor: '#D9D9D9',
+							zIndex: 10,
+						}}
+					/>
+				</>
+			)}
+
 			{/* Top-left text label */}
 			<div
 				data-drafting-top-label
 				style={{ position: 'absolute', top: '-20px', left: '2px', pointerEvents: 'none' }}
 				className="text-[12px] font-inter font-medium text-black"
 			>
-				{isContacts ? 'Contacts' : isDrafts ? 'Drafts' : isSent ? 'Sent' : title}
+				{isContacts ? '' : isDrafts ? '' : isSent ? '' : title}
 			</div>
 			{/* Container box with header */}
 			<div
@@ -61,7 +254,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					width: '100%',
 					height: '100%',
 					border: isContacts
-						? '2px solid #5D5B5B'
+						? '2px solid #000000'
 						: isDrafts
 						? '2px solid #A8833A'
 						: isSent
@@ -71,12 +264,12 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					position: 'relative',
 					display: 'flex',
 					flexDirection: 'column',
-					backgroundColor: isContacts
-						? '#EB8586'
+					background: isContacts
+						? 'linear-gradient(to bottom, #ffffff 26px, #EB8586 26px)'
 						: isDrafts
-						? '#FFD383'
+						? 'linear-gradient(to bottom, #ffffff 26px, #FFDC9E 26px)'
 						: isSent
-						? '#5AB477'
+						? 'linear-gradient(to bottom, #ffffff 26px, #5AB477 26px)'
 						: 'white',
 				}}
 			>
@@ -93,11 +286,11 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						alignItems: 'center',
 						height: isCompactHeader ? '20px' : '48px',
 						backgroundColor: isContacts
-							? '#EB8586'
+							? 'transparent'
 							: isDrafts
-							? '#FFD383'
+							? 'transparent'
 							: isSent
-							? '#5AB477'
+							? 'transparent'
 							: 'white',
 					}}
 				>
@@ -106,10 +299,16 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							<div className="text-sm font-inter font-medium text-black">{title}</div>
 						</div>
 					)}
-					{hasData && !isSent && (
+					{hasData && !isSent && !(isContacts && topContent) && (
 						<div
 							style={{
-								transform: isCompactHeader ? 'translateY(-2px)' : 'translateY(6px)',
+								transform: isCompactHeader
+									? isContacts
+										? 'translateY(103px)'
+										: isDrafts || isSent
+										? 'translateY(30px)'
+										: 'translateY(-2px)'
+									: 'translateY(6px)',
 							}}
 						>
 							<Button
@@ -124,9 +323,34 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					)}
 				</div>
 
+				{/* Top content area (e.g., mini searchbar for contacts) */}
+				{isContacts && topContent && (
+					<div
+						style={{
+							position: 'absolute',
+							top: '35px',
+							left: 0,
+							right: 0,
+							zIndex: 5,
+						}}
+					>
+						{topContent}
+					</div>
+				)}
+
 				{/* Content area */}
 				<CustomScrollbar
 					className="flex-1 drafting-table-content"
+					style={{
+						marginTop:
+							isContacts && topContent
+								? '115px'
+								: isContacts
+								? '105px'
+								: isDrafts || isSent
+								? '32px'
+								: 0,
+					}}
 					thumbWidth={2}
 					thumbColor="#000000"
 					trackColor="transparent"
@@ -139,20 +363,24 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					) : hasData ? (
 						children
 					) : isDrafts || isSent ? (
-						<div className="overflow-visible w-full flex flex-col gap-2 items-center py-2">
+						<div className="overflow-visible w-full flex flex-col gap-2 items-center">
 							{Array.from({ length: 6 }).map((_, idx) => (
 								<div
 									key={idx}
-									className="select-none w-[366px] h-[64px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
+									className={`select-none w-[489px] ${
+										isDrafts || isSent ? 'h-[97px]' : 'h-[64px]'
+									} overflow-hidden rounded-[8px] border-2 border-[#000000] ${
+										isDrafts ? 'bg-[#FFDC9E]' : isSent ? 'bg-[#5AB477]' : 'bg-white'
+									} p-2`}
 								/>
 							))}
 						</div>
 					) : isContacts ? (
 						<div className="overflow-visible w-full flex flex-col gap-2 items-center py-2">
-							{Array.from({ length: 7 }).map((_, idx) => (
+							{Array.from({ length: 9 }).map((_, idx) => (
 								<div
 									key={idx}
-									className="select-none w-[366px] h-[49px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
+									className={`select-none ${contentWidth} h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#EB8586]`}
 								/>
 							))}
 						</div>
@@ -173,7 +401,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							backgroundColor: isContacts
 								? '#EB8586'
 								: isDrafts
-								? '#FFD383'
+								? '#FFDC9E'
 								: isSent
 								? '#5AB477'
 								: 'white',

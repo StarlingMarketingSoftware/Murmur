@@ -114,6 +114,7 @@ interface CustomTableProps<TData, TValue> extends DataTableProps<TData, TValue> 
 	onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
 	nativeScroll?: boolean;
 	stickyHeader?: boolean;
+	stickyHeaderClassName?: string;
 }
 
 export function CustomTable<TData, TValue>({
@@ -147,6 +148,7 @@ export function CustomTable<TData, TValue>({
 	onScroll,
 	nativeScroll,
 	stickyHeader = true,
+	stickyHeaderClassName,
 }: CustomTableProps<TData, TValue>) {
 	type ColumnDefWithSize = ColumnDef<TData, TValue> & { size?: number };
 	const [pagination, setPagination] = useState({
@@ -343,7 +345,12 @@ export function CustomTable<TData, TValue>({
 				>
 					<div className="min-w-full">
 						{showInContainerHeader && (
-							<div className="sticky top-0 z-10 bg-[#EBF5FB] px-4 py-2 rounded-t-[8px]">
+							<div
+								className={cn(
+									'sticky top-0 z-10 bg-[#EBF5FB] px-4 py-2 rounded-t-[8px]',
+									stickyHeaderClassName
+								)}
+							>
 								<div className="relative h-[32px] flex items-center">
 									{/* Left: Select all / Deselect All */}
 									{headerAction ? (
