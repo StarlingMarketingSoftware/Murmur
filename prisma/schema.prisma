@@ -270,8 +270,6 @@ model InboundEmail {
   token             String?
   timestamp         Int?
   signature         String?
-  status            InboundEmailStatus  @default(pending)
-  processedAt       DateTime?
   userId            String?
   user              User?               @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
   contactId         Int?
@@ -354,13 +352,4 @@ enum DraftingTone {
   formal
   concise
   casual
-}
-
-enum InboundEmailStatus {
-  pending
-  processed
-  replied
-  archived
-  failed
-  spam
 }
