@@ -33,4 +33,3 @@ export const useGetInboundEmails = (options: InboundEmailQueryOptions = {}) => {
 		enabled: options.enabled,
 	});
 };
-
