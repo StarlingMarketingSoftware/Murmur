@@ -1,7 +1,59 @@
 import { NextRequest } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
-import { apiResponse, apiServerError, handleApiError } from '@/app/api/_utils';
+import {
+	apiResponse,
+	apiServerError,
+	apiUnauthorized,
+	handleApiError,
+} from '@/app/api/_utils';
+import { getValidatedParamsFromUrl } from '@/utils';
+import { z } from 'zod';
 import crypto from 'crypto';
+
+const inboundEmailFilterSchema = z.object({
+	campaignId: z.union([z.string(), z.number()]).optional(),
+	contactId: z.union([z.string(), z.number()]).optional(),
+});
+
+export type InboundEmailFilterData = z.infer<typeof inboundEmailFilterSchema>;
+
+/**
+ * GET handler for fetching inbound emails for the authenticated user
+ * Supports optional filtering by campaignId and contactId
+ */
+export async function GET(req: NextRequest) {
+	try {
+		const { userId } = await auth();
+		if (!userId) {
+			return apiUnauthorized();
+		}
+
+		const validatedFilters = getValidatedParamsFromUrl(req.url, inboundEmailFilterSchema);
+
+		const { campaignId, contactId } = validatedFilters.data || {};
+
+		const inboundEmails = await prisma.inboundEmail.findMany({
+			where: {
+				userId,
+				...(campaignId && { campaignId: Number(campaignId) }),
+				...(contactId && { contactId: Number(contactId) }),
+			},
+			include: {
+				contact: true,
+				campaign: true,
+				originalEmail: true,
+			},
+			orderBy: {
+				receivedAt: 'desc',
+			},
+		});
+
+		return apiResponse(inboundEmails);
+	} catch (error) {
+		return handleApiError(error);
+	}
+}
 
 /**
  * Mailgun Inbound Email Webhook Handler
