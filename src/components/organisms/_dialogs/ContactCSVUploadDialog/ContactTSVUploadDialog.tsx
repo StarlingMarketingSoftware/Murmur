@@ -38,13 +38,28 @@ export const ContactTSVUploadDialog: FC<ContactTSVUploadDialogProps> = (props) =
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
-				<Button
-					variant={buttonVariant || 'primary-light'}
-					className={cn('gradient-button gradient-button-blue', className)}
-					bold
-				>
-					{triggerText}
-				</Button>
+				{props.asTextTrigger ? (
+					<span
+						className={cn('cursor-pointer select-none', className)}
+						style={{
+							fontFamily:
+								'Inter, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif',
+							fontSize: '12px',
+							fontWeight: 600,
+							color: 'rgba(0, 0, 0, 0.43)',
+						}}
+					>
+						{triggerText}
+					</span>
+				) : (
+					<Button
+						variant={buttonVariant || 'primary-light'}
+						className={cn('gradient-button gradient-button-blue', className)}
+						bold
+					>
+						{triggerText}
+					</Button>
+				)}
 			</DialogTrigger>
 			<DialogContent
 				className={cn(isAdmin && '!max-w-98/100 !max-h-98/100')}
