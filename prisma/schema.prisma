@@ -287,7 +287,6 @@ model InboundEmail {
   @@index([sender])
   @@index([contactId])
   @@index([campaignId])
-  @@index([status])
   @@index([receivedAt])
   @@index([messageId])
   @@index([inReplyTo])
