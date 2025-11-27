@@ -54,35 +54,25 @@ export async function POST(req: Request) {
 
 	if (evt.type === 'user.created') {
 		const { id, email_addresses, last_name, first_name } = evt.data;
-		if (
-			!id ||
-			!email_addresses ||
-			email_addresses.length === 0 ||
-			!last_name ||
-			!first_name
-		) {
+		if (!id || !email_addresses || email_addresses.length === 0) {
 			return apiBadRequest('Error: Missing required fields');
 		}
 		const email = evt.data.email_addresses[0].email_address;
+		const murmurEmail = generateMurmurEmail(first_name ?? null, last_name ?? null);
 		const stripeCustomer = await stripe.customers.create({
 			email: email,
-			name: `${first_name} ${last_name}`,
+			name: `${first_name ?? ''} ${last_name ?? ''}`.trim() || 'User',
 		});
 		try {
-			const newUser = await prisma.user.create({
+			await prisma.user.create({
 				data: {
 					clerkId: id,
 					stripeCustomerId: stripeCustomer.id,
 					email: email,
-					firstName: first_name,
-					lastName: last_name,
+					firstName: first_name ?? null,
+					lastName: last_name ?? null,
+					murmurEmail,
 				},
-			});
-
-			const murmurEmail = generateMurmurEmail(first_name, last_name);
-			await prisma.user.update({
-				where: { id: newUser.id },
-				data: { murmurEmail },
 			});
 		} catch (error) {
 			return handleApiError(error);
