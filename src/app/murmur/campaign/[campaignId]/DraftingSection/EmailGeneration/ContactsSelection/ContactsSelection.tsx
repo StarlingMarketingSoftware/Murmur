@@ -518,7 +518,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		areAllSelected,
 	} = useContactsSelection(props);
 
-	const { campaign, onDraftEmails } = props;
+	const { campaign, onDraftEmails, onContactHover } = props;
 	const [isDrafting, setIsDrafting] = useState(false);
 	const router = useRouter();
 	const searchInfo = useMemo(() => parseSearchFromCampaign(campaign), [campaign]);
@@ -638,6 +638,12 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								if (e.shiftKey) {
 									e.preventDefault();
 								}
+							}}
+							onMouseEnter={() => {
+								onContactHover?.(contact);
+							}}
+							onMouseLeave={() => {
+								onContactHover?.(null);
 							}}
 							onClick={(e) => handleContactSelection(contact.id, e)}
 						>

@@ -1,4 +1,4 @@
-import { FC, useState } from 'react';
+import { FC, useEffect, useState } from 'react';
 import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
 import { Form } from '@/components/ui/form';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
@@ -21,6 +21,8 @@ import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { useMe } from '@/hooks/useMe';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { ContactWithName } from '@/types/contact';
+import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 
 interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	onOpenIdentityDialog?: () => void;
@@ -115,6 +117,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const sentCount = sentEmails.length;
 
 	const isSendingDisabled = isFreeTrial || (user?.sendingCredits || 0) === 0;
+
+	// Hovered contact for shared research panel
+	const [hoveredContactForResearch, setHoveredContactForResearch] =
+		useState<ContactWithName | null>(null);
+
+	// Clear research panel when switching views
+	useEffect(() => {
+		setHoveredContactForResearch(null);
+	}, [view]);
 
 	const handleSendDrafts = async () => {
 		const selectedDrafts =
@@ -248,6 +259,21 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							</div>
 						)}
 
+						{/* Shared Research panel to the right of the drafting tables */}
+						{!isMobile &&
+							['contacts', 'drafting', 'sent'].includes(view) &&
+							hoveredContactForResearch && (
+								<div
+									className="absolute hidden xl:block"
+									style={{
+										top: '29px',
+										left: 'calc(50% + 250px + 36px)',
+									}}
+								>
+									<ContactResearchPanel contact={hoveredContactForResearch} />
+								</div>
+							)}
+
 						{view === 'testing' && (
 							<div className="relative">
 								<HybridPromptInput
@@ -313,6 +339,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										fromName={fromName}
 										fromEmail={fromEmail}
 										subject={form.watch('subject')}
+										onContactHover={setHoveredContactForResearch}
 									/>
 								</div>
 							)}
@@ -331,6 +358,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										await handleGenerateDrafts(ids);
 									}}
 									isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
+									onContactHover={setHoveredContactForResearch}
 								/>
 							</div>
 						)}
@@ -338,7 +366,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* Sent tab - show the sent emails table */}
 						{view === 'sent' && (
 							<div className="flex items-center justify-center min-h-[300px]">
-								<SentEmails emails={sentEmails} isPendingEmails={isPendingEmails} />
+								<SentEmails
+									emails={sentEmails}
+									isPendingEmails={isPendingEmails}
+									onContactHover={setHoveredContactForResearch}
+								/>
 							</div>
 						)}
 

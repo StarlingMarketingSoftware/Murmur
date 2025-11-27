@@ -38,6 +38,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		selectedDraftIds,
 		handleSelectAllDrafts,
 	} = useDraftedEmails(props);
+	const { onContactHover } = props;
 
 	const [showConfirm, setShowConfirm] = useState(false);
 
@@ -202,6 +203,14 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										if (e.shiftKey) {
 											e.preventDefault();
 										}
+									}}
+									onMouseEnter={() => {
+										if (contact && onContactHover) {
+											onContactHover(contact);
+										}
+									}}
+									onMouseLeave={() => {
+										onContactHover?.(null);
 									}}
 									onClick={(e) => handleDraftSelect(draft, e)}
 									onDoubleClick={() => handleDraftDoubleClick(draft)}
