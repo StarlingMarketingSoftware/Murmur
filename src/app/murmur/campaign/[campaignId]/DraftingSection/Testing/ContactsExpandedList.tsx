@@ -134,7 +134,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 	return (
 		<div
-			className="max-[480px]:w-[96.27vw] rounded-md border-2 border-black/30 bg-[#EB8586] px-2 pb-2 flex flex-col"
+			className="max-[480px]:w-[96.27vw] rounded-md border-2 border-black/30 bg-[#EB8586] flex flex-col overflow-hidden"
 			style={{
 				width: typeof resolvedWidth === 'number' ? `${resolvedWidth}px` : resolvedWidth,
 				height: typeof resolvedHeight === 'number' ? `${resolvedHeight}px` : resolvedHeight,
@@ -145,7 +145,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			{/* Header row */}
 			<div
 				className={cn(
-					'flex items-center gap-2 h-[21px] px-1',
+					'flex items-center gap-2 h-[28px] px-3 bg-white border-b-2 border-black/30 shrink-0',
 					onHeaderClick ? 'cursor-pointer' : ''
 				)}
 				role={onHeaderClick ? 'button' : undefined}
@@ -202,8 +202,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				</div>
 			</div>
 
-			{/* Scrollable list */}
-			<CustomScrollbar
+			<div className="flex-1 flex flex-col px-2 pb-2 pt-2 min-h-0 mt-[20px]">
+				{/* Scrollable list */}
+				<CustomScrollbar
 				className="flex-1 drafting-table-content"
 				thumbWidth={2}
 				thumbColor="#000000"
@@ -561,6 +562,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				>
 					{isPendingGeneration ? 'Drafting...' : 'Draft'}
 				</button>
+			</div>
 			</div>
 		</div>
 	);
