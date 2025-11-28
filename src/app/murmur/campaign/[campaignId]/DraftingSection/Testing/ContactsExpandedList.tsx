@@ -1,7 +1,9 @@
 'use client';
 
 import { FC, MouseEvent, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ContactWithName } from '@/types/contact';
+import { CampaignWithRelations } from '@/types';
 import { cn } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -12,8 +14,14 @@ import {
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
-import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
+import { useGetUsedContactIds, useGetLocations } from '@/hooks/queryHooks/useContacts';
 import { ContactsHeaderChrome } from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraftingTable/DraftingTable';
+import {
+	MiniSearchBar,
+	parseSearchFromCampaign,
+} from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/ContactsSelection/ContactsSelection';
+import { useDebounce } from '@/hooks/useDebounce';
+import { urls } from '@/constants/urls';
 
 export interface ContactsExpandedListProps {
 	contacts: ContactWithName[];
@@ -41,6 +49,19 @@ export interface ContactsExpandedListProps {
 	 * Defaults to 7.
 	 */
 	minRows?: number;
+	/**
+	 * Campaign used to prefill the mini search bar query (optional).
+	 */
+	campaign?: CampaignWithRelations;
+	/**
+	 * Whether to show the mini search bar under the header. Defaults to true.
+	 */
+	showSearchBar?: boolean;
+	/**
+	 * Optional callback for when the mini search bar triggers a search.
+	 * When provided, this overrides the default dashboard navigation behavior.
+	 */
+	onSearchFromMiniBar?: (params: { why: string; what: string; where: string }) => void;
 }
 
 export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
@@ -56,7 +77,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	width,
 	height,
 	minRows = 7,
+	campaign,
+	showSearchBar = true,
+	onSearchFromMiniBar,
 }) => {
+	const router = useRouter();
 	const [internalSelectedContactIds, setInternalSelectedContactIds] = useState<Set<number>>(
 		new Set()
 	);
@@ -128,6 +153,62 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 	const computedIsDraftDisabled =
 		Boolean(isDraftDisabled) || currentSelectedIds.size === 0;
+	const selectedCount = currentSelectedIds.size;
+
+	// Mini search bar state – mirrors ContactsSelection logic so the UX matches
+	const searchInfo = useMemo(() => parseSearchFromCampaign(campaign), [campaign]);
+	const [activeSection, setActiveSection] = useState<'why' | 'what' | 'where' | null>(
+		null
+	);
+	const [whyValue, setWhyValue] = useState('[Booking]');
+	const [whatValue, setWhatValue] = useState(searchInfo.what);
+	const [whereValue, setWhereValue] = useState(searchInfo.where);
+
+	// Location search for the "Where" dropdown
+	const debouncedWhereValue = useDebounce(whereValue, 300);
+	const { data: locationResults, isLoading: isLoadingLocations } = useGetLocations(
+		debouncedWhereValue,
+		'state-first'
+	);
+
+	// Handle search button click
+	const handleSearch = () => {
+		// Always compute the current values first
+		const payload = {
+			why: whyValue,
+			what: whatValue,
+			where: whereValue,
+		};
+
+		// If the parent provided a handler (e.g., to drive the in-campaign Search tab),
+		// use that instead of navigating away.
+		if (onSearchFromMiniBar) {
+			onSearchFromMiniBar(payload);
+			return;
+		}
+
+		// Fallback: preserve original behavior of kicking off a dashboard search
+		let searchQuery = '';
+		if (payload.why) {
+			searchQuery += payload.why + ' ';
+		}
+		if (payload.what) {
+			searchQuery += payload.what;
+		}
+		if (payload.where) {
+			searchQuery += ' in ' + payload.where;
+		}
+		searchQuery = searchQuery.trim();
+
+		if (searchQuery) {
+			try {
+				sessionStorage.setItem('murmur_pending_search', searchQuery);
+			} catch {
+				// Ignore sessionStorage errors (e.g., disabled storage)
+			}
+			router.push(urls.murmur.dashboard.index);
+		}
+	};
 
 	// Allow callers to override dimensions; default to the original sidebar size
 	const resolvedWidth = width ?? 376;
@@ -135,7 +216,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 	return (
 		<div
-			className="relative max-[480px]:w-[96.27vw] rounded-md border-2 border-black/30 bg-[#EB8586] flex flex-col overflow-hidden"
+			className="relative max-[480px]:w-[96.27vw] rounded-md border-2 border-black/30 bg-[#EB8586] flex flex-col overflow-visible"
 			style={{
 				width: typeof resolvedWidth === 'number' ? `${resolvedWidth}px` : resolvedWidth,
 				height: typeof resolvedHeight === 'number' ? `${resolvedHeight}px` : resolvedHeight,
@@ -162,21 +243,38 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				}}
 			></div>
 
-			<div className="relative flex-1 flex flex-col px-2 pb-2 pt-2 min-h-0 mt-[73px]">
-				<div className="absolute top-[-18px] left-1/2 -translate-x-1/2 text-[11px] font-medium text-black/70 z-10">
-					{currentSelectedIds.size} Selected
+			{showSearchBar && (
+				<div className="px-2 pt-2">
+					<MiniSearchBar
+						activeSection={activeSection}
+						setActiveSection={setActiveSection}
+						whyValue={whyValue}
+						setWhyValue={setWhyValue}
+						whatValue={whatValue}
+						setWhatValue={setWhatValue}
+						whereValue={whereValue}
+						setWhereValue={setWhereValue}
+						locationResults={locationResults}
+						isLoadingLocations={isLoadingLocations}
+						debouncedWhereValue={debouncedWhereValue}
+						onSearch={handleSearch}
+					/>
 				</div>
+			)}
+
+			{/* Selected count row, shared across all layouts */}
+			<div className="px-3 mt-2 mb-1 flex items-center justify-between text-[11px] font-medium text-black/70">
+				<span>{selectedCount} Selected</span>
 				<button
 					type="button"
-					className="absolute top-[-18px] right-[22px] bg-transparent border-none p-0 hover:text-black text-[11px] font-medium text-black/70 z-10"
-					onClick={(e) => {
-						e.stopPropagation();
-						handleSelectAllToggle();
-					}}
+					className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium text-black/70 cursor-pointer"
+					onClick={handleSelectAllToggle}
 				>
 					{areAllSelected ? 'Deselect All' : 'Select All'}
 				</button>
+			</div>
 
+			<div className="relative flex-1 flex flex-col px-2 pb-2 pt-2 min-h-0">
 				{/* Scrollable list */}
 				<CustomScrollbar
 				className="flex-1 drafting-table-content"

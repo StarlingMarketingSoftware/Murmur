@@ -68,7 +68,7 @@ interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 }
 
 export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
-	const { view = 'testing', goToDrafting, onOpenIdentityDialog } = props;
+	const { view = 'testing', goToDrafting, onOpenIdentityDialog, onGoToSearch } = props;
 	const {
 		campaign,
 		contacts,
@@ -244,6 +244,45 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		setHasCampaignSearched(true);
 		setSearchActiveSection(null);
 		setSearchResultsSelectedContacts([]);
+	};
+
+	// Handler for triggering search from the mini searchbar in the contacts panel
+	const handleMiniContactsSearch = ({
+		why,
+		what,
+		where,
+	}: {
+		why: string;
+		what: string;
+		where: string;
+	}) => {
+		// Sync the Search tab's mini searchbar state so the UI reflects the query
+		if (why) {
+			setSearchWhyValue(why);
+		}
+		setSearchWhatValue(what);
+		setSearchWhereValue(where);
+
+		const parts: string[] = [];
+		if (what) parts.push(what);
+		if (where) parts.push(where);
+		const query = parts.join(' ');
+
+		if (!query.trim()) {
+			toast.error('Please enter what you want to search for');
+			return;
+		}
+
+		// Drive the in-campaign search results
+		setActiveCampaignSearchQuery(query);
+		setHasCampaignSearched(true);
+		setSearchActiveSection(null);
+		setSearchResultsSelectedContacts([]);
+
+		// Ask the parent page to switch to the Search tab, if supported
+		if (onGoToSearch) {
+			onGoToSearch();
+		}
 	};
 
 	// Handler for adding selected search results to campaign
@@ -892,11 +931,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											style={{
 												width: '373px',
 												height: view === 'search' ? '557px' : '373px',
-												overflow: 'hidden',
+												overflow: 'visible',
 											}}
 										>
 											<ContactsExpandedList
 												contacts={contacts || []}
+												campaign={campaign}
 												selectedContactIds={contactsTabSelectedIds}
 												onContactSelectionChange={(updater) =>
 													setContactsTabSelectedIds((prev) => updater(new Set(prev)))
@@ -911,6 +951,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												width={373}
 												height={view === 'search' ? 557 : 373}
 												minRows={view === 'search' ? 8 : 7}
+												onSearchFromMiniBar={handleMiniContactsSearch}
 											/>
 										</div>
 									) : (

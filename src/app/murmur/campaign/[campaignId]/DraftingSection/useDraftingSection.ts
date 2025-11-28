@@ -47,6 +47,10 @@ export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
 	view?: 'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 	goToDrafting?: () => void;
+	/**
+	 * Optional callback to switch the campaign page into the Search tab.
+	 */
+	onGoToSearch?: () => void;
 }
 
 type GeneratedEmail = {

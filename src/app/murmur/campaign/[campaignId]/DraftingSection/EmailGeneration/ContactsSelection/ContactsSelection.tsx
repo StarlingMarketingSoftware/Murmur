@@ -37,7 +37,7 @@ const DEFAULT_STATE_SUGGESTIONS = [
 
 // Parse campaign name to extract search components
 // Campaign names are typically formatted as "{what} in {where}" or just "{what}"
-const parseSearchFromCampaign = (campaign?: CampaignWithRelations) => {
+export const parseSearchFromCampaign = (campaign?: CampaignWithRelations) => {
 	// Try to get the name from userContactLists first (more accurate), then fall back to campaign name
 	const searchName = campaign?.userContactLists?.[0]?.name || campaign?.name || '';
 
@@ -59,7 +59,7 @@ const parseSearchFromCampaign = (campaign?: CampaignWithRelations) => {
 };
 
 // Mini search bar component for contacts filtering - matches dashboard design
-const MiniSearchBar: FC<{
+export const MiniSearchBar: FC<{
 	activeSection: 'why' | 'what' | 'where' | null;
 	setActiveSection: (section: 'why' | 'what' | 'where' | null) => void;
 	whyValue: string;
@@ -105,8 +105,8 @@ const MiniSearchBar: FC<{
 	return (
 		<div className="relative" ref={containerRef}>
 			<div
-				className="w-[489px] h-[49px] bg-white rounded-[8px] border-2 border-black flex items-center relative"
-				style={{ marginBottom: '4px' }}
+				className="h-[49px] bg-white rounded-[8px] border-2 border-black flex items-center relative"
+				style={{ marginBottom: '4px', width: 'min(489px, 100%)' }}
 			>
 				<div
 					className={cn(
@@ -126,11 +126,7 @@ const MiniSearchBar: FC<{
 					>
 						{activeSection === 'why' && (
 							<div
-								className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
-								style={{
-									width: '117px',
-									height: '38px',
-								}}
+								className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0 w-full h-[38px]"
 							/>
 						)}
 						<div className="w-full h-full flex items-center text-left text-[13px] font-bold font-secondary truncate p-0 relative z-10">
@@ -147,11 +143,7 @@ const MiniSearchBar: FC<{
 					>
 						{activeSection === 'what' && (
 							<div
-								className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
-								style={{
-									width: '144px',
-									height: '38px',
-								}}
+								className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0 w-full h-[38px]"
 							/>
 						)}
 						<input
@@ -171,11 +163,7 @@ const MiniSearchBar: FC<{
 					<div className="flex-1 flex items-center justify-start h-full min-w-0 relative pl-[16px] pr-[8px]">
 						{activeSection === 'where' && (
 							<div
-								className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
-								style={{
-									width: '143px',
-									height: '38px',
-								}}
+								className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0 w-full h-[38px]"
 							/>
 						)}
 						<input
@@ -228,11 +216,17 @@ const MiniSearchBar: FC<{
 			{/* Why dropdown */}
 			{activeSection === 'why' && (
 				<div
-					className="absolute flex flex-col items-center justify-start gap-[12px] w-[439px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
-					style={{ top: 'calc(100% + 10px)', left: '25px', padding: '12px 0' }}
+					className="absolute flex flex-col items-center justify-start gap-[12px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
+					style={{
+						top: 'calc(100% + 10px)',
+						left: '25px',
+						padding: '12px 0',
+						width: 'min(439px, calc(100% - 50px))',
+					}}
 				>
 					<div
-						className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+						className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+						style={{ width: 'min(415px, calc(100% - 24px))' }}
 						onClick={() => {
 							setWhyValue('[Booking]');
 							setActiveSection('what');
@@ -251,7 +245,8 @@ const MiniSearchBar: FC<{
 						</div>
 					</div>
 					<div
-						className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+						className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+						style={{ width: 'min(415px, calc(100% - 24px))' }}
 						onClick={() => {
 							setWhyValue('[Promotion]');
 							setActiveSection('what');
@@ -275,11 +270,17 @@ const MiniSearchBar: FC<{
 			{/* What dropdown - Promotion */}
 			{activeSection === 'what' && whyValue === '[Promotion]' && (
 				<div
-					className="absolute flex flex-col items-center justify-start gap-[10px] w-[439px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
-					style={{ top: 'calc(100% + 10px)', left: '25px', padding: '12px 0' }}
+					className="absolute flex flex-col items-center justify-start gap-[10px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
+					style={{
+						top: 'calc(100% + 10px)',
+						left: '25px',
+						padding: '12px 0',
+						width: 'min(439px, calc(100% - 50px))',
+					}}
 				>
 					<div
-						className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+						className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+						style={{ width: 'min(415px, calc(100% - 24px))' }}
 						onClick={() => {
 							setWhatValue('Radio Stations');
 							setActiveSection('where');
@@ -304,8 +305,12 @@ const MiniSearchBar: FC<{
 			{activeSection === 'what' && whyValue !== '[Promotion]' && (
 				<div
 					id="contacts-what-dropdown"
-					className="absolute w-[439px] h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
-					style={{ top: 'calc(100% + 10px)', left: '25px' }}
+					className="absolute h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
+					style={{
+						top: 'calc(100% + 10px)',
+						left: '25px',
+						width: 'min(439px, calc(100% - 50px))',
+					}}
 				>
 					<style jsx global>{`
 						#contacts-what-dropdown .scrollbar-hide,
@@ -329,7 +334,8 @@ const MiniSearchBar: FC<{
 						offsetRight={-5}
 					>
 						<div
-							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							style={{ width: 'min(415px, calc(100% - 24px))' }}
 							onClick={() => {
 								setWhatValue('Music Venues');
 								setActiveSection('where');
@@ -348,7 +354,8 @@ const MiniSearchBar: FC<{
 							</div>
 						</div>
 						<div
-							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							style={{ width: 'min(415px, calc(100% - 24px))' }}
 							onClick={() => {
 								setWhatValue('Wine, Beer, and Spirits');
 								setActiveSection('where');
@@ -367,7 +374,8 @@ const MiniSearchBar: FC<{
 							</div>
 						</div>
 						<div
-							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							style={{ width: 'min(415px, calc(100% - 24px))' }}
 							onClick={() => {
 								setWhatValue('Restaurants');
 								setActiveSection('where');
@@ -386,7 +394,8 @@ const MiniSearchBar: FC<{
 							</div>
 						</div>
 						<div
-							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							style={{ width: 'min(415px, calc(100% - 24px))' }}
 							onClick={() => {
 								setWhatValue('Coffee Shops');
 								setActiveSection('where');
@@ -405,7 +414,8 @@ const MiniSearchBar: FC<{
 							</div>
 						</div>
 						<div
-							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							style={{ width: 'min(415px, calc(100% - 24px))' }}
 							onClick={() => {
 								setWhatValue('Wedding Planners');
 								setActiveSection('where');
@@ -424,7 +434,8 @@ const MiniSearchBar: FC<{
 							</div>
 						</div>
 						<div
-							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							style={{ width: 'min(415px, calc(100% - 24px))' }}
 							onClick={() => {
 								setWhatValue('Festivals');
 								setActiveSection('where');
@@ -450,8 +461,12 @@ const MiniSearchBar: FC<{
 			{activeSection === 'where' && (
 				<div
 					id="contacts-where-dropdown"
-					className="absolute w-[439px] h-[300px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
-					style={{ top: 'calc(100% + 10px)', left: '25px' }}
+					className="absolute h-[300px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
+					style={{
+						top: 'calc(100% + 10px)',
+						left: '25px',
+						width: 'min(439px, calc(100% - 50px))',
+					}}
 				>
 					<style jsx global>{`
 						#contacts-where-dropdown .scrollbar-hide,
@@ -485,7 +500,8 @@ const MiniSearchBar: FC<{
 									return (
 										<div
 											key={`${loc.city}-${loc.state}-${idx}`}
-											className="w-[415px] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+											className="min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+											style={{ width: 'min(415px, calc(100% - 24px))' }}
 											onClick={() => {
 												setWhereValue(loc.label);
 												setActiveSection(null);
@@ -521,7 +537,8 @@ const MiniSearchBar: FC<{
 								return (
 									<div
 										key={label}
-										className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+										className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+										style={{ width: 'min(415px, calc(100% - 24px))' }}
 										onClick={() => {
 											setWhereValue(label);
 											setActiveSection(null);
