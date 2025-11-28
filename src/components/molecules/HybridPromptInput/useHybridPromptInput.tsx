@@ -67,6 +67,11 @@ export interface HybridPromptInputProps {
 	forceShowTestPreview?: boolean;
 	compactLeftOnly?: boolean;
 	onGoToDrafting?: () => void;
+	/**
+	 * Desktop-only: notify parent when the user wants to open/close the Test Preview
+	 * so it can be rendered in the right-hand research slot instead of as a popup.
+	 */
+	onTestPreviewToggle?: (open: boolean) => void;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {

@@ -16,6 +16,7 @@ import { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import { cn } from '@/utils';
 
 export interface TestPreviewPanelProps {
 	setShowTestPreview: Dispatch<SetStateAction<boolean>>;
@@ -25,6 +26,8 @@ export interface TestPreviewPanelProps {
 	isDisabled?: boolean;
 	isTesting?: boolean;
 	contact?: ContactWithName | null;
+	className?: string;
+	style?: React.CSSProperties;
 }
 
 export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
@@ -35,6 +38,8 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	isDisabled,
 	isTesting,
 	contact,
+	className,
+	style,
 }) => {
 	const form = useFormContext();
 	const contentRef = useRef<HTMLDivElement | null>(null);
@@ -311,7 +316,10 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	return (
 		<div
 			data-test-preview-panel
-			className="w-[457px] max-[480px]:w-full h-[644px] flex flex-col bg-gray-50 relative"
+			className={cn(
+				'w-[457px] max-[480px]:w-full h-[644px] flex flex-col bg-gray-50 relative',
+				className
+			)}
 			style={{
 				boxSizing: 'border-box',
 				border: '2px solid black',
@@ -319,6 +327,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 				overflow: 'hidden',
 				outline: '2px solid black',
 				outlineOffset: '-2px',
+				...style,
 			}}
 		>
 			<div className="flex-1 flex flex-col pt-1 pb-0">

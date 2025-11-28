@@ -23,6 +23,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ContactWithName } from '@/types/contact';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
+import { TestPreviewPanel } from '@/components/molecules/TestPreviewPanel/TestPreviewPanel';
 import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
 import ContactsExpandedList from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
 
@@ -129,9 +130,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// Track whether the user has explicitly selected a contact (via click)
 	const [hasUserSelectedResearchContact, setHasUserSelectedResearchContact] =
 		useState(false);
+	// Whether to show the Test Preview panel in place of the Research panel (desktop only)
+	const [showTestPreview, setShowTestPreview] = useState(false);
 
 	// Display priority: hovered contact > selected contact
-	const displayedContactForResearch = hoveredContactForResearch || selectedContactForResearch;
+	const displayedContactForResearch =
+		hoveredContactForResearch || selectedContactForResearch;
 
 	// Default to the first contact in the campaign for the research panel
 	useEffect(() => {
@@ -271,7 +275,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						className="mb-[4px] flex justify-between items-center"
 					></div>
 
-				{/* Main content wrapper to anchor the persistent Header Box */}
+					{/* Main content wrapper to anchor the persistent Header Box */}
 					<div className="relative w-full flex flex-col items-center">
 						{/* Persistent Campaign Header Box for specific tabs */}
 						{!isMobile && ['testing', 'contacts', 'drafting', 'sent'].includes(view) && (
@@ -347,20 +351,34 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							</div>
 						)}
 
-						{/* Shared Research panel to the right of the drafting tables / writing view */}
-						{!isMobile &&
-							['testing', 'contacts', 'drafting', 'sent'].includes(view) &&
-							displayedContactForResearch && (
-								<div
-									className="absolute hidden xl:block"
-									style={{
-										top: '29px',
-										left: 'calc(50% + 250px + 36px)',
-									}}
-								>
+						{/* Shared Research / Test Preview panel to the right of the drafting tables / writing view */}
+						{!isMobile && ['testing', 'contacts', 'drafting', 'sent'].includes(view) && (
+							<div
+								className="absolute hidden xl:block"
+								style={{
+									top: '29px',
+									left: 'calc(50% + 250px + 36px)',
+								}}
+							>
+								{view === 'testing' && showTestPreview ? (
+									<TestPreviewPanel
+										setShowTestPreview={setShowTestPreview}
+										testMessage={campaign?.testMessage || ''}
+										isLoading={Boolean(isTest)}
+										onTest={() => {
+											handleGenerateTestDrafts();
+											setShowTestPreview(true);
+										}}
+										isDisabled={isGenerationDisabled()}
+										isTesting={Boolean(isTest)}
+										contact={contacts?.[0] || displayedContactForResearch}
+										style={{ width: 375, height: 630 }}
+									/>
+								) : (
 									<ContactResearchPanel contact={displayedContactForResearch} />
-								</div>
-							)}
+								)}
+							</div>
+						)}
 
 						{view === 'testing' && (
 							<div className="relative">
@@ -373,6 +391,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									isTest={isTest}
 									contact={contacts?.[0]}
 									onGoToDrafting={goToDrafting}
+									onTestPreviewToggle={setShowTestPreview}
 								/>
 								{/* Right panel for Testing view - positioned absolutely */}
 								{false && (
@@ -411,25 +430,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							{/* Drafts tab - show only the drafts table centered */}
 							{view === 'drafting' && (
 								<div className="flex items-center justify-center min-h-[300px]">
-							<DraftedEmails
-								contacts={contacts || []}
-								selectedDraftIds={draftsTabSelectedIds}
-								selectedDraft={selectedDraft}
-								setSelectedDraft={setSelectedDraft}
-								setIsDraftDialogOpen={setIsDraftDialogOpen}
-								handleDraftSelection={handleDraftSelection}
-								draftEmails={draftEmails}
-								isPendingEmails={isPendingEmails}
-								setSelectedDraftIds={setDraftsTabSelectedIds}
-								onSend={handleSendDrafts}
-								isSendingDisabled={isSendingDisabled}
-								isFreeTrial={isFreeTrial || false}
-								fromName={fromName}
-								fromEmail={fromEmail}
-								subject={form.watch('subject')}
-								onContactClick={handleResearchContactClick}
-								onContactHover={handleResearchContactHover}
-							/>
+									<DraftedEmails
+										contacts={contacts || []}
+										selectedDraftIds={draftsTabSelectedIds}
+										selectedDraft={selectedDraft}
+										setSelectedDraft={setSelectedDraft}
+										setIsDraftDialogOpen={setIsDraftDialogOpen}
+										handleDraftSelection={handleDraftSelection}
+										draftEmails={draftEmails}
+										isPendingEmails={isPendingEmails}
+										setSelectedDraftIds={setDraftsTabSelectedIds}
+										onSend={handleSendDrafts}
+										isSendingDisabled={isSendingDisabled}
+										isFreeTrial={isFreeTrial || false}
+										fromName={fromName}
+										fromEmail={fromEmail}
+										subject={form.watch('subject')}
+										onContactClick={handleResearchContactClick}
+										onContactHover={handleResearchContactHover}
+									/>
 								</div>
 							)}
 						</div>
@@ -437,31 +456,31 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* Contacts tab - show the contacts table */}
 						{view === 'contacts' && (
 							<div className="flex items-center justify-center min-h-[300px]">
-							<ContactsSelection
-								contacts={contacts || []}
-								selectedContactIds={contactsTabSelectedIds}
-								setSelectedContactIds={setContactsTabSelectedIds}
-								handleContactSelection={handleContactsTabSelection}
-								campaign={campaign}
-								onDraftEmails={async (ids) => {
-									await handleGenerateDrafts(ids);
-								}}
-								isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
-								onContactClick={handleResearchContactClick}
-								onContactHover={handleResearchContactHover}
-							/>
+								<ContactsSelection
+									contacts={contacts || []}
+									selectedContactIds={contactsTabSelectedIds}
+									setSelectedContactIds={setContactsTabSelectedIds}
+									handleContactSelection={handleContactsTabSelection}
+									campaign={campaign}
+									onDraftEmails={async (ids) => {
+										await handleGenerateDrafts(ids);
+									}}
+									isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
+									onContactClick={handleResearchContactClick}
+									onContactHover={handleResearchContactHover}
+								/>
 							</div>
 						)}
 
 						{/* Sent tab - show the sent emails table */}
 						{view === 'sent' && (
 							<div className="flex items-center justify-center min-h-[300px]">
-							<SentEmails
-								emails={sentEmails}
-								isPendingEmails={isPendingEmails}
-								onContactClick={handleResearchContactClick}
-								onContactHover={handleResearchContactHover}
-							/>
+								<SentEmails
+									emails={sentEmails}
+									isPendingEmails={isPendingEmails}
+									onContactClick={handleResearchContactClick}
+									onContactHover={handleResearchContactHover}
+								/>
 							</div>
 						)}
 

@@ -824,12 +824,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		onGoToDrafting,
 	} = useHybridPromptInput(props);
 
-	const { compactLeftOnly } = props;
+	const { compactLeftOnly, onTestPreviewToggle } = props;
 
 	// Track if the user has attempted to Test to control error styling
 	const [hasAttemptedTest, setHasAttemptedTest] = useState(false);
-	// Controls swap order between compressed drafting panel and test preview panel
-	const [isPanelsReversed, setIsPanelsReversed] = useState(false);
 
 	// Subject field red styling (manual mode): mirror text block behavior
 	const subjectValue = form.watch('subject');
@@ -1202,20 +1200,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							ref={mainContainerRef}
 							className={`${
 								compactLeftOnly
-									? ''
-									: 'w-[96.27vw] max-w-[499px] min-h-[703px] transition mb-4 flex mx-auto '
-							}	${
-								showTestPreview
-									? 'flex-row gap-[40px] justify-center items-start'
-									: compactLeftOnly
 									? 'flex-col'
-									: 'flex-col border-[3px] border-black rounded-md bg-[#A6E2A8] min-h-[703px]'
-							}	relative overflow-visible`}
-							style={
-								!showTestPreview && !compactLeftOnly
-									? { backgroundColor: '#A6E2A8' }
-									: undefined
-							}
+									: 'w-[96.27vw] max-w-[499px] min-h-[703px] transition mb-4 flex mx-auto flex-col border-[3px] border-black rounded-md bg-[#A6E2A8]'
+							} relative overflow-visible`}
+							style={!compactLeftOnly ? { backgroundColor: '#A6E2A8' } : undefined}
 							data-hpi-container
 						>
 							{/* Mobile-only gradient background overlay starting under Mode divider */}
@@ -1240,35 +1228,25 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									}}
 								/>
 							)}
-							{/* Left side - Content area (draggable when testing) */}
+							{/* Left side - Content area (main drafting box) */}
 							<DraggableBox
 								id="test-left-panel"
 								dragHandleSelector="[data-left-drag-handle]"
-								enabled={Boolean(showTestPreview)}
-								onDropOver={(overId) => {
-									if (overId === 'test-preview-panel') setIsPanelsReversed((p) => !p);
-								}}
-								className={cn(
-									showTestPreview ? (isPanelsReversed ? 'order-2' : 'order-1') : '',
-									// Hide the main drafting panel on mobile when Test Preview is open
-									isMobile && showTestPreview && 'hidden',
-									'relative z-10'
-								)}
+								enabled={isMobile === false}
+								onDropOver={() => {}}
+								className="relative z-10"
 							>
 								<div
 									className={cn(
 										`flex flex-col`,
-										showTestPreview
-											? 'w-[457px] shrink-0 h-[644px] pt-[10px] px-[18px] pb-[18px] border-[2px] border-black rounded-[8px] bg-white'
-											: compactLeftOnly
+										compactLeftOnly
 											? 'w-[350px]'
 											: 'w-full min-h-0 pt-0 max-[480px]:pt-[1px] px-0 pb-0 flex-1',
-
 										'relative z-10'
 									)}
 									data-hpi-left-panel
 								>
-									{!showTestPreview && !compactLeftOnly && (
+									{!compactLeftOnly && (
 										<div className="w-full h-[17px] border-b-[2px] border-black flex items-center px-[9px] bg-white rounded-t-[calc(0.375rem-3px)]">
 											<span className="font-inter font-bold text-[12px] leading-none text-black">
 												Writing
@@ -1277,22 +1255,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									)}
 									{/* Removed explicit drag bar; header below acts as the drag handle */}
 									{/* Subject header inside the box */}
-									<div
-										ref={headerSectionRef}
-										className={cn(
-											'pt-0 pb-0',
-											showTestPreview && '-mx-[18px] px-[18px] rounded-t-[8px]'
-										)}
-									>
-										<div
-											className={!showTestPreview && !compactLeftOnly ? 'bg-white' : ''}
-										>
+									<div ref={headerSectionRef} className={cn('pt-0 pb-0')}>
+										<div className={!compactLeftOnly ? 'bg-white' : ''}>
 											<div
 												className={cn(
 													'h-[42px] flex items-center relative z-20',
-													showTestPreview
-														? 'w-[426px] max-[480px]:w-[89.8vw] mx-auto pl-[8px] max-[480px]:pl-[6px]'
-														: 'w-[93.7vw] max-w-[475px] mx-auto pl-[8px] max-[480px]:pl-[6px]'
+													'w-[93.7vw] max-w-[475px] mx-auto pl-[8px] max-[480px]:pl-[6px]'
 												)}
 												data-left-drag-handle
 												data-root-drag-handle
@@ -1773,127 +1741,176 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							</DraggableBox>
 
 							{/* Bottom-anchored footer with Signature and Test */}
-							{!showTestPreview && (
-								<div
-									className="flex flex-col items-center mt-auto w-full"
-									data-hpi-footer
-								>
-									{/* Signature Block - always visible; positioned above Test with fixed gap */}
-									<FormField
-										control={form.control}
-										name="signature"
-										render={({ field }) => (
-											<FormItem
-												className={cn(
-													!showTestPreview && !compactLeftOnly ? 'mb-[23px]' : 'mb-[9px]'
-												)}
-											>
-												<div
-													className={cn(
-														`min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2`,
-														showTestPreview
-															? 'w-[426px] max-[480px]:w-[89.33vw]'
-															: 'w-[89.33vw] max-w-[475px]'
-													)}
-													data-hpi-signature-card
-												>
-													<FormLabel className="text-base font-semibold font-secondary">
-														Signature
-													</FormLabel>
-													<FormControl>
-														<Textarea
-															placeholder="Enter your signature..."
-															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white max-[480px]:text-[10px] signature-textarea"
-															style={{
-																fontFamily: form.watch('font') || 'Arial',
-															}}
-															onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
-																const target = e.currentTarget;
-																target.style.height = 'auto';
-																target.style.height = target.scrollHeight + 'px';
-															}}
-															{...field}
-														/>
-													</FormControl>
-												</div>
-												<FormMessage />
-											</FormItem>
-										)}
-									/>
-
-									{/* Test button and notices (hidden in compact mode) */}
-									{compactLeftOnly ? null : (
-										<>
+							<div className="flex flex-col items-center mt-auto w-full" data-hpi-footer>
+								{/* Signature Block - always visible; positioned above Test with fixed gap */}
+								<FormField
+									control={form.control}
+									name="signature"
+									render={({ field }) => (
+										<FormItem className={cn(!compactLeftOnly ? 'mb-[23px]' : 'mb-[9px]')}>
 											<div
 												className={cn(
-													'w-full flex flex-col items-center',
-													showTestPreview && 'hidden',
-													'max-[480px]:hidden'
+													'min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2',
+													'w-[89.33vw] max-w-[475px]'
 												)}
+												data-hpi-signature-card
 											>
-												{hasEmptyTextBlocks && (
-													<div
-														className={cn(
-															hasTouchedEmptyTextBlocks || hasAttemptedTest
-																? 'text-destructive'
-																: 'text-black',
-															'text-sm font-medium mb-2',
-															showTestPreview
-																? 'w-[426px] max-[480px]:w-[89.8vw]'
-																: 'w-[93.7vw] max-w-[475px]'
-														)}
-													>
-														Fill in all text blocks in order to compose an email.
+												<FormLabel className="text-base font-semibold font-secondary">
+													Signature
+												</FormLabel>
+												<FormControl>
+													<Textarea
+														placeholder="Enter your signature..."
+														className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white max-[480px]:text-[10px] signature-textarea"
+														style={{
+															fontFamily: form.watch('font') || 'Arial',
+														}}
+														onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+															const target = e.currentTarget;
+															target.style.height = 'auto';
+															target.style.height = target.scrollHeight + 'px';
+														}}
+														{...field}
+													/>
+												</FormControl>
+											</div>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+
+								{/* Test button and notices (hidden in compact mode) */}
+								{compactLeftOnly ? null : (
+									<>
+										<div
+											className={cn(
+												'w-full flex flex-col items-center',
+												'max-[480px]:hidden'
+											)}
+										>
+											{hasEmptyTextBlocks && (
+												<div
+													className={cn(
+														hasTouchedEmptyTextBlocks || hasAttemptedTest
+															? 'text-destructive'
+															: 'text-black',
+														'text-sm font-medium mb-2',
+														'w-[93.7vw] max-w-[475px]'
+													)}
+												>
+													Fill in all text blocks in order to compose an email.
+												</div>
+											)}
+											<div className="w-full h-[2px] bg-black" />
+											<div className="w-full h-[41px] flex items-center justify-center bg-white rounded-b-[calc(0.375rem-3px)]">
+												<Button
+													type="button"
+													onClick={() => {
+														if (isMobile) {
+															setShowTestPreview?.(true);
+														} else {
+															onTestPreviewToggle?.(true);
+														}
+														handleGenerateTestDrafts?.();
+														setHasAttemptedTest(true);
+													}}
+													disabled={isGenerationDisabled?.()}
+													className={cn(
+														'h-[28px] bg-white border-[3px] border-[#349A37] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center transition-all hover:bg-primary/20 active:bg-primary/20 p-0',
+														'w-[93.7vw] max-w-[475px]',
+														isGenerationDisabled?.()
+															? 'opacity-50 cursor-not-allowed'
+															: 'opacity-100'
+													)}
+												>
+													{isPendingGeneration && isTest ? 'Testing...' : 'Generate Test'}
+												</Button>
+											</div>
+										</div>
+
+										{/* Mobile sticky Test button at page bottom */}
+										{!showTestPreview && (
+											<div className="hidden max-[480px]:block mobile-sticky-test-button">
+												<div className="fixed bottom-0 left-0 right-0 z-40">
+													<div className="flex w-full">
+														<Button
+															type="button"
+															onClick={() => {
+																setShowTestPreview?.(true);
+																handleGenerateTestDrafts?.();
+																setHasAttemptedTest(true);
+															}}
+															disabled={isGenerationDisabled?.()}
+															className={cn(
+																'h-[53px] flex-1 rounded-none bg-[#5DAB68] text-white font-times font-bold cursor-pointer flex items-center justify-center font-primary border-2 border-black border-r-0',
+																isGenerationDisabled?.()
+																	? 'opacity-50 cursor-not-allowed'
+																	: 'opacity-100'
+															)}
+														>
+															{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+														</Button>
+														<button
+															type="button"
+															onClick={() => onGoToDrafting?.()}
+															className="h-[53px] w-[92px] bg-[#EEEEEE] text-black font-inter text-[16px] leading-none border-2 border-[#626262] rounded-none flex-shrink-0 border-l-[#626262]"
+														>
+															<span className="block">Go to</span>
+															<span className="block">Drafting</span>
+														</button>
 													</div>
-												)}
-												<div className="w-full h-[2px] bg-black" />
-												<div className="w-full h-[41px] flex items-center justify-center bg-white rounded-b-[calc(0.375rem-3px)]">
-													<Button
-														type="button"
-														onClick={() => {
+												</div>
+											</div>
+										)}
+									</>
+								)}
+							</div>
+
+							{compactLeftOnly
+								? null
+								: isMobile &&
+								  showTestPreview && (
+										<div
+											className="fixed inset-0 z-50 flex items-center justify-center bg-black/20"
+											onClick={() => setShowTestPreview?.(false)}
+										>
+											<div
+												className={cn('w-[461px] max-[480px]:w-[96.27vw]')}
+												data-test-preview-wrapper
+												onClick={(e) => e.stopPropagation()}
+											>
+												<DraggableBox
+													id="test-preview-panel"
+													dragHandleSelector="[data-test-preview-header]"
+													enabled={false}
+													onDropOver={() => {}}
+												>
+													<TestPreviewPanel
+														setShowTestPreview={setShowTestPreview}
+														testMessage={testMessage || ''}
+														isLoading={Boolean(isTest)}
+														onTest={() => {
 															setShowTestPreview?.(true);
 															handleGenerateTestDrafts?.();
 															setHasAttemptedTest(true);
 														}}
-														disabled={isGenerationDisabled?.()}
-														className={cn(
-															'h-[28px] bg-white border-[3px] border-[#349A37] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center transition-all hover:bg-primary/20 active:bg-primary/20 p-0',
-															showTestPreview
-																? 'w-[426px] max-[480px]:w-[89.8vw]'
-																: 'w-[93.7vw] max-w-[475px]',
-															isGenerationDisabled?.()
-																? 'opacity-50 cursor-not-allowed'
-																: 'opacity-100'
-														)}
-													>
-														{isPendingGeneration && isTest
-															? 'Testing...'
-															: 'Generate Test'}
-													</Button>
-												</div>
-											</div>
-
-											{/* Mobile sticky Test button at page bottom */}
-											{!showTestPreview && (
-												<div className="hidden max-[480px]:block mobile-sticky-test-button">
+														isDisabled={isGenerationDisabled?.()}
+														isTesting={Boolean(isTest)}
+														contact={contact}
+													/>
+												</DraggableBox>
+												{/* Mobile sticky footer with Back to Testing and Go to Drafting */}
+												<div className="hidden max-[480px]:block mobile-landscape-sticky-preview-footer">
 													<div className="fixed bottom-0 left-0 right-0 z-40">
 														<div className="flex w-full">
 															<Button
 																type="button"
-																onClick={() => {
-																	setShowTestPreview?.(true);
-																	handleGenerateTestDrafts?.();
-																	setHasAttemptedTest(true);
-																}}
-																disabled={isGenerationDisabled?.()}
+																onClick={() => setShowTestPreview?.(false)}
 																className={cn(
-																	'h-[53px] flex-1 rounded-none bg-[#5DAB68] text-white font-times font-bold cursor-pointer flex items-center justify-center font-primary border-2 border-black border-r-0',
-																	isGenerationDisabled?.()
-																		? 'opacity-50 cursor-not-allowed'
-																		: 'opacity-100'
+																	'h-[53px] flex-1 rounded-none bg-[#5DAB68] text-white font-times font-bold cursor-pointer flex items-center justify-center font-primary border-2 border-black border-r-0'
 																)}
 															>
-																{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+																Back to Testing
 															</Button>
 															<button
 																type="button"
@@ -1904,68 +1921,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																<span className="block">Drafting</span>
 															</button>
 														</div>
-													</div>
-												</div>
-											)}
-										</>
-									)}
-								</div>
-							)}
-
-							{compactLeftOnly
-								? null
-								: showTestPreview && (
-										<div
-											className={cn(
-												'w-[461px] max-[480px]:w-[96.27vw] shrink-0',
-												isPanelsReversed ? 'order-1' : 'order-2'
-											)}
-											data-test-preview-wrapper
-										>
-											<DraggableBox
-												id="test-preview-panel"
-												dragHandleSelector="[data-test-preview-header]"
-												enabled={Boolean(showTestPreview)}
-												onDropOver={(overId) => {
-													if (overId === 'test-left-panel')
-														setIsPanelsReversed((p) => !p);
-												}}
-											>
-												<TestPreviewPanel
-													setShowTestPreview={setShowTestPreview}
-													testMessage={testMessage || ''}
-													isLoading={Boolean(isTest)}
-													onTest={() => {
-														setShowTestPreview?.(true);
-														handleGenerateTestDrafts?.();
-														setHasAttemptedTest(true);
-													}}
-													isDisabled={isGenerationDisabled?.()}
-													isTesting={Boolean(isTest)}
-													contact={contact}
-												/>
-											</DraggableBox>
-											{/* Mobile sticky footer with Back to Testing and Go to Drafting */}
-											<div className="hidden max-[480px]:block mobile-landscape-sticky-preview-footer">
-												<div className="fixed bottom-0 left-0 right-0 z-40">
-													<div className="flex w-full">
-														<Button
-															type="button"
-															onClick={() => setShowTestPreview?.(false)}
-															className={cn(
-																'h-[53px] flex-1 rounded-none bg-[#5DAB68] text-white font-times font-bold cursor-pointer flex items-center justify-center font-primary border-2 border-black border-r-0'
-															)}
-														>
-															Back to Testing
-														</Button>
-														<button
-															type="button"
-															onClick={() => onGoToDrafting?.()}
-															className="h-[53px] w-[92px] bg-[#EEEEEE] text-black font-inter text-[16px] leading-none border-2 border-[#626262] rounded-none flex-shrink-0 border-l-[#626262]"
-														>
-															<span className="block">Go to</span>
-															<span className="block">Drafting</span>
-														</button>
 													</div>
 												</div>
 											</div>
