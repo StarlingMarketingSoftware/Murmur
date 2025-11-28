@@ -827,13 +827,13 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 							onSearch={handleSearch}
 						/>
 						{/* Selected count row - positioned right above contact rows */}
-						<div className="w-[489px] flex justify-between items-center px-1 mt-[16px] mb-[2px]">
-							<span className="text-[12px] font-inter font-medium text-black">
+						<div className="w-[489px] relative flex justify-center items-center px-1 mt-[10px] mb-[2px]">
+							<span className="text-[14px] font-inter font-medium text-black">
 								{selectedCount} Selected
 							</span>
 							<button
 								type="button"
-								className="text-[12px] font-inter font-medium text-black bg-transparent border-none cursor-pointer p-0 m-0 leading-none hover:underline transition-colors"
+								className="absolute right-1 text-[14px] font-inter font-medium text-black bg-transparent border-none cursor-pointer p-0 m-0 leading-none hover:underline transition-colors"
 								onClick={handleClick}
 							>
 								{areAllSelected ? 'Deselect All' : 'Select All'}
