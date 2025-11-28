@@ -264,11 +264,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			)}
 
 			{/* Selected count row, shared across all layouts */}
-			<div className="px-3 mt-2 mb-1 flex items-center justify-between text-[11px] font-medium text-black/70">
+			<div className="px-3 mt-1 mb-0 flex items-center justify-center relative text-[14px] font-inter font-medium text-black/70">
 				<span>{selectedCount} Selected</span>
 				<button
 					type="button"
-					className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium text-black/70 cursor-pointer"
+					className="absolute right-3 bg-transparent border-none p-0 hover:text-black text-[14px] font-inter font-medium text-black/70 cursor-pointer"
 					onClick={handleSelectAllToggle}
 				>
 					{areAllSelected ? 'Deselect All' : 'Select All'}
