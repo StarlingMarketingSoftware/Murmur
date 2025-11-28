@@ -286,7 +286,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							<div
 								className="absolute hidden lg:flex flex-col"
 								style={{
-									right: 'calc(50% + 250px + 24px)',
+									right: view === 'search' ? 'calc(50% + 384px + 37px)' : 'calc(50% + 250px + 24px)',
 									top: '29px',
 									gap: '16px',
 								}}
@@ -361,7 +361,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								className="absolute hidden xl:block"
 								style={{
 									top: '29px',
-									left: 'calc(50% + 250px + 36px)',
+									left: view === 'search' ? 'calc(50% + 384px + 37px)' : 'calc(50% + 250px + 36px)',
 								}}
 							>
 								{view === 'testing' && showTestPreview ? (
@@ -491,33 +491,60 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* Search tab - show the campaign contacts on a map */}
 						{view === 'search' && (
 							<div className="flex items-center justify-center min-h-[300px]">
+								{/* Outer container box */}
 								<div
 									className="relative rounded-[12px] overflow-hidden"
 									style={{
-										width: '500px',
-										height: '630px',
+										width: '768px',
+										height: '815px',
+										backgroundColor: '#D8E5FB',
 										border: '3px solid #143883',
 									}}
 								>
-									<SearchResultsMap
-										contacts={contacts || []}
-										selectedContacts={searchTabSelectedContacts}
-										onToggleSelection={(contactId) => {
-											if (searchTabSelectedContacts.includes(contactId)) {
-												setSearchTabSelectedContacts(
-													searchTabSelectedContacts.filter((id) => id !== contactId)
-												);
-											} else {
-												setSearchTabSelectedContacts([
-													...searchTabSelectedContacts,
-													contactId,
-												]);
-											}
+									{/* Search label */}
+									<span
+										className="absolute font-inter font-bold text-[14px] text-black"
+										style={{ top: '5px', left: '16px' }}
+									>
+										Search
+									</span>
+									{/* Map container */}
+									<div
+										className="absolute"
+										style={{
+											top: '36px',
+											left: '14px',
+											right: '14px',
+											bottom: '14px',
 										}}
-										onMarkerClick={(contact) => {
-											handleResearchContactClick(contact);
-										}}
-									/>
+									>
+										<div
+											className="relative rounded-[8px] overflow-hidden w-full h-full"
+											style={{
+												border: '3px solid #143883',
+											}}
+										>
+											<SearchResultsMap
+												contacts={contacts || []}
+												selectedContacts={searchTabSelectedContacts}
+												onToggleSelection={(contactId) => {
+													if (searchTabSelectedContacts.includes(contactId)) {
+														setSearchTabSelectedContacts(
+															searchTabSelectedContacts.filter((id) => id !== contactId)
+														);
+													} else {
+														setSearchTabSelectedContacts([
+															...searchTabSelectedContacts,
+															contactId,
+														]);
+													}
+												}}
+												onMarkerClick={(contact) => {
+													handleResearchContactClick(contact);
+												}}
+											/>
+										</div>
+									</div>
 								</div>
 							</div>
 						)}
