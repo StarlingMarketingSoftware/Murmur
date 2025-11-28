@@ -735,7 +735,8 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		areAllSelected,
 	} = useContactsSelection(props);
 
-	const { campaign, onDraftEmails, onContactClick, onContactHover } = props;
+	const { campaign, onDraftEmails, onContactClick, onContactHover, onSearchFromMiniBar } =
+		props;
 	const [isDrafting, setIsDrafting] = useState(false);
 	const router = useRouter();
 	const searchInfo = useMemo(() => parseSearchFromCampaign(campaign), [campaign]);
@@ -754,9 +755,22 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		'state-first'
 	);
 
-	// Handle search button click - navigate to dashboard with new search
+	// Handle search button click - trigger search in campaign's Search tab, or fallback to dashboard
 	const handleSearch = () => {
-		// Construct the search query in the format: "[Why] What in Where"
+		const payload = {
+			why: whyValue,
+			what: whatValue,
+			where: whereValue,
+		};
+
+		// If the parent provided a handler (e.g., to drive the in-campaign Search tab),
+		// use that instead of navigating away.
+		if (onSearchFromMiniBar) {
+			onSearchFromMiniBar(payload);
+			return;
+		}
+
+		// Fallback: preserve original behavior of kicking off a dashboard search
 		let searchQuery = '';
 		if (whyValue) {
 			searchQuery += whyValue + ' ';

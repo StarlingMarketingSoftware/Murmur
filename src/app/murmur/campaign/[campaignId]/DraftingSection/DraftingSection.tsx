@@ -1359,6 +1359,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
 									onContactClick={handleResearchContactClick}
 									onContactHover={handleResearchContactHover}
+									onSearchFromMiniBar={handleMiniContactsSearch}
 								/>
 							</div>
 						)}

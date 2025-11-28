@@ -15,6 +15,11 @@ export interface ContactsSelectionProps {
 	campaign?: CampaignWithRelations;
 	onDraftEmails?: (contactIds: number[]) => Promise<void>;
 	isDraftingDisabled?: boolean;
+	/**
+	 * Optional callback for when the search bar triggers a search.
+	 * When provided, this overrides the default dashboard navigation behavior.
+	 */
+	onSearchFromMiniBar?: (params: { why: string; what: string; where: string }) => void;
 }
 
 export const useContactsSelection = (props: ContactsSelectionProps) => {
