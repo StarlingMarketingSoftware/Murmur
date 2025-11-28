@@ -73,6 +73,8 @@ export const MiniSearchBar: FC<{
 	debouncedWhereValue: string;
 	onSearch: () => void;
 	width?: string | number;
+	height?: string | number;
+	borderRadius?: string | number;
 }> = ({
 	activeSection,
 	setActiveSection,
@@ -87,6 +89,8 @@ export const MiniSearchBar: FC<{
 	debouncedWhereValue,
 	onSearch,
 	width,
+	height,
+	borderRadius,
 }) => {
 	const containerRef = useRef<HTMLDivElement>(null);
 
@@ -107,12 +111,17 @@ export const MiniSearchBar: FC<{
 	return (
 		<div className="relative" ref={containerRef}>
 			<div
-				className="h-[49px] bg-white rounded-[8px] border-2 border-black flex items-center relative"
-				style={{ marginBottom: '4px', width: width ?? 'min(489px, 100%)' }}
+				className="bg-white rounded-[8px] border-2 border-black flex items-center relative"
+				style={{
+					marginBottom: '4px',
+					width: width ?? 'min(489px, 100%)',
+					height: height ?? '49px',
+					borderRadius: borderRadius ?? (height === '44px' ? '8px' : undefined),
+				}}
 			>
 				<div
 					className={cn(
-						'flex items-center h-[38px] mx-[5px] rounded-[6px] flex-1 group',
+						'flex items-center h-[38px] ml-[1px] rounded-[6px] flex-1 group',
 						activeSection
 							? 'bg-[#F3F3F3] border border-transparent'
 							: 'bg-white border border-black'
@@ -127,9 +136,7 @@ export const MiniSearchBar: FC<{
 						onClick={() => setActiveSection(activeSection === 'why' ? null : 'why')}
 					>
 						{activeSection === 'why' && (
-							<div
-								className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0 w-full h-[38px]"
-							/>
+							<div className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0 w-full h-[38px]" />
 						)}
 						<div className="w-full h-full flex items-center text-left text-[13px] font-bold font-secondary truncate p-0 relative z-10">
 							{whyValue ? whyValue.replace(/[\[\]]/g, '') : 'Why'}
@@ -144,9 +151,7 @@ export const MiniSearchBar: FC<{
 						)}
 					>
 						{activeSection === 'what' && (
-							<div
-								className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0 w-full h-[38px]"
-							/>
+							<div className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0 w-full h-[38px]" />
 						)}
 						<input
 							value={whatValue}
@@ -162,11 +167,9 @@ export const MiniSearchBar: FC<{
 					</div>
 
 					{/* Where section - input field */}
-					<div className="flex-1 flex items-center justify-start h-full min-w-0 relative pl-[16px] pr-[8px]">
+					<div className="flex-1 flex items-center justify-start h-full min-w-0 relative pl-[16px] pr-[2px]">
 						{activeSection === 'where' && (
-							<div
-								className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0 w-full h-[38px]"
-							/>
+							<div className="absolute -left-[1px] -top-[1px] -right-[1px] border border-black bg-white rounded-[6px] z-0 h-[38px]" />
 						)}
 						<input
 							value={whereValue}
@@ -185,9 +188,9 @@ export const MiniSearchBar: FC<{
 				{/* Search button */}
 				<button
 					type="button"
-					className="flex items-center justify-center transition-colors cursor-pointer hover:bg-[#a3d9a5] mr-[5px]"
+					className="flex items-center justify-center transition-colors cursor-pointer hover:bg-[#a3d9a5] ml-[1px] mr-[1px]"
 					style={{
-						width: '42px',
+						width: '35px',
 						height: '38px',
 						backgroundColor: '#B8E4BE',
 						border: '1px solid #5DAB68',
@@ -695,22 +698,22 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[489px] h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none row-hover-scroll',
 								selectedContactIds.has(contact.id) ? 'bg-[#EAAEAE]' : ''
 							)}
-						onMouseDown={(e) => {
-							// Prevent text selection on shift-click
-							if (e.shiftKey) {
-								e.preventDefault();
-							}
-						}}
-						onMouseEnter={() => {
-							onContactHover?.(contact);
-						}}
-						onMouseLeave={() => {
-							onContactHover?.(null);
-						}}
-						onClick={(e) => {
-							handleContactSelection(contact.id, e);
-							onContactClick?.(contact);
-						}}
+							onMouseDown={(e) => {
+								// Prevent text selection on shift-click
+								if (e.shiftKey) {
+									e.preventDefault();
+								}
+							}}
+							onMouseEnter={() => {
+								onContactHover?.(contact);
+							}}
+							onMouseLeave={() => {
+								onContactHover?.(null);
+							}}
+							onClick={(e) => {
+								handleContactSelection(contact.id, e);
+								onContactClick?.(contact);
+							}}
 						>
 							{(() => {
 								const fullName =

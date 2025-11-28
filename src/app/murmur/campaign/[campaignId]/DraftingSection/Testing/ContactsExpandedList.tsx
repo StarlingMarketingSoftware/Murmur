@@ -260,6 +260,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						debouncedWhereValue={debouncedWhereValue}
 						onSearch={handleSearch}
 						width="370px"
+						height="44px"
+						borderRadius="4px"
 					/>
 				</div>
 			)}
