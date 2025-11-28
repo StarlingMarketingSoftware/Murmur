@@ -277,8 +277,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 					{/* Main content wrapper to anchor the persistent Header Box */}
 					<div className="relative w-full flex flex-col items-center">
-						{/* Persistent Campaign Header Box for specific tabs */}
-						{!isMobile && ['testing', 'contacts', 'drafting', 'sent'].includes(view) && (
+					{/* Persistent Campaign Header Box for specific tabs */}
+					{!isMobile && ['testing', 'contacts', 'drafting', 'sent', 'search'].includes(view) && (
 							<div
 								className="absolute hidden lg:flex flex-col"
 								style={{
@@ -297,8 +297,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									sentCount={sentCount}
 									onFromClick={onOpenIdentityDialog}
 								/>
-								{/* For the Writing (testing) tab, show a mini contacts table instead of mini email structure. */}
-								{view === 'testing' ? (
+								{/* For the Writing (testing) and Search tabs, show a mini contacts table instead of mini email structure. */}
+								{view === 'testing' || view === 'search' ? (
 									<div
 										style={{
 											width: '373px',
