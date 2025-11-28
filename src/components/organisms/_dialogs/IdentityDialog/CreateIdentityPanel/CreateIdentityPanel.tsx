@@ -79,18 +79,18 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 	const isVeryShortLandscape =
 		isMobile && isLandscape && (viewportHeight ?? Infinity) <= 360;
 
-	// Panel height - simplified since we have fewer fields now
+	// Panel height - sized to fit name, email, and website fields
 	const panelHeightStyle =
 		isMobile && isLandscape
 			? {
-					height: isVeryShortLandscape ? 'min(200px, 45vh)' : 'min(220px, 50vh)',
-					maxHeight: isVeryShortLandscape ? 'min(200px, 45vh)' : 'min(220px, 50vh)',
-					minHeight: '150px',
+					height: isVeryShortLandscape ? 'min(280px, 60vh)' : 'min(320px, 65vh)',
+					maxHeight: isVeryShortLandscape ? 'min(280px, 60vh)' : 'min(320px, 65vh)',
+					minHeight: '200px',
 			  }
 			: {
-					height: '220px',
-					maxHeight: '220px',
-					minHeight: '150px',
+					height: '320px',
+					maxHeight: '320px',
+					minHeight: '200px',
 			  };
 
 	// Adjust spacing between form fields when height is constrained
@@ -101,7 +101,12 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 		: 'space-y-4';
 
 	// Check if form is valid for submit button
-	const isFormValid = form.watch('name')?.trim().length > 0;
+	const nameValue = form.watch('name');
+	const emailValue = form.watch('email');
+	const isFormValid =
+		nameValue?.trim().length > 0 &&
+		emailValue?.trim().length > 0 &&
+		/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue);
 
 	return (
 		<FormProvider {...form}>
@@ -142,6 +147,26 @@ export const CreateIdentityPanel: FC<CreateIdentityPanelProps> = (props) => {
 										<FormItem className="col-span-11 relative">
 											<FormLabel className="font-secondary text-[14px]">
 												{'Name (First and Last)*'}
+											</FormLabel>
+											<FormControl>
+												<StyledInput
+													field={field}
+													width={isMobile && isLandscape ? 'w-full' : undefined}
+												/>
+											</FormControl>
+											<div className="absolute left-0 top-full mt-0.5">
+												<FormMessage className="m-0 leading-4" />
+											</div>
+										</FormItem>
+									)}
+								/>
+								<FormField
+									control={form.control}
+									name="email"
+									render={({ field }) => (
+										<FormItem className="col-span-11 relative">
+											<FormLabel className="font-secondary text-[14px]">
+												{'Email*'}
 											</FormLabel>
 											<FormControl>
 												<StyledInput

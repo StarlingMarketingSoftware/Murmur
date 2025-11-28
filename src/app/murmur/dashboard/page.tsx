@@ -40,7 +40,6 @@ import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
-import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -560,7 +559,7 @@ const Dashboard = () => {
 	const logoWidth = isMobile ? '190px' : '300px';
 	const logoHeight = isMobile ? '50px' : '79px';
 	const hasProblematicBrowser = isProblematicBrowser();
-	const { user } = useMe();
+	useMe(); // Hook call for side effects
 	const searchContainerRef = useRef<HTMLDivElement>(null);
 	const whatInputRef = useRef<HTMLInputElement>(null);
 	const whereInputRef = useRef<HTMLInputElement>(null);

@@ -11,6 +11,7 @@ import { DEFAULT_FONT } from '@/constants/ui';
 
 const upsertIdentityFormSchema = z.object({
 	name: z.string().min(1, 'Name is required'),
+	email: z.string().email('Please enter a valid email address'),
 	website: z.string().optional(),
 });
 
@@ -40,6 +41,7 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 		resolver: zodResolver(upsertIdentityFormSchema),
 		defaultValues: {
 			name: '',
+			email: '',
 			website: '',
 		},
 	});
@@ -55,6 +57,7 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 				setShowCreatePanel(false);
 				form.reset({
 					name: '',
+					email: '',
 					website: '',
 				});
 			},
@@ -78,12 +81,14 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 				id: selectedIdentity?.id,
 				data: {
 					name: values.name,
+					email: values.email,
 					website: values.website,
 				},
 			});
 		} else {
 			const newIdentity: Identity = await createIdentity({
 				name: values.name,
+				email: values.email,
 				website: values.website,
 			});
 			setValue('identityId', String(newIdentity.id));
@@ -103,11 +108,13 @@ export const useCreateIdentityPanel = (props: CreateIdentityPanelProps) => {
 		if (isEdit && selectedIdentity) {
 			form.reset({
 				name: selectedIdentity.name,
+				email: selectedIdentity.email,
 				website: selectedIdentity.website || '',
 			});
 		} else {
 			form.reset({
 				name: '',
+				email: '',
 				website: '',
 			});
 		}

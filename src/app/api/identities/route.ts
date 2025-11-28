@@ -13,6 +13,7 @@ import { getValidatedParamsFromUrl } from '@/utils';
 
 const postIdentitySchema = z.object({
 	name: z.string().min(1),
+	email: z.string().email(),
 	website: z.string().optional(),
 });
 const getIdentityFilterSchema = z.object({
