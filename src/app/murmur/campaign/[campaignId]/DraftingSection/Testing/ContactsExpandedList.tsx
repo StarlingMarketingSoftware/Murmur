@@ -67,9 +67,8 @@ export interface ContactsExpandedListProps {
 export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	contacts,
 	onHeaderClick,
-	onDraftSelected,
-	isDraftDisabled,
-	isPendingGeneration,
+	// Note: onDraftSelected, isDraftDisabled, isPendingGeneration are available
+	// in props interface for future use but not currently wired up.
 	onContactClick,
 	onContactHover,
 	selectedContactIds,
@@ -151,8 +150,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		});
 	};
 
-	const computedIsDraftDisabled =
-		Boolean(isDraftDisabled) || currentSelectedIds.size === 0;
 	const selectedCount = currentSelectedIds.size;
 
 	// Mini search bar state – mirrors ContactsSelection logic so the UX matches
