@@ -26,6 +26,7 @@ import { ContactResearchPanel } from '@/components/molecules/ContactResearchPane
 import { TestPreviewPanel } from '@/components/molecules/TestPreviewPanel/TestPreviewPanel';
 import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
 import ContactsExpandedList from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
+import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 
 interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	onOpenIdentityDialog?: () => void;
@@ -84,6 +85,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			return next;
 		});
 	};
+
+	// State for search tab map selection
+	const [searchTabSelectedContacts, setSearchTabSelectedContacts] = useState<number[]>([]);
 
 	// State for drafts selection in the Drafts tab
 	const [draftsTabSelectedIds, setDraftsTabSelectedIds] = useState<Set<number>>(
@@ -352,7 +356,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						)}
 
 						{/* Shared Research / Test Preview panel to the right of the drafting tables / writing view */}
-						{!isMobile && ['testing', 'contacts', 'drafting', 'sent'].includes(view) && (
+						{!isMobile && ['testing', 'contacts', 'drafting', 'sent', 'search'].includes(view) && (
 							<div
 								className="absolute hidden xl:block"
 								style={{
@@ -484,8 +488,42 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							</div>
 						)}
 
+						{/* Search tab - show the campaign contacts on a map */}
+						{view === 'search' && (
+							<div className="flex items-center justify-center min-h-[300px]">
+								<div
+									className="relative rounded-[12px] overflow-hidden"
+									style={{
+										width: '500px',
+										height: '630px',
+										border: '3px solid #143883',
+									}}
+								>
+									<SearchResultsMap
+										contacts={contacts || []}
+										selectedContacts={searchTabSelectedContacts}
+										onToggleSelection={(contactId) => {
+											if (searchTabSelectedContacts.includes(contactId)) {
+												setSearchTabSelectedContacts(
+													searchTabSelectedContacts.filter((id) => id !== contactId)
+												);
+											} else {
+												setSearchTabSelectedContacts([
+													...searchTabSelectedContacts,
+													contactId,
+												]);
+											}
+										}}
+										onMarkerClick={(contact) => {
+											handleResearchContactClick(contact);
+										}}
+									/>
+								</div>
+							</div>
+						)}
+
 						{/* Placeholder content for future tabs */}
-						{(view === 'search' || view === 'inbox' || view === 'all') && (
+						{(view === 'inbox' || view === 'all') && (
 							<div className="flex items-center justify-center min-h-[300px] text-gray-400">
 								{/* Blank for now */}
 							</div>
