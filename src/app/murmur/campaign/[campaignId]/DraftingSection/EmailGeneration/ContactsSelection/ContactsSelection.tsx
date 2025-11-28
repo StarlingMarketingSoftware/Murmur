@@ -233,25 +233,6 @@ const MiniSearchBar: FC<{
 					<div
 						className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 						onClick={() => {
-							setWhyValue('[Promotion]');
-							setActiveSection('what');
-						}}
-					>
-						<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-							<PromotionIcon />
-						</div>
-						<div className="ml-[12px] flex flex-col">
-							<div className="text-[20px] font-medium leading-none text-black font-inter">
-								Promotion
-							</div>
-							<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
-								reach out to radio stations, playlists, and more
-							</div>
-						</div>
-					</div>
-					<div
-						className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-						onClick={() => {
 							setWhyValue('[Booking]');
 							setActiveSection('what');
 						}}
@@ -265,6 +246,25 @@ const MiniSearchBar: FC<{
 							</div>
 							<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
 								contact venues, restaurants and more, to book shows
+							</div>
+						</div>
+					</div>
+					<div
+						className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+						onClick={() => {
+							setWhyValue('[Promotion]');
+							setActiveSection('what');
+						}}
+					>
+						<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+							<PromotionIcon />
+						</div>
+						<div className="ml-[12px] flex flex-col">
+							<div className="text-[20px] font-medium leading-none text-black font-inter">
+								Promotion
+							</div>
+							<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
+								reach out to radio stations, playlists, and more
 							</div>
 						</div>
 					</div>

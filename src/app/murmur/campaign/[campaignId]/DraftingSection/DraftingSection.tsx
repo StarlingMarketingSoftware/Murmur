@@ -380,6 +380,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						<div
 							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 							onClick={() => {
+								setSearchWhyValue('[Booking]');
+								setSearchActiveSection('what');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<BookingIcon />
+							</div>
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Booking
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
+									contact venues, restaurants and more, to book shows
+								</div>
+							</div>
+						</div>
+						<div
+							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
 								setSearchWhyValue('[Promotion]');
 								setSearchActiveSection('what');
 							}}
@@ -394,25 +413,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
 									reach out to radio stations, playlists, and more to get your music
 									played
-								</div>
-							</div>
-						</div>
-						<div
-							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-							onClick={() => {
-								setSearchWhyValue('[Booking]');
-								setSearchActiveSection('what');
-							}}
-						>
-							<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-								<BookingIcon />
-							</div>
-							<div className="ml-[12px] flex flex-col">
-								<div className="text-[20px] font-medium leading-none text-black font-inter">
-									Booking
-								</div>
-								<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
-									contact venues, restaurants and more, to book shows
 								</div>
 							</div>
 						</div>
