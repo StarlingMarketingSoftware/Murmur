@@ -303,123 +303,146 @@ const MiniSearchBar: FC<{
 			{/* What dropdown - Booking */}
 			{activeSection === 'what' && whyValue !== '[Promotion]' && (
 				<div
-					className="absolute flex flex-col items-center justify-start gap-[10px] w-[439px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
-					style={{ top: 'calc(100% + 10px)', left: '25px', padding: '12px 0' }}
+					id="contacts-what-dropdown"
+					className="absolute w-[439px] h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
+					style={{ top: 'calc(100% + 10px)', left: '25px' }}
 				>
-					<div
-						className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-						onClick={() => {
-							setWhatValue('Music Venues');
-							setActiveSection('where');
-						}}
+					<style jsx global>{`
+						#contacts-what-dropdown .scrollbar-hide,
+						#contacts-what-dropdown [data-scrollbar-content] {
+							scrollbar-width: none !important;
+							-ms-overflow-style: none !important;
+						}
+						#contacts-what-dropdown .scrollbar-hide::-webkit-scrollbar,
+						#contacts-what-dropdown [data-scrollbar-content]::-webkit-scrollbar {
+							display: none !important;
+							width: 0 !important;
+							height: 0 !important;
+						}
+					`}</style>
+					<CustomScrollbar
+						className="w-full h-full scrollbar-hide"
+						contentClassName="flex flex-col items-center gap-[10px] py-[12px] scrollbar-hide"
+						thumbWidth={2}
+						thumbColor="#000000"
+						trackColor="transparent"
+						offsetRight={-5}
 					>
-						<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-							<MusicVenuesIcon />
-						</div>
-						<div className="ml-[12px] flex flex-col">
-							<div className="text-[20px] font-medium leading-none text-black font-inter">
-								Music Venues
+						<div
+							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setWhatValue('Music Venues');
+								setActiveSection('where');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<MusicVenuesIcon />
 							</div>
-							<div className="text-[12px] leading-tight text-black mt-[4px]">
-								Reach talent buyers for live shows
-							</div>
-						</div>
-					</div>
-					<div
-						className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-						onClick={() => {
-							setWhatValue('Wine, Beer, and Spirits');
-							setActiveSection('where');
-						}}
-					>
-						<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-							<WineBeerSpiritsIcon />
-						</div>
-						<div className="ml-[12px] flex flex-col">
-							<div className="text-[20px] font-medium leading-none text-black font-inter">
-								Wine, Beer, and Spirits
-							</div>
-							<div className="text-[12px] leading-tight text-black mt-[4px]">
-								Pitch your act for seasonal events
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Music Venues
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px]">
+									Reach talent buyers for live shows
+								</div>
 							</div>
 						</div>
-					</div>
-					<div
-						className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-						onClick={() => {
-							setWhatValue('Restaurants');
-							setActiveSection('where');
-						}}
-					>
-						<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-							<RestaurantsIcon />
-						</div>
-						<div className="ml-[12px] flex flex-col">
-							<div className="text-[20px] font-medium leading-none text-black font-inter">
-								Restaurants
+						<div
+							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setWhatValue('Wine, Beer, and Spirits');
+								setActiveSection('where');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<WineBeerSpiritsIcon />
 							</div>
-							<div className="text-[12px] leading-tight text-black mt-[4px]">
-								Land steady dinner and brunch gigs
-							</div>
-						</div>
-					</div>
-					<div
-						className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-						onClick={() => {
-							setWhatValue('Coffee Shops');
-							setActiveSection('where');
-						}}
-					>
-						<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-							<CoffeeShopsIcon />
-						</div>
-						<div className="ml-[12px] flex flex-col">
-							<div className="text-[20px] font-medium leading-none text-black font-inter">
-								Coffee Shops
-							</div>
-							<div className="text-[12px] leading-tight text-black mt-[4px]">
-								Book intimate daytime performances
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Wine, Beer, and Spirits
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px]">
+									Pitch your act for seasonal events
+								</div>
 							</div>
 						</div>
-					</div>
-					<div
-						className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-						onClick={() => {
-							setWhatValue('Wedding Planners');
-							setActiveSection('where');
-						}}
-					>
-						<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-							<WeddingPlannersIcon />
-						</div>
-						<div className="ml-[12px] flex flex-col">
-							<div className="text-[20px] font-medium leading-none text-black font-inter">
-								Wedding Planners
+						<div
+							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setWhatValue('Restaurants');
+								setActiveSection('where');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<RestaurantsIcon />
 							</div>
-							<div className="text-[12px] leading-tight text-black mt-[4px]">
-								Get hired for ceremonies & receptions
-							</div>
-						</div>
-					</div>
-					<div
-						className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-						onClick={() => {
-							setWhatValue('Festivals');
-							setActiveSection('where');
-						}}
-					>
-						<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-							<FestivalsIcon />
-						</div>
-						<div className="ml-[12px] flex flex-col">
-							<div className="text-[20px] font-medium leading-none text-black font-inter">
-								Festivals
-							</div>
-							<div className="text-[12px] leading-tight text-black mt-[4px]">
-								Pitch your act for seasonal events
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Restaurants
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px]">
+									Land steady dinner and brunch gigs
+								</div>
 							</div>
 						</div>
-					</div>
+						<div
+							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setWhatValue('Coffee Shops');
+								setActiveSection('where');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<CoffeeShopsIcon />
+							</div>
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Coffee Shops
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px]">
+									Book intimate daytime performances
+								</div>
+							</div>
+						</div>
+						<div
+							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setWhatValue('Wedding Planners');
+								setActiveSection('where');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<WeddingPlannersIcon />
+							</div>
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Wedding Planners
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px]">
+									Get hired for ceremonies & receptions
+								</div>
+							</div>
+						</div>
+						<div
+							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setWhatValue('Festivals');
+								setActiveSection('where');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<FestivalsIcon />
+							</div>
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Festivals
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px]">
+									Pitch your act for seasonal events
+								</div>
+							</div>
+						</div>
+					</CustomScrollbar>
 				</div>
 			)}
 
