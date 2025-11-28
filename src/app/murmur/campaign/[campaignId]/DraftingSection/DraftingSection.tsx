@@ -308,6 +308,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onContactSelectionChange={(updater) =>
 												setContactsTabSelectedIds((prev) => updater(new Set(prev)))
 											}
+											onContactClick={handleResearchContactClick}
+											onContactHover={handleResearchContactHover}
 											onDraftSelected={async (ids) => {
 												await handleGenerateDrafts(ids);
 											}}
@@ -345,9 +347,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							</div>
 						)}
 
-						{/* Shared Research panel to the right of the drafting tables */}
+						{/* Shared Research panel to the right of the drafting tables / writing view */}
 						{!isMobile &&
-							['contacts', 'drafting', 'sent'].includes(view) &&
+							['testing', 'contacts', 'drafting', 'sent'].includes(view) &&
 							displayedContactForResearch && (
 								<div
 									className="absolute hidden xl:block"

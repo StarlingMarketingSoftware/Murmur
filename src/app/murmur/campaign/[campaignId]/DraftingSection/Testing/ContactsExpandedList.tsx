@@ -20,6 +20,8 @@ export interface ContactsExpandedListProps {
 	onDraftSelected?: (contactIds: number[]) => void;
 	isDraftDisabled?: boolean;
 	isPendingGeneration?: boolean;
+	onContactClick?: (contact: ContactWithName | null) => void;
+	onContactHover?: (contact: ContactWithName | null) => void;
 	/**
 	 * Optional controlled selection props. When provided, this component will
 	 * mirror and update the passed-in selection instead of managing its own.
@@ -41,6 +43,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	onDraftSelected,
 	isDraftDisabled,
 	isPendingGeneration,
+	onContactClick,
+	onContactHover,
 	selectedContactIds,
 	onContactSelectionChange,
 	width,
@@ -207,7 +211,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						const fullName =
 							contact.name ||
 							`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
-						const isSelected = selectedContactIds.has(contact.id);
+						const isSelected = currentSelectedIds.has(contact.id);
 						const isUsed = usedContactIdsSet.has(contact.id);
 						return (
 							<div
@@ -219,7 +223,16 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 								onMouseDown={(e) => {
 									if (e.shiftKey) e.preventDefault();
 								}}
-								onClick={(e) => handleContactClick(contact, e)}
+								onMouseEnter={() => {
+									onContactHover?.(contact);
+								}}
+								onMouseLeave={() => {
+									onContactHover?.(null);
+								}}
+								onClick={(e) => {
+									handleContactClick(contact, e);
+									onContactClick?.(contact);
+								}}
 							>
 								{fullName ? (
 									<>
