@@ -32,6 +32,7 @@ import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
 import { BookingIcon } from '@/components/atoms/_svg/BookingIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
@@ -446,7 +447,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				)}
 				{searchActiveSection === 'what' && searchWhyValue !== '[Promotion]' && (
 					<div
-						className="campaign-search-dropdown-menu flex flex-col items-center justify-center gap-[10px] w-[439px] h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[120]"
+						className="campaign-search-dropdown-menu flex flex-col items-center justify-center gap-[10px] w-[439px] h-[482px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[120]"
 						style={{ position: 'absolute', top: '75px', left: 'calc(50% - 120px)' }}
 					>
 						<div
@@ -471,16 +472,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						<div
 							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 							onClick={() => {
-								setSearchWhatValue('Festivals');
+								setSearchWhatValue('Wine, Beer, and Spirits');
 								setSearchActiveSection('where');
 							}}
 						>
 							<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-								<FestivalsIcon />
+								<WineBeerSpiritsIcon />
 							</div>
 							<div className="ml-[12px] flex flex-col">
 								<div className="text-[20px] font-medium leading-none text-black font-inter">
-									Festivals
+									Wine, Beer, and Spirits
 								</div>
 								<div className="text-[12px] leading-tight text-black mt-[4px]">
 									Pitch your act for seasonal events
@@ -541,6 +542,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								</div>
 								<div className="text-[12px] leading-tight text-black mt-[4px]">
 									Get hired for ceremonies & receptions
+								</div>
+							</div>
+						</div>
+						<div
+							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setSearchWhatValue('Festivals');
+								setSearchActiveSection('where');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<FestivalsIcon />
+							</div>
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Festivals
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px]">
+									Pitch your act for seasonal events
 								</div>
 							</div>
 						</div>

@@ -19,6 +19,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
 import { BookingIcon } from '@/components/atoms/_svg/BookingIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
@@ -327,16 +328,16 @@ const MiniSearchBar: FC<{
 					<div
 						className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 						onClick={() => {
-							setWhatValue('Festivals');
+							setWhatValue('Wine, Beer, and Spirits');
 							setActiveSection('where');
 						}}
 					>
 						<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-							<FestivalsIcon />
+							<WineBeerSpiritsIcon />
 						</div>
 						<div className="ml-[12px] flex flex-col">
 							<div className="text-[20px] font-medium leading-none text-black font-inter">
-								Festivals
+								Wine, Beer, and Spirits
 							</div>
 							<div className="text-[12px] leading-tight text-black mt-[4px]">
 								Pitch your act for seasonal events
@@ -397,6 +398,25 @@ const MiniSearchBar: FC<{
 							</div>
 							<div className="text-[12px] leading-tight text-black mt-[4px]">
 								Get hired for ceremonies & receptions
+							</div>
+						</div>
+					</div>
+					<div
+						className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+						onClick={() => {
+							setWhatValue('Festivals');
+							setActiveSection('where');
+						}}
+					>
+						<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+							<FestivalsIcon />
+						</div>
+						<div className="ml-[12px] flex flex-col">
+							<div className="text-[20px] font-medium leading-none text-black font-inter">
+								Festivals
+							</div>
+							<div className="text-[12px] leading-tight text-black mt-[4px]">
+								Pitch your act for seasonal events
 							</div>
 						</div>
 					</div>
