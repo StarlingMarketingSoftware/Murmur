@@ -891,7 +891,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										<div
 											style={{
 												width: '373px',
-												height: '373px',
+												height: view === 'search' ? '557px' : '373px',
 												overflow: 'hidden',
 											}}
 										>
@@ -909,7 +909,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
 												isPendingGeneration={isPendingGeneration}
 												width={373}
-												height={373}
+												height={view === 'search' ? 557 : 373}
+												minRows={view === 'search' ? 10 : 7}
 											/>
 										</div>
 									) : (

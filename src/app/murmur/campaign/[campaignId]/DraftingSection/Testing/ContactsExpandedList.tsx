@@ -30,11 +30,16 @@ export interface ContactsExpandedListProps {
 	onContactSelectionChange?: (updater: (prev: Set<number>) => Set<number>) => void;
 	/**
 	 * Optional explicit dimensions so the same component can be reused
-	 * in compact “mini” layouts (e.g. pinned panel on the Writing tab)
+	 * in compact "mini" layouts (e.g. pinned panel on the Writing tab)
 	 * as well as the full-height drafting sidebar.
 	 */
 	width?: number | string;
 	height?: number | string;
+	/**
+	 * Minimum number of rows to display (fills remaining space with empty placeholders).
+	 * Defaults to 7.
+	 */
+	minRows?: number;
 }
 
 export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
@@ -49,6 +54,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	onContactSelectionChange,
 	width,
 	height,
+	minRows = 7,
 }) => {
 	const [internalSelectedContactIds, setInternalSelectedContactIds] = useState<Set<number>>(
 		new Set()
@@ -529,10 +535,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							</div>
 						);
 					})}
-					{Array.from({ length: Math.max(0, 7 - contacts.length) }).map((_, idx) => (
+					{Array.from({ length: Math.max(0, minRows - contacts.length) }).map((_, idx) => (
 						<div
 							key={`placeholder-${idx}`}
-							className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[49px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white"
+							className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[49px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#EB8586]"
 						/>
 					))}
 				</div>
