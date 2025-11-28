@@ -506,7 +506,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					position: 'relative',
 					display: 'flex',
 					flexDirection: 'column',
-					background: '#DEF2E1',
+					background: '#A6E2A8',
 					overflow: 'visible',
 				}}
 			>
