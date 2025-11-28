@@ -910,7 +910,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												isPendingGeneration={isPendingGeneration}
 												width={373}
 												height={view === 'search' ? 557 : 373}
-												minRows={view === 'search' ? 10 : 7}
+												minRows={7}
 											/>
 										</div>
 									) : (

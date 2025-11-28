@@ -168,17 +168,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					<button
 						type="button"
 						className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-						onClick={(e) => {
-							e.stopPropagation();
-							handleSelectAllToggle();
-						}}
-					>
-						{areAllSelected ? 'Deselect All' : 'Select All'}
-					</button>
-					<div className="w-px self-stretch border-l border-black/40" />
-					<button
-						type="button"
-						className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
 						onClick={(e) => e.stopPropagation()}
 					>
 						Draft
@@ -202,7 +191,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				</div>
 			</div>
 
-			<div className="flex-1 flex flex-col px-2 pb-2 pt-2 min-h-0 mt-[20px]">
+			<div className="relative flex-1 flex flex-col px-2 pb-2 pt-2 min-h-0 mt-[73px]">
+				<button
+					type="button"
+					className="absolute top-[-18px] right-[22px] bg-transparent border-none p-0 hover:text-black text-[11px] font-medium text-black/70 z-10"
+					onClick={(e) => {
+						e.stopPropagation();
+						handleSelectAllToggle();
+					}}
+				>
+					{areAllSelected ? 'Deselect All' : 'Select All'}
+				</button>
+
 				{/* Scrollable list */}
 				<CustomScrollbar
 				className="flex-1 drafting-table-content"
