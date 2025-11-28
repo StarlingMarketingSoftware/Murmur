@@ -3,6 +3,72 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
+export const ContactsHeaderChrome: FC<{ offsetY?: number }> = ({ offsetY = 0 }) => {
+	const pillTop = 3 + offsetY;
+	const dotTop = 10 + offsetY;
+
+	return (
+		<>
+			<div
+				style={{
+					position: 'absolute',
+					top: `${pillTop}px`,
+					left: '21px',
+					width: '72px',
+					height: '22px',
+					backgroundColor: '#F5DADA',
+					border: '2px solid #8D5B5B',
+					borderRadius: '11px',
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					zIndex: 10,
+				}}
+			>
+				<span className="text-[13px] font-semibold font-inter text-black leading-none">
+					Contacts
+				</span>
+			</div>
+			<div
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					left: '117px',
+					width: '9px',
+					height: '9px',
+					borderRadius: '50%',
+					backgroundColor: '#D9D9D9',
+					zIndex: 10,
+				}}
+			/>
+			<div
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					left: '176px',
+					width: '9px',
+					height: '9px',
+					borderRadius: '50%',
+					backgroundColor: '#D9D9D9',
+					zIndex: 10,
+				}}
+			/>
+			<div
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					left: '235px',
+					width: '9px',
+					height: '9px',
+					borderRadius: '50%',
+					backgroundColor: '#D9D9D9',
+					zIndex: 10,
+				}}
+			/>
+		</>
+	);
+}
+
 interface DraftingTableProps {
 	handleClick: () => void;
 	children: ReactNode;
@@ -54,66 +120,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				{isContacts ? '' : isDrafts ? '' : isSent ? '' : ''}
 			</div>
 			{/* New Contacts Pill */}
-			{isContacts && (
-				<>
-					<div
-						style={{
-							position: 'absolute',
-							top: '3px',
-							left: '21px',
-							width: '72px',
-							height: '22px',
-							backgroundColor: '#F5DADA',
-							border: '2px solid #8D5B5B',
-							borderRadius: '11px',
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-							zIndex: 10,
-						}}
-					>
-						<span className="text-[13px] font-semibold font-inter text-black leading-none">
-							Contacts
-						</span>
-					</div>
-					<div
-						style={{
-							position: 'absolute',
-							top: '10px',
-							left: '117px',
-							width: '9px',
-							height: '9px',
-							borderRadius: '50%',
-							backgroundColor: '#D9D9D9',
-							zIndex: 10,
-						}}
-					/>
-					<div
-						style={{
-							position: 'absolute',
-							top: '10px',
-							left: '176px',
-							width: '9px',
-							height: '9px',
-							borderRadius: '50%',
-							backgroundColor: '#D9D9D9',
-							zIndex: 10,
-						}}
-					/>
-					<div
-						style={{
-							position: 'absolute',
-							top: '10px',
-							left: '235px',
-							width: '9px',
-							height: '9px',
-							borderRadius: '50%',
-							backgroundColor: '#D9D9D9',
-							zIndex: 10,
-						}}
-					/>
-				</>
-			)}
+			{isContacts && <ContactsHeaderChrome />}
 
 			{/* New Drafts Pill */}
 			{isDrafts && (

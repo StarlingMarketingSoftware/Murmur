@@ -13,6 +13,7 @@ import {
 	stateBadgeColorMap,
 } from '@/constants/ui';
 import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
+import { ContactsHeaderChrome } from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraftingTable/DraftingTable';
 
 export interface ContactsExpandedListProps {
 	contacts: ContactWithName[];
@@ -134,7 +135,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 	return (
 		<div
-			className="max-[480px]:w-[96.27vw] rounded-md border-2 border-black/30 bg-[#EB8586] flex flex-col overflow-hidden"
+			className="relative max-[480px]:w-[96.27vw] rounded-md border-2 border-black/30 bg-[#EB8586] flex flex-col overflow-hidden"
 			style={{
 				width: typeof resolvedWidth === 'number' ? `${resolvedWidth}px` : resolvedWidth,
 				height: typeof resolvedHeight === 'number' ? `${resolvedHeight}px` : resolvedHeight,
@@ -142,10 +143,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			role="region"
 			aria-label="Expanded contacts preview"
 		>
-			{/* Header row */}
+			{/* Header row (no explicit divider; let the background change from white to pink like the main table) */}
+			<ContactsHeaderChrome />
 			<div
 				className={cn(
-					'flex items-center gap-2 h-[28px] px-3 bg-white border-b-2 border-black/30 shrink-0',
+					'flex items-center gap-2 h-[28px] px-3 bg-white shrink-0',
 					onHeaderClick ? 'cursor-pointer' : ''
 				)}
 				role={onHeaderClick ? 'button' : undefined}
