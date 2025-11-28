@@ -1,5 +1,4 @@
 import { FC, useEffect, useState, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
 import { Form } from '@/components/ui/form';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
@@ -376,7 +375,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				{searchActiveSection === 'why' && (
 					<div
 						className="campaign-search-dropdown-menu flex flex-col items-center justify-center gap-[12px] w-[439px] h-[173px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[120]"
-						style={{ position: 'fixed', top: '220px', left: 'calc(50% - 220px)' }}
+						style={{ position: 'absolute', top: '75px', left: 'calc(50% - 220px)' }}
 					>
 						<div
 							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
@@ -422,7 +421,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				{searchActiveSection === 'what' && searchWhyValue === '[Promotion]' && (
 					<div
 						className="campaign-search-dropdown-menu flex flex-col items-center justify-center gap-[10px] w-[439px] h-[92px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[120]"
-						style={{ position: 'fixed', top: '220px', left: 'calc(50% - 120px)' }}
+						style={{ position: 'absolute', top: '75px', left: 'calc(50% - 120px)' }}
 					>
 						<div
 							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
@@ -448,7 +447,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				{searchActiveSection === 'what' && searchWhyValue !== '[Promotion]' && (
 					<div
 						className="campaign-search-dropdown-menu flex flex-col items-center justify-center gap-[10px] w-[439px] h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[120]"
-						style={{ position: 'fixed', top: '220px', left: 'calc(50% - 120px)' }}
+						style={{ position: 'absolute', top: '75px', left: 'calc(50% - 120px)' }}
 					>
 						<div
 							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
@@ -552,8 +551,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						id="campaign-where-dropdown-container"
 						className="campaign-search-dropdown-menu w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[120]"
 						style={{
-							position: 'fixed',
-							top: '220px',
+							position: 'absolute',
+							top: '75px',
 							left: 'calc(50% - 120px)',
 							overflow: 'visible',
 						}}
@@ -691,11 +690,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			</>
 		);
 
-		// Render dropdowns via portal
-		if (typeof window !== 'undefined') {
-			return createPortal(dropdownContent, document.body);
-		}
-		return null;
+		// Render dropdowns directly (not via portal) so they scroll with the page
+		return dropdownContent;
 	};
 
 	return (
