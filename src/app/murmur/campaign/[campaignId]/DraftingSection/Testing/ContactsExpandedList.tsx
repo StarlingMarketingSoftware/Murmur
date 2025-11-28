@@ -20,6 +20,19 @@ export interface ContactsExpandedListProps {
 	onDraftSelected?: (contactIds: number[]) => void;
 	isDraftDisabled?: boolean;
 	isPendingGeneration?: boolean;
+	/**
+	 * Optional controlled selection props. When provided, this component will
+	 * mirror and update the passed-in selection instead of managing its own.
+	 */
+	selectedContactIds?: Set<number>;
+	onContactSelectionChange?: (updater: (prev: Set<number>) => Set<number>) => void;
+	/**
+	 * Optional explicit dimensions so the same component can be reused
+	 * in compact “mini” layouts (e.g. pinned panel on the Writing tab)
+	 * as well as the full-height drafting sidebar.
+	 */
+	width?: number | string;
+	height?: number | string;
 }
 
 export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
@@ -28,8 +41,14 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	onDraftSelected,
 	isDraftDisabled,
 	isPendingGeneration,
+	selectedContactIds,
+	onContactSelectionChange,
+	width,
+	height,
 }) => {
-	const [selectedContactIds, setSelectedContactIds] = useState<Set<number>>(new Set());
+	const [internalSelectedContactIds, setInternalSelectedContactIds] = useState<Set<number>>(
+		new Set()
+	);
 	const lastClickedRef = useRef<number | null>(null);
 
 	// Used contacts indicator data (IDs for current user)
@@ -38,6 +57,17 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		() => new Set(usedContactIds || []),
 		[usedContactIds]
 	);
+
+	const isControlled = Boolean(selectedContactIds);
+	const currentSelectedIds = selectedContactIds ?? internalSelectedContactIds;
+
+	const updateSelection = (updater: (prev: Set<number>) => Set<number>) => {
+		if (isControlled && onContactSelectionChange) {
+			onContactSelectionChange(updater);
+		} else {
+			setInternalSelectedContactIds((prev) => updater(new Set(prev)));
+		}
+	};
 
 	const handleContactClick = (contact: ContactWithName, e: MouseEvent) => {
 		if (e.shiftKey && lastClickedRef.current !== null) {
@@ -51,15 +81,17 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			if (currentIndex !== -1 && lastIndex !== -1) {
 				const start = Math.min(currentIndex, lastIndex);
 				const end = Math.max(currentIndex, lastIndex);
-				const newSelected = new Set<number>();
-				for (let i = start; i <= end; i++) {
-					newSelected.add(contacts[i].id);
-				}
-				setSelectedContactIds(newSelected);
+				updateSelection(() => {
+					const newSelected = new Set<number>();
+					for (let i = start; i <= end; i++) {
+						newSelected.add(contacts[i].id);
+					}
+					return newSelected;
+				});
 			}
 		} else {
 			// Toggle single selection
-			setSelectedContactIds((prev) => {
+			updateSelection((prev) => {
 				const next = new Set(prev);
 				if (next.has(contact.id)) {
 					next.delete(contact.id);
@@ -73,21 +105,30 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	};
 
 	const areAllSelected =
-		selectedContactIds.size === contacts.length && contacts.length > 0;
+		currentSelectedIds.size === contacts.length && contacts.length > 0;
 	const handleSelectAllToggle = () => {
-		if (areAllSelected) {
-			setSelectedContactIds(new Set());
-		} else {
-			setSelectedContactIds(new Set(contacts.map((c) => c.id)));
-		}
+		updateSelection(() => {
+			if (areAllSelected) {
+				return new Set();
+			}
+			return new Set(contacts.map((c) => c.id));
+		});
 	};
 
 	const computedIsDraftDisabled =
-		Boolean(isDraftDisabled) || selectedContactIds.size === 0;
+		Boolean(isDraftDisabled) || currentSelectedIds.size === 0;
+
+	// Allow callers to override dimensions; default to the original sidebar size
+	const resolvedWidth = width ?? 376;
+	const resolvedHeight = height ?? 424;
 
 	return (
 		<div
-			className="w-[376px] max-[480px]:w-[96.27vw] h-[424px] rounded-md border-2 border-black/30 bg-[#F5DADA] px-2 pb-2 flex flex-col"
+			className="max-[480px]:w-[96.27vw] rounded-md border-2 border-black/30 bg-[#F5DADA] px-2 pb-2 flex flex-col"
+			style={{
+				width: typeof resolvedWidth === 'number' ? `${resolvedWidth}px` : resolvedWidth,
+				height: typeof resolvedHeight === 'number' ? `${resolvedHeight}px` : resolvedHeight,
+			}}
 			role="region"
 			aria-label="Expanded contacts preview"
 		>
@@ -490,7 +531,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					type="button"
 					onClick={() => {
 						if (computedIsDraftDisabled) return;
-						if (onDraftSelected) onDraftSelected(Array.from(selectedContactIds));
+						if (onDraftSelected) onDraftSelected(Array.from(currentSelectedIds));
 					}}
 					disabled={computedIsDraftDisabled}
 					className={cn(

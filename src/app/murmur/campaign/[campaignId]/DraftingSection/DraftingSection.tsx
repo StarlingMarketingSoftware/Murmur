@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import { ContactWithName } from '@/types/contact';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
+import ContactsExpandedList from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
 
 interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	onOpenIdentityDialog?: () => void;
@@ -292,28 +293,55 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									sentCount={sentCount}
 									onFromClick={onOpenIdentityDialog}
 								/>
-								{/* Mini Email Structure below CampaignHeaderBox */}
-								<div
-									style={{
-										width: '373px',
-										height: '373px',
-										// Fixed-height mini structure that uses the compact layout
-										// inside; no scaling, just a tighter signature area.
-										overflow: 'hidden',
-									}}
-								>
-									<MiniEmailStructure
-										form={form}
-										onDraft={() => handleGenerateDrafts(contacts?.map((c) => c.id) || [])}
-										isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
-										isPendingGeneration={isPendingGeneration}
-										generationProgress={generationProgress}
-										generationTotal={contacts?.length || 0}
-										hideTopChrome
-										hideFooter
-										fullWidthMobile
-									/>
-								</div>
+								{/* For the Writing (testing) tab, show a mini contacts table instead of mini email structure. */}
+								{view === 'testing' ? (
+									<div
+										style={{
+											width: '373px',
+											height: '373px',
+											overflow: 'hidden',
+										}}
+									>
+										<ContactsExpandedList
+											contacts={contacts || []}
+											selectedContactIds={contactsTabSelectedIds}
+											onContactSelectionChange={(updater) =>
+												setContactsTabSelectedIds((prev) => updater(new Set(prev)))
+											}
+											onDraftSelected={async (ids) => {
+												await handleGenerateDrafts(ids);
+											}}
+											isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+											isPendingGeneration={isPendingGeneration}
+											width={373}
+											height={373}
+										/>
+									</div>
+								) : (
+									<div
+										style={{
+											width: '373px',
+											height: '373px',
+											// Fixed-height mini structure that uses the compact layout
+											// inside; no scaling, just a tighter signature area.
+											overflow: 'hidden',
+										}}
+									>
+										<MiniEmailStructure
+											form={form}
+											onDraft={() =>
+												handleGenerateDrafts(contacts?.map((c) => c.id) || [])
+											}
+											isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+											isPendingGeneration={isPendingGeneration}
+											generationProgress={generationProgress}
+											generationTotal={contacts?.length || 0}
+											hideTopChrome
+											hideFooter
+											fullWidthMobile
+										/>
+									</div>
+								)}
 							</div>
 						)}
 
