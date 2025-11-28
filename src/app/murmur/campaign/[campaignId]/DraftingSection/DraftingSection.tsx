@@ -493,7 +493,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							<div
 								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 								onClick={() => {
-									setSearchWhatValue('Wine, Beer, and Spirits');
+									setSearchWhatValue('Wine, Beer, Spirits');
 									setSearchActiveSection('where');
 								}}
 							>
@@ -502,7 +502,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								</div>
 								<div className="ml-[12px] flex flex-col">
 									<div className="text-[20px] font-medium leading-none text-black font-inter">
-										Wine, Beer, and Spirits
+										Wine, Beer, Spirits
 									</div>
 									<div className="text-[12px] leading-tight text-black mt-[4px]">
 										Pitch your act for seasonal events
@@ -1031,7 +1031,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														{searchActiveSection === 'why' && (
 															<div
 																className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
-																style={{ width: '117px', height: '38px' }}
+																style={{
+																	width: 'calc(100% + 2px)',
+																	height: 'calc(100% + 2px)',
+																}}
 															/>
 														)}
 														<div className="w-full h-full flex items-center text-left text-[13px] font-bold font-secondary truncate p-0 relative z-10">
@@ -1049,7 +1052,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														{searchActiveSection === 'what' && (
 															<div
 																className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
-																style={{ width: '144px', height: '38px' }}
+																style={{
+																	width: 'calc(100% + 2px)',
+																	height: 'calc(100% + 2px)',
+																}}
 															/>
 														)}
 														<input
@@ -1070,7 +1076,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														{searchActiveSection === 'where' && (
 															<div
 																className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
-																style={{ width: '143px', height: '38px' }}
+																style={{
+																	width: 'calc(100% + 2px)',
+																	height: 'calc(100% + 2px)',
+																}}
 															/>
 														)}
 														<input
