@@ -108,112 +108,264 @@ export const MiniSearchBar: FC<{
 		}
 	}, [activeSection, setActiveSection]);
 
+	// Use compact layout for side panel (44px height)
+	const isCompact = height === '44px';
+
 	return (
-		<div className="relative" ref={containerRef}>
+		<div
+			className="relative mx-auto"
+			ref={containerRef}
+			style={{ width: width ?? 'min(489px, 100%)' }}
+		>
 			<div
-				className="bg-white rounded-[8px] border-2 border-black flex items-center relative"
+				className="bg-white rounded-[8px] border-2 border-black flex items-center relative w-full"
 				style={{
 					marginBottom: '4px',
-					width: width ?? 'min(489px, 100%)',
-					height: height ?? '49px',
-					borderRadius: borderRadius ?? (height === '44px' ? '8px' : undefined),
+					height: height ?? '58px',
+					borderRadius: borderRadius ?? (isCompact ? '8px' : undefined),
 				}}
 			>
+				{/* Sections container - matches dashboard styling */}
 				<div
 					className={cn(
-						'flex items-center h-[38px] ml-[1px] rounded-[6px] flex-1 group',
+						'relative ml-[3px] rounded-[6px] flex-1 h-[50px] font-secondary',
 						activeSection
-							? 'bg-[#F3F3F3] border border-transparent'
+							? 'bg-[#EFEFEF] border border-transparent'
 							: 'bg-white border border-black'
 					)}
+					style={isCompact ? { height: '38px' } : undefined}
 				>
-					{/* Why section */}
+					{/* Vertical dividers */}
 					<div
 						className={cn(
-							'flex-1 flex items-center justify-start h-full min-w-0 relative pl-[16px] pr-1 cursor-pointer',
-							!activeSection && 'border-r border-transparent group-hover:border-black/10'
+							'absolute left-[33%] top-0 bottom-0 w-[2px] bg-black/10',
+							activeSection && 'hidden'
 						)}
+					/>
+					<div
+						className={cn(
+							'absolute left-[66%] top-0 bottom-0 w-[2px] bg-black/10',
+							activeSection && 'hidden'
+						)}
+					/>
+
+					{/* Kind/Why section */}
+					<div
+						className={cn(
+							'absolute left-0 top-[-1px] cursor-pointer border',
+							activeSection === 'why'
+								? 'bg-white border-black z-30 rounded-[6px]'
+								: `border-transparent ${
+										activeSection ? 'hover:bg-[#F9F9F9]' : 'hover:bg-black/5'
+								  } rounded-l-[6px]`
+						)}
+						style={{
+							width: activeSection === 'why' ? 'calc(33% + 2px)' : '33%',
+							height: isCompact ? '38px' : '50px',
+						}}
 						onClick={() => setActiveSection(activeSection === 'why' ? null : 'why')}
 					>
-						{activeSection === 'why' && (
-							<div className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0 w-full h-[38px]" />
-						)}
-						<div className="w-full h-full flex items-center text-left text-[13px] font-bold font-secondary truncate p-0 relative z-10">
-							{whyValue ? whyValue.replace(/[\[\]]/g, '') : 'Why'}
+						<div
+							className="absolute left-[16px] font-bold text-black leading-none"
+							style={{
+								top: isCompact ? '6px' : '8px',
+								fontSize: isCompact ? '13px' : '18px',
+							}}
+						>
+							Kind
+						</div>
+						<div
+							className="absolute left-[16px] right-[8px]"
+							style={{ top: isCompact ? '22px' : '30px' }}
+						>
+							<div
+								className="font-semibold whitespace-nowrap truncate"
+								style={{
+									fontSize: isCompact ? '9px' : '11px',
+									lineHeight: '12px',
+									color:
+										whyValue && whyValue.trim().length > 0
+											? '#000000'
+											: 'rgba(0, 0, 0, 0.42)',
+								}}
+							>
+								{whyValue ? whyValue.replace(/[\[\]]/g, '') : 'Choose Type of Search'}
+							</div>
 						</div>
 					</div>
 
-					{/* What section - input field */}
+					{/* Who/What section */}
 					<div
 						className={cn(
-							'flex-1 flex items-center justify-start h-full min-w-0 relative pl-[16px] pr-1',
-							!activeSection && 'border-r border-transparent group-hover:border-black/10'
+							'absolute left-[33%] top-[-1px] cursor-pointer border',
+							activeSection === 'what'
+								? 'bg-white border-black z-30 rounded-[6px]'
+								: `border-transparent ${
+										activeSection ? 'hover:bg-[#F9F9F9]' : 'hover:bg-black/5'
+								  }`
 						)}
+						style={{
+							width: activeSection === 'what' ? 'calc(33% + 2px)' : '33%',
+							height: isCompact ? '38px' : '50px',
+						}}
+						onClick={() => setActiveSection('what')}
 					>
-						{activeSection === 'what' && (
-							<div className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0 w-full h-[38px]" />
-						)}
-						<input
-							value={whatValue}
-							onChange={(e) => setWhatValue(e.target.value)}
-							className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-black p-0 focus:ring-0 cursor-pointer relative z-10"
-							placeholder="What"
-							onFocus={(e) => {
-								setActiveSection('what');
-								const target = e.target;
-								setTimeout(() => target.setSelectionRange(0, 0), 0);
+						<div
+							className="absolute left-[16px] font-bold text-black leading-none"
+							style={{
+								top: isCompact ? '6px' : '8px',
+								fontSize: isCompact ? '13px' : '18px',
 							}}
-						/>
+						>
+							Who
+						</div>
+						<div
+							className="absolute left-[16px] right-[8px]"
+							style={{ top: isCompact ? '22px' : '30px' }}
+						>
+							{activeSection === 'what' ? (
+								<input
+									type="text"
+									value={whatValue}
+									onChange={(e) => setWhatValue(e.target.value)}
+									onKeyDown={(e) => {
+										if (e.key === 'Enter') {
+											e.preventDefault();
+											setActiveSection('where');
+										}
+									}}
+									onFocus={(e) => e.target.select()}
+									className="w-full font-semibold text-black bg-transparent outline-none border-none"
+									style={{
+										fontSize: isCompact ? '9px' : '11px',
+										lineHeight: '12px',
+										height: '12px',
+										padding: '0',
+										margin: '0',
+										verticalAlign: 'top',
+									}}
+									placeholder="Add Recipients"
+									autoFocus
+									onClick={(e) => e.stopPropagation()}
+								/>
+							) : (
+								<div
+									className="font-semibold whitespace-nowrap truncate hover:text-black/60 transition-colors"
+									style={{
+										fontSize: isCompact ? '9px' : '11px',
+										lineHeight: '12px',
+										color: whatValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
+									}}
+								>
+									{whatValue || 'Add Recipients'}
+								</div>
+							)}
+						</div>
 					</div>
 
-					{/* Where section - input field */}
-					<div className="flex-1 flex items-center justify-start h-full min-w-0 relative pl-[16px] pr-[2px]">
-						{activeSection === 'where' && (
-							<div className="absolute -left-[1px] -top-[1px] -right-[1px] border border-black bg-white rounded-[6px] z-0 h-[38px]" />
+					{/* Where section */}
+					<div
+						className={cn(
+							'absolute left-[66%] top-[-1px] cursor-pointer border',
+							activeSection === 'where'
+								? 'bg-white border-black z-30 rounded-[6px]'
+								: `border-transparent ${
+										activeSection ? 'hover:bg-[#F9F9F9]' : 'hover:bg-black/5'
+								  } rounded-r-[6px]`
 						)}
-						<input
-							value={whereValue}
-							onChange={(e) => setWhereValue(e.target.value)}
-							className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-black p-0 focus:ring-0 cursor-pointer relative z-10"
-							placeholder="Where"
-							onFocus={(e) => {
-								setActiveSection('where');
-								const target = e.target;
-								setTimeout(() => target.setSelectionRange(0, target.value.length), 0);
+						style={{
+							width: activeSection === 'where' ? 'calc(34% + 2px)' : '34%',
+							height: isCompact ? '38px' : '50px',
+						}}
+						onClick={() => setActiveSection('where')}
+					>
+						<div
+							className="absolute left-[16px] font-bold text-black leading-none"
+							style={{
+								top: isCompact ? '6px' : '8px',
+								fontSize: isCompact ? '13px' : '18px',
 							}}
-						/>
+						>
+							Where
+						</div>
+						<div
+							className="absolute left-[16px] right-[8px]"
+							style={{ top: isCompact ? '22px' : '30px' }}
+						>
+							{activeSection === 'where' ? (
+								<input
+									type="text"
+									value={whereValue}
+									onChange={(e) => setWhereValue(e.target.value)}
+									onKeyDown={(e) => {
+										if (e.key === 'Enter') {
+											e.preventDefault();
+											setActiveSection(null);
+										}
+									}}
+									onFocus={(e) => e.target.select()}
+									className="w-full font-semibold text-black bg-transparent outline-none border-none"
+									style={{
+										fontSize: isCompact ? '9px' : '11px',
+										lineHeight: '12px',
+										height: '12px',
+										padding: '0',
+										margin: '0',
+										verticalAlign: 'top',
+									}}
+									placeholder="Search Destinations"
+									autoFocus
+									onClick={(e) => e.stopPropagation()}
+								/>
+							) : (
+								<div
+									className="font-semibold whitespace-nowrap truncate hover:text-black/60 transition-colors"
+									style={{
+										fontSize: isCompact ? '9px' : '11px',
+										lineHeight: '12px',
+										color: whereValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
+									}}
+								>
+									{whereValue || 'Search Destinations'}
+								</div>
+							)}
+						</div>
 					</div>
 				</div>
 
-				{/* Search button */}
+				{/* Search button - matches dashboard styling */}
 				<button
 					type="button"
-					className="flex items-center justify-center transition-colors cursor-pointer hover:bg-[#a3d9a5] ml-[1px] mr-[1px]"
+					className="flex items-center justify-center transition-colors cursor-pointer ml-[1px] mr-[1px]"
 					style={{
-						width: '35px',
-						height: '38px',
-						backgroundColor: '#B8E4BE',
+						width: isCompact ? '35px' : '48px',
+						height: isCompact ? '38px' : '50px',
+						backgroundColor: 'rgba(93, 171, 104, 0.49)',
 						border: '1px solid #5DAB68',
 						borderRadius: '0 6px 6px 0',
 					}}
 					aria-label="Search"
 					onClick={onSearch}
+					onMouseEnter={(e) => {
+						e.currentTarget.style.backgroundColor = 'rgba(93, 171, 104, 0.65)';
+					}}
+					onMouseLeave={(e) => {
+						e.currentTarget.style.backgroundColor = 'rgba(93, 171, 104, 0.49)';
+					}}
 				>
-					<div style={{ transform: 'scale(0.75)', display: 'flex' }}>
-						<svg
-							width="26"
-							height="28"
-							viewBox="0 0 28 30"
-							fill="none"
-							xmlns="http://www.w3.org/2000/svg"
-						>
-							<path
-								d="M10.7681 16.6402L0.768066 28.6402M26.9998 10.5C26.9998 15.7467 22.5227 20 16.9998 20C11.477 20 6.99985 15.7467 6.99985 10.5C6.99985 5.25329 11.477 1 16.9998 1C22.5227 1 26.9998 5.25329 26.9998 10.5Z"
-								stroke="black"
-								strokeWidth="2"
-							/>
-						</svg>
-					</div>
+					<svg
+						width={isCompact ? '20' : '24'}
+						height={isCompact ? '22' : '26'}
+						viewBox="0 0 28 30"
+						fill="none"
+						xmlns="http://www.w3.org/2000/svg"
+					>
+						<path
+							d="M10.7681 16.6402L0.768066 28.6402M26.9998 10.5C26.9998 15.7467 22.5227 20 16.9998 20C11.477 20 6.99985 15.7467 6.99985 10.5C6.99985 5.25329 11.477 1 16.9998 1C22.5227 1 26.9998 5.25329 26.9998 10.5Z"
+							stroke="black"
+							strokeWidth="2"
+						/>
+					</svg>
 				</button>
 			</div>
 
