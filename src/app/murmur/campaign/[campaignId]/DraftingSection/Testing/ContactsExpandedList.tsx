@@ -128,7 +128,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 	return (
 		<div
-			className="max-[480px]:w-[96.27vw] rounded-md border-2 border-black/30 bg-[#F5DADA] px-2 pb-2 flex flex-col"
+			className="max-[480px]:w-[96.27vw] rounded-md border-2 border-black/30 bg-[#EB8586] px-2 pb-2 flex flex-col"
 			style={{
 				width: typeof resolvedWidth === 'number' ? `${resolvedWidth}px` : resolvedWidth,
 				height: typeof resolvedHeight === 'number' ? `${resolvedHeight}px` : resolvedHeight,
