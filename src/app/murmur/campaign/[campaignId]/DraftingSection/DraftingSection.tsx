@@ -11,8 +11,9 @@ import { useDebounce } from '@/hooks/useDebounce';
 import DraftingStatusPanel from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftingStatusPanel';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { useGetContacts, useGetLocations } from '@/hooks/queryHooks/useContacts';
+import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useEditEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
-import { EmailStatus } from '@/constants/prismaEnums';
+import { EmailStatus, EmailVerificationStatus } from '@/constants/prismaEnums';
 import { ContactsSelection } from './EmailGeneration/ContactsSelection/ContactsSelection';
 import { SentEmails } from './EmailGeneration/SentEmails/SentEmails';
 import { DraftedEmails } from './EmailGeneration/DraftedEmails/DraftedEmails';
@@ -41,6 +42,8 @@ import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import { getStateAbbreviation } from '@/utils/string';
+import { stateBadgeColorMap } from '@/constants/ui';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -187,6 +190,118 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			whereInputRef.current.focus();
 		}
 	}, [searchActiveSection]);
+
+	// State for in-campaign search results
+	const [hasCampaignSearched, setHasCampaignSearched] = useState(false);
+	const [activeCampaignSearchQuery, setActiveCampaignSearchQuery] = useState('');
+	const [searchResultsSelectedContacts, setSearchResultsSelectedContacts] = useState<
+		number[]
+	>([]);
+
+	// Construct the search query from Why/What/Where values
+	const buildSearchQuery = () => {
+		const parts: string[] = [];
+		if (searchWhatValue) parts.push(searchWhatValue);
+		if (searchWhereValue) parts.push(searchWhereValue);
+		return parts.join(' ');
+	};
+
+	// Use useGetContacts for in-campaign search (separate from campaign contacts)
+	const {
+		data: searchResults,
+		isLoading: isLoadingSearchResults,
+		isRefetching: isRefetchingSearchResults,
+	} = useGetContacts({
+		filters: {
+			query: activeCampaignSearchQuery,
+			verificationStatus:
+				process.env.NODE_ENV === 'production' ? EmailVerificationStatus.valid : undefined,
+			useVectorSearch: true,
+			limit: 50,
+		},
+		enabled:
+			hasCampaignSearched &&
+			!!activeCampaignSearchQuery &&
+			activeCampaignSearchQuery.trim().length > 0,
+	});
+
+	const isSearching = isLoadingSearchResults || isRefetchingSearchResults;
+
+	// Hook for adding contacts to the campaign's user contact list
+	const { mutateAsync: editUserContactList, isPending: isAddingToCampaign } =
+		useEditUserContactList({
+			suppressToasts: true,
+		});
+
+	// Handler for triggering search
+	const handleCampaignSearch = () => {
+		const query = buildSearchQuery();
+		if (!query.trim()) {
+			toast.error('Please enter what you want to search for');
+			return;
+		}
+		setActiveCampaignSearchQuery(query);
+		setHasCampaignSearched(true);
+		setSearchActiveSection(null);
+		setSearchResultsSelectedContacts([]);
+	};
+
+	// Handler for adding selected search results to campaign
+	const handleAddSearchResultsToCampaign = async () => {
+		if (searchResultsSelectedContacts.length === 0) {
+			toast.error('Please select contacts to add');
+			return;
+		}
+
+		// Get the first user contact list ID from the campaign
+		const userContactListId = campaign?.userContactLists?.[0]?.id;
+		if (!userContactListId) {
+			toast.error('Campaign has no contact list');
+			return;
+		}
+
+		try {
+			await editUserContactList({
+				id: userContactListId,
+				data: {
+					contactOperation: {
+						action: 'connect',
+						contactIds: searchResultsSelectedContacts,
+					},
+				},
+			});
+
+			const addedCount = searchResultsSelectedContacts.length;
+
+			// Clear selection
+			setSearchResultsSelectedContacts([]);
+
+			// Invalidate queries to refresh the campaign data and contacts
+			queryClient.invalidateQueries({
+				queryKey: ['campaigns', 'detail', campaign?.id?.toString()],
+			});
+			queryClient.invalidateQueries({
+				queryKey: ['contacts'],
+			});
+			queryClient.invalidateQueries({
+				queryKey: ['userContactLists'],
+			});
+
+			toast.success(
+				`${addedCount} contact${addedCount > 1 ? 's' : ''} added to campaign!`
+			);
+		} catch (error) {
+			console.error('Error adding contacts to campaign:', error);
+			toast.error('Failed to add contacts to campaign');
+		}
+	};
+
+	// Handler for clearing search results and going back to campaign contacts
+	const handleClearSearchResults = () => {
+		setHasCampaignSearched(false);
+		setActiveCampaignSearchQuery('');
+		setSearchResultsSelectedContacts([]);
+	};
 
 	// State for drafts selection in the Drafts tab
 	const [draftsTabSelectedIds, setDraftsTabSelectedIds] = useState<Set<number>>(
@@ -827,7 +942,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 						{/* Shared Research / Test Preview panel to the right of the drafting tables / writing view */}
 						{!isMobile &&
-							['testing', 'contacts', 'drafting', 'sent', 'search'].includes(view) && (
+							['testing', 'contacts', 'drafting', 'sent', 'search'].includes(view) &&
+							!(view === 'search' && hasCampaignSearched) && (
 								<div
 									className="absolute hidden xl:block"
 									style={{
@@ -855,6 +971,261 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									) : (
 										<ContactResearchPanel contact={displayedContactForResearch} />
 									)}
+								</div>
+							)}
+
+						{/* Search Results Panel - replaces Research panel when search has been performed */}
+						{!isMobile &&
+							view === 'search' &&
+							hasCampaignSearched &&
+							!isSearching &&
+							searchResults &&
+							searchResults.length > 0 && (
+								<div
+									className="absolute hidden xl:block"
+									style={{
+										top: '29px',
+										left: 'calc(50% + 384px + 37px)',
+									}}
+								>
+									<div
+										className="bg-[#D8E5FB] border-[2px] border-black rounded-[7px] overflow-hidden flex flex-col"
+										style={{
+											width: '375px',
+											height: '815px',
+										}}
+									>
+										{/* Header */}
+										<div
+											className="w-full flex-shrink-0 flex items-center justify-between px-4 relative"
+											style={{
+												height: '24px',
+												backgroundColor: '#E8EFFF',
+											}}
+										>
+											<span className="font-secondary font-bold text-[14px] leading-none text-black">
+												Search Results
+											</span>
+											<div className="flex items-center gap-2">
+												<span className="font-inter text-[11px] text-black">
+													{searchResultsSelectedContacts.length} selected
+												</span>
+												<button
+													type="button"
+													onClick={() => {
+														if (
+															searchResultsSelectedContacts.length ===
+															searchResults.length
+														) {
+															setSearchResultsSelectedContacts([]);
+														} else {
+															setSearchResultsSelectedContacts(
+																searchResults.map((c) => c.id)
+															);
+														}
+													}}
+													className="font-secondary text-[11px] font-medium text-black hover:underline"
+												>
+													{searchResultsSelectedContacts.length === searchResults.length
+														? 'Deselect all'
+														: 'Select all'}
+												</button>
+											</div>
+										</div>
+
+										{/* Divider under header */}
+										<div className="w-full h-[1px] bg-black flex-shrink-0" />
+
+										{/* Scrollable contact list */}
+										<CustomScrollbar
+											className="flex-1 min-h-0"
+											contentClassName="p-[6px] pb-[14px] space-y-[7px]"
+											thumbWidth={2}
+											thumbColor="#000000"
+											trackColor="transparent"
+											offsetRight={-6}
+											disableOverflowClass
+										>
+											{searchResults.map((contact) => {
+												const isSelected = searchResultsSelectedContacts.includes(
+													contact.id
+												);
+												const firstName = contact.firstName || '';
+												const lastName = contact.lastName || '';
+												const fullName =
+													contact.name || `${firstName} ${lastName}`.trim();
+												const company = contact.company || '';
+												const headline = contact.headline || contact.title || '';
+												const stateAbbr = getStateAbbreviation(contact.state || '') || '';
+												const city = contact.city || '';
+
+												return (
+													<div
+														key={contact.id}
+														data-contact-id={contact.id}
+														className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none"
+														style={{
+															backgroundColor: isSelected ? '#C9EAFF' : '#FFFFFF',
+														}}
+														onClick={() => {
+															if (isSelected) {
+																setSearchResultsSelectedContacts(
+																	searchResultsSelectedContacts.filter(
+																		(id) => id !== contact.id
+																	)
+																);
+															} else {
+																setSearchResultsSelectedContacts([
+																	...searchResultsSelectedContacts,
+																	contact.id,
+																]);
+															}
+														}}
+													>
+														{fullName ? (
+															<>
+																{/* Top Left - Name */}
+																<div className="pl-3 pr-1 flex items-center h-[23px]">
+																	<div className="font-bold text-[11px] w-full truncate leading-tight">
+																		{fullName}
+																	</div>
+																</div>
+																{/* Top Right - Title/Headline */}
+																<div className="pr-2 pl-1 flex items-center h-[23px]">
+																	{headline ? (
+																		<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																			<span className="text-[10px] text-black leading-none truncate">
+																				{headline}
+																			</span>
+																		</div>
+																	) : (
+																		<div className="w-full" />
+																	)}
+																</div>
+																{/* Bottom Left - Company */}
+																<div className="pl-3 pr-1 flex items-center h-[22px]">
+																	<div className="text-[11px] text-black w-full truncate leading-tight">
+																		{company}
+																	</div>
+																</div>
+																{/* Bottom Right - Location */}
+																<div className="pr-2 pl-1 flex items-center h-[22px]">
+																	{city || stateAbbr ? (
+																		<div className="flex items-center gap-1 w-full">
+																			{stateAbbr && (
+																				<span
+																					className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																					style={{
+																						backgroundColor:
+																							stateBadgeColorMap[stateAbbr] ||
+																							'transparent',
+																						borderColor: '#000000',
+																					}}
+																				>
+																					{stateAbbr}
+																				</span>
+																			)}
+																			{city && (
+																				<span className="text-[10px] text-black leading-none truncate">
+																					{city}
+																				</span>
+																			)}
+																		</div>
+																	) : (
+																		<div className="w-full" />
+																	)}
+																</div>
+															</>
+														) : (
+															<>
+																{/* No name - Company spans left column */}
+																<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
+																	<div className="font-bold text-[11px] w-full truncate leading-tight">
+																		{company || '—'}
+																	</div>
+																</div>
+																{/* Top Right - Title/Headline */}
+																<div className="pr-2 pl-1 flex items-center h-[23px]">
+																	{headline ? (
+																		<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																			<span className="text-[10px] text-black leading-none truncate">
+																				{headline}
+																			</span>
+																		</div>
+																	) : (
+																		<div className="w-full" />
+																	)}
+																</div>
+																{/* Bottom Right - Location */}
+																<div className="pr-2 pl-1 flex items-center h-[22px]">
+																	{city || stateAbbr ? (
+																		<div className="flex items-center gap-1 w-full">
+																			{stateAbbr && (
+																				<span
+																					className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																					style={{
+																						backgroundColor:
+																							stateBadgeColorMap[stateAbbr] ||
+																							'transparent',
+																						borderColor: '#000000',
+																					}}
+																				>
+																					{stateAbbr}
+																				</span>
+																			)}
+																			{city && (
+																				<span className="text-[10px] text-black leading-none truncate">
+																					{city}
+																				</span>
+																			)}
+																		</div>
+																	) : (
+																		<div className="w-full" />
+																	)}
+																</div>
+															</>
+														)}
+													</div>
+												);
+											})}
+										</CustomScrollbar>
+
+										{/* Footer with Add to Campaign button */}
+										<div className="w-full h-[50px] flex-shrink-0 bg-[#E8EFFF] flex items-center justify-between px-3 border-t border-black">
+											<button
+												type="button"
+												onClick={handleAddSearchResultsToCampaign}
+												disabled={
+													searchResultsSelectedContacts.length === 0 || isAddingToCampaign
+												}
+												className="flex-1 h-[36px] flex items-center justify-center gap-2 text-[13px] font-semibold text-white bg-[#143883] hover:bg-[#1a4a9e] rounded-[6px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+											>
+												{isAddingToCampaign ? (
+													<>
+														<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+														Adding...
+													</>
+												) : (
+													<>+ Add to Campaign</>
+												)}
+											</button>
+											<button
+												type="button"
+												onClick={() => {
+													if (
+														searchResultsSelectedContacts.length !== searchResults.length
+													) {
+														setSearchResultsSelectedContacts(
+															searchResults.map((c) => c.id)
+														);
+													}
+												}}
+												className="ml-2 h-[36px] px-4 flex items-center justify-center text-[13px] font-semibold text-black bg-white hover:bg-gray-100 rounded-[6px] border-2 border-black transition-colors"
+											>
+												All
+											</button>
+										</div>
+									</div>
 								</div>
 							)}
 
@@ -1102,7 +1473,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												{/* Search button */}
 												<button
 													type="button"
-													className="absolute right-[6px] top-1/2 -translate-y-1/2 flex items-center justify-center cursor-pointer hover:bg-[#a3d9a5] transition-colors"
+													className="absolute right-[6px] top-1/2 -translate-y-1/2 flex items-center justify-center cursor-pointer hover:bg-[#a3d9a5] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 													style={{
 														width: '48px',
 														height: '37px',
@@ -1111,19 +1482,47 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														borderRadius: '6px',
 													}}
 													aria-label="Search"
-													onClick={() => {
-														// TODO: Trigger search with selected values
-														setSearchActiveSection(null);
-													}}
+													disabled={isSearching}
+													onClick={handleCampaignSearch}
 												>
-													<div style={{ transform: 'scale(0.75)', display: 'flex' }}>
-														<SearchIconDesktop />
-													</div>
+													{isSearching ? (
+														<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+													) : (
+														<div style={{ transform: 'scale(0.75)', display: 'flex' }}>
+															<SearchIconDesktop />
+														</div>
+													)}
 												</button>
 											</div>
 										</div>
 										{/* Render search dropdowns via portal */}
 										{renderSearchDropdowns()}
+
+										{/* Back button - shows when search has been performed */}
+										{hasCampaignSearched && (
+											<button
+												type="button"
+												onClick={handleClearSearchResults}
+												className="absolute z-10 flex items-center gap-1 px-3 py-2 bg-white/95 backdrop-blur-sm rounded-[8px] border border-black/20 text-[13px] font-medium text-gray-600 hover:text-black transition-colors"
+												style={{
+													top: '70px',
+													left: '12px',
+												}}
+											>
+												<svg
+													width="16"
+													height="16"
+													viewBox="0 0 24 24"
+													fill="none"
+													stroke="currentColor"
+													strokeWidth="2"
+												>
+													<path d="M19 12H5M12 19l-7-7 7-7" />
+												</svg>
+												Back to Campaign
+											</button>
+										)}
+
 										<div
 											className="relative rounded-[8px] overflow-hidden w-full h-full"
 											style={{
@@ -1131,18 +1530,41 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 										>
 											<SearchResultsMap
-												contacts={contacts || []}
-												selectedContacts={searchTabSelectedContacts}
+												contacts={
+													hasCampaignSearched ? searchResults || [] : contacts || []
+												}
+												selectedContacts={
+													hasCampaignSearched
+														? searchResultsSelectedContacts
+														: searchTabSelectedContacts
+												}
 												onToggleSelection={(contactId) => {
-													if (searchTabSelectedContacts.includes(contactId)) {
-														setSearchTabSelectedContacts(
-															searchTabSelectedContacts.filter((id) => id !== contactId)
-														);
+													if (hasCampaignSearched) {
+														// Handle selection for search results
+														if (searchResultsSelectedContacts.includes(contactId)) {
+															setSearchResultsSelectedContacts(
+																searchResultsSelectedContacts.filter(
+																	(id) => id !== contactId
+																)
+															);
+														} else {
+															setSearchResultsSelectedContacts([
+																...searchResultsSelectedContacts,
+																contactId,
+															]);
+														}
 													} else {
-														setSearchTabSelectedContacts([
-															...searchTabSelectedContacts,
-															contactId,
-														]);
+														// Handle selection for campaign contacts
+														if (searchTabSelectedContacts.includes(contactId)) {
+															setSearchTabSelectedContacts(
+																searchTabSelectedContacts.filter((id) => id !== contactId)
+															);
+														} else {
+															setSearchTabSelectedContacts([
+																...searchTabSelectedContacts,
+																contactId,
+															]);
+														}
 													}
 												}}
 												onMarkerClick={(contact) => {
