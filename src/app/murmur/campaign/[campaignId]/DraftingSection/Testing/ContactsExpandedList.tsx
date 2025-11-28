@@ -216,32 +216,33 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 	return (
 		<div
-			className="relative max-[480px]:w-[96.27vw] rounded-md border-2 border-black/30 bg-[#EB8586] flex flex-col overflow-visible"
+			className="relative max-[480px]:w-[96.27vw] rounded-md border border-black flex flex-col overflow-visible"
 			style={{
 				width: typeof resolvedWidth === 'number' ? `${resolvedWidth}px` : resolvedWidth,
 				height: typeof resolvedHeight === 'number' ? `${resolvedHeight}px` : resolvedHeight,
+				background: 'linear-gradient(to bottom, #ffffff 28px, #EB8586 28px)',
 			}}
 			role="region"
 			aria-label="Expanded contacts preview"
 		>
 			{/* Header row (no explicit divider; let the background change from white to pink like the main table) */}
 			<ContactsHeaderChrome />
-			<div
-				className={cn(
-					'flex items-center gap-2 h-[28px] px-3 bg-white shrink-0',
-					onHeaderClick ? 'cursor-pointer' : ''
-				)}
-				role={onHeaderClick ? 'button' : undefined}
-				tabIndex={onHeaderClick ? 0 : undefined}
-				onClick={onHeaderClick}
-				onKeyDown={(e) => {
-					if (!onHeaderClick) return;
-					if (e.key === 'Enter' || e.key === ' ') {
-						e.preventDefault();
-						onHeaderClick();
-					}
-				}}
-			></div>
+		<div
+			className={cn(
+				'flex items-center gap-2 h-[28px] px-3 shrink-0',
+				onHeaderClick ? 'cursor-pointer' : ''
+			)}
+			role={onHeaderClick ? 'button' : undefined}
+			tabIndex={onHeaderClick ? 0 : undefined}
+			onClick={onHeaderClick}
+			onKeyDown={(e) => {
+				if (!onHeaderClick) return;
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					onHeaderClick();
+				}
+			}}
+		></div>
 
 			{showSearchBar && (
 				<div className="px-2 pt-2">
