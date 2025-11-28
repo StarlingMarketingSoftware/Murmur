@@ -518,7 +518,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		areAllSelected,
 	} = useContactsSelection(props);
 
-	const { campaign, onDraftEmails, onContactHover } = props;
+	const { campaign, onDraftEmails, onContactClick, onContactHover } = props;
 	const [isDrafting, setIsDrafting] = useState(false);
 	const router = useRouter();
 	const searchInfo = useMemo(() => parseSearchFromCampaign(campaign), [campaign]);
@@ -633,19 +633,22 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[489px] h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none row-hover-scroll',
 								selectedContactIds.has(contact.id) ? 'bg-[#EAAEAE]' : ''
 							)}
-							onMouseDown={(e) => {
-								// Prevent text selection on shift-click
-								if (e.shiftKey) {
-									e.preventDefault();
-								}
-							}}
-							onMouseEnter={() => {
-								onContactHover?.(contact);
-							}}
-							onMouseLeave={() => {
-								onContactHover?.(null);
-							}}
-							onClick={(e) => handleContactSelection(contact.id, e)}
+						onMouseDown={(e) => {
+							// Prevent text selection on shift-click
+							if (e.shiftKey) {
+								e.preventDefault();
+							}
+						}}
+						onMouseEnter={() => {
+							onContactHover?.(contact);
+						}}
+						onMouseLeave={() => {
+							onContactHover?.(null);
+						}}
+						onClick={(e) => {
+							handleContactSelection(contact.id, e);
+							onContactClick?.(contact);
+						}}
 						>
 							{(() => {
 								const fullName =

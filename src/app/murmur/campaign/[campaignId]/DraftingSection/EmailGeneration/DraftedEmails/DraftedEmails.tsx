@@ -38,7 +38,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		selectedDraftIds,
 		handleSelectAllDrafts,
 	} = useDraftedEmails(props);
-	const { onContactHover } = props;
+	const { onContactClick, onContactHover } = props;
 
 	const [showConfirm, setShowConfirm] = useState(false);
 
@@ -198,22 +198,27 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										'cursor-pointer transition-colors relative select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
 										isSelected && 'bg-[#E8EFFF]'
 									)}
-									onMouseDown={(e) => {
-										// Prevent text selection on shift-click
-										if (e.shiftKey) {
-											e.preventDefault();
-										}
-									}}
-									onMouseEnter={() => {
-										if (contact && onContactHover) {
-											onContactHover(contact);
-										}
-									}}
-									onMouseLeave={() => {
-										onContactHover?.(null);
-									}}
-									onClick={(e) => handleDraftSelect(draft, e)}
-									onDoubleClick={() => handleDraftDoubleClick(draft)}
+								onMouseDown={(e) => {
+									// Prevent text selection on shift-click
+									if (e.shiftKey) {
+										e.preventDefault();
+									}
+								}}
+								onMouseEnter={() => {
+									if (contact) {
+										onContactHover?.(contact);
+									}
+								}}
+								onMouseLeave={() => {
+									onContactHover?.(null);
+								}}
+								onClick={(e) => {
+									handleDraftSelect(draft, e);
+									if (contact) {
+										onContactClick?.(contact);
+									}
+								}}
+								onDoubleClick={() => handleDraftDoubleClick(draft)}
 								>
 									{/* Used-contact indicator - vertically centered */}
 									{usedContactIdsSet.has(draft.contactId) && (
