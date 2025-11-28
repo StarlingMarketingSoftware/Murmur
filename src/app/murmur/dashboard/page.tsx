@@ -40,7 +40,6 @@ import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
-import ContactTSVUploadDialog from '@/components/organisms/_dialogs/ContactCSVUploadDialog/ContactTSVUploadDialog';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -560,7 +559,7 @@ const Dashboard = () => {
 	const logoWidth = isMobile ? '190px' : '300px';
 	const logoHeight = isMobile ? '50px' : '79px';
 	const hasProblematicBrowser = isProblematicBrowser();
-	const { user } = useMe();
+	useMe(); // Hook call for side effects
 	const searchContainerRef = useRef<HTMLDivElement>(null);
 	const whatInputRef = useRef<HTMLInputElement>(null);
 	const whereInputRef = useRef<HTMLInputElement>(null);
@@ -1196,6 +1195,7 @@ const Dashboard = () => {
 						</div>
 
 						{/* TSV upload is always visible on the search tab, before any search is made */}
+						{/* Hidden: Import button
 						{activeTab === 'search' && (
 							<div className="mt-2 w-full max-w-[532px] mx-auto flex justify-start pl-1">
 								<ContactTSVUploadDialog
@@ -1205,6 +1205,7 @@ const Dashboard = () => {
 								/>
 							</div>
 						)}
+						*/}
 
 						{/* Box 92px below searchbar - only show when on search tab */}
 						{activeTab === 'search' && (
@@ -1600,6 +1601,7 @@ const Dashboard = () => {
 											>
 												Select who you want to contact, or upload your own contacts via TSV.
 											</span>
+											{/* Hidden: Import button
 											<div className="flex justify-center">
 												<ContactTSVUploadDialog
 													isAdmin={user?.role === 'admin'}
@@ -1607,6 +1609,7 @@ const Dashboard = () => {
 													asTextTrigger
 												/>
 											</div>
+											*/}
 										</div>
 									)}
 								</Form>

@@ -164,14 +164,6 @@ export const ExistingProfilesSection: FC<ExistingProfilesSectionProps> = ({
 																		className="font-secondary font-normal text-[15.5px] text-[#000000] truncate"
 																		style={{ lineHeight: 1.1 }}
 																	>
-																		{identity.email}
-																	</span>
-																</div>
-																<div className="w-full md:w-[267.13px] flex items-center overflow-hidden pl-1">
-																	<span
-																		className="font-secondary font-normal text-[15.5px] text-[#000000] truncate"
-																		style={{ lineHeight: 1.1 }}
-																	>
 																		{identity.website ? identity.website : ''}
 																	</span>
 																</div>

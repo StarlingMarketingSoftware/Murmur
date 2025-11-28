@@ -11,6 +11,7 @@ import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists
 import { PostBatchContactData } from '@/app/api/contacts/batch/route';
 import { useMe } from '@/hooks/useMe';
 import { EllipsesWithTooltip } from '@/components/atoms/EllipsesWithTooltip/EllipsesWithTooltip';
+import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
 
 export interface ContactTSVUploadDialogProps {
 	isAdmin: boolean;
@@ -268,6 +269,9 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 			suppressToasts: true,
 		});
 
+	const { mutateAsync: createCampaign, isPending: isPendingCreateCampaign } =
+		useCreateCampaign();
+
 	const trimKeywords = (keywords: string[]): string[] => {
 		return keywords.map((keyword) => keyword.trim());
 	};
@@ -354,10 +358,20 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		});
 
 		if (created > 0) {
-			await createContactList({
-				name: `TSV Upload - ${new Date().toLocaleDateString()}`,
+			const name = `TSV Upload - ${new Date().toLocaleDateString()}`;
+
+			const newUserContactList = await createContactList({
+				name,
 				contactIds: contacts?.map((contact: Contact) => contact.id) || [],
 			});
+
+			// For non-admin users, automatically create a campaign from the imported contacts
+			if (!isAdmin && newUserContactList?.id) {
+				await createCampaign({
+					name,
+					userContactLists: [newUserContactList.id],
+				});
+			}
 		}
 		setTsvData([]);
 		setOpen(false);
@@ -376,7 +390,8 @@ export const useContactTSVUploadDialog = (props: ContactTSVUploadDialogProps) =>
 		setTsvData([]);
 	};
 
-	const isPending = isPendingCreateContactList || isPendingBatchCreateContacts;
+	const isPending =
+		isPendingCreateContactList || isPendingBatchCreateContacts || isPendingCreateCampaign;
 
 	return {
 		isPending,

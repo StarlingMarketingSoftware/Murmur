@@ -23,6 +23,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ContactWithName } from '@/types/contact';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
+import { TestPreviewPanel } from '@/components/molecules/TestPreviewPanel/TestPreviewPanel';
+import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
+import ContactsExpandedList from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
 
 interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	onOpenIdentityDialog?: () => void;
@@ -118,14 +121,51 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const isSendingDisabled = isFreeTrial || (user?.sendingCredits || 0) === 0;
 
-	// Hovered contact for shared research panel
+	// Selected contact for shared research panel (persistent on click)
+	const [selectedContactForResearch, setSelectedContactForResearch] =
+		useState<ContactWithName | null>(null);
+	// Hovered contact for temporary preview
 	const [hoveredContactForResearch, setHoveredContactForResearch] =
 		useState<ContactWithName | null>(null);
+	// Track whether the user has explicitly selected a contact (via click)
+	const [hasUserSelectedResearchContact, setHasUserSelectedResearchContact] =
+		useState(false);
+	// Whether to show the Test Preview panel in place of the Research panel (desktop only)
+	const [showTestPreview, setShowTestPreview] = useState(false);
 
-	// Clear research panel when switching views
+	// Display priority: hovered contact > selected contact
+	const displayedContactForResearch =
+		hoveredContactForResearch || selectedContactForResearch;
+
+	// Default to the first contact in the campaign for the research panel
 	useEffect(() => {
-		setHoveredContactForResearch(null);
-	}, [view]);
+		if (!selectedContactForResearch && contacts && contacts.length > 0) {
+			setSelectedContactForResearch(contacts[0]);
+		}
+	}, [contacts, selectedContactForResearch]);
+
+	// Handlers to coordinate hover / selection behavior for the research panel
+	const handleResearchContactClick = (contact: ContactWithName | null) => {
+		if (!contact) return;
+		setSelectedContactForResearch(contact);
+		setHasUserSelectedResearchContact(true);
+	};
+
+	const handleResearchContactHover = (contact: ContactWithName | null) => {
+		if (contact) {
+			// Always update the currently hovered contact
+			setHoveredContactForResearch(contact);
+			return;
+		}
+
+		// When hover ends (null), decide what to show:
+		// - If the user has explicitly selected a contact, fall back to that selection
+		//   by clearing the hover state.
+		// - If not, keep showing the last hovered contact by leaving hover state as-is.
+		if (hasUserSelectedResearchContact) {
+			setHoveredContactForResearch(null);
+		}
+	};
 
 	const handleSendDrafts = async () => {
 		const selectedDrafts =
@@ -240,10 +280,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* Persistent Campaign Header Box for specific tabs */}
 						{!isMobile && ['testing', 'contacts', 'drafting', 'sent'].includes(view) && (
 							<div
-								className="absolute hidden lg:block"
+								className="absolute hidden lg:flex flex-col"
 								style={{
 									right: 'calc(50% + 250px + 24px)',
 									top: '29px',
+									gap: '16px',
 								}}
 							>
 								<CampaignHeaderBox
@@ -256,23 +297,88 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									sentCount={sentCount}
 									onFromClick={onOpenIdentityDialog}
 								/>
+								{/* For the Writing (testing) tab, show a mini contacts table instead of mini email structure. */}
+								{view === 'testing' ? (
+									<div
+										style={{
+											width: '373px',
+											height: '373px',
+											overflow: 'hidden',
+										}}
+									>
+										<ContactsExpandedList
+											contacts={contacts || []}
+											selectedContactIds={contactsTabSelectedIds}
+											onContactSelectionChange={(updater) =>
+												setContactsTabSelectedIds((prev) => updater(new Set(prev)))
+											}
+											onContactClick={handleResearchContactClick}
+											onContactHover={handleResearchContactHover}
+											onDraftSelected={async (ids) => {
+												await handleGenerateDrafts(ids);
+											}}
+											isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+											isPendingGeneration={isPendingGeneration}
+											width={373}
+											height={373}
+										/>
+									</div>
+								) : (
+									<div
+										style={{
+											width: '373px',
+											height: '373px',
+											// Fixed-height mini structure that uses the compact layout
+											// inside; no scaling, just a tighter signature area.
+											overflow: 'hidden',
+										}}
+									>
+										<MiniEmailStructure
+											form={form}
+											onDraft={() =>
+												handleGenerateDrafts(contacts?.map((c) => c.id) || [])
+											}
+											isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+											isPendingGeneration={isPendingGeneration}
+											generationProgress={generationProgress}
+											generationTotal={contacts?.length || 0}
+											hideTopChrome
+											hideFooter
+											fullWidthMobile
+										/>
+									</div>
+								)}
 							</div>
 						)}
 
-						{/* Shared Research panel to the right of the drafting tables */}
-						{!isMobile &&
-							['contacts', 'drafting', 'sent'].includes(view) &&
-							hoveredContactForResearch && (
-								<div
-									className="absolute hidden xl:block"
-									style={{
-										top: '29px',
-										left: 'calc(50% + 250px + 36px)',
-									}}
-								>
-									<ContactResearchPanel contact={hoveredContactForResearch} />
-								</div>
-							)}
+						{/* Shared Research / Test Preview panel to the right of the drafting tables / writing view */}
+						{!isMobile && ['testing', 'contacts', 'drafting', 'sent'].includes(view) && (
+							<div
+								className="absolute hidden xl:block"
+								style={{
+									top: '29px',
+									left: 'calc(50% + 250px + 36px)',
+								}}
+							>
+								{view === 'testing' && showTestPreview ? (
+									<TestPreviewPanel
+										setShowTestPreview={setShowTestPreview}
+										testMessage={campaign?.testMessage || ''}
+										isLoading={Boolean(isTest)}
+										onTest={() => {
+											handleGenerateTestDrafts();
+											setShowTestPreview(true);
+										}}
+										isDisabled={isGenerationDisabled()}
+										isTesting={Boolean(isTest)}
+										contact={contacts?.[0] || displayedContactForResearch}
+										style={{ width: 375, height: 630 }}
+									/>
+								) : (
+									<ContactResearchPanel contact={displayedContactForResearch} />
+								)}
+							</div>
+						)}
 
 						{view === 'testing' && (
 							<div className="relative">
@@ -285,6 +391,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									isTest={isTest}
 									contact={contacts?.[0]}
 									onGoToDrafting={goToDrafting}
+									onTestPreviewToggle={setShowTestPreview}
 								/>
 								{/* Right panel for Testing view - positioned absolutely */}
 								{false && (
@@ -339,7 +446,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										fromName={fromName}
 										fromEmail={fromEmail}
 										subject={form.watch('subject')}
-										onContactHover={setHoveredContactForResearch}
+										onContactClick={handleResearchContactClick}
+										onContactHover={handleResearchContactHover}
 									/>
 								</div>
 							)}
@@ -358,7 +466,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										await handleGenerateDrafts(ids);
 									}}
 									isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
-									onContactHover={setHoveredContactForResearch}
+									onContactClick={handleResearchContactClick}
+									onContactHover={handleResearchContactHover}
 								/>
 							</div>
 						)}
@@ -369,7 +478,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<SentEmails
 									emails={sentEmails}
 									isPendingEmails={isPendingEmails}
-									onContactHover={setHoveredContactForResearch}
+									onContactClick={handleResearchContactClick}
+									onContactHover={handleResearchContactHover}
 								/>
 							</div>
 						)}

@@ -21,6 +21,7 @@ export interface DraftedEmailsProps {
 	fromName?: string;
 	fromEmail?: string;
 	subject?: string;
+	onContactClick?: (contact: ContactWithName | null) => void;
 	onContactHover?: (contact: ContactWithName | null) => void;
 	/** Optional: called when the inline preview icon is clicked */
 	onPreview?: (draft: EmailWithRelations) => void;
