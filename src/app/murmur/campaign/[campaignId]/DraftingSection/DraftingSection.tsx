@@ -1,4 +1,4 @@
-import { FC, useState } from 'react';
+import { FC, useEffect, useState } from 'react';
 import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
 import { Form } from '@/components/ui/form';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
@@ -122,12 +122,45 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// Selected contact for shared research panel (persistent on click)
 	const [selectedContactForResearch, setSelectedContactForResearch] =
 		useState<ContactWithName | null>(null);
-	// Hovered contact for temporary preview (clears on mouse leave)
+	// Hovered contact for temporary preview
 	const [hoveredContactForResearch, setHoveredContactForResearch] =
 		useState<ContactWithName | null>(null);
+	// Track whether the user has explicitly selected a contact (via click)
+	const [hasUserSelectedResearchContact, setHasUserSelectedResearchContact] =
+		useState(false);
 
 	// Display priority: hovered contact > selected contact
 	const displayedContactForResearch = hoveredContactForResearch || selectedContactForResearch;
+
+	// Default to the first contact in the campaign for the research panel
+	useEffect(() => {
+		if (!selectedContactForResearch && contacts && contacts.length > 0) {
+			setSelectedContactForResearch(contacts[0]);
+		}
+	}, [contacts, selectedContactForResearch]);
+
+	// Handlers to coordinate hover / selection behavior for the research panel
+	const handleResearchContactClick = (contact: ContactWithName | null) => {
+		if (!contact) return;
+		setSelectedContactForResearch(contact);
+		setHasUserSelectedResearchContact(true);
+	};
+
+	const handleResearchContactHover = (contact: ContactWithName | null) => {
+		if (contact) {
+			// Always update the currently hovered contact
+			setHoveredContactForResearch(contact);
+			return;
+		}
+
+		// When hover ends (null), decide what to show:
+		// - If the user has explicitly selected a contact, fall back to that selection
+		//   by clearing the hover state.
+		// - If not, keep showing the last hovered contact by leaving hover state as-is.
+		if (hasUserSelectedResearchContact) {
+			setHoveredContactForResearch(null);
+		}
+	};
 
 	const handleSendDrafts = async () => {
 		const selectedDrafts =
@@ -364,8 +397,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								fromName={fromName}
 								fromEmail={fromEmail}
 								subject={form.watch('subject')}
-								onContactClick={setSelectedContactForResearch}
-								onContactHover={setHoveredContactForResearch}
+								onContactClick={handleResearchContactClick}
+								onContactHover={handleResearchContactHover}
 							/>
 								</div>
 							)}
@@ -384,8 +417,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									await handleGenerateDrafts(ids);
 								}}
 								isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
-								onContactClick={setSelectedContactForResearch}
-								onContactHover={setHoveredContactForResearch}
+								onContactClick={handleResearchContactClick}
+								onContactHover={handleResearchContactHover}
 							/>
 							</div>
 						)}
@@ -396,8 +429,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							<SentEmails
 								emails={sentEmails}
 								isPendingEmails={isPendingEmails}
-								onContactClick={setSelectedContactForResearch}
-								onContactHover={setHoveredContactForResearch}
+								onContactClick={handleResearchContactClick}
+								onContactHover={handleResearchContactHover}
 							/>
 							</div>
 						)}

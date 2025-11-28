@@ -66,7 +66,9 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 		[contact?.metadata]
 	);
 
-	if (!contact || !contact.metadata || contact.metadata.trim().length === 0) {
+	// If there is no contact, don't render the panel at all.
+	// For contacts without metadata, keep the panel visible but show an empty state.
+	if (!contact) {
 		return null;
 	}
 
