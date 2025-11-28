@@ -72,6 +72,7 @@ export const MiniSearchBar: FC<{
 	isLoadingLocations: boolean;
 	debouncedWhereValue: string;
 	onSearch: () => void;
+	width?: string | number;
 }> = ({
 	activeSection,
 	setActiveSection,
@@ -85,6 +86,7 @@ export const MiniSearchBar: FC<{
 	isLoadingLocations,
 	debouncedWhereValue,
 	onSearch,
+	width,
 }) => {
 	const containerRef = useRef<HTMLDivElement>(null);
 
@@ -106,7 +108,7 @@ export const MiniSearchBar: FC<{
 		<div className="relative" ref={containerRef}>
 			<div
 				className="h-[49px] bg-white rounded-[8px] border-2 border-black flex items-center relative"
-				style={{ marginBottom: '4px', width: 'min(489px, 100%)' }}
+				style={{ marginBottom: '4px', width: width ?? 'min(489px, 100%)' }}
 			>
 				<div
 					className={cn(

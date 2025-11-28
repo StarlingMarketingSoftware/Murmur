@@ -929,7 +929,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									{view === 'testing' || view === 'search' ? (
 										<div
 											style={{
-												width: '373px',
+												width: '375px',
 												height: view === 'search' ? '557px' : '373px',
 												overflow: 'visible',
 											}}
@@ -948,7 +948,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
 												isPendingGeneration={isPendingGeneration}
-												width={373}
+												width={375}
 												height={view === 'search' ? 557 : 373}
 												minRows={view === 'search' ? 8 : 7}
 												onSearchFromMiniBar={handleMiniContactsSearch}
@@ -957,7 +957,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									) : (
 										<div
 											style={{
-												width: '373px',
+												width: '375px',
 												height: '373px',
 												// Fixed-height mini structure that uses the compact layout
 												// inside; no scaling, just a tighter signature area.

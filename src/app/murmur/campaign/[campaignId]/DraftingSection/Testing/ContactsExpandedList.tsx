@@ -245,7 +245,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		></div>
 
 			{showSearchBar && (
-				<div className="px-2 pt-2">
+				<div className="pt-2 flex justify-center">
 					<MiniSearchBar
 						activeSection={activeSection}
 						setActiveSection={setActiveSection}
@@ -259,6 +259,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						isLoadingLocations={isLoadingLocations}
 						debouncedWhereValue={debouncedWhereValue}
 						onSearch={handleSearch}
+						width="370px"
 					/>
 				</div>
 			)}
@@ -275,7 +276,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				</button>
 			</div>
 
-			<div className="relative flex-1 flex flex-col px-2 pb-2 pt-2 min-h-0">
+			<div className="relative flex-1 flex flex-col pb-2 pt-2 min-h-0">
 				{/* Scrollable list */}
 				<CustomScrollbar
 				className="flex-1 drafting-table-content"
@@ -286,7 +287,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				contentClassName="overflow-x-hidden"
 				alwaysShow
 			>
-				<div className="space-y-2 pb-2 flex flex-col items-center">
+					<div className="space-y-2 pb-2 flex flex-col items-center">
 					{contacts.map((contact) => {
 						const fullName =
 							contact.name ||
@@ -297,7 +298,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							<div
 								key={contact.id}
 								className={cn(
-									'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full max-w-[356px] max-[480px]:max-w-none h-[49px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none',
+									'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[370px] max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none',
 									isSelected && 'bg-[#EAAEAE]'
 								)}
 								onMouseDown={(e) => {
@@ -612,7 +613,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					{Array.from({ length: Math.max(0, minRows - contacts.length) }).map((_, idx) => (
 						<div
 							key={`placeholder-${idx}`}
-							className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[49px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#EB8586]"
+							className="select-none w-[370px] max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#EB8586]"
 						/>
 					))}
 				</div>
