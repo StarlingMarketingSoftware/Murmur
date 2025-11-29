@@ -1232,7 +1232,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									data-hpi-left-panel
 								>
 									{!compactLeftOnly && (
-										<div className="w-full h-[17px] border-b-[2px] border-black flex items-center px-[9px] bg-white rounded-t-[calc(0.375rem-3px)]">
+										<div className="w-full h-[22px] border-b-[2px] border-black flex items-center px-[9px] bg-white rounded-t-[calc(0.375rem-3px)]">
 											<span className="font-inter font-bold text-[12px] leading-none text-black">
 												Writing
 											</span>
@@ -1244,7 +1244,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										<div className={!compactLeftOnly ? 'bg-white' : ''}>
 											<div
 												className={cn(
-													'h-[42px] flex items-center relative z-20',
+													'h-[40px] flex items-center relative z-20',
 													'w-[93.7vw] max-w-[475px] mx-auto pl-[8px] max-[480px]:pl-[6px]'
 												)}
 												data-left-drag-handle
@@ -1333,12 +1333,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											{compactLeftOnly ? null : (
 												<>
 													{showTestPreview && (
-														<div className="h-[2px] bg-black -mx-[18px]" />
+														<div className="w-full border-b-[2px] border-black -mx-[18px]" />
 													)}
 													<div
 														ref={modeDividerRef}
 														className={cn(
-															'h-[2px] bg-black',
+															'w-full border-b-[2px] border-black',
 															showTestPreview && 'hidden'
 														)}
 													/>
@@ -1346,7 +1346,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</>
 											)}
 										</div>
-										<div className="flex flex-col items-center">
+										<div className="flex flex-col items-center pt-[20px]">
 											<FormField
 												control={form.control}
 												name="subject"
@@ -1361,33 +1361,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															'max-[480px]:mb-0'
 														)}
 													>
-														<div
-															className={cn(
-																'flex items-center',
-																showTestPreview
-																	? 'justify-end pr-[24px] mt-1 mb-1'
-																	: 'justify-end mb-2 pr-5'
-															)}
-														>
-															<div className="flex items-center gap-2"></div>
-															{hasBlocks && (
-																<button
-																	type="button"
-																	onClick={handleClearAllInside}
-																	className={cn(
-																		showTestPreview ? 'text-xs' : 'text-sm',
-																		'font-inter font-medium text-[#AFAFAF] hover:underline',
-																		showTestPreview ? 'mr-[12px]' : 'relative top-[4px]',
-																		// Hide on mobile portrait
-																		'max-[480px]:hidden',
-																		// Hide in mobile landscape view of the campaign page
-																		'mobile-landscape-hide'
-																	)}
-																>
-																	Clear All
-																</button>
-															)}
-														</div>
 														<FormControl>
 															<div
 																className={cn(
