@@ -6,7 +6,19 @@ import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useMe } from '@/hooks/useMe';
 
-export const InboxSection: FC = () => {
+interface InboxSectionProps {
+	/**
+	 * Optional list of sender email addresses that should be visible
+	 * in this inbox instance. When provided, inbound emails whose
+	 * `sender` does not match any of these addresses will be hidden.
+	 *
+	 * Intended for the in‑campaign inbox, where we only want to show
+	 * replies from contacts that belong to the active campaign.
+	 */
+	allowedSenderEmails?: string[];
+}
+
+export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => {
 	const { data: inboundEmails, isLoading, error } = useGetInboundEmails();
 	const [selectedEmailId, setSelectedEmailId] = useState<number | null>(null);
 	const [replyMessage, setReplyMessage] = useState('');
@@ -18,7 +30,26 @@ export const InboxSection: FC = () => {
 		errorMessage: 'Failed to send reply',
 	});
 
-	const selectedEmail = inboundEmails?.find((email) => email.id === selectedEmailId);
+	// If a list of allowed sender emails is provided (e.g. campaign contacts),
+	// hide any inbound emails whose sender address does not match.
+	const normalizedAllowedSenders =
+		allowedSenderEmails && allowedSenderEmails.length > 0
+			? new Set(
+					allowedSenderEmails
+						.filter((email) => !!email)
+						.map((email) => email.toLowerCase().trim())
+			  )
+			: null;
+
+	const visibleEmails =
+		normalizedAllowedSenders && inboundEmails
+			? inboundEmails.filter((email) => {
+					const sender = email.sender?.toLowerCase().trim();
+					return !!sender && normalizedAllowedSenders.has(sender);
+			  })
+			: inboundEmails;
+
+	const selectedEmail = visibleEmails?.find((email) => email.id === selectedEmailId);
 
 	const handleSendReply = async () => {
 		if (!selectedEmail || !replyMessage.trim()) return;
@@ -95,7 +126,7 @@ export const InboxSection: FC = () => {
 		);
 	}
 
-	if (!inboundEmails || inboundEmails.length === 0) {
+	if (!visibleEmails || visibleEmails.length === 0) {
 		return (
 			<div className="w-full max-w-[998px] mx-auto px-4">
 				<div
@@ -228,7 +259,7 @@ export const InboxSection: FC = () => {
 				) : (
 					/* Email List View */
 					<>
-						{inboundEmails.map((email) => (
+						{visibleEmails.map((email) => (
 							<div
 								key={email.id}
 								className="bg-white hover:bg-gray-50 cursor-pointer px-4 flex items-center mb-2"
@@ -281,22 +312,22 @@ export const InboxSection: FC = () => {
 								</div>
 							</div>
 						))}
-						{Array.from({ length: Math.max(0, 5 - inboundEmails.length) }).map(
-							(_, idx) => (
-								<div
-									key={`inbox-placeholder-${idx}`}
-									className="select-none mb-2"
-									style={{
-										width: '967px',
-										height: '78px',
-										minHeight: '78px',
-										border: '2px solid #000000',
-										borderRadius: '8px',
-										backgroundColor: '#FFFFFF',
-									}}
-								/>
-							)
-						)}
+						{Array.from({
+							length: Math.max(0, 5 - (visibleEmails?.length ?? 0)),
+						}).map((_, idx) => (
+							<div
+								key={`inbox-placeholder-${idx}`}
+								className="select-none mb-2"
+								style={{
+									width: '967px',
+									height: '78px',
+									minHeight: '78px',
+									border: '2px solid #000000',
+									borderRadius: '8px',
+									backgroundColor: '#FFFFFF',
+								}}
+							/>
+						))}
 					</>
 				)}
 			</div>
@@ -305,5 +336,3 @@ export const InboxSection: FC = () => {
 };
 
 export default InboxSection;
-
-

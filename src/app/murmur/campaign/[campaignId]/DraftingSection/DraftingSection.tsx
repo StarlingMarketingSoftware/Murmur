@@ -547,6 +547,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	};
 
+	// Sender email addresses for all contacts in this campaign.
+	// Used to scope the in‑campaign inbox so it only shows replies
+	// from contacts that belong to this campaign.
+	const campaignContactEmails = contacts
+		? contacts
+				.map((contact) => contact.email)
+				.filter((email): email is string => Boolean(email))
+		: undefined;
+
 	const toListNames =
 		campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
 	const fromName = campaign?.identity?.name || '';
@@ -1667,7 +1676,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* Inbox tab: reuse the dashboard inbox UI */}
 						{(view === 'inbox' || view === 'all') && (
 							<div className="mt-6 flex justify-center">
-								<InboxSection />
+								<InboxSection allowedSenderEmails={campaignContactEmails} />
 							</div>
 						)}
 
