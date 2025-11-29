@@ -10,7 +10,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
 const postGeminiSchema = z.object({
-	model: z.string().min(1).default('gemini-1.5-flash'),
+	model: z.string().min(1).default('gemini-3-pro-preview'),
 	prompt: z.string().min(1),
 	content: z.string().min(1),
 });
@@ -39,4 +39,3 @@ export async function POST(request: NextRequest) {
 		return handleApiError(error);
 	}
 }
-

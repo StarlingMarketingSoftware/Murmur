@@ -11,11 +11,12 @@ import { useGetSignatures } from '@/hooks/queryHooks/useSignatures';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { useMe } from '@/hooks/useMe';
 import { useMistral } from '@/hooks/useMistral';
-import { DraftEmailResponse, usePerplexity } from '@/hooks/usePerplexity';
+import { DraftEmailResponse } from '@/hooks/usePerplexity';
+import { useGemini } from '@/hooks/useGemini';
 import {
 	getMistralHybridPrompt,
-	PERPLEXITY_FULL_AI_PROMPT,
-	PERPLEXITY_HYBRID_PROMPT,
+	GEMINI_FULL_AI_PROMPT,
+	GEMINI_HYBRID_PROMPT,
 } from '@/constants/ai';
 import {
 	CampaignWithRelations,
@@ -254,10 +255,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	});
 
 	const {
-		data: dataPerplexity,
-		isPending: isPendingCallPerplexity,
-		mutateAsync: callPerplexity,
-	} = usePerplexity();
+		data: dataGemini,
+		isPending: isPendingCallGemini,
+		mutateAsync: callGemini,
+	} = useGemini({
+		suppressToasts: true,
+	});
 
 	const { mutateAsync: callMistralAgent, isPending: isPendingCallMistralAgent } =
 		useMistral({
@@ -304,7 +307,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const draftingMode = getDraftingModeBasedOnBlocks();
 
 	const isPendingGeneration =
-		isPendingCallPerplexity || isPendingCallMistralAgent || isPendingCreateEmail;
+		isPendingCallGemini || isPendingCallMistralAgent || isPendingCreateEmail;
 
 	let dataDraftEmail: TestDraftEmail = {
 		subject: '',
@@ -312,7 +315,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		contactEmail: contacts ? contacts[0]?.email : '',
 	};
 
-	if (!dataPerplexity && campaign.testMessage && campaign.testMessage.length > 0) {
+	if (!dataGemini && campaign.testMessage && campaign.testMessage.length > 0) {
 		dataDraftEmail = {
 			subject: campaign.testSubject || '',
 			message: campaign.testMessage,
@@ -522,7 +525,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			throw new Error('Campaign identity is required');
 		}
 
-		const populatedSystemPrompt = PERPLEXITY_FULL_AI_PROMPT.replace(
+		const populatedSystemPrompt = GEMINI_FULL_AI_PROMPT.replace(
 			'{recipient_first_name}',
 			recipient.firstName || ''
 		).replace('{company}', recipient.company || '');
@@ -541,6 +544,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			'country',
 			'website',
 			'phone',
+			'metadata',
 		])}\n\nUser Goal: ${prompt}`;
 
 		// Debug logging for Full AI path
@@ -550,16 +554,16 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		console.log('[Full AI] Populated System Prompt:', populatedSystemPrompt);
 		console.log('[Full AI] User Prompt:', userPrompt);
 
-		let perplexityResponse: string;
+		let geminiResponse: string;
 		try {
-			perplexityResponse = await callPerplexity({
-				model: 'sonar',
-				rolePrompt: populatedSystemPrompt, // Use the new, populated prompt
-				userPrompt: userPrompt,
-				signal: signal,
+			geminiResponse = await callGemini({
+				model: 'gemini-3-pro-preview',
+				prompt: populatedSystemPrompt, // Use the new, populated prompt
+				content: userPrompt,
+				signal,
 			});
 		} catch (error) {
-			console.error('[Full AI] Perplexity call failed:', error);
+			console.error('[Full AI] Gemini call failed:', error);
 			if (error instanceof Error && error.message.includes('cancelled')) {
 				throw error;
 			}
@@ -570,11 +574,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			);
 		}
 
-		console.log('[Full AI] Perplexity response preview:', perplexityResponse);
+		console.log('[Full AI] Gemini response preview:', geminiResponse);
 
 		const mistralResponse1 = await callMistralAgent({
 			prompt: getMistralTonePrompt(toneAgentType),
-			content: perplexityResponse,
+			content: geminiResponse,
 			agentType: toneAgentType,
 			signal: signal,
 		});
@@ -629,12 +633,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				};
 				console.log('[Full AI] Extracted from plain text fallback');
 			} else {
-				// Last resort: use the perplexity response directly
+				// Last resort: use the Gemini response directly
 				mistralResponse1Parsed = {
 					subject: `Email regarding ${recipient.company || 'your inquiry'}`,
-					message: perplexityResponse,
+					message: geminiResponse,
 				};
-				console.log('[Full AI] Using perplexity response as fallback');
+				console.log('[Full AI] Using Gemini response as fallback');
 			}
 		}
 
@@ -692,6 +696,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			'country',
 			'website',
 			'phone',
+			'metadata',
 		]);
 
 		if (!campaign.identity) {
@@ -704,15 +709,15 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		]);
 		const stringifiedHybridBlocks = generateEmailTemplateFromBlocks(hybridBlocks);
 
-		const perplexityPrompt = `**RECIPIENT**\n${stringifiedRecipient}\n\n**SENDER**\n${stringifiedSender}\n\n**PROMPT**\n${hybridPrompt}\n\n**EMAIL TEMPLATE**\n${stringifiedHybridBlocks}\n\n**PROMPTS**\n${generatePromptsFromBlocks(
+		const geminiPrompt = `**RECIPIENT**\n${stringifiedRecipient}\n\n**SENDER**\n${stringifiedSender}\n\n**PROMPT**\n${hybridPrompt}\n\n**EMAIL TEMPLATE**\n${stringifiedHybridBlocks}\n\n**PROMPTS**\n${generatePromptsFromBlocks(
 			hybridBlocks
 		)}`;
 
-		const perplexityResponse: string = await callPerplexity({
-			model: 'sonar',
-			rolePrompt: PERPLEXITY_HYBRID_PROMPT,
-			userPrompt: perplexityPrompt,
-			signal: signal,
+		const geminiResponse: string = await callGemini({
+			model: 'gemini-3-pro-preview',
+			prompt: GEMINI_HYBRID_PROMPT,
+			content: geminiPrompt,
+			signal,
 		});
 
 		const mistralResponse = await callMistralAgent({
@@ -720,7 +725,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				stringifiedHybridBlocks,
 				generatePromptsFromBlocks(hybridBlocks)
 			),
-			content: perplexityResponse,
+			content: geminiResponse,
 			agentType: 'hybrid',
 			signal: signal,
 		});

@@ -1,17 +1,19 @@
 import { MistralToneAgentType, PerplexityModel } from '@/types';
 
-export const PERPLEXITY_FULL_AI_PROMPT = `
+export const GEMINI_FULL_AI_PROMPT = `
 INSTRUCTIONS FOR EMAIL CONTENT:
+
+You are a musician. your goal is to get yourself booked for a show. Do not make up any information about your own identity, as that will be provided to you.
 
 Write a personalized email to {recipient_first_name} who works at {company}. If there is no recipient name provided, start the email with "Hello!"
 
 Here is a template to follow:
 
-1. "Hi {recipient_first_name},
+1. "Hi {recipient_first_name}, 
 
 I'm reaching out regarding how I could help {company}. [insert knowledge about the company in a way that feels anecdotal and not like you're reiterating their own sales pitches]
 
-If you’re available next week…”
+If you're available next week…”
 something like “Do you have any time next week? I'd love to hop on a call and go over everything…"
 
 DON'T START EVERY SINGLE EMAIL WITH "I've been following"
@@ -83,7 +85,7 @@ Write this how you think Jensen Huang would write an email. This should feel lik
 OUTPUT FORMAT:
 Return ONLY the email body text, without any subject line, signature, or other text. Do not return JSON format - just the plain email body text.`;
 
-export const PERPLEXITY_HYBRID_PROMPT = `
+export const GEMINI_HYBRID_PROMPT = `
 
 You will be provided with an email template to follow that includes pre-written text that must remain in its original form, as well as placeholders that may include {{introduction}} {{research}} and {{call-to-action}}. Only fill in the placeholders, do not change the pre-written text. Each placeholder may have specific instructions attached to them.
 
@@ -217,6 +219,15 @@ export const OPEN_AI_MODEL_OPTIONS = {
 	gpt4: 'gpt-4-0613',
 	gpt4nano: 'gpt-4.1-nano-2025-04-14',
 };
+
+export const GEMINI_MODEL_OPTIONS = {
+	gemini2Flash: 'gemini-2.0-flash',
+	gemini25Pro: 'gemini-2.5-pro-preview-05-06',
+	gemini3Pro: 'gemini-3-pro-preview',
+} as const;
+
+export type GeminiModel =
+	(typeof GEMINI_MODEL_OPTIONS)[keyof typeof GEMINI_MODEL_OPTIONS];
 
 export const PERPLEXITY_MODEL_OPTIONS: Record<string, PerplexityModel> = {
 	sonar: 'sonar',

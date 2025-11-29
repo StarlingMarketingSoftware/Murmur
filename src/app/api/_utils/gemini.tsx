@@ -8,10 +8,10 @@ export const fetchGemini = async (
 	const timeoutMs = options?.timeoutMs ?? 30000; // 30s default timeout for Gemini
 	const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-	const apiKey = process.env.GOOGLE_VERTEX_API_KEY;
+	const apiKey = process.env.GEMINI_API_KEY;
 
 	if (!apiKey) {
-		throw new Error('Google Vertex API key is not set');
+		throw new Error('GEMINI_API_KEY environment variable is not set');
 	}
 
 	try {
@@ -76,6 +76,10 @@ export const fetchGemini = async (
 
 		const message = res.candidates[0].content.parts[0].text;
 		console.log('[Gemini] Response received, length:', message.length);
+		// Log a preview of the actual text Gemini generated to the server console
+		const preview =
+			message.length > 600 ? `${message.slice(0, 600)}... [truncated]` : message;
+		console.log('[Gemini] Draft text preview:', preview);
 		return message;
 	} finally {
 		clearTimeout(timeoutId);
