@@ -847,11 +847,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px] max-[480px]:text-[10px] mini-full-auto-placeholder">
 																<div className="space-y-2">
 																	<div>
-																		<p>Prompt Murmur here.</p>
-																		<p>
-																			Tell it what you want to say and it will compose
-																			emails based on your instructions.
-																		</p>
+																		<p>Type anything you wnat to include</p>
 																	</div>
 																</div>
 															</div>

@@ -291,18 +291,20 @@ const SortableAIBlock = ({
 									<span className="absolute right-0 h-full border-r border-[#000000]"></span>
 								</button>
 							)}
-							<Button
-								type="button"
-								variant="ghost"
-								size="icon"
-								className={cn(isCompactBlock && 'h-8 w-8')}
-								onClick={(e) => {
-									e.stopPropagation();
-									onRemove(id);
-								}}
-							>
-								<X className="h-[13px] w-[13px] text-destructive-dark" />
-							</Button>
+							{!isFullAutomatedBlock && (
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									className={cn(isCompactBlock && 'h-8 w-8')}
+									onClick={(e) => {
+										e.stopPropagation();
+										onRemove(id);
+									}}
+								>
+									<X className="h-[13px] w-[13px] text-destructive-dark" />
+								</Button>
+							)}
 						</div>
 						{isCompactBlock ? (
 							// Compact blocks
@@ -664,25 +666,7 @@ const SortableAIBlock = ({
 												<div className={isFullAutomatedBlock ? 'relative' : ''}>
 													{showCustomPlaceholder && (
 														<div className="absolute inset-0 pointer-events-none py-2 pr-10 text-[#505050] text-base md:text-sm max-[480px]:text-[10px] z-10">
-															<div className="space-y-3">
-																<div>
-																	<p>Prompt Murmur here.</p>
-																	<p>
-																		Tell it what you want to say and it will compose
-																		emails based on your instructions.
-																	</p>
-																</div>
-																<div className="full-auto-placeholder-example">
-																	<p>Ex.</p>
-																	<p>
-																		&ldquo;Compose a professional booking pitch email.
-																		Include one or two facts about the venue, introduce my
-																		band honestly, highlight our fit for their space, and
-																		end with a straightforward next-steps question. Keep
-																		tone warm, clear, and brief.&rdquo;
-																	</p>
-																</div>
-															</div>
+															<p>Type anything you want to include</p>
 														</div>
 													)}
 													<Textarea
