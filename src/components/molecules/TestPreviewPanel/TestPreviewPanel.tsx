@@ -1,4 +1,3 @@
-import { X } from 'lucide-react';
 import {
 	Dispatch,
 	FC,
@@ -17,6 +16,7 @@ import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { cn } from '@/utils';
+import CloseButtonIcon from '@/components/atoms/_svg/CloseButtonIcon';
 
 export interface TestPreviewPanelProps {
 	setShowTestPreview: Dispatch<SetStateAction<boolean>>;
@@ -408,14 +408,13 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 											</>
 										)}
 									</div>
-									<Button
+									<button
 										type="button"
-										variant="icon"
 										onClick={() => setShowTestPreview(false)}
-										className="absolute right-0 top-1/2 -translate-y-1/2 p-0.5 sm:p-1 hover:bg-gray-100 rounded transition-colors"
+										className="absolute right-0 top-1/2 -translate-y-1/2 p-0.5 sm:p-1 transition-all hover:brightness-75"
 									>
-										<X className="h-4 w-4 sm:h-5 sm:w-5 text-destructive-dark" />
-									</Button>
+										<CloseButtonIcon />
+									</button>
 								</div>
 							</div>
 						)}

@@ -1029,7 +1029,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<div
 									className="absolute hidden xl:block"
 									style={{
-										top: '29px',
+										top: '17px',
 										left:
 											view === 'search'
 												? 'calc(50% + 384px + 37px)'
