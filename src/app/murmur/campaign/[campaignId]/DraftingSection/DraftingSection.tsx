@@ -1048,7 +1048,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isDisabled={isGenerationDisabled()}
 											isTesting={Boolean(isTest)}
 											contact={contacts?.[0] || displayedContactForResearch}
-											style={{ width: 375, height: 630 }}
+											style={{ width: 375, height: 670 }}
 										/>
 									) : (
 										<ContactResearchPanel contact={displayedContactForResearch} />
