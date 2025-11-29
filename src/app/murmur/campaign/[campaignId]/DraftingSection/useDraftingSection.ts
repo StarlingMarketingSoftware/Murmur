@@ -1,26 +1,16 @@
-import {
-	DEFAULT_FONT,
-	FONT_OPTIONS,
-	getMistralParagraphPrompt,
-	getMistralTonePrompt,
-} from '@/constants';
+import { DEFAULT_FONT, FONT_OPTIONS } from '@/constants';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { useCreateEmail } from '@/hooks/queryHooks/useEmails';
 import { useGetSignatures } from '@/hooks/queryHooks/useSignatures';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { useMe } from '@/hooks/useMe';
-import { useMistral } from '@/hooks/useMistral';
-import { DraftEmailResponse, usePerplexity } from '@/hooks/usePerplexity';
-import {
-	getMistralHybridPrompt,
-	PERPLEXITY_FULL_AI_PROMPT,
-	PERPLEXITY_HYBRID_PROMPT,
-} from '@/constants/ai';
+import { DraftEmailResponse } from '@/hooks/usePerplexity';
+import { useGemini } from '@/hooks/useGemini';
+import { GEMINI_FULL_AI_PROMPT, GEMINI_HYBRID_PROMPT } from '@/constants/ai';
 import {
 	CampaignWithRelations,
 	Font,
-	MistralParagraphAgentType,
 	MistralToneAgentType,
 	TestDraftEmail,
 } from '@/types';
@@ -139,9 +129,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [isTest, setIsTest] = useState<boolean>(false);
 	const [abortController, setAbortController] = useState<AbortController | null>(null);
 	const [isFirstLoad, setIsFirstLoad] = useState(true);
-	const [activeTab, setActiveTab] = useState<'settings' | 'test' | 'placeholders'>(
-		'settings'
-	);
+	const [activeTab, setActiveTab] = useState<'test' | 'placeholders'>('test');
 
 	const draftingRef = useRef<HTMLDivElement>(null);
 	const emailStructureRef = useRef<HTMLDivElement>(null);
@@ -254,15 +242,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	});
 
 	const {
-		data: dataPerplexity,
-		isPending: isPendingCallPerplexity,
-		mutateAsync: callPerplexity,
-	} = usePerplexity();
-
-	const { mutateAsync: callMistralAgent, isPending: isPendingCallMistralAgent } =
-		useMistral({
-			suppressToasts: true,
-		});
+		data: dataGemini,
+		isPending: isPendingCallGemini,
+		mutateAsync: callGemini,
+	} = useGemini({
+		suppressToasts: true,
+	});
 
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 
@@ -283,8 +268,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const getDraftingModeBasedOnBlocks = useCallback(() => {
 		const blocks = form.getValues('hybridBlockPrompts');
-		
-		const hasFullAutomatedBlock = blocks?.some((block) => block.type === 'full_automated');
+
+		const hasFullAutomatedBlock = blocks?.some(
+			(block) => block.type === 'full_automated'
+		);
 
 		if (hasFullAutomatedBlock) {
 			return DraftingMode.ai;
@@ -301,8 +288,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const draftingMode = getDraftingModeBasedOnBlocks();
 
-	const isPendingGeneration =
-		isPendingCallPerplexity || isPendingCallMistralAgent || isPendingCreateEmail;
+	const isPendingGeneration = isPendingCallGemini || isPendingCreateEmail;
 
 	let dataDraftEmail: TestDraftEmail = {
 		subject: '',
@@ -310,7 +296,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		contactEmail: contacts ? contacts[0]?.email : '',
 	};
 
-	if (!dataPerplexity && campaign.testMessage && campaign.testMessage.length > 0) {
+	if (!dataGemini && campaign.testMessage && campaign.testMessage.length > 0) {
 		dataDraftEmail = {
 			subject: campaign.testSubject || '',
 			message: campaign.testMessage,
@@ -520,7 +506,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			throw new Error('Campaign identity is required');
 		}
 
-		const populatedSystemPrompt = PERPLEXITY_FULL_AI_PROMPT.replace(
+		const populatedSystemPrompt = GEMINI_FULL_AI_PROMPT.replace(
 			'{recipient_first_name}',
 			recipient.firstName || ''
 		).replace('{company}', recipient.company || '');
@@ -539,6 +525,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			'country',
 			'website',
 			'phone',
+			'metadata',
 		])}\n\nUser Goal: ${prompt}`;
 
 		// Debug logging for Full AI path
@@ -548,16 +535,16 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		console.log('[Full AI] Populated System Prompt:', populatedSystemPrompt);
 		console.log('[Full AI] User Prompt:', userPrompt);
 
-		let perplexityResponse: string;
+		let geminiResponse: string;
 		try {
-			perplexityResponse = await callPerplexity({
-				model: 'sonar',
-				rolePrompt: populatedSystemPrompt, // Use the new, populated prompt
-				userPrompt: userPrompt,
-				signal: signal,
+			geminiResponse = await callGemini({
+				model: 'gemini-3-pro-preview',
+				prompt: populatedSystemPrompt, // Use the new, populated prompt
+				content: userPrompt,
+				signal,
 			});
 		} catch (error) {
-			console.error('[Full AI] Perplexity call failed:', error);
+			console.error('[Full AI] Gemini call failed:', error);
 			if (error instanceof Error && error.message.includes('cancelled')) {
 				throw error;
 			}
@@ -568,21 +555,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			);
 		}
 
-		console.log('[Full AI] Perplexity response preview:', perplexityResponse);
+		console.log('[Full AI] Gemini response preview:', geminiResponse);
 
-		const mistralResponse1 = await callMistralAgent({
-			prompt: getMistralTonePrompt(toneAgentType),
-			content: perplexityResponse,
-			agentType: toneAgentType,
-			signal: signal,
-		});
-
-		console.log('[Full AI] Mistral raw response:', mistralResponse1);
-
-		let mistralResponse1Parsed: DraftEmailResponse;
+		// Parse Gemini response directly (no Mistral processing)
+		let geminiParsed: DraftEmailResponse;
 		try {
 			// Robust JSON parsing: handle markdown blocks, extra text, etc.
-			let cleanedResponse = mistralResponse1;
+			let cleanedResponse = geminiResponse;
 
 			// Remove markdown code blocks if present
 			cleanedResponse = cleanedResponse
@@ -602,75 +581,47 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				'[Full AI] Attempting to parse cleaned JSON:',
 				cleanedResponse.substring(0, 200)
 			);
-			mistralResponse1Parsed = JSON.parse(cleanedResponse);
+			geminiParsed = JSON.parse(cleanedResponse);
 
 			// Validate the parsed object has required fields
-			if (!mistralResponse1Parsed.message || !mistralResponse1Parsed.subject) {
+			if (!geminiParsed.message || !geminiParsed.subject) {
 				throw new Error('Parsed JSON missing required fields (message or subject)');
 			}
 
-			console.log('[Full AI] Successfully parsed Mistral response');
+			console.log('[Full AI] Successfully parsed Gemini response');
 		} catch (e) {
-			console.error('[Full AI] Mistral JSON parse failed:', e);
-			console.error('[Full AI] Failed response was:', mistralResponse1);
+			console.error('[Full AI] Gemini JSON parse failed:', e);
+			console.error('[Full AI] Failed response was:', geminiResponse);
 
 			// Better fallback: try to extract subject and message as plain text
-			const subjectMatch = mistralResponse1.match(/subject[:\s]+["']?([^"'\n]+)["']?/i);
-			const messageMatch = mistralResponse1.match(
+			const subjectMatch = geminiResponse.match(/subject[:\s]+["']?([^"'\n]+)["']?/i);
+			const messageMatch = geminiResponse.match(
 				/message[:\s]+["']?([\s\S]+?)["']?(?:\}|$)/i
 			);
 
 			if (subjectMatch && messageMatch) {
-				mistralResponse1Parsed = {
+				geminiParsed = {
 					subject: subjectMatch[1].trim(),
 					message: messageMatch[1].trim(),
 				};
 				console.log('[Full AI] Extracted from plain text fallback');
 			} else {
-				// Last resort: use the perplexity response directly
-				mistralResponse1Parsed = {
+				// Last resort: use the Gemini response as message and generate a subject
+				geminiParsed = {
 					subject: `Email regarding ${recipient.company || 'your inquiry'}`,
-					message: perplexityResponse,
+					message: geminiResponse,
 				};
-				console.log('[Full AI] Using perplexity response as fallback');
+				console.log('[Full AI] Using Gemini response as fallback');
 			}
 		}
 
-		if (!mistralResponse1Parsed.message || !mistralResponse1Parsed.subject) {
-			throw new Error('No message or subject generated by Mistral Agent');
-		}
-
-		let mistralResponse2 = mistralResponse1;
-
-		if (paragraphs > 0) {
-			try {
-				console.log(
-					`[Full AI] Applying paragraph formatting for ${paragraphs} paragraphs`
-				);
-				mistralResponse2 = await callMistralAgent({
-					prompt: getMistralParagraphPrompt(paragraphs),
-					content: mistralResponse1Parsed.message,
-					agentType: `paragraph${paragraphs}` as MistralParagraphAgentType,
-					signal: signal,
-				});
-				console.log('[Full AI] Paragraph formatting applied successfully');
-			} catch (e) {
-				console.error('[Full AI] Mistral paragraph formatting failed:', e);
-				mistralResponse2 = mistralResponse1Parsed.message;
-			}
-		} else {
-			console.log(
-				'[Full AI] No paragraph formatting requested, returning parsed response'
-			);
-			return {
-				subject: removeEmDashes(mistralResponse1Parsed.subject),
-				message: removeEmDashes(mistralResponse1Parsed.message),
-			};
+		if (!geminiParsed.message || !geminiParsed.subject) {
+			throw new Error('No message or subject generated by Gemini');
 		}
 
 		return {
-			subject: removeEmDashes(mistralResponse1Parsed.subject),
-			message: removeEmDashes(mistralResponse2),
+			subject: removeEmDashes(geminiParsed.subject),
+			message: removeEmDashes(geminiParsed.message),
 		};
 	};
 
@@ -690,6 +641,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			'country',
 			'website',
 			'phone',
+			'metadata',
 		]);
 
 		if (!campaign.identity) {
@@ -702,33 +654,23 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		]);
 		const stringifiedHybridBlocks = generateEmailTemplateFromBlocks(hybridBlocks);
 
-		const perplexityPrompt = `**RECIPIENT**\n${stringifiedRecipient}\n\n**SENDER**\n${stringifiedSender}\n\n**PROMPT**\n${hybridPrompt}\n\n**EMAIL TEMPLATE**\n${stringifiedHybridBlocks}\n\n**PROMPTS**\n${generatePromptsFromBlocks(
+		const geminiPrompt = `**RECIPIENT**\n${stringifiedRecipient}\n\n**SENDER**\n${stringifiedSender}\n\n**PROMPT**\n${hybridPrompt}\n\n**EMAIL TEMPLATE**\n${stringifiedHybridBlocks}\n\n**PROMPTS**\n${generatePromptsFromBlocks(
 			hybridBlocks
 		)}`;
 
-		const perplexityResponse: string = await callPerplexity({
-			model: 'sonar',
-			rolePrompt: PERPLEXITY_HYBRID_PROMPT,
-			userPrompt: perplexityPrompt,
-			signal: signal,
+		const geminiResponse: string = await callGemini({
+			model: 'gemini-3-pro-preview',
+			prompt: GEMINI_HYBRID_PROMPT,
+			content: geminiPrompt,
+			signal,
 		});
 
-		const mistralResponse = await callMistralAgent({
-			prompt: getMistralHybridPrompt(
-				stringifiedHybridBlocks,
-				generatePromptsFromBlocks(hybridBlocks)
-			),
-			content: perplexityResponse,
-			agentType: 'hybrid',
-			signal: signal,
-		});
+		console.log('[Hybrid] Gemini raw response:', geminiResponse.substring(0, 500));
 
-		console.log('[Hybrid] Mistral raw response:', mistralResponse.substring(0, 500));
-
-		let mistralResponseParsed: DraftEmailResponse;
+		let geminiParsed: DraftEmailResponse;
 		try {
-			// Apply same robust JSON parsing as Full AI mode
-			let cleanedResponse = mistralResponse;
+			// Apply robust JSON parsing
+			let cleanedResponse = geminiResponse;
 
 			// Remove markdown code blocks if present
 			cleanedResponse = cleanedResponse
@@ -744,39 +686,39 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			// Remove any trailing commas before closing braces/brackets
 			cleanedResponse = cleanedResponse.replace(/,(\s*[}\]])/g, '$1');
 
-			mistralResponseParsed = JSON.parse(cleanedResponse);
+			geminiParsed = JSON.parse(cleanedResponse);
 
-			if (!mistralResponseParsed.message || !mistralResponseParsed.subject) {
+			if (!geminiParsed.message || !geminiParsed.subject) {
 				throw new Error('Parsed JSON missing required fields');
 			}
 		} catch (e) {
-			console.error('[Hybrid] Mistral JSON parse failed:', e);
+			console.error('[Hybrid] Gemini JSON parse failed:', e);
 
 			// Fallback: try to extract from plain text
-			const subjectMatch = mistralResponse.match(/subject[:\s]+["']?([^"'\n]+)["']?/i);
-			const messageMatch = mistralResponse.match(
+			const subjectMatch = geminiResponse.match(/subject[:\s]+["']?([^"'\n]+)["']?/i);
+			const messageMatch = geminiResponse.match(
 				/message[:\s]+["']?([\s\S]+?)["']?(?:\}|$)/i
 			);
 
 			if (subjectMatch && messageMatch) {
-				mistralResponseParsed = {
+				geminiParsed = {
 					subject: subjectMatch[1].trim(),
 					message: messageMatch[1].trim(),
 				};
 			} else {
-				throw new Error('Mistral response failed to be parsed');
+				throw new Error('Gemini response failed to be parsed');
 			}
 		}
 
-		if (!mistralResponseParsed.message || !mistralResponseParsed.subject) {
-			throw new Error('No message or subject generated by Mistral Agent');
+		if (!geminiParsed.message || !geminiParsed.subject) {
+			throw new Error('No message or subject generated by Gemini');
 		}
 
 		// POST-PROCESS: If CTA block is not present, remove the CTA paragraph from the message.
 		// We assume the generated email typically has: [Greeting?], Introduction, Research, CTA.
 		// If greeting is present as its own short line (e.g., "Hi John,"), CTA is likely the 4th segment; otherwise 3rd.
 		const hasActionBlock = hybridBlocks.some((b) => b.type === HybridBlock.action);
-		let cleanedMessage = removeEmDashes(mistralResponseParsed.message);
+		let cleanedMessage = removeEmDashes(geminiParsed.message);
 		if (!hasActionBlock) {
 			const paragraphs = cleanedMessage.split(/\n{2,}/);
 			if (paragraphs.length >= 3) {
@@ -791,7 +733,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 		return {
 			subject: isAiSubject
-				? removeEmDashes(mistralResponseParsed.subject)
+				? removeEmDashes(geminiParsed.subject)
 				: form.getValues('subject'),
 			message: cleanedMessage,
 		};
@@ -1277,7 +1219,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				return;
 			}
 		}
-		
+
 		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
 			await batchGenerateFullAiDrafts(contactIds);
 		} else if (draftingMode === DraftingMode.handwritten) {
@@ -1443,17 +1385,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const hasFullAutomatedBlock = watchedHybridBlockPrompts?.some(
 		(block) => block.type === 'full_automated'
 	);
-
-	useEffect(() => {
-		// If Full Automated block is added and we're not on settings, switch to settings
-		if (hasFullAutomatedBlock && activeTab !== 'settings' && activeTab !== 'test') {
-			setActiveTab('settings');
-		}
-		// If settings tab is active but Full Automated block is removed, switch to placeholders
-		else if (!hasFullAutomatedBlock && activeTab === 'settings') {
-			setActiveTab('placeholders');
-		}
-	}, [hasFullAutomatedBlock, activeTab]);
 
 	return {
 		activeTab,

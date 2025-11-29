@@ -376,6 +376,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const sentEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.sent);
 	const sentCount = sentEmails.length;
 
+	// Contacts that are still eligible for drafting in this campaign:
+	// hide any contact that already has a draft email for this campaign.
+	const draftedContactIds = new Set(draftEmails.map((e) => e.contactId));
+	const contactsAvailableForDrafting = (contacts || []).filter(
+		(contact) => !draftedContactIds.has(contact.id)
+	);
+
 	const isSendingDisabled = isFreeTrial || (user?.sendingCredits || 0) === 0;
 
 	// Selected contact for shared research panel (persistent on click)
@@ -400,6 +407,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			setSelectedContactForResearch(contacts[0]);
 		}
 	}, [contacts, selectedContactForResearch]);
+
+	// Ensure selected IDs only reference contacts that are still available for drafting.
+	useEffect(() => {
+		if (!contactsAvailableForDrafting) return;
+		const availableIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
+		setContactsTabSelectedIds((prev) => {
+			let hasChange = false;
+			const next = new Set<number>();
+			prev.forEach((id) => {
+				if (availableIds.has(id)) {
+					next.add(id);
+				} else {
+					hasChange = true;
+				}
+			});
+			if (!hasChange && next.size === prev.size) {
+				return prev;
+			}
+			return next;
+		});
+	}, [contactsAvailableForDrafting, setContactsTabSelectedIds]);
 
 	// Handlers to coordinate hover / selection behavior for the research panel
 	const handleResearchContactClick = (contact: ContactWithName | null) => {
@@ -935,7 +963,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 										>
 											<ContactsExpandedList
-												contacts={contacts || []}
+												contacts={contactsAvailableForDrafting}
 												campaign={campaign}
 												selectedContactIds={contactsTabSelectedIds}
 												onContactSelectionChange={(updater) =>
@@ -967,12 +995,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<MiniEmailStructure
 												form={form}
 												onDraft={() =>
-													handleGenerateDrafts(contacts?.map((c) => c.id) || [])
+													handleGenerateDrafts(
+														contactsAvailableForDrafting.map((c) => c.id)
+													)
 												}
 												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
 												isPendingGeneration={isPendingGeneration}
 												generationProgress={generationProgress}
-												generationTotal={contacts?.length || 0}
+												generationTotal={contactsAvailableForDrafting.length}
 												hideTopChrome
 												hideFooter
 												fullWidthMobile
@@ -1283,6 +1313,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									contact={contacts?.[0]}
 									onGoToDrafting={goToDrafting}
 									onTestPreviewToggle={setShowTestPreview}
+									draftCount={contactsTabSelectedIds.size}
+									onDraftClick={async () => {
+										if (contactsTabSelectedIds.size === 0) {
+											toast.error('Select at least one contact to draft emails.');
+											return;
+										}
+										await handleGenerateDrafts(
+											Array.from(contactsTabSelectedIds.values())
+										);
+									}}
+									isDraftDisabled={
+										isPendingGeneration || contactsTabSelectedIds.size === 0
+									}
 								/>
 								{/* Right panel for Testing view - positioned absolutely */}
 								{false && (
@@ -1348,7 +1391,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{view === 'contacts' && (
 							<div className="flex items-center justify-center min-h-[300px]">
 								<ContactsSelection
-									contacts={contacts || []}
+									contacts={contactsAvailableForDrafting}
 									selectedContactIds={contactsTabSelectedIds}
 									setSelectedContactIds={setContactsTabSelectedIds}
 									handleContactSelection={handleContactsTabSelection}

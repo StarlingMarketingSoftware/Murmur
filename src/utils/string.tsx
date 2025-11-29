@@ -195,13 +195,26 @@ export const generatePromptsFromBlocks = (blocks: HybridBlockPrompt[]): string =
 	};
 
 	const prompts: string[] = [];
+	let textBlockCount = 0;
+
 	for (const block of blocks) {
 		const prompt =
 			block.value?.trim() ||
 			defaultPrompts[block.type] ||
 			`Generate content for ${block.type}`;
-		const labelText = block.type === 'text' ? 'Exact text' : 'Prompt for';
-		prompts.push(`${labelText} {{${block.type}}}: ${prompt}`);
+
+		const labelText = block.type === HybridBlock.text ? 'Exact text' : 'Prompt for';
+
+		// Match the placeholder keys used in generateEmailTemplateFromBlocks
+		let placeholderKey: string;
+		if (block.type === HybridBlock.text) {
+			placeholderKey = `${block.type}${textBlockCount}`;
+			textBlockCount++;
+		} else {
+			placeholderKey = block.type;
+		}
+
+		prompts.push(`${labelText} {{${placeholderKey}}}: ${prompt}`);
 	}
 	return prompts.join('\n\n');
 };
