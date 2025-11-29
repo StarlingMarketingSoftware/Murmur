@@ -113,6 +113,9 @@ export const urls = {
 		mailgun: {
 			index: '/api/mailgun',
 		},
+		gemini: {
+			index: '/api/gemini',
+		},
 		mistral: {
 			index: '/api/mistral',
 		},

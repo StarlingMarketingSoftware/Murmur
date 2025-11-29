@@ -68,10 +68,20 @@ export interface HybridPromptInputProps {
 	compactLeftOnly?: boolean;
 	onGoToDrafting?: () => void;
 	/**
+	 * Optional: invoked when the user clicks the Draft button on the Writing tab.
+	 * Typically used to generate drafts for the currently selected contacts.
+	 */
+	onDraftClick?: () => void;
+	/**
+	 * Optional: control whether the Draft button is disabled.
+	 */
+	isDraftDisabled?: boolean;
+	/**
 	 * Desktop-only: notify parent when the user wants to open/close the Test Preview
 	 * so it can be rendered in the right-hand research slot instead of as a popup.
 	 */
 	onTestPreviewToggle?: (open: boolean) => void;
+	draftCount?: number;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {

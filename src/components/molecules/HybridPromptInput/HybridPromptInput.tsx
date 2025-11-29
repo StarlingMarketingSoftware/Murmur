@@ -35,8 +35,6 @@ import React, {
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
-import { ParagraphSlider } from '@/components/atoms/ParagraphSlider/ParagraphSlider';
-import { ToneSelector } from '../ToneSelector/ToneSelector';
 import { DraggableHighlight } from '../DragAndDrop/DraggableHighlight';
 import DraggableBox from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraggableBox';
 interface SortableAIBlockProps {
@@ -293,18 +291,20 @@ const SortableAIBlock = ({
 									<span className="absolute right-0 h-full border-r border-[#000000]"></span>
 								</button>
 							)}
-							<Button
-								type="button"
-								variant="ghost"
-								size="icon"
-								className={cn(isCompactBlock && 'h-8 w-8')}
-								onClick={(e) => {
-									e.stopPropagation();
-									onRemove(id);
-								}}
-							>
-								<X className="h-[13px] w-[13px] text-destructive-dark" />
-							</Button>
+							{!isFullAutomatedBlock && (
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									className={cn(isCompactBlock && 'h-8 w-8')}
+									onClick={(e) => {
+										e.stopPropagation();
+										onRemove(id);
+									}}
+								>
+									<X className="h-[13px] w-[13px] text-destructive-dark" />
+								</Button>
+							)}
 						</div>
 						{isCompactBlock ? (
 							// Compact blocks
@@ -638,8 +638,6 @@ const SortableAIBlock = ({
 													? 'Full Auto'
 													: (block as { label: string }).label}
 											</Typography>
-
-											<ToneSelector isCompact={!!showTestPreview && !!testMessage} />
 										</>
 									) : (
 										<Typography
@@ -668,25 +666,7 @@ const SortableAIBlock = ({
 												<div className={isFullAutomatedBlock ? 'relative' : ''}>
 													{showCustomPlaceholder && (
 														<div className="absolute inset-0 pointer-events-none py-2 pr-10 text-[#505050] text-base md:text-sm max-[480px]:text-[10px] z-10">
-															<div className="space-y-3">
-																<div>
-																	<p>Prompt Murmur here.</p>
-																	<p>
-																		Tell it what you want to say and it will compose
-																		emails based on your instructions.
-																	</p>
-																</div>
-																<div className="full-auto-placeholder-example">
-																	<p>Ex.</p>
-																	<p>
-																		&ldquo;Compose a professional booking pitch email.
-																		Include one or two facts about the venue, introduce my
-																		band honestly, highlight our fit for their space, and
-																		end with a straightforward next-steps question. Keep
-																		tone warm, clear, and brief.&rdquo;
-																	</p>
-																</div>
-															</div>
+															<p>Type anything you want to include</p>
 														</div>
 													)}
 													<Textarea
@@ -736,7 +716,6 @@ const SortableAIBlock = ({
 														}}
 													/>
 												</div>
-												{isFullAutomatedBlock && <ParagraphSlider />}
 											</>
 										);
 									})()
@@ -824,7 +803,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		onGoToDrafting,
 	} = useHybridPromptInput(props);
 
-	const { compactLeftOnly, onTestPreviewToggle } = props;
+	const {
+		compactLeftOnly,
+		onTestPreviewToggle,
+		draftCount = 0,
+		onDraftClick,
+		isDraftDisabled,
+	} = props;
 
 	// Track if the user has attempted to Test to control error styling
 	const [hasAttemptedTest, setHasAttemptedTest] = useState(false);
@@ -1201,7 +1186,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							className={`${
 								compactLeftOnly
 									? 'flex-col'
-									: 'w-[96.27vw] max-w-[499px] min-h-[703px] transition mb-4 flex mx-auto flex-col border-[3px] border-black rounded-md bg-[#A6E2A8]'
+									: 'w-[96.27vw] max-w-[499px] min-h-[703px] transition flex mx-auto flex-col border-[3px] border-black rounded-md bg-[#A6E2A8]'
 							} relative overflow-visible`}
 							style={!compactLeftOnly ? { backgroundColor: '#A6E2A8' } : undefined}
 							data-hpi-container
@@ -1927,6 +1912,28 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										</div>
 								  )}
 						</div>
+						{!compactLeftOnly && (
+							<button
+								type="button"
+								onClick={() => {
+									if (!isDraftDisabled) {
+										onDraftClick?.();
+									}
+								}}
+								disabled={isDraftDisabled}
+								className={cn(
+									'w-[475px] h-[40px] mt-[10px] mx-auto block rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
+									isDraftDisabled
+										? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+										: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+								)}
+							>
+								Draft
+								{draftCount > 0
+									? ` ${draftCount} ${draftCount === 1 ? 'Contact' : 'Contacts'}`
+									: ''}
+							</button>
+						)}
 					</DraggableBox>
 				</Droppable>
 			</DndContext>

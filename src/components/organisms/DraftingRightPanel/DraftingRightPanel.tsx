@@ -2,86 +2,26 @@ import { FC } from 'react';
 import { DraftingRightPanelProps, useDraftingRightPanel } from './useDraftingRightPanel';
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
-import { StepSlider } from '@/components/atoms/StepSlider/StepSlider';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
-import { FormField, FormItem, FormControl } from '@/components/ui/form';
-import { BlockSelect } from '@/components/atoms/BlockSelect/BlockSelect';
 import { cn } from '@/utils';
 
 export const DraftingRightPanel: FC<DraftingRightPanelProps> = (props) => {
 	const {
 		activeTab,
 		setActiveTab,
-		toneOptions,
 		draftEmail,
 		handleTestPrompt,
 		isTest,
-		areSettingsDisabled,
-		form,
 		isGenerationDisabled,
 		hasTestMessage,
-		showSettings,
 		insertPlaceholder,
 	} = useDraftingRightPanel(props);
 
 	return (
 		<div className="flex flex-col">
 			<div className="w-[559px] h-[530px] border border-black rounded-lg overflow-y-auto">
-				{activeTab === 'settings' && showSettings && (
-					<div className="p-4">
-						<div className="mx-auto w-fit mt-2">
-							<Typography variant="h3" bold className="text-[22px]">
-								Tone
-							</Typography>
-							<FormField
-								control={form.control}
-								name="draftingTone"
-								render={({ field }) => (
-									<FormItem>
-										<FormControl>
-											<BlockSelect
-												options={toneOptions}
-												value={field.value}
-												onChange={field.onChange}
-												disabled={areSettingsDisabled}
-											/>
-										</FormControl>
-									</FormItem>
-								)}
-							/>
-						</div>
-						<div className="max-w-56 mx-auto mt-4">
-							<Typography variant="h3" bold className="text-[22px]">
-								Paragraphs
-							</Typography>
-							<Typography className="!text-[10px] mt-0.5" color="light">
-								Select the number of paragraphs you want to generate automatically in your
-								email
-							</Typography>
-							<FormField
-								control={form.control}
-								name="paragraphs"
-								render={({ field }) => (
-									<FormItem>
-										<FormControl>
-											<StepSlider
-												disabled={areSettingsDisabled}
-												className="mt-3"
-												value={[field.value]}
-												onValueChange={(value) => field.onChange(value[0])}
-												max={5}
-												step={1}
-												min={0}
-											/>
-										</FormControl>
-									</FormItem>
-								)}
-							/>
-						</div>
-					</div>
-				)}
 				{activeTab === 'test' && (
 					<div className="grid gap-4 p-6 relative">
 						<div
