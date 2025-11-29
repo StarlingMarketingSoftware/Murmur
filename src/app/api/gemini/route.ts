@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 		}
 		const { prompt, model, content } = validatedData.data;
 
-		const parsed = await fetchGemini(model, prompt, content);
+		const parsed = await fetchGemini(model, prompt, content, { timeoutMs: 55000 });
 		return apiResponse(parsed);
 	} catch (error) {
 		return handleApiError(error);

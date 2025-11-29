@@ -14,9 +14,7 @@ import { DraftingFormValues } from '../useDraftingSection';
 import { Button } from '@/components/ui/button';
 import { HybridBlock } from '@prisma/client';
 import { cn } from '@/utils';
-import { ParagraphSlider } from '@/components/atoms/ParagraphSlider/ParagraphSlider';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
-import { ToneSelector } from '@/components/molecules/ToneSelector/ToneSelector';
 
 interface MiniEmailStructureProps {
 	form: UseFormReturn<DraftingFormValues>;
@@ -844,9 +842,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											</div>
 											{b.type === 'full_automated' ? (
 												<div className="mt-1">
-													<div className="mb-1">
-														<ToneSelector isCompact />
-													</div>
 													<div className="relative">
 														{!b.value && (
 															<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px] max-[480px]:text-[10px] mini-full-auto-placeholder">
@@ -872,9 +867,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															value={b.value || ''}
 															onChange={(e) => updateBlockValue(b.id, e.target.value)}
 														/>
-													</div>
-													<div className="pl-2 mb-2 max-[480px]:mb-0 mini-paragraph-slider">
-														<ParagraphSlider />
 													</div>
 												</div>
 											) : (

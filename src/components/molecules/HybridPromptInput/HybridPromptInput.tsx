@@ -35,8 +35,6 @@ import React, {
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
-import { ParagraphSlider } from '@/components/atoms/ParagraphSlider/ParagraphSlider';
-import { ToneSelector } from '../ToneSelector/ToneSelector';
 import { DraggableHighlight } from '../DragAndDrop/DraggableHighlight';
 import DraggableBox from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraggableBox';
 interface SortableAIBlockProps {
@@ -638,8 +636,6 @@ const SortableAIBlock = ({
 													? 'Full Auto'
 													: (block as { label: string }).label}
 											</Typography>
-
-											<ToneSelector isCompact={!!showTestPreview && !!testMessage} />
 										</>
 									) : (
 										<Typography
@@ -736,7 +732,6 @@ const SortableAIBlock = ({
 														}}
 													/>
 												</div>
-												{isFullAutomatedBlock && <ParagraphSlider />}
 											</>
 										);
 									})()
