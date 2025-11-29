@@ -1178,7 +1178,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 					<DraggableBox
 						id="main-drafting"
 						dragHandleSelector="[data-root-drag-handle]"
-						enabled={isMobile === false && !showTestPreview}
+						enabled={false}
 						onDropOver={() => {}}
 					>
 						<div
@@ -1217,7 +1217,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							<DraggableBox
 								id="test-left-panel"
 								dragHandleSelector="[data-left-drag-handle]"
-								enabled={isMobile === false}
+								enabled={false}
 								onDropOver={() => {}}
 								className="relative z-10"
 							>
