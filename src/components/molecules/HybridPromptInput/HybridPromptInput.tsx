@@ -1291,6 +1291,24 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														Full Auto
 													</Button>
 													<Button
+														ref={manualModeButtonRef}
+														variant="ghost"
+														type="button"
+														className={cn(
+															'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
+															selectedModeKey !== 'none' &&
+																(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
+																form
+																	.getValues('hybridBlockPrompts')
+																	?.every((b) => b.type === HybridBlock.text)
+																? 'text-black'
+																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
+														)}
+														onClick={switchToManual}
+													>
+														Manual
+													</Button>
+													<Button
 														ref={hybridModeButtonRef}
 														variant="ghost"
 														type="button"
@@ -1309,24 +1327,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														onClick={switchToHybrid}
 													>
 														Hybrid
-													</Button>
-													<Button
-														ref={manualModeButtonRef}
-														variant="ghost"
-														type="button"
-														className={cn(
-															'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
-															selectedModeKey !== 'none' &&
-																(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
-																form
-																	.getValues('hybridBlockPrompts')
-																	?.every((b) => b.type === HybridBlock.text)
-																? 'text-black'
-																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
-														)}
-														onClick={switchToManual}
-													>
-														Manual
 													</Button>
 												</div>
 											</div>
