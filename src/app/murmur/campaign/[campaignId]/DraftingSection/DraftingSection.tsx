@@ -29,6 +29,7 @@ import { TestPreviewPanel } from '@/components/molecules/TestPreviewPanel/TestPr
 import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
 import ContactsExpandedList from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
+import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
 import { BookingIcon } from '@/components/atoms/_svg/BookingIcon';
@@ -1663,10 +1664,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							</div>
 						)}
 
-						{/* Placeholder content for future tabs */}
+						{/* Inbox tab: reuse the dashboard inbox UI */}
 						{(view === 'inbox' || view === 'all') && (
-							<div className="flex items-center justify-center min-h-[300px] text-gray-400">
-								{/* Blank for now */}
+							<div className="mt-6 flex justify-center">
+								<InboxSection />
 							</div>
 						)}
 
