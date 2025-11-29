@@ -824,7 +824,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		onGoToDrafting,
 	} = useHybridPromptInput(props);
 
-	const { compactLeftOnly, onTestPreviewToggle } = props;
+	const {
+		compactLeftOnly,
+		onTestPreviewToggle,
+		draftCount = 0,
+		onDraftClick,
+		isDraftDisabled,
+	} = props;
 
 	// Track if the user has attempted to Test to control error styling
 	const [hasAttemptedTest, setHasAttemptedTest] = useState(false);
@@ -1201,7 +1207,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							className={`${
 								compactLeftOnly
 									? 'flex-col'
-									: 'w-[96.27vw] max-w-[499px] min-h-[703px] transition mb-4 flex mx-auto flex-col border-[3px] border-black rounded-md bg-[#A6E2A8]'
+									: 'w-[96.27vw] max-w-[499px] min-h-[703px] transition flex mx-auto flex-col border-[3px] border-black rounded-md bg-[#A6E2A8]'
 							} relative overflow-visible`}
 							style={!compactLeftOnly ? { backgroundColor: '#A6E2A8' } : undefined}
 							data-hpi-container
@@ -1927,6 +1933,28 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										</div>
 								  )}
 						</div>
+						{!compactLeftOnly && (
+							<button
+								type="button"
+								onClick={() => {
+									if (!isDraftDisabled) {
+										onDraftClick?.();
+									}
+								}}
+								disabled={isDraftDisabled}
+								className={cn(
+									'w-[475px] h-[40px] mt-[10px] mx-auto block rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
+									isDraftDisabled
+										? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+										: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+								)}
+							>
+								Draft
+								{draftCount > 0
+									? ` ${draftCount} ${draftCount === 1 ? 'Contact' : 'Contacts'}`
+									: ''}
+							</button>
+						)}
 					</DraggableBox>
 				</Droppable>
 			</DndContext>

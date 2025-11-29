@@ -283,8 +283,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const getDraftingModeBasedOnBlocks = useCallback(() => {
 		const blocks = form.getValues('hybridBlockPrompts');
-		
-		const hasFullAutomatedBlock = blocks?.some((block) => block.type === 'full_automated');
+
+		const hasFullAutomatedBlock = blocks?.some(
+			(block) => block.type === 'full_automated'
+		);
 
 		if (hasFullAutomatedBlock) {
 			return DraftingMode.ai;
@@ -1277,7 +1279,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				return;
 			}
 		}
-		
+
 		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
 			await batchGenerateFullAiDrafts(contactIds);
 		} else if (draftingMode === DraftingMode.handwritten) {
