@@ -573,19 +573,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										Full Auto
 									</button>
 									<button
-										ref={hybridButtonRef}
-										type="button"
-										className={cn(
-											'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20',
-											draftingMode === 'hybrid'
-												? 'text-black'
-												: 'text-[#6B6B6B] hover:text-black'
-										)}
-										onClick={() => setMode('hybrid')}
-									>
-										Hybrid
-									</button>
-									<button
 										ref={handwrittenButtonRef}
 										type="button"
 										className={cn(
@@ -597,6 +584,19 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										onClick={() => setMode('handwritten')}
 									>
 										Manual
+									</button>
+									<button
+										ref={hybridButtonRef}
+										type="button"
+										className={cn(
+											'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20',
+											draftingMode === 'hybrid'
+												? 'text-black'
+												: 'text-[#6B6B6B] hover:text-black'
+										)}
+										onClick={() => setMode('hybrid')}
+									>
+										Hybrid
 									</button>
 								</div>
 							</div>
