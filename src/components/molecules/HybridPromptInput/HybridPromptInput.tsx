@@ -619,8 +619,6 @@ const SortableAIBlock = ({
 								{/* Header background fill for Full Auto box */}
 								{isFullAutomatedBlock && (
 									<div className="w-[calc(100%+32px)] -mx-4 h-[29px] bg-[#B9DAF5] -mt-0 flex items-stretch">
-										{/* Left divider */}
-										<div className="w-[1px] bg-[#51A2E4] flex-shrink-0" />
 										{/* Full Auto label section */}
 										<div className="flex-1 flex items-center pl-[16px]">
 											<Typography
@@ -642,7 +640,7 @@ const SortableAIBlock = ({
 											type="button"
 											onClick={() => setSelectedPowerMode('normal')}
 											className={cn(
-												'w-[101px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0',
+												'w-[101px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
 												selectedPowerMode === 'normal' ? 'bg-[#8DBFE8]' : 'bg-transparent'
 											)}
 										>
@@ -671,7 +669,7 @@ const SortableAIBlock = ({
 											type="button"
 											onClick={() => setSelectedPowerMode('high')}
 											className={cn(
-												'w-[46px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0',
+												'w-[46px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
 												selectedPowerMode === 'high' ? 'bg-[#8DBFE8]' : 'bg-transparent'
 											)}
 										>
@@ -1527,7 +1525,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									</div>
 									<div className="flex-1 flex flex-col" data-hpi-content>
 										{/* Content area */}
-										<div className="pt-[18px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
+										<div className="pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
 											{fields.length === 0 && (
 												<span className="text-gray-300 font-primary text-[12px]">
 													Add blocks here to build your prompt...
