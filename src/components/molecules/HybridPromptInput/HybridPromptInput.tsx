@@ -67,7 +67,6 @@ const SortableAIBlock = ({
 	onExpand,
 	trackFocusedField,
 	showTestPreview,
-	testMessage,
 }: SortableAIBlockProps) => {
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
 		useSortable({ id });
@@ -76,6 +75,8 @@ const SortableAIBlock = ({
 	const [hasBeenTouched, setHasBeenTouched] = useState(false);
 	// Track if advanced mode is enabled for hybrid blocks
 	const [isAdvancedEnabled, setIsAdvancedEnabled] = useState(false);
+	// Track selected power mode for Full Auto block ('normal' or 'high')
+	const [selectedPowerMode, setSelectedPowerMode] = useState<'normal' | 'high'>('normal');
 	// When a block is opened (advanced), focus its input once
 	const advancedInputRef = useRef<HTMLInputElement | null>(null);
 	useEffect(() => {
@@ -252,7 +253,9 @@ const SortableAIBlock = ({
 							? isAdvancedEnabled
 								? 'p-0 h-full'
 								: 'p-2 h-full max-[480px]:py-[2px]'
-							: isFullAutomatedBlock || isTextBlock
+							: isFullAutomatedBlock
+							? 'px-4 pt-0 pb-4'
+							: isTextBlock
 							? 'px-4 pt-2 pb-4'
 							: 'p-4'
 					)}
@@ -613,44 +616,126 @@ const SortableAIBlock = ({
 							// Non-compact blocks
 							<>
 								{!isTextBlock && !isFullAutomatedBlock && <></>}
-								<div
-									className={cn(
-										'flex gap-2 min-h-7 items-center relative z-20',
-										isFullAutomatedBlock || isTextBlock ? 'mb-1' : 'mb-2',
-										isFullAutomatedBlock && showTestPreview && testMessage && 'flex-wrap',
-										// On mobile portrait, allow the header to wrap so the tone selector can move to a second row
-										isFullAutomatedBlock && 'max-[480px]:flex-wrap max-[480px]:gap-y-1'
-									)}
-								>
-									{!isTextBlock ? (
-										<>
+								{/* Header background fill for Full Auto box */}
+								{isFullAutomatedBlock && (
+									<div className="w-[calc(100%+32px)] -mx-4 h-[29px] bg-[#B9DAF5] -mt-0 flex items-stretch">
+										{/* Left divider */}
+										<div className="w-[1px] bg-[#51A2E4] flex-shrink-0" />
+										{/* Full Auto label section */}
+										<div className="flex-1 flex items-center pl-[16px]">
+											<Typography
+												variant="h4"
+												className="font-inter font-semibold text-[17px] text-[#000000]"
+											>
+												Full Auto
+											</Typography>
+										</div>
+										{/* Divider - black when Normal Power selected */}
+										<div
+											className={cn(
+												'w-[1px] flex-shrink-0 transition-colors',
+												selectedPowerMode === 'normal' ? 'bg-[#000000]' : 'bg-[#51A2E4]'
+											)}
+										/>
+										{/* Normal Power section */}
+										<button
+											type="button"
+											onClick={() => setSelectedPowerMode('normal')}
+											className={cn(
+												'w-[101px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0',
+												selectedPowerMode === 'normal' ? 'bg-[#8DBFE8]' : 'bg-transparent'
+											)}
+										>
+											<span
+												className={cn(
+													'font-inter font-normal italic text-[14px] transition-colors',
+													selectedPowerMode === 'normal'
+														? 'text-[#000000]'
+														: 'text-[#9E9E9E]'
+												)}
+											>
+												Normal Power
+											</span>
+										</button>
+										{/* Divider - black when either Normal Power or High selected */}
+										<div
+											className={cn(
+												'w-[1px] flex-shrink-0 transition-colors',
+												selectedPowerMode === 'normal' || selectedPowerMode === 'high'
+													? 'bg-[#000000]'
+													: 'bg-[#51A2E4]'
+											)}
+										/>
+										{/* High section */}
+										<button
+											type="button"
+											onClick={() => setSelectedPowerMode('high')}
+											className={cn(
+												'w-[46px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0',
+												selectedPowerMode === 'high' ? 'bg-[#8DBFE8]' : 'bg-transparent'
+											)}
+										>
+											<span
+												className={cn(
+													'font-inter font-normal italic text-[14px] transition-colors',
+													selectedPowerMode === 'high'
+														? 'text-[#000000]'
+														: 'text-[#9E9E9E]'
+												)}
+											>
+												High
+											</span>
+										</button>
+										{/* Divider - black when High selected */}
+										<div
+											className={cn(
+												'w-[1px] flex-shrink-0 transition-colors',
+												selectedPowerMode === 'high' ? 'bg-[#000000]' : 'bg-[#51A2E4]'
+											)}
+										/>
+										{/* Right empty section */}
+										<div className="w-[31px] flex-shrink-0" />
+									</div>
+								)}
+								{!isFullAutomatedBlock && (
+									<div
+										className={cn(
+											'flex gap-2 items-center relative z-20',
+											isTextBlock ? 'min-h-7 mb-1' : 'min-h-7 mb-2',
+											'max-[480px]:flex-wrap max-[480px]:gap-y-1'
+										)}
+									>
+										{!isTextBlock ? (
+											<>
+												<Typography
+													variant="h4"
+													className={cn(
+														'font-inter',
+														isIntroductionBlock && 'text-[#9D9DFF]',
+														isResearchBlock && 'text-[#4A4AD9]',
+														isActionBlock && 'text-[#040488]'
+													)}
+												>
+													{(block as { label: string }).label}
+												</Typography>
+											</>
+										) : (
 											<Typography
 												variant="h4"
 												className={cn(
 													'font-inter',
-													isIntroductionBlock && 'text-[#9D9DFF]',
-													isResearchBlock && 'text-[#4A4AD9]',
-													isActionBlock && 'text-[#040488]',
-													isFullAutomatedBlock && 'font-semibold text-[17px]'
+													shouldShowRedStyling && 'text-[#A20000]'
 												)}
 											>
-												{isFullAutomatedBlock
-													? 'Full Auto'
-													: (block as { label: string }).label}
+												Text
 											</Typography>
-										</>
-									) : (
-										<Typography
-											variant="h4"
-											className={cn(
-												'font-inter',
-												shouldShowRedStyling && 'text-[#A20000]'
-											)}
-										>
-											Text
-										</Typography>
-									)}
-								</div>
+										)}
+									</div>
+								)}
+								{/* Horizontal divider for Full Auto box */}
+								{isFullAutomatedBlock && (
+									<div className="w-[calc(100%+32px)] -mx-4 h-[1px] bg-[#51A2E4] mb-2" />
+								)}
 								{isTextBlock || isFullAutomatedBlock ? (
 									(() => {
 										const fieldProps = form.register(
@@ -684,7 +769,7 @@ const SortableAIBlock = ({
 																? '!bg-[#DADAFC] [&]:!bg-[#DADAFC]'
 																: 'bg-white',
 															isFullAutomatedBlock
-																? 'h-[195px] px-0 resize-none full-auto-textarea'
+																? 'h-[150px] px-0 resize-none full-auto-textarea'
 																: '',
 															shouldShowRedStyling ? 'placeholder:text-[#A20000]' : '',
 															(isIntroductionBlock || isResearchBlock || isActionBlock) &&
@@ -826,7 +911,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const isHandwrittenMode =
 		(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
 		form.getValues('hybridBlockPrompts').every((b) => b.type === HybridBlock.text);
-	const hasBlocks = (form.getValues('hybridBlockPrompts')?.length || 0) > 0;
 
 	// Check for empty text blocks
 	const hasEmptyTextBlocks = form
@@ -985,17 +1069,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 				: [{ id: 'text-0', type: HybridBlock.text, value: '' }]
 		);
 		form.setValue('isAiSubject', false);
-	};
-
-	const handleClearAllInside = () => {
-		form.setValue('hybridBlockPrompts', []);
-		form.setValue('hybridAvailableBlocks', [
-			HybridBlock.full_automated,
-			HybridBlock.introduction,
-			HybridBlock.research,
-			HybridBlock.action,
-			HybridBlock.text,
-		]);
 	};
 
 	const modeContainerRef = useRef<HTMLDivElement>(null);
@@ -1357,8 +1430,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															showTestPreview
 																? 'w-[426px] max-[480px]:w-[89.33vw]'
 																: 'w-[89.33vw] max-w-[475px]',
-															// On mobile portrait, remove default mb-6 to tighten spacing under subject
-															'max-[480px]:mb-0'
+															// Remove default margin to control spacing to content below
+															'mb-0'
 														)}
 													>
 														<FormControl>
@@ -1454,7 +1527,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									</div>
 									<div className="flex-1 flex flex-col" data-hpi-content>
 										{/* Content area */}
-										<div className="pt-[16px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
+										<div className="pt-[18px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
 											{fields.length === 0 && (
 												<span className="text-gray-300 font-primary text-[12px]">
 													Add blocks here to build your prompt...
