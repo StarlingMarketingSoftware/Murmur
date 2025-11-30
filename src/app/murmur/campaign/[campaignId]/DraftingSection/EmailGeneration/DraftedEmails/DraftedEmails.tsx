@@ -191,6 +191,13 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								: 'Unknown Contact';
 							const isSelected = selectedDraftIds.has(draft.id);
 
+							// Check if we have a separate name to decide layout
+							const hasSeparateName = Boolean(
+								(contact?.name && contact.name.trim()) ||
+									(contact?.firstName && contact.firstName.trim()) ||
+									(contact?.lastName && contact.lastName.trim())
+							);
+
 							return (
 								<div
 									key={draft.id}
@@ -198,27 +205,27 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										'cursor-pointer transition-colors relative select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
 										isSelected && 'bg-[#E8EFFF]'
 									)}
-								onMouseDown={(e) => {
-									// Prevent text selection on shift-click
-									if (e.shiftKey) {
-										e.preventDefault();
-									}
-								}}
-								onMouseEnter={() => {
-									if (contact) {
-										onContactHover?.(contact);
-									}
-								}}
-								onMouseLeave={() => {
-									onContactHover?.(null);
-								}}
-								onClick={(e) => {
-									handleDraftSelect(draft, e);
-									if (contact) {
-										onContactClick?.(contact);
-									}
-								}}
-								onDoubleClick={() => handleDraftDoubleClick(draft)}
+									onMouseDown={(e) => {
+										// Prevent text selection on shift-click
+										if (e.shiftKey) {
+											e.preventDefault();
+										}
+									}}
+									onMouseEnter={() => {
+										if (contact) {
+											onContactHover?.(contact);
+										}
+									}}
+									onMouseLeave={() => {
+										onContactHover?.(null);
+									}}
+									onClick={(e) => {
+										handleDraftSelect(draft, e);
+										if (contact) {
+											onContactClick?.(contact);
+										}
+									}}
+									onDoubleClick={() => handleDraftDoubleClick(draft)}
 								>
 									{/* Used-contact indicator - vertically centered */}
 									{usedContactIdsSet.has(draft.contactId) && (
@@ -226,7 +233,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											className="absolute left-[8px]"
 											title="Used in a previous campaign"
 											style={{
-												top: '50%',
+												top: hasSeparateName ? '50%' : '30px',
 												transform: 'translateY(-50%)',
 												width: '16px',
 												height: '16px',
@@ -241,7 +248,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										type="button"
 										variant="icon"
 										onClick={(e) => handleDeleteDraft(e, draft.id)}
-										className="absolute top-[6px] right-[2px] p-1 transition-colors z-10 group"
+										className="absolute top-[50px] right-[2px] p-1 transition-colors z-10 group"
 									>
 										<X size={16} className="text-gray-500 group-hover:text-red-500" />
 									</Button>
@@ -259,7 +266,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 												handleDraftDoubleClick(draft);
 											}
 										}}
-										className="absolute top-[28px] right-[2px] p-1 transition-colors z-20"
+										className="absolute top-[72px] right-[2px] p-1 transition-colors z-20"
 										aria-label="Preview draft"
 									>
 										<PreviewIcon
@@ -269,9 +276,19 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										/>
 									</Button>
 
-									{/* Fixed top-right info (Location + Title) */}
-									<div className="absolute top-[6px] right-[28px] flex flex-col items-end gap-[2px] w-[92px] pointer-events-none">
-										<div className="flex items-center justify-start gap-1 h-[11.67px] w-[92px]">
+									{/* Fixed top-right info (Title + Location) - matching contacts table design */}
+									<div className="absolute top-[6px] right-[4px] flex flex-col items-start gap-[2px] pointer-events-none">
+										{contact?.headline ? (
+											<div className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden">
+												<ScrollableText
+													text={contact.headline}
+													className="text-[10px] text-black leading-none"
+													scrollPixelsPerSecond={60}
+												/>
+											</div>
+										) : null}
+
+										<div className="flex items-center justify-start gap-1 h-[20px]">
 											{(() => {
 												const fullStateName = (contact?.state as string) || '';
 												const stateAbbr = getStateAbbreviation(fullStateName) || '';
@@ -292,8 +309,12 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 												if (!stateAbbr) return null;
 												return isCanadianProvince ? (
 													<div
-														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border overflow-hidden"
-														style={{ borderColor: '#000000' }}
+														className="inline-flex items-center justify-center rounded-[6px] border overflow-hidden flex-shrink-0"
+														style={{
+															width: '39px',
+															height: '20px',
+															borderColor: '#000000',
+														}}
 														title="Canadian province"
 													>
 														<CanadianFlag
@@ -304,8 +325,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 													</div>
 												) : isUSAbbr ? (
 													<span
-														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border text-[8px] leading-none font-bold"
+														className="inline-flex items-center justify-center rounded-[6px] border text-[12px] leading-none font-bold flex-shrink-0"
 														style={{
+															width: '39px',
+															height: '20px',
 															backgroundColor:
 																stateBadgeColorMap[stateAbbr] || 'transparent',
 															borderColor: '#000000',
@@ -315,64 +338,89 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 													</span>
 												) : (
 													<span
-														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border"
-														style={{ borderColor: '#000000' }}
+														className="inline-flex items-center justify-center rounded-[6px] border flex-shrink-0"
+														style={{
+															width: '39px',
+															height: '20px',
+															borderColor: '#000000',
+														}}
 													/>
 												);
 											})()}
 											{contact?.city ? (
 												<ScrollableText
 													text={contact.city}
-													className="text-[10px] text-black leading-none max-w-[70px]"
+													className="text-[12px] font-inter font-normal text-black leading-none"
 												/>
 											) : null}
 										</div>
-
-										{contact?.headline ? (
-											<div className="w-[92px] h-[10px] rounded-[3.71px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
-												<ScrollableText
-													text={contact.headline}
-													className="text-[8px] text-black leading-none px-1"
-												/>
-											</div>
-										) : null}
 									</div>
 
-									{/* Content grid */}
-									<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px] pl-[22px]">
-										{/* Row 1: Name + Location */}
-										<div className="row-start-1 col-start-1 flex items-center">
-											<div className="font-bold text-[11px] truncate leading-none">
-												{contactName}
-											</div>
-										</div>
-
-										{/* Row 2: Company + Headline (only when there is a separate name) */}
+									{/* Content flex column */}
+									<div className="flex flex-col justify-center h-full pl-[30px] gap-[2px] pr-[30px]">
+										{/* Row 1 & 2: Name / Company */}
 										{(() => {
-											const hasSeparateName = Boolean(
-												(contact?.name && contact.name.trim()) ||
-													(contact?.firstName && contact.firstName.trim()) ||
-													(contact?.lastName && contact.lastName.trim())
-											);
+											const topRowMargin = contact?.headline
+												? 'mr-[220px]'
+												: 'mr-[120px]';
+											if (hasSeparateName) {
+												return (
+													<>
+														{/* Name */}
+														<div
+															className={cn(
+																'flex items-center min-h-[20px]',
+																topRowMargin
+															)}
+														>
+															<div className="text-[15px] font-inter font-semibold truncate leading-none">
+																{contactName}
+															</div>
+														</div>
+														{/* Company */}
+														<div
+															className={cn(
+																'flex items-center min-h-[20px]',
+																topRowMargin
+															)}
+														>
+															<div className="text-[15px] font-inter font-medium text-black leading-tight line-clamp-2">
+																{contact?.company || ''}
+															</div>
+														</div>
+													</>
+												);
+											}
+
+											// No separate name - Company (in contactName) spans 2 rows height
 											return (
-												<div className="row-start-2 col-start-1 flex items-center pr-2">
-													<div className="text-[11px] text-black truncate leading-none">
-														{hasSeparateName ? contact?.company || '' : ''}
+												<div
+													className={cn(
+														'flex items-center min-h-[42px] pb-[6px]',
+														topRowMargin
+													)}
+												>
+													<div className="text-[15px] font-inter font-medium text-black leading-tight line-clamp-2">
+														{contactName}
 													</div>
 												</div>
 											);
 										})()}
 
 										{/* Row 3: Subject */}
-										<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center">
-											{draft.subject || 'No subject'}
+										<div className="flex items-center min-h-[14px]">
+											<div className="text-[14px] font-inter font-semibold text-black truncate leading-none">
+												{draft.subject || 'No subject'}
+											</div>
 										</div>
 
 										{/* Row 4: Message preview */}
-										<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center">
-											{draft.message
-												? draft.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
-												: 'No content'}
+										<div className="flex items-center min-h-[14px]">
+											<div className="text-[10px] text-gray-500 truncate leading-none">
+												{draft.message
+													? draft.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
+													: 'No content'}
+											</div>
 										</div>
 									</div>
 								</div>
@@ -460,9 +508,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									}
 								/>
 							) : (
-								<div
-									className="w-full h-full rounded-[4px] border-[3px] border-[#000000] flex overflow-hidden"
-								>
+								<div className="w-full h-full rounded-[4px] border-[3px] border-[#000000] flex overflow-hidden">
 									<button
 										type="button"
 										className={cn(
