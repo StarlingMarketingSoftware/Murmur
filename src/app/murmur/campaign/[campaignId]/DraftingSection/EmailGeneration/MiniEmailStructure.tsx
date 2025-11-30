@@ -338,7 +338,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	const hybridButtonRef = useRef<HTMLButtonElement>(null);
 	const handwrittenButtonRef = useRef<HTMLButtonElement>(null);
 	const [highlightStyle, setHighlightStyle] = useState<{ left: number; opacity: number }>(
-		{ left: 0, opacity: 0 }
+		{ left: 0, opacity: 1 }
 	);
 
 	useEffect(() => {
@@ -645,11 +645,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								<div ref={modeContainerRef} className="relative flex items-center gap-6">
 									<div
 										className="absolute top-1/2 -translate-y-1/2 z-10 pointer-events-none"
-										style={{
-											left: highlightStyle.left,
-											transition: 'left 0.25s ease-in-out, opacity 0.2s ease-in-out',
-											opacity: highlightStyle.opacity,
-										}}
+									style={{
+										left: highlightStyle.left,
+										transition: 'left 0.25s ease-in-out',
+										opacity: highlightStyle.opacity,
+									}}
 									>
 										<div
 											style={{

@@ -1085,7 +1085,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const [highlightStyle, setHighlightStyle] = useState({
 		left: 0,
 		width: 0,
-		opacity: 0,
+		opacity: 1,
 	});
 	const [isInitialRender, setIsInitialRender] = useState(true);
 
