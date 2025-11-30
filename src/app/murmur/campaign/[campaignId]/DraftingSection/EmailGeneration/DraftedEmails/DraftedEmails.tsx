@@ -435,17 +435,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						</div>
 					</div>
 
-					<div className="w-full flex items-center justify-center">
-						<div
-							className="flex items-stretch rounded-[6px] overflow-hidden"
-							style={{
-								width: '100%',
-								height: '28px',
-								border: '1px solid #000000',
-								backgroundColor: 'transparent',
-							}}
-						>
-							{props.isSendingDisabled ? (
+					<div className="relative w-[475px] h-[40px] mx-auto">
+						{hasSelection ? (
+							props.isSendingDisabled ? (
 								<UpgradeSubscriptionDrawer
 									triggerButtonText={
 										showConfirm
@@ -456,10 +448,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									}
 									buttonVariant="primary"
 									className={cn(
-										'flex-1 h-full !rounded-none !border-0 !bg-[#68C575] !text-black !font-inter !font-medium !text-[14px] !flex !items-center !justify-center border-r border-[#000000]',
+										'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] !flex !items-center !justify-center',
 										hasSelection
-											? 'hover:!bg-[#5FA968] active:!bg-[#569D60]'
-											: '!opacity-50 !cursor-not-allowed pointer-events-none'
+											? '!bg-[#C7F2C9] !border-[#349A37] hover:!bg-[#B9E7BC] cursor-pointer'
+											: '!bg-[#E0E0E0] !border-[#A0A0A0] !cursor-not-allowed !opacity-60 pointer-events-none'
 									)}
 									message={
 										props.isFreeTrial
@@ -468,48 +460,56 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									}
 								/>
 							) : (
-								<Button
-									type="button"
-									className={cn(
-										'flex-1 h-full rounded-none font-inter font-medium text-[14px] flex items-center justify-center transition-all duration-200 border-r border-[#000000]',
-										showConfirm
-											? 'bg-[#68C575] text-black'
+								<div
+									className="w-full h-full rounded-[4px] border-[3px] border-[#000000] flex overflow-hidden"
+								>
+									<button
+										type="button"
+										className={cn(
+											'flex-1 h-full flex items-center justify-center text-center text-black font-inter font-normal text-[17px] pl-[62px]',
+											hasSelection
+												? 'bg-[#FFDC9F] hover:bg-[#F4C87E] cursor-pointer'
+												: 'bg-[#E0E0E0] cursor-not-allowed opacity-60'
+										)}
+										onClick={async () => {
+											if (!hasSelection) return;
+											if (!showConfirm) {
+												setShowConfirm(true);
+												setTimeout(() => setShowConfirm(false), 10000);
+												return;
+											}
+											setShowConfirm(false);
+											await props.onSend();
+										}}
+										disabled={!hasSelection}
+									>
+										{showConfirm
+											? 'Click to Confirm and Send'
 											: hasSelection
-											? 'bg-[#68C575] text-black hover:bg-[#5FA968] active:bg-[#569D60]'
-											: 'bg-[#68C575] text-black opacity-50 cursor-not-allowed'
-									)}
-									onClick={async () => {
-										if (!hasSelection) return;
-										if (!showConfirm) {
+											? `Send ${selectedCount} Selected`
+											: 'Send'}
+									</button>
+
+									{/* Right section "All" button */}
+									<button
+										type="button"
+										className="w-[62px] h-full bg-[#C69A4D] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#B2863F] cursor-pointer border-l-[2px] border-[#000000]"
+										onClick={(e) => {
+											e.stopPropagation();
+											handleSelectAllDrafts();
 											setShowConfirm(true);
 											setTimeout(() => setShowConfirm(false), 10000);
-											return;
-										}
-										setShowConfirm(false);
-										await props.onSend();
-									}}
-									disabled={!hasSelection}
-								>
-									{showConfirm
-										? 'Click to Confirm and Send'
-										: hasSelection
-										? `Send ${selectedCount} Selected`
-										: 'Send'}
-								</Button>
-							)}
-							<Button
-								type="button"
-								variant="ghost"
-								className="w-[56px] h-full rounded-none text-black font-inter font-medium text-[14px]"
-								onClick={() => {
-									handleSelectAllDrafts();
-									setShowConfirm(true);
-									setTimeout(() => setShowConfirm(false), 10000);
-								}}
-							>
-								All
-							</Button>
-						</div>
+										}}
+									>
+										All
+									</button>
+								</div>
+							)
+						) : (
+							<div className="w-full h-full flex items-center justify-center text-center text-[15px] font-inter text-black">
+								Select Drafts and Send Emails
+							</div>
+						)}
 					</div>
 				</div>
 			)}
