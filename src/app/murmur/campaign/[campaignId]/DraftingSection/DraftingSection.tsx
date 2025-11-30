@@ -947,8 +947,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									style={{
 										right:
 											view === 'search'
-												? 'calc(50% + 384px + 37px)'
-												: 'calc(50% + 250px + 24px)',
+												? 'calc(50% + 384px + 32px)'
+												: 'calc(50% + 250px + 32px)',
 										top: '29px',
 										gap: '16px',
 									}}
@@ -1029,11 +1029,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<div
 									className="absolute hidden xl:block"
 									style={{
-										top: '17px',
+										top: '29px',
 										left:
 											view === 'search'
-												? 'calc(50% + 384px + 37px)'
-												: 'calc(50% + 250px + 36px)',
+												? 'calc(50% + 384px + 32px)'
+												: 'calc(50% + 250px + 32px)',
 									}}
 								>
 									{view === 'testing' && showTestPreview ? (
@@ -1067,7 +1067,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									className="absolute hidden xl:block"
 									style={{
 										top: '29px',
-										left: 'calc(50% + 384px + 37px)',
+										left: 'calc(50% + 384px + 32px)',
 									}}
 								>
 									<div
@@ -1342,7 +1342,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									<div
 										className="absolute hidden lg:block"
 										style={{
-											left: 'calc(50% + 250px + 50px)',
+											left: 'calc(50% + 250px + 32px)',
 											top: '0',
 										}}
 									>
