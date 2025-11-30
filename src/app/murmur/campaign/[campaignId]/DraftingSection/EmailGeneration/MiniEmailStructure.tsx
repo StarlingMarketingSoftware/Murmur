@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { HybridBlock } from '@prisma/client';
 import { cn } from '@/utils';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
+import CloseButtonIcon from '@/components/atoms/_svg/CloseButtonIcon';
 
 interface MiniEmailStructureProps {
 	form: UseFormReturn<DraftingFormValues>;
@@ -364,6 +365,51 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		form.setValue('hybridBlockPrompts', blocks, { shouldDirty: true });
 	};
 
+	// Normalize blocks into proper slot order: intro -> text -> research -> text -> action -> text
+	// Only allows ONE text block per slot (no consecutive text blocks)
+	const normalizeBlockOrder = (
+		blocks: Array<{ id: string; type: HybridBlock; value: string }>
+	) => {
+		const slots: Array<'introduction' | 'research' | 'action'> = [
+			'introduction',
+			'research',
+			'action',
+		];
+		const slotCore: Record<
+			'introduction' | 'research' | 'action',
+			{ id: string; type: HybridBlock; value: string } | null
+		> = { introduction: null, research: null, action: null };
+		const slotText: Record<
+			'introduction' | 'research' | 'action',
+			{ id: string; type: HybridBlock; value: string } | null
+		> = { introduction: null, research: null, action: null };
+
+		let currentSlot: 'introduction' | 'research' | 'action' = 'introduction';
+		for (const b of blocks) {
+			if (b.type === 'introduction' || b.type === 'research' || b.type === 'action') {
+				slotCore[b.type] = b;
+				currentSlot = b.type;
+			} else if (b.type === 'text') {
+				// Only keep the first text block per slot (prevents consecutive text blocks)
+				if (!slotText[currentSlot]) {
+					slotText[currentSlot] = b;
+				}
+			}
+		}
+
+		// Rebuild in proper order: core -> text (max 1) for each slot
+		const normalized: Array<{ id: string; type: HybridBlock; value: string }> = [];
+		for (const slot of slots) {
+			if (slotCore[slot]) {
+				normalized.push(slotCore[slot]!);
+			}
+			if (slotText[slot]) {
+				normalized.push(slotText[slot]!);
+			}
+		}
+		return normalized;
+	};
+
 	const addTextBlockAt = (index: number) => {
 		const newText = {
 			id: `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -372,7 +418,51 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		};
 		const blocks = [...(form.getValues('hybridBlockPrompts') || [])];
 		blocks.splice(index + 1, 0, newText);
-		form.setValue('hybridBlockPrompts', blocks, { shouldDirty: true });
+		const normalized = normalizeBlockOrder(blocks);
+		form.setValue('hybridBlockPrompts', normalized, { shouldDirty: true });
+	};
+
+	// Add one text block at the first available slot position (after each core block in order)
+	const addTextBlocksBetweenAll = () => {
+		const currentBlocks = form.getValues('hybridBlockPrompts') || [];
+		if (currentBlocks.length === 0) return;
+
+		// Parse into slot structure
+		const slots: Array<'introduction' | 'research' | 'action'> = [
+			'introduction',
+			'research',
+			'action',
+		];
+		const slotCore: Record<string, boolean> = {};
+		const slotHasText: Record<string, boolean> = {
+			introduction: false,
+			research: false,
+			action: false,
+		};
+
+		let currentSlot = 'introduction';
+		for (const b of currentBlocks) {
+			if (b.type === 'introduction' || b.type === 'research' || b.type === 'action') {
+				slotCore[b.type] = true;
+				currentSlot = b.type;
+			} else if (b.type === 'text') {
+				slotHasText[currentSlot] = true;
+			}
+		}
+
+		// Find the first slot that has a core block but no text block after it
+		for (const slot of slots) {
+			if (slotCore[slot] && !slotHasText[slot]) {
+				// Find the index of this core block and add text after it
+				const coreIndex = currentBlocks.findIndex((b) => b.type === slot);
+				if (coreIndex !== -1) {
+					addTextBlockAt(coreIndex);
+					return;
+				}
+			}
+		}
+
+		// If all slots with core blocks already have text, do nothing (max 1 text per slot)
 	};
 
 	const addHybridBlock = (type: HybridBlock) => {
@@ -440,7 +530,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 			if (!allowed) return; // keep Intro until other cores are removed
 		}
 		const blocks = currentBlocks.filter((b) => b.id !== id);
-		form.setValue('hybridBlockPrompts', blocks, { shouldDirty: true });
+		const normalized = normalizeBlockOrder(blocks);
+		form.setValue('hybridBlockPrompts', normalized, { shouldDirty: true });
 	};
 
 	const updateSignature = (value: string) => {
@@ -739,66 +830,102 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																isMobileLandscape ? 'items-center' : 'items-stretch'
 															)}
 														>
-															<div
-																className={cn(
-																	'border-l border-black',
-																	isExpanded
-																		? 'h-[21px]'
-																		: draftingMode === 'hybrid'
-																		? 'h-[22px]'
-																		: 'h-[27px] max-[480px]:h-[20px]',
-																	!isExpanded && isMobileLandscape && 'h-[20px]'
-																)}
-															/>
+															{draftingMode !== 'hybrid' && (
+																<div
+																	className={cn(
+																		'border-l border-black',
+																		isExpanded
+																			? 'h-[21px]'
+																			: 'h-[27px] max-[480px]:h-[20px]',
+																		!isExpanded && isMobileLandscape && 'h-[20px]'
+																	)}
+																/>
+															)}
 															<button
 																type="button"
 																onClick={() => {
 																	setExpandedBlocks((prev) => {
-																		const next = new Set(prev);
-																		if (isExpanded) next.delete(b.id);
-																		else next.add(b.id);
-																		return next;
+																		// Only allow one expanded at a time
+																		if (prev.has(b.id)) {
+																			return new Set();
+																		}
+																		return new Set([b.id]);
 																	});
 																}}
 																className={cn(
-																	'w-[75px] h-full flex items-center justify-center text-[11px] leading-none cursor-pointer appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none',
-																	isExpanded
+																	'h-full flex items-center justify-center cursor-pointer appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none',
+																	draftingMode === 'hybrid'
+																		? 'w-[26px]'
+																		: 'w-[75px] text-[11px] leading-none',
+																	draftingMode === 'hybrid'
+																		? ''
+																		: isExpanded
 																		? 'text-white bg-[#5353AF] hover:bg-[#4a4a9d]'
 																		: 'text-black/80 hover:bg-black/5'
 																)}
 															>
-																Advanced
-															</button>
-															<div
-																className={cn(
-																	'border-l border-black',
-																	isExpanded
-																		? 'h-[21px]'
-																		: draftingMode === 'hybrid'
-																		? 'h-[22px]'
-																		: 'h-[27px] max-[480px]:h-[20px]',
-																	!isExpanded && isMobileLandscape && 'h-[20px]'
+																{draftingMode === 'hybrid' ? (
+																	<svg
+																		width="7"
+																		height="5"
+																		viewBox="0 0 7 5"
+																		fill="none"
+																		xmlns="http://www.w3.org/2000/svg"
+																	>
+																		<path
+																			d="M0.796875 0.796875L3.12021 3.34412L5.44355 0.796875"
+																			stroke="black"
+																			strokeWidth="1.59374"
+																			strokeLinecap="round"
+																			strokeLinejoin="round"
+																		/>
+																	</svg>
+																) : (
+																	'Advanced'
 																)}
-															/>
-															<button
-																type="button"
-																onClick={() => removeBlock(b.id)}
-																className={cn(
-																	'w-[30px] h-full flex items-center justify-center leading-none font-bold text-red-600 hover:bg-black/10 appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none',
-																	isMobileLandscape ? 'text-[16px]' : 'text-[18px]'
-																)}
-																aria-label="Remove block"
-															>
-																×
 															</button>
+															{draftingMode !== 'hybrid' && (
+																<>
+																	<div
+																		className={cn(
+																			'border-l border-black',
+																			isExpanded
+																				? 'h-[21px]'
+																				: 'h-[27px] max-[480px]:h-[20px]',
+																			!isExpanded && isMobileLandscape && 'h-[20px]'
+																		)}
+																	/>
+																	<button
+																		type="button"
+																		onClick={() => removeBlock(b.id)}
+																		className={cn(
+																			'w-[30px] h-full flex items-center justify-center leading-none font-bold text-red-600 hover:bg-black/10 appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none',
+																			isMobileLandscape ? 'text-[16px]' : 'text-[18px]'
+																		)}
+																		aria-label="Remove block"
+																	>
+																		×
+																	</button>
+																</>
+															)}
 														</div>
 													</div>
 													{isExpanded && (
-														<div className="flex-1 flex flex-col min-h-0">
+														<div className="flex-1 flex flex-col min-h-0 relative">
 															<div
 																className="h-[2px] w-full"
 																style={{ backgroundColor: strokeColor }}
 															/>
+															{draftingMode === 'hybrid' && (
+																<button
+																	type="button"
+																	onClick={() => removeBlock(b.id)}
+																	className="absolute top-[10px] right-[9px] cursor-pointer z-10"
+																	aria-label="Remove block"
+																>
+																	<CloseButtonIcon width={7} height={7} />
+																</button>
+															)}
 															<div className="flex-1 px-3 py-1 flex items-center bg-white">
 																<textarea
 																	className="w-full bg-white text-[11px] outline-none focus:outline-none placeholder:italic placeholder:text-[#5d5d5d] resize-none leading-tight"
@@ -825,97 +952,186 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									id: string;
 									type: HybridBlock;
 									value: string | null;
-								}) => (
-									<Fragment key={b.id}>
-										<div
-											className={cn(
-												'rounded-[8px] border-2 bg-white px-2 py-1 relative',
-												draftingMode === 'hybrid'
-													? 'w-[351px] ml-[2.5%]'
-													: 'w-[95%] max-[480px]:w-[89.33vw] mx-auto',
-												b.type === 'full_automated' && 'mini-full-auto-card'
-											)}
-											style={{
-												borderColor:
-													(draftingMode === 'handwritten' || draftingMode === 'hybrid') &&
-													b.type === 'text'
-														? '#53A25D'
-														: b.type === 'full_automated'
-														? '#51A2E4'
-														: '#000000',
-											}}
-										>
-											<div className="flex items-center justify-between">
-												<div className="flex items-center gap-2">
-													<span
-														className={cn(
-															'font-inter text-[12px] font-semibold text-black',
-															b.type === 'full_automated' && 'whitespace-nowrap'
-														)}
-													>
-														{blockLabel(b.type as HybridBlock)}
-													</span>
-												</div>
-												<div className="flex items-center gap-2">
-													{blockHint(b.type as HybridBlock) && (
-														<span className="text-[10px] italic text-[#5d5d5d]">
-															{blockHint(b.type as HybridBlock)}
-														</span>
+								}) => {
+									// For text blocks in hybrid mode, render like hybrid core blocks
+									if (draftingMode === 'hybrid' && b.type === 'text') {
+										const isTextExpanded = expandedBlocks.has(b.id);
+										return (
+											<Fragment key={b.id}>
+												<div
+													className={cn(
+														'rounded-[8px] border-2 border-black overflow-hidden relative w-[351px] ml-[2.5%]',
+														isTextExpanded ? 'h-[78px]' : 'h-[26px]'
 													)}
-													{b.type !== 'full_automated' && (
-														<button
-															type="button"
-															className="text-[12px] text-[#b30000] hover:text-red-600"
-															onClick={() => removeBlock(b.id)}
-															aria-label="Remove block"
+													style={{ backgroundColor: '#A2E2AF' }}
+												>
+													<div className="w-full h-full flex flex-col">
+														<div
+															className={cn(
+																'flex flex-row items-center flex-shrink-0',
+																isTextExpanded ? 'h-[21px]' : 'h-[26px]'
+															)}
 														>
-															×
-														</button>
-													)}
-												</div>
-											</div>
-											{b.type === 'full_automated' ? (
-												<div className="mt-1">
-													<div className="relative">
-														{!b.value && (
-															<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px] max-[480px]:text-[10px] mini-full-auto-placeholder">
-																<div className="space-y-2">
-																	<div>
-																		<p>Type anything you wnat to include</p>
-																	</div>
+															<div className="flex-1 flex h-full px-3 items-center">
+																<span className="font-inter text-[12px] leading-none font-semibold text-black">
+																	{blockLabel(b.type as HybridBlock)}
+																</span>
+															</div>
+															<div className="flex flex-row h-full items-center">
+																<button
+																	type="button"
+																	onClick={() => {
+																		setExpandedBlocks((prev) => {
+																			// Only allow one expanded at a time
+																			if (prev.has(b.id)) {
+																				return new Set();
+																			}
+																			return new Set([b.id]);
+																		});
+																	}}
+																	className="w-[26px] h-full flex items-center justify-center cursor-pointer appearance-none border-0 outline-none focus:outline-none focus:ring-0 rounded-none select-none"
+																>
+																	<svg
+																		width="7"
+																		height="5"
+																		viewBox="0 0 7 5"
+																		fill="none"
+																		xmlns="http://www.w3.org/2000/svg"
+																	>
+																		<path
+																			d="M0.796875 0.796875L3.12021 3.34412L5.44355 0.796875"
+																			stroke="black"
+																			strokeWidth="1.59374"
+																			strokeLinecap="round"
+																			strokeLinejoin="round"
+																		/>
+																	</svg>
+																</button>
+															</div>
+														</div>
+														{isTextExpanded && (
+															<div className="flex-1 flex flex-col min-h-0 relative">
+																<div className="h-[2px] w-full bg-black" />
+																<button
+																	type="button"
+																	onClick={() => removeBlock(b.id)}
+																	className="absolute top-[10px] right-[9px] cursor-pointer z-10"
+																	aria-label="Remove block"
+																>
+																	<CloseButtonIcon width={7} height={7} />
+																</button>
+																<div className="flex-1 px-3 py-1 flex items-center bg-white">
+																	<textarea
+																		className="w-full bg-white text-[11px] outline-none focus:outline-none resize-none leading-tight"
+																		placeholder=""
+																		value={b.value || ''}
+																		onChange={(e) =>
+																			updateBlockValue(b.id, e.target.value)
+																		}
+																		tabIndex={isTextExpanded ? 0 : -1}
+																		rows={2}
+																	/>
 																</div>
 															</div>
 														)}
-														<textarea
-															className={cn(
-																'border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 w-full max-w-full min-w-0',
-																'h-[70px] py-2 pr-2 px-0 resize-none',
-																'bg-white text-[12px] leading-[16px]',
-																'mini-full-auto-textarea'
-															)}
-															placeholder=""
-															value={b.value || ''}
-															onChange={(e) => updateBlockValue(b.id, e.target.value)}
-														/>
 													</div>
 												</div>
-											) : (
-												<textarea
-													className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none max-[480px]:placeholder:text-[8px]"
-													placeholder={
-														draftingMode === 'hybrid'
-															? ''
-															: b.type === 'text'
-															? 'Write the exact text you want in your email here. *required'
-															: 'Type here to specify further, e.g., "I am ... and I lead ..."'
-													}
-													value={b.value || ''}
-													onChange={(e) => updateBlockValue(b.id, e.target.value)}
-												/>
-											)}
-										</div>
-									</Fragment>
-								);
+											</Fragment>
+										);
+									}
+
+									// Default rendering for non-hybrid or non-text blocks
+									return (
+										<Fragment key={b.id}>
+											<div
+												className={cn(
+													'rounded-[8px] border-2 bg-white px-2 py-1 relative',
+													draftingMode === 'hybrid'
+														? 'w-[351px] ml-[2.5%]'
+														: 'w-[95%] max-[480px]:w-[89.33vw] mx-auto',
+													b.type === 'full_automated' && 'mini-full-auto-card'
+												)}
+												style={{
+													borderColor:
+														(draftingMode === 'handwritten' ||
+															draftingMode === 'hybrid') &&
+														b.type === 'text'
+															? '#53A25D'
+															: b.type === 'full_automated'
+															? '#51A2E4'
+															: '#000000',
+												}}
+											>
+												<div className="flex items-center justify-between">
+													<div className="flex items-center gap-2">
+														<span
+															className={cn(
+																'font-inter text-[12px] font-semibold text-black',
+																b.type === 'full_automated' && 'whitespace-nowrap'
+															)}
+														>
+															{blockLabel(b.type as HybridBlock)}
+														</span>
+													</div>
+													<div className="flex items-center gap-2">
+														{blockHint(b.type as HybridBlock) && (
+															<span className="text-[10px] italic text-[#5d5d5d]">
+																{blockHint(b.type as HybridBlock)}
+															</span>
+														)}
+														{b.type !== 'full_automated' && draftingMode !== 'hybrid' && (
+															<button
+																type="button"
+																className="text-[12px] text-[#b30000] hover:text-red-600"
+																onClick={() => removeBlock(b.id)}
+																aria-label="Remove block"
+															>
+																×
+															</button>
+														)}
+													</div>
+												</div>
+												{b.type === 'full_automated' ? (
+													<div className="mt-1">
+														<div className="relative">
+															{!b.value && (
+																<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px] max-[480px]:text-[10px] mini-full-auto-placeholder">
+																	<div className="space-y-2">
+																		<div>
+																			<p>Type anything you wnat to include</p>
+																		</div>
+																	</div>
+																</div>
+															)}
+															<textarea
+																className={cn(
+																	'border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 w-full max-w-full min-w-0',
+																	'h-[70px] py-2 pr-2 px-0 resize-none',
+																	'bg-white text-[12px] leading-[16px]',
+																	'mini-full-auto-textarea'
+																)}
+																placeholder=""
+																value={b.value || ''}
+																onChange={(e) => updateBlockValue(b.id, e.target.value)}
+															/>
+														</div>
+													</div>
+												) : (
+													<textarea
+														className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none max-[480px]:placeholder:text-[8px]"
+														placeholder={
+															b.type === 'text'
+																? 'Write the exact text you want in your email here. *required'
+																: 'Type here to specify further, e.g., "I am ... and I lead ..."'
+														}
+														value={b.value || ''}
+														onChange={(e) => updateBlockValue(b.id, e.target.value)}
+													/>
+												)}
+											</div>
+										</Fragment>
+									);
+								};
 
 								if (draftingMode !== 'hybrid') {
 									return hybridBlocks.map((b) =>
@@ -1027,16 +1243,20 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										<div className="font-inter text-[12px] font-semibold text-black shrink-0">
 											Signature
 										</div>
-										<input
-											type="text"
-											className="flex-1 text-[12px] outline-none focus:outline-none bg-transparent signature-textarea"
-											placeholder="Your signature..."
-											value={signature}
-											onChange={(e) => updateSignature(e.target.value)}
-										/>
+										{!isCompactSignature && (
+											<input
+												type="text"
+												className="flex-1 text-[12px] outline-none focus:outline-none bg-transparent signature-textarea"
+												placeholder="Your signature..."
+												value={signature}
+												onChange={(e) => updateSignature(e.target.value)}
+											/>
+										)}
 									</div>
-									<div
-										className="w-[30px] h-[30px] shrink-0 rounded-[8px] border-2 border-black flex items-center justify-center"
+									<button
+										type="button"
+										onClick={addTextBlocksBetweenAll}
+										className="w-[30px] h-[30px] shrink-0 rounded-[8px] border-2 border-black flex items-center justify-center cursor-pointer"
 										style={{ backgroundColor: '#A6E2AB' }}
 									>
 										<svg
@@ -1052,7 +1272,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												strokeWidth="1"
 											/>
 										</svg>
-									</div>
+									</button>
 								</div>
 							) : (
 								<div
@@ -1090,16 +1310,20 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								<div className="font-inter text-[12px] font-semibold text-black shrink-0">
 									Signature
 								</div>
-								<input
-									type="text"
-									className="flex-1 text-[12px] outline-none focus:outline-none bg-transparent signature-textarea"
-									placeholder="Your signature..."
-									value={signature}
-									onChange={(e) => updateSignature(e.target.value)}
-								/>
+								{!isCompactSignature && (
+									<input
+										type="text"
+										className="flex-1 text-[12px] outline-none focus:outline-none bg-transparent signature-textarea"
+										placeholder="Your signature..."
+										value={signature}
+										onChange={(e) => updateSignature(e.target.value)}
+									/>
+								)}
 							</div>
-							<div
-								className="w-[30px] h-[30px] rounded-[8px] border-2 border-black flex items-center justify-center"
+							<button
+								type="button"
+								onClick={addTextBlocksBetweenAll}
+								className="w-[30px] h-[30px] rounded-[8px] border-2 border-black flex items-center justify-center cursor-pointer"
 								style={{ backgroundColor: '#A6E2AB' }}
 							>
 								<svg
@@ -1111,7 +1335,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								>
 									<path d="M7.5 0.5V14.5M0.5 7.5H14.5" stroke="#000000" strokeWidth="1" />
 								</svg>
-							</div>
+							</button>
 						</div>
 					) : (
 						<div
