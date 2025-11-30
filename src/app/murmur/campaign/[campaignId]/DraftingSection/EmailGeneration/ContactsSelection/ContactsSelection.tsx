@@ -856,7 +856,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 					</div>
 				}
 			>
-				<div className="overflow-visible w-full flex flex-col gap-2 items-center">
+				<div className="overflow-visible w-full flex flex-col gap-4 items-center">
 					{contacts.map((contact) => (
 						<div
 							key={contact.id}
@@ -928,7 +928,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 											{/* Bottom Left - Company */}
 											<div className="pl-3 pr-1 flex items-center h-[24px]">
-												<div className="text-[11px] text-black w-full truncate leading-tight">
+												<div className="text-[15px] font-medium text-black w-full truncate leading-tight">
 													{contact.company || ''}
 												</div>
 											</div>
@@ -1020,7 +1020,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 														}}
 													/>
 												)}
-												<div className="font-bold text-[11px] text-black w-full truncate leading-tight">
+												<div className="font-medium text-[15px] text-black w-full truncate leading-tight">
 													{contact.company || 'Contact'}
 												</div>
 											</div>

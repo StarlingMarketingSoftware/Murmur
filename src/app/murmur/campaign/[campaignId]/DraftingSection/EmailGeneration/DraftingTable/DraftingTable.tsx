@@ -383,7 +383,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							))}
 						</div>
 					) : isContacts ? (
-						<div className="overflow-visible w-full flex flex-col gap-2 items-center py-2">
+						<div className="overflow-visible w-full flex flex-col gap-4 items-center py-2">
 							{Array.from({ length: 9 }).map((_, idx) => (
 								<div
 									key={idx}
