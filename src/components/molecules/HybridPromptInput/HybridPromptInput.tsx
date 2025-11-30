@@ -75,8 +75,11 @@ const SortableAIBlock = ({
 	const [hasBeenTouched, setHasBeenTouched] = useState(false);
 	// Track if advanced mode is enabled for hybrid blocks
 	const [isAdvancedEnabled, setIsAdvancedEnabled] = useState(false);
-	// Track selected power mode for Full Auto block ('normal' or 'high')
-	const [selectedPowerMode, setSelectedPowerMode] = useState<'normal' | 'high'>('normal');
+	// Power mode from form (shared with MiniEmailStructure)
+	const selectedPowerMode = form.watch('powerMode') || 'normal';
+	const setSelectedPowerMode = (mode: 'normal' | 'high') => {
+		form.setValue('powerMode', mode, { shouldDirty: true });
+	};
 	// When a block is opened (advanced), focus its input once
 	const advancedInputRef = useRef<HTMLInputElement | null>(null);
 	useEffect(() => {

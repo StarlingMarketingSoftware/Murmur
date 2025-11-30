@@ -111,6 +111,7 @@ export const draftingFormSchema = z.object({
 	signature: z.string().optional(),
 	draftingTone: z.nativeEnum(DraftingTone).default(DraftingTone.normal),
 	paragraphs: z.number().min(0).max(5).default(3),
+	powerMode: z.enum(['normal', 'high']).default('normal'),
 });
 
 export type DraftingFormValues = z.infer<typeof draftingFormSchema>;
