@@ -172,7 +172,7 @@ export const MiniSearchBar: FC<{
 								fontSize: isCompact ? '13px' : '18px',
 							}}
 						>
-							Kind
+							Why
 						</div>
 						<div
 							className="absolute left-[16px] right-[8px]"
@@ -217,7 +217,7 @@ export const MiniSearchBar: FC<{
 								fontSize: isCompact ? '13px' : '18px',
 							}}
 						>
-							Who
+							What
 						</div>
 						<div
 							className="absolute left-[16px] right-[8px]"
