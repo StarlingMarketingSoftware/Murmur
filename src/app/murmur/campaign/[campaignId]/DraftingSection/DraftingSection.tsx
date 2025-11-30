@@ -1016,6 +1016,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												hideTopChrome
 												hideFooter
 												fullWidthMobile
+												hideAddTextButtons
 											/>
 										</div>
 									)}

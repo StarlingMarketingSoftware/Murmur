@@ -30,6 +30,8 @@ interface MiniEmailStructureProps {
 	hideFooter?: boolean;
 	/** When true, use 100% width so parent can control width on mobile */
 	fullWidthMobile?: boolean;
+	/** When true, hides the +Text buttons on the left side */
+	hideAddTextButtons?: boolean;
 }
 
 export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
@@ -43,6 +45,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	hideTopChrome,
 	hideFooter,
 	fullWidthMobile,
+	hideAddTextButtons,
 }) => {
 	const watchedHybridBlocks = form.watch('hybridBlockPrompts');
 	const hybridBlocks = useMemo(() => watchedHybridBlocks || [], [watchedHybridBlocks]);
@@ -213,8 +216,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		}
 	};
 
-	// Subtitle hint shown next to hybrid block labels
+	// Subtitle hint shown next to hybrid block labels (hidden in hybrid mode)
 	const blockHint = (type: HybridBlock) => {
+		if (draftingMode === 'hybrid') return null;
 		if (type === 'introduction') return 'Automated Intro';
 		if (type === 'research') return 'Automated';
 		if (type === 'action') return 'Automated Call to Action';
@@ -660,7 +664,14 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						</div>
 
 						{/* Blocks list - overflow visible to show buttons outside */}
-						<div className="flex flex-col gap-[25px] max-[480px]:gap-[40px] overflow-visible">
+						<div
+							className={cn(
+								'flex flex-col overflow-visible',
+								draftingMode === 'hybrid'
+									? 'gap-[7px]'
+									: 'gap-[25px] max-[480px]:gap-[40px]'
+							)}
+						>
 							{(() => {
 								// Renderers reused below
 								const renderHybridCore = (b: {
@@ -682,8 +693,15 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													blockRefs.current[b.id] = el;
 												}}
 												className={cn(
-													'rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden relative w-[95%] max-[480px]:w-[89.33vw] mx-auto',
-													isExpanded ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]',
+													'rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden relative',
+													draftingMode === 'hybrid'
+														? 'w-[351px] ml-[2.5%]'
+														: 'w-[95%] max-[480px]:w-[89.33vw] mx-auto',
+													isExpanded
+														? 'h-[78px]'
+														: draftingMode === 'hybrid'
+														? 'h-[26px]'
+														: 'h-[31px] max-[480px]:h-[24px]',
 													!isExpanded && isMobileLandscape && 'h-[24px]'
 												)}
 												style={{ borderColor: strokeColor }}
@@ -692,7 +710,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													<div
 														className={cn(
 															'flex flex-row items-center flex-shrink-0',
-															isExpanded ? 'h-[21px]' : 'h-[31px] max-[480px]:h-[24px]',
+															isExpanded
+																? 'h-[21px]'
+																: draftingMode === 'hybrid'
+																? 'h-[26px]'
+																: 'h-[31px] max-[480px]:h-[24px]',
 															!isExpanded && isMobileLandscape && 'h-[24px]'
 														)}
 													>
@@ -722,6 +744,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																	'border-l border-black',
 																	isExpanded
 																		? 'h-[21px]'
+																		: draftingMode === 'hybrid'
+																		? 'h-[22px]'
 																		: 'h-[27px] max-[480px]:h-[20px]',
 																	!isExpanded && isMobileLandscape && 'h-[20px]'
 																)}
@@ -750,6 +774,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																	'border-l border-black',
 																	isExpanded
 																		? 'h-[21px]'
+																		: draftingMode === 'hybrid'
+																		? 'h-[22px]'
 																		: 'h-[27px] max-[480px]:h-[20px]',
 																	!isExpanded && isMobileLandscape && 'h-[20px]'
 																)}
@@ -776,7 +802,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															<div className="flex-1 px-3 py-1 flex items-center bg-white">
 																<textarea
 																	className="w-full bg-white text-[11px] outline-none focus:outline-none placeholder:italic placeholder:text-[#5d5d5d] resize-none leading-tight"
-																	placeholder="Type here to specify further, i.e 'I am ... and I lead ...'"
+																	placeholder={
+																		draftingMode === 'hybrid'
+																			? ''
+																			: "Type here to specify further, i.e 'I am ... and I lead ...'"
+																	}
 																	value={b.value || ''}
 																	onChange={(e) => updateBlockValue(b.id, e.target.value)}
 																	tabIndex={isExpanded ? 0 : -1}
@@ -799,7 +829,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									<Fragment key={b.id}>
 										<div
 											className={cn(
-												'rounded-[8px] border-2 bg-white px-2 py-1 relative w-[95%] max-[480px]:w-[89.33vw] mx-auto',
+												'rounded-[8px] border-2 bg-white px-2 py-1 relative',
+												draftingMode === 'hybrid'
+													? 'w-[351px] ml-[2.5%]'
+													: 'w-[95%] max-[480px]:w-[89.33vw] mx-auto',
 												b.type === 'full_automated' && 'mini-full-auto-card'
 											)}
 											style={{
@@ -870,7 +903,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												<textarea
 													className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none max-[480px]:placeholder:text-[8px]"
 													placeholder={
-														b.type === 'text'
+														draftingMode === 'hybrid'
+															? ''
+															: b.type === 'text'
 															? 'Write the exact text you want in your email here. *required'
 															: 'Type here to specify further, e.g., "I am ... and I lead ..."'
 													}
@@ -946,14 +981,14 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											<div
 												key={`mini-ph-${slot}`}
 												className={cn(
-													'w-[95%] max-[480px]:w-[89.33vw] mx-auto h-[31px] max-[480px]:h-[24px] flex items-center justify-end',
+													'w-[351px] ml-[2.5%] h-[26px] flex items-center justify-end',
 													isMobileLandscape && 'h-[24px]'
 												)}
 											>
 												<Button
 													type="button"
 													onClick={() => addHybridBlock(slot)}
-													className="w-[76px] h-[26px] bg-white hover:bg-stone-100 active:bg-stone-200 border-2 rounded-[6px] !font-normal text-[10px] text-black inline-flex items-center justify-start gap-[4px] pl-[4px]"
+													className="w-[76px] h-[22px] bg-white hover:bg-stone-100 active:bg-stone-200 border-2 rounded-[6px] !font-normal text-[10px] text-black inline-flex items-center justify-start gap-[4px] pl-[4px]"
 													style={{ borderColor: colorFor(slot) }}
 													title={`Add ${labelFor(slot)}`}
 												>
@@ -983,19 +1018,57 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							)}
 							style={{ display: isMobileLandscape ? 'block' : undefined }}
 						>
-							<div
-								className="rounded-[8px] border-2 bg-white px-2 py-2 w-[95%] max-[480px]:w-[89.33vw] mx-auto"
-								style={{ borderColor: '#969696' }}
-							>
-								<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
-									Signature
+							{draftingMode === 'hybrid' ? (
+								<div className="w-[95%] max-[480px]:w-[89.33vw] mx-auto flex items-center justify-between">
+									<div
+										className="w-[312px] max-[480px]:flex-1 max-[480px]:mr-2 h-[30px] px-2 flex items-center gap-2 rounded-[8px] border-2 bg-white"
+										style={{ borderColor: '#969696' }}
+									>
+										<div className="font-inter text-[12px] font-semibold text-black shrink-0">
+											Signature
+										</div>
+										<input
+											type="text"
+											className="flex-1 text-[12px] outline-none focus:outline-none bg-transparent signature-textarea"
+											placeholder="Your signature..."
+											value={signature}
+											onChange={(e) => updateSignature(e.target.value)}
+										/>
+									</div>
+									<div
+										className="w-[30px] h-[30px] shrink-0 rounded-[8px] border-2 border-black flex items-center justify-center"
+										style={{ backgroundColor: '#A6E2AB' }}
+									>
+										<svg
+											width="15"
+											height="15"
+											viewBox="0 0 15 15"
+											fill="none"
+											xmlns="http://www.w3.org/2000/svg"
+										>
+											<path
+												d="M7.5 0.5V14.5M0.5 7.5H14.5"
+												stroke="#000000"
+												strokeWidth="1"
+											/>
+										</svg>
+									</div>
 								</div>
-								<textarea
-									className="w-full text-[12px] leading-[16px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none h-[48px] signature-textarea"
-									value={signature}
-									onChange={(e) => updateSignature(e.target.value)}
-								/>
-							</div>
+							) : (
+								<div
+									className="px-2 py-2 w-[95%] max-[480px]:w-[89.33vw] mx-auto rounded-[8px] border-2 bg-white"
+									style={{ borderColor: '#969696' }}
+								>
+									<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
+										Signature
+									</div>
+									<textarea
+										className="w-full text-[12px] leading-[16px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none h-[48px] signature-textarea"
+										value={signature}
+										onChange={(e) => updateSignature(e.target.value)}
+									/>
+								</div>
+							)}
 						</div>
 					</div>
 				</div>
@@ -1008,28 +1081,62 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					)}
 					style={{ display: isMobileLandscape ? 'none' : undefined }}
 				>
-					<div
-						className="rounded-[8px] border-2 bg-white px-2 py-2 w-[95%] max-[480px]:w-[89.33vw] mx-auto"
-						style={{ borderColor: '#969696' }}
-					>
-						<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
-							Signature
+					{draftingMode === 'hybrid' ? (
+						<div className="w-[95%] mx-auto flex items-center justify-between">
+							<div
+								className="w-[312px] h-[30px] px-2 flex items-center gap-2 rounded-[8px] border-2 bg-white"
+								style={{ borderColor: '#969696' }}
+							>
+								<div className="font-inter text-[12px] font-semibold text-black shrink-0">
+									Signature
+								</div>
+								<input
+									type="text"
+									className="flex-1 text-[12px] outline-none focus:outline-none bg-transparent signature-textarea"
+									placeholder="Your signature..."
+									value={signature}
+									onChange={(e) => updateSignature(e.target.value)}
+								/>
+							</div>
+							<div
+								className="w-[30px] h-[30px] rounded-[8px] border-2 border-black flex items-center justify-center"
+								style={{ backgroundColor: '#A6E2AB' }}
+							>
+								<svg
+									width="15"
+									height="15"
+									viewBox="0 0 15 15"
+									fill="none"
+									xmlns="http://www.w3.org/2000/svg"
+								>
+									<path d="M7.5 0.5V14.5M0.5 7.5H14.5" stroke="#000000" strokeWidth="1" />
+								</svg>
+							</div>
 						</div>
-						<textarea
-							className={cn(
-								'w-full text-[12px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none max-[480px]:h-[40px] signature-textarea',
-								isCompactSignature
-									? hybridBlocks.some((b) => b.type === 'full_automated')
-										? 'h-[28px]'
-										: 'h-[36px]'
-									: hybridBlocks.some((b) => b.type === 'full_automated')
-									? 'h-[40px]'
-									: 'h-[58px]'
-							)}
-							value={signature}
-							onChange={(e) => updateSignature(e.target.value)}
-						/>
-					</div>
+					) : (
+						<div
+							className="px-2 py-2 w-[95%] max-[480px]:w-[89.33vw] mx-auto rounded-[8px] border-2 bg-white"
+							style={{ borderColor: '#969696' }}
+						>
+							<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
+								Signature
+							</div>
+							<textarea
+								className={cn(
+									'w-full text-[12px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none max-[480px]:h-[40px] signature-textarea',
+									isCompactSignature
+										? hybridBlocks.some((b) => b.type === 'full_automated')
+											? 'h-[28px]'
+											: 'h-[36px]'
+										: hybridBlocks.some((b) => b.type === 'full_automated')
+										? 'h-[40px]'
+										: 'h-[58px]'
+								)}
+								value={signature}
+								onChange={(e) => updateSignature(e.target.value)}
+							/>
+						</div>
+					)}
 				</div>
 
 				{/* Footer with Draft button */}
@@ -1087,39 +1194,41 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					</div>
 				)}
 			</div>
-			<div
-				className="absolute top-0 left-[-18px] max-[480px]:-left-[10px] flex flex-col"
-				style={{ pointerEvents: 'none', zIndex: 100 }}
-			>
-				{addTextButtons.map((btn, index) => {
-					if (!btn.show) return null;
-					const blockIndex = hybridBlocks.findIndex((b) => b.id === btn.blockId);
-					if (blockIndex === -1) return null;
-					return (
-						<div
-							key={`add-btn-${btn.blockId}-${index}`}
-							style={{
-								position: 'absolute',
-								top: `${btn.top}px`,
-								left: 0,
-								pointerEvents: 'all',
-							}}
-						>
-							<Button
-								type="button"
-								onClick={() => addTextBlockAt(blockIndex)}
-								className={cn(
-									'w-[52px] h-[20px] bg-white hover:bg-stone-100 active:bg-stone-200 border border-[#5DAB68] rounded-[4px] !font-normal text-[10px] text-black flex items-center justify-center gap-1'
-								)}
-								title="Text block"
+			{!hideAddTextButtons && (
+				<div
+					className="absolute top-0 left-[-18px] max-[480px]:-left-[10px] flex flex-col"
+					style={{ pointerEvents: 'none', zIndex: 100 }}
+				>
+					{addTextButtons.map((btn, index) => {
+						if (!btn.show) return null;
+						const blockIndex = hybridBlocks.findIndex((b) => b.id === btn.blockId);
+						if (blockIndex === -1) return null;
+						return (
+							<div
+								key={`add-btn-${btn.blockId}-${index}`}
+								style={{
+									position: 'absolute',
+									top: `${btn.top}px`,
+									left: 0,
+									pointerEvents: 'all',
+								}}
 							>
-								<TinyPlusIcon width="5px" height="5px" className="!w-[8px] !h-[8px]" />
-								<span className="font-secondary">Text</span>
-							</Button>
-						</div>
-					);
-				})}
-			</div>
+								<Button
+									type="button"
+									onClick={() => addTextBlockAt(blockIndex)}
+									className={cn(
+										'w-[52px] h-[20px] bg-white hover:bg-stone-100 active:bg-stone-200 border border-[#5DAB68] rounded-[4px] !font-normal text-[10px] text-black flex items-center justify-center gap-1'
+									)}
+									title="Text block"
+								>
+									<TinyPlusIcon width="5px" height="5px" className="!w-[8px] !h-[8px]" />
+									<span className="font-secondary">Text</span>
+								</Button>
+							</div>
+						);
+					})}
+				</div>
+			)}
 		</div>
 	);
 };
