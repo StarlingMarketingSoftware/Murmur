@@ -1694,7 +1694,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			'flex relative z-30',
 																			showTestPreview
 																				? 'justify-start w-full'
-																				: 'justify-end -mr-[102px] w-[93.7vw] max-w-[475px] max-[480px]:-mr-[2vw]'
+																				: 'justify-end -mr-[85px] w-[93.7vw] max-w-[475px] max-[480px]:-mr-[2vw]'
 																		)}
 																		style={{ transform: 'translateY(-12px)' }}
 																	>
