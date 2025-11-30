@@ -506,6 +506,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					flexDirection: 'column',
 					background: '#A6E2A8',
 					overflow: 'visible',
+					zIndex: 1,
 				}}
 			>
 				{/* Content area - miniature, but interactive */}
@@ -1087,8 +1088,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				)}
 			</div>
 			<div
-				className="absolute top-0 left-[-18px] max-[480px]:-left-[10px] z-50 flex flex-col"
-				style={{ pointerEvents: 'none' }}
+				className="absolute top-0 left-[-18px] max-[480px]:-left-[10px] flex flex-col"
+				style={{ pointerEvents: 'none', zIndex: 100 }}
 			>
 				{addTextButtons.map((btn, index) => {
 					if (!btn.show) return null;

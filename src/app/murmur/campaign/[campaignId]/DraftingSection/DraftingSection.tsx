@@ -999,7 +999,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												height: '373px',
 												// Fixed-height mini structure that uses the compact layout
 												// inside; no scaling, just a tighter signature area.
-												overflow: 'hidden',
+												overflow: 'visible',
 											}}
 										>
 											<MiniEmailStructure

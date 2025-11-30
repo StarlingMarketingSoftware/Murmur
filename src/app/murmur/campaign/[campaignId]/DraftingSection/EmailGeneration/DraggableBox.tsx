@@ -20,11 +20,6 @@ interface DraggableBoxProps {
 	resetToken?: number | string;
 }
 
-/**
- * Non-draggable layout wrapper.
- * We keep the same API and data attribute so existing callers and overlay code continue to work,
- * but all dragging behavior has been removed.
- */
 export const DraggableBox: FC<DraggableBoxProps> = ({ id, children, className }) => {
 	return (
 		<div data-draggable-box-id={id} className={className}>
