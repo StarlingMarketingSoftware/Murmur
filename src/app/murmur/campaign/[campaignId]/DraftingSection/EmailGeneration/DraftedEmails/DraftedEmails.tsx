@@ -202,7 +202,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								<div
 									key={draft.id}
 									className={cn(
-										'cursor-pointer transition-colors relative select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
+										'cursor-pointer transition-colors relative select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2 group/draft',
 										isSelected && 'bg-[#E8EFFF]'
 									)}
 									onMouseDown={(e) => {
@@ -248,7 +248,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										type="button"
 										variant="icon"
 										onClick={(e) => handleDeleteDraft(e, draft.id)}
-										className="absolute top-[50px] right-[2px] p-1 transition-colors z-10 group"
+										className="absolute top-[50px] right-[2px] p-1 transition-colors z-10 group hidden group-hover/draft:block"
 									>
 										<X size={16} className="text-gray-500 group-hover:text-red-500" />
 									</Button>
@@ -266,7 +266,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 												handleDraftDoubleClick(draft);
 											}
 										}}
-										className="absolute top-[72px] right-[2px] p-1 transition-colors z-20"
+										className="absolute top-[72px] right-[2px] p-1 transition-colors z-20 hidden group-hover/draft:block"
 										aria-label="Preview draft"
 									>
 										<PreviewIcon
