@@ -1960,7 +1960,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										</div>
 								  )}
 						</div>
-						{!compactLeftOnly && (
+						{!compactLeftOnly && !isPendingGeneration && (
 							<div className="relative w-[475px] h-[40px] mt-[10px] mx-auto">
 								{draftCount > 0 ? (
 									<>

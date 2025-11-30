@@ -1190,49 +1190,51 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 			</DraftingTable>
 
 			{/* Draft Emails Button - below the table box */}
-			<div className="relative w-[475px] h-[40px] mt-4 mx-auto">
-				{selectedCount > 0 ? (
-					<>
-						<button
-							type="button"
-							onClick={handleDraftEmails}
-							disabled={isButtonDisabled}
-							className={cn(
-								'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
-								isButtonDisabled
-									? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
-									: 'bg-[#F2C7C7] border-[#9A3434] hover:bg-[#E6B9B9] cursor-pointer'
-							)}
-						>
-							{isDrafting ? (
-								<>
-									<div className="animate-spin rounded-full h-4 w-4 border-2 border-black border-t-transparent inline-block mr-2" />
-									Drafting...
-								</>
-							) : (
-								`Draft ${selectedCount} ${selectedCount === 1 ? 'Contact' : 'Contacts'}`
-							)}
-						</button>
-						{/* Right section "All" button */}
-						<button
-							type="button"
-							className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10"
-							onClick={(e) => {
-								e.stopPropagation();
-								handleClick();
-							}}
-						>
-							{/* Vertical divider line - explicit element to avoid border rendering gaps */}
-							<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
-							All
-						</button>
-					</>
-				) : (
-					<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
-						Select Contacts and Draft Emails
-					</div>
-				)}
-			</div>
+			{!isDrafting && (
+				<div className="relative w-[475px] h-[40px] mt-4 mx-auto">
+					{selectedCount > 0 ? (
+						<>
+							<button
+								type="button"
+								onClick={handleDraftEmails}
+								disabled={isButtonDisabled}
+								className={cn(
+									'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
+									isButtonDisabled
+										? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+										: 'bg-[#F2C7C7] border-[#9A3434] hover:bg-[#E6B9B9] cursor-pointer'
+								)}
+							>
+								{isDrafting ? (
+									<>
+										<div className="animate-spin rounded-full h-4 w-4 border-2 border-black border-t-transparent inline-block mr-2" />
+										Drafting...
+									</>
+								) : (
+									`Draft ${selectedCount} ${selectedCount === 1 ? 'Contact' : 'Contacts'}`
+								)}
+							</button>
+							{/* Right section "All" button */}
+							<button
+								type="button"
+								className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10"
+								onClick={(e) => {
+									e.stopPropagation();
+									handleClick();
+								}}
+							>
+								{/* Vertical divider line - explicit element to avoid border rendering gaps */}
+								<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
+								All
+							</button>
+						</>
+					) : (
+						<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
+							Select Contacts and Draft Emails
+						</div>
+					)}
+				</div>
+			)}
 		</div>
 	);
 };
