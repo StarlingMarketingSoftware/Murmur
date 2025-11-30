@@ -294,7 +294,7 @@ const SortableAIBlock = ({
 									<span className="absolute right-0 h-full border-r border-[#000000]"></span>
 								</button>
 							)}
-							{!isFullAutomatedBlock && (
+							{!isFullAutomatedBlock && (!isTextBlock || !isManualModeSelected) && (
 								<Button
 									type="button"
 									variant="ghost"
@@ -892,6 +892,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		draftCount = 0,
 		onDraftClick,
 		isDraftDisabled,
+		onSelectAllContacts,
 	} = props;
 
 	// Track if the user has attempted to Test to control error styling
@@ -1957,26 +1958,43 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								  )}
 						</div>
 						{!compactLeftOnly && (
-							<button
-								type="button"
-								onClick={() => {
-									if (!isDraftDisabled) {
-										onDraftClick?.();
-									}
-								}}
-								disabled={isDraftDisabled}
-								className={cn(
-									'w-[475px] h-[40px] mt-[10px] mx-auto block rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
-									isDraftDisabled
-										? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
-										: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+							<div className="relative w-[475px] h-[40px] mt-[10px] mx-auto">
+								{draftCount > 0 ? (
+									<>
+										<button
+											type="button"
+											onClick={() => {
+												if (!isDraftDisabled) {
+													onDraftClick?.();
+												}
+											}}
+											disabled={isDraftDisabled}
+											className={cn(
+												'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
+												isDraftDisabled
+													? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+													: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+											)}
+										>
+											Draft {draftCount} {draftCount === 1 ? 'Contact' : 'Contacts'}
+										</button>
+										{/* Right section "All" button */}
+										<button
+											type="button"
+											className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
+											onClick={() => {
+												onSelectAllContacts?.();
+											}}
+										>
+											All
+										</button>
+									</>
+								) : (
+									<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
+										Select Contacts and Draft Emails
+									</div>
 								)}
-							>
-								Draft
-								{draftCount > 0
-									? ` ${draftCount} ${draftCount === 1 ? 'Contact' : 'Contacts'}`
-									: ''}
-							</button>
+							</div>
 						)}
 					</DraggableBox>
 				</Droppable>

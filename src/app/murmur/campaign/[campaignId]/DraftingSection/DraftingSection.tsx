@@ -1336,6 +1336,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									isDraftDisabled={
 										isPendingGeneration || contactsTabSelectedIds.size === 0
 									}
+									onSelectAllContacts={() => {
+										const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
+										const areAllSelected =
+											contactsTabSelectedIds.size === allIds.size &&
+											[...allIds].every((id) => contactsTabSelectedIds.has(id));
+
+										if (areAllSelected) {
+											setContactsTabSelectedIds(new Set());
+										} else {
+											setContactsTabSelectedIds(allIds);
+										}
+									}}
 								/>
 								{/* Right panel for Testing view - positioned absolutely */}
 								{false && (
