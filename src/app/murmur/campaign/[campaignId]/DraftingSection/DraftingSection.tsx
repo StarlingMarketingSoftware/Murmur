@@ -2020,6 +2020,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onMarkerClick={(contact) => {
 													handleResearchContactClick(contact);
 												}}
+												enableStateInteractions
+												onStateSelect={(stateName) => {
+													setSearchActiveSection('where');
+													setSearchWhereValue(stateName);
+												}}
 											/>
 										</div>
 									</div>

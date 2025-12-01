@@ -159,6 +159,8 @@ interface SearchResultsMapProps {
 	selectedContacts: number[];
 	onMarkerClick?: (contact: ContactWithName) => void;
 	onToggleSelection?: (contactId: number) => void;
+	onStateSelect?: (stateName: string) => void;
+	enableStateInteractions?: boolean;
 }
 
 const mapContainerStyle = {
@@ -191,15 +193,23 @@ const mapOptions: google.maps.MapOptions = {
 	],
 };
 
+const STATE_GEOJSON_URL = 'https://storage.googleapis.com/mapsdevsite/json/states.js';
+const STATE_HIGHLIGHT_COLOR = '#5DAB68';
+const STATE_HIGHLIGHT_OPACITY = 0.68;
+const STATE_BORDER_COLOR = '#CFD8DC';
+
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
 	selectedContacts,
 	onMarkerClick,
 	onToggleSelection,
+	onStateSelect,
+	enableStateInteractions,
 }) => {
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
 	const [map, setMap] = useState<google.maps.Map | null>(null);
+	const [selectedStateId, setSelectedStateId] = useState<string | null>(null);
 	// Local state for newly geocoded coordinates (updates before query refetch)
 	const [geocodedCoords, setGeocodedCoords] = useState<
 		Map<number, { lat: number; lng: number }>
@@ -207,6 +217,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const geocodedIdsRef = useRef<Set<number>>(new Set());
 	// Timeout ref for auto-hiding research panel
 	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const stateLayerRef = useRef<google.maps.Data | null>(null);
 
 	// Clear timeout when panel is closed or component unmounts
 	useEffect(() => {
@@ -216,6 +227,83 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		};
 	}, []);
+
+	// Load US state shapes and handle hover/click highlighting for this Search view
+	useEffect(() => {
+		if (!map || !enableStateInteractions) return;
+
+		const dataLayer = new google.maps.Data({ map });
+		stateLayerRef.current = dataLayer;
+
+		dataLayer.setStyle({
+			fillOpacity: 0,
+			strokeColor: STATE_BORDER_COLOR,
+			strokeOpacity: 0.7,
+			strokeWeight: 0.6,
+			zIndex: 0,
+		});
+
+		dataLayer.loadGeoJson(STATE_GEOJSON_URL, { idPropertyName: 'NAME' });
+
+		const mouseoverListener = dataLayer.addListener(
+			'mouseover',
+			(event: google.maps.Data.MouseEvent) => {
+				dataLayer.overrideStyle(event.feature, {
+					fillColor: STATE_HIGHLIGHT_COLOR,
+					fillOpacity: STATE_HIGHLIGHT_OPACITY,
+					strokeColor: STATE_HIGHLIGHT_COLOR,
+					strokeOpacity: 1,
+					strokeWeight: 1.2,
+				});
+			}
+		);
+
+		const mouseoutListener = dataLayer.addListener(
+			'mouseout',
+			(event: google.maps.Data.MouseEvent) => {
+				dataLayer.revertStyle(event.feature);
+			}
+		);
+
+		const clickListener = dataLayer.addListener(
+			'click',
+			(event: google.maps.Data.MouseEvent) => {
+				const stateName = (event.feature.getProperty('NAME') as string) || '';
+				const featureId = (event.feature.getId() as string) || stateName || null;
+				setSelectedStateId(featureId);
+				if (stateName) {
+					onStateSelect?.(stateName);
+				}
+			}
+		);
+
+		return () => {
+			mouseoverListener.remove();
+			mouseoutListener.remove();
+			clickListener.remove();
+			dataLayer.setMap(null);
+			stateLayerRef.current = null;
+			setSelectedStateId(null);
+		};
+	}, [map, enableStateInteractions, onStateSelect]);
+
+	// Update stroke styling when the selected state changes
+	useEffect(() => {
+		if (!enableStateInteractions) return;
+		const dataLayer = stateLayerRef.current;
+		if (!dataLayer) return;
+
+		dataLayer.setStyle((feature) => {
+			const isSelected = feature.getId() === selectedStateId;
+			return {
+				fillOpacity: 0,
+				strokeColor: isSelected ? '#000000' : STATE_BORDER_COLOR,
+				strokeOpacity: isSelected ? 1 : 0.7,
+				strokeWeight: isSelected ? 2 : 0.6,
+				zIndex: 0,
+			};
+		});
+	}, [selectedStateId, enableStateInteractions]);
 
 	const handleResearchPanelMouseEnter = useCallback(() => {
 		if (researchPanelTimeoutRef.current) {
