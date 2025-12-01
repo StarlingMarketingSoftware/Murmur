@@ -230,6 +230,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const stateLayerRef = useRef<google.maps.Data | null>(null);
 	const selectedStateKeyRef = useRef<string | null>(null);
 	const onStateSelectRef = useRef<SearchResultsMapProps['onStateSelect'] | null>(null);
+	const [isStateLayerReady, setIsStateLayerReady] = useState(false);
 
 	useEffect(() => {
 		selectedStateKeyRef.current = selectedStateKey;
@@ -260,6 +261,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const dataLayer = new google.maps.Data({ map });
 		stateLayerRef.current = dataLayer;
+		setIsStateLayerReady(true);
 
 		dataLayer.setStyle({
 			fillOpacity: 0,
@@ -318,13 +320,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			clickListener.remove();
 			dataLayer.setMap(null);
 			stateLayerRef.current = null;
+			setIsStateLayerReady(false);
 			setSelectedStateKey(null);
 		};
 	}, [map, enableStateInteractions]);
 
 	// Update stroke styling when the selected state changes
 	useEffect(() => {
-		if (!enableStateInteractions) return;
+		if (!enableStateInteractions || !isStateLayerReady) return;
 		const dataLayer = stateLayerRef.current;
 		if (!dataLayer) return;
 
@@ -341,7 +344,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				zIndex: 0,
 			};
 		});
-	}, [selectedStateKey, enableStateInteractions]);
+	}, [selectedStateKey, enableStateInteractions, isStateLayerReady]);
 
 	const handleResearchPanelMouseEnter = useCallback(() => {
 		if (researchPanelTimeoutRef.current) {

@@ -2022,7 +2022,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 												enableStateInteractions
 												onStateSelect={(stateName) => {
-													setSearchActiveSection('where');
+													setSearchActiveSection('why');
 													setSearchWhereValue(stateName);
 												}}
 												lockedStateName={searchWhereValue}
