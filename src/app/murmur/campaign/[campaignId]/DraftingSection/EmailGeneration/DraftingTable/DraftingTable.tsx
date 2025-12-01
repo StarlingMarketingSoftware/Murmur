@@ -204,8 +204,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							left: '137px',
 							width: '72px',
 							height: '22px',
-							backgroundColor: '#DBF6D4',
-							border: '2px solid #19670F',
+							backgroundColor: hasData ? '#DBF6D4' : '#a2e1b7',
+							border: `2px solid ${hasData ? '#19670F' : '#B0B0B0'}`,
 							borderRadius: '11px',
 							display: 'flex',
 							alignItems: 'center',
@@ -213,7 +213,10 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							zIndex: 10,
 						}}
 					>
-						<span className="text-[13px] font-semibold font-inter text-black leading-none">
+						<span
+							className="text-[13px] font-semibold font-inter leading-none"
+							style={{ color: hasData ? '#000000' : '#B0B0B0' }}
+						>
 							Sent
 						</span>
 					</div>
@@ -225,7 +228,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							width: '9px',
 							height: '9px',
 							borderRadius: '50%',
-							backgroundColor: '#D9D9D9',
+							backgroundColor: hasData ? '#D9D9D9' : '#B0B0B0',
 							zIndex: 10,
 						}}
 					/>
@@ -237,7 +240,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							width: '9px',
 							height: '9px',
 							borderRadius: '50%',
-							backgroundColor: '#D9D9D9',
+							backgroundColor: hasData ? '#D9D9D9' : '#B0B0B0',
 							zIndex: 10,
 						}}
 					/>
@@ -249,7 +252,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							width: '9px',
 							height: '9px',
 							borderRadius: '50%',
-							backgroundColor: '#D9D9D9',
+							backgroundColor: hasData ? '#D9D9D9' : '#B0B0B0',
 							zIndex: 10,
 						}}
 					/>
@@ -288,7 +291,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							? 'linear-gradient(to bottom, #ffffff 26px, #FFDC9E 26px)'
 							: '#FFCD73'
 						: isSent
-						? 'linear-gradient(to bottom, #ffffff 26px, #5AB477 26px)'
+						? hasData
+							? 'linear-gradient(to bottom, #ffffff 26px, #5AB477 26px)'
+							: '#a2e1b7'
 						: 'white',
 				}}
 			>
@@ -387,19 +392,35 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							style={{ gap: '11px' }}
 						>
 							{Array.from({ length: 8 }).map((_, idx) => {
-								// For drafts empty state: boxes 2-5 (idx 1-4) are 52px, all others are 85px
+								// For drafts/sent empty state: boxes 2-5 (idx 1-4) are 52px, all others are 85px
 								const boxHeight =
-									isDrafts && idx >= 1 && idx <= 4 ? 'h-[52px]' : 'h-[85px]';
+									(isDrafts || isSent) && idx >= 1 && idx <= 4 ? 'h-[52px]' : 'h-[85px]';
+								const boxBgColor = isDrafts
+									? 'bg-[#FFCD73]'
+									: isSent
+									? idx === 1
+										? 'bg-[#52CD7A]'
+										: idx === 2
+										? 'bg-[#63D286]'
+										: idx === 3
+										? 'bg-[#79dc99]'
+										: idx === 4
+										? 'bg-[#96e7b0]'
+										: 'bg-[#53c076]'
+									: 'bg-white';
 								return (
 									<div
 										key={idx}
-										className={`select-none w-[489px] ${boxHeight} overflow-hidden rounded-[8px] border-2 border-[#000000] ${
-											isDrafts ? 'bg-[#FFCD73]' : isSent ? 'bg-[#5AB477]' : 'bg-white'
-										} p-2 flex items-center justify-center`}
+										className={`select-none w-[489px] ${boxHeight} overflow-hidden rounded-[8px] border-2 border-[#000000] ${boxBgColor} p-2 flex items-center justify-center`}
 									>
 										{isDrafts && idx === 0 && (
 											<span className="text-[15px] font-semibold font-inter text-black">
 												Draft Your First Email
+											</span>
+										)}
+										{isSent && idx === 0 && (
+											<span className="text-[15px] font-semibold font-inter text-black">
+												Send Your First Message
 											</span>
 										)}
 										{isDrafts && idx === 1 && (
@@ -429,6 +450,46 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
 												style={{ width: '375px', height: '42px' }}
 												onClick={() => router.push(urls.murmur.dashboard.index)}
+											>
+												<span className="text-[15px] font-semibold font-inter text-black">
+													Create New Campaign
+												</span>
+											</div>
+										)}
+										{isSent && idx === 1 && (
+											<div
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center"
+												style={{ width: '376px', height: '42px' }}
+											>
+												<span className="text-[15px] font-semibold font-inter text-black">
+													Review and Send Drafts
+												</span>
+											</div>
+										)}
+										{isSent && idx === 2 && (
+											<div
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center"
+												style={{ width: '376px', height: '42px' }}
+											>
+												<span className="text-[15px] font-semibold font-inter text-black">
+													Write More Emails
+												</span>
+											</div>
+										)}
+										{isSent && idx === 3 && (
+											<div
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center"
+												style={{ width: '376px', height: '42px' }}
+											>
+												<span className="text-[15px] font-semibold font-inter text-black">
+													Add More Contacts
+												</span>
+											</div>
+										)}
+										{isSent && idx === 4 && (
+											<div
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center"
+												style={{ width: '376px', height: '42px' }}
 											>
 												<span className="text-[15px] font-semibold font-inter text-black">
 													Create New Campaign
