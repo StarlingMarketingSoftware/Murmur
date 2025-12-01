@@ -29,6 +29,8 @@ export interface DraftedEmailsProps {
 	goToWriting?: () => void;
 	/** Optional: callback to navigate to the Search tab */
 	goToSearch?: () => void;
+	/** Optional: callback to navigate to the Inbox tab */
+	goToInbox?: () => void;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {

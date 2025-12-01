@@ -285,7 +285,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								right: '10px',
 								width: '319px',
 								height: '43px',
-								backgroundColor: '#FFFFFF',
+								backgroundColor: hideAllText ? config.color : '#FFFFFF',
 								border: '1px solid #000000',
 								borderRadius: '6px',
 							}}
@@ -353,7 +353,11 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 							  }),
 						width: '350px',
 						height: hasAnyParsedSections ? '182px' : '299px',
-						backgroundColor: '#FFFFFF',
+						backgroundColor: hideAllText
+							? hasAnyParsedSections
+								? '#E9F7FF'
+								: '#158BCF'
+							: '#FFFFFF',
 						border: '1px solid #000000',
 						borderRadius: '6px',
 					}}

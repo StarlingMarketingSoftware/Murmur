@@ -86,6 +86,7 @@ interface DraftingTableProps {
 	goToSearch?: () => void;
 	goToDrafts?: () => void;
 	goToContacts?: () => void;
+	goToInbox?: () => void;
 }
 export const DraftingTable: FC<DraftingTableProps> = ({
 	title,
@@ -102,6 +103,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	goToSearch,
 	goToDrafts,
 	goToContacts,
+	goToInbox,
 }) => {
 	const router = useRouter();
 	const isContacts = title === 'Contacts';
@@ -293,7 +295,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						: isDrafts
 						? hasData
 							? 'linear-gradient(to bottom, #ffffff 26px, #FFDC9E 26px)'
-							: '#FFCD73'
+							: '#F8D69A'
 						: isSent
 						? hasData
 							? 'linear-gradient(to bottom, #ffffff 26px, #5AB477 26px)'
@@ -400,7 +402,15 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 								const boxHeight =
 									(isDrafts || isSent) && idx >= 1 && idx <= 4 ? 'h-[52px]' : 'h-[85px]';
 								const boxBgColor = isDrafts
-									? 'bg-[#FFCD73]'
+									? idx === 1
+										? 'bg-[#FFCF79]'
+										: idx === 2
+										? 'bg-[#FFD487]'
+										: idx === 3
+										? 'bg-[#FFD892]'
+										: idx === 4
+										? 'bg-[#FFDA97]'
+										: 'bg-[#FFCD73]'
 									: isSent
 									? idx === 1
 										? 'bg-[#52CD7A]'
@@ -450,6 +460,17 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 											</div>
 										)}
 										{isDrafts && idx === 3 && (
+											<div
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+												style={{ width: '375px', height: '42px' }}
+												onClick={goToInbox}
+											>
+												<span className="text-[15px] font-semibold font-inter text-black">
+													Check Inbox
+												</span>
+											</div>
+										)}
+										{isDrafts && idx === 4 && (
 											<div
 												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
 												style={{ width: '375px', height: '42px' }}
