@@ -1,4 +1,4 @@
-import { FC, useEffect, useState, useRef } from 'react';
+import { FC, Fragment, useEffect, useState, useRef } from 'react';
 import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
 import { Form } from '@/components/ui/form';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
@@ -233,12 +233,41 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	}, [searchActiveSection]);
 
-	// State for in-campaign search results
-	const [hasCampaignSearched, setHasCampaignSearched] = useState(false);
-	const [activeCampaignSearchQuery, setActiveCampaignSearchQuery] = useState('');
-	const [searchResultsSelectedContacts, setSearchResultsSelectedContacts] = useState<
-		number[]
-	>([]);
+	// Search tab type and state
+	type SearchTab = {
+		id: string;
+		label: string;
+		query: string;
+		selectedContacts: number[];
+	};
+	const [searchTabs, setSearchTabs] = useState<SearchTab[]>([]);
+	const [activeSearchTabId, setActiveSearchTabId] = useState<string | null>(null);
+
+	// Get active tab data
+	const activeSearchTab = searchTabs.find((tab) => tab.id === activeSearchTabId);
+	const hasCampaignSearched = activeSearchTabId !== null;
+	const activeCampaignSearchQuery = activeSearchTab?.query || '';
+	const searchResultsSelectedContacts = activeSearchTab?.selectedContacts || [];
+
+	// Setter for selected contacts that updates the active tab
+	const setSearchResultsSelectedContacts = (
+		contacts: number[] | ((prev: number[]) => number[])
+	) => {
+		if (!activeSearchTabId) return;
+		setSearchTabs((tabs) =>
+			tabs.map((tab) =>
+				tab.id === activeSearchTabId
+					? {
+							...tab,
+							selectedContacts:
+								typeof contacts === 'function'
+									? contacts(tab.selectedContacts)
+									: contacts,
+					  }
+					: tab
+			)
+		);
+	};
 
 	// Construct the search query from Why/What/Where values
 	const buildSearchQuery = () => {
@@ -275,17 +304,39 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			suppressToasts: true,
 		});
 
-	// Handler for triggering search
+	// Handler for triggering search - creates a new tab
 	const handleCampaignSearch = () => {
 		const query = buildSearchQuery();
 		if (!query.trim()) {
 			toast.error('Please enter what you want to search for');
 			return;
 		}
-		setActiveCampaignSearchQuery(query);
-		setHasCampaignSearched(true);
+
+		// Build a label for the tab (e.g., "MS - Music Venues")
+		const labelParts: string[] = [];
+		if (searchWhereValue) {
+			// Extract state abbreviation if it's a full state name or use the value directly
+			const stateAbbrev =
+				searchWhereValue.length === 2
+					? searchWhereValue.toUpperCase()
+					: searchWhereValue.split(',')[0]?.trim() || searchWhereValue;
+			labelParts.push(stateAbbrev);
+		}
+		if (searchWhatValue) {
+			labelParts.push(searchWhatValue);
+		}
+		const label = labelParts.join(' - ') || query;
+
+		const newTab: SearchTab = {
+			id: `search-${Date.now()}`,
+			label,
+			query,
+			selectedContacts: [],
+		};
+
+		setSearchTabs((tabs) => [...tabs, newTab]);
+		setActiveSearchTabId(newTab.id);
 		setSearchActiveSection(null);
-		setSearchResultsSelectedContacts([]);
 	};
 
 	// Handler for triggering search from the mini searchbar in the contacts panel
@@ -315,11 +366,29 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			return;
 		}
 
-		// Drive the in-campaign search results
-		setActiveCampaignSearchQuery(query);
-		setHasCampaignSearched(true);
+		// Build a label for the tab
+		const labelParts: string[] = [];
+		if (where) {
+			const stateAbbrev =
+				where.length === 2 ? where.toUpperCase() : where.split(',')[0]?.trim() || where;
+			labelParts.push(stateAbbrev);
+		}
+		if (what) {
+			labelParts.push(what);
+		}
+		const label = labelParts.join(' - ') || query;
+
+		// Create a new search tab
+		const newTab: SearchTab = {
+			id: `search-${Date.now()}`,
+			label,
+			query,
+			selectedContacts: [],
+		};
+
+		setSearchTabs((tabs) => [...tabs, newTab]);
+		setActiveSearchTabId(newTab.id);
 		setSearchActiveSection(null);
-		setSearchResultsSelectedContacts([]);
 
 		// Ask the parent page to switch to the Search tab, if supported
 		if (onGoToSearch) {
@@ -377,11 +446,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	};
 
-	// Handler for clearing search results and going back to campaign contacts
-	const handleClearSearchResults = () => {
-		setHasCampaignSearched(false);
-		setActiveCampaignSearchQuery('');
-		setSearchResultsSelectedContacts([]);
+	// Handler for closing a search tab
+	const handleCloseSearchTab = (tabId: string) => {
+		setSearchTabs((tabs) => tabs.filter((tab) => tab.id !== tabId));
+		// If we're closing the active tab, switch to Original
+		if (activeSearchTabId === tabId) {
+			setActiveSearchTabId(null);
+		}
 	};
 
 	// State for drafts selection in the Drafts tab
@@ -1804,6 +1875,86 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										Search
 									</span>
 
+									{/* Search tabs header */}
+									<div
+										className="absolute flex items-center"
+										style={{
+											left: '138px',
+											top: '0',
+											right: '14px',
+											height: '36px',
+										}}
+									>
+										{/* Original tab */}
+										<div
+											className="relative flex items-center justify-center cursor-pointer border-l border-black"
+											style={{
+												width: '105px',
+												height: '36px',
+												backgroundColor:
+													activeSearchTabId === null ? '#94c4e4' : 'transparent',
+											}}
+											onClick={() => setActiveSearchTabId(null)}
+										>
+											<span className="font-inter font-normal text-[15px] text-black">
+												Original
+											</span>
+										</div>
+										<div className="border-l border-black h-full" />
+
+										{/* Dynamic search tabs */}
+										{searchTabs.map((tab) => (
+											<Fragment key={tab.id}>
+												<div
+													className="relative flex items-center justify-center cursor-pointer group"
+													style={{
+														minWidth: '120px',
+														maxWidth: '220px',
+														height: '36px',
+														backgroundColor:
+															activeSearchTabId === tab.id ? '#94c4e4' : 'transparent',
+														paddingLeft: '12px',
+														paddingRight: '28px',
+													}}
+													onClick={() => setActiveSearchTabId(tab.id)}
+												>
+													<span className="font-inter font-normal text-[15px] text-black truncate">
+														{tab.label}
+													</span>
+													{/* Close button */}
+													<button
+														type="button"
+														className="absolute right-[8px] top-1/2 -translate-y-1/2 w-[16px] h-[16px] flex items-center justify-center text-black/60 hover:text-black transition-colors"
+														onClick={(e) => {
+															e.stopPropagation();
+															handleCloseSearchTab(tab.id);
+														}}
+													>
+														×
+													</button>
+												</div>
+												<div className="border-l border-black h-full" />
+											</Fragment>
+										))}
+
+										{/* Plus button to add new search */}
+										<div
+											className="flex items-center justify-center cursor-pointer hover:bg-black/5 transition-colors"
+											style={{
+												width: '36px',
+												height: '36px',
+											}}
+											onClick={() => {
+												// Focus the search bar
+												setSearchActiveSection('what');
+											}}
+										>
+											<span className="font-inter font-normal text-[20px] text-black">
+												+
+											</span>
+										</div>
+									</div>
+
 									{/* Map container */}
 									<div
 										className="absolute"
@@ -1947,31 +2098,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										{/* Render search dropdowns via portal */}
 										{renderSearchDropdowns()}
-
-										{/* Back button - shows when search has been performed */}
-										{hasCampaignSearched && (
-											<button
-												type="button"
-												onClick={handleClearSearchResults}
-												className="absolute z-10 flex items-center gap-1 px-3 py-2 bg-white/95 backdrop-blur-sm rounded-[8px] border border-black/20 text-[13px] font-medium text-gray-600 hover:text-black transition-colors"
-												style={{
-													top: '70px',
-													left: '12px',
-												}}
-											>
-												<svg
-													width="16"
-													height="16"
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke="currentColor"
-													strokeWidth="2"
-												>
-													<path d="M19 12H5M12 19l-7-7 7-7" />
-												</svg>
-												Back to Campaign
-											</button>
-										)}
 
 										<div
 											className="relative rounded-[8px] overflow-hidden w-full h-full"
