@@ -18,6 +18,9 @@ interface SentEmailsProps {
 	isPendingEmails: boolean;
 	onContactClick?: (contact: ContactWithName | null) => void;
 	onContactHover?: (contact: ContactWithName | null) => void;
+	goToDrafts?: () => void;
+	goToWriting?: () => void;
+	goToContacts?: () => void;
 }
 
 export const SentEmails: FC<SentEmailsProps> = ({
@@ -25,6 +28,9 @@ export const SentEmails: FC<SentEmailsProps> = ({
 	isPendingEmails,
 	onContactClick,
 	onContactHover,
+	goToDrafts,
+	goToWriting,
+	goToContacts,
 }) => {
 	const { data: usedContactIds } = useGetUsedContactIds();
 	const usedContactIdsSet = useMemo(
@@ -40,6 +46,9 @@ export const SentEmails: FC<SentEmailsProps> = ({
 			noDataDescription="Emails you send will appear here"
 			isPending={isPendingEmails}
 			title="Sent"
+			goToDrafts={goToDrafts}
+			goToWriting={goToWriting}
+			goToContacts={goToContacts}
 		>
 			<div className="overflow-visible w-full flex flex-col gap-2 items-center">
 				{emails.map((email) => {

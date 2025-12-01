@@ -77,6 +77,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		goToWriting,
 		onOpenIdentityDialog,
 		onGoToSearch,
+		goToContacts,
 	} = props;
 	const {
 		campaign,
@@ -1756,6 +1757,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									isPendingEmails={isPendingEmails}
 									onContactClick={handleResearchContactClick}
 									onContactHover={handleResearchContactHover}
+									goToDrafts={goToDrafting}
+									goToWriting={goToWriting}
+									goToContacts={goToContacts}
 								/>
 							</div>
 						)}

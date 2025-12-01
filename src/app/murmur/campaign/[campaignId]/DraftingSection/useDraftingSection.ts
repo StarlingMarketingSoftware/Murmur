@@ -49,6 +49,10 @@ export interface DraftingSectionProps {
 	 * Optional callback to switch the campaign page into the Search tab.
 	 */
 	onGoToSearch?: () => void;
+	/**
+	 * Optional callback to switch the campaign page into the Contacts tab.
+	 */
+	goToContacts?: () => void;
 }
 
 type GeneratedEmail = {

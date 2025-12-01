@@ -217,6 +217,7 @@ const Murmur = () => {
 							goToDrafting={() => setActiveView('drafting')}
 							goToWriting={() => setActiveView('testing')}
 							onGoToSearch={() => setActiveView('search')}
+							goToContacts={() => setActiveView('contacts')}
 							onOpenIdentityDialog={() => {
 								setIdentityDialogOrigin('campaign');
 								setIsIdentityDialogOpen(true);

@@ -84,6 +84,8 @@ interface DraftingTableProps {
 	topContent?: ReactNode;
 	goToWriting?: () => void;
 	goToSearch?: () => void;
+	goToDrafts?: () => void;
+	goToContacts?: () => void;
 }
 export const DraftingTable: FC<DraftingTableProps> = ({
 	title,
@@ -98,6 +100,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	topContent,
 	goToWriting,
 	goToSearch,
+	goToDrafts,
+	goToContacts,
 }) => {
 	const router = useRouter();
 	const isContacts = title === 'Contacts';
@@ -458,8 +462,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 										)}
 										{isSent && idx === 1 && (
 											<div
-												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center"
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
 												style={{ width: '376px', height: '42px' }}
+												onClick={goToDrafts}
 											>
 												<span className="text-[15px] font-semibold font-inter text-black">
 													Review and Send Drafts
@@ -468,8 +473,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 										)}
 										{isSent && idx === 2 && (
 											<div
-												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center"
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
 												style={{ width: '376px', height: '42px' }}
+												onClick={goToWriting}
 											>
 												<span className="text-[15px] font-semibold font-inter text-black">
 													Write More Emails
@@ -478,8 +484,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 										)}
 										{isSent && idx === 3 && (
 											<div
-												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center"
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
 												style={{ width: '376px', height: '42px' }}
+												onClick={goToContacts}
 											>
 												<span className="text-[15px] font-semibold font-inter text-black">
 													Add More Contacts
@@ -488,8 +495,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 										)}
 										{isSent && idx === 4 && (
 											<div
-												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center"
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
 												style={{ width: '376px', height: '42px' }}
+												onClick={() => router.push(urls.murmur.dashboard.index)}
 											>
 												<span className="text-[15px] font-semibold font-inter text-black">
 													Create New Campaign
