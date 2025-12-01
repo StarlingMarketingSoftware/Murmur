@@ -965,33 +965,200 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									/>
 									{/* For the Writing (testing) and Search tabs, show a mini contacts table instead of mini email structure. */}
 									{view === 'testing' || view === 'search' ? (
-										<div
-											style={{
-												width: '375px',
-												height: view === 'search' ? '557px' : '373px',
-												overflow: 'visible',
-											}}
-										>
-											<ContactsExpandedList
-												contacts={contactsAvailableForDrafting}
-												campaign={campaign}
-												selectedContactIds={contactsTabSelectedIds}
-												onContactSelectionChange={(updater) =>
-													setContactsTabSelectedIds((prev) => updater(new Set(prev)))
-												}
-												onContactClick={handleResearchContactClick}
-												onContactHover={handleResearchContactHover}
-												onDraftSelected={async (ids) => {
-													await handleGenerateDrafts(ids);
+										<>
+											<div
+												style={{
+													width: '375px',
+													height: view === 'search' ? '557px' : '274px',
+													overflow: 'visible',
 												}}
-												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
-												isPendingGeneration={isPendingGeneration}
-												width={375}
-												height={view === 'search' ? 557 : 373}
-												minRows={view === 'search' ? 8 : 7}
-												onSearchFromMiniBar={handleMiniContactsSearch}
-											/>
-										</div>
+											>
+												<ContactsExpandedList
+													contacts={contactsAvailableForDrafting}
+													campaign={campaign}
+													selectedContactIds={contactsTabSelectedIds}
+													onContactSelectionChange={(updater) =>
+														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
+													}
+													onContactClick={handleResearchContactClick}
+													onContactHover={handleResearchContactHover}
+													onDraftSelected={async (ids) => {
+														await handleGenerateDrafts(ids);
+													}}
+													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isPendingGeneration={isPendingGeneration}
+													width={375}
+													height={view === 'search' ? 557 : 274}
+													minRows={view === 'search' ? 8 : 5}
+													onSearchFromMiniBar={handleMiniContactsSearch}
+												/>
+											</div>
+											{view === 'testing' && (
+												<div
+													style={{
+														width: '377px',
+														height: '249px',
+														marginTop: '-5px', // 16px gap - 5px = 11px
+														background:
+															'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
+														border: '2px solid #000000',
+														borderRadius: '7px',
+														position: 'relative',
+													}}
+												>
+													<div
+														style={{
+															height: '28px',
+															display: 'flex',
+															alignItems: 'center',
+															paddingLeft: '9px',
+														}}
+													>
+														<span className="font-inter font-bold text-[12px] leading-none text-black">
+															Suggestion
+														</span>
+													</div>
+													{/* Inner box */}
+													<div
+														style={{
+															position: 'absolute',
+															top: '34px',
+															left: '50%',
+															transform: 'translateX(-50%)',
+															width: '369px',
+															height: '44px',
+															backgroundColor: '#FFFFFF',
+															border: '2px solid #000000',
+															borderRadius: '7px',
+														}}
+													>
+														{/* Small box inside */}
+														<div
+															style={{
+																position: 'absolute',
+																bottom: '3px',
+																left: '4px',
+																width: '223px',
+																height: '12px',
+																backgroundColor: '#FFFFFF',
+																border: '2px solid #000000',
+																borderRadius: '8px',
+															}}
+														/>
+													</div>
+													{/* Small box below the first inner box */}
+													<div
+														style={{
+															position: 'absolute',
+															top: '83px', // 34px + 44px + 5px
+															left: '6px',
+															width: '39px',
+															height: '32px',
+															backgroundColor: '#C2C2C2',
+															border: '2px solid #000000',
+															borderRadius: '8px',
+														}}
+													/>
+													{/* Box to the right of the small box */}
+													<div
+														style={{
+															position: 'absolute',
+															top: '83px',
+															left: '50px', // 6px + 39px + 5px
+															width: '196px',
+															height: '32px',
+															backgroundColor: '#D7F0FF',
+															border: '2px solid #000000',
+															borderRadius: '8px',
+														}}
+													/>
+													{/* Box below the two small boxes */}
+													<div
+														style={{
+															position: 'absolute',
+															top: '123px', // 83px + 32px + 8px
+															left: '50%',
+															transform: 'translateX(-50%)',
+															width: '362px',
+															height: '56px',
+															backgroundColor: '#A6E0B4',
+															border: '2px solid #000000',
+															borderRadius: '8px',
+														}}
+													>
+														{/* Section indicator */}
+														<div
+															className="absolute font-inter font-bold"
+															style={{
+																top: '4.5px',
+																left: '8px',
+																fontSize: '11.5px',
+																color: '#000000',
+															}}
+														>
+															[1]
+														</div>
+														{/* Inner box */}
+														<div
+															style={{
+																position: 'absolute',
+																top: '0',
+																bottom: '0',
+																margin: 'auto',
+																left: '25px',
+																width: '324px',
+																height: '48px',
+																backgroundColor: '#FFFFFF',
+																border: '2px solid #000000',
+																borderRadius: '8px',
+															}}
+														/>
+													</div>
+													{/* Second box below */}
+													<div
+														style={{
+															position: 'absolute',
+															top: '187px', // 123px + 56px + 8px
+															left: '50%',
+															transform: 'translateX(-50%)',
+															width: '362px',
+															height: '56px',
+															backgroundColor: '#5BCB75',
+															border: '2px solid #000000',
+															borderRadius: '8px',
+														}}
+													>
+														{/* Section indicator */}
+														<div
+															className="absolute font-inter font-bold"
+															style={{
+																top: '4.5px',
+																left: '8px',
+																fontSize: '11.5px',
+																color: '#000000',
+															}}
+														>
+															[2]
+														</div>
+														{/* Inner box */}
+														<div
+															style={{
+																position: 'absolute',
+																top: '0',
+																bottom: '0',
+																margin: 'auto',
+																left: '25px',
+																width: '324px',
+																height: '48px',
+																backgroundColor: '#FFFFFF',
+																border: '2px solid #000000',
+																borderRadius: '8px',
+															}}
+														/>
+													</div>
+												</div>
+											)}
+										</>
 									) : (
 										<div
 											style={{
