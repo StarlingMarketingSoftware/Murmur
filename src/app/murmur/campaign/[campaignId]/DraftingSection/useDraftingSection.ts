@@ -42,6 +42,10 @@ export interface DraftingSectionProps {
 	view?: 'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 	goToDrafting?: () => void;
 	/**
+	 * Optional callback to switch the campaign page into the Writing tab.
+	 */
+	goToWriting?: () => void;
+	/**
 	 * Optional callback to switch the campaign page into the Search tab.
 	 */
 	onGoToSearch?: () => void;

@@ -1,7 +1,9 @@
 import { FC, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import { urls } from '@/constants/urls';
 
 export const ContactsHeaderChrome: FC<{ offsetY?: number }> = ({ offsetY = 0 }) => {
 	const pillTop = 3 + offsetY;
@@ -80,6 +82,8 @@ interface DraftingTableProps {
 	title: string;
 	footer?: ReactNode;
 	topContent?: ReactNode;
+	goToWriting?: () => void;
+	goToSearch?: () => void;
 }
 export const DraftingTable: FC<DraftingTableProps> = ({
 	title,
@@ -92,7 +96,10 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	isPending,
 	footer,
 	topContent,
+	goToWriting,
+	goToSearch,
 }) => {
+	const router = useRouter();
 	const isContacts = title === 'Contacts';
 	const isCompactHeader = isContacts || title === 'Drafts' || title === 'Sent';
 	const showTitle = !isContacts && title !== 'Drafts' && title !== 'Sent';
@@ -394,6 +401,39 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 											<span className="text-[15px] font-semibold font-inter text-black">
 												Draft Your First Email
 											</span>
+										)}
+										{isDrafts && idx === 1 && (
+											<div
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+												style={{ width: '375px', height: '42px' }}
+												onClick={goToWriting}
+											>
+												<span className="text-[15px] font-semibold font-inter text-black">
+													Write Your Emails
+												</span>
+											</div>
+										)}
+										{isDrafts && idx === 2 && (
+											<div
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+												style={{ width: '375px', height: '42px' }}
+												onClick={goToSearch}
+											>
+												<span className="text-[15px] font-semibold font-inter text-black">
+													Search For More Contacts
+												</span>
+											</div>
+										)}
+										{isDrafts && idx === 3 && (
+											<div
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+												style={{ width: '375px', height: '42px' }}
+												onClick={() => router.push(urls.murmur.dashboard.index)}
+											>
+												<span className="text-[15px] font-semibold font-inter text-black">
+													Create New Campaign
+												</span>
+											</div>
 										)}
 									</div>
 								);

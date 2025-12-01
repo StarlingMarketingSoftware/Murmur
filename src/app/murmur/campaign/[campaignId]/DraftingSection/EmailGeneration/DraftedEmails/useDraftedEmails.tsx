@@ -25,6 +25,10 @@ export interface DraftedEmailsProps {
 	onContactHover?: (contact: ContactWithName | null) => void;
 	/** Optional: called when the inline preview icon is clicked */
 	onPreview?: (draft: EmailWithRelations) => void;
+	/** Optional: callback to navigate to the Writing tab */
+	goToWriting?: () => void;
+	/** Optional: callback to navigate to the Search tab */
+	goToSearch?: () => void;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {

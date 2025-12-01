@@ -71,7 +71,13 @@ interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 }
 
 export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
-	const { view = 'testing', goToDrafting, onOpenIdentityDialog, onGoToSearch } = props;
+	const {
+		view = 'testing',
+		goToDrafting,
+		goToWriting,
+		onOpenIdentityDialog,
+		onGoToSearch,
+	} = props;
 	const {
 		campaign,
 		contacts,
@@ -1711,6 +1717,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										subject={form.watch('subject')}
 										onContactClick={handleResearchContactClick}
 										onContactHover={handleResearchContactHover}
+										goToWriting={goToWriting}
+										goToSearch={onGoToSearch}
 									/>
 								</div>
 							)}
