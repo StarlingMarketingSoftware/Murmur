@@ -291,7 +291,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					display: 'flex',
 					flexDirection: 'column',
 					background: isContacts
-						? 'linear-gradient(to bottom, #ffffff 26px, #EB8586 26px)'
+						? hasData
+							? 'linear-gradient(to bottom, #ffffff 26px, #EB8586 26px)'
+							: '#FFAEAE'
 						: isDrafts
 						? hasData
 							? 'linear-gradient(to bottom, #ffffff 26px, #FFDC9E 26px)'
@@ -354,7 +356,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				</div>
 
 				{/* Top content area (e.g., mini searchbar for contacts) */}
-				{isContacts && topContent && (
+				{isContacts && topContent && hasData && (
 					<div
 						style={{
 							position: 'absolute',
@@ -373,10 +375,12 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					className="flex-1 drafting-table-content"
 					style={{
 						marginTop:
-							isContacts && topContent
+							isContacts && topContent && hasData
 								? '115px'
-								: isContacts
+								: isContacts && hasData
 								? '105px'
+								: isContacts
+								? '68px'
 								: isDrafts || isSent
 								? '32px'
 								: 0,
@@ -530,12 +534,43 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							})}
 						</div>
 					) : isContacts ? (
-						<div className="overflow-visible w-full flex flex-col gap-4 items-center py-2">
+						<div
+							className="overflow-visible w-full flex flex-col items-center pb-2"
+							style={{ gap: '11px' }}
+						>
 							{Array.from({ length: 9 }).map((_, idx) => (
 								<div
 									key={idx}
-									className={`select-none ${contentWidth} h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#EB8586]`}
-								/>
+									className={`select-none w-[459px] h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] flex items-center justify-center ${
+										idx === 0
+											? 'bg-[#E54D50]'
+											: idx === 2
+											? 'bg-[#E72528]'
+											: idx === 3
+											? 'bg-[#E85052]'
+											: idx === 4
+											? 'bg-[#F87C7D]'
+											: idx === 5
+											? 'bg-[#EB8586]'
+											: 'bg-[#E15E60]'
+									}`}
+								>
+									{idx === 0 && (
+										<span className="text-[15px] font-semibold font-inter text-black">
+											All Contacts Drafted
+										</span>
+									)}
+									{idx >= 2 && idx <= 5 && (
+										<div className="w-[403px] h-[42px] bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center">
+											<span className="text-[15px] font-semibold font-inter text-black">
+												{idx === 2 && 'Add More Contacts'}
+												{idx === 3 && 'Send Drafts'}
+												{idx === 4 && 'Check Inbox'}
+												{idx === 5 && 'Create New Campaign'}
+											</span>
+										</div>
+									)}
+								</div>
 							))}
 						</div>
 					) : (
