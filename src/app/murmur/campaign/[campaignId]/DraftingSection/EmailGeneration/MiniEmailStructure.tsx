@@ -33,6 +33,8 @@ interface MiniEmailStructureProps {
 	fullWidthMobile?: boolean;
 	/** When true, hides the +Text buttons on the left side */
 	hideAddTextButtons?: boolean;
+	/** When true, visually hides all text inside the panel (used for empty Drafts state) */
+	hideAllText?: boolean;
 }
 
 export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
@@ -47,6 +49,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	hideFooter,
 	fullWidthMobile,
 	hideAddTextButtons,
+	hideAllText,
 }) => {
 	const watchedHybridBlocks = form.watch('hybridBlockPrompts');
 	const hybridBlocks = useMemo(() => watchedHybridBlocks || [], [watchedHybridBlocks]);
@@ -552,7 +555,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	return (
 		<div
 			ref={rootRef}
+			data-mini-email-hide-text={hideAllText ? 'true' : 'false'}
 			style={{
+				cursor: hideAllText ? 'default' : 'auto',
 				width: fullWidthMobile ? '100%' : '376px',
 				height:
 					isMobilePortrait || isMobileLandscape
@@ -564,6 +569,31 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				overflow: 'visible',
 			}}
 		>
+			{hideAllText && (
+				<style jsx global>{`
+					[data-mini-email-hide-text='true'],
+					[data-mini-email-hide-text='true'] * {
+						color: transparent !important;
+					}
+					[data-mini-email-hide-text='true'] input::placeholder,
+					[data-mini-email-hide-text='true'] textarea::placeholder {
+						color: transparent !important;
+					}
+				`}</style>
+			)}
+			{hideAllText && (
+				<div
+					aria-hidden="true"
+					style={{
+						position: 'absolute',
+						inset: 0,
+						pointerEvents: 'auto',
+						cursor: 'default',
+						background: 'transparent',
+						zIndex: 2,
+					}}
+				/>
+			)}
 			{/* Centered number above block (hidden in mobile landscape) */}
 			{!hideTopChrome && !isMobileLandscape && (
 				<div

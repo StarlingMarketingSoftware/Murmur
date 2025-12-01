@@ -1329,6 +1329,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												hideFooter
 												fullWidthMobile
 												hideAddTextButtons
+												hideAllText={view === 'drafting' && draftCount === 0}
 											/>
 										</div>
 									)}
@@ -1364,7 +1365,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											style={{ width: 375, height: 670 }}
 										/>
 									) : (
-										<ContactResearchPanel contact={displayedContactForResearch} />
+										<ContactResearchPanel
+											contact={displayedContactForResearch}
+											hideAllText={view === 'drafting' && draftCount === 0}
+										/>
 									)}
 								</div>
 							)}
