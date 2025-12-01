@@ -329,13 +329,13 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 													</div>
 												</div>
 												{/* Right Column - Location and Title */}
-												<div className="p-0.5 sm:p-1 pb-0 sm:pb-[1.5px] flex flex-col gap-0.5 sm:gap-[3px]">
+												<div className="p-0.5 sm:p-1 pb-0 sm:pb-[1.5px] flex flex-col gap-[1px]">
 													{/* State and City */}
 													{contact.city || stateAbbr ? (
 														<div className="flex items-center gap-0.5 sm:gap-2">
 															{stateAbbr && (
 																<span
-																	className="inline-flex items-center justify-center w-[30px] sm:w-[35px] h-[17px] sm:h-[19px] rounded-[5.6px] border text-[11px] sm:text-[12px] leading-none font-bold flex-shrink-0"
+																	className="inline-flex items-center justify-center w-[22px] h-[12px] rounded-[5px] border text-[8px] leading-none font-bold flex-shrink-0"
 																	style={{
 																		borderColor: 'rgba(0,0,0,0.7)',
 																		backgroundColor: isUSState
@@ -355,8 +355,8 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 													) : null}
 													{/* Title Badge */}
 													{contact.headline && (
-														<div className="h-[18px] sm:h-[20.54px] rounded-[5px] sm:rounded-[6.64px] px-1.5 sm:px-2 flex items-center w-fit max-w-[120px] sm:max-w-[150px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
-															<span className="text-[10px] sm:text-xs text-black truncate">
+														<div className="h-[14px] rounded-[5px] px-1 flex items-center w-[117px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
+															<span className="text-[9px] text-black truncate">
 																{contact.headline}
 															</span>
 														</div>
@@ -372,13 +372,13 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 													</div>
 												</div>
 												{/* Right Column - Location and Title */}
-												<div className="p-0.5 sm:p-1 pb-0 sm:pb-[1.5px] flex flex-col gap-0.5 sm:gap-[3px]">
+												<div className="p-0.5 sm:p-1 pb-0 sm:pb-[1.5px] flex flex-col gap-[1px]">
 													{/* State and City */}
 													{contact.city || stateAbbr ? (
 														<div className="flex items-center gap-0.5 sm:gap-2">
 															{stateAbbr && (
 																<span
-																	className="inline-flex items-center justify-center w-[30px] sm:w-[35px] h-[17px] sm:h-[19px] rounded-[5.6px] border text-[11px] sm:text-[12px] leading-none font-bold flex-shrink-0"
+																	className="inline-flex items-center justify-center w-[22px] h-[12px] rounded-[5px] border text-[8px] leading-none font-bold flex-shrink-0"
 																	style={{
 																		borderColor: 'rgba(0,0,0,0.7)',
 																		backgroundColor: isUSState
@@ -398,8 +398,8 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 													) : null}
 													{/* Title Badge */}
 													{contact.headline && (
-														<div className="h-[18px] sm:h-[20.54px] rounded-[5px] sm:rounded-[6.64px] px-1.5 sm:px-2 flex items-center w-fit max-w-[120px] sm:max-w-[150px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
-															<span className="text-[10px] sm:text-xs text-black truncate">
+														<div className="h-[14px] rounded-[5px] px-1 flex items-center w-[117px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
+															<span className="text-[9px] text-black truncate">
 																{contact.headline}
 															</span>
 														</div>

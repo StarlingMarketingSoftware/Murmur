@@ -1026,7 +1026,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onSearchFromMiniBar={handleMiniContactsSearch}
 												/>
 											</div>
-											{view === 'testing' && (
+											{view === 'testing' && (suggestionText1 || suggestionText2) && (
 												<div
 													style={{
 														width: '377px',
@@ -1230,8 +1230,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	textOverflow: 'ellipsis',
 																}}
 															>
-																{suggestionText1 ||
-																	'After you score your AI prompt, your first one-sentence suggestion will appear here.'}
+																{suggestionText1 || ''}
 															</div>
 														</div>
 													</div>
@@ -1292,8 +1291,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	textOverflow: 'ellipsis',
 																}}
 															>
-																{suggestionText2 ||
-																	'Your second one-sentence suggestion will land here after scoring.'}
+																{suggestionText2 || ''}
 															</div>
 														</div>
 													</div>
