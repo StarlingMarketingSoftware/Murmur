@@ -1484,25 +1484,29 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										left: 'calc(50% + 384px + 32px)',
 									}}
 								>
+									{/* Title above the panel */}
+									<span className="font-inter text-[13px] font-medium text-black mb-1 block">
+										Search Results
+									</span>
 									<div
 										className="bg-[#D8E5FB] border-[2px] border-black rounded-[7px] overflow-hidden flex flex-col"
 										style={{
-											width: '375px',
-											height: '815px',
+											width: '396px',
+											height: '703px',
 										}}
 									>
-										{/* Header */}
-										<div
-											className="w-full flex-shrink-0 flex items-center justify-between px-4 relative"
-											style={{
-												height: '24px',
-												backgroundColor: '#E8EFFF',
-											}}
+										{/* Scrollable contact list */}
+										<CustomScrollbar
+											className="flex-1 min-h-0"
+											contentClassName="pt-[12px] px-[6px] pb-[14px]"
+											thumbWidth={2}
+											thumbColor="#000000"
+											trackColor="transparent"
+											offsetRight={-6}
+											disableOverflowClass
 										>
-											<span className="font-secondary font-bold text-[14px] leading-none text-black">
-												Search Results
-											</span>
-											<div className="flex items-center gap-2">
+											{/* Selection controls */}
+											<div className="flex items-center justify-end gap-2 mb-[7px] pr-1">
 												<span className="font-inter text-[11px] text-black">
 													{searchResultsSelectedContacts.length} selected
 												</span>
@@ -1527,163 +1531,152 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														: 'Select all'}
 												</button>
 											</div>
-										</div>
+											{/* Contact list */}
+											<div className="space-y-[7px] pt-[16px]">
+												{searchResults.map((contact) => {
+													const isSelected = searchResultsSelectedContacts.includes(
+														contact.id
+													);
+													const firstName = contact.firstName || '';
+													const lastName = contact.lastName || '';
+													const fullName =
+														contact.name || `${firstName} ${lastName}`.trim();
+													const company = contact.company || '';
+													const headline = contact.headline || contact.title || '';
+													const stateAbbr =
+														getStateAbbreviation(contact.state || '') || '';
+													const city = contact.city || '';
 
-										{/* Divider under header */}
-										<div className="w-full h-[1px] bg-black flex-shrink-0" />
-
-										{/* Scrollable contact list */}
-										<CustomScrollbar
-											className="flex-1 min-h-0"
-											contentClassName="p-[6px] pb-[14px] space-y-[7px]"
-											thumbWidth={2}
-											thumbColor="#000000"
-											trackColor="transparent"
-											offsetRight={-6}
-											disableOverflowClass
-										>
-											{searchResults.map((contact) => {
-												const isSelected = searchResultsSelectedContacts.includes(
-													contact.id
-												);
-												const firstName = contact.firstName || '';
-												const lastName = contact.lastName || '';
-												const fullName =
-													contact.name || `${firstName} ${lastName}`.trim();
-												const company = contact.company || '';
-												const headline = contact.headline || contact.title || '';
-												const stateAbbr = getStateAbbreviation(contact.state || '') || '';
-												const city = contact.city || '';
-
-												return (
-													<div
-														key={contact.id}
-														data-contact-id={contact.id}
-														className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none"
-														style={{
-															backgroundColor: isSelected ? '#C9EAFF' : '#FFFFFF',
-														}}
-														onClick={() => {
-															if (isSelected) {
-																setSearchResultsSelectedContacts(
-																	searchResultsSelectedContacts.filter(
-																		(id) => id !== contact.id
-																	)
-																);
-															} else {
-																setSearchResultsSelectedContacts([
-																	...searchResultsSelectedContacts,
-																	contact.id,
-																]);
-															}
-														}}
-													>
-														{fullName ? (
-															<>
-																{/* Top Left - Name */}
-																<div className="pl-3 pr-1 flex items-center h-[23px]">
-																	<div className="font-bold text-[11px] w-full truncate leading-tight">
-																		{fullName}
-																	</div>
-																</div>
-																{/* Top Right - Title/Headline */}
-																<div className="pr-2 pl-1 flex items-center h-[23px]">
-																	{headline ? (
-																		<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
-																			<span className="text-[10px] text-black leading-none truncate">
-																				{headline}
-																			</span>
+													return (
+														<div
+															key={contact.id}
+															data-contact-id={contact.id}
+															className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none"
+															style={{
+																backgroundColor: isSelected ? '#C9EAFF' : '#FFFFFF',
+															}}
+															onClick={() => {
+																if (isSelected) {
+																	setSearchResultsSelectedContacts(
+																		searchResultsSelectedContacts.filter(
+																			(id) => id !== contact.id
+																		)
+																	);
+																} else {
+																	setSearchResultsSelectedContacts([
+																		...searchResultsSelectedContacts,
+																		contact.id,
+																	]);
+																}
+															}}
+														>
+															{fullName ? (
+																<>
+																	{/* Top Left - Name */}
+																	<div className="pl-3 pr-1 flex items-center h-[23px]">
+																		<div className="font-bold text-[11px] w-full truncate leading-tight">
+																			{fullName}
 																		</div>
-																	) : (
-																		<div className="w-full" />
-																	)}
-																</div>
-																{/* Bottom Left - Company */}
-																<div className="pl-3 pr-1 flex items-center h-[22px]">
-																	<div className="text-[11px] text-black w-full truncate leading-tight">
-																		{company}
 																	</div>
-																</div>
-																{/* Bottom Right - Location */}
-																<div className="pr-2 pl-1 flex items-center h-[22px]">
-																	{city || stateAbbr ? (
-																		<div className="flex items-center gap-1 w-full">
-																			{stateAbbr && (
-																				<span
-																					className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
-																					style={{
-																						backgroundColor:
-																							stateBadgeColorMap[stateAbbr] ||
-																							'transparent',
-																						borderColor: '#000000',
-																					}}
-																				>
-																					{stateAbbr}
-																				</span>
-																			)}
-																			{city && (
+																	{/* Top Right - Title/Headline */}
+																	<div className="pr-2 pl-1 flex items-center h-[23px]">
+																		{headline ? (
+																			<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
 																				<span className="text-[10px] text-black leading-none truncate">
-																					{city}
+																					{headline}
 																				</span>
-																			)}
-																		</div>
-																	) : (
-																		<div className="w-full" />
-																	)}
-																</div>
-															</>
-														) : (
-															<>
-																{/* No name - Company spans left column */}
-																<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
-																	<div className="font-bold text-[11px] w-full truncate leading-tight">
-																		{company || '—'}
+																			</div>
+																		) : (
+																			<div className="w-full" />
+																		)}
 																	</div>
-																</div>
-																{/* Top Right - Title/Headline */}
-																<div className="pr-2 pl-1 flex items-center h-[23px]">
-																	{headline ? (
-																		<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
-																			<span className="text-[10px] text-black leading-none truncate">
-																				{headline}
-																			</span>
+																	{/* Bottom Left - Company */}
+																	<div className="pl-3 pr-1 flex items-center h-[22px]">
+																		<div className="text-[11px] text-black w-full truncate leading-tight">
+																			{company}
 																		</div>
-																	) : (
-																		<div className="w-full" />
-																	)}
-																</div>
-																{/* Bottom Right - Location */}
-																<div className="pr-2 pl-1 flex items-center h-[22px]">
-																	{city || stateAbbr ? (
-																		<div className="flex items-center gap-1 w-full">
-																			{stateAbbr && (
-																				<span
-																					className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
-																					style={{
-																						backgroundColor:
-																							stateBadgeColorMap[stateAbbr] ||
-																							'transparent',
-																						borderColor: '#000000',
-																					}}
-																				>
-																					{stateAbbr}
-																				</span>
-																			)}
-																			{city && (
+																	</div>
+																	{/* Bottom Right - Location */}
+																	<div className="pr-2 pl-1 flex items-center h-[22px]">
+																		{city || stateAbbr ? (
+																			<div className="flex items-center gap-1 w-full">
+																				{stateAbbr && (
+																					<span
+																						className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																						style={{
+																							backgroundColor:
+																								stateBadgeColorMap[stateAbbr] ||
+																								'transparent',
+																							borderColor: '#000000',
+																						}}
+																					>
+																						{stateAbbr}
+																					</span>
+																				)}
+																				{city && (
+																					<span className="text-[10px] text-black leading-none truncate">
+																						{city}
+																					</span>
+																				)}
+																			</div>
+																		) : (
+																			<div className="w-full" />
+																		)}
+																	</div>
+																</>
+															) : (
+																<>
+																	{/* No name - Company spans left column */}
+																	<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
+																		<div className="font-bold text-[11px] w-full truncate leading-tight">
+																			{company || '—'}
+																		</div>
+																	</div>
+																	{/* Top Right - Title/Headline */}
+																	<div className="pr-2 pl-1 flex items-center h-[23px]">
+																		{headline ? (
+																			<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
 																				<span className="text-[10px] text-black leading-none truncate">
-																					{city}
+																					{headline}
 																				</span>
-																			)}
-																		</div>
-																	) : (
-																		<div className="w-full" />
-																	)}
-																</div>
-															</>
-														)}
-													</div>
-												);
-											})}
+																			</div>
+																		) : (
+																			<div className="w-full" />
+																		)}
+																	</div>
+																	{/* Bottom Right - Location */}
+																	<div className="pr-2 pl-1 flex items-center h-[22px]">
+																		{city || stateAbbr ? (
+																			<div className="flex items-center gap-1 w-full">
+																				{stateAbbr && (
+																					<span
+																						className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																						style={{
+																							backgroundColor:
+																								stateBadgeColorMap[stateAbbr] ||
+																								'transparent',
+																							borderColor: '#000000',
+																						}}
+																					>
+																						{stateAbbr}
+																					</span>
+																				)}
+																				{city && (
+																					<span className="text-[10px] text-black leading-none truncate">
+																						{city}
+																					</span>
+																				)}
+																			</div>
+																		) : (
+																			<div className="w-full" />
+																		)}
+																	</div>
+																</>
+															)}
+														</div>
+													);
+												})}
+											</div>
 										</CustomScrollbar>
 
 										{/* Footer with Add to Campaign button */}
