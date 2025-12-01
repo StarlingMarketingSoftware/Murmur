@@ -139,6 +139,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	const [activeTab, setActiveTab] = useState<'test' | 'placeholders'>('test');
 	const [isUpscalingPrompt, setIsUpscalingPrompt] = useState(false);
+	const [previousPromptValue, setPreviousPromptValue] = useState<string | null>(null);
 
 	const draftingRef = useRef<HTMLDivElement>(null);
 	const emailStructureRef = useRef<HTMLDivElement>(null);
@@ -921,19 +922,16 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 			return;
 		}
 
+		// Save the current prompt value before upscaling
+		setPreviousPromptValue(currentPrompt);
 		setIsUpscalingPrompt(true);
 
 		try {
 			const upscaleSystemPrompt = `You are an expert at improving email prompts. Your task is to take a user's prompt for generating outreach emails and make it significantly better.
 
 INSTRUCTIONS:
-1. Make the prompt more detailed and specific
-2. Add nuanced instructions about tone, personalization, and structure
-3. Include guidance on how to reference the recipient's context
-4. Expand on the goals and desired outcomes
-5. Keep the core intent but make it 2-3x more comprehensive
-6. Do NOT add any placeholders or variables - just write the improved prompt text
-7. The output should be the improved prompt ONLY - no explanations, no JSON, no markdown
+1. You're a musicians trying to get yourself booked for a show by writing an email.
+2. The output should be the improved prompt ONLY - no explanations, no JSON, no markdown
 
 The improved prompt should result in more personalized, engaging, and effective emails.`;
 
@@ -979,6 +977,35 @@ The improved prompt should result in more personalized, engaging, and effective 
 			setIsUpscalingPrompt(false);
 		}
 	}, [callGemini, form, scoreFullAutomatedPrompt]);
+
+	/**
+	 * Undo the upscaled prompt by restoring the previous value.
+	 */
+	const undoUpscalePrompt = useCallback(() => {
+		if (!previousPromptValue) {
+			toast.error('No previous prompt to restore.');
+			return;
+		}
+
+		const blocks = form.getValues('hybridBlockPrompts');
+		const updatedBlocks = blocks.map((block) => {
+			if (block.type === 'full_automated') {
+				return { ...block, value: previousPromptValue };
+			}
+			return block;
+		});
+
+		form.setValue('hybridBlockPrompts', updatedBlocks, {
+			shouldDirty: true,
+			shouldValidate: true,
+		});
+
+		// Re-score the restored prompt
+		scoreFullAutomatedPrompt(previousPromptValue);
+
+		setPreviousPromptValue(null);
+		toast.success('Prompt restored to previous version.');
+	}, [form, previousPromptValue, scoreFullAutomatedPrompt]);
 
 	const cancelGeneration = () => {
 		isGenerationCancelledRef.current = true;
@@ -1682,6 +1709,8 @@ The improved prompt should result in more personalized, engaging, and effective 
 		isTest,
 		isUpscalingPrompt,
 		upscalePrompt,
+		undoUpscalePrompt,
+		hasPreviousPrompt: previousPromptValue !== null,
 		setActiveTab,
 		setGenerationProgress,
 		setIsOpenUpgradeSubscriptionDrawer,

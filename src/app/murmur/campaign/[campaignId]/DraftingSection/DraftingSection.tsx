@@ -41,6 +41,8 @@ import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
+import UndoIcon from '@/components/atoms/_svg/UndoIcon';
+import UpscaleIcon from '@/components/atoms/_svg/UpscaleIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
@@ -84,6 +86,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		isTest,
 		isUpscalingPrompt,
 		upscalePrompt,
+		undoUpscalePrompt,
+		hasPreviousPrompt,
 		setIsOpenUpgradeSubscriptionDrawer,
 		trackFocusedField,
 		handleGenerateDrafts,
@@ -1107,6 +1111,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													</div>
 													{/* Small box below the first inner box */}
 													<div
+														onClick={() => {
+															if (hasPreviousPrompt) {
+																undoUpscalePrompt();
+															}
+														}}
 														style={{
 															position: 'absolute',
 															top: '83px', // 34px + 44px + 5px
@@ -1116,8 +1125,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															backgroundColor: '#C2C2C2',
 															border: '2px solid #000000',
 															borderRadius: '8px',
+															display: 'flex',
+															alignItems: 'center',
+															justifyContent: 'center',
+															cursor: hasPreviousPrompt ? 'pointer' : 'not-allowed',
+															opacity: hasPreviousPrompt ? 1 : 0.5,
 														}}
-													/>
+													>
+														<UndoIcon width="24" height="24" />
+													</div>
 													{/* Box to the right of the small box */}
 													<div
 														onClick={() => {
@@ -1153,50 +1169,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														>
 															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
 														</span>
-														<svg
-															width="24"
-															height="24"
-															viewBox="0 0 24 24"
-															fill="none"
-															xmlns="http://www.w3.org/2000/svg"
-															style={{ flexShrink: 0 }}
-														>
-															<path
-																d="M6 19L12 13L18 19"
-																stroke="black"
-																strokeWidth="1.5"
-																strokeLinecap="round"
-																strokeLinejoin="round"
-															/>
-															<path
-																d="M6 16L12 10L18 16"
-																stroke="black"
-																strokeWidth="1.5"
-																strokeLinecap="round"
-																strokeLinejoin="round"
-															/>
-															<path
-																d="M6 13L12 7L18 13"
-																stroke="black"
-																strokeWidth="1.5"
-																strokeLinecap="round"
-																strokeLinejoin="round"
-															/>
-															<path
-																d="M20 4.5V8.5"
-																stroke="black"
-																strokeWidth="1.5"
-																strokeLinecap="round"
-																strokeLinejoin="round"
-															/>
-															<path
-																d="M18 6.5H22"
-																stroke="black"
-																strokeWidth="1.5"
-																strokeLinecap="round"
-																strokeLinejoin="round"
-															/>
-														</svg>
+														<div style={{ flexShrink: 0 }}>
+															<UpscaleIcon width="24" height="24" />
+														</div>
 													</div>
 													{/* Box below the two small boxes */}
 													<div
