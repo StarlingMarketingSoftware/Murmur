@@ -1330,7 +1330,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												hideFooter
 												fullWidthMobile
 												hideAddTextButtons
-												hideAllText={view === 'drafting' && draftCount === 0}
+												hideAllText={
+													// Hide all structure text to show chrome-only skeleton:
+													// - When the Drafts tab has no drafts
+													// - When the Sent tab is in its empty state
+													(view === 'drafting' && draftCount === 0) ||
+													(view === 'sent' && sentCount === 0)
+												}
 											/>
 										</div>
 									)}
@@ -1368,7 +1374,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									) : (
 										<ContactResearchPanel
 											contact={displayedContactForResearch}
-											hideAllText={view === 'drafting' && draftCount === 0}
+											hideAllText={
+												// Hide all research text to show a chrome-only skeleton:
+												// - When the Drafts tab has no drafts
+												// - When the Sent tab is in its empty state
+												(view === 'drafting' && draftCount === 0) ||
+												(view === 'sent' && sentCount === 0)
+											}
 										/>
 									)}
 								</div>
