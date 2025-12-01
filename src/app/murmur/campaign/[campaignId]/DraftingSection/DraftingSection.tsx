@@ -82,6 +82,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		isOpenUpgradeSubscriptionDrawer,
 		isPendingGeneration,
 		isTest,
+		isUpscalingPrompt,
+		upscalePrompt,
 		setIsOpenUpgradeSubscriptionDrawer,
 		trackFocusedField,
 		handleGenerateDrafts,
@@ -1118,6 +1120,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													/>
 													{/* Box to the right of the small box */}
 													<div
+														onClick={() => {
+															if (!isUpscalingPrompt) {
+																upscalePrompt();
+															}
+														}}
 														style={{
 															position: 'absolute',
 															top: '83px',
@@ -1127,8 +1134,70 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															backgroundColor: '#D7F0FF',
 															border: '2px solid #000000',
 															borderRadius: '8px',
+															display: 'flex',
+															alignItems: 'center',
+															justifyContent: 'space-between',
+															paddingLeft: '10px',
+															paddingRight: '10px',
+															cursor: isUpscalingPrompt ? 'wait' : 'pointer',
 														}}
-													/>
+													>
+														<span
+															style={{
+																fontFamily: 'Inter, system-ui, sans-serif',
+																fontSize: '17px',
+																fontWeight: 500,
+																color: '#000000',
+																lineHeight: '1',
+															}}
+														>
+															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
+														</span>
+														<svg
+															width="24"
+															height="24"
+															viewBox="0 0 24 24"
+															fill="none"
+															xmlns="http://www.w3.org/2000/svg"
+															style={{ flexShrink: 0 }}
+														>
+															<path
+																d="M6 19L12 13L18 19"
+																stroke="black"
+																strokeWidth="1.5"
+																strokeLinecap="round"
+																strokeLinejoin="round"
+															/>
+															<path
+																d="M6 16L12 10L18 16"
+																stroke="black"
+																strokeWidth="1.5"
+																strokeLinecap="round"
+																strokeLinejoin="round"
+															/>
+															<path
+																d="M6 13L12 7L18 13"
+																stroke="black"
+																strokeWidth="1.5"
+																strokeLinecap="round"
+																strokeLinejoin="round"
+															/>
+															<path
+																d="M20 4.5V8.5"
+																stroke="black"
+																strokeWidth="1.5"
+																strokeLinecap="round"
+																strokeLinejoin="round"
+															/>
+															<path
+																d="M18 6.5H22"
+																stroke="black"
+																strokeWidth="1.5"
+																strokeLinecap="round"
+																strokeLinejoin="round"
+															/>
+														</svg>
+													</div>
 													{/* Box below the two small boxes */}
 													<div
 														style={{

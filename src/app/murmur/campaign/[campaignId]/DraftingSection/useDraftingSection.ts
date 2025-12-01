@@ -138,6 +138,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [abortController, setAbortController] = useState<AbortController | null>(null);
 	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	const [activeTab, setActiveTab] = useState<'test' | 'placeholders'>('test');
+	const [isUpscalingPrompt, setIsUpscalingPrompt] = useState(false);
 
 	const draftingRef = useRef<HTMLDivElement>(null);
 	const emailStructureRef = useRef<HTMLDivElement>(null);
@@ -906,6 +907,79 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 		[callGemini]
 	);
 
+	/**
+	 * Upscale the current Full Auto prompt using Gemini 2.5 Flash.
+	 * Makes the prompt deeper, longer, and more detailed.
+	 */
+	const upscalePrompt = useCallback(async () => {
+		const blocks = form.getValues('hybridBlockPrompts');
+		const fullAutomatedBlock = blocks?.find((b) => b.type === 'full_automated');
+		const currentPrompt = fullAutomatedBlock?.value?.trim() || '';
+
+		if (!currentPrompt) {
+			toast.error('Please enter a prompt first before upscaling.');
+			return;
+		}
+
+		setIsUpscalingPrompt(true);
+
+		try {
+			const upscaleSystemPrompt = `You are an expert at improving email prompts. Your task is to take a user's prompt for generating outreach emails and make it significantly better.
+
+INSTRUCTIONS:
+1. Make the prompt more detailed and specific
+2. Add nuanced instructions about tone, personalization, and structure
+3. Include guidance on how to reference the recipient's context
+4. Expand on the goals and desired outcomes
+5. Keep the core intent but make it 2-3x more comprehensive
+6. Do NOT add any placeholders or variables - just write the improved prompt text
+7. The output should be the improved prompt ONLY - no explanations, no JSON, no markdown
+
+The improved prompt should result in more personalized, engaging, and effective emails.`;
+
+			const response = await callGemini({
+				model: GEMINI_MODEL_OPTIONS.gemini25Flash,
+				prompt: upscaleSystemPrompt,
+				content: `Current prompt to improve:\n\n${currentPrompt}`,
+			});
+
+			// Clean the response - remove any markdown or extra formatting
+			let improvedPrompt = response.trim();
+
+			// Remove markdown code blocks if present
+			improvedPrompt = improvedPrompt
+				.replace(/^```(?:\w+)?\s*/i, '')
+				.replace(/\s*```$/i, '');
+
+			if (improvedPrompt && improvedPrompt.length > currentPrompt.length * 0.5) {
+				// Update the full_automated block with the improved prompt
+				const updatedBlocks = blocks.map((block) => {
+					if (block.type === 'full_automated') {
+						return { ...block, value: improvedPrompt };
+					}
+					return block;
+				});
+
+				form.setValue('hybridBlockPrompts', updatedBlocks, {
+					shouldDirty: true,
+					shouldValidate: true,
+				});
+
+				toast.success('Prompt upscaled successfully!');
+
+				// Re-score the new prompt
+				await scoreFullAutomatedPrompt(improvedPrompt);
+			} else {
+				toast.error('Failed to generate an improved prompt. Please try again.');
+			}
+		} catch (error) {
+			console.error('[Upscale Prompt] Error:', error);
+			toast.error('Failed to upscale prompt. Please try again.');
+		} finally {
+			setIsUpscalingPrompt(false);
+		}
+	}, [callGemini, form, scoreFullAutomatedPrompt]);
+
 	const cancelGeneration = () => {
 		isGenerationCancelledRef.current = true;
 		setGenerationProgress(-1);
@@ -1606,6 +1680,8 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 		isOpenUpgradeSubscriptionDrawer,
 		isPendingGeneration,
 		isTest,
+		isUpscalingPrompt,
+		upscalePrompt,
 		setActiveTab,
 		setGenerationProgress,
 		setIsOpenUpgradeSubscriptionDrawer,
