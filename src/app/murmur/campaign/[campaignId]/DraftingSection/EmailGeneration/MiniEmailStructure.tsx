@@ -645,11 +645,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								<div ref={modeContainerRef} className="relative flex items-center gap-6">
 									<div
 										className="absolute top-1/2 -translate-y-1/2 z-10 pointer-events-none"
-									style={{
-										left: highlightStyle.left,
-										transition: 'left 0.25s ease-in-out',
-										opacity: highlightStyle.opacity,
-									}}
+										style={{
+											left: highlightStyle.left,
+											transition: 'left 0.25s ease-in-out',
+											opacity: highlightStyle.opacity,
+										}}
 									>
 										<div
 											style={{
@@ -1049,177 +1049,188 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									// Default rendering for non-hybrid or non-text blocks
 									return (
 										<Fragment key={b.id}>
-								<div
-									className={cn(
-										'rounded-[8px] border-2 bg-white relative overflow-hidden',
-										draftingMode === 'hybrid'
-											? 'w-[351px] ml-[2.5%]'
-											: 'w-[95%] max-[480px]:w-[89.33vw] mx-auto',
-										b.type === 'full_automated' && 'mini-full-auto-card',
-										b.type !== 'full_automated' && 'px-2 py-1'
-									)}
-									style={{
-										borderColor:
-											(draftingMode === 'handwritten' ||
-												draftingMode === 'hybrid') &&
-											b.type === 'text'
-												? '#53A25D'
-												: b.type === 'full_automated'
-												? '#51A2E4'
-												: '#000000',
-									}}
-								>
-									{b.type === 'full_automated' ? (
-										<>
-											{/* Full Auto Header with Power Mode toggles */}
-											<div className="w-full h-[22px] bg-[#B9DAF5] flex items-stretch">
-												{/* Full Auto label section */}
-												<div className="flex-1 flex items-center pl-[8px]">
-													<span className="font-inter font-semibold text-[12px] text-[#000000]">
-														Full Auto
-													</span>
-												</div>
-												{/* Divider - black when Normal Power selected */}
-												<div
-													className={cn(
-														'w-[1px] flex-shrink-0 transition-colors',
-														selectedPowerMode === 'normal' ? 'bg-[#000000]' : 'bg-[#51A2E4]'
-													)}
-												/>
-												{/* Normal Power section */}
-												<button
-													type="button"
-													onClick={() => setSelectedPowerMode('normal')}
-													className={cn(
-														'w-[76px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
-														selectedPowerMode === 'normal' ? 'bg-[#8DBFE8]' : 'bg-transparent'
-													)}
-												>
-													<span
-														className={cn(
-															'font-inter font-normal italic text-[10px] transition-colors',
-															selectedPowerMode === 'normal'
-																? 'text-[#000000]'
-																: 'text-[#9E9E9E]'
-														)}
-													>
-														Normal Power
-													</span>
-												</button>
-												{/* Divider - black when either Normal Power or High selected */}
-												<div
-													className={cn(
-														'w-[1px] flex-shrink-0 transition-colors',
-														selectedPowerMode === 'normal' || selectedPowerMode === 'high'
-															? 'bg-[#000000]'
-															: 'bg-[#51A2E4]'
-													)}
-												/>
-												{/* High section */}
-												<button
-													type="button"
-													onClick={() => setSelectedPowerMode('high')}
-													className={cn(
-														'w-[34px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
-														selectedPowerMode === 'high' ? 'bg-[#8DBFE8]' : 'bg-transparent'
-													)}
-												>
-													<span
-														className={cn(
-															'font-inter font-normal italic text-[10px] transition-colors',
-															selectedPowerMode === 'high'
-																? 'text-[#000000]'
-																: 'text-[#9E9E9E]'
-														)}
-													>
-														High
-													</span>
-												</button>
-												{/* Divider - black when High selected */}
-												<div
-													className={cn(
-														'w-[1px] flex-shrink-0 transition-colors',
-														selectedPowerMode === 'high' ? 'bg-[#000000]' : 'bg-[#51A2E4]'
-													)}
-												/>
-												{/* Right empty section */}
-												<div className="w-[16px] flex-shrink-0" />
-											</div>
-											{/* Horizontal divider under header */}
-											<div className="w-full h-[1px] bg-[#51A2E4]" />
-											{/* Content area */}
-											<div className="px-2 py-1">
-												<div className="relative">
-													{!b.value && (
-														<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px] max-[480px]:text-[10px] mini-full-auto-placeholder">
-															<div className="space-y-2">
-																<div>
-																	<p>Type anything you want to include</p>
-																</div>
+											<div
+												className={cn(
+													'rounded-[8px] border-2 bg-white relative overflow-hidden',
+													draftingMode === 'hybrid'
+														? 'w-[351px] ml-[2.5%]'
+														: 'w-[95%] max-[480px]:w-[89.33vw] mx-auto',
+													b.type === 'full_automated' && 'mini-full-auto-card',
+													b.type !== 'full_automated' && 'px-2 py-1'
+												)}
+												style={{
+													borderColor:
+														(draftingMode === 'handwritten' ||
+															draftingMode === 'hybrid') &&
+														b.type === 'text'
+															? '#53A25D'
+															: b.type === 'full_automated'
+															? '#51A2E4'
+															: '#000000',
+												}}
+											>
+												{b.type === 'full_automated' ? (
+													<>
+														{/* Full Auto Header with Power Mode toggles */}
+														<div className="w-full h-[22px] bg-[#B9DAF5] flex items-stretch">
+															{/* Full Auto label section */}
+															<div className="flex-1 flex items-center pl-[8px]">
+																<span className="font-inter font-semibold text-[12px] text-[#000000]">
+																	Full Auto
+																</span>
 															</div>
-														</div>
-													)}
-													<textarea
-														className={cn(
-															'border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 w-full max-w-full min-w-0',
-															'h-[70px] py-2 pr-2 px-0 resize-none',
-															'bg-white text-[12px] leading-[16px]',
-															'mini-full-auto-textarea'
-														)}
-														placeholder=""
-														value={b.value || ''}
-														onChange={(e) => updateBlockValue(b.id, e.target.value)}
-													/>
-												</div>
-											</div>
-										</>
-									) : (
-										<>
-											<div className="flex items-center justify-between">
-												<div className="flex items-center gap-2">
-													<span
-														className={cn(
-															'font-inter text-[12px] font-semibold text-black',
-															b.type === 'full_automated' && 'whitespace-nowrap'
-														)}
-													>
-														{blockLabel(b.type as HybridBlock)}
-													</span>
-												</div>
-												<div className="flex items-center gap-2">
-													{blockHint(b.type as HybridBlock) && (
-														<span className="text-[10px] italic text-[#5d5d5d]">
-															{blockHint(b.type as HybridBlock)}
-														</span>
-													)}
-													{b.type !== 'full_automated' &&
-														draftingMode !== 'hybrid' &&
-														!(draftingMode === 'handwritten' && b.type === 'text') && (
+															{/* Divider - black when Normal Power selected */}
+															<div
+																className={cn(
+																	'w-[1px] flex-shrink-0 transition-colors',
+																	selectedPowerMode === 'normal'
+																		? 'bg-[#000000]'
+																		: 'bg-[#51A2E4]'
+																)}
+															/>
+															{/* Normal Power section */}
 															<button
 																type="button"
-																className="text-[12px] text-[#b30000] hover:text-red-600"
-																onClick={() => removeBlock(b.id)}
-																aria-label="Remove block"
+																onClick={() => setSelectedPowerMode('normal')}
+																className={cn(
+																	'w-[76px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
+																	selectedPowerMode === 'normal'
+																		? 'bg-[#8DBFE8]'
+																		: 'bg-transparent'
+																)}
 															>
-																×
+																<span
+																	className={cn(
+																		'font-inter font-normal italic text-[10px] transition-colors',
+																		selectedPowerMode === 'normal'
+																			? 'text-[#000000]'
+																			: 'text-[#9E9E9E]'
+																	)}
+																>
+																	Normal Power
+																</span>
 															</button>
-														)}
-												</div>
+															{/* Divider - black when either Normal Power or High selected */}
+															<div
+																className={cn(
+																	'w-[1px] flex-shrink-0 transition-colors',
+																	selectedPowerMode === 'normal' ||
+																		selectedPowerMode === 'high'
+																		? 'bg-[#000000]'
+																		: 'bg-[#51A2E4]'
+																)}
+															/>
+															{/* High section */}
+															<button
+																type="button"
+																onClick={() => setSelectedPowerMode('high')}
+																className={cn(
+																	'w-[34px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
+																	selectedPowerMode === 'high'
+																		? 'bg-[#8DBFE8]'
+																		: 'bg-transparent'
+																)}
+															>
+																<span
+																	className={cn(
+																		'font-inter font-normal italic text-[10px] transition-colors',
+																		selectedPowerMode === 'high'
+																			? 'text-[#000000]'
+																			: 'text-[#9E9E9E]'
+																	)}
+																>
+																	High
+																</span>
+															</button>
+															{/* Divider - black when High selected */}
+															<div
+																className={cn(
+																	'w-[1px] flex-shrink-0 transition-colors',
+																	selectedPowerMode === 'high'
+																		? 'bg-[#000000]'
+																		: 'bg-[#51A2E4]'
+																)}
+															/>
+															{/* Right empty section */}
+															<div className="w-[16px] flex-shrink-0" />
+														</div>
+														{/* Horizontal divider under header */}
+														<div className="w-full h-[1px] bg-[#51A2E4]" />
+														{/* Content area */}
+														<div className="px-2 py-1">
+															<div className="relative">
+																{!b.value && (
+																	<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px] max-[480px]:text-[10px] mini-full-auto-placeholder">
+																		<div className="space-y-2">
+																			<div>
+																				<p>Type anything you want to include</p>
+																			</div>
+																		</div>
+																	</div>
+																)}
+																<textarea
+																	className={cn(
+																		'border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 w-full max-w-full min-w-0',
+																		'h-[70px] py-2 pr-2 px-0 resize-none',
+																		'bg-white text-[12px] leading-[16px]',
+																		'mini-full-auto-textarea'
+																	)}
+																	placeholder=""
+																	value={b.value || ''}
+																	onChange={(e) => updateBlockValue(b.id, e.target.value)}
+																/>
+															</div>
+														</div>
+													</>
+												) : (
+													<>
+														<div className="flex items-center justify-between">
+															<div className="flex items-center gap-2">
+																<span
+																	className={cn(
+																		'font-inter text-[12px] font-semibold text-black',
+																		b.type === 'full_automated' && 'whitespace-nowrap'
+																	)}
+																>
+																	{blockLabel(b.type as HybridBlock)}
+																</span>
+															</div>
+															<div className="flex items-center gap-2">
+																{blockHint(b.type as HybridBlock) && (
+																	<span className="text-[10px] italic text-[#5d5d5d]">
+																		{blockHint(b.type as HybridBlock)}
+																	</span>
+																)}
+																{b.type !== 'full_automated' &&
+																	draftingMode !== 'hybrid' &&
+																	!(
+																		draftingMode === 'handwritten' && b.type === 'text'
+																	) && (
+																		<button
+																			type="button"
+																			className="text-[12px] text-[#b30000] hover:text-red-600"
+																			onClick={() => removeBlock(b.id)}
+																			aria-label="Remove block"
+																		>
+																			×
+																		</button>
+																	)}
+															</div>
+														</div>
+														<textarea
+															className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none max-[480px]:placeholder:text-[8px]"
+															placeholder={
+																b.type === 'text'
+																	? 'Write the exact text you want in your email here. *required'
+																	: 'Type here to specify further, e.g., "I am ... and I lead ..."'
+															}
+															value={b.value || ''}
+															onChange={(e) => updateBlockValue(b.id, e.target.value)}
+														/>
+													</>
+												)}
 											</div>
-											<textarea
-												className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none max-[480px]:placeholder:text-[8px]"
-												placeholder={
-													b.type === 'text'
-														? 'Write the exact text you want in your email here. *required'
-														: 'Type here to specify further, e.g., "I am ... and I lead ..."'
-												}
-												value={b.value || ''}
-												onChange={(e) => updateBlockValue(b.id, e.target.value)}
-											/>
-										</>
-									)}
-								</div>
-							</Fragment>
+										</Fragment>
 									);
 								};
 

@@ -92,47 +92,47 @@ const Dashboard = () => {
 								? { position: 'fixed', top: '118px', left: 'calc(50% - 220px)' }
 								: { position: 'absolute', top: 'calc(100% + 10px)', left: '4px' }
 						}
-				>
-					<div
-						className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-						onClick={() => {
-							setWhyValue('[Booking]');
-							setActiveSection('what');
-						}}
 					>
-						<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-							<BookingIcon />
-						</div>
-						<div className="ml-[12px] flex flex-col">
-							<div className="text-[20px] font-medium leading-none text-black font-inter">
-								Booking
+						<div
+							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setWhyValue('[Booking]');
+								setActiveSection('what');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<BookingIcon />
 							</div>
-							<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
-								contact venues, resturants and more, to book shows
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Booking
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
+									contact venues, resturants and more, to book shows
+								</div>
+							</div>
+						</div>
+						<div
+							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							onClick={() => {
+								setWhyValue('[Promotion]');
+								setActiveSection('what');
+							}}
+						>
+							<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+								<PromotionIcon />
+							</div>
+							<div className="ml-[12px] flex flex-col">
+								<div className="text-[20px] font-medium leading-none text-black font-inter">
+									Promotion
+								</div>
+								<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
+									reach out to radio stations, playlists, and more to get your music
+									played
+								</div>
 							</div>
 						</div>
 					</div>
-					<div
-						className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-						onClick={() => {
-							setWhyValue('[Promotion]');
-							setActiveSection('what');
-						}}
-					>
-						<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-							<PromotionIcon />
-						</div>
-						<div className="ml-[12px] flex flex-col">
-							<div className="text-[20px] font-medium leading-none text-black font-inter">
-								Promotion
-							</div>
-							<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
-								reach out to radio stations, playlists, and more to get your music
-								played
-							</div>
-						</div>
-					</div>
-				</div>
 				)}
 				{activeSection === 'what' && whyValue === '[Promotion]' && (
 					<div
@@ -1640,7 +1640,8 @@ const Dashboard = () => {
 												className="font-secondary text-center"
 												style={{ fontSize: '13px', fontWeight: 400, color: '#7f7f7f' }}
 											>
-												Select who you want to contact, or upload your own contacts via TSV.
+												Select who you want to contact, or upload your own contacts via
+												TSV.
 											</span>
 											{/* Hidden: Import button
 											<div className="flex justify-center">
