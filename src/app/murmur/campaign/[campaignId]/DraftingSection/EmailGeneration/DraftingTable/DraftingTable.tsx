@@ -132,8 +132,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							left: '69px',
 							width: '72px',
 							height: '22px',
-							backgroundColor: '#FFECDC',
-							border: '2px solid #A8833A',
+							backgroundColor: !hasData ? '#FFCD73' : '#FFECDC',
+							border: `2px solid ${!hasData ? '#B0B0B0' : '#A8833A'}`,
 							borderRadius: '11px',
 							display: 'flex',
 							alignItems: 'center',
@@ -141,7 +141,10 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							zIndex: 10,
 						}}
 					>
-						<span className="text-[13px] font-semibold font-inter text-black leading-none">
+						<span
+							className="text-[13px] font-semibold font-inter leading-none"
+							style={{ color: !hasData ? '#B0B0B0' : '#000000' }}
+						>
 							Drafts
 						</span>
 					</div>
@@ -153,7 +156,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							width: '9px',
 							height: '9px',
 							borderRadius: '50%',
-							backgroundColor: '#D9D9D9',
+							backgroundColor: !hasData ? '#B0B0B0' : '#D9D9D9',
 							zIndex: 10,
 						}}
 					/>
@@ -165,7 +168,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							width: '9px',
 							height: '9px',
 							borderRadius: '50%',
-							backgroundColor: '#D9D9D9',
+							backgroundColor: !hasData ? '#B0B0B0' : '#D9D9D9',
 							zIndex: 10,
 						}}
 					/>
@@ -177,7 +180,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							width: '9px',
 							height: '9px',
 							borderRadius: '50%',
-							backgroundColor: '#D9D9D9',
+							backgroundColor: !hasData ? '#B0B0B0' : '#D9D9D9',
 							zIndex: 10,
 						}}
 					/>
@@ -274,7 +277,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					background: isContacts
 						? 'linear-gradient(to bottom, #ffffff 26px, #EB8586 26px)'
 						: isDrafts
-						? 'linear-gradient(to bottom, #ffffff 26px, #FFDC9E 26px)'
+						? hasData
+							? 'linear-gradient(to bottom, #ffffff 26px, #FFDC9E 26px)'
+							: '#FFCD73'
 						: isSent
 						? 'linear-gradient(to bottom, #ffffff 26px, #5AB477 26px)'
 						: 'white',
@@ -383,8 +388,14 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 										key={idx}
 										className={`select-none w-[489px] ${boxHeight} overflow-hidden rounded-[8px] border-2 border-[#000000] ${
 											isDrafts ? 'bg-[#FFCD73]' : isSent ? 'bg-[#5AB477]' : 'bg-white'
-										} p-2`}
-									/>
+										} p-2 flex items-center justify-center`}
+									>
+										{isDrafts && idx === 0 && (
+											<span className="text-[15px] font-semibold font-inter text-black">
+												Draft Your First Email
+											</span>
+										)}
+									</div>
 								);
 							})}
 						</div>
