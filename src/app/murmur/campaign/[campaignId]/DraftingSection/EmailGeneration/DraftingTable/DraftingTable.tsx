@@ -5,9 +5,16 @@ import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { urls } from '@/constants/urls';
 
-export const ContactsHeaderChrome: FC<{ offsetY?: number }> = ({ offsetY = 0 }) => {
+export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean }> = ({
+	offsetY = 0,
+	hasData = true,
+}) => {
 	const pillTop = 3 + offsetY;
 	const dotTop = 10 + offsetY;
+	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
+	const pillBorderColor = hasData ? '#8D5B5B' : '#B0B0B0';
+	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
+	const pillBgColor = hasData ? '#F5DADA' : '#FFAEAE';
 
 	return (
 		<>
@@ -18,8 +25,8 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number }> = ({ offsetY = 0 }) 
 					left: '21px',
 					width: '72px',
 					height: '22px',
-					backgroundColor: '#F5DADA',
-					border: '2px solid #8D5B5B',
+					backgroundColor: pillBgColor,
+					border: `2px solid ${pillBorderColor}`,
 					borderRadius: '11px',
 					display: 'flex',
 					alignItems: 'center',
@@ -27,7 +34,10 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number }> = ({ offsetY = 0 }) 
 					zIndex: 10,
 				}}
 			>
-				<span className="text-[13px] font-semibold font-inter text-black leading-none">
+				<span
+					className="text-[13px] font-semibold font-inter leading-none"
+					style={{ color: pillTextColor }}
+				>
 					Contacts
 				</span>
 			</div>
@@ -39,7 +49,7 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number }> = ({ offsetY = 0 }) 
 					width: '9px',
 					height: '9px',
 					borderRadius: '50%',
-					backgroundColor: '#D9D9D9',
+					backgroundColor: dotColor,
 					zIndex: 10,
 				}}
 			/>
@@ -51,7 +61,7 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number }> = ({ offsetY = 0 }) 
 					width: '9px',
 					height: '9px',
 					borderRadius: '50%',
-					backgroundColor: '#D9D9D9',
+					backgroundColor: dotColor,
 					zIndex: 10,
 				}}
 			/>
@@ -63,7 +73,7 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number }> = ({ offsetY = 0 }) 
 					width: '9px',
 					height: '9px',
 					borderRadius: '50%',
-					backgroundColor: '#D9D9D9',
+					backgroundColor: dotColor,
 					zIndex: 10,
 				}}
 			/>
@@ -133,7 +143,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				{isContacts ? '' : isDrafts ? '' : isSent ? '' : ''}
 			</div>
 			{/* New Contacts Pill */}
-			{isContacts && <ContactsHeaderChrome />}
+			{isContacts && <ContactsHeaderChrome hasData={hasData} />}
 
 			{/* New Drafts Pill */}
 			{isDrafts && (

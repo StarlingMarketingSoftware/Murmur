@@ -1335,8 +1335,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													// Hide all structure text to show chrome-only skeleton:
 													// - When the Drafts tab has no drafts
 													// - When the Sent tab is in its empty state
+													// - When the Contacts tab has no contacts to show
 													(view === 'drafting' && draftCount === 0) ||
-													(view === 'sent' && sentCount === 0)
+													(view === 'sent' && sentCount === 0) ||
+													(view === 'contacts' &&
+														contactsAvailableForDrafting.length === 0)
 												}
 											/>
 										</div>
@@ -1379,8 +1382,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												// Hide all research text to show a chrome-only skeleton:
 												// - When the Drafts tab has no drafts
 												// - When the Sent tab is in its empty state
+												// - When the Contacts tab has no contacts to show
 												(view === 'drafting' && draftCount === 0) ||
-												(view === 'sent' && sentCount === 0)
+												(view === 'sent' && sentCount === 0) ||
+												(view === 'contacts' && contactsAvailableForDrafting.length === 0)
 											}
 										/>
 									)}
