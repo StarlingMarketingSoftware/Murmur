@@ -67,7 +67,7 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number }> = ({ offsetY = 0 }) 
 			/>
 		</>
 	);
-}
+};
 
 interface DraftingTableProps {
 	handleClick: () => void;
@@ -370,17 +370,23 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					) : hasData ? (
 						children
 					) : isDrafts || isSent ? (
-						<div className="overflow-visible w-full flex flex-col gap-2 items-center">
-							{Array.from({ length: 6 }).map((_, idx) => (
-								<div
-									key={idx}
-									className={`select-none w-[489px] ${
-										isDrafts || isSent ? 'h-[97px]' : 'h-[64px]'
-									} overflow-hidden rounded-[8px] border-2 border-[#000000] ${
-										isDrafts ? 'bg-[#FFDC9E]' : isSent ? 'bg-[#5AB477]' : 'bg-white'
-									} p-2`}
-								/>
-							))}
+						<div
+							className="overflow-visible w-full flex flex-col items-center"
+							style={{ gap: '11px' }}
+						>
+							{Array.from({ length: 8 }).map((_, idx) => {
+								// For drafts empty state: boxes 2-5 (idx 1-4) are 52px, all others are 85px
+								const boxHeight =
+									isDrafts && idx >= 1 && idx <= 4 ? 'h-[52px]' : 'h-[85px]';
+								return (
+									<div
+										key={idx}
+										className={`select-none w-[489px] ${boxHeight} overflow-hidden rounded-[8px] border-2 border-[#000000] ${
+											isDrafts ? 'bg-[#FFCD73]' : isSent ? 'bg-[#5AB477]' : 'bg-white'
+										} p-2`}
+									/>
+								);
+							})}
 						</div>
 					) : isContacts ? (
 						<div className="overflow-visible w-full flex flex-col gap-4 items-center py-2">
