@@ -145,7 +145,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							left: '69px',
 							width: '72px',
 							height: '22px',
-							backgroundColor: !hasData ? '#FFCD73' : '#FFECDC',
+							backgroundColor: !hasData ? '#F8D69A' : '#FFECDC',
 							border: `2px solid ${!hasData ? '#B0B0B0' : '#A8833A'}`,
 							borderRadius: '11px',
 							display: 'flex',
