@@ -2025,6 +2025,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													setSearchActiveSection('where');
 													setSearchWhereValue(stateName);
 												}}
+												lockedStateName={searchWhereValue}
 											/>
 										</div>
 									</div>

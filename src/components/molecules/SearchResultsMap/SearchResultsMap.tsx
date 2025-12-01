@@ -161,6 +161,7 @@ interface SearchResultsMapProps {
 	onToggleSelection?: (contactId: number) => void;
 	onStateSelect?: (stateName: string) => void;
 	enableStateInteractions?: boolean;
+	lockedStateName?: string | null;
 }
 
 const mapContainerStyle = {
@@ -179,6 +180,7 @@ const mapOptions: google.maps.MapOptions = {
 	streetViewControl: false,
 	mapTypeControl: false,
 	fullscreenControl: false,
+	gestureHandling: 'greedy',
 	styles: [
 		{
 			featureType: 'poi',
@@ -198,6 +200,13 @@ const STATE_HIGHLIGHT_COLOR = '#5DAB68';
 const STATE_HIGHLIGHT_OPACITY = 0.68;
 const STATE_BORDER_COLOR = '#CFD8DC';
 
+const normalizeStateKey = (state?: string | null): string | null => {
+	if (!state) return null;
+	const abbr = getStateAbbreviation(state);
+	if (abbr) return abbr;
+	return state.trim().toUpperCase();
+};
+
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
 	selectedContacts,
@@ -205,11 +214,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	onToggleSelection,
 	onStateSelect,
 	enableStateInteractions,
+	lockedStateName,
 }) => {
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
 	const [map, setMap] = useState<google.maps.Map | null>(null);
-	const [selectedStateId, setSelectedStateId] = useState<string | null>(null);
+	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
 	// Local state for newly geocoded coordinates (updates before query refetch)
 	const [geocodedCoords, setGeocodedCoords] = useState<
 		Map<number, { lat: number; lng: number }>
@@ -218,6 +228,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Timeout ref for auto-hiding research panel
 	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const stateLayerRef = useRef<google.maps.Data | null>(null);
+	const selectedStateKeyRef = useRef<string | null>(null);
+	const onStateSelectRef = useRef<SearchResultsMapProps['onStateSelect'] | null>(null);
+
+	useEffect(() => {
+		selectedStateKeyRef.current = selectedStateKey;
+	}, [selectedStateKey]);
+
+	useEffect(() => {
+		onStateSelectRef.current = onStateSelect ?? null;
+	}, [onStateSelect]);
+
+	useEffect(() => {
+		if (lockedStateName === undefined) return;
+		const nextKey = normalizeStateKey(lockedStateName);
+		setSelectedStateKey(nextKey);
+	}, [lockedStateName]);
 
 	// Clear timeout when panel is closed or component unmounts
 	useEffect(() => {
@@ -248,6 +274,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const mouseoverListener = dataLayer.addListener(
 			'mouseover',
 			(event: google.maps.Data.MouseEvent) => {
+				const hoveredKey = normalizeStateKey(
+					(event.feature.getProperty('NAME') as string) ||
+						(event.feature.getId() as string)
+				);
+				if (hoveredKey && hoveredKey === selectedStateKeyRef.current) {
+					return;
+				}
 				dataLayer.overrideStyle(event.feature, {
 					fillColor: STATE_HIGHLIGHT_COLOR,
 					fillOpacity: STATE_HIGHLIGHT_OPACITY,
@@ -269,10 +302,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			'click',
 			(event: google.maps.Data.MouseEvent) => {
 				const stateName = (event.feature.getProperty('NAME') as string) || '';
-				const featureId = (event.feature.getId() as string) || stateName || null;
-				setSelectedStateId(featureId);
+				const normalizedKey =
+					normalizeStateKey(stateName) ||
+					normalizeStateKey((event.feature.getId() as string) || undefined);
+				setSelectedStateKey(normalizedKey);
 				if (stateName) {
-					onStateSelect?.(stateName);
+					onStateSelectRef.current?.(stateName);
 				}
 			}
 		);
@@ -283,9 +318,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			clickListener.remove();
 			dataLayer.setMap(null);
 			stateLayerRef.current = null;
-			setSelectedStateId(null);
+			setSelectedStateKey(null);
 		};
-	}, [map, enableStateInteractions, onStateSelect]);
+	}, [map, enableStateInteractions]);
 
 	// Update stroke styling when the selected state changes
 	useEffect(() => {
@@ -294,7 +329,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!dataLayer) return;
 
 		dataLayer.setStyle((feature) => {
-			const isSelected = feature.getId() === selectedStateId;
+			const featureKey = normalizeStateKey(
+				(feature.getProperty('NAME') as string) || (feature.getId() as string)
+			);
+			const isSelected = featureKey && featureKey === selectedStateKey;
 			return {
 				fillOpacity: 0,
 				strokeColor: isSelected ? '#000000' : STATE_BORDER_COLOR,
@@ -303,7 +341,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				zIndex: 0,
 			};
 		});
-	}, [selectedStateId, enableStateInteractions]);
+	}, [selectedStateKey, enableStateInteractions]);
 
 	const handleResearchPanelMouseEnter = useCallback(() => {
 		if (researchPanelTimeoutRef.current) {
