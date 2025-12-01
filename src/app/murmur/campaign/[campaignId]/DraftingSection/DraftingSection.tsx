@@ -74,6 +74,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		campaign,
 		contacts,
 		form,
+		promptQualityScore,
+		promptQualityLabel,
+		promptSuggestions,
 		handleGenerateTestDrafts,
 		isGenerationDisabled,
 		isOpenUpgradeSubscriptionDrawer,
@@ -105,6 +108,30 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 
 	const isMobile = useIsMobile();
+
+	const clampedPromptScore =
+		typeof promptQualityScore === 'number'
+			? Math.max(60, Math.min(100, Math.round(promptQualityScore)))
+			: null;
+
+	const promptScoreFillPercent = clampedPromptScore == null ? 0 : clampedPromptScore;
+
+	const suggestionText1 = promptSuggestions?.[0] || '';
+	const suggestionText2 = promptSuggestions?.[1] || '';
+
+	const promptScoreDisplayLabel =
+		clampedPromptScore == null
+			? 'Prompt score pending'
+			: `${clampedPromptScore} - ${
+					promptQualityLabel ||
+					(clampedPromptScore >= 90
+						? 'Excellent'
+						: clampedPromptScore >= 80
+						? 'Great'
+						: clampedPromptScore >= 70
+						? 'Good'
+						: 'Fair')
+			  }`;
 
 	// State for contacts selection in the Contacts tab
 	const [contactsTabSelectedIds, setContactsTabSelectedIds] = useState<Set<number>>(
@@ -1032,7 +1059,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															borderRadius: '7px',
 														}}
 													>
-														{/* Small box inside */}
+														{/* Score label */}
+														<div
+															style={{
+																position: 'absolute',
+																top: '6px',
+																left: '10px',
+																fontFamily: 'Inter, system-ui, sans-serif',
+																fontWeight: 700,
+																fontSize: '12px',
+																lineHeight: '14px',
+																color: '#000000',
+															}}
+														>
+															{promptScoreDisplayLabel}
+														</div>
+														{/* Small box inside (progress track) */}
 														<div
 															style={{
 																position: 'absolute',
@@ -1043,8 +1085,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																backgroundColor: '#FFFFFF',
 																border: '2px solid #000000',
 																borderRadius: '8px',
+																overflow: 'hidden',
 															}}
-														/>
+														>
+															<div
+																style={{
+																	position: 'absolute',
+																	top: 0,
+																	bottom: 0,
+																	left: 0,
+																	borderRadius: '999px',
+																	backgroundColor: '#36B24A',
+																	width: `${promptScoreFillPercent}%`,
+																	maxWidth: '100%',
+																	transition: 'width 250ms ease-out',
+																}}
+															/>
+														</div>
 													</div>
 													{/* Small box below the first inner box */}
 													<div
@@ -1111,8 +1168,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																backgroundColor: '#FFFFFF',
 																border: '2px solid #000000',
 																borderRadius: '8px',
+																display: 'flex',
+																alignItems: 'center',
+																padding: '4px 8px',
+																overflow: 'hidden',
 															}}
-														/>
+														>
+															<div
+																style={{
+																	fontFamily: 'Inter, system-ui, sans-serif',
+																	fontSize: '11px',
+																	lineHeight: '1.3',
+																	color: '#000000',
+																	wordBreak: 'break-word',
+																	whiteSpace: 'normal',
+																	overflow: 'hidden',
+																	textOverflow: 'ellipsis',
+																}}
+															>
+																{suggestionText1 ||
+																	'After you score your AI prompt, your first one-sentence suggestion will appear here.'}
+															</div>
+														</div>
 													</div>
 													{/* Second box below */}
 													<div
@@ -1153,8 +1230,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																backgroundColor: '#FFFFFF',
 																border: '2px solid #000000',
 																borderRadius: '8px',
+																display: 'flex',
+																alignItems: 'center',
+																padding: '4px 8px',
+																overflow: 'hidden',
 															}}
-														/>
+														>
+															<div
+																style={{
+																	fontFamily: 'Inter, system-ui, sans-serif',
+																	fontSize: '11px',
+																	lineHeight: '1.3',
+																	color: '#000000',
+																	wordBreak: 'break-word',
+																	whiteSpace: 'normal',
+																	overflow: 'hidden',
+																	textOverflow: 'ellipsis',
+																}}
+															>
+																{suggestionText2 ||
+																	'Your second one-sentence suggestion will land here after scoring.'}
+															</div>
+														</div>
 													</div>
 												</div>
 											)}
