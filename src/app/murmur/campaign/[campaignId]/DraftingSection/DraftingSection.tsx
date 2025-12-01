@@ -304,7 +304,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			suppressToasts: true,
 		});
 
-	// Handler for triggering search - creates a new tab
+	// Handler for triggering search - creates or updates a tab
 	const handleCampaignSearch = () => {
 		const query = buildSearchQuery();
 		if (!query.trim()) {
@@ -327,15 +327,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 		const label = labelParts.join(' - ') || query;
 
-		const newTab: SearchTab = {
-			id: `search-${Date.now()}`,
-			label,
-			query,
-			selectedContacts: [],
-		};
-
-		setSearchTabs((tabs) => [...tabs, newTab]);
-		setActiveSearchTabId(newTab.id);
+		// If we're on an empty search tab (no query yet), update it instead of creating new
+		if (activeSearchTab && !activeSearchTab.query) {
+			setSearchTabs((tabs) =>
+				tabs.map((tab) => (tab.id === activeSearchTabId ? { ...tab, label, query } : tab))
+			);
+		} else {
+			// Create a new tab
+			const newTab: SearchTab = {
+				id: `search-${Date.now()}`,
+				label,
+				query,
+				selectedContacts: [],
+			};
+			setSearchTabs((tabs) => [...tabs, newTab]);
+			setActiveSearchTabId(newTab.id);
+		}
 		setSearchActiveSection(null);
 	};
 
@@ -1863,7 +1870,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									style={{
 										width: '768px',
 										height: '815px',
-										backgroundColor: '#D8E5FB',
+										backgroundColor: '#AFD6EF',
 										border: '3px solid #143883',
 									}}
 								>
@@ -1892,7 +1899,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												width: '105px',
 												height: '36px',
 												backgroundColor:
-													activeSearchTabId === null ? '#94c4e4' : 'transparent',
+													activeSearchTabId === null ? '#94c4e4' : '#95D6FF',
 											}}
 											onClick={() => setActiveSearchTabId(null)}
 										>
@@ -1912,19 +1919,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														maxWidth: '220px',
 														height: '36px',
 														backgroundColor:
-															activeSearchTabId === tab.id ? '#94c4e4' : 'transparent',
+															activeSearchTabId === tab.id ? '#94c4e4' : '#95d6ff',
 														paddingLeft: '12px',
 														paddingRight: '28px',
 													}}
 													onClick={() => setActiveSearchTabId(tab.id)}
 												>
-													<span className="font-inter font-normal text-[15px] text-black truncate">
+													<span
+														className="font-inter font-normal text-[15px] text-black whitespace-nowrap overflow-hidden"
+														style={{
+															maskImage:
+																'linear-gradient(to right, black calc(100% - 20px), transparent 100%)',
+															WebkitMaskImage:
+																'linear-gradient(to right, black calc(100% - 20px), transparent 100%)',
+														}}
+													>
 														{tab.label}
 													</span>
-													{/* Close button */}
+													{/* Close button - visible on hover */}
 													<button
 														type="button"
-														className="absolute right-[8px] top-1/2 -translate-y-1/2 w-[16px] h-[16px] flex items-center justify-center text-black/60 hover:text-black transition-colors"
+														className="absolute right-[8px] top-1/2 -translate-y-1/2 w-[16px] h-[16px] hidden group-hover:flex items-center justify-center text-black/60 hover:text-black"
 														onClick={(e) => {
 															e.stopPropagation();
 															handleCloseSearchTab(tab.id);
@@ -1939,12 +1954,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 										{/* Plus button to add new search */}
 										<div
-											className="flex items-center justify-center cursor-pointer hover:bg-black/5 transition-colors"
+											className="flex items-center justify-center cursor-pointer"
 											style={{
 												width: '36px',
 												height: '36px',
 											}}
 											onClick={() => {
+												// Create a new empty tab
+												const newTab: SearchTab = {
+													id: `search-${Date.now()}`,
+													label: 'New Search',
+													query: '',
+													selectedContacts: [],
+												};
+												setSearchTabs((tabs) => [...tabs, newTab]);
+												setActiveSearchTabId(newTab.id);
+												// Reset search inputs to placeholders
+												setSearchWhyValue('[Booking]');
+												setSearchWhatValue('');
+												setSearchWhereValue('');
 												// Focus the search bar
 												setSearchActiveSection('what');
 											}}
@@ -2083,16 +2111,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														borderRadius: '6px',
 													}}
 													aria-label="Search"
-													disabled={isSearching}
 													onClick={handleCampaignSearch}
 												>
-													{isSearching ? (
-														<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-													) : (
-														<div style={{ transform: 'scale(0.75)', display: 'flex' }}>
-															<SearchIconDesktop />
-														</div>
-													)}
+													<div style={{ transform: 'scale(0.75)', display: 'flex' }}>
+														<SearchIconDesktop />
+													</div>
 												</button>
 											</div>
 										</div>
@@ -2107,15 +2130,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										>
 											<SearchResultsMap
 												contacts={
-													hasCampaignSearched ? searchResults || [] : contacts || []
+													activeSearchTabId === null
+														? contacts || [] // Original tab - show campaign contacts
+														: activeCampaignSearchQuery
+														? searchResults || [] // Search tab with query - show results
+														: [] // Empty search tab - show nothing (zoomed out view)
 												}
 												selectedContacts={
-													hasCampaignSearched
+													activeSearchTabId !== null
 														? searchResultsSelectedContacts
 														: searchTabSelectedContacts
 												}
 												onToggleSelection={(contactId) => {
-													if (hasCampaignSearched) {
+													if (activeSearchTabId !== null) {
 														// Handle selection for search results
 														if (searchResultsSelectedContacts.includes(contactId)) {
 															setSearchResultsSelectedContacts(
