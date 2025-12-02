@@ -12,6 +12,50 @@ import type { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 
+/**
+ * Strip quoted reply content from email body (e.g., "On Thu, Nov 27, 2025 at 2:36 AM ... wrote:")
+ */
+const stripQuotedReply = (text: string): string => {
+	// Match patterns like "On [day], [month] [date], [year] at [time] [name] <email> wrote:"
+	// or "On [date], [name] wrote:" and everything after
+	const patterns = [
+		/\n*On\s+[A-Za-z]{3},\s+[A-Za-z]{3}\s+\d{1,2},\s+\d{4}\s+at\s+\d{1,2}:\d{2}\s*[AP]M\s+.*?wrote:[\s\S]*/i,
+		/\n*On\s+[A-Za-z]+,\s+[A-Za-z]+\s+\d{1,2},\s+\d{4}\s+at\s+\d{1,2}:\d{2}\s*[AP]M\s+.*?wrote:[\s\S]*/i,
+		/\n*On\s+\d{1,2}\/\d{1,2}\/\d{2,4}.*?wrote:[\s\S]*/i,
+		/\n*On\s+.*?\s+wrote:[\s\S]*/i,
+	];
+	
+	let result = text;
+	for (const pattern of patterns) {
+		result = result.replace(pattern, '');
+	}
+	return result.trim();
+};
+
+/**
+ * Strip quoted reply content from HTML email body
+ */
+const stripQuotedReplyHtml = (html: string): string => {
+	// Remove Gmail-style quoted content (div with gmail_quote class)
+	let result = html.replace(/<div[^>]*class="[^"]*gmail_quote[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
+	
+	// Remove blockquote elements (common in email replies)
+	result = result.replace(/<blockquote[^>]*>[\s\S]*?<\/blockquote>/gi, '');
+	
+	// Remove "On ... wrote:" pattern and everything after in plain text within HTML
+	const patterns = [
+		/<div[^>]*>On\s+[A-Za-z]{3},\s+[A-Za-z]{3}\s+\d{1,2},\s+\d{4}\s+at\s+\d{1,2}:\d{2}\s*[AP]M[\s\S]*$/i,
+		/On\s+[A-Za-z]{3},\s+[A-Za-z]{3}\s+\d{1,2},\s+\d{4}\s+at\s+\d{1,2}:\d{2}\s*[AP]M\s+.*?wrote:[\s\S]*$/i,
+		/On\s+.*?\s+wrote:[\s\S]*$/i,
+	];
+	
+	for (const pattern of patterns) {
+		result = result.replace(pattern, '');
+	}
+	
+	return result.trim();
+};
+
 interface InboxSectionProps {
 	/**
 	 * Optional list of sender email addresses that should be visible
@@ -414,6 +458,34 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
 				}}
 			>
+				{/* Back button - shown when email is selected */}
+				{selectedEmail && (
+					<button
+						type="button"
+						onClick={() => {
+							setSelectedEmailId(null);
+							setReplyMessage('');
+						}}
+						className="absolute cursor-pointer bg-transparent border-0 p-0 z-10"
+						style={{
+							top: '3px',
+							left: '21px',
+						}}
+					>
+						<svg
+							width="34"
+							height="15"
+							viewBox="0 0 34 15"
+							fill="none"
+							xmlns="http://www.w3.org/2000/svg"
+						>
+							<path
+								d="M0.292892 6.65666C-0.0976295 7.04719 -0.0976295 7.68035 0.292892 8.07088L6.65685 14.4348C7.04738 14.8254 7.68054 14.8254 8.07107 14.4348C8.46159 14.0443 8.46159 13.4111 8.07107 13.0206L2.41421 7.36377L8.07107 1.70692C8.46159 1.31639 8.46159 0.683226 8.07107 0.292702C7.68054 -0.0978227 7.04738 -0.0978227 6.65685 0.292702L0.292892 6.65666ZM34 7.36377V6.36377L1 6.36377V7.36377V8.36377L34 8.36377V7.36377Z"
+								fill="white"
+							/>
+						</svg>
+					</button>
+				)}
 				{/* Three circles at top */}
 				{!selectedEmail && (
 					<>
@@ -534,7 +606,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							width: '880px',
 							border: '3px solid #000000',
 							borderRadius: '8px',
-							backgroundColor: '#FFFFFF',
+							backgroundColor: '#5DA0EB',
 							overflow: 'hidden',
 						}}
 					>
@@ -629,63 +701,96 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						</div>
 
 						{/* Content Section */}
-						<div className="flex-1 overflow-y-auto p-5">
-							{/* Date/time header */}
-							<div className="text-sm text-black mb-4">
-								{selectedEmail.receivedAt
-									? (() => {
-											const date = new Date(selectedEmail.receivedAt);
-											const now = new Date();
-											const diffTime = Math.abs(now.getTime() - date.getTime());
-											const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-											const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
-											const monthDay = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-											const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
-											const ago = diffDays === 0 ? 'today' : diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
-											return `${dayName}, ${monthDay} ${time} (${ago})`;
-										})()
-									: ''}
+						<div
+							className="flex-1 overflow-y-auto flex flex-col items-start"
+							style={{ paddingBottom: '18px' }}
+						>
+							{/* Email Body Box - 828x326px, 19px below header */}
+							<div
+								style={{
+									width: '828px',
+									height: '326px',
+									marginTop: '19px',
+									marginLeft: 0,
+									backgroundColor: '#E5F1FF',
+									border: '3px solid #000000',
+									borderRadius: '8px',
+									padding: '16px',
+									overflowY: 'auto',
+								}}
+							>
+								{/* Date/time header */}
+								<div className="text-sm text-black mb-4">
+									{selectedEmail.receivedAt
+										? (() => {
+												const date = new Date(selectedEmail.receivedAt);
+												const now = new Date();
+												const diffTime = Math.abs(now.getTime() - date.getTime());
+												const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+												const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+												const monthDay = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+												const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+												const ago = diffDays === 0 ? 'today' : diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
+												return `${dayName}, ${monthDay} ${time} (${ago})`;
+											})()
+										: ''}
+								</div>
+
+								{/* Email body */}
+								<div className="text-sm">
+									{selectedEmail.bodyHtml ? (
+										<div
+											dangerouslySetInnerHTML={{ __html: stripQuotedReplyHtml(selectedEmail.bodyHtml) }}
+											className="prose prose-sm max-w-none"
+										/>
+									) : (
+										<div className="whitespace-pre-wrap">
+											{stripQuotedReply(selectedEmail.strippedText || selectedEmail.bodyPlain || '') || 'No content'}
+										</div>
+									)}
+								</div>
 							</div>
 
-							{/* Email body */}
-							<div className="text-sm">
-								{selectedEmail.bodyHtml ? (
-									<div
-										dangerouslySetInnerHTML={{ __html: selectedEmail.bodyHtml }}
-										className="prose prose-sm max-w-none"
-									/>
-								) : (
-									<div className="whitespace-pre-wrap">
-										{selectedEmail.strippedText || selectedEmail.bodyPlain || 'No content'}
-									</div>
-								)}
-							</div>
-
-							{/* Reply Box */}
-							<div className="mt-6">
+						{/* Reply Box */}
+						<div className="w-full flex justify-center" style={{ marginTop: '49px' }}>
+							<div
+								style={{
+									width: '828px',
+									minWidth: '828px',
+									maxWidth: '828px',
+									border: '3px solid #000000',
+									borderRadius: '8px',
+									backgroundColor: '#FFFFFF',
+									overflow: 'hidden',
+								}}
+							>
 								<textarea
 									value={replyMessage}
 									onChange={(e) => setReplyMessage(e.target.value)}
 									placeholder=""
-									className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+									className="w-full resize-none focus:outline-none"
 									style={{
-										minHeight: '100px',
+										height: '121px',
+										padding: '16px',
+										border: 'none',
 									}}
 									disabled={isSending}
 								/>
-								<div className="flex justify-center mt-2">
-									<Button
-										onClick={handleSendReply}
-										disabled={!replyMessage.trim() || isSending}
-										className="bg-transparent text-black px-6 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-										style={{
-											fontWeight: 400,
-										}}
-									>
-										{isSending ? 'Sending...' : 'Reply'}
-									</Button>
-								</div>
+								<Button
+									onClick={handleSendReply}
+									disabled={!replyMessage.trim() || isSending}
+									className="w-full rounded-none bg-[#E1EDF5] text-black disabled:opacity-50 disabled:cursor-not-allowed"
+									style={{
+										height: '36px',
+										borderTop: '3px solid #000000',
+										borderRadius: 0,
+										fontWeight: 500,
+									}}
+								>
+									{isSending ? 'Sending...' : 'Reply'}
+								</Button>
 							</div>
+						</div>
 						</div>
 					</div>
 				) : (
