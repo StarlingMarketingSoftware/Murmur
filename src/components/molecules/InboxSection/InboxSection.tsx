@@ -6,6 +6,11 @@ import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useMe } from '@/hooks/useMe';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import type { InboundEmailWithRelations } from '@/types';
+import type { ContactWithName } from '@/types/contact';
+import { getStateAbbreviation } from '@/utils/string';
+import { stateBadgeColorMap } from '@/constants/ui';
 
 interface InboxSectionProps {
 	/**
@@ -17,9 +22,94 @@ interface InboxSectionProps {
 	 * replies from contacts that belong to the active campaign.
 	 */
 	allowedSenderEmails?: string[];
+
+	/**
+	 * Optional map of sender email -> campaign contact.
+	 * When provided (in campaign inbox), this is treated as the
+	 * source of truth for the contact's name/company.
+	 */
+	contactByEmail?: Record<string, ContactWithName>;
 }
 
-export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => {
+/**
+ * Resolve the best contact object for a given inbound email, preferring
+ * the campaign contact (from `contactByEmail`) over the raw `email.contact`.
+ */
+const resolveContactForEmail = (
+	email: InboundEmailWithRelations,
+	contactByEmail?: Record<string, ContactWithName>
+) => {
+	const senderKey = email.sender?.toLowerCase().trim();
+	if (senderKey && contactByEmail && contactByEmail[senderKey]) {
+		return contactByEmail[senderKey] as any;
+	}
+	return email.contact as any;
+};
+
+/**
+ * Derive a stable, campaign-linked display name for an inbound email.
+ * Prefer the linked campaign contact over the raw email sender/header.
+ */
+const getCanonicalContactName = (
+	email: InboundEmailWithRelations,
+	contactByEmail?: Record<string, ContactWithName>
+): string => {
+	const contact: any = resolveContactForEmail(email, contactByEmail);
+
+	if (contact) {
+		const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+		const legacyName: string | undefined =
+			typeof contact.name === 'string' ? contact.name : undefined;
+
+		const primary =
+			fullName ||
+			(legacyName && legacyName.trim()) ||
+			(contact.company && contact.company.trim()) ||
+			(contact.email && contact.email.trim());
+
+		if (primary && typeof primary === 'string' && primary.trim().length > 0) {
+			return primary.trim();
+		}
+	}
+
+	// Fallback: raw sender info from the inbound email headers
+	const senderLabel = email.senderName?.trim() || email.sender?.trim();
+	return senderLabel || 'Unknown sender';
+};
+
+/**
+ * Optional secondary label for the company, shown only when we have a
+ * separate person name as the primary label (mirrors ContactResearchPanel).
+ */
+const getContactCompanyLabel = (
+	email: InboundEmailWithRelations,
+	contactByEmail?: Record<string, ContactWithName>
+): string | null => {
+	const contact: any = resolveContactForEmail(email, contactByEmail);
+	if (!contact) return null;
+
+	const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+	const legacyName: string | undefined =
+		typeof contact.name === 'string' ? contact.name : undefined;
+
+	const hasName =
+		(fullName && fullName.length > 0) || (legacyName && legacyName.trim().length > 0);
+
+	// If we are showing the company as the main title (because no name),
+	// don't repeat it as a secondary label.
+	if (!hasName) return null;
+
+	const company: string | undefined =
+		typeof contact.company === 'string' ? contact.company : undefined;
+
+	if (!company || !company.trim()) return null;
+	return company.trim();
+};
+
+export const InboxSection: FC<InboxSectionProps> = ({
+	allowedSenderEmails,
+	contactByEmail,
+}) => {
 	const { data: inboundEmails, isLoading, error } = useGetInboundEmails();
 	const [selectedEmailId, setSelectedEmailId] = useState<number | null>(null);
 	const [replyMessage, setReplyMessage] = useState('');
@@ -51,7 +141,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 			  })
 			: inboundEmails;
 
-	// Further filter by search query (sender, subject, body)
+	// Further filter by search query (sender, subject, body, contact name/company/email)
 	const visibleEmails = filteredBySender?.filter((email) => {
 		if (!searchQuery.trim()) return true;
 		const query = searchQuery.toLowerCase();
@@ -59,11 +149,28 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 		const senderName = email.senderName?.toLowerCase() || '';
 		const subject = email.subject?.toLowerCase() || '';
 		const body = (email.strippedText || email.bodyPlain || '').toLowerCase();
+
+		const contact: any = resolveContactForEmail(email, contactByEmail);
+		const fullName =
+			contact && (contact.firstName || contact.lastName)
+				? `${contact.firstName || ''} ${contact.lastName || ''}`.trim().toLowerCase()
+				: '';
+		const legacyName =
+			contact && typeof contact.name === 'string' ? contact.name.toLowerCase() : '';
+		const company =
+			contact && typeof contact.company === 'string' ? contact.company.toLowerCase() : '';
+		const contactEmail =
+			contact && typeof contact.email === 'string' ? contact.email.toLowerCase() : '';
+
 		return (
 			sender.includes(query) ||
 			senderName.includes(query) ||
 			subject.includes(query) ||
-			body.includes(query)
+			body.includes(query) ||
+			fullName.includes(query) ||
+			legacyName.includes(query) ||
+			company.includes(query) ||
+			contactEmail.includes(query)
 		);
 	});
 
@@ -116,7 +223,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 					style={{
 						width: '907px',
 						height: '657px',
-						border: '2px solid #000000',
+						border: '3px solid #000000',
 						borderRadius: '8px',
 					}}
 				>
@@ -134,7 +241,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 					style={{
 						width: '907px',
 						height: '657px',
-						border: '2px solid #000000',
+						border: '3px solid #000000',
 						borderRadius: '8px',
 					}}
 				>
@@ -148,16 +255,16 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 		return (
 			<div className="w-full max-w-[907px] mx-auto px-4">
 				<div
-				className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative"
-				style={{
-					width: '907px',
-					height: '657px',
-					border: '2px solid #000000',
-					borderRadius: '8px',
-					padding: '16px',
-					paddingTop: '109px', // 55px (search top) + 48px (search height) + 6px (gap) = 109px
-					background: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
-				}}
+					className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative"
+					style={{
+						width: '907px',
+						height: '657px',
+						border: '3px solid #000000',
+						borderRadius: '8px',
+						padding: '16px',
+						paddingTop: '109px', // 55px (search top) + 48px (search height) + 6px (gap) = 109px
+						background: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
+					}}
 				>
 					{/* Three circles at top */}
 					<svg
@@ -216,7 +323,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 							width: '69px',
 							height: '18px',
 							borderRadius: '11px',
-							border: '2px solid #000000',
+							border: '3px solid #000000',
 							backgroundColor: '#CCDFF4',
 							zIndex: 10,
 							display: 'flex',
@@ -224,9 +331,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 							justifyContent: 'center',
 						}}
 					>
-						<span className="text-[10px] font-bold text-black leading-none">
-							Inbox
-						</span>
+						<span className="text-[10px] font-bold text-black leading-none">Inbox</span>
 					</div>
 
 					{/* Search Bar - positioned 55px from top, left-aligned with emails */}
@@ -237,7 +342,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 							left: '14px',
 							width: '725px',
 							height: '48px',
-							border: '2px solid #000000',
+							border: '3px solid #000000',
 							borderRadius: '8px',
 							backgroundColor: '#FFFFFF',
 							zIndex: 10,
@@ -257,11 +362,11 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 								height: '100%',
 								border: 'none',
 								outline: 'none',
-								fontSize: '20px',
+								fontSize: '16px',
 								fontFamily: 'Inter, sans-serif',
 								color: '#000000',
 								backgroundColor: 'transparent',
-								marginLeft: '12px',
+								marginLeft: '16px',
 								paddingRight: '16px',
 							}}
 							className="placeholder:text-[#737373]"
@@ -275,7 +380,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 							style={{
 								width: '879px',
 								height: '78px',
-								border: '2px solid #000000',
+								border: '3px solid #000000',
 								borderRadius: '8px',
 								backgroundColor: '#FFFFFF',
 							}}
@@ -288,16 +393,25 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 
 	return (
 		<div className="w-full max-w-[907px] mx-auto px-4">
-			<div
-				className="flex flex-col items-center overflow-y-auto overflow-x-hidden relative"
+			<CustomScrollbar
+				className="flex flex-col items-center relative"
+				contentClassName="flex flex-col items-center"
+				thumbWidth={2}
+				thumbColor="#000000"
+				trackColor="transparent"
+				offsetRight={-6}
+				offsetTop={selectedEmail ? 0 : 109}
+				disableOverflowClass
 				style={{
 					width: '907px',
 					height: '657px',
-					border: '2px solid #000000',
+					border: '3px solid #000000',
 					borderRadius: '8px',
 					padding: '16px',
 					paddingTop: selectedEmail ? '16px' : '109px', // 55px (search top) + 48px (search height) + 6px (gap) = 109px
-					background: selectedEmail ? '#6fa4e1' : 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
+					background: selectedEmail
+						? '#6fa4e1'
+						: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
 				}}
 			>
 				{/* Three circles at top */}
@@ -310,8 +424,8 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 							fill="none"
 							style={{
 								position: 'absolute',
-							top: '9.5px',
-							transform: 'translateY(-50%)',
+								top: '9.5px',
+								transform: 'translateY(-50%)',
 								left: '17px',
 								zIndex: 10,
 							}}
@@ -325,8 +439,8 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 							fill="none"
 							style={{
 								position: 'absolute',
-							top: '9.5px',
-							transform: 'translateY(-50%)',
+								top: '9.5px',
+								transform: 'translateY(-50%)',
 								left: '78px',
 								zIndex: 10,
 							}}
@@ -340,8 +454,8 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 							fill="none"
 							style={{
 								position: 'absolute',
-							top: '9.5px',
-							transform: 'translateY(-50%)',
+								top: '9.5px',
+								transform: 'translateY(-50%)',
 								left: '139px',
 								zIndex: 10,
 							}}
@@ -353,13 +467,13 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 						<div
 							style={{
 								position: 'absolute',
-							top: '9.5px',
-							transform: 'translateY(-50%)',
+								top: '9.5px',
+								transform: 'translateY(-50%)',
 								left: '174px', // 139px (3rd circle left) + 9px (width) + 26px (gap)
 								width: '69px',
 								height: '18px',
 								borderRadius: '11px',
-								border: '2px solid #000000',
+								border: '3px solid #000000',
 								backgroundColor: '#CCDFF4',
 								zIndex: 10,
 								display: 'flex',
@@ -367,9 +481,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 								justifyContent: 'center',
 							}}
 						>
-							<span className="text-[10px] font-bold text-black leading-none">
-								Inbox
-							</span>
+							<span className="text-[10px] font-bold text-black leading-none">Inbox</span>
 						</div>
 					</>
 				)}
@@ -382,7 +494,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 							left: '14px',
 							width: '725px',
 							height: '48px',
-							border: '2px solid #000000',
+							border: '3px solid #000000',
 							borderRadius: '8px',
 							backgroundColor: '#FFFFFF',
 							zIndex: 10,
@@ -402,11 +514,11 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 								height: '100%',
 								border: 'none',
 								outline: 'none',
-								fontSize: '20px',
+								fontSize: '16px',
 								fontFamily: 'Inter, sans-serif',
 								color: '#000000',
 								backgroundColor: 'transparent',
-								marginLeft: '12px',
+								marginLeft: '16px',
 								paddingRight: '16px',
 							}}
 							className="placeholder:text-[#737373]"
@@ -420,7 +532,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 						className="w-full h-full overflow-y-auto"
 						style={{
 							width: '879px',
-							border: '2px solid #000000',
+							border: '3px solid #000000',
 							borderRadius: '8px',
 							backgroundColor: '#FFFFFF',
 							padding: '20px',
@@ -432,14 +544,23 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 									{selectedEmail.subject || '(No Subject)'}
 								</div>
 								<div className="text-sm text-gray-600 mt-1">
-									From: {selectedEmail.senderName || selectedEmail.sender}
-									{selectedEmail.contact && (
-										<span className="ml-2 text-xs bg-gray-100 px-2 py-0.5 rounded">
-											{selectedEmail.contact.firstName && selectedEmail.contact.lastName
-												? `${selectedEmail.contact.firstName} ${selectedEmail.contact.lastName}`
-												: selectedEmail.contact.firstName || selectedEmail.contact.email}
-										</span>
-									)}
+									From:{' '}
+									{selectedEmail
+										? getCanonicalContactName(selectedEmail, contactByEmail)
+										: ''}
+									{(() => {
+										if (!selectedEmail) return null;
+										const companyLabel = getContactCompanyLabel(
+											selectedEmail,
+											contactByEmail
+										);
+										if (!companyLabel) return null;
+										return (
+											<span className="ml-2 font-inter text-[17px] font-medium bg-gray-100 px-2 py-0.5 rounded">
+												{companyLabel}
+											</span>
+										);
+									})()}
 								</div>
 								<div className="text-xs text-gray-400 mt-1">
 									{selectedEmail.receivedAt
@@ -508,7 +629,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 									width: '879px',
 									height: '78px',
 									minHeight: '78px',
-									border: '2px solid #000000',
+									border: '3px solid #000000',
 									borderRadius: '8px',
 									backgroundColor: '#FFFFFF',
 								}}
@@ -517,44 +638,83 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 									setReplyMessage('');
 								}}
 							>
-								<div className="flex justify-between items-center gap-4 w-full">
-									<div className="flex-1 min-w-0">
-										<div className="flex items-center gap-2 mb-1">
+								<div className="flex gap-3 w-full h-full">
+									{/* Left side: Name, Company, Subject */}
+									<div
+										className="flex flex-col justify-center min-w-0"
+										style={{ width: '200px', flexShrink: 0 }}
+									>
+										<div className="flex items-center gap-2">
 											<span className="font-medium truncate">
-												{email.senderName || email.sender}
+												{getCanonicalContactName(email, contactByEmail)}
 											</span>
-											{email.contact && (
-												<span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-													{email.contact.firstName && email.contact.lastName
-														? `${email.contact.firstName} ${email.contact.lastName}`
-														: email.contact.firstName || email.contact.email}
-												</span>
-											)}
-											{email.campaign && (
-												<span className="text-xs text-gray-500">
-													• {email.campaign.name}
-												</span>
-											)}
 										</div>
-										<div className="text-sm font-medium truncate">
+										{(() => {
+											const companyLabel = getContactCompanyLabel(email, contactByEmail);
+											if (!companyLabel) return null;
+											return (
+												<span className="font-inter text-[17px] font-medium text-gray-500 truncate">
+													{companyLabel}
+												</span>
+											);
+										})()}
+										<div className="text-sm font-medium truncate mt-1">
 											{email.subject || '(No Subject)'}
 										</div>
-										<div className="text-sm text-gray-500 truncate">
-											{email.strippedText?.slice(0, 80) ||
-												email.bodyPlain?.slice(0, 80) ||
+									</div>
+									{/* Right side: Badges + Body preview + date in a row */}
+									<div className="flex-1 flex items-start gap-2 min-w-0 pt-[10px]">
+										{/* Title and State badges */}
+										{(() => {
+											const contact = resolveContactForEmail(email, contactByEmail);
+											const headline = contact?.headline || contact?.title || '';
+											const stateAbbr = contact
+												? getStateAbbreviation(contact.state || '') || ''
+												: '';
+											return (
+												<>
+													{headline && (
+														<div className="h-[21px] max-w-[160px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden flex-shrink-0">
+															<span className="text-[10px] text-black leading-none truncate">
+																{headline}
+															</span>
+														</div>
+													)}
+													{stateAbbr && (
+														<span
+															className="inline-flex items-center justify-center rounded-[6px] border text-[12px] leading-none font-bold flex-shrink-0"
+															style={{
+																width: '39px',
+																height: '20px',
+																backgroundColor:
+																	stateBadgeColorMap[stateAbbr] || 'transparent',
+																borderColor: '#000000',
+															}}
+														>
+															{stateAbbr}
+														</span>
+													)}
+												</>
+											);
+										})()}
+										{/* Email body preview */}
+										<div className="flex-1 text-sm text-[#000000] line-clamp-2 min-w-0 pt-[7px]">
+											{email.strippedText?.slice(0, 120) ||
+												email.bodyPlain?.slice(0, 120) ||
 												''}
 										</div>
-									</div>
-									<div className="text-xs text-gray-400 whitespace-nowrap">
-										{email.receivedAt
-											? new Date(email.receivedAt).toLocaleDateString()
-											: ''}
+										{/* Date */}
+										<div className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
+											{email.receivedAt
+												? new Date(email.receivedAt).toLocaleDateString()
+												: ''}
+										</div>
 									</div>
 								</div>
 							</div>
 						))}
 						{Array.from({
-							length: Math.max(0, 5 - (visibleEmails?.length ?? 0)),
+							length: Math.max(0, 8 - (visibleEmails?.length ?? 0)),
 						}).map((_, idx) => (
 							<div
 								key={`inbox-placeholder-${idx}`}
@@ -563,7 +723,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 									width: '879px',
 									height: '78px',
 									minHeight: '78px',
-									border: '2px solid #000000',
+									border: '3px solid #000000',
 									borderRadius: '8px',
 									backgroundColor: '#FFFFFF',
 								}}
@@ -571,7 +731,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 						))}
 					</>
 				)}
-			</div>
+			</CustomScrollbar>
 		</div>
 	);
 };
