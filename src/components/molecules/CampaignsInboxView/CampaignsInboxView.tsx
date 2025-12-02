@@ -197,10 +197,10 @@ export const CampaignsInboxView: FC = () => {
 					className="flex items-center justify-center"
 					style={{
 						width: '907px',
-						height: '657px',
+						height: '535px',
 						border: '3px solid #000000',
 						borderRadius: '8px',
-						backgroundColor: '#84b9f5',
+						backgroundColor: '#4ca9db',
 					}}
 				>
 					<div className="text-white font-medium">Loading campaigns...</div>
@@ -218,91 +218,23 @@ export const CampaignsInboxView: FC = () => {
 				thumbColor="#000000"
 				trackColor="transparent"
 				offsetRight={-6}
-				offsetTop={109}
+				offsetTop={76}
 				disableOverflowClass
 				style={{
 					width: '907px',
-					height: '657px',
+					height: '535px',
 					border: '3px solid #000000',
 					borderRadius: '8px',
 					padding: '16px',
-					paddingTop: '109px',
-					background: 'linear-gradient(to bottom, #FFFFFF 19px, #84b9f5 19px)',
+					paddingTop: '76px',
+					backgroundColor: '#4ca9db',
 				}}
 			>
-				{/* Three circles at top */}
-				<svg
-					width="9"
-					height="9"
-					viewBox="0 0 9 9"
-					fill="none"
-					style={{
-						position: 'absolute',
-						top: '9.5px',
-						transform: 'translateY(-50%)',
-						left: '17px',
-						zIndex: 10,
-					}}
-				>
-					<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
-				</svg>
-				<svg
-					width="9"
-					height="9"
-					viewBox="0 0 9 9"
-					fill="none"
-					style={{
-						position: 'absolute',
-						top: '9.5px',
-						transform: 'translateY(-50%)',
-						left: '78px',
-						zIndex: 10,
-					}}
-				>
-					<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
-				</svg>
-				<svg
-					width="9"
-					height="9"
-					viewBox="0 0 9 9"
-					fill="none"
-					style={{
-						position: 'absolute',
-						top: '9.5px',
-						transform: 'translateY(-50%)',
-						left: '139px',
-						zIndex: 10,
-					}}
-				>
-					<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
-				</svg>
-
-				{/* Campaigns Badge */}
-				<div
-					style={{
-						position: 'absolute',
-						top: '9.5px',
-						transform: 'translateY(-50%)',
-						left: '174px',
-						width: '90px',
-						height: '18px',
-						borderRadius: '11px',
-						border: '3px solid #000000',
-						backgroundColor: '#CCDFF4',
-						zIndex: 10,
-						display: 'flex',
-						alignItems: 'center',
-						justifyContent: 'center',
-					}}
-				>
-					<span className="text-[10px] font-bold text-black leading-none">Campaigns</span>
-				</div>
-
 				{/* Search Bar */}
 				<div
 					style={{
 						position: 'absolute',
-						top: '55px',
+						top: '13px',
 						left: '14px',
 						width: '879px',
 						height: '48px',
@@ -372,7 +304,11 @@ export const CampaignsInboxView: FC = () => {
 								minHeight: '78px',
 								border: '3px solid #000000',
 								borderRadius: '8px',
-								backgroundColor: isConfirming ? '#DC3545' : '#FFFFFF',
+								backgroundColor: isConfirming
+									? '#DC3545'
+									: campaign.visibleInboxCount && campaign.visibleInboxCount > 0
+									? '#FFFFFF'
+									: '#EAEAEA',
 								display: 'flex',
 								alignItems: 'center',
 								padding: '0 16px',
@@ -534,7 +470,7 @@ export const CampaignsInboxView: FC = () => {
 								minHeight: '78px',
 								border: '3px solid #000000',
 								borderRadius: '8px',
-								backgroundColor: '#6fa4e1',
+								backgroundColor: '#4ca9db',
 							}}
 						/>
 					)
