@@ -159,6 +159,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const [replyMessage, setReplyMessage] = useState('');
 	const [isSending, setIsSending] = useState(false);
 	const [searchQuery, setSearchQuery] = useState('');
+	const [sentReplies, setSentReplies] = useState<Record<number, Array<{message: string, timestamp: Date}>>>({});
 
 	const { user } = useMe();
 	const { mutateAsync: sendMailgunMessage } = useSendMailgunMessage({
@@ -249,6 +250,16 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						? `${user.firstName} ${user.lastName}`
 						: user?.firstName || 'Murmur User',
 				originEmail: senderEmail,
+			});
+
+			// Store the sent reply
+			setSentReplies((prev) => {
+				const emailId = selectedEmail.id;
+				const existingReplies = prev[emailId] || [];
+				return {
+					...prev,
+					[emailId]: [...existingReplies, { message: replyMessage, timestamp: new Date() }],
+				};
 			});
 
 			setReplyMessage('');
@@ -678,7 +689,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 												</div>
 											)}
 											{headline && (
-												<div className="h-[21px] max-w-[160px] rounded-[6px] px-2 flex items-center bg-white border border-black overflow-hidden">
+												<div 
+													className="h-[21px] max-w-[160px] rounded-[6px] px-2 flex items-center border border-black overflow-hidden"
+													style={{ backgroundColor: '#e8efff' }}
+												>
 													<span className="text-[10px] text-black leading-none truncate">
 														{headline}
 													</span>
@@ -702,7 +716,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 						{/* Content Section */}
 						<div
-							className="flex-1 overflow-y-auto flex flex-col items-start"
+							className="flex-1 overflow-y-auto flex flex-col"
 							style={{ paddingBottom: '18px' }}
 						>
 							{/* Email Body Box - 828x326px, 19px below header */}
@@ -712,6 +726,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									height: '326px',
 									marginTop: '19px',
 									marginLeft: 0,
+									alignSelf: 'flex-start',
 									backgroundColor: '#E5F1FF',
 									border: '3px solid #000000',
 									borderRadius: '8px',
@@ -750,6 +765,45 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									)}
 								</div>
 							</div>
+
+							{/* Sent Replies - Right aligned */}
+							{(sentReplies[selectedEmail.id] || []).map((reply, index) => (
+								<div
+									key={index}
+									style={{
+										width: '828px',
+										height: '326px',
+										marginTop: '19px',
+										marginRight: 0,
+										alignSelf: 'flex-end',
+										backgroundColor: '#FFFFFF',
+										border: '3px solid #000000',
+										borderRadius: '8px',
+										padding: '16px',
+										overflowY: 'auto',
+									}}
+								>
+									{/* Date/time header */}
+									<div className="text-sm text-black mb-4">
+										{(() => {
+											const date = reply.timestamp;
+											const now = new Date();
+											const diffTime = Math.abs(now.getTime() - date.getTime());
+											const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+											const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+											const monthDay = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+											const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+											const ago = diffDays === 0 ? 'today' : diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
+											return `${dayName}, ${monthDay} ${time} (${ago})`;
+										})()}
+									</div>
+
+									{/* Reply body */}
+									<div className="text-sm whitespace-pre-wrap">
+										{reply.message}
+									</div>
+								</div>
+							))}
 
 						{/* Reply Box */}
 						<div className="w-full flex justify-center" style={{ marginTop: '49px' }}>
