@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useMe } from '@/hooks/useMe';
+import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 
 interface InboxSectionProps {
 	/**
@@ -23,6 +24,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 	const [selectedEmailId, setSelectedEmailId] = useState<number | null>(null);
 	const [replyMessage, setReplyMessage] = useState('');
 	const [isSending, setIsSending] = useState(false);
+	const [searchQuery, setSearchQuery] = useState('');
 
 	const { user } = useMe();
 	const { mutateAsync: sendMailgunMessage } = useSendMailgunMessage({
@@ -41,13 +43,29 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 			  )
 			: null;
 
-	const visibleEmails =
+	const filteredBySender =
 		normalizedAllowedSenders && inboundEmails
 			? inboundEmails.filter((email) => {
 					const sender = email.sender?.toLowerCase().trim();
 					return !!sender && normalizedAllowedSenders.has(sender);
 			  })
 			: inboundEmails;
+
+	// Further filter by search query (sender, subject, body)
+	const visibleEmails = filteredBySender?.filter((email) => {
+		if (!searchQuery.trim()) return true;
+		const query = searchQuery.toLowerCase();
+		const sender = email.sender?.toLowerCase() || '';
+		const senderName = email.senderName?.toLowerCase() || '';
+		const subject = email.subject?.toLowerCase() || '';
+		const body = (email.strippedText || email.bodyPlain || '').toLowerCase();
+		return (
+			sender.includes(query) ||
+			senderName.includes(query) ||
+			subject.includes(query) ||
+			body.includes(query)
+		);
+	});
 
 	const selectedEmail = visibleEmails?.find((email) => email.id === selectedEmailId);
 
@@ -130,16 +148,16 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 		return (
 			<div className="w-full max-w-[907px] mx-auto px-4">
 				<div
-					className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative"
-					style={{
-						width: '907px',
-						height: '657px',
-						border: '2px solid #000000',
-						borderRadius: '8px',
-						padding: '16px',
-						paddingTop: '108px',
-						background: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
-					}}
+				className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative"
+				style={{
+					width: '907px',
+					height: '657px',
+					border: '2px solid #000000',
+					borderRadius: '8px',
+					padding: '16px',
+					paddingTop: '109px', // 55px (search top) + 48px (search height) + 6px (gap) = 109px
+					background: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
+				}}
 				>
 					{/* Three circles at top */}
 					<svg
@@ -210,6 +228,46 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 							Inbox
 						</span>
 					</div>
+
+					{/* Search Bar - positioned 55px from top, left-aligned with emails */}
+					<div
+						style={{
+							position: 'absolute',
+							top: '55px',
+							left: '14px',
+							width: '725px',
+							height: '48px',
+							border: '2px solid #000000',
+							borderRadius: '8px',
+							backgroundColor: '#FFFFFF',
+							zIndex: 10,
+							display: 'flex',
+							alignItems: 'center',
+							paddingLeft: '16px',
+						}}
+					>
+						<SearchIconDesktop />
+						<input
+							type="text"
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							placeholder="Search Mail"
+							style={{
+								flex: 1,
+								height: '100%',
+								border: 'none',
+								outline: 'none',
+								fontSize: '20px',
+								fontFamily: 'Inter, sans-serif',
+								color: '#000000',
+								backgroundColor: 'transparent',
+								marginLeft: '12px',
+								paddingRight: '16px',
+							}}
+							className="placeholder:text-[#737373]"
+						/>
+					</div>
+
 					{Array.from({ length: 3 }).map((_, idx) => (
 						<div
 							key={`inbox-placeholder-${idx}`}
@@ -238,7 +296,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 					border: '2px solid #000000',
 					borderRadius: '8px',
 					padding: '16px',
-					paddingTop: selectedEmail ? '16px' : '108px',
+					paddingTop: selectedEmail ? '16px' : '109px', // 55px (search top) + 48px (search height) + 6px (gap) = 109px
 					background: selectedEmail ? '#6fa4e1' : 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
 				}}
 			>
@@ -315,6 +373,47 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 						</div>
 					</>
 				)}
+				{/* Search Bar - positioned 55px from top, left-aligned with emails */}
+				{!selectedEmail && (
+					<div
+						style={{
+							position: 'absolute',
+							top: '55px',
+							left: '14px',
+							width: '725px',
+							height: '48px',
+							border: '2px solid #000000',
+							borderRadius: '8px',
+							backgroundColor: '#FFFFFF',
+							zIndex: 10,
+							display: 'flex',
+							alignItems: 'center',
+							paddingLeft: '16px',
+						}}
+					>
+						<SearchIconDesktop />
+						<input
+							type="text"
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							placeholder="Search Mail"
+							style={{
+								flex: 1,
+								height: '100%',
+								border: 'none',
+								outline: 'none',
+								fontSize: '20px',
+								fontFamily: 'Inter, sans-serif',
+								color: '#000000',
+								backgroundColor: 'transparent',
+								marginLeft: '12px',
+								paddingRight: '16px',
+							}}
+							className="placeholder:text-[#737373]"
+						/>
+					</div>
+				)}
+
 				{selectedEmail ? (
 					/* Expanded Email View Inside Box */
 					<div
