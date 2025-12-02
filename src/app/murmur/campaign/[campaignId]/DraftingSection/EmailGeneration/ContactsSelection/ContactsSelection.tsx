@@ -735,8 +735,16 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		areAllSelected,
 	} = useContactsSelection(props);
 
-	const { campaign, onDraftEmails, onContactClick, onContactHover, onSearchFromMiniBar } =
-		props;
+	const {
+		campaign,
+		onDraftEmails,
+		onContactClick,
+		onContactHover,
+		onSearchFromMiniBar,
+		goToSearch,
+		goToDrafts,
+		goToInbox,
+	} = props;
 	const [isDrafting, setIsDrafting] = useState(false);
 	const router = useRouter();
 	const searchInfo = useMemo(() => parseSearchFromCampaign(campaign), [campaign]);
@@ -824,6 +832,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 				noDataDescription="Select contacts to generate personalized emails"
 				isPending={false}
 				title="Contacts"
+				goToSearch={goToSearch}
+				goToDrafts={goToDrafts}
+				goToInbox={goToInbox}
 				topContent={
 					<div className="w-full flex flex-col items-center pt-[6px]">
 						<MiniSearchBar

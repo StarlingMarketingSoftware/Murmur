@@ -20,7 +20,7 @@ interface SentEmailsProps {
 	onContactHover?: (contact: ContactWithName | null) => void;
 	goToDrafts?: () => void;
 	goToWriting?: () => void;
-	goToContacts?: () => void;
+	goToSearch?: () => void;
 }
 
 export const SentEmails: FC<SentEmailsProps> = ({
@@ -30,7 +30,7 @@ export const SentEmails: FC<SentEmailsProps> = ({
 	onContactHover,
 	goToDrafts,
 	goToWriting,
-	goToContacts,
+	goToSearch,
 }) => {
 	const { data: usedContactIds } = useGetUsedContactIds();
 	const usedContactIdsSet = useMemo(
@@ -48,7 +48,7 @@ export const SentEmails: FC<SentEmailsProps> = ({
 			title="Sent"
 			goToDrafts={goToDrafts}
 			goToWriting={goToWriting}
-			goToContacts={goToContacts}
+			goToSearch={goToSearch}
 		>
 			<div className="overflow-visible w-full flex flex-col gap-2 items-center">
 				{emails.map((email) => {

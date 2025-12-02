@@ -20,6 +20,18 @@ export interface ContactsSelectionProps {
 	 * When provided, this overrides the default dashboard navigation behavior.
 	 */
 	onSearchFromMiniBar?: (params: { why: string; what: string; where: string }) => void;
+	/**
+	 * Callback to navigate to the search tab.
+	 */
+	goToSearch?: () => void;
+	/**
+	 * Callback to navigate to the drafts tab.
+	 */
+	goToDrafts?: () => void;
+	/**
+	 * Callback to navigate to the inbox tab.
+	 */
+	goToInbox?: () => void;
 }
 
 export const useContactsSelection = (props: ContactsSelectionProps) => {

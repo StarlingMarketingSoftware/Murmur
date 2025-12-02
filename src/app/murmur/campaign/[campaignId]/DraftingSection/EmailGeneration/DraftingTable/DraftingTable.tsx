@@ -95,7 +95,6 @@ interface DraftingTableProps {
 	goToWriting?: () => void;
 	goToSearch?: () => void;
 	goToDrafts?: () => void;
-	goToContacts?: () => void;
 	goToInbox?: () => void;
 }
 export const DraftingTable: FC<DraftingTableProps> = ({
@@ -112,7 +111,6 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	goToWriting,
 	goToSearch,
 	goToDrafts,
-	goToContacts,
 	goToInbox,
 }) => {
 	const router = useRouter();
@@ -124,7 +122,6 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 
 	const boxWidth = isContacts || isDrafts || isSent ? '499px' : '376px';
 	const boxHeight = isContacts || isDrafts || isSent ? '703px' : '474px';
-	const contentWidth = isContacts || isDrafts || isSent ? 'w-[489px]' : 'w-[366px]';
 
 	return (
 		<div style={{ width: boxWidth, height: boxHeight, position: 'relative' }}>
@@ -521,7 +518,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 											<div
 												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
 												style={{ width: '376px', height: '42px' }}
-												onClick={goToContacts}
+												onClick={goToSearch}
 											>
 												<span className="text-[15px] font-semibold font-inter text-black">
 													Add More Contacts
@@ -571,7 +568,15 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 										</span>
 									)}
 									{idx >= 2 && idx <= 5 && (
-										<div className="w-[403px] h-[42px] bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center">
+										<div
+											className="w-[403px] h-[42px] bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											onClick={() => {
+												if (idx === 2) goToSearch?.();
+												if (idx === 3) goToDrafts?.();
+												if (idx === 4) goToInbox?.();
+												if (idx === 5) router.push(urls.murmur.dashboard.index);
+											}}
+										>
 											<span className="text-[15px] font-semibold font-inter text-black">
 												{idx === 2 && 'Add More Contacts'}
 												{idx === 3 && 'Send Drafts'}

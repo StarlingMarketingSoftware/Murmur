@@ -77,7 +77,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		goToWriting,
 		onOpenIdentityDialog,
 		onGoToSearch,
-		goToContacts,
 		goToInbox,
 	} = props;
 	const {
@@ -1857,6 +1856,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									onContactClick={handleResearchContactClick}
 									onContactHover={handleResearchContactHover}
 									onSearchFromMiniBar={handleMiniContactsSearch}
+									goToSearch={onGoToSearch}
+									goToDrafts={goToDrafting}
+									goToInbox={goToInbox}
 								/>
 							</div>
 						)}
@@ -1871,7 +1873,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									onContactHover={handleResearchContactHover}
 									goToDrafts={goToDrafting}
 									goToWriting={goToWriting}
-									goToContacts={goToContacts}
+									goToSearch={onGoToSearch}
 								/>
 							</div>
 						)}
