@@ -1138,9 +1138,6 @@ body {
 	}
 }
 
-/* Removed dead animations: premium-gradient-move, premium-shimmer, premium-float */
-/* These animations were not being used in the dashboard */
-
 /* Hero section - clean without animations */
 .premium-hero-section {
 	position: relative;
@@ -1593,7 +1590,6 @@ body {
 	-ms-overflow-style: none !important;
 }
 
-/* Debug: Make sure the wrapper div also hides scrollbars */
 .campaigns-table-container > div::-webkit-scrollbar {
 	display: none !important;
 }
@@ -1735,8 +1731,6 @@ body {
 	position: relative;
 	z-index: 1;
 }
-
-/* Removed gradient-based dividers - using absolute positioned elements instead */
 
 /* Ensure all table rows are clickable */
 .campaigns-table-container tbody tr {
@@ -3701,16 +3695,6 @@ body.murmur-page.murmur-map-view {
 	height: auto;
 }
 
-/* Removed - Using custom GlobalScrollbar component instead */
-
-/* Removed - Using custom GlobalScrollbar component instead */
-
-/* Removed - Using custom GlobalScrollbar component instead */
-
-/* Removed - Using custom GlobalScrollbar component instead */
-
-/* Removed - Using custom GlobalScrollbar component instead */
-
 .custom-scroll:not(.my-campaigns-table),
 .overflow-auto:not(.my-campaigns-table),
 .overflow-y-auto:not(.my-campaigns-table),
@@ -3783,20 +3767,6 @@ main {
 	isolation: isolate;
 }
 
-/* Add at the end of the file, after existing scrollbar rules */
-
-/* Removed - Using custom GlobalScrollbar component instead */
-
-/* Removed - Using custom GlobalScrollbar component instead */
-
-/* Removed - Using custom GlobalScrollbar component instead */
-
-/* Removed - Using custom GlobalScrollbar component instead */
-
-/* Removed - Using custom GlobalScrollbar component instead */
-
-/* Removed - Using custom GlobalScrollbar component instead */
-
 /* Firefox scrollbar styles */
 .campaigns-table-container .my-campaigns-table,
 .my-campaigns-table,
@@ -3821,26 +3791,6 @@ main {
 	background-color: #f8f8f8 !important;
 }
 
-/* Specific styles for My Campaigns table scrollbars - DEBUGGING */
-/* Remove debug My Campaigns specific scrollbar visuals; use global 2px style */
-
-/* Removed - Using custom GlobalScrollbar component instead */
-
-/* Removed - Using custom GlobalScrollbar component instead */
-
-/* === ALLOW GSAP ANIMATIONS FOR SEARCH BAR === */
-/* Commented out to allow GSAP animations to work
-.results-search-input-group,
-.results-search-input-group * {
-	-webkit-animation: none !important;
-	animation: none !important;
-	-webkit-transition: none !important;
-	transition: none !important;
-	transform: none !important;
-	will-change: auto !important;
-}
-*/
-
 /* Murmur route compact scaling (90%) */
 html.murmur-compact {
 	zoom: 0.9;
@@ -3859,8 +3809,6 @@ html.murmur-compact {
 	transform: translateY(-50%) !important;
 	z-index: 4 !important;
 }
-
-/* Removed - Using custom GlobalScrollbar component instead */
 
 .table-header-secondary {
 	border-bottom: 2px solid #8c8c8c;
@@ -3900,10 +3848,6 @@ html.murmur-compact {
 	scrollbar-width: none !important;
 	-ms-overflow-style: none !important;
 }
-
-/* Remove debug child borders */
-/* .drafting-table-content .scrollbar-hide > * { }
-*/
 
 .drafting-table-content .scrollbar-hide::-webkit-scrollbar {
 	display: none !important;
@@ -4168,8 +4112,6 @@ body,
 		-webkit-transform: translateY(-50%) translateZ(0) !important;
 	}
 }
-
-/* Removed gradient-based dividers - using absolute positioned elements instead */
 
 /* Make entire row light up on hover in My Campaigns table but keep metric boxes' original colors */
 
