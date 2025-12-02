@@ -167,6 +167,8 @@ export const OPEN_AI_MODEL_OPTIONS = {
 
 export const GEMINI_MODEL_OPTIONS = {
 	gemini2Flash: 'gemini-2.0-flash',
+	gemini25FlashLite: 'gemini-2.5-flash-lite',
+	gemini25Flash: 'gemini-2.5-flash',
 	gemini25Pro: 'gemini-2.5-pro-preview-05-06',
 	gemini3Pro: 'gemini-3-pro-preview',
 } as const;

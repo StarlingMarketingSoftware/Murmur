@@ -1,4 +1,3 @@
-import { X } from 'lucide-react';
 import {
 	Dispatch,
 	FC,
@@ -17,6 +16,7 @@ import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { cn } from '@/utils';
+import CloseButtonIcon from '@/components/atoms/_svg/CloseButtonIcon';
 
 export interface TestPreviewPanelProps {
 	setShowTestPreview: Dispatch<SetStateAction<boolean>>;
@@ -49,11 +49,9 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	const layer3Ref = useRef<HTMLDivElement | null>(null);
 	const waveTweensRef = useRef<gsap.core.Tween[]>([]);
 	const typingTimerRef = useRef<number | null>(null);
-	const loadingTypingTimerRef = useRef<number | null>(null);
 	const boxRef = useRef<HTMLDivElement | null>(null);
 	const [typedSubject, setTypedSubject] = useState<string>('');
 	const [typedBody, setTypedBody] = useState<string>('');
-	const [loadingTyped, setLoadingTyped] = useState<string>('');
 	const WORD_LIMIT = 100;
 	const [clipAtHeight, setClipAtHeight] = useState<number | null>(null);
 
@@ -267,42 +265,6 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 		};
 	}, [isLoading, subjectTokens, bodyTokens]);
 
-	// Typewriter effect for loading overlay text: "Writing Test Email..."
-	useEffect(() => {
-		const LOADING_TEXT = 'Writing Test Email...';
-		if (!isLoading) {
-			setLoadingTyped('');
-			if (loadingTypingTimerRef.current) {
-				window.clearTimeout(loadingTypingTimerRef.current);
-				loadingTypingTimerRef.current = null;
-			}
-			return;
-		}
-
-		let index = 0;
-		function run() {
-			setLoadingTyped(LOADING_TEXT.slice(0, index));
-			index += 1;
-			if (index <= LOADING_TEXT.length) {
-				loadingTypingTimerRef.current = window.setTimeout(run, 65);
-			} else {
-				// Hold full text, then restart
-				loadingTypingTimerRef.current = window.setTimeout(() => {
-					index = 0;
-					setLoadingTyped('');
-					run();
-				}, 900);
-			}
-		}
-		run();
-		return () => {
-			if (loadingTypingTimerRef.current) {
-				window.clearTimeout(loadingTypingTimerRef.current);
-				loadingTypingTimerRef.current = null;
-			}
-		};
-	}, [isLoading]);
-
 	// Capture full box height at 100 words and enable scroll
 	useEffect(() => {
 		const wordCount = typedBody.trim().split(/\s+/).filter(Boolean).length;
@@ -317,25 +279,39 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 		<div
 			data-test-preview-panel
 			className={cn(
-				'w-[457px] max-[480px]:w-full h-[644px] flex flex-col bg-gray-50 relative',
+				'w-[457px] max-[480px]:w-full h-[644px] flex flex-col relative',
 				className
 			)}
 			style={{
 				boxSizing: 'border-box',
 				border: '2px solid black',
-				borderRadius: '8px',
+				borderRadius: '7px',
 				overflow: 'hidden',
 				outline: '2px solid black',
 				outlineOffset: '-2px',
+				backgroundColor: '#F5DE94',
 				...style,
 			}}
 		>
-			<div className="flex-1 flex flex-col pt-1 pb-0">
+			{/* Test label at the top - 22px total height with centered text */}
+			<div className="w-full flex items-center px-[9px]" style={{ height: '22px' }}>
+				<span className="font-inter font-bold text-[12px] leading-none text-black">
+					Test
+				</span>
+			</div>
+			{/* Horizontal divider below the label */}
+			<div className="w-full bg-black" style={{ height: '1px' }} />
+			<div className="flex-1 flex flex-col pb-0">
 				<div className="flex-1 flex flex-col overflow-visible relative z-20">
-					<div className="relative px-3 sm:px-5" data-test-preview-header>
+					{/* Content area between dividers - fixed 40px height, white background */}
+					<div
+						className="relative px-3 sm:px-5 bg-white"
+						style={{ height: '40px' }}
+						data-test-preview-header
+					>
 						{contact && (
-							<div className="pb-1 sm:pb-2">
-								<div className="relative">
+							<div className="h-full flex items-center">
+								<div className="relative w-full">
 									<div className="grid grid-cols-2 w-full overflow-visible">
 										{fullName ? (
 											<>
@@ -353,13 +329,13 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 													</div>
 												</div>
 												{/* Right Column - Location and Title */}
-												<div className="p-0.5 sm:p-1 pb-0 sm:pb-[1.5px] flex flex-col gap-0.5 sm:gap-[3px]">
+												<div className="p-0.5 sm:p-1 pb-0 sm:pb-[1.5px] flex flex-col gap-[1px]">
 													{/* State and City */}
 													{contact.city || stateAbbr ? (
 														<div className="flex items-center gap-0.5 sm:gap-2">
 															{stateAbbr && (
 																<span
-																	className="inline-flex items-center justify-center w-[30px] sm:w-[35px] h-[17px] sm:h-[19px] rounded-[5.6px] border text-[11px] sm:text-[12px] leading-none font-bold flex-shrink-0"
+																	className="inline-flex items-center justify-center w-[22px] h-[12px] rounded-[5px] border text-[8px] leading-none font-bold flex-shrink-0"
 																	style={{
 																		borderColor: 'rgba(0,0,0,0.7)',
 																		backgroundColor: isUSState
@@ -379,8 +355,8 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 													) : null}
 													{/* Title Badge */}
 													{contact.headline && (
-														<div className="h-[18px] sm:h-[20.54px] rounded-[5px] sm:rounded-[6.64px] px-1.5 sm:px-2 flex items-center w-fit max-w-[120px] sm:max-w-[150px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
-															<span className="text-[10px] sm:text-xs text-black truncate">
+														<div className="h-[14px] rounded-[5px] px-1 flex items-center w-[117px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
+															<span className="text-[9px] text-black truncate">
 																{contact.headline}
 															</span>
 														</div>
@@ -396,13 +372,13 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 													</div>
 												</div>
 												{/* Right Column - Location and Title */}
-												<div className="p-0.5 sm:p-1 pb-0 sm:pb-[1.5px] flex flex-col gap-0.5 sm:gap-[3px]">
+												<div className="p-0.5 sm:p-1 pb-0 sm:pb-[1.5px] flex flex-col gap-[1px]">
 													{/* State and City */}
 													{contact.city || stateAbbr ? (
 														<div className="flex items-center gap-0.5 sm:gap-2">
 															{stateAbbr && (
 																<span
-																	className="inline-flex items-center justify-center w-[30px] sm:w-[35px] h-[17px] sm:h-[19px] rounded-[5.6px] border text-[11px] sm:text-[12px] leading-none font-bold flex-shrink-0"
+																	className="inline-flex items-center justify-center w-[22px] h-[12px] rounded-[5px] border text-[8px] leading-none font-bold flex-shrink-0"
 																	style={{
 																		borderColor: 'rgba(0,0,0,0.7)',
 																		backgroundColor: isUSState
@@ -422,8 +398,8 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 													) : null}
 													{/* Title Badge */}
 													{contact.headline && (
-														<div className="h-[18px] sm:h-[20.54px] rounded-[5px] sm:rounded-[6.64px] px-1.5 sm:px-2 flex items-center w-fit max-w-[120px] sm:max-w-[150px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
-															<span className="text-[10px] sm:text-xs text-black truncate">
+														<div className="h-[14px] rounded-[5px] px-1 flex items-center w-[117px] bg-[#E8EFFF] border-[0.83px] border-black overflow-hidden">
+															<span className="text-[9px] text-black truncate">
 																{contact.headline}
 															</span>
 														</div>
@@ -432,163 +408,80 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 											</>
 										)}
 									</div>
-									<Button
+									<button
 										type="button"
-										variant="icon"
 										onClick={() => setShowTestPreview(false)}
-										className="absolute right-0 top-1/2 -translate-y-1/2 p-0.5 sm:p-1 hover:bg-gray-100 rounded transition-colors"
+										className="absolute right-0 top-1/2 -translate-y-1/2 p-0.5 sm:p-1 transition-all hover:brightness-75"
 									>
-										<X className="h-4 w-4 sm:h-5 sm:w-5 text-destructive-dark" />
-									</Button>
+										<CloseButtonIcon />
+									</button>
 								</div>
 							</div>
 						)}
 					</div>
-					<div className="h-[2px] bg-black" />
+					{/* Second horizontal divider - 40px below the first */}
+					<div className="h-[1px] bg-black" />
 
+					{/* Subject box - 354x46px, 6px below the second divider */}
 					<div
-						ref={boxRef}
-						className="relative flex-1 bg-white flex flex-col"
+						className="bg-white border-2 border-black rounded-[4px] flex items-center px-3 mx-auto"
 						style={{
-							minHeight: '400px',
-							borderBottomLeftRadius: '6px',
-							borderBottomRightRadius: '6px',
+							width: '354px',
+							height: '46px',
+							marginTop: '6px',
 						}}
 					>
-						{/* Typing content with custom 2px scrollbar */}
-						{clipAtHeight !== null ? (
-							<div
-								style={{
-									height: (clipAtHeight as number) ?? '100%',
-									position: 'relative',
-									overflow: 'visible',
-								}}
-							>
-								<CustomScrollbar
-									className="h-full test-preview-panel-content"
-									thumbColor="#000000"
-									trackColor="transparent"
-									thumbWidth={2}
-									offsetRight={-5}
-								>
-									<div ref={contentRef} className="max-w-none text-[14px] p-6">
-										<div
-											className="whitespace-pre-wrap leading-[1.6] font-bold font-inter"
-											style={{ fontFamily: 'Inter' }}
-										>
-											{typedSubject}
-										</div>
-										{typedSubject && (typedBody || bodyTokens.length > 0) && (
-											<div className="h-3" />
-										)}
-										<div
-											className="whitespace-pre-wrap leading-[1.6]"
-											style={{ fontFamily }}
-										>
-											{typedBody}
-										</div>
-									</div>
-								</CustomScrollbar>
-							</div>
-						) : (
-							<div ref={contentRef} className="max-w-none text-[14px] p-6 flex-1">
-								<div
-									className="whitespace-pre-wrap leading-[1.6] font-bold font-inter"
-									style={{ fontFamily: 'Inter' }}
-								>
-									{typedSubject}
-								</div>
-								{typedSubject && (typedBody || bodyTokens.length > 0) && (
-									<div className="h-3" />
-								)}
+						<span className="font-inter font-bold text-[14px] text-black truncate">
+							{typedSubject}
+						</span>
+					</div>
+
+					{/* Email body box - 355x504px, 4px below the subject box */}
+					<div
+						ref={boxRef}
+						className="bg-white border-2 border-black rounded-[4px] mx-auto overflow-hidden relative"
+						style={{
+							width: '355px',
+							height: '504px',
+							marginTop: '4px',
+						}}
+					>
+						<CustomScrollbar
+							className="h-full test-preview-panel-content"
+							thumbColor="#000000"
+							trackColor="transparent"
+							thumbWidth={2}
+							offsetRight={-5}
+						>
+							<div ref={contentRef} className="max-w-none text-[14px] p-4">
 								<div className="whitespace-pre-wrap leading-[1.6]" style={{ fontFamily }}>
 									{typedBody}
 								</div>
 							</div>
-						)}
-
-						{/* Organic grayscale blob animation overlay */}
-						{isLoading && (
-							<div
-								ref={overlayRef}
-								className="absolute inset-0 pointer-events-none overflow-hidden z-30"
-								style={
-									{
-										// Removed mask gradient to prevent text cutoff
-									}
-								}
-							>
-								<div
-									ref={layer1Ref}
-									className="absolute inset-0"
-									style={{
-										filter: 'blur(10px)',
-										willChange: 'transform',
-										background: `
-										radial-gradient(ellipse 70% 55% at 10% 40%, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0) 42%),
-										radial-gradient(ellipse 80% 60% at 35% 70%, rgba(0,0,0,0.07) 0%, rgba(0,0,0,0) 48%),
-										radial-gradient(ellipse 65% 50% at 75% 35%, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0) 45%)
-										`,
-										backgroundSize: '180% 100%',
-										backgroundPosition: '0% 0%',
-									}}
-								/>
-								<div
-									ref={layer2Ref}
-									className="absolute inset-0"
-									style={{
-										filter: 'blur(14px)',
-										willChange: 'transform',
-										background: `
-										radial-gradient(ellipse 55% 45% at 20% 65%, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0) 40%),
-										radial-gradient(ellipse 60% 50% at 55% 30%, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0) 44%),
-										radial-gradient(ellipse 50% 40% at 85% 75%, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0) 38%)
-										`,
-										backgroundSize: '220% 100%',
-										backgroundPosition: '-20% 0%',
-									}}
-								/>
-								<div
-									ref={layer3Ref}
-									className="absolute inset-0"
-									style={{
-										filter: 'blur(18px)',
-										opacity: 0.9,
-										willChange: 'transform',
-										background: `
-										radial-gradient(ellipse 60% 50% at 15% 85%, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 36%),
-										radial-gradient(ellipse 75% 55% at 65% 55%, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0) 42%),
-										radial-gradient(ellipse 55% 45% at 92% 20%, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 34%)
-										`,
-										backgroundSize: '260% 100%',
-										backgroundPosition: '-40% 0%',
-									}}
-								/>
-
-								{/* Centered typewriter loading text */}
-								<div className="absolute inset-0 flex items-center justify-center">
-									<span className="font-inter text-[#737373] text-sm tracking-wide select-none">
-										{loadingTyped}
-									</span>
-								</div>
-							</div>
-						)}
+						</CustomScrollbar>
 					</div>
 
-					{/* Footer with Test button (hidden on mobile portrait via max-[480px], and on mobile landscape via .mobile-landscape-hide) */}
-					<div className="p-4 bg-background rounded-b-md max-[480px]:hidden mobile-landscape-hide">
-						<Button
-							type="button"
-							onClick={onTest}
-							disabled={isDisabled}
-							className={
-								'h-[42px] w-full bg-white border-2 border-primary text-black font-times font-bold rounded-[6px] cursor-pointer flex items-center justify-center font-primary transition-all hover:bg-primary/20 active:bg-primary/20' +
-								(isDisabled ? ' opacity-50 cursor-not-allowed' : ' opacity-100')
-							}
-						>
-							{isTesting ? 'Testing...' : 'Test Again'}
-						</Button>
-					</div>
+					{/* Test Again button - 355x28px, 10px below the email body box */}
+					<Button
+						type="button"
+						onClick={onTest}
+						disabled={isDisabled}
+						className={
+							'border-2 border-black text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center transition-all hover:brightness-95 active:brightness-90 mx-auto max-[480px]:hidden mobile-landscape-hide disabled:opacity-100' +
+							(isDisabled ? ' cursor-not-allowed' : '')
+						}
+						style={{
+							width: '355px',
+							height: '28px',
+							marginTop: '10px',
+							backgroundColor: '#E6E6E6',
+							lineHeight: '28px',
+						}}
+					>
+						<span style={{ marginTop: '-2px' }}>
+							{isTesting ? 'Testing...' : 'Regenerate'}
+						</span>
+					</Button>
 				</div>
 			</div>
 		</div>

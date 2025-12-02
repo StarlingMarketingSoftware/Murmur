@@ -1,4 +1,4 @@
-import { FC, useEffect, useState, useRef } from 'react';
+import { FC, Fragment, useEffect, useState, useRef } from 'react';
 import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
 import { Form } from '@/components/ui/form';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
@@ -41,6 +41,8 @@ import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
+import UndoIcon from '@/components/atoms/_svg/UndoIcon';
+import UpscaleIcon from '@/components/atoms/_svg/UpscaleIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
@@ -69,16 +71,30 @@ interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 }
 
 export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
-	const { view = 'testing', goToDrafting, onOpenIdentityDialog, onGoToSearch } = props;
+	const {
+		view = 'testing',
+		goToDrafting,
+		goToWriting,
+		onOpenIdentityDialog,
+		onGoToSearch,
+		goToInbox,
+	} = props;
 	const {
 		campaign,
 		contacts,
 		form,
+		promptQualityScore,
+		promptQualityLabel,
+		promptSuggestions,
 		handleGenerateTestDrafts,
 		isGenerationDisabled,
 		isOpenUpgradeSubscriptionDrawer,
 		isPendingGeneration,
 		isTest,
+		isUpscalingPrompt,
+		upscalePrompt,
+		undoUpscalePrompt,
+		hasPreviousPrompt,
 		setIsOpenUpgradeSubscriptionDrawer,
 		trackFocusedField,
 		handleGenerateDrafts,
@@ -105,6 +121,30 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 
 	const isMobile = useIsMobile();
+
+	const clampedPromptScore =
+		typeof promptQualityScore === 'number'
+			? Math.max(60, Math.min(100, Math.round(promptQualityScore)))
+			: null;
+
+	const promptScoreFillPercent = clampedPromptScore == null ? 0 : clampedPromptScore;
+
+	const suggestionText1 = promptSuggestions?.[0] || '';
+	const suggestionText2 = promptSuggestions?.[1] || '';
+
+	const promptScoreDisplayLabel =
+		clampedPromptScore == null
+			? 'Prompt score pending'
+			: `${clampedPromptScore} - ${
+					promptQualityLabel ||
+					(clampedPromptScore >= 90
+						? 'Excellent'
+						: clampedPromptScore >= 80
+						? 'Great'
+						: clampedPromptScore >= 70
+						? 'Good'
+						: 'Fair')
+			  }`;
 
 	// State for contacts selection in the Contacts tab
 	const [contactsTabSelectedIds, setContactsTabSelectedIds] = useState<Set<number>>(
@@ -192,12 +232,41 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	}, [searchActiveSection]);
 
-	// State for in-campaign search results
-	const [hasCampaignSearched, setHasCampaignSearched] = useState(false);
-	const [activeCampaignSearchQuery, setActiveCampaignSearchQuery] = useState('');
-	const [searchResultsSelectedContacts, setSearchResultsSelectedContacts] = useState<
-		number[]
-	>([]);
+	// Search tab type and state
+	type SearchTab = {
+		id: string;
+		label: string;
+		query: string;
+		selectedContacts: number[];
+	};
+	const [searchTabs, setSearchTabs] = useState<SearchTab[]>([]);
+	const [activeSearchTabId, setActiveSearchTabId] = useState<string | null>(null);
+
+	// Get active tab data
+	const activeSearchTab = searchTabs.find((tab) => tab.id === activeSearchTabId);
+	const hasCampaignSearched = activeSearchTabId !== null;
+	const activeCampaignSearchQuery = activeSearchTab?.query || '';
+	const searchResultsSelectedContacts = activeSearchTab?.selectedContacts || [];
+
+	// Setter for selected contacts that updates the active tab
+	const setSearchResultsSelectedContacts = (
+		contacts: number[] | ((prev: number[]) => number[])
+	) => {
+		if (!activeSearchTabId) return;
+		setSearchTabs((tabs) =>
+			tabs.map((tab) =>
+				tab.id === activeSearchTabId
+					? {
+							...tab,
+							selectedContacts:
+								typeof contacts === 'function'
+									? contacts(tab.selectedContacts)
+									: contacts,
+					  }
+					: tab
+			)
+		);
+	};
 
 	// Construct the search query from Why/What/Where values
 	const buildSearchQuery = () => {
@@ -234,17 +303,46 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			suppressToasts: true,
 		});
 
-	// Handler for triggering search
+	// Handler for triggering search - creates or updates a tab
 	const handleCampaignSearch = () => {
 		const query = buildSearchQuery();
 		if (!query.trim()) {
 			toast.error('Please enter what you want to search for');
 			return;
 		}
-		setActiveCampaignSearchQuery(query);
-		setHasCampaignSearched(true);
+
+		// Build a label for the tab (e.g., "MS - Music Venues")
+		const labelParts: string[] = [];
+		if (searchWhereValue) {
+			// Extract state abbreviation if it's a full state name or use the value directly
+			const stateAbbrev =
+				searchWhereValue.length === 2
+					? searchWhereValue.toUpperCase()
+					: searchWhereValue.split(',')[0]?.trim() || searchWhereValue;
+			labelParts.push(stateAbbrev);
+		}
+		if (searchWhatValue) {
+			labelParts.push(searchWhatValue);
+		}
+		const label = labelParts.join(' - ') || query;
+
+		// If we're on an empty search tab (no query yet), update it instead of creating new
+		if (activeSearchTab && !activeSearchTab.query) {
+			setSearchTabs((tabs) =>
+				tabs.map((tab) => (tab.id === activeSearchTabId ? { ...tab, label, query } : tab))
+			);
+		} else {
+			// Create a new tab
+			const newTab: SearchTab = {
+				id: `search-${Date.now()}`,
+				label,
+				query,
+				selectedContacts: [],
+			};
+			setSearchTabs((tabs) => [...tabs, newTab]);
+			setActiveSearchTabId(newTab.id);
+		}
 		setSearchActiveSection(null);
-		setSearchResultsSelectedContacts([]);
 	};
 
 	// Handler for triggering search from the mini searchbar in the contacts panel
@@ -274,11 +372,29 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			return;
 		}
 
-		// Drive the in-campaign search results
-		setActiveCampaignSearchQuery(query);
-		setHasCampaignSearched(true);
+		// Build a label for the tab
+		const labelParts: string[] = [];
+		if (where) {
+			const stateAbbrev =
+				where.length === 2 ? where.toUpperCase() : where.split(',')[0]?.trim() || where;
+			labelParts.push(stateAbbrev);
+		}
+		if (what) {
+			labelParts.push(what);
+		}
+		const label = labelParts.join(' - ') || query;
+
+		// Create a new search tab
+		const newTab: SearchTab = {
+			id: `search-${Date.now()}`,
+			label,
+			query,
+			selectedContacts: [],
+		};
+
+		setSearchTabs((tabs) => [...tabs, newTab]);
+		setActiveSearchTabId(newTab.id);
 		setSearchActiveSection(null);
-		setSearchResultsSelectedContacts([]);
 
 		// Ask the parent page to switch to the Search tab, if supported
 		if (onGoToSearch) {
@@ -336,11 +452,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	};
 
-	// Handler for clearing search results and going back to campaign contacts
-	const handleClearSearchResults = () => {
-		setHasCampaignSearched(false);
-		setActiveCampaignSearchQuery('');
-		setSearchResultsSelectedContacts([]);
+	// Handler for closing a search tab
+	const handleCloseSearchTab = (tabId: string) => {
+		setSearchTabs((tabs) => tabs.filter((tab) => tab.id !== tabId));
+		// If we're closing the active tab, switch to Original
+		if (activeSearchTabId === tabId) {
+			setActiveSearchTabId(null);
+		}
 	};
 
 	// State for drafts selection in the Drafts tab
@@ -947,8 +1065,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									style={{
 										right:
 											view === 'search'
-												? 'calc(50% + 384px + 37px)'
-												: 'calc(50% + 250px + 24px)',
+												? 'calc(50% + 384px + 32px)'
+												: 'calc(50% + 250px + 32px)',
 										top: '29px',
 										gap: '16px',
 									}}
@@ -965,33 +1083,306 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									/>
 									{/* For the Writing (testing) and Search tabs, show a mini contacts table instead of mini email structure. */}
 									{view === 'testing' || view === 'search' ? (
-										<div
-											style={{
-												width: '375px',
-												height: view === 'search' ? '557px' : '373px',
-												overflow: 'visible',
-											}}
-										>
-											<ContactsExpandedList
-												contacts={contactsAvailableForDrafting}
-												campaign={campaign}
-												selectedContactIds={contactsTabSelectedIds}
-												onContactSelectionChange={(updater) =>
-													setContactsTabSelectedIds((prev) => updater(new Set(prev)))
-												}
-												onContactClick={handleResearchContactClick}
-												onContactHover={handleResearchContactHover}
-												onDraftSelected={async (ids) => {
-													await handleGenerateDrafts(ids);
+										<>
+											<div
+												style={{
+													width: '375px',
+													height: view === 'search' ? '557px' : '274px',
+													overflow: 'visible',
 												}}
-												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
-												isPendingGeneration={isPendingGeneration}
-												width={375}
-												height={view === 'search' ? 557 : 373}
-												minRows={view === 'search' ? 8 : 7}
-												onSearchFromMiniBar={handleMiniContactsSearch}
-											/>
-										</div>
+											>
+												<ContactsExpandedList
+													contacts={contactsAvailableForDrafting}
+													campaign={campaign}
+													selectedContactIds={contactsTabSelectedIds}
+													onContactSelectionChange={(updater) =>
+														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
+													}
+													onContactClick={handleResearchContactClick}
+													onContactHover={handleResearchContactHover}
+													onDraftSelected={async (ids) => {
+														await handleGenerateDrafts(ids);
+													}}
+													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isPendingGeneration={isPendingGeneration}
+													width={375}
+													height={view === 'search' ? 557 : 274}
+													minRows={view === 'search' ? 8 : 5}
+													onSearchFromMiniBar={handleMiniContactsSearch}
+												/>
+											</div>
+											{view === 'testing' && (suggestionText1 || suggestionText2) && (
+												<div
+													style={{
+														width: '377px',
+														height: '249px',
+														marginTop: '-5px', // 16px gap - 5px = 11px
+														background:
+															'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
+														border: '2px solid #000000',
+														borderRadius: '7px',
+														position: 'relative',
+													}}
+												>
+													<div
+														style={{
+															height: '28px',
+															display: 'flex',
+															alignItems: 'center',
+															paddingLeft: '9px',
+														}}
+													>
+														<span className="font-inter font-bold text-[12px] leading-none text-black">
+															Suggestion
+														</span>
+													</div>
+													{/* Inner box */}
+													<div
+														style={{
+															position: 'absolute',
+															top: '34px',
+															left: '50%',
+															transform: 'translateX(-50%)',
+															width: '369px',
+															height: '44px',
+															backgroundColor: '#FFFFFF',
+															border: '2px solid #000000',
+															borderRadius: '7px',
+														}}
+													>
+														{/* Score label */}
+														<div
+															style={{
+																position: 'absolute',
+																top: '6px',
+																left: '10px',
+																fontFamily: 'Inter, system-ui, sans-serif',
+																fontWeight: 700,
+																fontSize: '12px',
+																lineHeight: '14px',
+																color: '#000000',
+															}}
+														>
+															{promptScoreDisplayLabel}
+														</div>
+														{/* Small box inside (progress track) */}
+														<div
+															style={{
+																position: 'absolute',
+																bottom: '3px',
+																left: '4px',
+																width: '223px',
+																height: '12px',
+																backgroundColor: '#FFFFFF',
+																border: '2px solid #000000',
+																borderRadius: '8px',
+																overflow: 'hidden',
+															}}
+														>
+															<div
+																style={{
+																	position: 'absolute',
+																	top: 0,
+																	bottom: 0,
+																	left: 0,
+																	borderRadius: '999px',
+																	backgroundColor: '#36B24A',
+																	width: `${promptScoreFillPercent}%`,
+																	maxWidth: '100%',
+																	transition: 'width 250ms ease-out',
+																}}
+															/>
+														</div>
+													</div>
+													{/* Small box below the first inner box */}
+													<div
+														onClick={() => {
+															if (hasPreviousPrompt) {
+																undoUpscalePrompt();
+															}
+														}}
+														style={{
+															position: 'absolute',
+															top: '83px', // 34px + 44px + 5px
+															left: '6px',
+															width: '39px',
+															height: '32px',
+															backgroundColor: '#C2C2C2',
+															border: '2px solid #000000',
+															borderRadius: '8px',
+															display: 'flex',
+															alignItems: 'center',
+															justifyContent: 'center',
+															cursor: hasPreviousPrompt ? 'pointer' : 'not-allowed',
+															opacity: hasPreviousPrompt ? 1 : 0.5,
+														}}
+													>
+														<UndoIcon width="24" height="24" />
+													</div>
+													{/* Box to the right of the small box */}
+													<div
+														onClick={() => {
+															if (!isUpscalingPrompt) {
+																upscalePrompt();
+															}
+														}}
+														style={{
+															position: 'absolute',
+															top: '83px',
+															left: '50px', // 6px + 39px + 5px
+															width: '196px',
+															height: '32px',
+															backgroundColor: '#D7F0FF',
+															border: '2px solid #000000',
+															borderRadius: '8px',
+															display: 'flex',
+															alignItems: 'center',
+															justifyContent: 'space-between',
+															paddingLeft: '10px',
+															paddingRight: '10px',
+															cursor: isUpscalingPrompt ? 'wait' : 'pointer',
+														}}
+													>
+														<span
+															style={{
+																fontFamily: 'Inter, system-ui, sans-serif',
+																fontSize: '17px',
+																fontWeight: 500,
+																color: '#000000',
+																lineHeight: '1',
+															}}
+														>
+															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
+														</span>
+														<div style={{ flexShrink: 0 }}>
+															<UpscaleIcon width="24" height="24" />
+														</div>
+													</div>
+													{/* Box below the two small boxes */}
+													<div
+														style={{
+															position: 'absolute',
+															top: '123px', // 83px + 32px + 8px
+															left: '50%',
+															transform: 'translateX(-50%)',
+															width: '362px',
+															height: '56px',
+															backgroundColor: '#A6E0B4',
+															border: '2px solid #000000',
+															borderRadius: '8px',
+														}}
+													>
+														{/* Section indicator */}
+														<div
+															className="absolute font-inter font-bold"
+															style={{
+																top: '4.5px',
+																left: '8px',
+																fontSize: '11.5px',
+																color: '#000000',
+															}}
+														>
+															[1]
+														</div>
+														{/* Inner box */}
+														<div
+															style={{
+																position: 'absolute',
+																top: '0',
+																bottom: '0',
+																margin: 'auto',
+																left: '25px',
+																width: '324px',
+																height: '48px',
+																backgroundColor: '#FFFFFF',
+																border: '2px solid #000000',
+																borderRadius: '8px',
+																display: 'flex',
+																alignItems: 'center',
+																padding: '4px 8px',
+																overflow: 'hidden',
+															}}
+														>
+															<div
+																style={{
+																	fontFamily: 'Inter, system-ui, sans-serif',
+																	fontSize: '11px',
+																	lineHeight: '1.3',
+																	color: '#000000',
+																	wordBreak: 'break-word',
+																	whiteSpace: 'normal',
+																	overflow: 'hidden',
+																	textOverflow: 'ellipsis',
+																}}
+															>
+																{suggestionText1 || ''}
+															</div>
+														</div>
+													</div>
+													{/* Second box below */}
+													<div
+														style={{
+															position: 'absolute',
+															top: '187px', // 123px + 56px + 8px
+															left: '50%',
+															transform: 'translateX(-50%)',
+															width: '362px',
+															height: '56px',
+															backgroundColor: '#5BCB75',
+															border: '2px solid #000000',
+															borderRadius: '8px',
+														}}
+													>
+														{/* Section indicator */}
+														<div
+															className="absolute font-inter font-bold"
+															style={{
+																top: '4.5px',
+																left: '8px',
+																fontSize: '11.5px',
+																color: '#000000',
+															}}
+														>
+															[2]
+														</div>
+														{/* Inner box */}
+														<div
+															style={{
+																position: 'absolute',
+																top: '0',
+																bottom: '0',
+																margin: 'auto',
+																left: '25px',
+																width: '324px',
+																height: '48px',
+																backgroundColor: '#FFFFFF',
+																border: '2px solid #000000',
+																borderRadius: '8px',
+																display: 'flex',
+																alignItems: 'center',
+																padding: '4px 8px',
+																overflow: 'hidden',
+															}}
+														>
+															<div
+																style={{
+																	fontFamily: 'Inter, system-ui, sans-serif',
+																	fontSize: '11px',
+																	lineHeight: '1.3',
+																	color: '#000000',
+																	wordBreak: 'break-word',
+																	whiteSpace: 'normal',
+																	overflow: 'hidden',
+																	textOverflow: 'ellipsis',
+																}}
+															>
+																{suggestionText2 || ''}
+															</div>
+														</div>
+													</div>
+												</div>
+											)}
+										</>
 									) : (
 										<div
 											style={{
@@ -999,7 +1390,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												height: '373px',
 												// Fixed-height mini structure that uses the compact layout
 												// inside; no scaling, just a tighter signature area.
-												overflow: 'hidden',
+												overflow: 'visible',
 											}}
 										>
 											<MiniEmailStructure
@@ -1016,6 +1407,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												hideTopChrome
 												hideFooter
 												fullWidthMobile
+												hideAddTextButtons
+												hideAllText={
+													// Hide all structure text to show chrome-only skeleton:
+													// - When the Drafts tab has no drafts
+													// - When the Sent tab is in its empty state
+													// - When the Contacts tab has no contacts to show
+													(view === 'drafting' && draftCount === 0) ||
+													(view === 'sent' && sentCount === 0) ||
+													(view === 'contacts' &&
+														contactsAvailableForDrafting.length === 0)
+												}
 											/>
 										</div>
 									)}
@@ -1032,8 +1434,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										top: '29px',
 										left:
 											view === 'search'
-												? 'calc(50% + 384px + 37px)'
-												: 'calc(50% + 250px + 36px)',
+												? 'calc(50% + 384px + 32px)'
+												: 'calc(50% + 250px + 32px)',
 									}}
 								>
 									{view === 'testing' && showTestPreview ? (
@@ -1048,10 +1450,21 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isDisabled={isGenerationDisabled()}
 											isTesting={Boolean(isTest)}
 											contact={contacts?.[0] || displayedContactForResearch}
-											style={{ width: 375, height: 630 }}
+											style={{ width: 375, height: 670 }}
 										/>
 									) : (
-										<ContactResearchPanel contact={displayedContactForResearch} />
+										<ContactResearchPanel
+											contact={displayedContactForResearch}
+											hideAllText={
+												// Hide all research text to show a chrome-only skeleton:
+												// - When the Drafts tab has no drafts
+												// - When the Sent tab is in its empty state
+												// - When the Contacts tab has no contacts to show
+												(view === 'drafting' && draftCount === 0) ||
+												(view === 'sent' && sentCount === 0) ||
+												(view === 'contacts' && contactsAvailableForDrafting.length === 0)
+											}
+										/>
 									)}
 								</div>
 							)}
@@ -1067,29 +1480,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									className="absolute hidden xl:block"
 									style={{
 										top: '29px',
-										left: 'calc(50% + 384px + 37px)',
+										left: 'calc(50% + 384px + 32px)',
 									}}
 								>
+									{/* Title above the panel */}
+									<span className="font-inter text-[13px] font-medium text-black mb-1 block">
+										Search Results
+									</span>
 									<div
-										className="bg-[#D8E5FB] border-[2px] border-black rounded-[7px] overflow-hidden flex flex-col"
+										className="bg-[#D8E5FB] border-[3px] border-[#143883] rounded-[7px] overflow-hidden flex flex-col"
 										style={{
-											width: '375px',
-											height: '815px',
+											width: '396px',
+											height: '703px',
 										}}
 									>
-										{/* Header */}
+										{/* Fixed header section - 52px */}
 										<div
-											className="w-full flex-shrink-0 flex items-center justify-between px-4 relative"
-											style={{
-												height: '24px',
-												backgroundColor: '#E8EFFF',
-											}}
+											className="flex-shrink-0 flex flex-col justify-center px-[6px]"
+											style={{ height: '52px' }}
 										>
-											<span className="font-secondary font-bold text-[14px] leading-none text-black">
-												Search Results
-											</span>
-											<div className="flex items-center gap-2">
-												<span className="font-inter text-[11px] text-black">
+											<div className="flex flex-col">
+												<span className="font-inter text-[11px] text-black text-center">
 													{searchResultsSelectedContacts.length} selected
 												</span>
 												<button
@@ -1106,7 +1517,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															);
 														}
 													}}
-													className="font-secondary text-[11px] font-medium text-black hover:underline"
+													className="font-secondary text-[11px] font-medium text-black hover:underline text-right pr-1"
 												>
 													{searchResultsSelectedContacts.length === searchResults.length
 														? 'Deselect all'
@@ -1114,199 +1525,216 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												</button>
 											</div>
 										</div>
-
-										{/* Divider under header */}
-										<div className="w-full h-[1px] bg-black flex-shrink-0" />
-
 										{/* Scrollable contact list */}
 										<CustomScrollbar
 											className="flex-1 min-h-0"
-											contentClassName="p-[6px] pb-[14px] space-y-[7px]"
+											contentClassName="px-[6px] pb-[14px]"
 											thumbWidth={2}
 											thumbColor="#000000"
 											trackColor="transparent"
 											offsetRight={-6}
 											disableOverflowClass
 										>
-											{searchResults.map((contact) => {
-												const isSelected = searchResultsSelectedContacts.includes(
-													contact.id
-												);
-												const firstName = contact.firstName || '';
-												const lastName = contact.lastName || '';
-												const fullName =
-													contact.name || `${firstName} ${lastName}`.trim();
-												const company = contact.company || '';
-												const headline = contact.headline || contact.title || '';
-												const stateAbbr = getStateAbbreviation(contact.state || '') || '';
-												const city = contact.city || '';
+											{/* Contact list */}
+											<div className="space-y-[7px]">
+												{searchResults.map((contact) => {
+													const isSelected = searchResultsSelectedContacts.includes(
+														contact.id
+													);
+													const firstName = contact.firstName || '';
+													const lastName = contact.lastName || '';
+													const fullName =
+														contact.name || `${firstName} ${lastName}`.trim();
+													const company = contact.company || '';
+													const headline = contact.headline || contact.title || '';
+													const stateAbbr =
+														getStateAbbreviation(contact.state || '') || '';
+													const city = contact.city || '';
 
-												return (
-													<div
-														key={contact.id}
-														data-contact-id={contact.id}
-														className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none"
-														style={{
-															backgroundColor: isSelected ? '#C9EAFF' : '#FFFFFF',
-														}}
-														onClick={() => {
-															if (isSelected) {
-																setSearchResultsSelectedContacts(
-																	searchResultsSelectedContacts.filter(
-																		(id) => id !== contact.id
-																	)
-																);
-															} else {
-																setSearchResultsSelectedContacts([
-																	...searchResultsSelectedContacts,
-																	contact.id,
-																]);
-															}
-														}}
-													>
-														{fullName ? (
-															<>
-																{/* Top Left - Name */}
-																<div className="pl-3 pr-1 flex items-center h-[23px]">
-																	<div className="font-bold text-[11px] w-full truncate leading-tight">
-																		{fullName}
-																	</div>
-																</div>
-																{/* Top Right - Title/Headline */}
-																<div className="pr-2 pl-1 flex items-center h-[23px]">
-																	{headline ? (
-																		<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
-																			<span className="text-[10px] text-black leading-none truncate">
-																				{headline}
-																			</span>
+													return (
+														<div
+															key={contact.id}
+															data-contact-id={contact.id}
+															className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-[#ABABAB] select-none"
+															style={{
+																backgroundColor: isSelected ? '#C9EAFF' : '#FFFFFF',
+															}}
+															onClick={() => {
+																if (isSelected) {
+																	setSearchResultsSelectedContacts(
+																		searchResultsSelectedContacts.filter(
+																			(id) => id !== contact.id
+																		)
+																	);
+																} else {
+																	setSearchResultsSelectedContacts([
+																		...searchResultsSelectedContacts,
+																		contact.id,
+																	]);
+																}
+															}}
+														>
+															{fullName ? (
+																<>
+																	{/* Top Left - Name */}
+																	<div className="pl-3 pr-1 flex items-center h-[23px]">
+																		<div className="font-bold text-[11px] w-full truncate leading-tight">
+																			{fullName}
 																		</div>
-																	) : (
-																		<div className="w-full" />
-																	)}
-																</div>
-																{/* Bottom Left - Company */}
-																<div className="pl-3 pr-1 flex items-center h-[22px]">
-																	<div className="text-[11px] text-black w-full truncate leading-tight">
-																		{company}
 																	</div>
-																</div>
-																{/* Bottom Right - Location */}
-																<div className="pr-2 pl-1 flex items-center h-[22px]">
-																	{city || stateAbbr ? (
-																		<div className="flex items-center gap-1 w-full">
-																			{stateAbbr && (
-																				<span
-																					className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
-																					style={{
-																						backgroundColor:
-																							stateBadgeColorMap[stateAbbr] ||
-																							'transparent',
-																						borderColor: '#000000',
-																					}}
-																				>
-																					{stateAbbr}
-																				</span>
-																			)}
-																			{city && (
+																	{/* Top Right - Title/Headline */}
+																	<div className="pr-2 pl-1 flex items-center h-[23px]">
+																		{headline ? (
+																			<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
 																				<span className="text-[10px] text-black leading-none truncate">
-																					{city}
+																					{headline}
 																				</span>
-																			)}
-																		</div>
-																	) : (
-																		<div className="w-full" />
-																	)}
-																</div>
-															</>
-														) : (
-															<>
-																{/* No name - Company spans left column */}
-																<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
-																	<div className="font-bold text-[11px] w-full truncate leading-tight">
-																		{company || '—'}
+																			</div>
+																		) : (
+																			<div className="w-full" />
+																		)}
 																	</div>
-																</div>
-																{/* Top Right - Title/Headline */}
-																<div className="pr-2 pl-1 flex items-center h-[23px]">
-																	{headline ? (
-																		<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
-																			<span className="text-[10px] text-black leading-none truncate">
-																				{headline}
-																			</span>
+																	{/* Bottom Left - Company */}
+																	<div className="pl-3 pr-1 flex items-center h-[22px]">
+																		<div className="text-[11px] text-black w-full truncate leading-tight">
+																			{company}
 																		</div>
-																	) : (
-																		<div className="w-full" />
-																	)}
-																</div>
-																{/* Bottom Right - Location */}
-																<div className="pr-2 pl-1 flex items-center h-[22px]">
-																	{city || stateAbbr ? (
-																		<div className="flex items-center gap-1 w-full">
-																			{stateAbbr && (
-																				<span
-																					className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
-																					style={{
-																						backgroundColor:
-																							stateBadgeColorMap[stateAbbr] ||
-																							'transparent',
-																						borderColor: '#000000',
-																					}}
-																				>
-																					{stateAbbr}
-																				</span>
-																			)}
-																			{city && (
+																	</div>
+																	{/* Bottom Right - Location */}
+																	<div className="pr-2 pl-1 flex items-center h-[22px]">
+																		{city || stateAbbr ? (
+																			<div className="flex items-center gap-1 w-full">
+																				{stateAbbr && (
+																					<span
+																						className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																						style={{
+																							backgroundColor:
+																								stateBadgeColorMap[stateAbbr] ||
+																								'transparent',
+																							borderColor: '#000000',
+																						}}
+																					>
+																						{stateAbbr}
+																					</span>
+																				)}
+																				{city && (
+																					<span className="text-[10px] text-black leading-none truncate">
+																						{city}
+																					</span>
+																				)}
+																			</div>
+																		) : (
+																			<div className="w-full" />
+																		)}
+																	</div>
+																</>
+															) : (
+																<>
+																	{/* No name - Company spans left column */}
+																	<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
+																		<div className="font-bold text-[11px] w-full truncate leading-tight">
+																			{company || '—'}
+																		</div>
+																	</div>
+																	{/* Top Right - Title/Headline */}
+																	<div className="pr-2 pl-1 flex items-center h-[23px]">
+																		{headline ? (
+																			<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
 																				<span className="text-[10px] text-black leading-none truncate">
-																					{city}
+																					{headline}
 																				</span>
-																			)}
-																		</div>
-																	) : (
-																		<div className="w-full" />
-																	)}
-																</div>
-															</>
-														)}
-													</div>
-												);
-											})}
+																			</div>
+																		) : (
+																			<div className="w-full" />
+																		)}
+																	</div>
+																	{/* Bottom Right - Location */}
+																	<div className="pr-2 pl-1 flex items-center h-[22px]">
+																		{city || stateAbbr ? (
+																			<div className="flex items-center gap-1 w-full">
+																				{stateAbbr && (
+																					<span
+																						className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																						style={{
+																							backgroundColor:
+																								stateBadgeColorMap[stateAbbr] ||
+																								'transparent',
+																							borderColor: '#000000',
+																						}}
+																					>
+																						{stateAbbr}
+																					</span>
+																				)}
+																				{city && (
+																					<span className="text-[10px] text-black leading-none truncate">
+																						{city}
+																					</span>
+																				)}
+																			</div>
+																		) : (
+																			<div className="w-full" />
+																		)}
+																	</div>
+																</>
+															)}
+														</div>
+													);
+												})}
+											</div>
 										</CustomScrollbar>
 
-										{/* Footer with Add to Campaign button */}
-										<div className="w-full h-[50px] flex-shrink-0 bg-[#E8EFFF] flex items-center justify-between px-3 border-t border-black">
-											<button
-												type="button"
-												onClick={handleAddSearchResultsToCampaign}
-												disabled={
-													searchResultsSelectedContacts.length === 0 || isAddingToCampaign
-												}
-												className="flex-1 h-[36px] flex items-center justify-center gap-2 text-[13px] font-semibold text-white bg-[#143883] hover:bg-[#1a4a9e] rounded-[6px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-											>
-												{isAddingToCampaign ? (
-													<>
-														<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-														Adding...
-													</>
-												) : (
-													<>+ Add to Campaign</>
-												)}
-											</button>
-											<button
-												type="button"
-												onClick={() => {
-													if (
-														searchResultsSelectedContacts.length !== searchResults.length
-													) {
-														setSearchResultsSelectedContacts(
-															searchResults.map((c) => c.id)
-														);
-													}
-												}}
-												className="ml-2 h-[36px] px-4 flex items-center justify-center text-[13px] font-semibold text-black bg-white hover:bg-gray-100 rounded-[6px] border-2 border-black transition-colors"
-											>
-												All
-											</button>
-										</div>
+										{/* Footer with Add to Campaign button - only shown when contacts are selected */}
+										{searchResultsSelectedContacts.length > 0 && (
+											<div className="w-full h-[50px] flex-shrink-0 bg-[#D8E5FB] flex items-center justify-center px-3">
+												<div className="relative flex w-full h-[36px] rounded-[6px] border-2 border-black overflow-hidden">
+													{/* Absolutely centered text */}
+													<span
+														className="absolute inset-0 flex items-center justify-center text-white font-serif font-medium text-[15px] pointer-events-none"
+														style={{ zIndex: 1 }}
+													>
+														{isAddingToCampaign ? (
+															<>
+																<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+																Adding...
+															</>
+														) : (
+															'Add to Campaign'
+														)}
+													</span>
+													{/* Clickable left area */}
+													<button
+														type="button"
+														onClick={handleAddSearchResultsToCampaign}
+														disabled={
+															searchResultsSelectedContacts.length === 0 ||
+															isAddingToCampaign
+														}
+														className="flex-1 bg-[#62A967] hover:bg-[#529957] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+													/>
+													<div
+														className="w-[2px]"
+														style={{ backgroundColor: '#349A37', zIndex: 2 }}
+													/>
+													<button
+														type="button"
+														onClick={() => {
+															if (
+																searchResultsSelectedContacts.length !==
+																searchResults.length
+															) {
+																setSearchResultsSelectedContacts(
+																	searchResults.map((c) => c.id)
+																);
+															}
+														}}
+														className="w-[50px] bg-[#7AD47A] hover:bg-[#6AC46A] text-black font-inter text-[13px] flex items-center justify-center transition-colors"
+														style={{ zIndex: 2 }}
+													>
+														All
+													</button>
+												</div>
+											</div>
+										)}
 									</div>
 								</div>
 							)}
@@ -1336,13 +1764,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									isDraftDisabled={
 										isPendingGeneration || contactsTabSelectedIds.size === 0
 									}
+									onSelectAllContacts={() => {
+										const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
+										const areAllSelected =
+											contactsTabSelectedIds.size === allIds.size &&
+											[...allIds].every((id) => contactsTabSelectedIds.has(id));
+
+										if (areAllSelected) {
+											setContactsTabSelectedIds(new Set());
+										} else {
+											setContactsTabSelectedIds(allIds);
+										}
+									}}
 								/>
 								{/* Right panel for Testing view - positioned absolutely */}
 								{false && (
 									<div
 										className="absolute hidden lg:block"
 										style={{
-											left: 'calc(50% + 250px + 50px)',
+											left: 'calc(50% + 250px + 32px)',
 											top: '0',
 										}}
 									>
@@ -1392,6 +1832,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										subject={form.watch('subject')}
 										onContactClick={handleResearchContactClick}
 										onContactHover={handleResearchContactHover}
+										goToWriting={goToWriting}
+										goToSearch={onGoToSearch}
+										goToInbox={goToInbox}
 									/>
 								</div>
 							)}
@@ -1413,6 +1856,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									onContactClick={handleResearchContactClick}
 									onContactHover={handleResearchContactHover}
 									onSearchFromMiniBar={handleMiniContactsSearch}
+									goToSearch={onGoToSearch}
+									goToDrafts={goToDrafting}
+									goToInbox={goToInbox}
 								/>
 							</div>
 						)}
@@ -1425,6 +1871,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									isPendingEmails={isPendingEmails}
 									onContactClick={handleResearchContactClick}
 									onContactHover={handleResearchContactHover}
+									goToDrafts={goToDrafting}
+									goToWriting={goToWriting}
+									goToSearch={onGoToSearch}
 								/>
 							</div>
 						)}
@@ -1438,7 +1887,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									style={{
 										width: '768px',
 										height: '815px',
-										backgroundColor: '#D8E5FB',
+										backgroundColor: '#AFD6EF',
 										border: '3px solid #143883',
 									}}
 								>
@@ -1449,6 +1898,107 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									>
 										Search
 									</span>
+
+									{/* Search tabs header */}
+									<div
+										className="absolute flex items-center"
+										style={{
+											left: '138px',
+											top: '0',
+											right: '14px',
+											height: '36px',
+										}}
+									>
+										{/* Original tab */}
+										<div
+											className="relative flex items-center justify-center cursor-pointer border-l border-black"
+											style={{
+												width: '105px',
+												height: '36px',
+												backgroundColor:
+													activeSearchTabId === null ? '#94c4e4' : '#95D6FF',
+											}}
+											onClick={() => setActiveSearchTabId(null)}
+										>
+											<span className="font-inter font-normal text-[15px] text-black">
+												Original
+											</span>
+										</div>
+										<div className="border-l border-black h-full" />
+
+										{/* Dynamic search tabs */}
+										{searchTabs.map((tab) => (
+											<Fragment key={tab.id}>
+												<div
+													className="relative flex items-center justify-center cursor-pointer group"
+													style={{
+														minWidth: '120px',
+														maxWidth: '220px',
+														height: '36px',
+														backgroundColor:
+															activeSearchTabId === tab.id ? '#94c4e4' : '#95d6ff',
+														paddingLeft: '12px',
+														paddingRight: '28px',
+													}}
+													onClick={() => setActiveSearchTabId(tab.id)}
+												>
+													<span
+														className="font-inter font-normal text-[15px] text-black whitespace-nowrap overflow-hidden"
+														style={{
+															maskImage:
+																'linear-gradient(to right, black calc(100% - 20px), transparent 100%)',
+															WebkitMaskImage:
+																'linear-gradient(to right, black calc(100% - 20px), transparent 100%)',
+														}}
+													>
+														{tab.label}
+													</span>
+													{/* Close button - visible on hover */}
+													<button
+														type="button"
+														className="absolute right-[8px] top-1/2 -translate-y-1/2 w-[16px] h-[16px] hidden group-hover:flex items-center justify-center text-black/60 hover:text-black"
+														onClick={(e) => {
+															e.stopPropagation();
+															handleCloseSearchTab(tab.id);
+														}}
+													>
+														×
+													</button>
+												</div>
+												<div className="border-l border-black h-full" />
+											</Fragment>
+										))}
+
+										{/* Plus button to add new search */}
+										<div
+											className="flex items-center justify-center cursor-pointer"
+											style={{
+												width: '36px',
+												height: '36px',
+											}}
+											onClick={() => {
+												// Create a new empty tab
+												const newTab: SearchTab = {
+													id: `search-${Date.now()}`,
+													label: 'New Search',
+													query: '',
+													selectedContacts: [],
+												};
+												setSearchTabs((tabs) => [...tabs, newTab]);
+												setActiveSearchTabId(newTab.id);
+												// Reset search inputs to placeholders
+												setSearchWhyValue('[Booking]');
+												setSearchWhatValue('');
+												setSearchWhereValue('');
+												// Focus the search bar
+												setSearchActiveSection('what');
+											}}
+										>
+											<span className="font-inter font-normal text-[20px] text-black">
+												+
+											</span>
+										</div>
+									</div>
 
 									{/* Map container */}
 									<div
@@ -1578,46 +2128,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														borderRadius: '6px',
 													}}
 													aria-label="Search"
-													disabled={isSearching}
 													onClick={handleCampaignSearch}
 												>
-													{isSearching ? (
-														<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-													) : (
-														<div style={{ transform: 'scale(0.75)', display: 'flex' }}>
-															<SearchIconDesktop />
-														</div>
-													)}
+													<div style={{ transform: 'scale(0.75)', display: 'flex' }}>
+														<SearchIconDesktop />
+													</div>
 												</button>
 											</div>
 										</div>
 										{/* Render search dropdowns via portal */}
 										{renderSearchDropdowns()}
-
-										{/* Back button - shows when search has been performed */}
-										{hasCampaignSearched && (
-											<button
-												type="button"
-												onClick={handleClearSearchResults}
-												className="absolute z-10 flex items-center gap-1 px-3 py-2 bg-white/95 backdrop-blur-sm rounded-[8px] border border-black/20 text-[13px] font-medium text-gray-600 hover:text-black transition-colors"
-												style={{
-													top: '70px',
-													left: '12px',
-												}}
-											>
-												<svg
-													width="16"
-													height="16"
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke="currentColor"
-													strokeWidth="2"
-												>
-													<path d="M19 12H5M12 19l-7-7 7-7" />
-												</svg>
-												Back to Campaign
-											</button>
-										)}
 
 										<div
 											className="relative rounded-[8px] overflow-hidden w-full h-full"
@@ -1627,15 +2147,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										>
 											<SearchResultsMap
 												contacts={
-													hasCampaignSearched ? searchResults || [] : contacts || []
+													activeSearchTabId === null
+														? contacts || [] // Original tab - show campaign contacts
+														: activeCampaignSearchQuery
+														? searchResults || [] // Search tab with query - show results
+														: [] // Empty search tab - show nothing (zoomed out view)
 												}
 												selectedContacts={
-													hasCampaignSearched
+													activeSearchTabId !== null
 														? searchResultsSelectedContacts
 														: searchTabSelectedContacts
 												}
 												onToggleSelection={(contactId) => {
-													if (hasCampaignSearched) {
+													if (activeSearchTabId !== null) {
 														// Handle selection for search results
 														if (searchResultsSelectedContacts.includes(contactId)) {
 															setSearchResultsSelectedContacts(
@@ -1666,6 +2190,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onMarkerClick={(contact) => {
 													handleResearchContactClick(contact);
 												}}
+												enableStateInteractions
+												onStateSelect={(stateName) => {
+													setSearchActiveSection('why');
+													setSearchWhereValue(stateName);
+												}}
+												lockedStateName={searchWhereValue}
 											/>
 										</div>
 									</div>

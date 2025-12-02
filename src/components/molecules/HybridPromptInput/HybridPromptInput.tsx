@@ -67,7 +67,6 @@ const SortableAIBlock = ({
 	onExpand,
 	trackFocusedField,
 	showTestPreview,
-	testMessage,
 }: SortableAIBlockProps) => {
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
 		useSortable({ id });
@@ -76,6 +75,11 @@ const SortableAIBlock = ({
 	const [hasBeenTouched, setHasBeenTouched] = useState(false);
 	// Track if advanced mode is enabled for hybrid blocks
 	const [isAdvancedEnabled, setIsAdvancedEnabled] = useState(false);
+	// Power mode from form (shared with MiniEmailStructure)
+	const selectedPowerMode = form.watch('powerMode') || 'normal';
+	const setSelectedPowerMode = (mode: 'normal' | 'high') => {
+		form.setValue('powerMode', mode, { shouldDirty: true });
+	};
 	// When a block is opened (advanced), focus its input once
 	const advancedInputRef = useRef<HTMLInputElement | null>(null);
 	useEffect(() => {
@@ -252,7 +256,9 @@ const SortableAIBlock = ({
 							? isAdvancedEnabled
 								? 'p-0 h-full'
 								: 'p-2 h-full max-[480px]:py-[2px]'
-							: isFullAutomatedBlock || isTextBlock
+							: isFullAutomatedBlock
+							? 'px-4 pt-0 pb-4'
+							: isTextBlock
 							? 'px-4 pt-2 pb-4'
 							: 'p-4'
 					)}
@@ -291,7 +297,7 @@ const SortableAIBlock = ({
 									<span className="absolute right-0 h-full border-r border-[#000000]"></span>
 								</button>
 							)}
-							{!isFullAutomatedBlock && (
+							{!isFullAutomatedBlock && (!isTextBlock || !isManualModeSelected) && (
 								<Button
 									type="button"
 									variant="ghost"
@@ -613,44 +619,124 @@ const SortableAIBlock = ({
 							// Non-compact blocks
 							<>
 								{!isTextBlock && !isFullAutomatedBlock && <></>}
-								<div
-									className={cn(
-										'flex gap-2 min-h-7 items-center relative z-20',
-										isFullAutomatedBlock || isTextBlock ? 'mb-1' : 'mb-2',
-										isFullAutomatedBlock && showTestPreview && testMessage && 'flex-wrap',
-										// On mobile portrait, allow the header to wrap so the tone selector can move to a second row
-										isFullAutomatedBlock && 'max-[480px]:flex-wrap max-[480px]:gap-y-1'
-									)}
-								>
-									{!isTextBlock ? (
-										<>
+								{/* Header background fill for Full Auto box */}
+								{isFullAutomatedBlock && (
+									<div className="w-[calc(100%+32px)] -mx-4 h-[29px] bg-[#B9DAF5] -mt-0 flex items-stretch">
+										{/* Full Auto label section */}
+										<div className="flex-1 flex items-center pl-[16px]">
+											<Typography
+												variant="h4"
+												className="font-inter font-semibold text-[17px] text-[#000000]"
+											>
+												Full Auto
+											</Typography>
+										</div>
+										{/* Divider - black when Normal Power selected */}
+										<div
+											className={cn(
+												'w-[1px] flex-shrink-0 transition-colors',
+												selectedPowerMode === 'normal' ? 'bg-[#000000]' : 'bg-[#51A2E4]'
+											)}
+										/>
+										{/* Normal Power section */}
+										<button
+											type="button"
+											onClick={() => setSelectedPowerMode('normal')}
+											className={cn(
+												'w-[101px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
+												selectedPowerMode === 'normal' ? 'bg-[#8DBFE8]' : 'bg-transparent'
+											)}
+										>
+											<span
+												className={cn(
+													'font-inter font-normal italic text-[14px] transition-colors',
+													selectedPowerMode === 'normal'
+														? 'text-[#000000]'
+														: 'text-[#9E9E9E]'
+												)}
+											>
+												Normal Power
+											</span>
+										</button>
+										{/* Divider - black when either Normal Power or High selected */}
+										<div
+											className={cn(
+												'w-[1px] flex-shrink-0 transition-colors',
+												selectedPowerMode === 'normal' || selectedPowerMode === 'high'
+													? 'bg-[#000000]'
+													: 'bg-[#51A2E4]'
+											)}
+										/>
+										{/* High section */}
+										<button
+											type="button"
+											onClick={() => setSelectedPowerMode('high')}
+											className={cn(
+												'w-[46px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
+												selectedPowerMode === 'high' ? 'bg-[#8DBFE8]' : 'bg-transparent'
+											)}
+										>
+											<span
+												className={cn(
+													'font-inter font-normal italic text-[14px] transition-colors',
+													selectedPowerMode === 'high'
+														? 'text-[#000000]'
+														: 'text-[#9E9E9E]'
+												)}
+											>
+												High
+											</span>
+										</button>
+										{/* Divider - black when High selected */}
+										<div
+											className={cn(
+												'w-[1px] flex-shrink-0 transition-colors',
+												selectedPowerMode === 'high' ? 'bg-[#000000]' : 'bg-[#51A2E4]'
+											)}
+										/>
+										{/* Right empty section */}
+										<div className="w-[31px] flex-shrink-0" />
+									</div>
+								)}
+								{!isFullAutomatedBlock && (
+									<div
+										className={cn(
+											'flex gap-2 items-center relative z-20',
+											isTextBlock ? 'min-h-7 mb-1' : 'min-h-7 mb-2',
+											'max-[480px]:flex-wrap max-[480px]:gap-y-1'
+										)}
+									>
+										{!isTextBlock ? (
+											<>
+												<Typography
+													variant="h4"
+													className={cn(
+														'font-inter',
+														isIntroductionBlock && 'text-[#9D9DFF]',
+														isResearchBlock && 'text-[#4A4AD9]',
+														isActionBlock && 'text-[#040488]'
+													)}
+												>
+													{(block as { label: string }).label}
+												</Typography>
+											</>
+										) : (
 											<Typography
 												variant="h4"
 												className={cn(
 													'font-inter',
-													isIntroductionBlock && 'text-[#9D9DFF]',
-													isResearchBlock && 'text-[#4A4AD9]',
-													isActionBlock && 'text-[#040488]',
-													isFullAutomatedBlock && 'font-semibold text-[17px]'
+													shouldShowRedStyling && 'text-[#A20000]'
 												)}
 											>
-												{isFullAutomatedBlock
-													? 'Full Auto'
-													: (block as { label: string }).label}
+												Text
 											</Typography>
-										</>
-									) : (
-										<Typography
-											variant="h4"
-											className={cn(
-												'font-inter',
-												shouldShowRedStyling && 'text-[#A20000]'
-											)}
-										>
-											Text
-										</Typography>
-									)}
-								</div>
+										)}
+									</div>
+								)}
+								{/* Horizontal divider for Full Auto box */}
+								{isFullAutomatedBlock && (
+									<div className="w-[calc(100%+32px)] -mx-4 h-[1px] bg-[#51A2E4] mb-2" />
+								)}
 								{isTextBlock || isFullAutomatedBlock ? (
 									(() => {
 										const fieldProps = form.register(
@@ -684,7 +770,7 @@ const SortableAIBlock = ({
 																? '!bg-[#DADAFC] [&]:!bg-[#DADAFC]'
 																: 'bg-white',
 															isFullAutomatedBlock
-																? 'h-[195px] px-0 resize-none full-auto-textarea'
+																? 'h-[150px] px-0 resize-none full-auto-textarea'
 																: '',
 															shouldShowRedStyling ? 'placeholder:text-[#A20000]' : '',
 															(isIntroductionBlock || isResearchBlock || isActionBlock) &&
@@ -809,6 +895,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		draftCount = 0,
 		onDraftClick,
 		isDraftDisabled,
+		onSelectAllContacts,
 	} = props;
 
 	// Track if the user has attempted to Test to control error styling
@@ -826,7 +913,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const isHandwrittenMode =
 		(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
 		form.getValues('hybridBlockPrompts').every((b) => b.type === HybridBlock.text);
-	const hasBlocks = (form.getValues('hybridBlockPrompts')?.length || 0) > 0;
 
 	// Check for empty text blocks
 	const hasEmptyTextBlocks = form
@@ -987,17 +1073,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		form.setValue('isAiSubject', false);
 	};
 
-	const handleClearAllInside = () => {
-		form.setValue('hybridBlockPrompts', []);
-		form.setValue('hybridAvailableBlocks', [
-			HybridBlock.full_automated,
-			HybridBlock.introduction,
-			HybridBlock.research,
-			HybridBlock.action,
-			HybridBlock.text,
-		]);
-	};
-
 	const modeContainerRef = useRef<HTMLDivElement>(null);
 	const fullModeButtonRef = useRef<HTMLButtonElement>(null);
 	const hybridModeButtonRef = useRef<HTMLButtonElement>(null);
@@ -1010,7 +1085,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const [highlightStyle, setHighlightStyle] = useState({
 		left: 0,
 		width: 0,
-		opacity: 0,
+		opacity: 1,
 	});
 	const [isInitialRender, setIsInitialRender] = useState(true);
 
@@ -1178,7 +1253,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 					<DraggableBox
 						id="main-drafting"
 						dragHandleSelector="[data-root-drag-handle]"
-						enabled={isMobile === false && !showTestPreview}
+						enabled={false}
 						onDropOver={() => {}}
 					>
 						<div
@@ -1217,7 +1292,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							<DraggableBox
 								id="test-left-panel"
 								dragHandleSelector="[data-left-drag-handle]"
-								enabled={isMobile === false}
+								enabled={false}
 								onDropOver={() => {}}
 								className="relative z-10"
 							>
@@ -1232,7 +1307,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									data-hpi-left-panel
 								>
 									{!compactLeftOnly && (
-										<div className="w-full h-[17px] border-b-[2px] border-black flex items-center px-[9px] bg-white rounded-t-[calc(0.375rem-3px)]">
+										<div className="w-full h-[22px] border-b-[2px] border-black flex items-center px-[9px] bg-white rounded-t-[calc(0.375rem-3px)]">
 											<span className="font-inter font-bold text-[12px] leading-none text-black">
 												Writing
 											</span>
@@ -1244,7 +1319,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										<div className={!compactLeftOnly ? 'bg-white' : ''}>
 											<div
 												className={cn(
-													'h-[42px] flex items-center relative z-20',
+													'h-[40px] flex items-center relative z-20',
 													'w-[93.7vw] max-w-[475px] mx-auto pl-[8px] max-[480px]:pl-[6px]'
 												)}
 												data-left-drag-handle
@@ -1291,6 +1366,24 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														Full Auto
 													</Button>
 													<Button
+														ref={manualModeButtonRef}
+														variant="ghost"
+														type="button"
+														className={cn(
+															'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
+															selectedModeKey !== 'none' &&
+																(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
+																form
+																	.getValues('hybridBlockPrompts')
+																	?.every((b) => b.type === HybridBlock.text)
+																? 'text-black'
+																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
+														)}
+														onClick={switchToManual}
+													>
+														Manual
+													</Button>
+													<Button
 														ref={hybridModeButtonRef}
 														variant="ghost"
 														type="button"
@@ -1310,35 +1403,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													>
 														Hybrid
 													</Button>
-													<Button
-														ref={manualModeButtonRef}
-														variant="ghost"
-														type="button"
-														className={cn(
-															'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
-															selectedModeKey !== 'none' &&
-																(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
-																form
-																	.getValues('hybridBlockPrompts')
-																	?.every((b) => b.type === HybridBlock.text)
-																? 'text-black'
-																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
-														)}
-														onClick={switchToManual}
-													>
-														Manual
-													</Button>
 												</div>
 											</div>
 											{compactLeftOnly ? null : (
 												<>
 													{showTestPreview && (
-														<div className="h-[2px] bg-black -mx-[18px]" />
+														<div className="w-full border-b-[2px] border-black -mx-[18px]" />
 													)}
 													<div
 														ref={modeDividerRef}
 														className={cn(
-															'h-[2px] bg-black',
+															'w-full border-b-[2px] border-black',
 															showTestPreview && 'hidden'
 														)}
 													/>
@@ -1346,7 +1421,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</>
 											)}
 										</div>
-										<div className="flex flex-col items-center">
+										<div className="flex flex-col items-center pt-[20px]">
 											<FormField
 												control={form.control}
 												name="subject"
@@ -1357,37 +1432,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															showTestPreview
 																? 'w-[426px] max-[480px]:w-[89.33vw]'
 																: 'w-[89.33vw] max-w-[475px]',
-															// On mobile portrait, remove default mb-6 to tighten spacing under subject
-															'max-[480px]:mb-0'
+															// Remove default margin to control spacing to content below
+															'mb-0'
 														)}
 													>
-														<div
-															className={cn(
-																'flex items-center',
-																showTestPreview
-																	? 'justify-end pr-[24px] mt-1 mb-1'
-																	: 'justify-end mb-2 pr-5'
-															)}
-														>
-															<div className="flex items-center gap-2"></div>
-															{hasBlocks && (
-																<button
-																	type="button"
-																	onClick={handleClearAllInside}
-																	className={cn(
-																		showTestPreview ? 'text-xs' : 'text-sm',
-																		'font-inter font-medium text-[#AFAFAF] hover:underline',
-																		showTestPreview ? 'mr-[12px]' : 'relative top-[4px]',
-																		// Hide on mobile portrait
-																		'max-[480px]:hidden',
-																		// Hide in mobile landscape view of the campaign page
-																		'mobile-landscape-hide'
-																	)}
-																>
-																	Clear All
-																</button>
-															)}
-														</div>
 														<FormControl>
 															<div
 																className={cn(
@@ -1481,7 +1529,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									</div>
 									<div className="flex-1 flex flex-col" data-hpi-content>
 										{/* Content area */}
-										<div className="pt-[16px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
+										<div className="pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
 											{fields.length === 0 && (
 												<span className="text-gray-300 font-primary text-[12px]">
 													Add blocks here to build your prompt...
@@ -1650,7 +1698,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			'flex relative z-30',
 																			showTestPreview
 																				? 'justify-start w-full'
-																				: 'justify-end -mr-[102px] w-[93.7vw] max-w-[475px] max-[480px]:-mr-[2vw]'
+																				: 'justify-end -mr-[85px] w-[93.7vw] max-w-[475px] max-[480px]:-mr-[2vw]'
 																		)}
 																		style={{ transform: 'translateY(-12px)' }}
 																	>
@@ -1912,27 +1960,44 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										</div>
 								  )}
 						</div>
-						{!compactLeftOnly && (
-							<button
-								type="button"
-								onClick={() => {
-									if (!isDraftDisabled) {
-										onDraftClick?.();
-									}
-								}}
-								disabled={isDraftDisabled}
-								className={cn(
-									'w-[475px] h-[40px] mt-[10px] mx-auto block rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
-									isDraftDisabled
-										? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
-										: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+						{!compactLeftOnly && !isPendingGeneration && (
+							<div className="relative w-[475px] h-[40px] mt-[10px] mx-auto">
+								{draftCount > 0 ? (
+									<>
+										<button
+											type="button"
+											onClick={() => {
+												if (!isDraftDisabled) {
+													onDraftClick?.();
+												}
+											}}
+											disabled={isDraftDisabled}
+											className={cn(
+												'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
+												isDraftDisabled
+													? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+													: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+											)}
+										>
+											Draft {draftCount} {draftCount === 1 ? 'Contact' : 'Contacts'}
+										</button>
+										{/* Right section "All" button */}
+										<button
+											type="button"
+											className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
+											onClick={() => {
+												onSelectAllContacts?.();
+											}}
+										>
+											All
+										</button>
+									</>
+								) : (
+									<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
+										Select Contacts and Draft Emails
+									</div>
 								)}
-							>
-								Draft
-								{draftCount > 0
-									? ` ${draftCount} ${draftCount === 1 ? 'Contact' : 'Contacts'}`
-									: ''}
-							</button>
+							</div>
 						)}
 					</DraggableBox>
 				</Droppable>

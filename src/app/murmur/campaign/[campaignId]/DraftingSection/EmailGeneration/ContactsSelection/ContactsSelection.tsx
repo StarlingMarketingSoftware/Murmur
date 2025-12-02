@@ -172,7 +172,7 @@ export const MiniSearchBar: FC<{
 								fontSize: isCompact ? '13px' : '18px',
 							}}
 						>
-							Kind
+							Why
 						</div>
 						<div
 							className="absolute left-[16px] right-[8px]"
@@ -217,7 +217,7 @@ export const MiniSearchBar: FC<{
 								fontSize: isCompact ? '13px' : '18px',
 							}}
 						>
-							Who
+							What
 						</div>
 						<div
 							className="absolute left-[16px] right-[8px]"
@@ -735,8 +735,16 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		areAllSelected,
 	} = useContactsSelection(props);
 
-	const { campaign, onDraftEmails, onContactClick, onContactHover, onSearchFromMiniBar } =
-		props;
+	const {
+		campaign,
+		onDraftEmails,
+		onContactClick,
+		onContactHover,
+		onSearchFromMiniBar,
+		goToSearch,
+		goToDrafts,
+		goToInbox,
+	} = props;
 	const [isDrafting, setIsDrafting] = useState(false);
 	const router = useRouter();
 	const searchInfo = useMemo(() => parseSearchFromCampaign(campaign), [campaign]);
@@ -824,6 +832,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 				noDataDescription="Select contacts to generate personalized emails"
 				isPending={false}
 				title="Contacts"
+				goToSearch={goToSearch}
+				goToDrafts={goToDrafts}
+				goToInbox={goToInbox}
 				topContent={
 					<div className="w-full flex flex-col items-center pt-[6px]">
 						<MiniSearchBar
@@ -856,7 +867,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 					</div>
 				}
 			>
-				<div className="overflow-visible w-full flex flex-col gap-2 items-center">
+				<div className="overflow-visible w-full flex flex-col gap-4 items-center">
 					{contacts.map((contact) => (
 						<div
 							key={contact.id}
@@ -912,9 +923,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 											</div>
 
 											{/* Top Right - Title */}
-											<div className="pr-2 pl-1 flex items-center h-[24px]">
+											<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
 												{contact.headline ? (
-													<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+													<div className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden">
 														<ScrollableText
 															text={contact.headline}
 															className="text-[10px] text-black leading-none"
@@ -928,15 +939,15 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 											{/* Bottom Left - Company */}
 											<div className="pl-3 pr-1 flex items-center h-[24px]">
-												<div className="text-[11px] text-black w-full truncate leading-tight">
+												<div className="text-[15px] font-medium text-black w-full truncate leading-tight">
 													{contact.company || ''}
 												</div>
 											</div>
 
 											{/* Bottom Right - Location */}
-											<div className="pr-2 pl-1 flex items-center h-[24px]">
+											<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
 												{contact.city || contact.state ? (
-													<div className="flex items-center gap-1 w-full">
+													<div className="flex items-center gap-1 w-[240px]">
 														{(() => {
 															const fullStateName = (contact.state as string) || '';
 															const stateAbbr = getStateAbbreviation(fullStateName) || '';
@@ -1020,7 +1031,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 														}}
 													/>
 												)}
-												<div className="font-bold text-[11px] text-black w-full truncate leading-tight">
+												<div className="font-medium text-[15px] text-black w-full truncate leading-tight">
 													{contact.company || 'Contact'}
 												</div>
 											</div>
@@ -1029,19 +1040,20 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 											{contact.headline ? (
 												<>
 													{/* Top Right - Title */}
-													<div className="pr-2 pl-1 flex items-center h-[24px]">
-														<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+													<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
+														<div className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden">
 															<ScrollableText
 																text={contact.headline}
 																className="text-[10px] text-black leading-none"
+																scrollPixelsPerSecond={60}
 															/>
 														</div>
 													</div>
 
 													{/* Bottom Right - Location */}
-													<div className="pr-2 pl-1 flex items-center h-[24px]">
+													<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
 														{contact.city || contact.state ? (
-															<div className="flex items-center gap-1 w-full">
+															<div className="flex items-center gap-1 w-[240px]">
 																{(() => {
 																	const fullStateName = (contact.state as string) || '';
 																	const stateAbbr =
@@ -1108,9 +1120,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 												</>
 											) : (
 												// No title - vertically center location
-												<div className="row-span-2 pr-2 pl-1 flex items-center h-full">
+												<div className="row-span-2 pr-1 pl-0 flex items-center h-full justify-end">
 													{contact.city || contact.state ? (
-														<div className="flex items-center gap-1 w-full">
+														<div className="flex items-center gap-1 w-[240px]">
 															{(() => {
 																const fullStateName = (contact.state as string) || '';
 																const stateAbbr =
@@ -1189,51 +1201,51 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 			</DraftingTable>
 
 			{/* Draft Emails Button - below the table box */}
-			<button
-				type="button"
-				onClick={handleDraftEmails}
-				disabled={isButtonDisabled}
-				className={cn(
-					'mt-4 relative flex items-center justify-center gap-2 rounded-[8px] font-inter font-semibold text-[14px] transition-all duration-200',
-					isButtonDisabled
-						? 'bg-[#E0E0E0] text-[#888888] border-2 border-[#888888] cursor-not-allowed'
-						: 'bg-[#F2C7C7] text-black border-[3px] border-[#9A3434] hover:bg-[#E8B5B5] cursor-pointer'
-				)}
-				style={{ width: '475px', height: '40px' }}
-			>
-				{/* Right section - Select All */}
-				<div
-					className={cn(
-						'absolute top-0 bottom-0 right-0 rounded-r-[5px] flex items-center justify-center cursor-pointer transition-colors',
-						isButtonDisabled ? 'bg-[#CCCCCC]' : 'bg-[#D17474] hover:bg-[#C16666]'
+			{!isDrafting && (
+				<div className="relative w-[475px] h-[40px] mt-4 mx-auto">
+					{selectedCount > 0 ? (
+						<>
+							<button
+								type="button"
+								onClick={handleDraftEmails}
+								disabled={isButtonDisabled}
+								className={cn(
+									'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
+									isButtonDisabled
+										? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+										: 'bg-[#F2C7C7] border-[#9A3434] hover:bg-[#E6B9B9] cursor-pointer'
+								)}
+							>
+								{isDrafting ? (
+									<>
+										<div className="animate-spin rounded-full h-4 w-4 border-2 border-black border-t-transparent inline-block mr-2" />
+										Drafting...
+									</>
+								) : (
+									`Draft ${selectedCount} ${selectedCount === 1 ? 'Contact' : 'Contacts'}`
+								)}
+							</button>
+							{/* Right section "All" button */}
+							<button
+								type="button"
+								className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10"
+								onClick={(e) => {
+									e.stopPropagation();
+									handleClick();
+								}}
+							>
+								{/* Vertical divider line - explicit element to avoid border rendering gaps */}
+								<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
+								All
+							</button>
+						</>
+					) : (
+						<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
+							Select Contacts and Draft Emails
+						</div>
 					)}
-					style={{ width: '60px' }}
-					onClick={(e) => {
-						e.stopPropagation();
-						handleClick();
-					}}
-				>
-					<span className="text-[17px] font-inter font-normal text-black">All</span>
 				</div>
-				{/* Vertical divider line */}
-				<div
-					className={cn(
-						'absolute top-0 bottom-0 w-[2px]',
-						isButtonDisabled ? 'bg-[#888888]' : 'bg-[#9A3434]'
-					)}
-					style={{ right: '60px' }}
-				/>
-				{isDrafting ? (
-					<>
-						<div className="animate-spin rounded-full h-4 w-4 border-2 border-black border-t-transparent" />
-						<span>Drafting...</span>
-					</>
-				) : (
-					<span>
-						Draft {selectedCount} {selectedCount === 1 ? 'Email' : 'Emails'}
-					</span>
-				)}
-			</button>
+			)}
 		</div>
 	);
 };
