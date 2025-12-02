@@ -1219,7 +1219,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																<span
 																	className={cn(
 																		'font-inter text-[12px] font-semibold text-black',
-																		b.type === 'full_automated' && 'whitespace-nowrap'
+																		(b.type as HybridBlock) === 'full_automated' &&
+																			'whitespace-nowrap'
 																	)}
 																>
 																	{blockLabel(b.type as HybridBlock)}
@@ -1231,7 +1232,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																		{blockHint(b.type as HybridBlock)}
 																	</span>
 																)}
-																{b.type !== 'full_automated' &&
+																{(b.type as HybridBlock) !== 'full_automated' &&
 																	draftingMode !== 'hybrid' &&
 																	!(
 																		draftingMode === 'handwritten' && b.type === 'text'
