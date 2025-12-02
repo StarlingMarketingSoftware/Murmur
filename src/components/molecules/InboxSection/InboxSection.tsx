@@ -12,6 +12,7 @@ import type { InboundEmailWithRelations, EmailWithRelations } from '@/types';
 import type { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
+import { urls } from '@/constants/urls';
 
 /**
  * Strip quoted reply content from email body (e.g., "On Thu, Nov 27, 2025 at 2:36 AM ... wrote:")
@@ -82,6 +83,21 @@ interface InboxSectionProps {
 	 * Optional campaign ID to filter sent emails by campaign.
 	 */
 	campaignId?: number;
+
+	/**
+	 * Optional callback to navigate to the drafts tab in the campaign page.
+	 */
+	onGoToDrafting?: () => void;
+
+	/**
+	 * Optional callback to navigate to the writing tab in the campaign page.
+	 */
+	onGoToWriting?: () => void;
+
+	/**
+	 * Optional callback to navigate to the contacts tab in the campaign page.
+	 */
+	onGoToContacts?: () => void;
 }
 
 /**
@@ -163,6 +179,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	allowedSenderEmails,
 	contactByEmail,
 	campaignId,
+	onGoToDrafting,
+	onGoToWriting,
+	onGoToContacts,
 }) => {
 	const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>('inbox');
 	const {
@@ -597,8 +616,114 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								border: '3px solid #000000',
 								borderRadius: '8px',
 								backgroundColor: '#3277c6',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
 							}}
-						/>
+						>
+							{idx === 0 && (
+								<span
+									style={{
+										fontSize: '16px',
+										fontWeight: 500,
+										color: '#FFFFFF',
+										fontFamily: 'Inter, sans-serif',
+										textAlign: 'center',
+									}}
+								>
+									Check Back Later
+								</span>
+							)}
+							{idx >= 1 && idx <= 4 && (
+								<div
+									onClick={
+										idx === 1 && onGoToDrafting
+											? onGoToDrafting
+											: idx === 2 && onGoToWriting
+											? onGoToWriting
+											: idx === 3 && onGoToContacts
+											? onGoToContacts
+											: idx === 4
+											? () => {
+													if (typeof window !== 'undefined') {
+														window.location.assign(urls.murmur.dashboard.index);
+													}
+												}
+											: undefined
+									}
+									style={{
+										width: '314px',
+										height: '42px',
+										border: '3px solid #000000',
+										borderRadius: '8px',
+										backgroundColor: '#FFFFFF',
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+										cursor:
+											(idx === 1 && onGoToDrafting) ||
+											(idx === 2 && onGoToWriting) ||
+											(idx === 3 && onGoToContacts) ||
+											idx === 4
+												? 'pointer'
+												: 'default',
+									}}
+								>
+									{idx === 1 && (
+										<span
+											style={{
+												fontSize: '14px',
+												fontWeight: 500,
+												color: '#000000',
+												fontFamily: 'Inter, sans-serif',
+												textAlign: 'center',
+											}}
+										>
+											Review and Send Drafts
+										</span>
+									)}
+									{idx === 2 && (
+										<span
+											style={{
+												fontSize: '14px',
+												fontWeight: 500,
+												color: '#000000',
+												fontFamily: 'Inter, sans-serif',
+												textAlign: 'center',
+											}}
+										>
+											Write More Emails
+										</span>
+									)}
+									{idx === 3 && (
+										<span
+											style={{
+												fontSize: '14px',
+												fontWeight: 500,
+												color: '#000000',
+												fontFamily: 'Inter, sans-serif',
+												textAlign: 'center',
+											}}
+										>
+											Add More Contacts
+										</span>
+									)}
+									{idx === 4 && (
+										<span
+											style={{
+												fontSize: '14px',
+												fontWeight: 500,
+												color: '#000000',
+												fontFamily: 'Inter, sans-serif',
+												textAlign: 'center',
+											}}
+										>
+											Create New Campaign
+										</span>
+									)}
+								</div>
+							)}
+						</div>
 					))}
 				</div>
 			</div>

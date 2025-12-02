@@ -78,6 +78,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		onOpenIdentityDialog,
 		onGoToSearch,
 		goToInbox,
+		goToContacts,
 	} = props;
 	const {
 		campaign,
@@ -2227,6 +2228,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									allowedSenderEmails={campaignContactEmails}
 									contactByEmail={campaignContactsByEmail}
 									campaignId={campaign.id}
+									onGoToDrafting={goToDrafting}
+									onGoToWriting={goToWriting}
+									onGoToContacts={goToContacts}
 								/>
 							</div>
 						)}
