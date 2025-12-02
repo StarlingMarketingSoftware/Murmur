@@ -92,12 +92,12 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 
 	if (isLoading) {
 		return (
-			<div className="w-full max-w-[998px] mx-auto px-4">
+			<div className="w-full max-w-[907px] mx-auto px-4">
 				<div
 					className="flex items-center justify-center"
 					style={{
-						width: '998px',
-						height: '400px',
+						width: '907px',
+						height: '657px',
 						border: '2px solid #000000',
 						borderRadius: '8px',
 					}}
@@ -110,12 +110,12 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 
 	if (error) {
 		return (
-			<div className="w-full max-w-[998px] mx-auto px-4">
+			<div className="w-full max-w-[907px] mx-auto px-4">
 				<div
 					className="flex items-center justify-center"
 					style={{
-						width: '998px',
-						height: '400px',
+						width: '907px',
+						height: '657px',
 						border: '2px solid #000000',
 						borderRadius: '8px',
 					}}
@@ -128,25 +128,94 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 
 	if (!visibleEmails || visibleEmails.length === 0) {
 		return (
-			<div className="w-full max-w-[998px] mx-auto px-4">
+			<div className="w-full max-w-[907px] mx-auto px-4">
 				<div
-					className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden"
+					className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative"
 					style={{
-						width: '998px',
-						height: '400px',
+						width: '907px',
+						height: '657px',
 						border: '2px solid #000000',
 						borderRadius: '8px',
 						padding: '16px',
-						paddingTop: '40px',
-						backgroundColor: '#4CA9DB',
+						paddingTop: '108px',
+						background: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
 					}}
 				>
+					{/* Three circles at top */}
+					<svg
+						width="9"
+						height="9"
+						viewBox="0 0 9 9"
+						fill="none"
+						style={{
+							position: 'absolute',
+							top: '9.5px',
+							transform: 'translateY(-50%)',
+							left: '17px',
+							zIndex: 10,
+						}}
+					>
+						<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
+					</svg>
+					<svg
+						width="9"
+						height="9"
+						viewBox="0 0 9 9"
+						fill="none"
+						style={{
+							position: 'absolute',
+							top: '9.5px',
+							transform: 'translateY(-50%)',
+							left: '78px',
+							zIndex: 10,
+						}}
+					>
+						<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
+					</svg>
+					<svg
+						width="9"
+						height="9"
+						viewBox="0 0 9 9"
+						fill="none"
+						style={{
+							position: 'absolute',
+							top: '9.5px',
+							transform: 'translateY(-50%)',
+							left: '139px',
+							zIndex: 10,
+						}}
+					>
+						<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
+					</svg>
+
+					{/* Inbox Badge */}
+					<div
+						style={{
+							position: 'absolute',
+							top: '9.5px', // vertically center within 19px header
+							transform: 'translateY(-50%)',
+							left: '174px', // 139px (3rd circle left) + 9px (width) + 26px (gap)
+							width: '69px',
+							height: '18px',
+							borderRadius: '11px',
+							border: '2px solid #000000',
+							backgroundColor: '#CCDFF4',
+							zIndex: 10,
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+						}}
+					>
+						<span className="text-[10px] font-bold text-black leading-none">
+							Inbox
+						</span>
+					</div>
 					{Array.from({ length: 3 }).map((_, idx) => (
 						<div
 							key={`inbox-placeholder-${idx}`}
 							className="select-none"
 							style={{
-								width: '967px',
+								width: '879px',
 								height: '78px',
 								border: '2px solid #000000',
 								borderRadius: '8px',
@@ -160,25 +229,98 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 	}
 
 	return (
-		<div className="w-full max-w-[998px] mx-auto px-4">
+		<div className="w-full max-w-[907px] mx-auto px-4">
 			<div
-				className="flex flex-col items-center overflow-y-auto overflow-x-hidden"
+				className="flex flex-col items-center overflow-y-auto overflow-x-hidden relative"
 				style={{
-					width: '998px',
-					height: '558px',
+					width: '907px',
+					height: '657px',
 					border: '2px solid #000000',
 					borderRadius: '8px',
 					padding: '16px',
-					paddingTop: selectedEmail ? '16px' : '40px',
-					backgroundColor: '#4CA9DB',
+					paddingTop: selectedEmail ? '16px' : '108px',
+					background: selectedEmail ? '#6fa4e1' : 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
 				}}
 			>
+				{/* Three circles at top */}
+				{!selectedEmail && (
+					<>
+						<svg
+							width="9"
+							height="9"
+							viewBox="0 0 9 9"
+							fill="none"
+							style={{
+								position: 'absolute',
+							top: '9.5px',
+							transform: 'translateY(-50%)',
+								left: '17px',
+								zIndex: 10,
+							}}
+						>
+							<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
+						</svg>
+						<svg
+							width="9"
+							height="9"
+							viewBox="0 0 9 9"
+							fill="none"
+							style={{
+								position: 'absolute',
+							top: '9.5px',
+							transform: 'translateY(-50%)',
+								left: '78px',
+								zIndex: 10,
+							}}
+						>
+							<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
+						</svg>
+						<svg
+							width="9"
+							height="9"
+							viewBox="0 0 9 9"
+							fill="none"
+							style={{
+								position: 'absolute',
+							top: '9.5px',
+							transform: 'translateY(-50%)',
+								left: '139px',
+								zIndex: 10,
+							}}
+						>
+							<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
+						</svg>
+
+						{/* Inbox Badge */}
+						<div
+							style={{
+								position: 'absolute',
+							top: '9.5px',
+							transform: 'translateY(-50%)',
+								left: '174px', // 139px (3rd circle left) + 9px (width) + 26px (gap)
+								width: '69px',
+								height: '18px',
+								borderRadius: '11px',
+								border: '2px solid #000000',
+								backgroundColor: '#CCDFF4',
+								zIndex: 10,
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+							}}
+						>
+							<span className="text-[10px] font-bold text-black leading-none">
+								Inbox
+							</span>
+						</div>
+					</>
+				)}
 				{selectedEmail ? (
 					/* Expanded Email View Inside Box */
 					<div
 						className="w-full h-full overflow-y-auto"
 						style={{
-							width: '967px',
+							width: '879px',
 							border: '2px solid #000000',
 							borderRadius: '8px',
 							backgroundColor: '#FFFFFF',
@@ -264,7 +406,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 								key={email.id}
 								className="bg-white hover:bg-gray-50 cursor-pointer px-4 flex items-center mb-2"
 								style={{
-									width: '967px',
+									width: '879px',
 									height: '78px',
 									minHeight: '78px',
 									border: '2px solid #000000',
@@ -319,7 +461,7 @@ export const InboxSection: FC<InboxSectionProps> = ({ allowedSenderEmails }) => 
 								key={`inbox-placeholder-${idx}`}
 								className="select-none mb-2"
 								style={{
-									width: '967px',
+									width: '879px',
 									height: '78px',
 									minHeight: '78px',
 									border: '2px solid #000000',
