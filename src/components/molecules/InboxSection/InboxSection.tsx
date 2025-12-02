@@ -407,10 +407,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					height: '657px',
 					border: '3px solid #000000',
 					borderRadius: '8px',
-					padding: '16px',
-					paddingTop: selectedEmail ? '16px' : '109px', // 55px (search top) + 48px (search height) + 6px (gap) = 109px
+					padding: selectedEmail ? '21px 13px 12px 13px' : '16px',
+					paddingTop: selectedEmail ? '21px' : '109px', // 55px (search top) + 48px (search height) + 6px (gap) = 109px
 					background: selectedEmail
-						? '#6fa4e1'
+						? '#437ec1'
 						: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
 				}}
 			>
@@ -529,92 +529,162 @@ export const InboxSection: FC<InboxSectionProps> = ({
 				{selectedEmail ? (
 					/* Expanded Email View Inside Box */
 					<div
-						className="w-full h-full overflow-y-auto"
+						className="w-full h-full flex flex-col"
 						style={{
-							width: '879px',
+							width: '880px',
 							border: '3px solid #000000',
 							borderRadius: '8px',
 							backgroundColor: '#FFFFFF',
-							padding: '20px',
+							overflow: 'hidden',
 						}}
 					>
-						<div className="flex justify-between items-start mb-4">
-							<div>
-								<div className="text-lg font-bold">
+						{/* Top Header Section - 880x79px */}
+						<div
+							className="flex items-center px-4"
+							style={{
+								width: '100%',
+								height: '79px',
+								minHeight: '79px',
+								backgroundColor: '#FFFFFF',
+								borderBottom: '3px solid #000000',
+								borderBottomLeftRadius: '8px',
+								borderBottomRightRadius: '8px',
+							}}
+						>
+								{/* Left side: Name, Company, Subject */}
+							<div
+								className="flex flex-col justify-center min-w-0"
+								style={{ width: '200px', flexShrink: 0 }}
+							>
+								<span className="font-medium truncate">
+									{getCanonicalContactName(selectedEmail, contactByEmail)}
+								</span>
+								{(() => {
+									const companyLabel = getContactCompanyLabel(selectedEmail, contactByEmail);
+									if (!companyLabel) return null;
+									return (
+										<span className="font-inter text-[14px] text-gray-500 truncate">
+											{companyLabel}
+										</span>
+									);
+								})()}
+								<div className="text-sm font-medium truncate mt-1">
 									{selectedEmail.subject || '(No Subject)'}
 								</div>
-								<div className="text-sm text-gray-600 mt-1">
-									From:{' '}
-									{selectedEmail
-										? getCanonicalContactName(selectedEmail, contactByEmail)
-										: ''}
-									{(() => {
-										if (!selectedEmail) return null;
-										const companyLabel = getContactCompanyLabel(
-											selectedEmail,
-											contactByEmail
-										);
-										if (!companyLabel) return null;
-										return (
-											<span className="ml-2 font-inter text-[17px] font-medium bg-gray-100 px-2 py-0.5 rounded">
-												{companyLabel}
-											</span>
-										);
-									})()}
-								</div>
-								<div className="text-xs text-gray-400 mt-1">
+							</div>
+							{/* Right side: Badges + timestamp */}
+							<div className="flex-1 flex items-center justify-end gap-2 min-w-0">
+								{/* State/City and Title badges - stacked vertically */}
+								{(() => {
+									const contact = resolveContactForEmail(selectedEmail, contactByEmail);
+									const headline = contact?.headline || contact?.title || '';
+									const stateAbbr = contact
+										? getStateAbbreviation(contact.state || '') || ''
+										: '';
+									const stateName = contact?.state || '';
+									return (
+										<div className="flex flex-col items-start gap-1 flex-shrink-0 mr-auto" style={{ marginLeft: '35%' }}>
+											{stateAbbr && (
+												<div className="flex items-center gap-1">
+													<span
+														className="inline-flex items-center justify-center rounded-[6px] border text-[12px] leading-none font-bold"
+														style={{
+															width: '28px',
+															height: '20px',
+															backgroundColor:
+																stateBadgeColorMap[stateAbbr] || 'transparent',
+															borderColor: '#000000',
+														}}
+													>
+														{stateAbbr}
+													</span>
+													{stateName && (
+														<span className="text-[12px] text-black">
+															{stateName}
+														</span>
+													)}
+												</div>
+											)}
+											{headline && (
+												<div className="h-[21px] max-w-[160px] rounded-[6px] px-2 flex items-center bg-white border border-black overflow-hidden">
+													<span className="text-[10px] text-black leading-none truncate">
+														{headline}
+													</span>
+												</div>
+											)}
+										</div>
+									);
+								})()}
+								{/* Timestamp */}
+								<div className="text-sm text-black whitespace-nowrap flex-shrink-0 ml-4">
 									{selectedEmail.receivedAt
-										? new Date(selectedEmail.receivedAt).toLocaleString()
+										? new Date(selectedEmail.receivedAt).toLocaleTimeString([], {
+												hour: 'numeric',
+												minute: '2-digit',
+												hour12: true,
+											}).toLowerCase()
 										: ''}
 								</div>
-								{selectedEmail.campaign && (
-									<div className="text-xs text-gray-500 mt-1">
-										Campaign: {selectedEmail.campaign.name}
+							</div>
+						</div>
+
+						{/* Content Section */}
+						<div className="flex-1 overflow-y-auto p-5">
+							{/* Date/time header */}
+							<div className="text-sm text-black mb-4">
+								{selectedEmail.receivedAt
+									? (() => {
+											const date = new Date(selectedEmail.receivedAt);
+											const now = new Date();
+											const diffTime = Math.abs(now.getTime() - date.getTime());
+											const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+											const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+											const monthDay = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+											const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+											const ago = diffDays === 0 ? 'today' : diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
+											return `${dayName}, ${monthDay} ${time} (${ago})`;
+										})()
+									: ''}
+							</div>
+
+							{/* Email body */}
+							<div className="text-sm">
+								{selectedEmail.bodyHtml ? (
+									<div
+										dangerouslySetInnerHTML={{ __html: selectedEmail.bodyHtml }}
+										className="prose prose-sm max-w-none"
+									/>
+								) : (
+									<div className="whitespace-pre-wrap">
+										{selectedEmail.strippedText || selectedEmail.bodyPlain || 'No content'}
 									</div>
 								)}
 							</div>
-							<button
-								onClick={() => {
-									setSelectedEmailId(null);
-									setReplyMessage('');
-								}}
-								className="text-gray-500 hover:text-gray-700 text-xl font-bold px-2"
-							>
-								×
-							</button>
-						</div>
-						<div className="border-t pt-4 text-sm">
-							{selectedEmail.bodyHtml ? (
-								<div
-									dangerouslySetInnerHTML={{ __html: selectedEmail.bodyHtml }}
-									className="prose prose-sm max-w-none"
-								/>
-							) : (
-								<div className="whitespace-pre-wrap">
-									{selectedEmail.strippedText || selectedEmail.bodyPlain || 'No content'}
-								</div>
-							)}
-						</div>
 
-						{/* Reply Box */}
-						<div className="border-t mt-4 pt-4">
-							<div className="text-sm font-medium mb-2">Reply</div>
-							<textarea
-								value={replyMessage}
-								onChange={(e) => setReplyMessage(e.target.value)}
-								placeholder="Type your reply..."
-								className="w-full p-3 border-2 border-black rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-								rows={4}
-								disabled={isSending}
-							/>
-							<div className="flex justify-end mt-2">
-								<Button
-									onClick={handleSendReply}
-									disabled={!replyMessage.trim() || isSending}
-									className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-								>
-									{isSending ? 'Sending...' : 'Send Reply'}
-								</Button>
+							{/* Reply Box */}
+							<div className="mt-6">
+								<textarea
+									value={replyMessage}
+									onChange={(e) => setReplyMessage(e.target.value)}
+									placeholder=""
+									className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+									style={{
+										minHeight: '100px',
+									}}
+									disabled={isSending}
+								/>
+								<div className="flex justify-center mt-2">
+									<Button
+										onClick={handleSendReply}
+										disabled={!replyMessage.trim() || isSending}
+										className="bg-transparent text-black px-6 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+										style={{
+											fontWeight: 400,
+										}}
+									>
+										{isSending ? 'Sending...' : 'Reply'}
+									</Button>
+								</div>
 							</div>
 						</div>
 					</div>
