@@ -1,4 +1,4 @@
-import { FC, Fragment, useEffect, useState, useRef } from 'react';
+import { FC, Fragment, useEffect, useState, useRef, useMemo } from 'react';
 import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
 import { Form } from '@/components/ui/form';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
@@ -78,6 +78,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		onOpenIdentityDialog,
 		onGoToSearch,
 		goToInbox,
+		goToContacts,
 	} = props;
 	const {
 		campaign,
@@ -673,6 +674,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				.map((contact) => contact.email)
 				.filter((email): email is string => Boolean(email))
 		: undefined;
+
+	// Map of email -> contact for this campaign, used by the Inbox tab
+	// so that replies are labeled with the campaign's canonical contact
+	// name/company rather than whatever name is in the incoming email.
+	const campaignContactsByEmail = useMemo(() => {
+		if (!contacts) return undefined;
+		const map: Record<string, ContactWithName> = {};
+		for (const contact of contacts) {
+			if (!contact.email) continue;
+			const key = contact.email.toLowerCase().trim();
+			if (!key) continue;
+			if (!map[key]) {
+				map[key] = contact;
+			}
+		}
+		return map;
+	}, [contacts]);
 
 	const toListNames =
 		campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
@@ -2203,10 +2221,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							</div>
 						)}
 
-						{/* Inbox tab: reuse the dashboard inbox UI */}
+						{/* Inbox tab: reuse the dashboard inbox UI, but scoped and labeled by campaign contacts */}
 						{(view === 'inbox' || view === 'all') && (
 							<div className="mt-6 flex justify-center">
-								<InboxSection allowedSenderEmails={campaignContactEmails} />
+								<InboxSection
+									allowedSenderEmails={campaignContactEmails}
+									contactByEmail={campaignContactsByEmail}
+									campaignId={campaign.id}
+									onGoToDrafting={goToDrafting}
+									onGoToWriting={goToWriting}
+									onGoToContacts={goToContacts}
+								/>
 							</div>
 						)}
 

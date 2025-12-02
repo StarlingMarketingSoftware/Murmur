@@ -89,6 +89,15 @@ export async function GET() {
 						status: true,
 					},
 				},
+				userContactLists: {
+					include: {
+						contacts: {
+							select: {
+								email: true,
+							},
+						},
+					},
+				},
 			},
 			orderBy: {
 				createdAt: 'desc',
@@ -102,15 +111,22 @@ export async function GET() {
 			).length;
 			const sentCount = campaign.emails.filter((email) => email.status === 'sent').length;
 
-			// Remove the emails array from the response, keep only counts
+			// Extract contact emails from userContactLists for inbox filtering
+			// Flatten all contacts from all userContactLists connected to this campaign
+			const contactEmails = campaign.userContactLists
+				.flatMap((list) => list.contacts.map((c) => c.email))
+				.filter((email): email is string => Boolean(email));
+
+			// Remove the emails and userContactLists arrays from the response, keep only counts and contactEmails
 
 			// eslint-disable-next-line @typescript-eslint/no-unused-vars
-			const { emails, ...campaignWithoutEmails } = campaign;
+			const { emails, userContactLists, ...campaignWithoutEmails } = campaign;
 
 			return {
 				...campaignWithoutEmails,
 				draftCount,
 				sentCount,
+				contactEmails,
 			};
 		});
 
