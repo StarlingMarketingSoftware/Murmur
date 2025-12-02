@@ -25,12 +25,24 @@ const Murmur = () => {
 
 	const searchParams = useSearchParams();
 	const silentLoad = searchParams.get('silent') === '1';
+	const tabParam = searchParams.get('tab');
 	const [identityDialogOrigin, setIdentityDialogOrigin] = useState<'campaign' | 'search'>(
 		silentLoad ? 'search' : 'campaign'
 	);
+	
+	// Determine initial view based on tab query parameter
+	const getInitialView = (): 'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all' => {
+		if (tabParam === 'inbox') return 'inbox';
+		if (tabParam === 'contacts') return 'contacts';
+		if (tabParam === 'drafting') return 'drafting';
+		if (tabParam === 'sent') return 'sent';
+		if (tabParam === 'search') return 'search';
+		return 'testing';
+	};
+	
 	const [activeView, setActiveView] = useState<
 		'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'
-	>('testing');
+	>(getInitialView());
 
 	if (isPendingCampaign || !campaign) {
 		return silentLoad ? null : <Spinner />;

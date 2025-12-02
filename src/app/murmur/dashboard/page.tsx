@@ -40,6 +40,7 @@ import { stateBadgeColorMap } from '@/constants/ui';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
+import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -1312,10 +1313,10 @@ const Dashboard = () => {
 								</div>
 							</div>
 						)}
-						{/* Inbox view - show inbox section and toggle right after logo */}
+						{/* Inbox view - show campaigns inbox view and toggle right after logo */}
 						{activeTab === 'inbox' && (
 							<>
-								<InboxSection />
+								<CampaignsInboxView />
 								{/* Toggle below inbox */}
 								<div
 									className="flex justify-center"
