@@ -9,9 +9,16 @@ import { urls } from '@/constants/urls';
 import Link from 'next/link';
 import { cn } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const Murmur = () => {
+	// Add campaign-specific class to body for background styling
+	useEffect(() => {
+		document.body.classList.add('murmur-campaign');
+		return () => {
+			document.body.classList.remove('murmur-campaign');
+		};
+	}, []);
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
 		useCampaignDetail();
 	const isMobile = useIsMobile();
@@ -38,10 +45,7 @@ const Murmur = () => {
 	// ensures a premium, smooth transition with no scale effects.
 	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
 	return (
-		<div
-			className="min-h-screen"
-			style={{ backgroundColor: 'rgba(222, 242, 225, 0.43)' }}
-		>
+		<div className="min-h-screen">
 			{/* Minimal header - just Back to Home link */}
 			<div data-slot="campaign-header">
 				<div className="relative h-[50px]">
@@ -215,7 +219,10 @@ const Murmur = () => {
 							campaign={campaign}
 							view={activeView}
 							goToDrafting={() => setActiveView('drafting')}
+							goToWriting={() => setActiveView('testing')}
 							onGoToSearch={() => setActiveView('search')}
+							goToContacts={() => setActiveView('contacts')}
+							goToInbox={() => setActiveView('inbox')}
 							onOpenIdentityDialog={() => {
 								setIdentityDialogOrigin('campaign');
 								setIsIdentityDialogOpen(true);

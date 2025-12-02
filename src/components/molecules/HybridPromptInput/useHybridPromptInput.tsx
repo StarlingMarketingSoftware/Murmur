@@ -82,6 +82,10 @@ export interface HybridPromptInputProps {
 	 */
 	onTestPreviewToggle?: (open: boolean) => void;
 	draftCount?: number;
+	/**
+	 * Optional: invoked when the user clicks the "All" button to select all contacts.
+	 */
+	onSelectAllContacts?: () => void;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {

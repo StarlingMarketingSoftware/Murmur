@@ -178,6 +178,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				noDataDescription='Click "Generate Drafts" to create emails for the selected contacts'
 				isPending={isPendingEmails}
 				title="Drafts"
+				goToWriting={props.goToWriting}
+				goToSearch={props.goToSearch}
+				goToInbox={props.goToInbox}
 			>
 				<>
 					<div className="overflow-visible w-full flex flex-col gap-2 items-center">
@@ -191,34 +194,41 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								: 'Unknown Contact';
 							const isSelected = selectedDraftIds.has(draft.id);
 
+							// Check if we have a separate name to decide layout
+							const hasSeparateName = Boolean(
+								(contact?.name && contact.name.trim()) ||
+									(contact?.firstName && contact.firstName.trim()) ||
+									(contact?.lastName && contact.lastName.trim())
+							);
+
 							return (
 								<div
 									key={draft.id}
 									className={cn(
-										'cursor-pointer transition-colors relative select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
+										'cursor-pointer transition-colors relative select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2 group/draft',
 										isSelected && 'bg-[#E8EFFF]'
 									)}
-								onMouseDown={(e) => {
-									// Prevent text selection on shift-click
-									if (e.shiftKey) {
-										e.preventDefault();
-									}
-								}}
-								onMouseEnter={() => {
-									if (contact) {
-										onContactHover?.(contact);
-									}
-								}}
-								onMouseLeave={() => {
-									onContactHover?.(null);
-								}}
-								onClick={(e) => {
-									handleDraftSelect(draft, e);
-									if (contact) {
-										onContactClick?.(contact);
-									}
-								}}
-								onDoubleClick={() => handleDraftDoubleClick(draft)}
+									onMouseDown={(e) => {
+										// Prevent text selection on shift-click
+										if (e.shiftKey) {
+											e.preventDefault();
+										}
+									}}
+									onMouseEnter={() => {
+										if (contact) {
+											onContactHover?.(contact);
+										}
+									}}
+									onMouseLeave={() => {
+										onContactHover?.(null);
+									}}
+									onClick={(e) => {
+										handleDraftSelect(draft, e);
+										if (contact) {
+											onContactClick?.(contact);
+										}
+									}}
+									onDoubleClick={() => handleDraftDoubleClick(draft)}
 								>
 									{/* Used-contact indicator - vertically centered */}
 									{usedContactIdsSet.has(draft.contactId) && (
@@ -226,7 +236,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											className="absolute left-[8px]"
 											title="Used in a previous campaign"
 											style={{
-												top: '50%',
+												top: hasSeparateName ? '50%' : '30px',
 												transform: 'translateY(-50%)',
 												width: '16px',
 												height: '16px',
@@ -241,7 +251,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										type="button"
 										variant="icon"
 										onClick={(e) => handleDeleteDraft(e, draft.id)}
-										className="absolute top-[6px] right-[2px] p-1 transition-colors z-10 group"
+										className="absolute top-[50px] right-[2px] p-1 transition-colors z-10 group hidden group-hover/draft:block"
 									>
 										<X size={16} className="text-gray-500 group-hover:text-red-500" />
 									</Button>
@@ -259,7 +269,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 												handleDraftDoubleClick(draft);
 											}
 										}}
-										className="absolute top-[28px] right-[2px] p-1 transition-colors z-20"
+										className="absolute top-[72px] right-[2px] p-1 transition-colors z-20 hidden group-hover/draft:block"
 										aria-label="Preview draft"
 									>
 										<PreviewIcon
@@ -269,9 +279,19 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										/>
 									</Button>
 
-									{/* Fixed top-right info (Location + Title) */}
-									<div className="absolute top-[6px] right-[28px] flex flex-col items-end gap-[2px] w-[92px] pointer-events-none">
-										<div className="flex items-center justify-start gap-1 h-[11.67px] w-[92px]">
+									{/* Fixed top-right info (Title + Location) - matching contacts table design */}
+									<div className="absolute top-[6px] right-[4px] flex flex-col items-start gap-[2px] pointer-events-none">
+										{contact?.headline ? (
+											<div className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden">
+												<ScrollableText
+													text={contact.headline}
+													className="text-[10px] text-black leading-none"
+													scrollPixelsPerSecond={60}
+												/>
+											</div>
+										) : null}
+
+										<div className="flex items-center justify-start gap-1 h-[20px]">
 											{(() => {
 												const fullStateName = (contact?.state as string) || '';
 												const stateAbbr = getStateAbbreviation(fullStateName) || '';
@@ -292,8 +312,12 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 												if (!stateAbbr) return null;
 												return isCanadianProvince ? (
 													<div
-														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border overflow-hidden"
-														style={{ borderColor: '#000000' }}
+														className="inline-flex items-center justify-center rounded-[6px] border overflow-hidden flex-shrink-0"
+														style={{
+															width: '39px',
+															height: '20px',
+															borderColor: '#000000',
+														}}
 														title="Canadian province"
 													>
 														<CanadianFlag
@@ -304,8 +328,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 													</div>
 												) : isUSAbbr ? (
 													<span
-														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border text-[8px] leading-none font-bold"
+														className="inline-flex items-center justify-center rounded-[6px] border text-[12px] leading-none font-bold flex-shrink-0"
 														style={{
+															width: '39px',
+															height: '20px',
 															backgroundColor:
 																stateBadgeColorMap[stateAbbr] || 'transparent',
 															borderColor: '#000000',
@@ -315,64 +341,89 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 													</span>
 												) : (
 													<span
-														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border"
-														style={{ borderColor: '#000000' }}
+														className="inline-flex items-center justify-center rounded-[6px] border flex-shrink-0"
+														style={{
+															width: '39px',
+															height: '20px',
+															borderColor: '#000000',
+														}}
 													/>
 												);
 											})()}
 											{contact?.city ? (
 												<ScrollableText
 													text={contact.city}
-													className="text-[10px] text-black leading-none max-w-[70px]"
+													className="text-[12px] font-inter font-normal text-black leading-none"
 												/>
 											) : null}
 										</div>
-
-										{contact?.headline ? (
-											<div className="w-[92px] h-[10px] rounded-[3.71px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
-												<ScrollableText
-													text={contact.headline}
-													className="text-[8px] text-black leading-none px-1"
-												/>
-											</div>
-										) : null}
 									</div>
 
-									{/* Content grid */}
-									<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px] pl-[22px]">
-										{/* Row 1: Name + Location */}
-										<div className="row-start-1 col-start-1 flex items-center">
-											<div className="font-bold text-[11px] truncate leading-none">
-												{contactName}
-											</div>
-										</div>
-
-										{/* Row 2: Company + Headline (only when there is a separate name) */}
+									{/* Content flex column */}
+									<div className="flex flex-col justify-center h-full pl-[30px] gap-[2px] pr-[30px]">
+										{/* Row 1 & 2: Name / Company */}
 										{(() => {
-											const hasSeparateName = Boolean(
-												(contact?.name && contact.name.trim()) ||
-													(contact?.firstName && contact.firstName.trim()) ||
-													(contact?.lastName && contact.lastName.trim())
-											);
+											const topRowMargin = contact?.headline
+												? 'mr-[220px]'
+												: 'mr-[120px]';
+											if (hasSeparateName) {
+												return (
+													<>
+														{/* Name */}
+														<div
+															className={cn(
+																'flex items-center min-h-[20px]',
+																topRowMargin
+															)}
+														>
+															<div className="text-[15px] font-inter font-semibold truncate leading-none">
+																{contactName}
+															</div>
+														</div>
+														{/* Company */}
+														<div
+															className={cn(
+																'flex items-center min-h-[20px]',
+																topRowMargin
+															)}
+														>
+															<div className="text-[15px] font-inter font-medium text-black leading-tight line-clamp-2">
+																{contact?.company || ''}
+															</div>
+														</div>
+													</>
+												);
+											}
+
+											// No separate name - Company (in contactName) spans 2 rows height
 											return (
-												<div className="row-start-2 col-start-1 flex items-center pr-2">
-													<div className="text-[11px] text-black truncate leading-none">
-														{hasSeparateName ? contact?.company || '' : ''}
+												<div
+													className={cn(
+														'flex items-center min-h-[42px] pb-[6px]',
+														topRowMargin
+													)}
+												>
+													<div className="text-[15px] font-inter font-medium text-black leading-tight line-clamp-2">
+														{contactName}
 													</div>
 												</div>
 											);
 										})()}
 
 										{/* Row 3: Subject */}
-										<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center">
-											{draft.subject || 'No subject'}
+										<div className="flex items-center min-h-[14px]">
+											<div className="text-[14px] font-inter font-semibold text-black truncate leading-none">
+												{draft.subject || 'No subject'}
+											</div>
 										</div>
 
 										{/* Row 4: Message preview */}
-										<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center">
-											{draft.message
-												? draft.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
-												: 'No content'}
+										<div className="flex items-center min-h-[14px]">
+											<div className="text-[10px] text-gray-500 truncate leading-none">
+												{draft.message
+													? draft.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
+													: 'No content'}
+											</div>
 										</div>
 									</div>
 								</div>
@@ -381,7 +432,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						{Array.from({ length: Math.max(0, 6 - draftEmails.length) }).map((_, idx) => (
 							<div
 								key={`draft-placeholder-${idx}`}
-								className="select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#FFDC9E] p-2"
+								className="select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#FFCD73] p-2"
 							/>
 						))}
 					</div>
@@ -435,17 +486,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						</div>
 					</div>
 
-					<div className="w-full flex items-center justify-center">
-						<div
-							className="flex items-stretch rounded-[6px] overflow-hidden"
-							style={{
-								width: '100%',
-								height: '28px',
-								border: '1px solid #000000',
-								backgroundColor: 'transparent',
-							}}
-						>
-							{props.isSendingDisabled ? (
+					<div className="relative w-[475px] h-[40px] mx-auto">
+						{hasSelection ? (
+							props.isSendingDisabled ? (
 								<UpgradeSubscriptionDrawer
 									triggerButtonText={
 										showConfirm
@@ -456,10 +499,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									}
 									buttonVariant="primary"
 									className={cn(
-										'flex-1 h-full !rounded-none !border-0 !bg-[#68C575] !text-black !font-inter !font-medium !text-[14px] !flex !items-center !justify-center border-r border-[#000000]',
+										'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] !flex !items-center !justify-center',
 										hasSelection
-											? 'hover:!bg-[#5FA968] active:!bg-[#569D60]'
-											: '!opacity-50 !cursor-not-allowed pointer-events-none'
+											? '!bg-[#C7F2C9] !border-[#349A37] hover:!bg-[#B9E7BC] cursor-pointer'
+											: '!bg-[#E0E0E0] !border-[#A0A0A0] !cursor-not-allowed !opacity-60 pointer-events-none'
 									)}
 									message={
 										props.isFreeTrial
@@ -468,48 +511,54 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									}
 								/>
 							) : (
-								<Button
-									type="button"
-									className={cn(
-										'flex-1 h-full rounded-none font-inter font-medium text-[14px] flex items-center justify-center transition-all duration-200 border-r border-[#000000]',
-										showConfirm
-											? 'bg-[#68C575] text-black'
+								<div className="w-full h-full rounded-[4px] border-[3px] border-[#000000] flex overflow-hidden">
+									<button
+										type="button"
+										className={cn(
+											'flex-1 h-full flex items-center justify-center text-center text-black font-inter font-normal text-[17px] pl-[62px]',
+											hasSelection
+												? 'bg-[#FFDC9F] hover:bg-[#F4C87E] cursor-pointer'
+												: 'bg-[#E0E0E0] cursor-not-allowed opacity-60'
+										)}
+										onClick={async () => {
+											if (!hasSelection) return;
+											if (!showConfirm) {
+												setShowConfirm(true);
+												setTimeout(() => setShowConfirm(false), 10000);
+												return;
+											}
+											setShowConfirm(false);
+											await props.onSend();
+										}}
+										disabled={!hasSelection}
+									>
+										{showConfirm
+											? 'Click to Confirm and Send'
 											: hasSelection
-											? 'bg-[#68C575] text-black hover:bg-[#5FA968] active:bg-[#569D60]'
-											: 'bg-[#68C575] text-black opacity-50 cursor-not-allowed'
-									)}
-									onClick={async () => {
-										if (!hasSelection) return;
-										if (!showConfirm) {
+											? `Send ${selectedCount} Selected`
+											: 'Send'}
+									</button>
+
+									{/* Right section "All" button */}
+									<button
+										type="button"
+										className="w-[62px] h-full bg-[#C69A4D] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#B2863F] cursor-pointer border-l-[2px] border-[#000000]"
+										onClick={(e) => {
+											e.stopPropagation();
+											handleSelectAllDrafts();
 											setShowConfirm(true);
 											setTimeout(() => setShowConfirm(false), 10000);
-											return;
-										}
-										setShowConfirm(false);
-										await props.onSend();
-									}}
-									disabled={!hasSelection}
-								>
-									{showConfirm
-										? 'Click to Confirm and Send'
-										: hasSelection
-										? `Send ${selectedCount} Selected`
-										: 'Send'}
-								</Button>
-							)}
-							<Button
-								type="button"
-								variant="ghost"
-								className="w-[56px] h-full rounded-none text-black font-inter font-medium text-[14px]"
-								onClick={() => {
-									handleSelectAllDrafts();
-									setShowConfirm(true);
-									setTimeout(() => setShowConfirm(false), 10000);
-								}}
-							>
-								All
-							</Button>
-						</div>
+										}}
+									>
+										All
+									</button>
+								</div>
+							)
+						) : (
+							<div className="w-full h-full flex items-center justify-center text-center text-[15px] font-inter text-black">
+								Select Drafts and Send Emails
+							</div>
+						)}
 					</div>
 				</div>
 			)}

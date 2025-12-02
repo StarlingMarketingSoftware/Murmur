@@ -8,6 +8,12 @@ export interface ContactResearchPanelProps {
 	contact: ContactWithName | null | undefined;
 	className?: string;
 	style?: React.CSSProperties;
+	/**
+	 * When true, renders the full panel chrome but hides all textual content.
+	 * Used for the Drafts tab empty state so research details aren't shown
+	 * while still keeping the layout skeleton visible.
+	 */
+	hideAllText?: boolean;
 }
 
 // Parse metadata sections [1], [2], etc. from the contact metadata field.
@@ -59,6 +65,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	contact,
 	className,
 	style,
+	hideAllText = false,
 }) => {
 	// useMemo must be called before any early returns to satisfy React Hooks rules
 	const metadataSections = useMemo(
@@ -72,8 +79,23 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 		return null;
 	}
 
-	const hasAnyParsedSections = Object.keys(metadataSections).length > 0;
-	const containerHeight = hasAnyParsedSections ? '630px' : '423px';
+	const parsedSectionsCount = Object.keys(metadataSections).length;
+	const hasAnyParsedSections = parsedSectionsCount > 0;
+
+	// Adjust the overall panel height based on how many bullet sections we have.
+	// Note: parseMetadataSections only returns sections when there are at least 3,
+	// so parsedSectionsCount is either 0 or >= 3.
+	// - 0 sections: summary-only state (shortest)
+	// - 3 sections: shorter panel
+	// - 4 sections: slightly taller
+	// - 5+ sections: original full height
+	const containerHeight = !hasAnyParsedSections
+		? '423px'
+		: parsedSectionsCount === 3
+		? '540px'
+		: parsedSectionsCount === 4
+		? '580px'
+		: '630px';
 
 	return (
 		<div
@@ -98,7 +120,10 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 
 			{/* Title */}
 			<div className="absolute top-[12px] left-[16px] -translate-y-1/2 z-10">
-				<span className="font-secondary font-bold text-[14px] leading-none text-black">
+				<span
+					className="font-secondary font-bold text-[14px] leading-none text-black"
+					style={hideAllText ? { color: 'transparent' } : undefined}
+				>
 					Research
 				</span>
 			</div>
@@ -122,7 +147,10 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 			>
 				<div className="w-full h-full px-3 flex items-center justify-between overflow-hidden">
 					<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
-						<div className="font-inter font-bold text-[16px] leading-none truncate text-black">
+						<div
+							className="font-inter font-bold text-[16px] leading-none truncate text-black"
+							style={hideAllText ? { color: 'transparent' } : undefined}
+						>
 							{(() => {
 								const fullName = `${contact.firstName || ''} ${
 									contact.lastName || ''
@@ -144,7 +172,10 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 							if (!hasName) return null;
 
 							return (
-								<div className="text-[12px] leading-tight truncate text-black mt-[2px]">
+								<div
+									className="text-[12px] leading-tight truncate text-black mt-[2px]"
+									style={hideAllText ? { color: 'transparent' } : undefined}
+								>
 									{contact.company || ''}
 								</div>
 							);
@@ -166,7 +197,13 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 														stateBadgeColorMap[stateAbbr],
 												}}
 											>
-												{stateAbbr}
+												<span
+													style={
+														hideAllText ? { color: 'transparent' } : undefined
+													}
+												>
+													{stateAbbr}
+												</span>
 											</span>
 										);
 									}
@@ -174,7 +211,10 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								})()}
 								{(contact.title || contact.headline) && (
 									<div className="px-2 py-[2px] rounded-[8px] bg-[#E8EFFF] border border-black max-w-full truncate">
-										<span className="text-[10px] leading-none text-black block truncate">
+										<span
+											className="text-[10px] leading-none text-black block truncate"
+											style={hideAllText ? { color: 'transparent' } : undefined}
+										>
 											{contact.title || contact.headline}
 										</span>
 									</div>
@@ -231,7 +271,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								top: '4.5px',
 								left: '8px',
 								fontSize: '11.5px',
-								color: '#000000',
+								color: hideAllText ? 'transparent' : '#000000',
 							}}
 						>
 							[{config.key}]
@@ -245,7 +285,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								right: '10px',
 								width: '319px',
 								height: '43px',
-								backgroundColor: '#FFFFFF',
+								backgroundColor: hideAllText ? config.color : '#FFFFFF',
 								border: '1px solid #000000',
 								borderRadius: '6px',
 							}}
@@ -258,6 +298,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 										WebkitLineClamp: 2,
 										WebkitBoxOrient: 'vertical',
 										overflow: 'hidden',
+										color: hideAllText ? 'transparent' : '#000000',
 									}}
 								>
 									{metadataSections[config.key]}
@@ -312,7 +353,11 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 							  }),
 						width: '350px',
 						height: hasAnyParsedSections ? '182px' : '299px',
-						backgroundColor: '#FFFFFF',
+						backgroundColor: hideAllText
+							? hasAnyParsedSections
+								? '#E9F7FF'
+								: '#158BCF'
+							: '#FFFFFF',
 						border: '1px solid #000000',
 						borderRadius: '6px',
 					}}
@@ -323,6 +368,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								className="text-[15px] leading-[1.5] text-black font-inter font-normal whitespace-pre-wrap overflow-y-scroll h-full"
 								style={{
 									wordBreak: 'break-word',
+									color: hideAllText ? 'transparent' : '#000000',
 								}}
 							>
 								{contact.metadata}

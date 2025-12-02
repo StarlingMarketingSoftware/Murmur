@@ -7,7 +7,11 @@ import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { useMe } from '@/hooks/useMe';
 import { DraftEmailResponse } from '@/hooks/usePerplexity';
 import { useGemini } from '@/hooks/useGemini';
-import { GEMINI_FULL_AI_PROMPT, GEMINI_HYBRID_PROMPT } from '@/constants/ai';
+import {
+	GEMINI_FULL_AI_PROMPT,
+	GEMINI_HYBRID_PROMPT,
+	GEMINI_MODEL_OPTIONS,
+} from '@/constants/ai';
 import {
 	CampaignWithRelations,
 	Font,
@@ -38,9 +42,21 @@ export interface DraftingSectionProps {
 	view?: 'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 	goToDrafting?: () => void;
 	/**
+	 * Optional callback to switch the campaign page into the Writing tab.
+	 */
+	goToWriting?: () => void;
+	/**
 	 * Optional callback to switch the campaign page into the Search tab.
 	 */
 	onGoToSearch?: () => void;
+	/**
+	 * Optional callback to switch the campaign page into the Contacts tab.
+	 */
+	goToContacts?: () => void;
+	/**
+	 * Optional callback to switch the campaign page into the Inbox tab.
+	 */
+	goToInbox?: () => void;
 }
 
 type GeneratedEmail = {
@@ -111,6 +127,7 @@ export const draftingFormSchema = z.object({
 	signature: z.string().optional(),
 	draftingTone: z.nativeEnum(DraftingTone).default(DraftingTone.normal),
 	paragraphs: z.number().min(0).max(5).default(3),
+	powerMode: z.enum(['normal', 'high']).default('normal'),
 });
 
 export type DraftingFormValues = z.infer<typeof draftingFormSchema>;
@@ -127,9 +144,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		useState(false);
 	const [generationProgress, setGenerationProgress] = useState(-1);
 	const [isTest, setIsTest] = useState<boolean>(false);
+	const [promptQualityScore, setPromptQualityScore] = useState<number | null>(null);
+	const [promptQualityLabel, setPromptQualityLabel] = useState<string | null>(null);
+	const [promptSuggestions, setPromptSuggestions] = useState<string[]>([]);
 	const [abortController, setAbortController] = useState<AbortController | null>(null);
 	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	const [activeTab, setActiveTab] = useState<'test' | 'placeholders'>('test');
+	const [isUpscalingPrompt, setIsUpscalingPrompt] = useState(false);
+	const [previousPromptValue, setPreviousPromptValue] = useState<string | null>(null);
 
 	const draftingRef = useRef<HTMLDivElement>(null);
 	const emailStructureRef = useRef<HTMLDivElement>(null);
@@ -739,6 +761,264 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		};
 	};
 
+	const scoreFullAutomatedPrompt = useCallback(
+		async (fullAiPrompt: string) => {
+			const trimmed = fullAiPrompt.trim();
+			if (!trimmed) {
+				setPromptQualityScore(null);
+				setPromptQualityLabel(null);
+				setPromptSuggestions([]);
+				return;
+			}
+
+			const scoringModel =
+				GEMINI_MODEL_OPTIONS.gemini25FlashLite ||
+				GEMINI_MODEL_OPTIONS.gemini25Flash ||
+				GEMINI_MODEL_OPTIONS.gemini2Flash;
+
+			const scoringPrompt = `You are evaluating the quality of a musician's email-writing prompt that will be used to generate outreach emails to venues and promoters.
+
+Analyze the PROMPT text below and assign a single numeric quality score between 60 and 100 inclusive, where:
+- 60–69 = Keep Going
+- 70–79 = Good
+- 80–89 = Great
+- 90–100 = Excellent
+
+			Look for specific details like, do they have specifics about themselves? Did the artist add an EPK?
+			Judge by how many details they have about themselves. 
+
+			Return ONLY a valid JSON object with this exact shape and no extra commentary or formatting:
+			{"score": 75, "label": "Good", "suggestion1": "First one-sentence suggestion to improve the prompt.", "suggestion2": "Second one-sentence suggestion to improve the prompt."}
+			DON'T USE THE WORD "AI" IN THE SUGGESTIONS.
+			Each suggestion MUST be a single, complete sentence (no bullet points) and should be as specific and actionable as possible.`;
+
+			const scoringContent = `PROMPT:\n${trimmed}`;
+
+			try {
+				const raw = await callGemini({
+					model: scoringModel,
+					prompt: scoringPrompt,
+					content: scoringContent,
+				});
+
+				let cleaned = raw;
+				// Strip optional markdown fences
+				cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+				// Try to isolate a JSON object if extra text slipped through
+				const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+				if (jsonMatch) {
+					cleaned = jsonMatch[0];
+				}
+
+				type PromptScoreResponse = {
+					score?: number | string;
+					label?: string;
+					suggestion1?: string;
+					suggestion2?: string;
+					suggestions?: string[];
+				};
+
+				let parsed: PromptScoreResponse = {};
+				try {
+					parsed = JSON.parse(cleaned) as PromptScoreResponse;
+				} catch (parseError) {
+					console.warn(
+						'[Prompt Score] JSON parse failed, attempting numeric fallback',
+						parseError
+					);
+				}
+
+				let rawScore: number | null = null;
+				if (typeof parsed.score === 'number') {
+					rawScore = parsed.score;
+				} else if (typeof parsed.score === 'string') {
+					const numeric = Number(parsed.score.replace(/[^\d.]/g, ''));
+					rawScore = Number.isFinite(numeric) ? numeric : null;
+				}
+
+				// Fallback: pull first 60–100-ish number out of the text
+				if (rawScore === null) {
+					const match = cleaned.match(/\b(6[0-9]|7[0-9]|8[0-9]|9[0-9]|100)\b/);
+					if (match) {
+						rawScore = Number(match[0]);
+					}
+				}
+
+				if (rawScore === null || Number.isNaN(rawScore)) {
+					console.warn(
+						'[Prompt Score] Unable to extract numeric score from Gemini response:',
+						raw
+					);
+					return;
+				}
+
+				let score = Math.round(rawScore);
+				score = Math.max(60, Math.min(100, score));
+
+				const labelFromModel =
+					typeof parsed.label === 'string' && parsed.label.trim().length > 0
+						? parsed.label.trim()
+						: undefined;
+
+				const fallbackLabel =
+					score >= 90
+						? 'Excellent'
+						: score >= 80
+						? 'Great'
+						: score >= 70
+						? 'Good'
+						: 'Fair';
+
+				// Extract up to two suggestions from the model response
+				const rawSuggestions: string[] = [];
+
+				if (
+					typeof parsed.suggestion1 === 'string' &&
+					parsed.suggestion1.trim().length > 0
+				) {
+					rawSuggestions.push(parsed.suggestion1.trim());
+				}
+				if (
+					typeof parsed.suggestion2 === 'string' &&
+					parsed.suggestion2.trim().length > 0
+				) {
+					rawSuggestions.push(parsed.suggestion2.trim());
+				}
+				if (Array.isArray(parsed.suggestions)) {
+					for (const s of parsed.suggestions) {
+						if (
+							typeof s === 'string' &&
+							s.trim().length > 0 &&
+							rawSuggestions.length < 2
+						) {
+							rawSuggestions.push(s.trim());
+						}
+					}
+				}
+
+				const normalizeToSingleSentence = (text: string) => {
+					const collapsed = text.replace(/\s+/g, ' ').trim();
+					if (!collapsed) return '';
+					const sentenceMatch = collapsed.match(/[^.!?]+[.!?]/);
+					const sentence = sentenceMatch ? sentenceMatch[0] : collapsed;
+					return sentence.trim();
+				};
+
+				const normalizedSuggestions = rawSuggestions
+					.slice(0, 2)
+					.map(normalizeToSingleSentence)
+					.filter((s) => s.length > 0);
+
+				setPromptQualityScore(score);
+				setPromptQualityLabel(labelFromModel || fallbackLabel);
+				setPromptSuggestions(normalizedSuggestions);
+			} catch (error) {
+				console.error('[Prompt Score] Gemini evaluation failed:', error);
+				setPromptSuggestions([]);
+			}
+		},
+		[callGemini]
+	);
+
+	/**
+	 * Upscale the current Full Auto prompt using Gemini 2.5 Flash.
+	 * Makes the prompt deeper, longer, and more detailed.
+	 */
+	const upscalePrompt = useCallback(async () => {
+		const blocks = form.getValues('hybridBlockPrompts');
+		const fullAutomatedBlock = blocks?.find((b) => b.type === 'full_automated');
+		const currentPrompt = fullAutomatedBlock?.value?.trim() || '';
+
+		if (!currentPrompt) {
+			toast.error('Please enter a prompt first before upscaling.');
+			return;
+		}
+
+		// Save the current prompt value before upscaling
+		setPreviousPromptValue(currentPrompt);
+		setIsUpscalingPrompt(true);
+
+		try {
+			const upscaleSystemPrompt = `You are an expert at improving email prompts. Your task is to take a user's prompt for generating outreach emails and make it significantly better.
+
+INSTRUCTIONS:
+1. You're a musicians trying to get yourself booked for a show by writing an email.
+2. The output should be the improved prompt ONLY - no explanations, no JSON, no markdown
+
+The improved prompt should result in more personalized, engaging, and effective emails.`;
+
+			const response = await callGemini({
+				model: GEMINI_MODEL_OPTIONS.gemini25Flash,
+				prompt: upscaleSystemPrompt,
+				content: `Current prompt to improve:\n\n${currentPrompt}`,
+			});
+
+			// Clean the response - remove any markdown or extra formatting
+			let improvedPrompt = response.trim();
+
+			// Remove markdown code blocks if present
+			improvedPrompt = improvedPrompt
+				.replace(/^```(?:\w+)?\s*/i, '')
+				.replace(/\s*```$/i, '');
+
+			if (improvedPrompt && improvedPrompt.length > currentPrompt.length * 0.5) {
+				// Update the full_automated block with the improved prompt
+				const updatedBlocks = blocks.map((block) => {
+					if (block.type === 'full_automated') {
+						return { ...block, value: improvedPrompt };
+					}
+					return block;
+				});
+
+				form.setValue('hybridBlockPrompts', updatedBlocks, {
+					shouldDirty: true,
+					shouldValidate: true,
+				});
+
+				toast.success('Prompt upscaled successfully!');
+
+				// Re-score the new prompt
+				await scoreFullAutomatedPrompt(improvedPrompt);
+			} else {
+				toast.error('Failed to generate an improved prompt. Please try again.');
+			}
+		} catch (error) {
+			console.error('[Upscale Prompt] Error:', error);
+			toast.error('Failed to upscale prompt. Please try again.');
+		} finally {
+			setIsUpscalingPrompt(false);
+		}
+	}, [callGemini, form, scoreFullAutomatedPrompt]);
+
+	/**
+	 * Undo the upscaled prompt by restoring the previous value.
+	 */
+	const undoUpscalePrompt = useCallback(() => {
+		if (!previousPromptValue) {
+			toast.error('No previous prompt to restore.');
+			return;
+		}
+
+		const blocks = form.getValues('hybridBlockPrompts');
+		const updatedBlocks = blocks.map((block) => {
+			if (block.type === 'full_automated') {
+				return { ...block, value: previousPromptValue };
+			}
+			return block;
+		});
+
+		form.setValue('hybridBlockPrompts', updatedBlocks, {
+			shouldDirty: true,
+			shouldValidate: true,
+		});
+
+		// Re-score the restored prompt
+		scoreFullAutomatedPrompt(previousPromptValue);
+
+		setPreviousPromptValue(null);
+		toast.success('Prompt restored to previous version.');
+	}, [form, previousPromptValue, scoreFullAutomatedPrompt]);
+
 	const cancelGeneration = () => {
 		isGenerationCancelledRef.current = true;
 		setGenerationProgress(-1);
@@ -779,6 +1059,27 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 		const values = getValues();
 		console.log('[Test Generation] All form values:', values);
+
+		// Score the Full AI prompt (when applicable) so the Suggestion meter reflects
+		// the exact prompt used for this test.
+		if (draftingMode === DraftingMode.ai) {
+			const fullAutomatedBlockForScore = values.hybridBlockPrompts?.find(
+				(block) => block.type === HybridBlock.full_automated
+			);
+			const fullAiPromptForScore = fullAutomatedBlockForScore?.value?.trim() || '';
+
+			if (fullAiPromptForScore) {
+				await scoreFullAutomatedPrompt(fullAiPromptForScore);
+			} else {
+				setPromptQualityScore(null);
+				setPromptQualityLabel(null);
+				setPromptSuggestions([]);
+			}
+		} else {
+			setPromptQualityScore(null);
+			setPromptQualityLabel(null);
+			setPromptSuggestions([]);
+		}
 
 		setIsTest(true);
 
@@ -1208,16 +1509,27 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		);
 
 		if (draftingMode === DraftingMode.ai) {
-			const fullAiPrompt = fullAutomatedBlock?.value || '';
-			if (!fullAiPrompt || fullAiPrompt.trim() === '') {
+			const fullAiPromptRaw = fullAutomatedBlock?.value || '';
+			const fullAiPrompt = fullAiPromptRaw.trim();
+			if (!fullAiPrompt) {
 				toast.error('Please set up your email template on the Testing tab first.');
 				return;
 			}
+
+			await scoreFullAutomatedPrompt(fullAiPrompt);
 		} else if (draftingMode === DraftingMode.hybrid) {
 			if (!hybridBlocks || hybridBlocks.length === 0) {
 				toast.error('Please set up your email template on the Testing tab first.');
 				return;
 			}
+
+			setPromptQualityScore(null);
+			setPromptQualityLabel(null);
+			setPromptSuggestions([]);
+		} else {
+			setPromptQualityScore(null);
+			setPromptQualityLabel(null);
+			setPromptSuggestions([]);
 		}
 
 		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
@@ -1394,6 +1706,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		draftingMode,
 		form,
 		generationProgress,
+		promptQualityScore,
+		promptQualityLabel,
+		promptSuggestions,
 		handleGenerateDrafts,
 		handleGenerateTestDrafts,
 		hasFullAutomatedBlock,
@@ -1404,6 +1719,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		isOpenUpgradeSubscriptionDrawer,
 		isPendingGeneration,
 		isTest,
+		isUpscalingPrompt,
+		upscalePrompt,
+		undoUpscalePrompt,
+		hasPreviousPrompt: previousPromptValue !== null,
 		setActiveTab,
 		setGenerationProgress,
 		setIsOpenUpgradeSubscriptionDrawer,

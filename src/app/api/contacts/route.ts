@@ -6,7 +6,7 @@ import {
 	apiBadRequest,
 	apiResponse,
 	apiUnauthorized,
-	fetchOpenAi,
+	fetchGemini,
 	handleApiError,
 } from '@/app/api/_utils';
 import { stripBothSidesOfBraces } from '@/utils/string';
@@ -15,7 +15,7 @@ import { getPostTrainingForQuery } from '@/app/api/_utils/postTraining';
 import { applyHardcodedLocationOverrides } from '@/app/api/_utils/searchPreprocess';
 import { Contact, EmailVerificationStatus, Prisma } from '@prisma/client';
 import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vectorDb';
-import { OPEN_AI_MODEL_OPTIONS } from '@/constants';
+import { GEMINI_MODEL_OPTIONS } from '@/constants';
 import { StripeSubscriptionStatus } from '@/types';
 
 const VECTOR_SEARCH_LIMIT_DEFAULT = 50;
@@ -377,10 +377,10 @@ export async function GET(req: NextRequest) {
 			restOfQuery: queryForLocationParsing,
 		};
 
-		if (process.env.OPEN_AI_API_KEY && queryForLocationParsing) {
+		if (process.env.GEMINI_API_KEY && queryForLocationParsing) {
 			try {
-				locationResponse = await fetchOpenAi(
-					OPEN_AI_MODEL_OPTIONS.o4mini,
+				locationResponse = await fetchGemini(
+					GEMINI_MODEL_OPTIONS.gemini25FlashLite,
 					`You are a geography and language expert that can tell the difference between words that are city, states, or countries, and words that are not, based on knowledge about place names as well as semantics and context of a given sentence. You will be given a search query that may contain words that are city, states, or countries, amongst other non-location based terms. You will separate the location words from the rest of the query, and return the words that are city, state, or country, along with the rest of the query in a JSON string in the following format: {"city": "cityName", "state": "stateName", "country": "countryName", "restOfQuery": "restOfQuery"}. 
                     
                     Additional instructions:
@@ -393,15 +393,16 @@ export async function GET(req: NextRequest) {
                     - Return a valid JSON string that can be parsed by a JSON.parse() in JavaScript. 
                     - There are some place names that can also be a word (such as buffalo steak house in new york) (Buffalo is a city in New York but it is also a general word for an animal). Use the context of the query to determine if the word is a place name or not.
                     - Return the JSON string and nothing else.`,
-					queryForLocationParsing
+					queryForLocationParsing,
+					{ timeoutMs: 10000 } // 10s timeout for location parsing
 				);
-			} catch (openAiError) {
-				console.error('OpenAI location parsing failed:', openAiError);
-				// Continue without location parsing if OpenAI fails
+			} catch (geminiError) {
+				console.error('Gemini location parsing failed:', geminiError);
+				// Continue without location parsing if Gemini fails
 				locationResponse = null;
 			}
-		} else if (!process.env.OPEN_AI_API_KEY) {
-			console.warn('OPEN_AI_API_KEY is not set. Location parsing will be skipped.');
+		} else if (!process.env.GEMINI_API_KEY) {
+			console.warn('GEMINI_API_KEY is not set. Location parsing will be skipped.');
 		}
 
 		// Parse location via LLM with a fast timeout and graceful fallback or no-LLM fallback

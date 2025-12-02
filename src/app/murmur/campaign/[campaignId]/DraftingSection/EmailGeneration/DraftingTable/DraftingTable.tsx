@@ -1,11 +1,20 @@
 import { FC, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import { urls } from '@/constants/urls';
 
-export const ContactsHeaderChrome: FC<{ offsetY?: number }> = ({ offsetY = 0 }) => {
+export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean }> = ({
+	offsetY = 0,
+	hasData = true,
+}) => {
 	const pillTop = 3 + offsetY;
 	const dotTop = 10 + offsetY;
+	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
+	const pillBorderColor = hasData ? '#8D5B5B' : '#B0B0B0';
+	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
+	const pillBgColor = hasData ? '#F5DADA' : '#FFAEAE';
 
 	return (
 		<>
@@ -16,8 +25,8 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number }> = ({ offsetY = 0 }) 
 					left: '21px',
 					width: '72px',
 					height: '22px',
-					backgroundColor: '#F5DADA',
-					border: '2px solid #8D5B5B',
+					backgroundColor: pillBgColor,
+					border: `2px solid ${pillBorderColor}`,
 					borderRadius: '11px',
 					display: 'flex',
 					alignItems: 'center',
@@ -25,7 +34,10 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number }> = ({ offsetY = 0 }) 
 					zIndex: 10,
 				}}
 			>
-				<span className="text-[13px] font-semibold font-inter text-black leading-none">
+				<span
+					className="text-[13px] font-semibold font-inter leading-none"
+					style={{ color: pillTextColor }}
+				>
 					Contacts
 				</span>
 			</div>
@@ -37,7 +49,7 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number }> = ({ offsetY = 0 }) 
 					width: '9px',
 					height: '9px',
 					borderRadius: '50%',
-					backgroundColor: '#D9D9D9',
+					backgroundColor: dotColor,
 					zIndex: 10,
 				}}
 			/>
@@ -49,7 +61,7 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number }> = ({ offsetY = 0 }) 
 					width: '9px',
 					height: '9px',
 					borderRadius: '50%',
-					backgroundColor: '#D9D9D9',
+					backgroundColor: dotColor,
 					zIndex: 10,
 				}}
 			/>
@@ -61,13 +73,13 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number }> = ({ offsetY = 0 }) 
 					width: '9px',
 					height: '9px',
 					borderRadius: '50%',
-					backgroundColor: '#D9D9D9',
+					backgroundColor: dotColor,
 					zIndex: 10,
 				}}
 			/>
 		</>
 	);
-}
+};
 
 interface DraftingTableProps {
 	handleClick: () => void;
@@ -80,6 +92,10 @@ interface DraftingTableProps {
 	title: string;
 	footer?: ReactNode;
 	topContent?: ReactNode;
+	goToWriting?: () => void;
+	goToSearch?: () => void;
+	goToDrafts?: () => void;
+	goToInbox?: () => void;
 }
 export const DraftingTable: FC<DraftingTableProps> = ({
 	title,
@@ -92,7 +108,12 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	isPending,
 	footer,
 	topContent,
+	goToWriting,
+	goToSearch,
+	goToDrafts,
+	goToInbox,
 }) => {
+	const router = useRouter();
 	const isContacts = title === 'Contacts';
 	const isCompactHeader = isContacts || title === 'Drafts' || title === 'Sent';
 	const showTitle = !isContacts && title !== 'Drafts' && title !== 'Sent';
@@ -101,7 +122,6 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 
 	const boxWidth = isContacts || isDrafts || isSent ? '499px' : '376px';
 	const boxHeight = isContacts || isDrafts || isSent ? '703px' : '474px';
-	const contentWidth = isContacts || isDrafts || isSent ? 'w-[489px]' : 'w-[366px]';
 
 	return (
 		<div style={{ width: boxWidth, height: boxHeight, position: 'relative' }}>
@@ -120,7 +140,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				{isContacts ? '' : isDrafts ? '' : isSent ? '' : ''}
 			</div>
 			{/* New Contacts Pill */}
-			{isContacts && <ContactsHeaderChrome />}
+			{isContacts && <ContactsHeaderChrome hasData={hasData} />}
 
 			{/* New Drafts Pill */}
 			{isDrafts && (
@@ -132,8 +152,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							left: '69px',
 							width: '72px',
 							height: '22px',
-							backgroundColor: '#FFECDC',
-							border: '2px solid #A8833A',
+							backgroundColor: !hasData ? '#F8D69A' : '#FFECDC',
+							border: `2px solid ${!hasData ? '#B0B0B0' : '#A8833A'}`,
 							borderRadius: '11px',
 							display: 'flex',
 							alignItems: 'center',
@@ -141,7 +161,10 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							zIndex: 10,
 						}}
 					>
-						<span className="text-[13px] font-semibold font-inter text-black leading-none">
+						<span
+							className="text-[13px] font-semibold font-inter leading-none"
+							style={{ color: !hasData ? '#B0B0B0' : '#000000' }}
+						>
 							Drafts
 						</span>
 					</div>
@@ -153,7 +176,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							width: '9px',
 							height: '9px',
 							borderRadius: '50%',
-							backgroundColor: '#D9D9D9',
+							backgroundColor: !hasData ? '#B0B0B0' : '#D9D9D9',
 							zIndex: 10,
 						}}
 					/>
@@ -165,7 +188,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							width: '9px',
 							height: '9px',
 							borderRadius: '50%',
-							backgroundColor: '#D9D9D9',
+							backgroundColor: !hasData ? '#B0B0B0' : '#D9D9D9',
 							zIndex: 10,
 						}}
 					/>
@@ -177,7 +200,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							width: '9px',
 							height: '9px',
 							borderRadius: '50%',
-							backgroundColor: '#D9D9D9',
+							backgroundColor: !hasData ? '#B0B0B0' : '#D9D9D9',
 							zIndex: 10,
 						}}
 					/>
@@ -194,8 +217,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							left: '137px',
 							width: '72px',
 							height: '22px',
-							backgroundColor: '#DBF6D4',
-							border: '2px solid #19670F',
+							backgroundColor: hasData ? '#DBF6D4' : '#a2e1b7',
+							border: `2px solid ${hasData ? '#19670F' : '#B0B0B0'}`,
 							borderRadius: '11px',
 							display: 'flex',
 							alignItems: 'center',
@@ -203,7 +226,10 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							zIndex: 10,
 						}}
 					>
-						<span className="text-[13px] font-semibold font-inter text-black leading-none">
+						<span
+							className="text-[13px] font-semibold font-inter leading-none"
+							style={{ color: hasData ? '#000000' : '#B0B0B0' }}
+						>
 							Sent
 						</span>
 					</div>
@@ -215,7 +241,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							width: '9px',
 							height: '9px',
 							borderRadius: '50%',
-							backgroundColor: '#D9D9D9',
+							backgroundColor: hasData ? '#D9D9D9' : '#B0B0B0',
 							zIndex: 10,
 						}}
 					/>
@@ -227,7 +253,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							width: '9px',
 							height: '9px',
 							borderRadius: '50%',
-							backgroundColor: '#D9D9D9',
+							backgroundColor: hasData ? '#D9D9D9' : '#B0B0B0',
 							zIndex: 10,
 						}}
 					/>
@@ -239,7 +265,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							width: '9px',
 							height: '9px',
 							borderRadius: '50%',
-							backgroundColor: '#D9D9D9',
+							backgroundColor: hasData ? '#D9D9D9' : '#B0B0B0',
 							zIndex: 10,
 						}}
 					/>
@@ -272,11 +298,17 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					display: 'flex',
 					flexDirection: 'column',
 					background: isContacts
-						? 'linear-gradient(to bottom, #ffffff 26px, #EB8586 26px)'
+						? hasData
+							? 'linear-gradient(to bottom, #ffffff 26px, #EB8586 26px)'
+							: '#FFAEAE'
 						: isDrafts
-						? 'linear-gradient(to bottom, #ffffff 26px, #FFDC9E 26px)'
+						? hasData
+							? 'linear-gradient(to bottom, #ffffff 26px, #FFDC9E 26px)'
+							: '#F8D69A'
 						: isSent
-						? 'linear-gradient(to bottom, #ffffff 26px, #5AB477 26px)'
+						? hasData
+							? 'linear-gradient(to bottom, #ffffff 26px, #5AB477 26px)'
+							: '#a2e1b7'
 						: 'white',
 				}}
 			>
@@ -331,7 +363,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				</div>
 
 				{/* Top content area (e.g., mini searchbar for contacts) */}
-				{isContacts && topContent && (
+				{isContacts && topContent && hasData && (
 					<div
 						style={{
 							position: 'absolute',
@@ -350,10 +382,12 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					className="flex-1 drafting-table-content"
 					style={{
 						marginTop:
-							isContacts && topContent
+							isContacts && topContent && hasData
 								? '115px'
-								: isContacts
+								: isContacts && hasData
 								? '105px'
+								: isContacts
+								? '68px'
 								: isDrafts || isSent
 								? '32px'
 								: 0,
@@ -370,25 +404,188 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					) : hasData ? (
 						children
 					) : isDrafts || isSent ? (
-						<div className="overflow-visible w-full flex flex-col gap-2 items-center">
-							{Array.from({ length: 6 }).map((_, idx) => (
-								<div
-									key={idx}
-									className={`select-none w-[489px] ${
-										isDrafts || isSent ? 'h-[97px]' : 'h-[64px]'
-									} overflow-hidden rounded-[8px] border-2 border-[#000000] ${
-										isDrafts ? 'bg-[#FFDC9E]' : isSent ? 'bg-[#5AB477]' : 'bg-white'
-									} p-2`}
-								/>
-							))}
+						<div
+							className="overflow-visible w-full flex flex-col items-center"
+							style={{ gap: '11px' }}
+						>
+							{Array.from({ length: 8 }).map((_, idx) => {
+								// For drafts/sent empty state: boxes 2-5 (idx 1-4) are 52px, all others are 85px
+								const boxHeight =
+									(isDrafts || isSent) && idx >= 1 && idx <= 4 ? 'h-[52px]' : 'h-[85px]';
+								const boxBgColor = isDrafts
+									? idx === 1
+										? 'bg-[#FFCF79]'
+										: idx === 2
+										? 'bg-[#FFD487]'
+										: idx === 3
+										? 'bg-[#FFD892]'
+										: idx === 4
+										? 'bg-[#FFDA97]'
+										: 'bg-[#FFCD73]'
+									: isSent
+									? idx === 1
+										? 'bg-[#52CD7A]'
+										: idx === 2
+										? 'bg-[#63D286]'
+										: idx === 3
+										? 'bg-[#79dc99]'
+										: idx === 4
+										? 'bg-[#96e7b0]'
+										: 'bg-[#53c076]'
+									: 'bg-white';
+								return (
+									<div
+										key={idx}
+										className={`select-none w-[489px] ${boxHeight} overflow-hidden rounded-[8px] border-2 border-[#000000] ${boxBgColor} p-2 flex items-center justify-center`}
+									>
+										{isDrafts && idx === 0 && (
+											<span className="text-[15px] font-semibold font-inter text-black">
+												Draft Your First Email
+											</span>
+										)}
+										{isSent && idx === 0 && (
+											<span className="text-[15px] font-semibold font-inter text-black">
+												Send Your First Message
+											</span>
+										)}
+										{isDrafts && idx === 1 && (
+											<div
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+												style={{ width: '375px', height: '42px' }}
+												onClick={goToWriting}
+											>
+												<span className="text-[15px] font-semibold font-inter text-black">
+													Write Your Emails
+												</span>
+											</div>
+										)}
+										{isDrafts && idx === 2 && (
+											<div
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+												style={{ width: '375px', height: '42px' }}
+												onClick={goToSearch}
+											>
+												<span className="text-[15px] font-semibold font-inter text-black">
+													Search For More Contacts
+												</span>
+											</div>
+										)}
+										{isDrafts && idx === 3 && (
+											<div
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+												style={{ width: '375px', height: '42px' }}
+												onClick={goToInbox}
+											>
+												<span className="text-[15px] font-semibold font-inter text-black">
+													Check Inbox
+												</span>
+											</div>
+										)}
+										{isDrafts && idx === 4 && (
+											<div
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+												style={{ width: '375px', height: '42px' }}
+												onClick={() => router.push(urls.murmur.dashboard.index)}
+											>
+												<span className="text-[15px] font-semibold font-inter text-black">
+													Create New Campaign
+												</span>
+											</div>
+										)}
+										{isSent && idx === 1 && (
+											<div
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+												style={{ width: '376px', height: '42px' }}
+												onClick={goToDrafts}
+											>
+												<span className="text-[15px] font-semibold font-inter text-black">
+													Review and Send Drafts
+												</span>
+											</div>
+										)}
+										{isSent && idx === 2 && (
+											<div
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+												style={{ width: '376px', height: '42px' }}
+												onClick={goToWriting}
+											>
+												<span className="text-[15px] font-semibold font-inter text-black">
+													Write More Emails
+												</span>
+											</div>
+										)}
+										{isSent && idx === 3 && (
+											<div
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+												style={{ width: '376px', height: '42px' }}
+												onClick={goToSearch}
+											>
+												<span className="text-[15px] font-semibold font-inter text-black">
+													Add More Contacts
+												</span>
+											</div>
+										)}
+										{isSent && idx === 4 && (
+											<div
+												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+												style={{ width: '376px', height: '42px' }}
+												onClick={() => router.push(urls.murmur.dashboard.index)}
+											>
+												<span className="text-[15px] font-semibold font-inter text-black">
+													Create New Campaign
+												</span>
+											</div>
+										)}
+									</div>
+								);
+							})}
 						</div>
 					) : isContacts ? (
-						<div className="overflow-visible w-full flex flex-col gap-2 items-center py-2">
+						<div
+							className="overflow-visible w-full flex flex-col items-center pb-2"
+							style={{ gap: '11px' }}
+						>
 							{Array.from({ length: 9 }).map((_, idx) => (
 								<div
 									key={idx}
-									className={`select-none ${contentWidth} h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#EB8586]`}
-								/>
+									className={`select-none w-[459px] h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] flex items-center justify-center ${
+										idx === 0
+											? 'bg-[#E54D50]'
+											: idx === 2
+											? 'bg-[#E72528]'
+											: idx === 3
+											? 'bg-[#E85052]'
+											: idx === 4
+											? 'bg-[#F87C7D]'
+											: idx === 5
+											? 'bg-[#EB8586]'
+											: 'bg-[#E15E60]'
+									}`}
+								>
+									{idx === 0 && (
+										<span className="text-[15px] font-semibold font-inter text-black">
+											All Contacts Drafted
+										</span>
+									)}
+									{idx >= 2 && idx <= 5 && (
+										<div
+											className="w-[403px] h-[42px] bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											onClick={() => {
+												if (idx === 2) goToSearch?.();
+												if (idx === 3) goToDrafts?.();
+												if (idx === 4) goToInbox?.();
+												if (idx === 5) router.push(urls.murmur.dashboard.index);
+											}}
+										>
+											<span className="text-[15px] font-semibold font-inter text-black">
+												{idx === 2 && 'Add More Contacts'}
+												{idx === 3 && 'Send Drafts'}
+												{idx === 4 && 'Check Inbox'}
+												{idx === 5 && 'Create New Campaign'}
+											</span>
+										</div>
+									)}
+								</div>
 							))}
 						</div>
 					) : (

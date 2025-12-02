@@ -3676,6 +3676,13 @@ body.murmur-page footer {
 	display: none !important;
 }
 
+/* Campaign page background - opaque equivalent of rgba(222, 242, 225, 0.43) on white.
+   Applied to both html and body to ensure full coverage with no white space. */
+html:has(body.murmur-page.murmur-campaign),
+body.murmur-page.murmur-campaign {
+	background-color: #f1f9f2;
+}
+
 /* Full-width background for murmur dashboard map view.
    Uses a vertical gradient so the top 36px (map header) stay white,
    and everything below is the AFD6EF blue. */
