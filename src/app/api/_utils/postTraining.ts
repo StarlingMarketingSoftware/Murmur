@@ -1,6 +1,6 @@
 import { normalizeTextCaseAndWhitespace } from '@/utils';
-import { fetchOpenAi } from './openai';
-import { OPEN_AI_MODEL_OPTIONS } from '@/constants';
+import { fetchGemini } from './gemini';
+import { GEMINI_MODEL_OPTIONS } from '@/constants';
 
 export type PostTrainingProfile = {
 	active: boolean;
@@ -73,8 +73,8 @@ Consider synonyms and related terms. For example:
 Return ONLY the category name (e.g., "music_venue"), nothing else.`;
 
 	try {
-		const response = await fetchOpenAi(
-			OPEN_AI_MODEL_OPTIONS.o4mini,
+		const response = await fetchGemini(
+			GEMINI_MODEL_OPTIONS.gemini25FlashLite,
 			prompt,
 			`Classify this search query: "${query}"`,
 			{ timeoutMs: 20000 } // allow more time for LLM classification
@@ -215,8 +215,8 @@ General Guidelines:
 - Include plural forms and common misspellings where appropriate`;
 
 	try {
-		const response = await fetchOpenAi(
-			OPEN_AI_MODEL_OPTIONS.o4mini,
+		const response = await fetchGemini(
+			GEMINI_MODEL_OPTIONS.gemini25FlashLite,
 			prompt,
 			`Generate appropriate filter terms for this ${queryType} search query: "${query}"`,
 			{ timeoutMs: 25000 } // filter generation can take longer
@@ -358,7 +358,7 @@ export async function getPostTrainingForQuery(
 ): Promise<PostTrainingProfile> {
 	try {
 		// Skip LLM if no API key
-		if (!process.env.OPEN_AI_API_KEY) {
+		if (!process.env.GEMINI_API_KEY) {
 			return getFallbackPostTraining(rawQuery);
 		}
 
