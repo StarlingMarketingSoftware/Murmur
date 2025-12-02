@@ -2222,7 +2222,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						)}
 
 						{/* Inbox tab: reuse the dashboard inbox UI, but scoped and labeled by campaign contacts */}
-						{(view === 'inbox' || view === 'all') && (
+						{view === 'inbox' && (
 							<div className="mt-6 flex justify-center">
 								<InboxSection
 									allowedSenderEmails={campaignContactEmails}
@@ -2232,6 +2232,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									onGoToWriting={goToWriting}
 									onGoToContacts={goToContacts}
 								/>
+							</div>
+						)}
+
+						{/* All tab */}
+						{view === 'all' && (
+							<div className="mt-6 flex justify-center">
+								{/* Empty - ready for building */}
 							</div>
 						)}
 
