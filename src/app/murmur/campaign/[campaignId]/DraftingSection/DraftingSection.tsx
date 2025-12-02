@@ -2226,6 +2226,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<InboxSection
 									allowedSenderEmails={campaignContactEmails}
 									contactByEmail={campaignContactsByEmail}
+									campaignId={campaign.id}
 								/>
 							</div>
 						)}

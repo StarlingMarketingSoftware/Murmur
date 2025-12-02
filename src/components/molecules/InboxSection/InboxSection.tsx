@@ -3,11 +3,12 @@
 import { FC, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
+import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useMe } from '@/hooks/useMe';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
-import type { InboundEmailWithRelations } from '@/types';
+import type { InboundEmailWithRelations, EmailWithRelations } from '@/types';
 import type { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
@@ -73,6 +74,11 @@ interface InboxSectionProps {
 	 * source of truth for the contact's name/company.
 	 */
 	contactByEmail?: Record<string, ContactWithName>;
+
+	/**
+	 * Optional campaign ID to filter sent emails by campaign.
+	 */
+	campaignId?: number;
 }
 
 /**
@@ -153,8 +159,14 @@ const getContactCompanyLabel = (
 export const InboxSection: FC<InboxSectionProps> = ({
 	allowedSenderEmails,
 	contactByEmail,
+	campaignId,
 }) => {
-	const { data: inboundEmails, isLoading, error } = useGetInboundEmails();
+	const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>('inbox');
+	const { data: inboundEmails, isLoading: isLoadingInbound, error: inboundError } = useGetInboundEmails();
+	const { data: emails, isLoading: isLoadingEmails, error: emailsError } = useGetEmails({
+		filters: campaignId ? { campaignId } : undefined,
+	});
+	const sentEmails = emails?.filter((email) => email.status === 'sent') || [];
 	const [selectedEmailId, setSelectedEmailId] = useState<number | null>(null);
 	const [replyMessage, setReplyMessage] = useState('');
 	const [isSending, setIsSending] = useState(false);
@@ -186,8 +198,29 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			  })
 			: inboundEmails;
 
+	// Convert sent emails to a format compatible with inbox display
+	const normalizedSentEmails: Array<InboundEmailWithRelations & { isSent?: boolean }> = sentEmails.map((email) => ({
+		id: email.id,
+		sender: email.contact?.email || '',
+		senderName: email.contact ? `${email.contact.firstName || ''} ${email.contact.lastName || ''}`.trim() : '',
+		subject: email.subject || '',
+		bodyPlain: email.message || '',
+		strippedText: email.message?.replace(/<[^>]*>/g, '') || '',
+		bodyHtml: email.message || '',
+		receivedAt: email.sentAt || email.createdAt,
+		contact: email.contact,
+		campaign: null,
+		originalEmail: null,
+		isSent: true,
+	} as any));
+
+	// Choose which emails to display based on active tab
+	const emailsToDisplay = activeTab === 'inbox' ? filteredBySender : normalizedSentEmails;
+	const isLoading = activeTab === 'inbox' ? isLoadingInbound : isLoadingEmails;
+	const error = activeTab === 'inbox' ? inboundError : emailsError;
+
 	// Further filter by search query (sender, subject, body, contact name/company/email)
-	const visibleEmails = filteredBySender?.filter((email) => {
+	const visibleEmails = emailsToDisplay?.filter((email) => {
 		if (!searchQuery.trim()) return true;
 		const query = searchQuery.toLowerCase();
 		const sender = email.sender?.toLowerCase() || '';
@@ -306,6 +339,13 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		);
 	}
 
+	// Reset selected email when switching tabs
+	const handleTabChange = (tab: 'inbox' | 'sent') => {
+		setActiveTab(tab);
+		setSelectedEmailId(null);
+		setReplyMessage('');
+	};
+
 	if (!visibleEmails || visibleEmails.length === 0) {
 		return (
 			<div className="w-full max-w-[907px] mx-auto px-4">
@@ -318,7 +358,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						borderRadius: '8px',
 						padding: '16px',
 						paddingTop: '109px', // 55px (search top) + 48px (search height) + 6px (gap) = 109px
-						background: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
+						background: activeTab === 'sent'
+							? 'linear-gradient(to bottom, #FFFFFF 19px, #5AB477 19px)'
+							: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
 					}}
 				>
 					{/* Three circles at top */}
@@ -368,7 +410,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
 					</svg>
 
-					{/* Inbox Badge */}
+					{/* Inbox/Sent Badge */}
 					<div
 						style={{
 							position: 'absolute',
@@ -386,7 +428,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							justifyContent: 'center',
 						}}
 					>
-						<span className="text-[10px] font-bold text-black leading-none">Inbox</span>
+						<span className="text-[10px] font-bold text-black leading-none">{activeTab === 'inbox' ? 'Inbox' : 'Sent'}</span>
 					</div>
 
 					{/* Search Bar - positioned 55px from top, left-aligned with emails */}
@@ -428,6 +470,74 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						/>
 					</div>
 
+					{/* New box - 148x47px, right-aligned with emails, centered with search bar */}
+					<div
+						style={{
+							position: 'absolute',
+							top: '55.5px', // Centered with search bar: 55px + (48px/2) - (47px/2) = 55.5px
+							right: '14px', // Right-aligned with emails (emails are 879px wide starting at 14px, so end at 893px; container is 907px, so 907-893=14px from right)
+							width: '148px',
+							height: '47px',
+							border: '3px solid #000000',
+							borderRadius: '8px',
+							backgroundColor: '#FFFFFF',
+							zIndex: 10,
+							display: 'flex',
+							alignItems: 'center',
+							padding: '4px',
+							gap: '4px',
+						}}
+					>
+						{/* Inbox tab */}
+						<button
+							type="button"
+							onClick={() => handleTabChange('inbox')}
+							style={{
+								width: '70px',
+								height: '19px',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								backgroundColor: activeTab === 'inbox' ? 'rgba(93, 171, 104, 0.63)' : 'transparent',
+								borderRadius: '8px',
+								border: activeTab === 'inbox' ? '2px solid #000000' : 'none',
+								cursor: 'pointer',
+								padding: 0,
+								margin: 0,
+								outline: 'none',
+								boxShadow: 'none',
+								WebkitAppearance: 'none',
+								appearance: 'none',
+							}}
+						>
+							<span style={{ fontSize: '14px', fontWeight: 500, color: '#000000', fontFamily: 'Times New Roman, serif' }}>Inbox</span>
+						</button>
+						{/* Sent tab */}
+						<button
+							type="button"
+							onClick={() => handleTabChange('sent')}
+							style={{
+								width: '70px',
+								height: '19px',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								backgroundColor: activeTab === 'sent' ? 'rgba(93, 171, 104, 0.63)' : 'transparent',
+								borderRadius: '8px',
+								border: activeTab === 'sent' ? '2px solid #000000' : 'none',
+								cursor: 'pointer',
+								padding: 0,
+								margin: 0,
+								outline: 'none',
+								boxShadow: 'none',
+								WebkitAppearance: 'none',
+								appearance: 'none',
+							}}
+						>
+							<span style={{ fontSize: '14px', fontWeight: 500, color: '#000000', fontFamily: 'Times New Roman, serif' }}>Sent</span>
+						</button>
+					</div>
+
 					{Array.from({ length: 3 }).map((_, idx) => (
 						<div
 							key={`inbox-placeholder-${idx}`}
@@ -457,17 +567,19 @@ export const InboxSection: FC<InboxSectionProps> = ({
 				offsetRight={-6}
 				offsetTop={selectedEmail ? 0 : 109}
 				disableOverflowClass
-				style={{
-					width: '907px',
-					height: '657px',
-					border: '3px solid #000000',
-					borderRadius: '8px',
-					padding: selectedEmail ? '21px 13px 12px 13px' : '16px',
-					paddingTop: selectedEmail ? '21px' : '109px', // 55px (search top) + 48px (search height) + 6px (gap) = 109px
-					background: selectedEmail
-						? '#437ec1'
-						: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
-				}}
+					style={{
+						width: '907px',
+						height: '657px',
+						border: '3px solid #000000',
+						borderRadius: '8px',
+						padding: selectedEmail ? '21px 13px 12px 13px' : '16px',
+						paddingTop: selectedEmail ? '21px' : '109px', // 55px (search top) + 48px (search height) + 6px (gap) = 109px
+						background: selectedEmail
+							? '#437ec1'
+							: activeTab === 'sent'
+								? 'linear-gradient(to bottom, #FFFFFF 19px, #5AB477 19px)'
+								: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
+					}}
 			>
 				{/* Back button - shown when email is selected */}
 				{selectedEmail && (
@@ -608,6 +720,75 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						/>
 					</div>
 				)}
+				{/* New box - 148x47px, right-aligned with emails, centered with search bar */}
+				{!selectedEmail && (
+					<div
+						style={{
+							position: 'absolute',
+							top: '55.5px', // Centered with search bar: 55px + (48px/2) - (47px/2) = 55.5px
+							right: '14px', // Right-aligned with emails (emails are 879px wide starting at 14px, so end at 893px; container is 907px, so 907-893=14px from right)
+							width: '148px',
+							height: '47px',
+							border: '3px solid #000000',
+							borderRadius: '8px',
+							backgroundColor: '#FFFFFF',
+							zIndex: 10,
+							display: 'flex',
+							alignItems: 'center',
+							padding: '4px',
+							gap: '4px',
+						}}
+					>
+						{/* Inbox tab */}
+						<button
+							type="button"
+							onClick={() => handleTabChange('inbox')}
+							style={{
+								width: '70px',
+								height: '19px',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								backgroundColor: activeTab === 'inbox' ? 'rgba(93, 171, 104, 0.63)' : 'transparent',
+								borderRadius: '8px',
+								border: activeTab === 'inbox' ? '2px solid #000000' : 'none',
+								cursor: 'pointer',
+								padding: 0,
+								margin: 0,
+								outline: 'none',
+								boxShadow: 'none',
+								WebkitAppearance: 'none',
+								appearance: 'none',
+							}}
+						>
+							<span style={{ fontSize: '14px', fontWeight: 500, color: '#000000', fontFamily: 'Times New Roman, serif' }}>Inbox</span>
+						</button>
+						{/* Sent tab */}
+						<button
+							type="button"
+							onClick={() => handleTabChange('sent')}
+							style={{
+								width: '70px',
+								height: '19px',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								backgroundColor: activeTab === 'sent' ? 'rgba(93, 171, 104, 0.63)' : 'transparent',
+								borderRadius: '8px',
+								border: activeTab === 'sent' ? '2px solid #000000' : 'none',
+								cursor: 'pointer',
+								padding: 0,
+								margin: 0,
+								outline: 'none',
+								boxShadow: 'none',
+								WebkitAppearance: 'none',
+								appearance: 'none',
+							}}
+						>
+							<span style={{ fontSize: '14px', fontWeight: 500, color: '#000000', fontFamily: 'Times New Roman, serif' }}>Sent</span>
+						</button>
+					</div>
+				)}
 
 				{selectedEmail ? (
 					/* Expanded Email View Inside Box */
@@ -725,9 +906,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									width: '828px',
 									height: '326px',
 									marginTop: '19px',
-									marginLeft: 0,
-									alignSelf: 'flex-start',
-									backgroundColor: '#E5F1FF',
+									marginLeft: activeTab === 'sent' ? 'auto' : 0,
+									marginRight: activeTab === 'sent' ? 0 : 'auto',
+									alignSelf: activeTab === 'sent' ? 'flex-end' : 'flex-start',
+									backgroundColor: activeTab === 'sent' ? '#FFFFFF' : '#E5F1FF',
 									border: '3px solid #000000',
 									borderRadius: '8px',
 									padding: '16px',
@@ -805,7 +987,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								</div>
 							))}
 
-						{/* Reply Box */}
+						{/* Reply Box - only show for inbox emails */}
+						{activeTab === 'inbox' && !selectedEmail?.isSent && (
 						<div className="w-full flex justify-center" style={{ marginTop: '49px' }}>
 							<div
 								style={{
@@ -845,6 +1028,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								</Button>
 							</div>
 						</div>
+						)}
 						</div>
 					</div>
 				) : (
@@ -943,7 +1127,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							</div>
 						))}
 						{Array.from({
-							length: Math.max(0, 8 - (visibleEmails?.length ?? 0)),
+							length: Math.max(0, 6 - (visibleEmails?.length ?? 0)),
 						}).map((_, idx) => (
 							<div
 								key={`inbox-placeholder-${idx}`}
@@ -954,7 +1138,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									minHeight: '78px',
 									border: '3px solid #000000',
 									borderRadius: '8px',
-									backgroundColor: '#FFFFFF',
+									backgroundColor: activeTab === 'inbox' ? '#6fa4e1' : '#5AB477',
 								}}
 							/>
 						))}
