@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { useDashboard } from './useDashboard';
@@ -39,7 +40,6 @@ import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
-import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
 
 const DEFAULT_STATE_SUGGESTIONS = [
@@ -60,8 +60,9 @@ const DEFAULT_STATE_SUGGESTIONS = [
 	},
 ];
 
-const Dashboard = () => {
+const DashboardContent = () => {
 	const { isSignedIn, openSignIn } = useClerk();
+	const searchParams = useSearchParams();
 	const isMobile = useIsMobile();
 	const [isMobileLandscape, setIsMobileLandscape] = useState(false);
 	const [whyValue, setWhyValue] = useState('');
@@ -73,6 +74,14 @@ const Dashboard = () => {
 		null
 	);
 	const [activeTab, setActiveTab] = useState<'search' | 'inbox'>('search');
+
+	// Handle tab query parameter
+	useEffect(() => {
+		const tabParam = searchParams.get('tab');
+		if (tabParam === 'search' || tabParam === 'inbox') {
+			setActiveTab(tabParam);
+		}
+	}, [searchParams]);
 	const [userLocationName, setUserLocationName] = useState<string | null>(null);
 	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
@@ -2647,6 +2656,14 @@ const Dashboard = () => {
 				)}
 			</div>
 		</AppLayout>
+	);
+};
+
+const Dashboard = () => {
+	return (
+		<Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+			<DashboardContent />
+		</Suspense>
 	);
 };
 

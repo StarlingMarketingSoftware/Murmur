@@ -85,9 +85,7 @@ export const CampaignsInboxView: FC = () => {
 	const router = useRouter();
 	const [searchQuery, setSearchQuery] = useState('');
 	const [confirmingCampaignId, setConfirmingCampaignId] = useState<number | null>(null);
-	const [countdown, setCountdown] = useState<number>(5);
 	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-	const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
 	// useGetCampaigns returns campaigns with draftCount and sentCount already computed by the API
 	// This is the same data source used by CampaignsTable
@@ -101,30 +99,8 @@ export const CampaignsInboxView: FC = () => {
 			if (confirmationTimeoutRef.current) {
 				clearTimeout(confirmationTimeoutRef.current);
 			}
-			if (countdownIntervalRef.current) {
-				clearInterval(countdownIntervalRef.current);
-			}
 		};
 	}, []);
-
-	// Handle countdown animation
-	useEffect(() => {
-		if (confirmingCampaignId !== null) {
-			setCountdown(5);
-			countdownIntervalRef.current = setInterval(() => {
-				setCountdown((prev) => Math.max(0, prev - 1));
-			}, 1000);
-		} else {
-			if (countdownIntervalRef.current) {
-				clearInterval(countdownIntervalRef.current);
-			}
-		}
-		return () => {
-			if (countdownIntervalRef.current) {
-				clearInterval(countdownIntervalRef.current);
-			}
-		};
-	}, [confirmingCampaignId]);
 
 	// Use draftCount, sentCount, and contactEmails directly from the API response
 	// Calculate visibleInboxCount: inbound emails where sender matches a contact email in the campaign
@@ -218,7 +194,6 @@ export const CampaignsInboxView: FC = () => {
 				thumbColor="#000000"
 				trackColor="transparent"
 				offsetRight={-6}
-				offsetTop={76}
 				disableOverflowClass
 				style={{
 					width: '907px',
@@ -240,7 +215,7 @@ export const CampaignsInboxView: FC = () => {
 						height: '48px',
 						border: '3px solid #000000',
 						borderRadius: '8px',
-						backgroundColor: '#FFFFFF',
+						backgroundColor: filteredCampaigns.length === 0 ? '#2995CE' : '#FFFFFF',
 						zIndex: 10,
 						display: 'flex',
 						alignItems: 'center',
@@ -252,7 +227,10 @@ export const CampaignsInboxView: FC = () => {
 						type="text"
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
-						placeholder="Search Mail"
+						placeholder={
+							filteredCampaigns.length === 0 && !searchQuery ? '' : 'Search Mail'
+						}
+						disabled={filteredCampaigns.length === 0 && !searchQuery}
 						style={{
 							flex: 1,
 							height: '100%',
@@ -264,6 +242,7 @@ export const CampaignsInboxView: FC = () => {
 							backgroundColor: 'transparent',
 							marginLeft: '16px',
 							paddingRight: '16px',
+							cursor: filteredCampaigns.length === 0 && !searchQuery ? 'default' : 'text',
 						}}
 						className="placeholder:text-[#737373]"
 					/>
@@ -459,21 +438,53 @@ export const CampaignsInboxView: FC = () => {
 				})}
 
 				{/* Empty Placeholder Rows */}
-				{Array.from({ length: Math.max(0, 6 - filteredCampaigns.length) }).map(
-					(_, idx) => (
-						<div
-							key={`placeholder-${idx}`}
-							className="select-none mb-2"
-							style={{
-								width: '879px',
-								height: '78px',
-								minHeight: '78px',
-								border: '3px solid #000000',
-								borderRadius: '8px',
-								backgroundColor: '#4ca9db',
-							}}
-						/>
-					)
+				{Array.from({ length: Math.max(0, 5 - filteredCampaigns.length) }).map(
+					(_, idx) => {
+						const isFirstInEmptyState = filteredCampaigns.length === 0 && idx === 0;
+						return (
+							<div
+								key={`placeholder-${idx}`}
+								className={`select-none mb-2 ${
+									isFirstInEmptyState
+										? 'cursor-pointer hover:opacity-90 transition-opacity'
+										: ''
+								}`}
+								style={{
+									width: '879px',
+									height: isFirstInEmptyState ? '58px' : '78px',
+									minHeight: isFirstInEmptyState ? '58px' : '78px',
+									border: '3px solid #000000',
+									borderRadius: '8px',
+									backgroundColor: isFirstInEmptyState
+										? '#A7E1FF'
+										: filteredCampaigns.length === 0
+										? '#2995CE'
+										: '#4ca9db',
+									display: isFirstInEmptyState ? 'flex' : 'block',
+									alignItems: 'center',
+									justifyContent: 'center',
+								}}
+								onClick={
+									isFirstInEmptyState
+										? () => router.push(`${urls.murmur.dashboard.index}?tab=search`)
+										: undefined
+								}
+							>
+								{isFirstInEmptyState && (
+									<span
+										style={{
+											fontSize: '16px',
+											fontWeight: 600,
+											color: '#000000',
+											fontFamily: 'Inter, sans-serif',
+										}}
+									>
+										Create New Campaign
+									</span>
+								)}
+							</div>
+						);
+					}
 				)}
 			</CustomScrollbar>
 		</div>

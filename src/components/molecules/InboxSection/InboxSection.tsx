@@ -8,7 +8,7 @@ import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useMe } from '@/hooks/useMe';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
-import type { InboundEmailWithRelations, EmailWithRelations } from '@/types';
+import type { InboundEmailWithRelations } from '@/types';
 import type { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
@@ -739,7 +739,6 @@ export const InboxSection: FC<InboxSectionProps> = ({
 				thumbColor="#000000"
 				trackColor="transparent"
 				offsetRight={-6}
-				offsetTop={selectedEmail ? 0 : 109}
 				disableOverflowClass
 				style={{
 					width: '907px',
@@ -1222,7 +1221,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							))}
 
 							{/* Reply Box - only show for inbox emails */}
-							{activeTab === 'inbox' && !selectedEmail?.isSent && (
+							{activeTab === 'inbox' && (
 								<div className="w-full flex justify-center" style={{ marginTop: '49px' }}>
 									<div
 										style={{
