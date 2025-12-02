@@ -1489,25 +1489,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										Search Results
 									</span>
 									<div
-										className="bg-[#D8E5FB] border-[2px] border-black rounded-[7px] overflow-hidden flex flex-col"
+										className="bg-[#D8E5FB] border-[3px] border-[#143883] rounded-[7px] overflow-hidden flex flex-col"
 										style={{
 											width: '396px',
 											height: '703px',
 										}}
 									>
-										{/* Scrollable contact list */}
-										<CustomScrollbar
-											className="flex-1 min-h-0"
-											contentClassName="pt-[12px] px-[6px] pb-[14px]"
-											thumbWidth={2}
-											thumbColor="#000000"
-											trackColor="transparent"
-											offsetRight={-6}
-											disableOverflowClass
+										{/* Fixed header section - 52px */}
+										<div
+											className="flex-shrink-0 flex flex-col justify-center px-[6px]"
+											style={{ height: '52px' }}
 										>
-											{/* Selection controls */}
-											<div className="flex items-center justify-end gap-2 mb-[7px] pr-1">
-												<span className="font-inter text-[11px] text-black">
+											<div className="flex flex-col">
+												<span className="font-inter text-[11px] text-black text-center">
 													{searchResultsSelectedContacts.length} selected
 												</span>
 												<button
@@ -1524,15 +1518,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															);
 														}
 													}}
-													className="font-secondary text-[11px] font-medium text-black hover:underline"
+													className="font-secondary text-[11px] font-medium text-black hover:underline text-right pr-1"
 												>
 													{searchResultsSelectedContacts.length === searchResults.length
 														? 'Deselect all'
 														: 'Select all'}
 												</button>
 											</div>
+										</div>
+										{/* Scrollable contact list */}
+										<CustomScrollbar
+											className="flex-1 min-h-0"
+											contentClassName="px-[6px] pb-[14px]"
+											thumbWidth={2}
+											thumbColor="#000000"
+											trackColor="transparent"
+											offsetRight={-6}
+											disableOverflowClass
+										>
 											{/* Contact list */}
-											<div className="space-y-[7px] pt-[16px]">
+											<div className="space-y-[7px]">
 												{searchResults.map((contact) => {
 													const isSelected = searchResultsSelectedContacts.includes(
 														contact.id
@@ -1551,7 +1556,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														<div
 															key={contact.id}
 															data-contact-id={contact.id}
-															className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none"
+															className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-[#ABABAB] select-none"
 															style={{
 																backgroundColor: isSelected ? '#C9EAFF' : '#FFFFFF',
 															}}
@@ -1679,41 +1684,58 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</CustomScrollbar>
 
-										{/* Footer with Add to Campaign button */}
-										<div className="w-full h-[50px] flex-shrink-0 bg-[#E8EFFF] flex items-center justify-between px-3 border-t border-black">
-											<button
-												type="button"
-												onClick={handleAddSearchResultsToCampaign}
-												disabled={
-													searchResultsSelectedContacts.length === 0 || isAddingToCampaign
-												}
-												className="flex-1 h-[36px] flex items-center justify-center gap-2 text-[13px] font-semibold text-white bg-[#143883] hover:bg-[#1a4a9e] rounded-[6px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-											>
-												{isAddingToCampaign ? (
-													<>
-														<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-														Adding...
-													</>
-												) : (
-													<>+ Add to Campaign</>
-												)}
-											</button>
-											<button
-												type="button"
-												onClick={() => {
-													if (
-														searchResultsSelectedContacts.length !== searchResults.length
-													) {
-														setSearchResultsSelectedContacts(
-															searchResults.map((c) => c.id)
-														);
-													}
-												}}
-												className="ml-2 h-[36px] px-4 flex items-center justify-center text-[13px] font-semibold text-black bg-white hover:bg-gray-100 rounded-[6px] border-2 border-black transition-colors"
-											>
-												All
-											</button>
-										</div>
+										{/* Footer with Add to Campaign button - only shown when contacts are selected */}
+										{searchResultsSelectedContacts.length > 0 && (
+											<div className="w-full h-[50px] flex-shrink-0 bg-[#D8E5FB] flex items-center justify-center px-3">
+												<div className="relative flex w-full h-[36px] rounded-[6px] border-2 border-black overflow-hidden">
+													{/* Absolutely centered text */}
+													<span
+														className="absolute inset-0 flex items-center justify-center text-white font-serif font-medium text-[15px] pointer-events-none"
+														style={{ zIndex: 1 }}
+													>
+														{isAddingToCampaign ? (
+															<>
+																<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+																Adding...
+															</>
+														) : (
+															'Add to Campaign'
+														)}
+													</span>
+													{/* Clickable left area */}
+													<button
+														type="button"
+														onClick={handleAddSearchResultsToCampaign}
+														disabled={
+															searchResultsSelectedContacts.length === 0 ||
+															isAddingToCampaign
+														}
+														className="flex-1 bg-[#62A967] hover:bg-[#529957] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+													/>
+													<div
+														className="w-[2px]"
+														style={{ backgroundColor: '#349A37', zIndex: 2 }}
+													/>
+													<button
+														type="button"
+														onClick={() => {
+															if (
+																searchResultsSelectedContacts.length !==
+																searchResults.length
+															) {
+																setSearchResultsSelectedContacts(
+																	searchResults.map((c) => c.id)
+																);
+															}
+														}}
+														className="w-[50px] bg-[#7AD47A] hover:bg-[#6AC46A] text-black font-inter text-[13px] flex items-center justify-center transition-colors"
+														style={{ zIndex: 2 }}
+													>
+														All
+													</button>
+												</div>
+											</div>
+										)}
 									</div>
 								</div>
 							)}
