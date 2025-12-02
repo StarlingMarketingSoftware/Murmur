@@ -1077,15 +1077,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					<div className="relative w-full flex flex-col items-center">
 						{/* Persistent Campaign Header Box for specific tabs */}
 						{!isMobile &&
-							['testing', 'contacts', 'drafting', 'sent', 'search'].includes(view) && (
+							['testing', 'contacts', 'drafting', 'sent', 'search', 'inbox'].includes(
+								view
+							) && (
 								<div
 									className="absolute hidden lg:flex flex-col"
 									style={{
 										right:
 											view === 'search'
 												? 'calc(50% + 384px + 32px)'
+												: view === 'inbox'
+												? 'calc(50% + 471.5px)'
 												: 'calc(50% + 250px + 32px)',
-										top: '29px',
+										top: view === 'inbox' ? '9px' : '29px',
 										gap: '16px',
 									}}
 								>
@@ -1401,7 +1405,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												</div>
 											)}
 										</>
-									) : (
+									) : view !== 'inbox' ? (
 										<div
 											style={{
 												width: '375px',
@@ -1438,7 +1442,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}
 											/>
 										</div>
-									)}
+									) : null}
 								</div>
 							)}
 
