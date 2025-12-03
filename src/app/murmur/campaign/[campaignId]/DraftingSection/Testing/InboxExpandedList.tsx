@@ -44,15 +44,15 @@ const ArrowIcon = () => (
 	</svg>
 );
 
-const InboxHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isAllTab?: boolean }> = ({
-	offsetY = 0,
-	hasData = true,
-	isAllTab = false,
-}) => {
+const InboxHeaderChrome: FC<{
+	offsetY?: number;
+	hasData?: boolean;
+	isAllTab?: boolean;
+}> = ({ offsetY = 0, hasData = true, isAllTab = false }) => {
 	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
-	const pillBorderColor = hasData ? '#8D5B5B' : '#B0B0B0';
+	const pillBorderColor = hasData ? '#000000' : '#B0B0B0';
 	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
-	const pillBgColor = hasData ? '#F5DADA' : '#FFAEAE';
+	const pillBgColor = hasData ? '#CCDFF4' : '#FFAEAE';
 	const dotSize = isAllTab ? 6 : 9;
 	// First dot is 29px from the left
 	const dot1Left = 29;
@@ -131,16 +131,16 @@ const InboxHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isAllTab?: bo
 			>
 				<span
 					className="font-semibold font-inter leading-none"
-					style={{ 
-						color: pillTextColor, 
-						fontSize: pillFontSize, 
-						textAlign: 'center', 
+					style={{
+						color: pillTextColor,
+						fontSize: pillFontSize,
+						textAlign: 'center',
 						width: '100%',
 						display: 'flex',
 						justifyContent: 'center',
 						alignItems: 'center',
 						height: '100%',
-						marginTop: isAllTab ? '-1px' : 0 // Optical alignment adjustment
+						marginTop: isAllTab ? '-1px' : 0, // Optical alignment adjustment
 					}}
 				>
 					Inbox
@@ -216,9 +216,7 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 			return allInboundEmails;
 		}
 
-		const allowedSet = new Set(
-			allowedSenderEmails.map((e) => e.toLowerCase().trim())
-		);
+		const allowedSet = new Set(allowedSenderEmails.map((e) => e.toLowerCase().trim()));
 
 		return allInboundEmails.filter((email) => {
 			const sender = email.sender?.toLowerCase().trim();
@@ -240,11 +238,17 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 			role="region"
 			aria-label="Expanded inbox preview"
 		>
+			{/* Header background to prevent content from showing through */}
+			<div
+				className="absolute top-0 left-0 right-0 bg-white z-[5]"
+				style={{ height: `${whiteSectionHeight}px`, borderRadius: 'inherit' }}
+			/>
 			{/* Header row (no explicit divider; let the background change from white to blue like the main table) */}
 			<InboxHeaderChrome isAllTab={isAllTab} />
 			<div
 				className={cn(
-					'flex items-center gap-2 h-[28px] px-3 shrink-0',
+					'flex items-center gap-2 px-3 shrink-0',
+					isAllTab ? 'h-0' : 'h-[28px]',
 					onHeaderClick ? 'cursor-pointer' : ''
 				)}
 				role={onHeaderClick ? 'button' : undefined}
@@ -259,7 +263,12 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 				}}
 			></div>
 
-			<div className="relative flex-1 flex flex-col pb-2 pt-2 min-h-0 px-2">
+			<div
+				className={cn(
+					'relative flex-1 flex flex-col pb-2 min-h-0 px-2 overflow-hidden',
+					isAllTab ? 'pt-0' : 'pt-2'
+				)}
+			>
 				{/* Scrollable list */}
 				<CustomScrollbar
 					className="flex-1 drafting-table-content"
@@ -270,142 +279,142 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 					contentClassName="overflow-x-hidden"
 					alwaysShow
 				>
-					<div 
+					<div
 						className="space-y-2 pb-2 flex flex-col items-center"
-						style={{ paddingTop: `${31 - whiteSectionHeight}px` }}
+						style={{ paddingTop: isAllTab ? '31px' : `${38 - whiteSectionHeight}px` }}
 					>
-					{inboundEmails.map((email) => {
-						const contact = resolveContactForEmail(email, contactByEmail);
-						const contactName = getCanonicalContactName(email, contactByEmail);
+						{inboundEmails.map((email) => {
+							const contact = resolveContactForEmail(email, contactByEmail);
+							const contactName = getCanonicalContactName(email, contactByEmail);
 
-						return (
-							<div
-								key={email.id}
-								className={cn(
-									'transition-colors relative select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2'
-								)}
-							>
-								{/* Fixed top-right info (Location + Title) */}
-								<div className="absolute top-[6px] right-[6px] flex flex-col items-end gap-[2px] w-[110px] pointer-events-none">
-									<div className="flex items-center justify-start gap-1 h-[11.67px] w-full">
-										{(() => {
-											const fullStateName = (contact?.state as string) || '';
-											const stateAbbr = getStateAbbreviation(fullStateName) || '';
-											const normalizedState = fullStateName.trim();
-											const lowercaseCanadianProvinceNames = canadianProvinceNames.map(
-												(s) => s.toLowerCase()
-											);
-											const isCanadianProvince =
-												lowercaseCanadianProvinceNames.includes(
-													normalizedState.toLowerCase()
-												) ||
-												canadianProvinceAbbreviations.includes(
-													normalizedState.toUpperCase()
-												) ||
-												canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
-											const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+							return (
+								<div
+									key={email.id}
+									className={cn(
+										'transition-colors relative select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2'
+									)}
+								>
+									{/* Fixed top-right info (Location + Title) */}
+									<div className="absolute top-[6px] right-[6px] flex flex-col items-end gap-[2px] w-[110px] pointer-events-none">
+										<div className="flex items-center justify-start gap-1 h-[11.67px] w-full">
+											{(() => {
+												const fullStateName = (contact?.state as string) || '';
+												const stateAbbr = getStateAbbreviation(fullStateName) || '';
+												const normalizedState = fullStateName.trim();
+												const lowercaseCanadianProvinceNames = canadianProvinceNames.map(
+													(s) => s.toLowerCase()
+												);
+												const isCanadianProvince =
+													lowercaseCanadianProvinceNames.includes(
+														normalizedState.toLowerCase()
+													) ||
+													canadianProvinceAbbreviations.includes(
+														normalizedState.toUpperCase()
+													) ||
+													canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+												const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
 
-											if (!stateAbbr) return null;
-											return isCanadianProvince ? (
-												<div
-													className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border overflow-hidden"
-													style={{ borderColor: '#000000' }}
-													title="Canadian province"
-												>
-													<CanadianFlag
-														width="100%"
-														height="100%"
-														className="w-full h-full"
+												if (!stateAbbr) return null;
+												return isCanadianProvince ? (
+													<div
+														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border overflow-hidden"
+														style={{ borderColor: '#000000' }}
+														title="Canadian province"
+													>
+														<CanadianFlag
+															width="100%"
+															height="100%"
+															className="w-full h-full"
+														/>
+													</div>
+												) : isUSAbbr ? (
+													<span
+														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border text-[8px] leading-none font-bold"
+														style={{
+															backgroundColor:
+																stateBadgeColorMap[stateAbbr] || 'transparent',
+															borderColor: '#000000',
+														}}
+													>
+														{stateAbbr}
+													</span>
+												) : (
+													<span
+														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border"
+														style={{ borderColor: '#000000' }}
 													/>
-												</div>
-											) : isUSAbbr ? (
-												<span
-													className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border text-[8px] leading-none font-bold"
-													style={{
-														backgroundColor:
-															stateBadgeColorMap[stateAbbr] || 'transparent',
-														borderColor: '#000000',
-													}}
-												>
-													{stateAbbr}
-												</span>
-											) : (
-												<span
-													className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border"
-													style={{ borderColor: '#000000' }}
+												);
+											})()}
+											{contact?.city ? (
+												<ScrollableText
+													text={contact.city}
+													className="text-[10px] text-black leading-none max-w-[80px]"
 												/>
-											);
-										})()}
-										{contact?.city ? (
-											<ScrollableText
-												text={contact.city}
-												className="text-[10px] text-black leading-none max-w-[80px]"
-											/>
+											) : null}
+										</div>
+
+										{contact?.headline ? (
+											<div className="w-[110px] h-[10px] rounded-[3.71px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
+												<ScrollableText
+													text={contact.headline}
+													className="text-[8px] text-black leading-none px-1"
+												/>
+											</div>
 										) : null}
 									</div>
 
-									{contact?.headline ? (
-										<div className="w-[110px] h-[10px] rounded-[3.71px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
-											<ScrollableText
-												text={contact.headline}
-												className="text-[8px] text-black leading-none px-1"
-											/>
-										</div>
-									) : null}
-								</div>
-
-								{/* Content grid */}
-								<div className="grid grid-cols-1 grid-rows-4 h-full pr-[120px] pl-[22px]">
-									{/* Row 1: Name */}
-									<div className="row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
-										<div className="font-bold text-[11px] truncate leading-none">
-											{contactName}
-										</div>
-									</div>
-
-									{/* Row 2: Company (only when there is a separate name) */}
-									{(() => {
-										const hasSeparateName = Boolean(
-											contact &&
-												((contact.firstName && contact.firstName.trim()) ||
-													(contact.lastName && contact.lastName.trim()))
-										);
-										return (
-											<div className="row-start-2 col-start-1 flex items-center pr-2 h-[16px] max-[480px]:h-[12px]">
-												<div className="text-[11px] text-black truncate leading-none">
-													{hasSeparateName ? contact?.company || '' : ''}
-												</div>
+									{/* Content grid */}
+									<div className="grid grid-cols-1 grid-rows-4 h-full pr-[120px] pl-[22px]">
+										{/* Row 1: Name */}
+										<div className="row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
+											<div className="font-bold text-[11px] truncate leading-none">
+												{contactName}
 											</div>
-										);
-									})()}
+										</div>
 
-									{/* Row 3: Subject */}
-									<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
-										{email.subject || 'No subject'}
-									</div>
+										{/* Row 2: Company (only when there is a separate name) */}
+										{(() => {
+											const hasSeparateName = Boolean(
+												contact &&
+													((contact.firstName && contact.firstName.trim()) ||
+														(contact.lastName && contact.lastName.trim()))
+											);
+											return (
+												<div className="row-start-2 col-start-1 flex items-center pr-2 h-[16px] max-[480px]:h-[12px]">
+													<div className="text-[11px] text-black truncate leading-none">
+														{hasSeparateName ? contact?.company || '' : ''}
+													</div>
+												</div>
+											);
+										})()}
 
-									{/* Row 4: Message preview */}
-									<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px]">
-										{email.bodyText
-											? email.bodyText.substring(0, 60) + '...'
-											: email.bodyHtml
-											? email.bodyHtml.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
-											: 'No content'}
+										{/* Row 3: Subject */}
+										<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
+											{email.subject || 'No subject'}
+										</div>
+
+										{/* Row 4: Message preview */}
+										<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px]">
+											{email.bodyText
+												? email.bodyText.substring(0, 60) + '...'
+												: email.bodyHtml
+												? email.bodyHtml.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
+												: 'No content'}
+										</div>
 									</div>
 								</div>
-							</div>
-						);
-					})}
-					{Array.from({ length: Math.max(0, 6 - inboundEmails.length) }).map(
-						(_, idx) => (
-							<div
-								key={`inbox-placeholder-${idx}`}
-								className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
-							/>
-						)
-					)}
-				</div>
-			</CustomScrollbar>
+							);
+						})}
+						{Array.from({ length: Math.max(0, 4 - inboundEmails.length) }).map(
+							(_, idx) => (
+								<div
+									key={`inbox-placeholder-${idx}`}
+									className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
+								/>
+							)
+						)}
+					</div>
+				</CustomScrollbar>
 			</div>
 		</div>
 	);

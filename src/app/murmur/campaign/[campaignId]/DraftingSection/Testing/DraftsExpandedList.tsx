@@ -62,9 +62,9 @@ const DraftsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isAllTab?: b
 	isAllTab = false,
 }) => {
 	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
-	const pillBorderColor = hasData ? '#8D5B5B' : '#B0B0B0';
+	const pillBorderColor = hasData ? '#000000' : '#B0B0B0';
 	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
-	const pillBgColor = hasData ? '#F5DADA' : '#FFAEAE';
+	const pillBgColor = hasData ? '#EFDAAF' : '#FFAEAE';
 	const dotSize = isAllTab ? 6 : 9;
 	// First dot is 29px from the left
 	const dot1Left = 29;
@@ -387,6 +387,28 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				}}
 			></div>
 
+			{/* Selection counter and Select All row - absolutely positioned */}
+			{isAllTab && (
+				<div
+					className="absolute flex items-center justify-center px-2 z-10"
+					style={{ top: '22px', left: 0, right: 0, height: '14px' }}
+				>
+					<span
+						className="font-inter font-medium text-[10px] text-black"
+						style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}
+					>
+						{selectedDraftIds.size} Selected
+					</span>
+					<span
+						className="font-inter font-medium text-[10px] text-black cursor-pointer hover:underline"
+						style={{ position: 'absolute', right: '10px' }}
+						onClick={handleSelectAllToggle}
+					>
+						Select All
+					</span>
+				</div>
+			)}
+
 			<div className="relative flex-1 flex flex-col pb-2 pt-2 min-h-0 px-2">
 				{/* Scrollable list */}
 				<CustomScrollbar
@@ -400,7 +422,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				>
 					<div 
 						className="space-y-2 pb-2 flex flex-col items-center"
-						style={{ paddingTop: `${38 - whiteSectionHeight}px` }}
+						style={{ paddingTop: isAllTab ? '3px' : `${38 - whiteSectionHeight}px` }}
 					>
 					{drafts.map((draft) => {
 						const contact = contacts?.find((c) => c.id === draft.contactId);
@@ -544,7 +566,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							</div>
 						);
 					})}
-					{Array.from({ length: Math.max(0, 6 - drafts.length) }).map((_, idx) => (
+					{Array.from({ length: Math.max(0, 4 - drafts.length) }).map((_, idx) => (
 						<div
 							key={`draft-placeholder-${idx}`}
 							className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
