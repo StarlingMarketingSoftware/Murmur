@@ -24,6 +24,10 @@ export interface ContactResearchPanelProps {
 	 * Fixed height override for the panel.
 	 */
 	height?: string | number;
+	/**
+	 * Width override for the inner content boxes. Defaults to 360px.
+	 */
+	boxWidth?: number;
 }
 
 // Parse metadata sections [1], [2], etc. from the contact metadata field.
@@ -76,7 +80,11 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	hideAllText = false,
 	hideSummaryIfBullets = false,
 	height,
+	boxWidth = 360,
 }) => {
+	// Calculate inner box widths based on outer box width
+	const innerBoxWidth = boxWidth - 41; // 360 - 41 = 319 default
+	const summaryInnerWidth = boxWidth - 10; // 360 - 10 = 350 default
 	// useMemo must be called before any early returns to satisfy React Hooks rules
 	const metadataSections = useMemo(
 		() => parseMetadataSections(contact?.metadata),
@@ -260,7 +268,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 							top: `${9 + index * 65}px`,
 							left: '50%',
 							transform: 'translateX(-50%)',
-							width: '360px',
+							width: `${boxWidth}px`,
 							height: '52px',
 							backgroundColor: config.color,
 							border: '2px solid #000000',
@@ -286,7 +294,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								top: '50%',
 								transform: 'translateY(-50%)',
 								right: '10px',
-								width: '319px',
+								width: `${innerBoxWidth}px`,
 								height: '43px',
 								backgroundColor: hideAllText ? config.color : '#FFFFFF',
 								border: '1px solid #000000',
@@ -371,7 +379,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 							top: `${76 + index * 65}px`,
 							left: '50%',
 							transform: 'translateX(-50%)',
-							width: '360px',
+							width: `${boxWidth}px`,
 							height: '52px',
 							backgroundColor: config.color,
 							border: '2px solid #000000',
@@ -397,7 +405,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								top: '50%',
 								transform: 'translateY(-50%)',
 								right: '10px',
-								width: '319px',
+								width: `${innerBoxWidth}px`,
 								height: '43px',
 								backgroundColor: hideAllText ? config.color : '#FFFFFF',
 								border: '1px solid #000000',
@@ -432,7 +440,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						bottom: hasAnyParsedSections ? '14px' : '8px',
 						left: '50%',
 						transform: 'translateX(-50%)',
-						width: '360px',
+						width: `${boxWidth}px`,
 						height: hasAnyParsedSections ? '197px' : '336px',
 						backgroundColor: hasAnyParsedSections ? '#E9F7FF' : '#158BCF',
 						border: '2px solid #000000',
@@ -466,7 +474,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 										left: '50%',
 										transform: 'translateX(-50%)',
 								  }),
-							width: '350px',
+							width: `${summaryInnerWidth}px`,
 							height: height
 								? typeof height === 'number'
 									? `${height - 53}px` // 352 - 53 = 299px (approx logic if fixed)
