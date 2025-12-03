@@ -12,6 +12,7 @@ import { cn } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useState, useEffect } from 'react';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
+import RightArrow from '@/components/atoms/_svg/RightArrow';
 
 const Murmur = () => {
 	// Add campaign-specific class to body for background styling
@@ -65,11 +66,21 @@ const Murmur = () => {
 				className="fixed z-50"
 				style={{
 					left: '33px',
-					top: '50%',
-					transform: 'translateY(-50%)',
+					top: '467px',
 				}}
 			>
 				<LeftArrow />
+			</div>
+
+			{/* Right navigation arrow - fixed position */}
+			<div
+				className="fixed z-50"
+				style={{
+					right: '33px',
+					top: '467px',
+				}}
+			>
+				<RightArrow />
 			</div>
 
 			{/* Minimal header - just Back to Home link */}
