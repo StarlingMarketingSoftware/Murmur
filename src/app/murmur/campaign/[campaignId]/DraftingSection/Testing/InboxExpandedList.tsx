@@ -1,7 +1,6 @@
 'use client';
 
-import { FC, MouseEvent, useMemo, useRef, useState } from 'react';
-import { EmailWithRelations } from '@/types';
+import { FC, useMemo } from 'react';
 import { ContactWithName } from '@/types/contact';
 import { cn } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
@@ -13,11 +12,15 @@ import {
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
-import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
+import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
+import type { InboundEmailWithRelations } from '@/types';
 
-export interface SentExpandedListProps {
-	sent: EmailWithRelations[];
+export interface InboxExpandedListProps {
 	contacts: ContactWithName[];
+	/** List of sender email addresses that should be visible (campaign contact emails) */
+	allowedSenderEmails?: string[];
+	/** Map of sender email -> contact for canonical name lookup */
+	contactByEmail?: Record<string, ContactWithName>;
 	onHeaderClick?: () => void;
 	/** Custom width in pixels */
 	width?: number;
@@ -25,7 +28,7 @@ export interface SentExpandedListProps {
 	height?: number;
 }
 
-const SentHeaderChrome: FC<{
+const InboxHeaderChrome: FC<{
 	offsetY?: number;
 	hasData?: boolean;
 	isAllTab?: boolean;
@@ -33,7 +36,7 @@ const SentHeaderChrome: FC<{
 	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
 	const pillBorderColor = hasData ? '#000000' : '#B0B0B0';
 	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
-	const pillBgColor = hasData ? '#C3E7BF' : '#FFAEAE';
+	const pillBgColor = hasData ? '#CCDFF4' : '#FFAEAE';
 	const dotSize = isAllTab ? 6 : 9;
 	// First dot is 29px from the left
 	const dot1Left = 29;
@@ -44,8 +47,10 @@ const SentHeaderChrome: FC<{
 	// Center pill between first and second dots (this will be the new dot2 position)
 	const midpointBetweenDots = (dot1Left + originalDot2Left) / 2;
 	const newDot2Left = midpointBetweenDots - dotSize / 2;
-	// Pill now goes where dot2 was - center the pill at the original dot2 position
-	const pillLeft = originalDot2Left - pillWidth / 2;
+	// Pill now goes where dot3 was - center the pill at the dot3 position
+	const pillLeft = dot3Left - pillWidth / 2;
+	// Third dot now goes where the pill was (at original dot2 position)
+	const newDot3Left = originalDot2Left - dotSize / 2;
 	const pillHeight = isAllTab ? 15 : 22;
 	const pillBorderRadius = isAllTab ? 7.5 : 11;
 	const pillFontSize = isAllTab ? '10px' : '13px';
@@ -83,6 +88,18 @@ const SentHeaderChrome: FC<{
 			<div
 				style={{
 					position: 'absolute',
+					top: `${dotTop}px`,
+					left: `${newDot3Left}px`,
+					width: `${dotSize}px`,
+					height: `${dotSize}px`,
+					borderRadius: '50%',
+					backgroundColor: dotColor,
+					zIndex: 10,
+				}}
+			/>
+			<div
+				style={{
+					position: 'absolute',
 					top: `${pillTop}px`,
 					left: `${pillLeft}px`,
 					width: `${pillWidth}px`,
@@ -110,86 +127,85 @@ const SentHeaderChrome: FC<{
 						marginTop: isAllTab ? '-1px' : 0, // Optical alignment adjustment
 					}}
 				>
-					Sent
+					Inbox
 				</span>
 			</div>
-			<div
-				style={{
-					position: 'absolute',
-					top: `${dotTop}px`,
-					left: `${dot3Left}px`,
-					width: `${dotSize}px`,
-					height: `${dotSize}px`,
-					borderRadius: '50%',
-					backgroundColor: dotColor,
-					zIndex: 10,
-				}}
-			/>
 		</>
 	);
 };
 
-export const SentExpandedList: FC<SentExpandedListProps> = ({
-	sent,
-	contacts,
+/**
+ * Resolve the best contact object for a given inbound email
+ */
+const resolveContactForEmail = (
+	email: InboundEmailWithRelations,
+	contactByEmail?: Record<string, ContactWithName>
+): ContactWithName | null => {
+	const senderKey = email.sender?.toLowerCase().trim();
+	if (senderKey && contactByEmail && contactByEmail[senderKey]) {
+		return contactByEmail[senderKey];
+	}
+	return email.contact as ContactWithName | null;
+};
+
+/**
+ * Get canonical contact name for display
+ */
+const getCanonicalContactName = (
+	email: InboundEmailWithRelations,
+	contactByEmail?: Record<string, ContactWithName>
+): string => {
+	const contact = resolveContactForEmail(email, contactByEmail);
+
+	if (contact) {
+		const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+		const legacyName = (contact as any).name;
+
+		const primary =
+			fullName ||
+			(legacyName && typeof legacyName === 'string' && legacyName.trim()) ||
+			contact.company ||
+			contact.email;
+
+		if (primary && typeof primary === 'string' && primary.trim().length > 0) {
+			return primary.trim();
+		}
+	}
+
+	// Fallback: raw sender info from the inbound email headers
+	const senderLabel = email.senderName?.trim() || email.sender?.trim();
+	return senderLabel || 'Unknown sender';
+};
+
+export const InboxExpandedList: FC<InboxExpandedListProps> = ({
+	allowedSenderEmails,
+	contactByEmail,
 	onHeaderClick,
 	width = 376,
 	height = 426,
 }) => {
-	const [selectedSentIds, setSelectedSentIds] = useState<Set<number>>(new Set());
-	const lastClickedRef = useRef<number | null>(null);
-
-	const { data: usedContactIds } = useGetUsedContactIds();
-	const usedContactIdsSet = useMemo(
-		() => new Set(usedContactIds || []),
-		[usedContactIds]
-	);
-
-	const handleSentClick = (emailId: number, e: MouseEvent) => {
-		if (e.shiftKey && lastClickedRef.current !== null) {
-			// Prevent text selection on shift-click
-			e.preventDefault();
-			window.getSelection()?.removeAllRanges();
-
-			const currentIndex = sent.findIndex((s) => s.id === emailId);
-			const lastIndex = sent.findIndex((s) => s.id === lastClickedRef.current);
-			if (currentIndex !== -1 && lastIndex !== -1) {
-				const start = Math.min(currentIndex, lastIndex);
-				const end = Math.max(currentIndex, lastIndex);
-				const newSelected = new Set<number>();
-				for (let i = start; i <= end; i++) {
-					const id = sent[i].id as number;
-					newSelected.add(id);
-				}
-				setSelectedSentIds(newSelected);
-			}
-		} else {
-			setSelectedSentIds((prev) => {
-				const next = new Set(prev);
-				if (next.has(emailId)) {
-					next.delete(emailId);
-				} else {
-					next.add(emailId);
-				}
-				return next;
-			});
-			lastClickedRef.current = emailId ?? null;
-		}
-	};
-
-	const areAllSelected = selectedSentIds.size === sent.length && sent.length > 0;
-	const handleSelectAllToggle = () => {
-		if (areAllSelected) {
-			setSelectedSentIds(new Set());
-		} else {
-			setSelectedSentIds(new Set(sent.map((s) => s.id as number)));
-		}
-	};
+	// Fetch ALL inbound emails (same as InboxSection)
+	const { data: allInboundEmails } = useGetInboundEmails();
 
 	// Special hack for "All" tab: if height is exactly 347px, we apply a thicker 3px border
 	// to match the other elements in that layout. Otherwise standard 2px border.
 	const isAllTab = height === 347;
 	const whiteSectionHeight = isAllTab ? 20 : 28;
+
+	// Filter to only show emails from campaign contacts
+	const inboundEmails = useMemo(() => {
+		if (!allInboundEmails) return [];
+		if (!allowedSenderEmails || allowedSenderEmails.length === 0) {
+			return allInboundEmails;
+		}
+
+		const allowedSet = new Set(allowedSenderEmails.map((e) => e.toLowerCase().trim()));
+
+		return allInboundEmails.filter((email) => {
+			const sender = email.sender?.toLowerCase().trim();
+			return sender && allowedSet.has(sender);
+		});
+	}, [allInboundEmails, allowedSenderEmails]);
 
 	return (
 		<div
@@ -200,16 +216,22 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 			style={{
 				width: `${width}px`,
 				height: `${height}px`,
-				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #5AB477 ${whiteSectionHeight}px)`,
+				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #5EB6D6 ${whiteSectionHeight}px)`,
 			}}
 			role="region"
-			aria-label="Expanded sent preview"
+			aria-label="Expanded inbox preview"
 		>
-			{/* Header row (no explicit divider; let the background change from white to green like the main table) */}
-			<SentHeaderChrome isAllTab={isAllTab} />
+			{/* Header background to prevent content from showing through */}
+			<div
+				className="absolute top-0 left-0 right-0 bg-white z-[5]"
+				style={{ height: `${whiteSectionHeight}px`, borderRadius: 'inherit' }}
+			/>
+			{/* Header row (no explicit divider; let the background change from white to blue like the main table) */}
+			<InboxHeaderChrome isAllTab={isAllTab} />
 			<div
 				className={cn(
-					'flex items-center gap-2 h-[28px] px-3 shrink-0',
+					'flex items-center gap-2 px-3 shrink-0',
+					isAllTab ? 'h-0' : 'h-[28px]',
 					onHeaderClick ? 'cursor-pointer' : ''
 				)}
 				role={onHeaderClick ? 'button' : undefined}
@@ -224,29 +246,12 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 				}}
 			></div>
 
-			{/* Selection counter and Select All row - absolutely positioned */}
-			{isAllTab && (
-				<div
-					className="absolute flex items-center justify-center px-2 z-10"
-					style={{ top: '22px', left: 0, right: 0, height: '14px' }}
-				>
-					<span
-						className="font-inter font-medium text-[10px] text-black"
-						style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}
-					>
-						{selectedSentIds.size} Selected
-					</span>
-					<span
-						className="font-inter font-medium text-[10px] text-black cursor-pointer hover:underline"
-						style={{ position: 'absolute', right: '10px' }}
-						onClick={handleSelectAllToggle}
-					>
-						Select All
-					</span>
-				</div>
-			)}
-
-			<div className="relative flex-1 flex flex-col pb-2 pt-2 min-h-0 px-2">
+			<div
+				className={cn(
+					'relative flex-1 flex flex-col pb-2 min-h-0 px-2 overflow-hidden',
+					isAllTab ? 'pt-0' : 'pt-2'
+				)}
+			>
 				{/* Scrollable list */}
 				<CustomScrollbar
 					className="flex-1 drafting-table-content"
@@ -259,28 +264,18 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 				>
 					<div
 						className="space-y-2 pb-2 flex flex-col items-center"
-						style={{ paddingTop: isAllTab ? '3px' : `${38 - whiteSectionHeight}px` }}
+						style={{ paddingTop: isAllTab ? '31px' : `${38 - whiteSectionHeight}px` }}
 					>
-						{sent.map((email) => {
-							const contact = contacts?.find((c) => c.id === email.contactId);
-							const contactName = contact
-								? `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
-								  contact.company ||
-								  'Contact'
-								: 'Unknown Contact';
-							const isSelected = selectedSentIds.has(email.id as number);
+						{inboundEmails.map((email) => {
+							const contact = resolveContactForEmail(email, contactByEmail);
+							const contactName = getCanonicalContactName(email, contactByEmail);
 
 							return (
 								<div
 									key={email.id}
 									className={cn(
-										'cursor-pointer transition-colors relative select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
-										isSelected && 'bg-[#A8E6A8]'
+										'transition-colors relative select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2'
 									)}
-									onMouseDown={(e) => {
-										if (e.shiftKey) e.preventDefault();
-									}}
-									onClick={(e) => handleSentClick(email.id as number, e)}
 								>
 									{/* Fixed top-right info (Location + Title) */}
 									<div className="absolute top-[6px] right-[6px] flex flex-col items-end gap-[2px] w-[110px] pointer-events-none">
@@ -363,31 +358,15 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 										{/* Row 2: Company (only when there is a separate name) */}
 										{(() => {
 											const hasSeparateName = Boolean(
-												(contact?.firstName && contact.firstName.trim()) ||
-													(contact?.lastName && contact.lastName.trim())
+												contact &&
+													((contact.firstName && contact.firstName.trim()) ||
+														(contact.lastName && contact.lastName.trim()))
 											);
 											return (
 												<div className="row-start-2 col-start-1 flex items-center pr-2 h-[16px] max-[480px]:h-[12px]">
 													<div className="text-[11px] text-black truncate leading-none">
 														{hasSeparateName ? contact?.company || '' : ''}
 													</div>
-
-													{/* Used-contact indicator - vertically centered */}
-													{usedContactIdsSet.has(email.contactId) && (
-														<span
-															className="absolute left-[8px]"
-															title="Used in a previous campaign"
-															style={{
-																top: '50%',
-																transform: 'translateY(-50%)',
-																width: '16px',
-																height: '16px',
-																borderRadius: '50%',
-																border: '1px solid #000000',
-																backgroundColor: '#DAE6FE',
-															}}
-														/>
-													)}
 												</div>
 											);
 										})()}
@@ -399,25 +378,27 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 
 										{/* Row 4: Message preview */}
 										<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px]">
-											{email.message
-												? email.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
+											{email.bodyPlain
+												? email.bodyPlain.substring(0, 60) + '...'
+												: email.bodyHtml
+												? email.bodyHtml.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
 												: 'No content'}
 										</div>
 									</div>
 								</div>
 							);
 						})}
-						{Array.from({ length: Math.max(0, 4 - sent.length) }).map((_, idx) => (
-							<div
-								key={`sent-placeholder-${idx}`}
-								className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#5AB477] p-2"
-							/>
-						))}
+						{Array.from({ length: Math.max(0, 4 - inboundEmails.length) }).map(
+							(_, idx) => (
+								<div
+									key={`inbox-placeholder-${idx}`}
+									className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#5EB6D6] p-2"
+								/>
+							)
+						)}
 					</div>
 				</CustomScrollbar>
 			</div>
 		</div>
 	);
 };
-
-export default SentExpandedList;

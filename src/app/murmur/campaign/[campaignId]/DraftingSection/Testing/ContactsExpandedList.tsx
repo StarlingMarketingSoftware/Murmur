@@ -211,20 +211,30 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const resolvedWidth = width ?? 376;
 	const resolvedHeight = height ?? 424;
 
+	/**
+	 * Special hack for "All" tab: if height is exactly 263px, we apply a thicker 3px border
+	 * to match the other elements in that layout. Otherwise standard 1px border.
+	 */
+	const isAllTab = height === 263;
+	const whiteSectionHeight = isAllTab ? 20 : 28;
+
 	return (
 		<div
-			className="relative max-[480px]:w-[96.27vw] rounded-md border border-black flex flex-col overflow-visible"
+			className={cn(
+				'relative max-[480px]:w-[96.27vw] rounded-md flex flex-col overflow-visible',
+				isAllTab ? 'border-[3px] border-black' : 'border border-black'
+			)}
 			style={{
 				width: typeof resolvedWidth === 'number' ? `${resolvedWidth}px` : resolvedWidth,
 				height:
 					typeof resolvedHeight === 'number' ? `${resolvedHeight}px` : resolvedHeight,
-				background: 'linear-gradient(to bottom, #ffffff 28px, #EB8586 28px)',
+				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #EB8586 ${whiteSectionHeight}px)`,
 			}}
 			role="region"
 			aria-label="Expanded contacts preview"
 		>
 			{/* Header row (no explicit divider; let the background change from white to pink like the main table) */}
-			<ContactsHeaderChrome />
+			<ContactsHeaderChrome isAllTab={isAllTab} />
 			<div
 				className={cn(
 					'flex items-center gap-2 h-[28px] px-3 shrink-0',
