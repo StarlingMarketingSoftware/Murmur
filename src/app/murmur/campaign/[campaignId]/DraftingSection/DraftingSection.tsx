@@ -31,6 +31,7 @@ import ContactsExpandedList from '@/app/murmur/campaign/[campaignId]/DraftingSec
 import { DraftsExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftsExpandedList';
 import { DraftPreviewExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftPreviewExpandedList';
 import { SentExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/SentExpandedList';
+import { InboxExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/InboxExpandedList';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
@@ -2618,6 +2619,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											contacts={contacts || []}
 											width={372}
 											height={354}
+										/>
+										{/* Row 2: Inbox */}
+										<InboxExpandedList
+											contacts={contacts || []}
+											allowedSenderEmails={campaignContactEmails}
+											contactByEmail={campaignContactsByEmail}
+											width={372}
+											height={426}
 										/>
 									</div>
 								</div>
