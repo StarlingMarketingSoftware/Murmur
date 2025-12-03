@@ -93,13 +93,6 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	const hasAnyParsedSections = parsedSectionsCount > 0;
 	const shouldHideSummary = hasAnyParsedSections && hideSummaryIfBullets;
 
-	// Adjust the overall panel height based on how many bullet sections we have.
-	// Note: parseMetadataSections only returns sections when there are at least 3,
-	// so parsedSectionsCount is either 0 or >= 3.
-	// - 0 sections: summary-only state (shortest)
-	// - 3 sections: shorter panel (or dynamic if summary hidden)
-	// - 4 sections: slightly taller (or dynamic if summary hidden)
-	// - 5+ sections: original full height (or dynamic if summary hidden)
 	const containerHeight = height
 		? height
 		: shouldHideSummary
@@ -115,7 +108,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	return (
 		<div
 			className={cn(
-				'hidden xl:block relative bg-[#D8E5FB] border-[2px] border-black rounded-[7px]',
+				'hidden xl:block relative bg-[#D8E5FB] border-[3px] border-black rounded-[7px]',
 				className
 			)}
 			style={{

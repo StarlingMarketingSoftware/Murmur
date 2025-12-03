@@ -2262,8 +2262,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										<div
 											style={{
 												width: '373px',
-												height: '284px',
+												height: '263px',
 												overflow: 'visible',
+												marginTop: '-1px', // Align bottom with MiniEmailStructure (349px) vs (Header 71px + Gap 16px + Contacts 263px = 350px)
 											}}
 										>
 											<ContactsExpandedList
@@ -2281,7 +2282,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
 												isPendingGeneration={isPendingGeneration}
 												width={373}
-												height={284}
+												height={263}
 												minRows={5}
 												onSearchFromMiniBar={handleMiniContactsSearch}
 											/>
@@ -2291,7 +2292,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											contact={displayedContactForResearch}
 											hideAllText={contactsAvailableForDrafting.length === 0}
 											hideSummaryIfBullets={true}
-											height={352}
+											height={347}
 										/>
 									</div>
 									{/* Column 2: Writing (Row 1) + Suggestion (Row 2) */}
@@ -2300,7 +2301,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										<div
 											style={{
 												width: '375px',
-												height: '373px',
+												height: '349px',
 												overflow: 'visible',
 											}}
 										>
@@ -2319,16 +2320,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												hideFooter
 												fullWidthMobile
 												hideAddTextButtons
+												height={349}
 											/>
 										</div>
 										{/* Row 2: Suggestion Box */}
 										<div
 											style={{
 												width: '377px',
-												height: '249px',
+												height: '347px',
 												background:
 													'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
-												border: '2px solid #000000',
+												border: '3px solid #000000',
 												borderRadius: '7px',
 												position: 'relative',
 											}}
@@ -2595,7 +2597,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											drafts={draftEmails}
 											contacts={contacts || []}
 											width={372}
-											height={354}
+											height={347}
 											hideSendButton
 										/>
 										{/* Row 2: Draft Preview */}
@@ -2610,6 +2612,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													  }
 													: null
 											}
+											width={372}
+											height={347}
 										/>
 									</div>
 
@@ -2620,7 +2624,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											sent={sentEmails}
 											contacts={contacts || []}
 											width={372}
-											height={354}
+											height={347}
 										/>
 										{/* Row 2: Inbox */}
 										<InboxExpandedList
@@ -2628,7 +2632,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											allowedSenderEmails={campaignContactEmails}
 											contactByEmail={campaignContactsByEmail}
 											width={372}
-											height={426}
+											height={347}
 										/>
 									</div>
 								</div>

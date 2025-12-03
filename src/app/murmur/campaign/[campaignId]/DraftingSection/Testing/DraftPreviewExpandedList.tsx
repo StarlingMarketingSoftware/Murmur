@@ -22,6 +22,10 @@ export interface DraftPreviewExpandedListProps {
 		subject?: string | null;
 		message?: string | null;
 	} | null;
+	/** Custom width in pixels */
+	width?: number;
+	/** Custom height in pixels */
+	height?: number;
 }
 
 const ArrowIcon = () => (
@@ -45,10 +49,16 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 	onHeaderClick,
 	livePreview,
 	fallbackDraft,
+	width = 376,
+	height = 426,
 }) => {
 	const useLive = Boolean(
 		livePreview?.visible && (livePreview?.message || livePreview?.subject)
 	);
+
+	// Special hack for "All" tab: if height is exactly 347px, we apply a thicker 3px border
+	// to match the other elements in that layout. Otherwise standard 2px border.
+	const isAllTab = height === 347;
 
 	const effectiveContactId = useMemo(() => {
 		return (
@@ -96,7 +106,11 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 
 	return (
 		<div
-			className="w-[376px] max-[480px]:w-[96.27vw] h-[426px] rounded-md border-2 border-black/30 bg-[#B4CBF4] px-2 pb-2 flex flex-col"
+			className={cn(
+				'max-[480px]:w-[96.27vw] rounded-md bg-[#B4CBF4] px-2 pb-2 flex flex-col',
+				isAllTab ? 'border-[3px] border-black' : 'border-2 border-black/30'
+			)}
+			style={{ width: `${width}px`, height: `${height}px` }}
 			role="region"
 			aria-label="Expanded draft preview"
 		>

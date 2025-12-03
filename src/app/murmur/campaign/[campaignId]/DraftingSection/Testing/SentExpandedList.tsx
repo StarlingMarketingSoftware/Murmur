@@ -53,9 +53,17 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 		() => new Set(usedContactIds || []),
 		[usedContactIds]
 	);
+
+	// Special hack for "All" tab: if height is exactly 347px, we apply a thicker 3px border
+	// to match the other elements in that layout. Otherwise standard 2px border.
+	const isAllTab = height === 347;
+
 	return (
 		<div
-			className="max-[480px]:w-[96.27vw] rounded-md border-2 border-black/30 bg-[#CFEBCF] px-2 pb-2 flex flex-col"
+			className={cn(
+				'max-[480px]:w-[96.27vw] rounded-md bg-[#CFEBCF] px-2 pb-2 flex flex-col',
+				isAllTab ? 'border-[3px] border-black' : 'border-2 border-black/30'
+			)}
 			style={{ width: `${width}px`, height: `${height}px` }}
 			role="region"
 			aria-label="Expanded sent preview"
