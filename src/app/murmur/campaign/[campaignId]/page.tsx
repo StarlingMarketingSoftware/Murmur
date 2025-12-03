@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { cn } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useState, useEffect } from 'react';
+import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 
 const Murmur = () => {
 	// Add campaign-specific class to body for background styling
@@ -59,6 +60,18 @@ const Murmur = () => {
 	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
 	return (
 		<div className="min-h-screen">
+			{/* Left navigation arrow - fixed position */}
+			<div
+				className="fixed z-50"
+				style={{
+					left: '33px',
+					top: '50%',
+					transform: 'translateY(-50%)',
+				}}
+			>
+				<LeftArrow />
+			</div>
+
 			{/* Minimal header - just Back to Home link */}
 			<div data-slot="campaign-header">
 				<div className="relative h-[50px]">
