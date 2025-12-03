@@ -4,6 +4,7 @@ import { useCampaignDetail } from './useCampaignDetail';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { IdentityDialog } from '@/components/organisms/_dialogs/IdentityDialog/IdentityDialog';
 import { DraftingSection } from './DraftingSection/DraftingSection';
+import { CampaignRightPanel } from '@/components/organisms/CampaignRightPanel/CampaignRightPanel';
 import { useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import Link from 'next/link';
@@ -644,6 +645,9 @@ const Murmur = () => {
 					`}</style>
 				</div>
 			</div>
+
+			{/* Right side panel */}
+			{!isMobile && <CampaignRightPanel view={activeView} onTabChange={setActiveView} />}
 		</div>
 	);
 };

@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useState } from 'react';
+import { FC, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
@@ -98,6 +98,18 @@ interface InboxSectionProps {
 	 * Optional callback to navigate to the contacts tab in the campaign page.
 	 */
 	onGoToContacts?: () => void;
+
+	/**
+	 * Optional callback when a contact is selected (based on the selected email).
+	 * Used to display the research panel for the selected contact.
+	 */
+	onContactSelect?: (contact: ContactWithName | null) => void;
+
+	/**
+	 * Optional callback when hovering over an email in the list.
+	 * Used to temporarily display the research panel for the hovered contact.
+	 */
+	onContactHover?: (contact: ContactWithName | null) => void;
 }
 
 /**
@@ -182,6 +194,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	onGoToDrafting,
 	onGoToWriting,
 	onGoToContacts,
+	onContactSelect,
+	onContactHover,
 }) => {
 	const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>('inbox');
 	const {
@@ -291,6 +305,18 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	});
 
 	const selectedEmail = visibleEmails?.find((email) => email.id === selectedEmailId);
+
+	// Notify parent when selected contact changes (for research panel)
+	useEffect(() => {
+		if (onContactSelect) {
+			if (selectedEmail) {
+				const contact = resolveContactForEmail(selectedEmail, contactByEmail);
+				onContactSelect(contact as ContactWithName | null);
+			} else {
+				onContactSelect(null);
+			}
+		}
+	}, [selectedEmail, contactByEmail, onContactSelect]);
 
 	const handleSendReply = async () => {
 		if (!selectedEmail || !replyMessage.trim()) return;
@@ -1282,6 +1308,17 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								onClick={() => {
 									setSelectedEmailId(email.id);
 									setReplyMessage('');
+								}}
+								onMouseEnter={() => {
+									if (onContactHover) {
+										const contact = resolveContactForEmail(email, contactByEmail);
+										onContactHover(contact as ContactWithName | null);
+									}
+								}}
+								onMouseLeave={() => {
+									if (onContactHover) {
+										onContactHover(null);
+									}
 								}}
 							>
 								<div className="flex gap-3 w-full h-full">
