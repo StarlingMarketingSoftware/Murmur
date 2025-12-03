@@ -47,6 +47,37 @@ const Murmur = () => {
 		'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'
 	>(getInitialView());
 
+	// Tab navigation order
+	const tabOrder: Array<'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'> = [
+		'search',
+		'contacts',
+		'testing',
+		'drafting',
+		'sent',
+		'inbox',
+		'all',
+	];
+
+	const goToPreviousTab = () => {
+		const currentIndex = tabOrder.indexOf(activeView);
+		if (currentIndex > 0) {
+			setActiveView(tabOrder[currentIndex - 1]);
+		} else {
+			// Wrap around to the last tab
+			setActiveView(tabOrder[tabOrder.length - 1]);
+		}
+	};
+
+	const goToNextTab = () => {
+		const currentIndex = tabOrder.indexOf(activeView);
+		if (currentIndex < tabOrder.length - 1) {
+			setActiveView(tabOrder[currentIndex + 1]);
+		} else {
+			// Wrap around to the first tab
+			setActiveView(tabOrder[0]);
+		}
+	};
+
 	if (isPendingCampaign || !campaign) {
 		return silentLoad ? null : <Spinner />;
 	}
@@ -62,26 +93,32 @@ const Murmur = () => {
 	return (
 		<div className="min-h-screen">
 			{/* Left navigation arrow - fixed position */}
-			<div
-				className="fixed z-50"
+			<button
+				type="button"
+				onClick={goToPreviousTab}
+				className="fixed z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
 				style={{
 					left: '33px',
 					top: '467px',
 				}}
+				aria-label="Previous tab"
 			>
 				<LeftArrow />
-			</div>
+			</button>
 
 			{/* Right navigation arrow - fixed position */}
-			<div
-				className="fixed z-50"
+			<button
+				type="button"
+				onClick={goToNextTab}
+				className="fixed z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
 				style={{
 					right: '33px',
 					top: '467px',
 				}}
+				aria-label="Next tab"
 			>
 				<RightArrow />
-			</div>
+			</button>
 
 			{/* Minimal header - just Back to Home link */}
 			<div data-slot="campaign-header">
