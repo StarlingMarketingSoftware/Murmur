@@ -28,6 +28,9 @@ import { ContactResearchPanel } from '@/components/molecules/ContactResearchPane
 import { TestPreviewPanel } from '@/components/molecules/TestPreviewPanel/TestPreviewPanel';
 import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
 import ContactsExpandedList from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
+import { DraftsExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftsExpandedList';
+import { DraftPreviewExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftPreviewExpandedList';
+import { SentExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/SentExpandedList';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
@@ -2242,7 +2245,382 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* All tab */}
 						{view === 'all' && (
 							<div className="mt-6 flex justify-center">
-								{/* Empty - ready for building */}
+								<div className="flex flex-row items-start gap-4">
+									{/* Left column: Campaign Header + Contacts + Research */}
+									<div className="flex flex-col items-center gap-4">
+										<CampaignHeaderBox
+											campaignId={campaign?.id}
+											campaignName={campaign?.name || 'Untitled Campaign'}
+											toListNames={toListNames}
+											fromName={fromName}
+											contactsCount={contactsCount}
+											draftCount={draftCount}
+											sentCount={sentCount}
+											onFromClick={onOpenIdentityDialog}
+										/>
+										<div
+											style={{
+												width: '373px',
+												height: '284px',
+												overflow: 'visible',
+											}}
+										>
+											<ContactsExpandedList
+												contacts={contactsAvailableForDrafting}
+												campaign={campaign}
+												selectedContactIds={contactsTabSelectedIds}
+												onContactSelectionChange={(updater) =>
+													setContactsTabSelectedIds((prev) => updater(new Set(prev)))
+												}
+												onContactClick={handleResearchContactClick}
+												onContactHover={handleResearchContactHover}
+												onDraftSelected={async (ids) => {
+													await handleGenerateDrafts(ids);
+												}}
+												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+												isPendingGeneration={isPendingGeneration}
+												width={373}
+												height={284}
+												minRows={5}
+												onSearchFromMiniBar={handleMiniContactsSearch}
+											/>
+										</div>
+										{/* Research Panel */}
+										<ContactResearchPanel
+											contact={displayedContactForResearch}
+											hideAllText={contactsAvailableForDrafting.length === 0}
+										/>
+									</div>
+									{/* Column 2: Writing (Row 1) + Suggestion (Row 2) */}
+									<div className="flex flex-col items-center gap-4">
+										{/* Row 1: Mini Email Structure */}
+										<div
+											style={{
+												width: '375px',
+												height: '373px',
+												overflow: 'visible',
+											}}
+										>
+											<MiniEmailStructure
+												form={form}
+												onDraft={() =>
+													handleGenerateDrafts(
+														contactsAvailableForDrafting.map((c) => c.id)
+													)
+												}
+												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+												isPendingGeneration={isPendingGeneration}
+												generationProgress={generationProgress}
+												generationTotal={contactsAvailableForDrafting.length}
+												hideTopChrome
+												hideFooter
+												fullWidthMobile
+												hideAddTextButtons
+											/>
+										</div>
+										{/* Row 2: Suggestion Box */}
+										<div
+											style={{
+												width: '377px',
+												height: '249px',
+												background:
+													'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
+												border: '2px solid #000000',
+												borderRadius: '7px',
+												position: 'relative',
+											}}
+										>
+											<div
+												style={{
+													height: '28px',
+													display: 'flex',
+													alignItems: 'center',
+													paddingLeft: '9px',
+												}}
+											>
+												<span className="font-inter font-bold text-[12px] leading-none text-black">
+													Suggestion
+												</span>
+											</div>
+											{/* Inner box */}
+											<div
+												style={{
+													position: 'absolute',
+													top: '34px',
+													left: '50%',
+													transform: 'translateX(-50%)',
+													width: '369px',
+													height: '44px',
+													backgroundColor: '#FFFFFF',
+													border: '2px solid #000000',
+													borderRadius: '7px',
+												}}
+											>
+												{/* Score label */}
+												<div
+													style={{
+														position: 'absolute',
+														top: '6px',
+														left: '10px',
+														fontFamily: 'Inter, system-ui, sans-serif',
+														fontWeight: 700,
+														fontSize: '12px',
+														lineHeight: '14px',
+														color: '#000000',
+													}}
+												>
+													{promptScoreDisplayLabel}
+												</div>
+												{/* Small box inside (progress track) */}
+												<div
+													style={{
+														position: 'absolute',
+														bottom: '3px',
+														left: '4px',
+														width: '223px',
+														height: '12px',
+														backgroundColor: '#FFFFFF',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+														overflow: 'hidden',
+													}}
+												>
+													<div
+														style={{
+															position: 'absolute',
+															top: 0,
+															bottom: 0,
+															left: 0,
+															borderRadius: '999px',
+															backgroundColor: '#36B24A',
+															width: `${promptScoreFillPercent}%`,
+															maxWidth: '100%',
+															transition: 'width 250ms ease-out',
+														}}
+													/>
+												</div>
+											</div>
+											{/* Undo button */}
+											<div
+												onClick={() => {
+													if (hasPreviousPrompt) {
+														undoUpscalePrompt();
+													}
+												}}
+												style={{
+													position: 'absolute',
+													top: '83px',
+													left: '6px',
+													width: '39px',
+													height: '32px',
+													backgroundColor: '#C2C2C2',
+													border: '2px solid #000000',
+													borderRadius: '8px',
+													display: 'flex',
+													alignItems: 'center',
+													justifyContent: 'center',
+													cursor: hasPreviousPrompt ? 'pointer' : 'not-allowed',
+													opacity: hasPreviousPrompt ? 1 : 0.5,
+												}}
+											>
+												<UndoIcon width="24" height="24" />
+											</div>
+											{/* Upscale Prompt button */}
+											<div
+												onClick={() => {
+													if (!isUpscalingPrompt) {
+														upscalePrompt();
+													}
+												}}
+												style={{
+													position: 'absolute',
+													top: '83px',
+													left: '50px',
+													width: '196px',
+													height: '32px',
+													backgroundColor: '#D7F0FF',
+													border: '2px solid #000000',
+													borderRadius: '8px',
+													display: 'flex',
+													alignItems: 'center',
+													justifyContent: 'space-between',
+													paddingLeft: '10px',
+													paddingRight: '10px',
+													cursor: isUpscalingPrompt ? 'wait' : 'pointer',
+												}}
+											>
+												<span
+													style={{
+														fontFamily: 'Inter, system-ui, sans-serif',
+														fontSize: '17px',
+														fontWeight: 500,
+														color: '#000000',
+														lineHeight: '1',
+													}}
+												>
+													{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
+												</span>
+												<div style={{ flexShrink: 0 }}>
+													<UpscaleIcon width="24" height="24" />
+												</div>
+											</div>
+											{/* Suggestion 1 */}
+											<div
+												style={{
+													position: 'absolute',
+													top: '123px',
+													left: '50%',
+													transform: 'translateX(-50%)',
+													width: '362px',
+													height: '56px',
+													backgroundColor: '#A6E0B4',
+													border: '2px solid #000000',
+													borderRadius: '8px',
+												}}
+											>
+												<div
+													className="absolute font-inter font-bold"
+													style={{
+														top: '4.5px',
+														left: '8px',
+														fontSize: '11.5px',
+														color: '#000000',
+													}}
+												>
+													[1]
+												</div>
+												<div
+													style={{
+														position: 'absolute',
+														top: '0',
+														bottom: '0',
+														margin: 'auto',
+														left: '25px',
+														width: '324px',
+														height: '48px',
+														backgroundColor: '#FFFFFF',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+														display: 'flex',
+														alignItems: 'center',
+														padding: '4px 8px',
+														overflow: 'hidden',
+													}}
+												>
+													<div
+														style={{
+															fontFamily: 'Inter, system-ui, sans-serif',
+															fontSize: '11px',
+															lineHeight: '1.3',
+															color: suggestionText1 ? '#000000' : '#888888',
+															wordBreak: 'break-word',
+															whiteSpace: 'normal',
+															overflow: 'hidden',
+															textOverflow: 'ellipsis',
+														}}
+													>
+														{suggestionText1 || 'Add your prompt to get suggestions'}
+													</div>
+												</div>
+											</div>
+											{/* Suggestion 2 */}
+											<div
+												style={{
+													position: 'absolute',
+													top: '187px',
+													left: '50%',
+													transform: 'translateX(-50%)',
+													width: '362px',
+													height: '56px',
+													backgroundColor: '#5BCB75',
+													border: '2px solid #000000',
+													borderRadius: '8px',
+												}}
+											>
+												<div
+													className="absolute font-inter font-bold"
+													style={{
+														top: '4.5px',
+														left: '8px',
+														fontSize: '11.5px',
+														color: '#000000',
+													}}
+												>
+													[2]
+												</div>
+												<div
+													style={{
+														position: 'absolute',
+														top: '0',
+														bottom: '0',
+														margin: 'auto',
+														left: '25px',
+														width: '324px',
+														height: '48px',
+														backgroundColor: '#FFFFFF',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+														display: 'flex',
+														alignItems: 'center',
+														padding: '4px 8px',
+														overflow: 'hidden',
+													}}
+												>
+													<div
+														style={{
+															fontFamily: 'Inter, system-ui, sans-serif',
+															fontSize: '11px',
+															lineHeight: '1.3',
+															color: suggestionText2 ? '#000000' : '#888888',
+															wordBreak: 'break-word',
+															whiteSpace: 'normal',
+															overflow: 'hidden',
+															textOverflow: 'ellipsis',
+														}}
+													>
+														{suggestionText2 || 'More suggestions will appear here'}
+													</div>
+												</div>
+											</div>
+										</div>
+									</div>
+
+									{/* Column 3: Drafts (Row 1) + Preview (Row 2) */}
+									<div className="flex flex-col items-center gap-4">
+										{/* Row 1: Drafts */}
+										<DraftsExpandedList
+											drafts={draftEmails}
+											contacts={contacts || []}
+											width={372}
+											height={354}
+											hideSendButton
+										/>
+										{/* Row 2: Draft Preview */}
+										<DraftPreviewExpandedList
+											contacts={contacts || []}
+											fallbackDraft={
+												draftEmails[0]
+													? {
+															contactId: draftEmails[0].contactId,
+															subject: draftEmails[0].subject,
+															message: draftEmails[0].message,
+													  }
+													: null
+											}
+										/>
+									</div>
+
+									{/* Column 4: Sent (Row 1) + Inbox (Row 2) */}
+									<div className="flex flex-col items-center gap-4">
+										{/* Row 1: Sent */}
+										<SentExpandedList
+											sent={sentEmails}
+											contacts={contacts || []}
+											width={372}
+											height={354}
+										/>
+									</div>
+								</div>
 							</div>
 						)}
 

@@ -19,6 +19,10 @@ export interface SentExpandedListProps {
 	sent: EmailWithRelations[];
 	contacts: ContactWithName[];
 	onHeaderClick?: () => void;
+	/** Custom width in pixels */
+	width?: number;
+	/** Custom height in pixels */
+	height?: number;
 }
 
 const ArrowIcon = () => (
@@ -41,6 +45,8 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 	sent,
 	contacts,
 	onHeaderClick,
+	width = 376,
+	height = 426,
 }) => {
 	const { data: usedContactIds } = useGetUsedContactIds();
 	const usedContactIdsSet = useMemo(
@@ -49,7 +55,8 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 	);
 	return (
 		<div
-			className="w-[376px] max-[480px]:w-[96.27vw] h-[426px] rounded-md border-2 border-black/30 bg-[#CFEBCF] px-2 pb-2 flex flex-col"
+			className="max-[480px]:w-[96.27vw] rounded-md border-2 border-black/30 bg-[#CFEBCF] px-2 pb-2 flex flex-col"
+			style={{ width: `${width}px`, height: `${height}px` }}
 			role="region"
 			aria-label="Expanded sent preview"
 		>

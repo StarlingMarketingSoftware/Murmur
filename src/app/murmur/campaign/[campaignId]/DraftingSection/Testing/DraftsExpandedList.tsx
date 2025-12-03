@@ -32,6 +32,12 @@ export interface DraftsExpandedListProps {
 	// Live Send Preview callbacks for status panel
 	onSendingPreviewUpdate?: (args: { contactId: number; subject?: string }) => void;
 	onSendingPreviewReset?: () => void;
+	/** Custom width in pixels */
+	width?: number;
+	/** Custom height in pixels */
+	height?: number;
+	/** When true, hides the footer send button */
+	hideSendButton?: boolean;
 }
 
 const ArrowIcon = () => (
@@ -56,6 +62,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	onHeaderClick,
 	onSendingPreviewUpdate,
 	onSendingPreviewReset,
+	width = 376,
+	height = 426,
+	hideSendButton = false,
 }) => {
 	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
 	const lastClickedRef = useRef<number | null>(null);
@@ -240,7 +249,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	};
 	return (
 		<div
-			className="w-[376px] max-[480px]:w-[96.27vw] h-[426px] rounded-md border-2 border-black/30 bg-[#F4E5BC] px-2 pb-2 flex flex-col"
+			className="max-[480px]:w-[96.27vw] rounded-md border-2 border-black/30 bg-[#F4E5BC] px-2 pb-2 flex flex-col"
+			style={{ width: `${width}px`, height: `${height}px` }}
 			role="region"
 			aria-label="Expanded drafts preview"
 		>
@@ -453,19 +463,21 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 			</CustomScrollbar>
 
 			{/* Footer bar */}
-			<div className="flex justify-center w-full mt-2">
-				<button
-					type="button"
-					disabled={isSendDisabled}
-					className={cn(
-						'w-full max-w-[356px] max-[480px]:max-w-none h-[26px] rounded-[6px] bg-[#B5E2B5] border border-black flex items-center justify-center text-[12px] font-medium',
-						isSendDisabled && 'opacity-50 cursor-not-allowed'
-					)}
-					onClick={handleSendSelected}
-				>
-					{isSending ? 'Sending...' : 'Send Selected'}
-				</button>
-			</div>
+			{!hideSendButton && (
+				<div className="flex justify-center w-full mt-2">
+					<button
+						type="button"
+						disabled={isSendDisabled}
+						className={cn(
+							'w-full max-w-[356px] max-[480px]:max-w-none h-[26px] rounded-[6px] bg-[#B5E2B5] border border-black flex items-center justify-center text-[12px] font-medium',
+							isSendDisabled && 'opacity-50 cursor-not-allowed'
+						)}
+						onClick={handleSendSelected}
+					>
+						{isSending ? 'Sending...' : 'Send Selected'}
+					</button>
+				</div>
+			)}
 		</div>
 	);
 };
