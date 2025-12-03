@@ -426,7 +426,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 						{Array.from({ length: Math.max(0, 4 - sent.length) }).map((_, idx) => (
 							<div
 								key={`sent-placeholder-${idx}`}
-								className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
+								className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#5AB477] p-2"
 							/>
 						))}
 					</div>

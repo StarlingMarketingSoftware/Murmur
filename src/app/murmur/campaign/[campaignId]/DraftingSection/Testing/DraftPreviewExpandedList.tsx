@@ -5,6 +5,7 @@ import { ContactWithName } from '@/types/contact';
 import { cn, convertHtmlToPlainText } from '@/utils';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
 export interface DraftPreviewExpandedListProps {
 	contacts: ContactWithName[];
@@ -213,13 +214,22 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 						borderRadius: '6px',
 						backgroundColor: 'white',
 					}}
-					className="flex-1 overflow-hidden"
+					className="flex-1 overflow-hidden drafting-table-content"
 				>
-					<div className="h-full overflow-hidden">
-						<div className="p-3 whitespace-pre-wrap text-[11px] leading-[1.4] overflow-y-auto h-full">
+					<CustomScrollbar
+						className="h-full"
+						thumbWidth={2}
+						thumbColor="#000000"
+						trackColor="transparent"
+						offsetRight={2}
+						contentClassName="overflow-x-hidden"
+						alwaysShow
+						lockHorizontalScroll
+					>
+						<div className="p-3 whitespace-pre-wrap text-[11px] leading-[1.4]">
 							{plainMessage || 'No content'}
 						</div>
-					</div>
+					</CustomScrollbar>
 				</div>
 			</div>
 		</div>

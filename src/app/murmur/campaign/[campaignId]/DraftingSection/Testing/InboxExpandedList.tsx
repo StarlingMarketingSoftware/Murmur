@@ -409,7 +409,7 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 							(_, idx) => (
 								<div
 									key={`inbox-placeholder-${idx}`}
-									className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2"
+									className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#5EB6D6] p-2"
 								/>
 							)
 						)}
