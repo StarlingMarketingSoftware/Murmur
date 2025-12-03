@@ -35,6 +35,8 @@ interface MiniEmailStructureProps {
 	hideAddTextButtons?: boolean;
 	/** When true, visually hides all text inside the panel (used for empty Drafts state) */
 	hideAllText?: boolean;
+	/** Optional height override for the container */
+	height?: number | string;
 }
 
 export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
@@ -50,6 +52,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	fullWidthMobile,
 	hideAddTextButtons,
 	hideAllText,
+	height,
 }) => {
 	const watchedHybridBlocks = form.watch('hybridBlockPrompts');
 	const hybridBlocks = useMemo(() => watchedHybridBlocks || [], [watchedHybridBlocks]);
@@ -559,12 +562,13 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 			style={{
 				cursor: hideAllText ? 'default' : 'auto',
 				width: fullWidthMobile ? '100%' : '376px',
-				height:
-					isMobilePortrait || isMobileLandscape
-						? 'auto'
-						: isCompactSignature
-						? '373px'
-						: '474px',
+				height: height
+					? height
+					: isMobilePortrait || isMobileLandscape
+					? 'auto'
+					: isCompactSignature
+					? '373px'
+					: '474px',
 				position: 'relative',
 				overflow: 'visible',
 			}}

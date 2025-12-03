@@ -5,6 +5,7 @@ import { ContactWithName } from '@/types/contact';
 import { cn, convertHtmlToPlainText } from '@/utils';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
 export interface DraftPreviewExpandedListProps {
 	contacts: ContactWithName[];
@@ -22,6 +23,10 @@ export interface DraftPreviewExpandedListProps {
 		subject?: string | null;
 		message?: string | null;
 	} | null;
+	/** Custom width in pixels */
+	width?: number;
+	/** Custom height in pixels */
+	height?: number;
 }
 
 const ArrowIcon = () => (
@@ -45,10 +50,16 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 	onHeaderClick,
 	livePreview,
 	fallbackDraft,
+	width = 376,
+	height = 426,
 }) => {
 	const useLive = Boolean(
 		livePreview?.visible && (livePreview?.message || livePreview?.subject)
 	);
+
+	// Special hack for "All" tab: if height is exactly 347px, we apply a thicker 3px border
+	// to match the other elements in that layout. Otherwise standard 2px border.
+	const isAllTab = height === 347;
 
 	const effectiveContactId = useMemo(() => {
 		return (
@@ -96,7 +107,11 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 
 	return (
 		<div
-			className="w-[376px] max-[480px]:w-[96.27vw] h-[426px] rounded-md border-2 border-black/30 bg-[#B4CBF4] px-2 pb-2 flex flex-col"
+			className={cn(
+				'max-[480px]:w-[96.27vw] rounded-md bg-[#B4CBF4] px-2 pb-2 flex flex-col',
+				isAllTab ? 'border-[3px] border-black' : 'border-2 border-black/30'
+			)}
+			style={{ width: `${width}px`, height: `${height}px` }}
 			role="region"
 			aria-label="Expanded draft preview"
 		>
@@ -199,13 +214,22 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 						borderRadius: '6px',
 						backgroundColor: 'white',
 					}}
-					className="flex-1 overflow-hidden"
+					className="flex-1 overflow-hidden drafting-table-content"
 				>
-					<div className="h-full overflow-hidden">
-						<div className="p-3 whitespace-pre-wrap text-[11px] leading-[1.4] overflow-y-auto h-full">
+					<CustomScrollbar
+						className="h-full"
+						thumbWidth={2}
+						thumbColor="#000000"
+						trackColor="transparent"
+						offsetRight={2}
+						contentClassName="overflow-x-hidden"
+						alwaysShow
+						lockHorizontalScroll
+					>
+						<div className="p-3 whitespace-pre-wrap text-[11px] leading-[1.4]">
 							{plainMessage || 'No content'}
 						</div>
-					</div>
+					</CustomScrollbar>
 				</div>
 			</div>
 		</div>
