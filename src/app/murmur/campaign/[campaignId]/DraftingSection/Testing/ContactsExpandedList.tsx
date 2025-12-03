@@ -216,6 +216,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	 * to match the other elements in that layout. Otherwise standard 1px border.
 	 */
 	const isAllTab = height === 263;
+	const whiteSectionHeight = isAllTab ? 20 : 28;
 
 	return (
 		<div
@@ -227,13 +228,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				width: typeof resolvedWidth === 'number' ? `${resolvedWidth}px` : resolvedWidth,
 				height:
 					typeof resolvedHeight === 'number' ? `${resolvedHeight}px` : resolvedHeight,
-				background: 'linear-gradient(to bottom, #ffffff 28px, #EB8586 28px)',
+				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #EB8586 ${whiteSectionHeight}px)`,
 			}}
 			role="region"
 			aria-label="Expanded contacts preview"
 		>
 			{/* Header row (no explicit divider; let the background change from white to pink like the main table) */}
-			<ContactsHeaderChrome />
+			<ContactsHeaderChrome isAllTab={isAllTab} />
 			<div
 				className={cn(
 					'flex items-center gap-2 h-[28px] px-3 shrink-0',

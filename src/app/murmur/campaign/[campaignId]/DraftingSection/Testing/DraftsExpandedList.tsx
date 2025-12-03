@@ -56,6 +56,108 @@ const ArrowIcon = () => (
 	</svg>
 );
 
+const DraftsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isAllTab?: boolean }> = ({
+	offsetY = 0,
+	hasData = true,
+	isAllTab = false,
+}) => {
+	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
+	const pillBorderColor = hasData ? '#8D5B5B' : '#B0B0B0';
+	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
+	const pillBgColor = hasData ? '#F5DADA' : '#FFAEAE';
+	const dotSize = isAllTab ? 6 : 9;
+	// First dot is 29px from the left
+	const dot1Left = 29;
+	const dot2Left = isAllTab ? 177.5 : 176;
+	const dot3Left = isAllTab ? 236.5 : 235;
+	// Pill dimensions for All tab
+	const pillWidth = isAllTab ? 50 : 72;
+	// Center pill between first and second dots
+	const midpointBetweenDots = (dot1Left + dot2Left) / 2;
+	const pillLeft = midpointBetweenDots - pillWidth / 2;
+	const pillHeight = isAllTab ? 15 : 22;
+	const pillBorderRadius = isAllTab ? 7.5 : 11;
+	const pillFontSize = isAllTab ? '10px' : '13px';
+	// Center dots vertically with the pill - calculate both positions relative to each other
+	const pillTop = 3 + offsetY;
+	const pillCenterY = pillTop + pillHeight / 2;
+	const dotTop = Math.round(pillCenterY - dotSize / 2);
+
+	return (
+		<>
+			<div
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					left: `${dot1Left}px`,
+					width: `${dotSize}px`,
+					height: `${dotSize}px`,
+					borderRadius: '50%',
+					backgroundColor: dotColor,
+					zIndex: 10,
+				}}
+			/>
+			<div
+				style={{
+					position: 'absolute',
+					top: `${pillTop}px`,
+					left: `${pillLeft}px`,
+					width: `${pillWidth}px`,
+					height: `${pillHeight}px`,
+					backgroundColor: pillBgColor,
+					border: `2px solid ${pillBorderColor}`,
+					borderRadius: `${pillBorderRadius}px`,
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					zIndex: 10,
+				}}
+			>
+				<span
+					className="font-semibold font-inter leading-none"
+					style={{ 
+						color: pillTextColor, 
+						fontSize: pillFontSize, 
+						textAlign: 'center', 
+						width: '100%',
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center',
+						height: '100%',
+						marginTop: isAllTab ? '-1px' : 0 // Optical alignment adjustment
+					}}
+				>
+					Drafts
+				</span>
+			</div>
+			<div
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					left: `${dot2Left}px`,
+					width: `${dotSize}px`,
+					height: `${dotSize}px`,
+					borderRadius: '50%',
+					backgroundColor: dotColor,
+					zIndex: 10,
+				}}
+			/>
+			<div
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					left: `${dot3Left}px`,
+					width: `${dotSize}px`,
+					height: `${dotSize}px`,
+					borderRadius: '50%',
+					backgroundColor: dotColor,
+					zIndex: 10,
+				}}
+			/>
+		</>
+	);
+};
+
 export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	drafts,
 	contacts,
@@ -135,6 +237,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	// Special hack for "All" tab: if height is exactly 347px, we apply a thicker 3px border
 	// to match the other elements in that layout. Otherwise standard 2px border.
 	const isAllTab = height === 347;
+	const whiteSectionHeight = isAllTab ? 20 : 28;
 
 	const handleSendSelected = async () => {
 		console.log('handleSendSelected called', { isSendDisabled, selectedDraftIds });
@@ -254,17 +357,22 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	return (
 		<div
 			className={cn(
-				'max-[480px]:w-[96.27vw] rounded-md bg-[#F4E5BC] px-2 pb-2 flex flex-col',
+				'relative max-[480px]:w-[96.27vw] rounded-md flex flex-col overflow-visible',
 				isAllTab ? 'border-[3px] border-black' : 'border-2 border-black/30'
 			)}
-			style={{ width: `${width}px`, height: `${height}px` }}
+			style={{
+				width: `${width}px`,
+				height: `${height}px`,
+				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #FFDC9E ${whiteSectionHeight}px)`,
+			}}
 			role="region"
 			aria-label="Expanded drafts preview"
 		>
-			{/* Header row */}
+			{/* Header row (no explicit divider; let the background change from white to yellow like the main table) */}
+			<DraftsHeaderChrome isAllTab={isAllTab} />
 			<div
 				className={cn(
-					'flex items-center gap-2 h-[21px] px-1',
+					'flex items-center gap-2 h-[28px] px-3 shrink-0',
 					onHeaderClick ? 'cursor-pointer' : ''
 				)}
 				role={onHeaderClick ? 'button' : undefined}
@@ -277,47 +385,23 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 						onHeaderClick();
 					}
 				}}
-			>
-				<span className="font-bold text-black text-sm">Drafts</span>
-				<div className="ml-auto flex items-center gap-2 text-[11px] text-black/70 font-medium h-full">
-					<span>{`${drafts.length} drafts`}</span>
-					<div className="w-px self-stretch border-l border-black/40" />
-					<button
-						type="button"
-						className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-						onClick={(e) => {
-							e.stopPropagation();
-							handleSelectAllToggle();
-						}}
-					>
-						{areAllSelected ? 'Deselect All' : 'Select All'}
-					</button>
-					<div className="w-px self-stretch border-l border-black/40" />
-					<button
-						type="button"
-						className="bg-transparent border-none p-0 hover:text-black text-[11px] font-medium"
-						onClick={(e) => e.stopPropagation()}
-					>
-						Send
-					</button>
-				</div>
-				<div className="self-stretch flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 border-l border-black/40 pl-2">
-					<span className="w-[20px] text-center">3</span>
-					<ArrowIcon />
-				</div>
-			</div>
+			></div>
 
-			{/* Scrollable list */}
-			<CustomScrollbar
-				className="flex-1 drafting-table-content"
-				thumbWidth={2}
-				thumbColor="#000000"
-				trackColor="transparent"
-				offsetRight={-14}
-				contentClassName="overflow-x-hidden"
-				alwaysShow
-			>
-				<div className="space-y-2 pb-2 flex flex-col items-center">
+			<div className="relative flex-1 flex flex-col pb-2 pt-2 min-h-0 px-2">
+				{/* Scrollable list */}
+				<CustomScrollbar
+					className="flex-1 drafting-table-content"
+					thumbWidth={2}
+					thumbColor="#000000"
+					trackColor="transparent"
+					offsetRight={-14}
+					contentClassName="overflow-x-hidden"
+					alwaysShow
+				>
+					<div 
+						className="space-y-2 pb-2 flex flex-col items-center"
+						style={{ paddingTop: `${38 - whiteSectionHeight}px` }}
+					>
 					{drafts.map((draft) => {
 						const contact = contacts?.find((c) => c.id === draft.contactId);
 						const contactName = contact
@@ -468,6 +552,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 					))}
 				</div>
 			</CustomScrollbar>
+			</div>
 
 			{/* Footer bar */}
 			{!hideSendButton && (

@@ -5,16 +5,29 @@ import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { urls } from '@/constants/urls';
 
-export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean }> = ({
+export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isAllTab?: boolean }> = ({
 	offsetY = 0,
 	hasData = true,
+	isAllTab = false,
 }) => {
-	const pillTop = 3 + offsetY;
-	const dotTop = 10 + offsetY;
 	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
 	const pillBorderColor = hasData ? '#8D5B5B' : '#B0B0B0';
 	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
 	const pillBgColor = hasData ? '#F5DADA' : '#FFAEAE';
+	const dotSize = isAllTab ? 6 : 9;
+	// Adjust left position to center smaller dots (add 1.5px to keep same visual center)
+	const dot1Left = isAllTab ? 118.5 : 117;
+	const dot2Left = isAllTab ? 177.5 : 176;
+	const dot3Left = isAllTab ? 236.5 : 235;
+	// Pill dimensions for All tab
+	const pillWidth = isAllTab ? 50 : 72;
+	const pillHeight = isAllTab ? 15 : 22;
+	const pillBorderRadius = isAllTab ? 7.5 : 11;
+	const pillFontSize = isAllTab ? '10px' : '13px';
+	// Center dots vertically with the pill - calculate both positions relative to each other
+	const pillTop = 3 + offsetY;
+	const pillCenterY = pillTop + pillHeight / 2;
+	const dotTop = Math.round(pillCenterY - dotSize / 2);
 
 	return (
 		<>
@@ -23,11 +36,11 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean }> =
 					position: 'absolute',
 					top: `${pillTop}px`,
 					left: '21px',
-					width: '72px',
-					height: '22px',
+					width: `${pillWidth}px`,
+					height: `${pillHeight}px`,
 					backgroundColor: pillBgColor,
 					border: `2px solid ${pillBorderColor}`,
-					borderRadius: '11px',
+					borderRadius: `${pillBorderRadius}px`,
 					display: 'flex',
 					alignItems: 'center',
 					justifyContent: 'center',
@@ -35,8 +48,18 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean }> =
 				}}
 			>
 				<span
-					className="text-[13px] font-semibold font-inter leading-none"
-					style={{ color: pillTextColor }}
+					className="font-semibold font-inter leading-none"
+					style={{ 
+						color: pillTextColor, 
+						fontSize: pillFontSize, 
+						textAlign: 'center', 
+						width: '100%',
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center',
+						height: '100%',
+						marginTop: isAllTab ? '-1px' : 0 // Optical alignment adjustment
+					}}
 				>
 					Contacts
 				</span>
@@ -45,9 +68,9 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean }> =
 				style={{
 					position: 'absolute',
 					top: `${dotTop}px`,
-					left: '117px',
-					width: '9px',
-					height: '9px',
+					left: `${dot1Left}px`,
+					width: `${dotSize}px`,
+					height: `${dotSize}px`,
 					borderRadius: '50%',
 					backgroundColor: dotColor,
 					zIndex: 10,
@@ -57,9 +80,9 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean }> =
 				style={{
 					position: 'absolute',
 					top: `${dotTop}px`,
-					left: '176px',
-					width: '9px',
-					height: '9px',
+					left: `${dot2Left}px`,
+					width: `${dotSize}px`,
+					height: `${dotSize}px`,
 					borderRadius: '50%',
 					backgroundColor: dotColor,
 					zIndex: 10,
@@ -69,9 +92,9 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean }> =
 				style={{
 					position: 'absolute',
 					top: `${dotTop}px`,
-					left: '235px',
-					width: '9px',
-					height: '9px',
+					left: `${dot3Left}px`,
+					width: `${dotSize}px`,
+					height: `${dotSize}px`,
 					borderRadius: '50%',
 					backgroundColor: dotColor,
 					zIndex: 10,
