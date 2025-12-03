@@ -25,22 +25,6 @@ export interface SentExpandedListProps {
 	height?: number;
 }
 
-const ArrowIcon = () => (
-	<svg
-		width="7"
-		height="12"
-		viewBox="0 0 7 12"
-		fill="none"
-		xmlns="http://www.w3.org/2000/svg"
-	>
-		<path
-			d="M6.53033 6.53033C6.82322 6.23744 6.82322 5.76256 6.53033 5.46967L1.75736 0.696699C1.46447 0.403806 0.989593 0.403806 0.696699 0.696699C0.403806 0.989593 0.403806 1.46447 0.696699 1.75736L4.93934 6L0.696699 10.2426C0.403806 10.5355 0.403806 11.0104 0.696699 11.3033C0.989593 11.5962 1.46447 11.5962 1.75736 11.3033L6.53033 6.53033ZM5 6V6.75H6V6V5.25H5V6Z"
-			fill="#636363"
-			fillOpacity="0.46"
-		/>
-	</svg>
-);
-
 const SentHeaderChrome: FC<{
 	offsetY?: number;
 	hasData?: boolean;
