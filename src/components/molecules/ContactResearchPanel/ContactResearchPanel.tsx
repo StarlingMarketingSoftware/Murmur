@@ -3,6 +3,7 @@ import { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { cn } from '@/utils';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
 export interface ContactResearchPanelProps {
 	contact: ContactWithName | null | undefined;
@@ -14,6 +15,15 @@ export interface ContactResearchPanelProps {
 	 * while still keeping the layout skeleton visible.
 	 */
 	hideAllText?: boolean;
+	/**
+	 * If true, hides the summary box at the bottom when bullet points (parsed sections) are present.
+	 * If no bullet points are present, the summary box is still shown (as the only content).
+	 */
+	hideSummaryIfBullets?: boolean;
+	/**
+	 * Fixed height override for the panel.
+	 */
+	height?: string | number;
 }
 
 // Parse metadata sections [1], [2], etc. from the contact metadata field.
@@ -39,9 +49,7 @@ const parseMetadataSections = (metadata: string | null | undefined) => {
 		const content = allSections[String(expectedNum)];
 		// Check if content has meaningful text (not just punctuation/whitespace)
 		// Remove common punctuation and whitespace to check for actual content
-		const meaningfulContent = content
-			.replace(/[.\s,;:!?'"()\-–—]/g, '')
-			.trim();
+		const meaningfulContent = content.replace(/[.\s,;:!?'"()\-–—]/g, '').trim();
 
 		// Require at least 5 characters of meaningful content
 		if (meaningfulContent.length < 5) {
@@ -66,6 +74,8 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	className,
 	style,
 	hideAllText = false,
+	hideSummaryIfBullets = false,
+	height,
 }) => {
 	// useMemo must be called before any early returns to satisfy React Hooks rules
 	const metadataSections = useMemo(
@@ -81,15 +91,20 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 
 	const parsedSectionsCount = Object.keys(metadataSections).length;
 	const hasAnyParsedSections = parsedSectionsCount > 0;
+	const shouldHideSummary = hasAnyParsedSections && hideSummaryIfBullets;
 
 	// Adjust the overall panel height based on how many bullet sections we have.
 	// Note: parseMetadataSections only returns sections when there are at least 3,
 	// so parsedSectionsCount is either 0 or >= 3.
 	// - 0 sections: summary-only state (shortest)
-	// - 3 sections: shorter panel
-	// - 4 sections: slightly taller
-	// - 5+ sections: original full height
-	const containerHeight = !hasAnyParsedSections
+	// - 3 sections: shorter panel (or dynamic if summary hidden)
+	// - 4 sections: slightly taller (or dynamic if summary hidden)
+	// - 5+ sections: original full height (or dynamic if summary hidden)
+	const containerHeight = height
+		? height
+		: shouldHideSummary
+		? `${77 + 65 * parsedSectionsCount}px`
+		: !hasAnyParsedSections
 		? '423px'
 		: parsedSectionsCount === 3
 		? '540px'
@@ -100,7 +115,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	return (
 		<div
 			className={cn(
-				'hidden xl:block relative bg-[#D8E5FB] border-[2px] border-black rounded-[7px] overflow-hidden',
+				'hidden xl:block relative bg-[#D8E5FB] border-[2px] border-black rounded-[7px]',
 				className
 			)}
 			style={{
@@ -111,7 +126,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 		>
 			{/* Header background bar */}
 			<div
-				className="absolute top-0 left-0 w-full"
+				className="absolute top-0 left-0 w-full rounded-t-[5px]"
 				style={{
 					height: '24px',
 					backgroundColor: '#E8EFFF',
@@ -166,8 +181,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								contact.lastName || ''
 							}`.trim();
 							const hasName =
-								fullName.length > 0 ||
-								(contact.name && contact.name.length > 0);
+								fullName.length > 0 || (contact.name && contact.name.length > 0);
 							// If we are showing the company as the main title (because no name), don't show it again here
 							if (!hasName) return null;
 
@@ -186,22 +200,16 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						<div className="flex flex-col items-end gap-[2px] max-w-[140px]">
 							<div className="flex items-center gap-1 w-full justify-end overflow-hidden">
 								{(() => {
-									const stateAbbr =
-										getStateAbbreviation(contact.state || '') || '';
+									const stateAbbr = getStateAbbreviation(contact.state || '') || '';
 									if (stateAbbr && stateBadgeColorMap[stateAbbr]) {
 										return (
 											<span
 												className="inline-flex items-center justify-center h-[16px] px-[6px] rounded-[4px] border border-black text-[11px] font-bold leading-none flex-shrink-0"
 												style={{
-													backgroundColor:
-														stateBadgeColorMap[stateAbbr],
+													backgroundColor: stateBadgeColorMap[stateAbbr],
 												}}
 											>
-												<span
-													style={
-														hideAllText ? { color: 'transparent' } : undefined
-													}
-												>
+												<span style={hideAllText ? { color: 'transparent' } : undefined}>
 													{stateAbbr}
 												</span>
 											</span>
@@ -245,10 +253,123 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				] as const;
 
 				// Filter to only boxes that have data
-				const visibleBoxes = boxConfigs.filter(
-					(config) => metadataSections[config.key]
-				);
+				const visibleBoxes = boxConfigs.filter((config) => metadataSections[config.key]);
 
+				const content = visibleBoxes.map((config, index) => (
+					<div
+						key={config.key}
+						// Relative to the scroll container now
+						className="absolute"
+						style={{
+							// Original top was 76 + index * 65
+							// Scroll container starts at 67px
+							// New relative top = 76 - 67 + index * 65 = 9 + index * 65
+							top: `${9 + index * 65}px`,
+							left: '50%',
+							transform: 'translateX(-50%)',
+							width: '360px',
+							height: '52px',
+							backgroundColor: config.color,
+							border: '2px solid #000000',
+							borderRadius: '8px',
+						}}
+					>
+						{/* Section indicator */}
+						<div
+							className="absolute font-inter font-bold"
+							style={{
+								top: '4.5px',
+								left: '8px',
+								fontSize: '11.5px',
+								color: hideAllText ? 'transparent' : '#000000',
+							}}
+						>
+							[{config.key}]
+						</div>
+						{/* Inner content box */}
+						<div
+							className="absolute overflow-hidden"
+							style={{
+								top: '50%',
+								transform: 'translateY(-50%)',
+								right: '10px',
+								width: '319px',
+								height: '43px',
+								backgroundColor: hideAllText ? config.color : '#FFFFFF',
+								border: '1px solid #000000',
+								borderRadius: '6px',
+							}}
+						>
+							<div className="w-full h-full px-2 flex items-center overflow-hidden">
+								<div
+									className="w-full text-[12px] leading-[1.3] text-black font-inter"
+									style={{
+										display: '-webkit-box',
+										WebkitLineClamp: 2,
+										WebkitBoxOrient: 'vertical',
+										overflow: 'hidden',
+										color: hideAllText ? 'transparent' : '#000000',
+									}}
+								>
+									{metadataSections[config.key]}
+								</div>
+							</div>
+						</div>
+					</div>
+				));
+
+				if (visibleBoxes.length === 0) return null;
+
+				// If height is constrained (e.g. 352px), wrap in scrollbar
+				// If not constrained, just render the content in absolute position relative to main container?
+				// Actually, to support scrolling properly, we should likely ALWAYS render the scroll container
+				// if we want to handle "5 points" case in fixed height mode.
+				// When height is NOT fixed, the container grows, so no scroll needed.
+				// When height IS fixed (e.g. 352px), scrolling is needed.
+
+				if (height) {
+					return (
+						<div
+							id="research-bullets-scroll-wrapper"
+							className="absolute w-full left-0 bottom-0"
+							style={{
+								top: '67px', // Below header/divider
+							}}
+						>
+							<style>{`
+								#research-bullets-scroll-wrapper *::-webkit-scrollbar {
+									display: none !important;
+									width: 0 !important;
+									height: 0 !important;
+									background: transparent !important;
+								}
+								#research-bullets-scroll-wrapper * {
+									-ms-overflow-style: none !important;
+									scrollbar-width: none !important;
+								}
+							`}</style>
+							<CustomScrollbar
+								className="w-full h-full"
+								thumbColor="#000000"
+								thumbWidth={2}
+								offsetRight={-5}
+							>
+								<div
+									style={{
+										// Ensure content has enough height to scroll
+										height: `${9 + visibleBoxes.length * 65 + 14}px`, // +14 for bottom padding
+										position: 'relative',
+										width: '100%',
+									}}
+								>
+									{content}
+								</div>
+							</CustomScrollbar>
+						</div>
+					);
+				}
+
+				// Original rendering for non-fixed height (absolute relative to main container)
 				return visibleBoxes.map((config, index) => (
 					<div
 						key={config.key}
@@ -310,21 +431,22 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 			})()}
 
 			{/* Summary box at bottom */}
-			<div
-				id="research-summary-box-shared"
-				className="absolute"
-				style={{
-					bottom: hasAnyParsedSections ? '14px' : '8px',
-					left: '50%',
-					transform: 'translateX(-50%)',
-					width: '360px',
-					height: hasAnyParsedSections ? '197px' : '336px',
-					backgroundColor: hasAnyParsedSections ? '#E9F7FF' : '#158BCF',
-					border: '2px solid #000000',
-					borderRadius: '8px',
-				}}
-			>
-				<style>{`
+			{!shouldHideSummary && (
+				<div
+					id="research-summary-box-shared"
+					className="absolute"
+					style={{
+						bottom: hasAnyParsedSections ? '14px' : '8px',
+						left: '50%',
+						transform: 'translateX(-50%)',
+						width: '360px',
+						height: hasAnyParsedSections ? '197px' : '336px',
+						backgroundColor: hasAnyParsedSections ? '#E9F7FF' : '#158BCF',
+						border: '2px solid #000000',
+						borderRadius: '8px',
+					}}
+				>
+					<style>{`
 					#research-summary-box-shared *::-webkit-scrollbar {
 						display: none !important;
 						width: 0 !important;
@@ -336,51 +458,56 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						-ms-overflow-style: none !important;
 					}
 				`}</style>
-				{/* Inner content box */}
-				<div
-					className="absolute overflow-hidden"
-					style={{
-						...(hasAnyParsedSections
-							? {
-									top: '50%',
-									left: '50%',
-									transform: 'translate(-50%, -50%)',
-							  }
-							: {
-									bottom: '9px',
-									left: '50%',
-									transform: 'translateX(-50%)',
-							  }),
-						width: '350px',
-						height: hasAnyParsedSections ? '182px' : '299px',
-						backgroundColor: hideAllText
-							? hasAnyParsedSections
-								? '#E9F7FF'
-								: '#158BCF'
-							: '#FFFFFF',
-						border: '1px solid #000000',
-						borderRadius: '6px',
-					}}
-				>
-					{contact?.metadata ? (
-						<div className="w-full h-full p-3 overflow-hidden">
-							<div
-								className="text-[15px] leading-[1.5] text-black font-inter font-normal whitespace-pre-wrap overflow-y-scroll h-full"
-								style={{
-									wordBreak: 'break-word',
-									color: hideAllText ? 'transparent' : '#000000',
-								}}
-							>
-								{contact.metadata}
+					{/* Inner content box */}
+					<div
+						className="absolute overflow-hidden"
+						style={{
+							...(hasAnyParsedSections
+								? {
+										top: '50%',
+										left: '50%',
+										transform: 'translate(-50%, -50%)',
+								  }
+								: {
+										bottom: '9px',
+										left: '50%',
+										transform: 'translateX(-50%)',
+								  }),
+							width: '350px',
+							height: height
+								? typeof height === 'number'
+									? `${height - 53}px` // 352 - 53 = 299px (approx logic if fixed)
+									: 'calc(100% - 53px)'
+								: hasAnyParsedSections
+								? '182px'
+								: '299px',
+							backgroundColor: hideAllText
+								? hasAnyParsedSections
+									? '#E9F7FF'
+									: '#158BCF'
+								: '#FFFFFF',
+							border: '1px solid #000000',
+							borderRadius: '6px',
+						}}
+					>
+						{contact?.metadata ? (
+							<div className="w-full h-full p-3 overflow-hidden">
+								<div
+									className="text-[15px] leading-[1.5] text-black font-inter font-normal whitespace-pre-wrap overflow-y-scroll h-full"
+									style={{
+										wordBreak: 'break-word',
+										color: hideAllText ? 'transparent' : '#000000',
+									}}
+								>
+									{contact.metadata}
+								</div>
 							</div>
-						</div>
-					) : null}
+						) : null}
+					</div>
 				</div>
-			</div>
+			)}
 		</div>
 	);
 };
 
 export default ContactResearchPanel;
-
-

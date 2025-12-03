@@ -2290,6 +2290,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										<ContactResearchPanel
 											contact={displayedContactForResearch}
 											hideAllText={contactsAvailableForDrafting.length === 0}
+											hideSummaryIfBullets={true}
+											height={352}
 										/>
 									</div>
 									{/* Column 2: Writing (Row 1) + Suggestion (Row 2) */}
