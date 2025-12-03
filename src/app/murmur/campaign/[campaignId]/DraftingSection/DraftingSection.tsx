@@ -1452,7 +1452,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 						{/* Shared Research / Test Preview panel to the right of the drafting tables / writing view */}
 						{!isMobile &&
-							['testing', 'contacts', 'drafting', 'sent', 'search'].includes(view) &&
+							['testing', 'contacts', 'drafting', 'sent', 'search', 'inbox'].includes(view) &&
 							!(view === 'search' && hasCampaignSearched) && (
 								<div
 									className="absolute hidden xl:block"
@@ -1461,6 +1461,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										left:
 											view === 'search'
 												? 'calc(50% + 384px + 32px)'
+												: view === 'inbox'
+												? 'calc(50% + 453.5px + 32px)'
 												: 'calc(50% + 250px + 32px)',
 									}}
 								>
@@ -1490,6 +1492,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												(view === 'sent' && sentCount === 0) ||
 												(view === 'contacts' && contactsAvailableForDrafting.length === 0)
 											}
+											style={view === 'inbox' ? { width: 259 } : undefined}
+											boxWidth={view === 'inbox' ? 247 : undefined}
 										/>
 									)}
 								</div>
@@ -2239,6 +2243,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									onGoToDrafting={goToDrafting}
 									onGoToWriting={goToWriting}
 									onGoToContacts={goToContacts}
+									onContactSelect={(contact) => {
+										if (contact) {
+											setSelectedContactForResearch(contact);
+										}
+									}}
+									onContactHover={(contact) => {
+										setHoveredContactForResearch(contact);
+									}}
 								/>
 							</div>
 						)}
