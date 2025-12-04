@@ -7,6 +7,7 @@ import { X } from 'lucide-react';
 import { cn } from '@/utils';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
 import PreviewIcon from '@/components/atoms/_svg/PreviewIcon';
+import CloseButtonIcon from '@/components/atoms/_svg/CloseButtonIcon';
 import { getStateAbbreviation } from '@/utils/string';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import {
@@ -110,6 +111,15 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							position: 'relative',
 						}}
 					>
+						{/* Close button */}
+						<Button
+							type="button"
+							variant="ghost"
+							onClick={handleBack}
+							className="absolute top-1/2 -translate-y-1/2 right-2 p-1 h-auto w-auto hover:bg-gray-100 rounded z-10"
+						>
+							<CloseButtonIcon width={14} height={14} />
+						</Button>
 						<div style={{ 
 							display: 'flex', 
 							flexDirection: 'column', 
@@ -196,41 +206,39 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 
 					{/* Editor container */}
 					<div
-						className="bg-background flex-1 overflow-x-hidden overflow-y-auto pr-[10px] flex flex-col p-3 relative"
+						className="flex-1 overflow-hidden flex flex-col relative"
 						data-lenis-prevent
-						style={{ margin: '0', border: 'none' }}
+						style={{ margin: '0', border: 'none', padding: '6px 12px 12px 12px', borderBottomLeftRadius: '5px', borderBottomRightRadius: '5px', backgroundColor: '#FFDC9E' }}
 					>
-						{/* Close button */}
-						<Button
-							type="button"
-							variant="ghost"
-							onClick={handleBack}
-							className="absolute top-2 right-2 p-1 h-auto w-auto hover:bg-gray-100 rounded"
-						>
-							<X size={16} className="text-black" />
-						</Button>
 						{/* Subject input */}
-						<div className="mb-3">
+						<div className="flex justify-center" style={{ marginBottom: '8px' }}>
 							<input
 								type="text"
 								value={editedSubject}
 								onChange={(e) => setEditedSubject(e.target.value)}
-								className="h-8 text-xs w-full bg-transparent border-0 p-0 focus:outline-none focus:ring-0"
+								className="font-inter text-[14px] font-extrabold bg-white border-2 border-black rounded-[4px] px-2 focus:outline-none focus:ring-0"
+								style={{ width: '469px', height: '39px' }}
 							/>
 						</div>
 
 						{/* Message editor - plain text */}
-						<div className="flex-1 flex flex-col min-h-0">
-							<textarea
-								value={editedMessage}
-								onChange={(e) => setEditedMessage(e.target.value)}
-								className="flex-1 w-full p-0 text-sm resize-none focus:outline-none focus:ring-0 bg-transparent border-0 whitespace-pre-wrap"
-								placeholder="Type your message here..."
-							/>
+						<div className="flex justify-center flex-1">
+							<div
+								className="bg-white border-2 border-black rounded-[4px] overflow-hidden"
+								style={{ width: '470px', height: '587px' }}
+							>
+								<textarea
+									value={editedMessage}
+									onChange={(e) => setEditedMessage(e.target.value)}
+									className="w-full h-full p-3 text-sm resize-none focus:outline-none focus:ring-0 bg-transparent border-0 whitespace-pre-wrap overflow-y-auto scrollbar-hide"
+									style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+									placeholder="Type your message here..."
+								/>
+							</div>
 						</div>
 
-						{/* Save button */}
-						<div className="mt-3 flex justify-end gap-2">
+						{/* Save and Delete buttons - hidden for now */}
+						<div className="hidden mt-3 flex justify-end gap-2">
 							<Button
 								type="button"
 								onClick={handleSave}
