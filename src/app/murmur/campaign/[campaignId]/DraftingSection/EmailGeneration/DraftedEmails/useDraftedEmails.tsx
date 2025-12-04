@@ -2,7 +2,7 @@ import { useDeleteEmail, useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
 import { convertHtmlToPlainText } from '@/utils';
-import { Dispatch, SetStateAction, useState, useRef } from 'react';
+import { Dispatch, SetStateAction, useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 
 export interface DraftedEmailsProps {
@@ -117,6 +117,17 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 	const [editedSubject, setEditedSubject] = useState('');
 	const [editedMessage, setEditedMessage] = useState('');
 	const { mutateAsync: updateEmail, isPending: isPendingUpdate } = useEditEmail();
+
+	useEffect(() => {
+		if (!selectedDraft) {
+			setEditedSubject('');
+			setEditedMessage('');
+			return;
+		}
+		setEditedSubject(selectedDraft.subject || '');
+		const plainMessage = convertHtmlToPlainText(selectedDraft.message);
+		setEditedMessage(plainMessage);
+	}, [selectedDraft]);
 
 	const handleSave = async () => {
 		if (!selectedDraft) return;
