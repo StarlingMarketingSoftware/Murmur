@@ -2,7 +2,7 @@ export const fetchGemini = async (
 	model: string,
 	prompt: string,
 	content: string,
-	options?: { timeoutMs?: number }
+	options?: { timeoutMs?: number; maxOutputTokens?: number }
 ): Promise<string> => {
 	const controller = new AbortController();
 	const timeoutMs = options?.timeoutMs ?? 30000; // 30s default timeout for Gemini
@@ -37,7 +37,7 @@ export const fetchGemini = async (
 						temperature: 0.7,
 						topK: 40,
 						topP: 0.95,
-						maxOutputTokens: 8192,
+						maxOutputTokens: options?.maxOutputTokens ?? 4096,
 					},
 					safetySettings: [
 						{
