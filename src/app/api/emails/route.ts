@@ -27,6 +27,7 @@ const postEmailSchema = z.union([postSingleEmailSchema, z.array(postSingleEmailS
 
 const emailFilterSchema = z.object({
 	campaignId: z.union([z.string(), z.number()]).optional(),
+	status: z.nativeEnum(EmailStatus).optional(),
 });
 export type PostEmailData = z.infer<typeof postEmailSchema>;
 
@@ -43,12 +44,13 @@ export async function GET(req: NextRequest) {
 		if (!validatedFilters.success) {
 			return apiBadRequest(validatedFilters.error);
 		}
-		const { campaignId } = validatedFilters.data;
+		const { campaignId, status } = validatedFilters.data;
 
 		const emails = await prisma.email.findMany({
 			where: {
 				userId,
 				campaignId: Number(campaignId),
+				...(status && { status }),
 			},
 			include: {
 				contact: true,
