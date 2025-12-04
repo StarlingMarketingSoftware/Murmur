@@ -284,7 +284,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 								customWhiteSectionHeight !== undefined
 									? '2px'
 									: isAllTab
-									? '3px'
+									? '8px'
 									: `${38 - whiteSectionHeight}px`,
 						}}
 					>

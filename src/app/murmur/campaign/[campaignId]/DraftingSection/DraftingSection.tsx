@@ -1868,7 +1868,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						>
 							{/* Drafts tab - show only the drafts table centered */}
 							{view === 'drafting' && (
-								<div className="flex items-center justify-center min-h-[300px]">
+								<div className="flex flex-col items-center min-h-[300px]">
 									<DraftedEmails
 										contacts={contacts || []}
 										selectedDraftIds={draftsTabSelectedIds}
@@ -1891,6 +1891,30 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										goToSearch={onGoToSearch}
 										goToInbox={goToInbox}
 									/>
+
+									{/* Bottom Panels: Contacts, Sent, and Inbox */}
+									<div className="mt-[35px] flex justify-center gap-[15px]">
+										<ContactsExpandedList
+											contacts={contactsAvailableForDrafting}
+											width={233}
+											height={125}
+											whiteSectionHeight={15}
+											showSearchBar={false}
+										/>
+										<SentExpandedList
+											sent={sentEmails}
+											contacts={contacts || []}
+											width={233}
+											height={125}
+											whiteSectionHeight={15}
+										/>
+										<InboxExpandedList
+											contacts={contacts || []}
+											width={233}
+											height={125}
+											whiteSectionHeight={15}
+										/>
+									</div>
 								</div>
 							)}
 						</div>
@@ -1921,7 +1945,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 						{/* Sent tab - show the sent emails table */}
 						{view === 'sent' && (
-							<div className="flex items-center justify-center min-h-[300px]">
+							<div className="flex flex-col items-center min-h-[300px]">
 								<SentEmails
 									emails={sentEmails}
 									isPendingEmails={isPendingEmails}
@@ -1931,6 +1955,31 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									goToWriting={goToWriting}
 									goToSearch={onGoToSearch}
 								/>
+
+								{/* Bottom Panels: Contacts, Drafts, and Inbox */}
+								<div className="mt-[35px] flex justify-center gap-[15px]">
+									<ContactsExpandedList
+										contacts={contactsAvailableForDrafting}
+										width={233}
+										height={125}
+										whiteSectionHeight={15}
+										showSearchBar={false}
+									/>
+									<DraftsExpandedList
+										drafts={draftEmails}
+										contacts={contacts || []}
+										width={233}
+										height={125}
+										whiteSectionHeight={15}
+										hideSendButton={true}
+									/>
+									<InboxExpandedList
+										contacts={contacts || []}
+										width={233}
+										height={125}
+										whiteSectionHeight={15}
+									/>
+								</div>
 							</div>
 						)}
 
@@ -2261,7 +2310,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 						{/* Inbox tab: reuse the dashboard inbox UI, but scoped and labeled by campaign contacts */}
 						{view === 'inbox' && (
-							<div className="mt-6 flex justify-center">
+							<div className="mt-6 flex flex-col items-center">
 								<InboxSection
 									allowedSenderEmails={campaignContactEmails}
 									contactByEmail={campaignContactsByEmail}
@@ -2278,6 +2327,32 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										setHoveredContactForResearch(contact);
 									}}
 								/>
+
+								{/* Bottom Panels: Contacts, Drafts, and Sent */}
+								<div className="mt-[35px] flex justify-center gap-[15px]">
+									<ContactsExpandedList
+										contacts={contactsAvailableForDrafting}
+										width={233}
+										height={125}
+										whiteSectionHeight={15}
+										showSearchBar={false}
+									/>
+									<DraftsExpandedList
+										drafts={draftEmails}
+										contacts={contacts || []}
+										width={233}
+										height={125}
+										whiteSectionHeight={15}
+										hideSendButton={true}
+									/>
+									<SentExpandedList
+										sent={sentEmails}
+										contacts={contacts || []}
+										width={233}
+										height={125}
+										whiteSectionHeight={15}
+									/>
+								</div>
 							</div>
 						)}
 

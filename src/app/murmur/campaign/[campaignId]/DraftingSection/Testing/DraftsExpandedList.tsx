@@ -431,7 +431,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								customWhiteSectionHeight !== undefined
 									? '2px'
 									: isAllTab
-									? '3px'
+									? '8px'
 									: `${38 - whiteSectionHeight}px`,
 						}}
 					>
