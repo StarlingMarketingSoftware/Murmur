@@ -8,6 +8,8 @@ import { cn } from '@/utils';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
 import PreviewIcon from '@/components/atoms/_svg/PreviewIcon';
 import CloseButtonIcon from '@/components/atoms/_svg/CloseButtonIcon';
+import ApproveCheckIcon from '@/components/atoms/svg/ApproveCheckIcon';
+import RejectXIcon from '@/components/atoms/svg/RejectXIcon';
 import { getStateAbbreviation } from '@/utils/string';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import {
@@ -257,7 +259,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
 
 		return (
-			<div style={{ width: '499px', height: '703px', position: 'relative' }}>
+			<div className="flex flex-col items-center">
+				<div style={{ width: '499px', height: '703px', position: 'relative' }}>
 				{/* Container box with header - matching the table view */}
 				<div
 					style={{
@@ -442,6 +445,51 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						</div>
 					</div>
 				</div>
+			</div>
+		<div className="flex" style={{ marginTop: '22px', gap: '13px' }}>
+			<Button
+				type="button"
+				variant="ghost"
+				className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
+				style={{
+					width: '124px',
+					height: '40px',
+					borderTopLeftRadius: '8px',
+					borderBottomLeftRadius: '8px',
+					backgroundColor: '#D5FFCB',
+				}}
+			>
+				<span>Approve</span>
+				<ApproveCheckIcon />
+			</Button>
+			<Button
+				type="button"
+				variant="ghost"
+				className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
+				style={{
+					width: '124px',
+					height: '40px',
+					backgroundColor: '#FFDC9E',
+				}}
+			>
+				Regenerate
+			</Button>
+			<Button
+				type="button"
+				variant="ghost"
+				className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
+				style={{
+					width: '124px',
+					height: '40px',
+					borderTopRightRadius: '8px',
+					borderBottomRightRadius: '8px',
+					backgroundColor: '#E17272',
+				}}
+			>
+				<span>Reject</span>
+				<RejectXIcon />
+			</Button>
+		</div>
 			</div>
 		);
 	}
