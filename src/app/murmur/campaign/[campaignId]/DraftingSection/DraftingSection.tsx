@@ -1,11 +1,11 @@
 import { FC, Fragment, useCallback, useEffect, useState, useRef, useMemo } from 'react';
-import { DraftingSectionProps, useDraftingSection } from './useDraftingSection';
+import { DraftingSectionProps, useDraftingSection, HybridBlockPrompt } from './useDraftingSection';
 import { Form } from '@/components/ui/form';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 // EmailGeneration kept available but not used in current view
 // import { EmailGeneration } from './EmailGeneration/EmailGeneration';
-import { cn } from '@/utils';
+import { cn, stringifyJsonSubset, generateEmailTemplateFromBlocks, generatePromptsFromBlocks, removeEmDashes, convertAiResponseToRichTextEmail } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
 import DraftingStatusPanel from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftingStatusPanel';
@@ -13,7 +13,7 @@ import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/Camp
 import { useGetContacts, useGetLocations } from '@/hooks/queryHooks/useContacts';
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useEditEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
-import { EmailStatus, EmailVerificationStatus } from '@/constants/prismaEnums';
+import { EmailStatus, EmailVerificationStatus, DraftingMode } from '@/constants/prismaEnums';
 import { ContactsSelection } from './EmailGeneration/ContactsSelection/ContactsSelection';
 import { SentEmails } from './EmailGeneration/SentEmails/SentEmails';
 import { DraftedEmails } from './EmailGeneration/DraftedEmails/DraftedEmails';
@@ -51,6 +51,9 @@ import { getCityIconProps } from '@/utils/cityIcons';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
+import { useGemini } from '@/hooks/useGemini';
+import { GEMINI_FULL_AI_PROMPT, GEMINI_HYBRID_PROMPT } from '@/constants/ai';
+import { Contact, Identity, HybridBlock } from '@prisma/client';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -162,6 +165,195 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			return next;
 		});
 	}, []);
+
+	// Gemini hook for regenerating drafts
+	const { mutateAsync: callGemini } = useGemini({ suppressToasts: true });
+
+	// Helper to determine drafting mode from form blocks
+	const getDraftingModeFromBlocks = useCallback(() => {
+		const blocks = form.getValues('hybridBlockPrompts');
+		const hasFullAutomatedBlock = blocks?.some(
+			(block: HybridBlockPrompt) => block.type === 'full_automated'
+		);
+		if (hasFullAutomatedBlock) return DraftingMode.ai;
+		const isOnlyTextBlocks = blocks?.every((block: HybridBlockPrompt) => block.type === 'text');
+		if (isOnlyTextBlocks) return DraftingMode.handwritten;
+		return DraftingMode.hybrid;
+	}, [form]);
+
+	// Handle regenerating a draft using the current prompt
+	const handleRegenerateDraft = useCallback(
+		async (draft: EmailWithRelations): Promise<{ subject: string; message: string } | null> => {
+			const contact = contacts?.find((c) => c.id === draft.contactId);
+			if (!contact) {
+				toast.error('Contact not found for this draft');
+				return null;
+			}
+
+			if (!campaign.identity) {
+				toast.error('Campaign identity is required');
+				return null;
+			}
+
+			const draftingMode = getDraftingModeFromBlocks();
+			const values = form.getValues();
+
+			try {
+				let geminiResponse: string;
+
+				if (draftingMode === DraftingMode.ai) {
+					// Full AI mode - use the full_automated block prompt
+					const fullAutomatedBlock = values.hybridBlockPrompts?.find(
+						(block: HybridBlockPrompt) => block.type === 'full_automated'
+					);
+					const fullAiPrompt = fullAutomatedBlock?.value || '';
+
+					if (!fullAiPrompt.trim()) {
+						toast.error('Please add a prompt in the Writing tab first');
+						return null;
+					}
+
+					const populatedSystemPrompt = GEMINI_FULL_AI_PROMPT.replace(
+						'{recipient_first_name}',
+						contact.firstName || ''
+					).replace('{company}', contact.company || '');
+
+					const userPrompt = `Sender information\n: ${stringifyJsonSubset<Identity>(
+						campaign.identity,
+						['name', 'website']
+					)}\n\nRecipient information: ${stringifyJsonSubset<Contact>(contact as Contact, [
+						'lastName',
+						'firstName',
+						'email',
+						'company',
+						'address',
+						'city',
+						'state',
+						'country',
+						'website',
+						'phone',
+						'metadata',
+					])}\n\nUser Goal: ${fullAiPrompt}`;
+
+					geminiResponse = await callGemini({
+						model: 'gemini-3-pro-preview',
+						prompt: populatedSystemPrompt,
+						content: userPrompt,
+					});
+				} else if (draftingMode === DraftingMode.hybrid) {
+					// Hybrid mode - use the hybrid blocks
+					const hybridBlocks = values.hybridBlockPrompts?.filter(
+						(block: HybridBlockPrompt) => block.type !== 'full_automated'
+					) || [];
+
+					if (hybridBlocks.length === 0) {
+						toast.error('Please set up your email template first');
+						return null;
+					}
+
+					const stringifiedRecipient = stringifyJsonSubset<Contact>(contact as Contact, [
+						'firstName',
+						'lastName',
+						'company',
+						'address',
+						'city',
+						'state',
+						'country',
+						'website',
+						'phone',
+						'metadata',
+					]);
+
+					const stringifiedSender = stringifyJsonSubset<Identity>(campaign.identity, [
+						'name',
+						'website',
+					]);
+
+					const stringifiedHybridBlocks = generateEmailTemplateFromBlocks(hybridBlocks);
+					const geminiPrompt = `**RECIPIENT**\n${stringifiedRecipient}\n\n**SENDER**\n${stringifiedSender}\n\n**PROMPT**\n${values.hybridPrompt || ''}\n\n**EMAIL TEMPLATE**\n${stringifiedHybridBlocks}\n\n**PROMPTS**\n${generatePromptsFromBlocks(
+						hybridBlocks
+					)}`;
+
+					geminiResponse = await callGemini({
+						model: 'gemini-3-pro-preview',
+						prompt: GEMINI_HYBRID_PROMPT,
+						content: geminiPrompt,
+					});
+				} else {
+					// Handwritten mode - no AI regeneration
+					toast.error('Regeneration is not available in handwritten mode');
+					return null;
+				}
+
+				// Parse the Gemini response
+				let parsed: { subject: string; message: string };
+				try {
+					let cleanedResponse = geminiResponse;
+					cleanedResponse = cleanedResponse
+						.replace(/^```(?:json)?\s*/i, '')
+						.replace(/\s*```$/i, '');
+
+					const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+					if (jsonMatch) {
+						cleanedResponse = jsonMatch[0];
+					}
+
+					cleanedResponse = cleanedResponse.replace(/,(\s*[}\]])/g, '$1');
+					parsed = JSON.parse(cleanedResponse);
+
+					if (!parsed.message || !parsed.subject) {
+						throw new Error('Missing required fields');
+					}
+				} catch {
+					// Fallback: try to extract from plain text
+					const subjectMatch = geminiResponse.match(/subject["']?\s*:\s*["']([^"']+)["']/i);
+					const messageMatch = geminiResponse.match(/message["']?\s*:\s*["']([\s\S]*?)["']\s*[,}]/i);
+					
+					parsed = {
+						subject: subjectMatch?.[1] || draft.subject || 'Re: Your inquiry',
+						message: messageMatch?.[1] || geminiResponse,
+					};
+				}
+
+				// Clean up the response
+				const cleanedSubject = removeEmDashes(parsed.subject);
+				const cleanedMessageText = removeEmDashes(parsed.message);
+
+				// Get signature and font from form values
+				const signatureText = values.signature || `Thank you,\n${campaign.identity?.name || ''}`;
+				const font = values.font || 'Arial';
+
+				// Convert to rich text with signature
+				const richTextMessage = convertAiResponseToRichTextEmail(
+					cleanedMessageText,
+					font,
+					signatureText
+				);
+
+				// Update the email in the database
+				await updateEmail({
+					id: draft.id.toString(),
+					data: {
+						subject: cleanedSubject,
+						message: richTextMessage,
+					},
+				});
+
+				// Invalidate queries to refresh the data
+				queryClient.invalidateQueries({ queryKey: ['emails'] });
+
+				toast.success('Draft regenerated successfully');
+				// Return the plain text with signature for the preview
+				const messageWithSignature = `${cleanedMessageText}\n\n${signatureText}`;
+				return { subject: cleanedSubject, message: messageWithSignature };
+			} catch (error) {
+				console.error('[Regenerate] Error:', error);
+				toast.error('Failed to regenerate draft');
+				return null;
+			}
+		},
+		[contacts, campaign.identity, getDraftingModeFromBlocks, form, callGemini, updateEmail, queryClient]
+	);
 
 	const clampedPromptScore =
 		typeof promptQualityScore === 'number'
@@ -1984,6 +2176,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										goToInbox={goToInbox}
 										onRejectDraft={handleRejectDraft}
 										onApproveDraft={handleApproveDraft}
+										onRegenerateDraft={handleRegenerateDraft}
 									/>
 
 									{/* Bottom Panels: Contacts, Sent, and Inbox */}

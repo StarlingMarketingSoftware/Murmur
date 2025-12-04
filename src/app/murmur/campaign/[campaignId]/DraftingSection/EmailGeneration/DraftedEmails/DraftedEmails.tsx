@@ -220,9 +220,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		selectedDraftIds,
 		handleSelectAllDrafts,
 	} = useDraftedEmails(props);
-	const { onContactClick, onContactHover } = props;
+	const { onContactClick, onContactHover, onRegenerateDraft } = props;
 
 	const [showConfirm, setShowConfirm] = useState(false);
+	const [isRegenerating, setIsRegenerating] = useState(false);
 
 	// Used contacts indicator
 	const { data: usedContactIds } = useGetUsedContactIds();
@@ -270,6 +271,31 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		() => handleNavigateDraft('next'),
 		[handleNavigateDraft]
 	);
+
+	const handleRegenerate = useCallback(async () => {
+		if (!selectedDraft || !onRegenerateDraft || isRegenerating) return;
+		
+		setIsRegenerating(true);
+		try {
+			const result = await onRegenerateDraft(selectedDraft);
+			if (result) {
+				// Update the local state with the regenerated content
+				setEditedSubject(result.subject);
+				setEditedMessage(result.message);
+				// Also update the selectedDraft to reflect the new content
+				setSelectedDraft((prev) => {
+					if (!prev || prev.id !== selectedDraft.id) return prev;
+					return {
+						...prev,
+						subject: result.subject,
+						message: result.message,
+					};
+				});
+			}
+		} finally {
+			setIsRegenerating(false);
+		}
+	}, [selectedDraft, onRegenerateDraft, isRegenerating, setEditedSubject, setEditedMessage, setSelectedDraft]);
 
 	if (selectedDraft) {
 		const contact = contacts?.find((c) => c.id === selectedDraft.contactId);
@@ -526,8 +552,14 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						height: '40px',
 						backgroundColor: '#FFDC9E',
 					}}
+					onClick={handleRegenerate}
+					disabled={isRegenerating || !onRegenerateDraft}
 				>
-					Regenerate
+					{isRegenerating ? (
+						<Spinner size="small" />
+					) : (
+						'Regenerate'
+					)}
 				</Button>
 				<Button
 					type="button"

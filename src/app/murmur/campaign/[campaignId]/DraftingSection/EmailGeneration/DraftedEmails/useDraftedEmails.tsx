@@ -44,6 +44,8 @@ export interface DraftedEmailsProps {
 	onRejectDraft?: (draftId: number) => void;
 	/** Optional: callback invoked when a draft is approved in preview */
 	onApproveDraft?: (draftId: number) => void;
+	/** Optional: callback invoked when regenerating a draft using AI */
+	onRegenerateDraft?: (draft: EmailWithRelations) => Promise<{ subject: string; message: string } | null>;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {
