@@ -10,6 +10,8 @@ import PreviewIcon from '@/components/atoms/_svg/PreviewIcon';
 import CloseButtonIcon from '@/components/atoms/_svg/CloseButtonIcon';
 import ApproveCheckIcon from '@/components/atoms/svg/ApproveCheckIcon';
 import RejectXIcon from '@/components/atoms/svg/RejectXIcon';
+import LeftArrowReviewIcon from '@/components/atoms/svg/LeftArrowReviewIcon';
+import RightArrowReviewIcon from '@/components/atoms/svg/RightArrowReviewIcon';
 import { getStateAbbreviation } from '@/utils/string';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import {
@@ -232,6 +234,42 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	const hasSelection = selectedCount > 0;
 	const toCount = selectedCount; // used in confirmation details
 	const subjectPreview = useMemo(() => props.subject || '', [props.subject]);
+	const hasDrafts = draftEmails.length > 0;
+
+	const handleNavigateDraft = useCallback(
+		(direction: 'previous' | 'next') => {
+			if (!hasDrafts) return;
+
+			const totalDrafts = draftEmails.length;
+			const currentIndex = selectedDraft
+				? draftEmails.findIndex((draft) => draft.id === selectedDraft.id)
+				: -1;
+
+			if (currentIndex === -1) {
+				const fallbackIndex = direction === 'next' ? 0 : totalDrafts - 1;
+				handleDraftDoubleClick(draftEmails[fallbackIndex]);
+				return;
+			}
+
+			const nextIndex =
+				direction === 'next'
+					? (currentIndex + 1) % totalDrafts
+					: (currentIndex - 1 + totalDrafts) % totalDrafts;
+
+			handleDraftDoubleClick(draftEmails[nextIndex]);
+		},
+		[draftEmails, handleDraftDoubleClick, hasDrafts, selectedDraft]
+	);
+
+	const handleNavigatePrevious = useCallback(
+		() => handleNavigateDraft('previous'),
+		[handleNavigateDraft]
+	);
+
+	const handleNavigateNext = useCallback(
+		() => handleNavigateDraft('next'),
+		[handleNavigateDraft]
+	);
 
 	if (selectedDraft) {
 		const contact = contacts?.find((c) => c.id === selectedDraft.contactId);
@@ -446,49 +484,71 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					</div>
 				</div>
 			</div>
-		<div className="flex" style={{ marginTop: '22px', gap: '13px' }}>
-			<Button
+		<div className="flex items-center" style={{ marginTop: '22px' }}>
+			<button
 				type="button"
-				variant="ghost"
-				className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
-				style={{
-					width: '124px',
-					height: '40px',
-					borderTopLeftRadius: '8px',
-					borderBottomLeftRadius: '8px',
-					backgroundColor: '#D5FFCB',
-				}}
+				onClick={handleNavigatePrevious}
+				disabled={!hasDrafts}
+				aria-label="View previous draft"
+				className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+				style={{ marginRight: '20px' }}
 			>
-				<span>Approve</span>
-				<ApproveCheckIcon />
-			</Button>
-			<Button
+				<LeftArrowReviewIcon />
+			</button>
+			<div className="flex" style={{ gap: '13px' }}>
+				<Button
+					type="button"
+					variant="ghost"
+					className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
+					style={{
+						width: '124px',
+						height: '40px',
+						borderTopLeftRadius: '8px',
+						borderBottomLeftRadius: '8px',
+						backgroundColor: '#D5FFCB',
+					}}
+				>
+					<span>Approve</span>
+					<ApproveCheckIcon />
+				</Button>
+				<Button
+					type="button"
+					variant="ghost"
+					className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
+					style={{
+						width: '124px',
+						height: '40px',
+						backgroundColor: '#FFDC9E',
+					}}
+				>
+					Regenerate
+				</Button>
+				<Button
+					type="button"
+					variant="ghost"
+					className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
+					style={{
+						width: '124px',
+						height: '40px',
+						borderTopRightRadius: '8px',
+						borderBottomRightRadius: '8px',
+						backgroundColor: '#E17272',
+					}}
+				>
+					<span>Reject</span>
+					<RejectXIcon />
+				</Button>
+			</div>
+			<button
 				type="button"
-				variant="ghost"
-				className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
-				style={{
-					width: '124px',
-					height: '40px',
-					backgroundColor: '#FFDC9E',
-				}}
+				onClick={handleNavigateNext}
+				disabled={!hasDrafts}
+				aria-label="View next draft"
+				className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+				style={{ marginLeft: '20px' }}
 			>
-				Regenerate
-			</Button>
-			<Button
-				type="button"
-				variant="ghost"
-				className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
-				style={{
-					width: '124px',
-					height: '40px',
-					borderTopRightRadius: '8px',
-					borderBottomRightRadius: '8px',
-					backgroundColor: '#E17272',
-				}}
-			>
-				<span>Reject</span>
-				<RejectXIcon />
-			</Button>
+				<RightArrowReviewIcon />
+			</button>
 		</div>
 			</div>
 		);
