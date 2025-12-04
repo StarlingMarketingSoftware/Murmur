@@ -614,6 +614,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				goToWriting={props.goToWriting}
 				goToSearch={props.goToSearch}
 				goToInbox={props.goToInbox}
+				selectedCount={selectedDraftIds.size}
 			>
 				<>
 					<div className="overflow-visible w-full flex flex-col gap-2 items-center">
