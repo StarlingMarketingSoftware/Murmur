@@ -1366,7 +1366,7 @@ The improved prompt should result in more personalized, engaging, and effective 
 		const controller = new AbortController();
 		setAbortController(controller);
 
-		const BATCH_SIZE = 1;
+		const BATCH_SIZE = 3;
 		let successfulEmails = 0;
 		let stoppedDueToCredits = false;
 
