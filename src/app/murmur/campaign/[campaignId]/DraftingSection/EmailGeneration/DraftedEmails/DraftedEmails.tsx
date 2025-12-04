@@ -1,4 +1,4 @@
-import { FC, useMemo, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DraftedEmailsProps, useDraftedEmails } from './useDraftedEmails';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,183 @@ import {
 } from '@/constants/ui';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
+
+interface ScrollableTextareaProps
+	extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+	containerClassName?: string;
+	thumbColor?: string;
+	trackColor?: string;
+	thumbWidth?: number;
+	trackOffset?: number;
+}
+
+const ScrollableTextarea: FC<ScrollableTextareaProps> = ({
+	containerClassName,
+	thumbColor = '#000000',
+	trackColor = 'transparent',
+	thumbWidth = 2,
+	trackOffset = 4,
+	className,
+	style,
+	onScroll,
+	...textareaProps
+}) => {
+	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+	const [thumbHeight, setThumbHeight] = useState(0);
+	const [thumbTop, setThumbTop] = useState(0);
+	const [isDragging, setIsDragging] = useState(false);
+	const [dragStartY, setDragStartY] = useState(0);
+	const [scrollStartY, setScrollStartY] = useState(0);
+
+	const updateScrollbar = useCallback(() => {
+		const textarea = textareaRef.current;
+		if (!textarea) return;
+
+		const { scrollTop, scrollHeight, clientHeight } = textarea;
+
+		if (!clientHeight || scrollHeight <= clientHeight) {
+			setThumbHeight((prev) => (prev !== 0 ? 0 : prev));
+			setThumbTop(0);
+			return;
+		}
+
+		const maxScrollTop = scrollHeight - clientHeight;
+		const ratio = clientHeight / scrollHeight;
+		const calculatedHeight = Math.max(ratio * clientHeight, 30);
+		const maxThumbTop = clientHeight - calculatedHeight;
+		const newThumbTop =
+			maxThumbTop > 0 ? (scrollTop / maxScrollTop) * maxThumbTop : 0;
+
+		setThumbHeight(calculatedHeight);
+		setThumbTop(newThumbTop);
+	}, []);
+
+	const handleTextareaScroll = useCallback(
+		(event: React.UIEvent<HTMLTextAreaElement>) => {
+			onScroll?.(event);
+			updateScrollbar();
+		},
+		[onScroll, updateScrollbar]
+	);
+
+	useEffect(() => {
+		updateScrollbar();
+	}, [updateScrollbar, textareaProps.value]);
+
+	useEffect(() => {
+		if (typeof ResizeObserver === 'undefined') return;
+
+		const textarea = textareaRef.current;
+		if (!textarea) return;
+
+		const resizeObserver = new ResizeObserver(updateScrollbar);
+		resizeObserver.observe(textarea);
+
+		return () => {
+			resizeObserver.disconnect();
+		};
+	}, [updateScrollbar]);
+
+	const handleThumbMouseDown = useCallback((event: React.MouseEvent) => {
+		event.preventDefault();
+		setIsDragging(true);
+		setDragStartY(event.clientY);
+		const textarea = textareaRef.current;
+		if (textarea) {
+			setScrollStartY(textarea.scrollTop);
+		}
+	}, []);
+
+	useEffect(() => {
+		if (!isDragging) return;
+
+		const handleMouseMove = (event: MouseEvent) => {
+			const textarea = textareaRef.current;
+			if (!textarea) return;
+
+			const { scrollHeight, clientHeight } = textarea;
+			const maxScrollTop = scrollHeight - clientHeight;
+			if (maxScrollTop <= 0) return;
+
+			const maxThumbTravel = Math.max(clientHeight - thumbHeight, 1);
+			const scrollRatio = maxScrollTop / maxThumbTravel;
+			const deltaY = event.clientY - dragStartY;
+			textarea.scrollTop = scrollStartY + deltaY * scrollRatio;
+		};
+
+		const handleMouseUp = () => {
+			setIsDragging(false);
+		};
+
+		document.addEventListener('mousemove', handleMouseMove);
+		document.addEventListener('mouseup', handleMouseUp);
+		document.body.style.cursor = 'grabbing';
+		document.body.style.userSelect = 'none';
+
+		return () => {
+			document.removeEventListener('mousemove', handleMouseMove);
+			document.removeEventListener('mouseup', handleMouseUp);
+			document.body.style.cursor = '';
+			document.body.style.userSelect = '';
+		};
+	}, [dragStartY, isDragging, scrollStartY, thumbHeight]);
+
+	const handleTrackClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+		const textarea = textareaRef.current;
+		if (!textarea || event.target !== event.currentTarget) return;
+
+		const rect = event.currentTarget.getBoundingClientRect();
+		const clickY = event.clientY - rect.top;
+		const { scrollHeight, clientHeight } = textarea;
+		const maxScrollTop = scrollHeight - clientHeight;
+		if (maxScrollTop <= 0) return;
+
+		textarea.scrollTop = (clickY / clientHeight) * maxScrollTop;
+	}, []);
+
+	return (
+		<div className={cn('relative h-full w-full', containerClassName)}>
+			<textarea
+				{...textareaProps}
+				ref={textareaRef}
+				className={cn('scrollbar-hide', className)}
+				style={{
+					...style,
+					overflowY: 'auto',
+					scrollbarWidth: 'none',
+					msOverflowStyle: 'none',
+					overscrollBehavior: 'contain',
+					WebkitOverflowScrolling: 'touch',
+					touchAction: 'pan-y',
+				}}
+				onScroll={handleTextareaScroll}
+			/>
+			{thumbHeight > 0 && (
+				<div
+					className="absolute top-0 bottom-0 cursor-pointer"
+					style={{
+						width: `${thumbWidth}px`,
+						right: `${trackOffset}px`,
+						backgroundColor: trackColor,
+					}}
+					onClick={handleTrackClick}
+				>
+					<div
+						className="absolute left-0 cursor-grab active:cursor-grabbing"
+						style={{
+							width: `${thumbWidth}px`,
+							height: `${thumbHeight}px`,
+							transform: `translateY(${thumbTop}px)`,
+							backgroundColor: thumbColor,
+							borderRadius: thumbWidth / 2,
+						}}
+						onMouseDown={handleThumbMouseDown}
+					/>
+				</div>
+			)}
+		</div>
+	);
+};
 
 export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	const {
@@ -227,12 +404,14 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								className="bg-white border-2 border-black rounded-[4px] overflow-hidden"
 								style={{ width: '470px', height: '587px' }}
 							>
-								<textarea
+								<ScrollableTextarea
 									value={editedMessage}
 									onChange={(e) => setEditedMessage(e.target.value)}
-									className="w-full h-full p-3 text-sm resize-none focus:outline-none focus:ring-0 bg-transparent border-0 whitespace-pre-wrap overflow-y-auto scrollbar-hide"
-									style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+									className="w-full h-full p-3 text-sm resize-none focus:outline-none focus:ring-0 bg-transparent border-0 whitespace-pre-wrap"
 									placeholder="Type your message here..."
+									thumbWidth={2}
+									thumbColor="#000000"
+									trackOffset={4}
 								/>
 							</div>
 						</div>
