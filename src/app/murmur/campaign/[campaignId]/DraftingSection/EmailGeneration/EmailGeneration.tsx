@@ -18,6 +18,7 @@ import { SentEmails } from './SentEmails/SentEmails';
 import DraftPreviewBox from './DraftPreviewBox';
 import DraggableBox from './DraggableBox';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { DraftsExpandedList } from '../Testing/DraftsExpandedList';
 
 export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	const {
@@ -56,6 +57,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	const { isLivePreviewVisible, livePreviewContactId, livePreviewMessage } = props;
 
 	const isMobile = useIsMobile();
+	const isDraftPreviewOpen = Boolean(selectedDraft);
 
 	// Sending preview: shows the email currently being sent
 	const [sendingPreview, setSendingPreview] = useState<{
@@ -366,17 +368,29 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												previewDraft || isLivePreviewVisible ? 'z-10' : undefined
 											}
 										>
-											<MiniEmailStructure
-												form={form}
-												onDraft={handleDraftButtonClick}
-												isDraftDisabled={
-													isGenerationDisabled() || selectedContactIds.size === 0
-												}
-												isPendingGeneration={isPendingGeneration}
-												generationProgress={generationProgress}
-												generationTotal={generationTotal}
-												onCancel={cancelGeneration}
-											/>
+											{isDraftPreviewOpen ? (
+												<DraftsExpandedList
+													drafts={draftEmails}
+													contacts={contacts}
+													width={376}
+													height={587}
+													hideSendButton
+													rowWidth={366}
+													rowHeight={92}
+												/>
+											) : (
+												<MiniEmailStructure
+													form={form}
+													onDraft={handleDraftButtonClick}
+													isDraftDisabled={
+														isGenerationDisabled() || selectedContactIds.size === 0
+													}
+													isPendingGeneration={isPendingGeneration}
+													generationProgress={generationProgress}
+													generationTotal={generationTotal}
+													onCancel={cancelGeneration}
+												/>
+											)}
 										</DraggableBox>
 									),
 									'draft-preview': (

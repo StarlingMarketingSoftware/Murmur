@@ -126,6 +126,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 
 	const isMobile = useIsMobile();
+	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
+	const isDraftPreviewOpen = view === 'drafting' && Boolean(selectedDraft);
 
 	const clampedPromptScore =
 		typeof promptQualityScore === 'number'
@@ -470,7 +472,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [draftsTabSelectedIds, setDraftsTabSelectedIds] = useState<Set<number>>(
 		new Set()
 	);
-	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	const [, setIsDraftDialogOpen] = useState(false);
 	const handleDraftSelection = (draftId: number) => {
 		setDraftsTabSelectedIds((prev) => {
@@ -1410,42 +1411,61 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											)}
 										</>
 									) : view !== 'inbox' ? (
-										<div
-											style={{
-												width: '375px',
-												height: '373px',
-												// Fixed-height mini structure that uses the compact layout
-												// inside; no scaling, just a tighter signature area.
-												overflow: 'visible',
-											}}
-										>
-											<MiniEmailStructure
-												form={form}
-												onDraft={() =>
-													handleGenerateDrafts(
-														contactsAvailableForDrafting.map((c) => c.id)
-													)
-												}
-												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
-												isPendingGeneration={isPendingGeneration}
-												generationProgress={generationProgress}
-												generationTotal={contactsAvailableForDrafting.length}
-												hideTopChrome
-												hideFooter
-												fullWidthMobile
-												hideAddTextButtons
-												hideAllText={
-													// Hide all structure text to show chrome-only skeleton:
-													// - When the Drafts tab has no drafts
-													// - When the Sent tab is in its empty state
-													// - When the Contacts tab has no contacts to show
-													(view === 'drafting' && draftCount === 0) ||
-													(view === 'sent' && sentCount === 0) ||
-													(view === 'contacts' &&
-														contactsAvailableForDrafting.length === 0)
-												}
-											/>
-										</div>
+										isDraftPreviewOpen ? (
+											<div
+												style={{
+													width: '376px',
+													height: '587px',
+												}}
+											>
+												<DraftsExpandedList
+													drafts={draftEmails}
+													contacts={contacts || []}
+													width={376}
+													height={587}
+													hideSendButton
+													rowWidth={366}
+													rowHeight={92}
+												/>
+											</div>
+										) : (
+											<div
+												style={{
+													width: '375px',
+													height: '373px',
+													// Fixed-height mini structure that uses the compact layout
+													// inside; no scaling, just a tighter signature area.
+													overflow: 'visible',
+												}}
+											>
+												<MiniEmailStructure
+													form={form}
+													onDraft={() =>
+														handleGenerateDrafts(
+															contactsAvailableForDrafting.map((c) => c.id)
+														)
+													}
+													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isPendingGeneration={isPendingGeneration}
+													generationProgress={generationProgress}
+													generationTotal={contactsAvailableForDrafting.length}
+													hideTopChrome
+													hideFooter
+													fullWidthMobile
+													hideAddTextButtons
+													hideAllText={
+														// Hide all structure text to show chrome-only skeleton:
+														// - When the Drafts tab has no drafts
+														// - When the Sent tab is in its empty state
+														// - When the Contacts tab has no contacts to show
+														(view === 'drafting' && draftCount === 0) ||
+														(view === 'sent' && sentCount === 0) ||
+														(view === 'contacts' &&
+															contactsAvailableForDrafting.length === 0)
+													}
+												/>
+											</div>
+										)
 									) : null}
 								</div>
 							)}
