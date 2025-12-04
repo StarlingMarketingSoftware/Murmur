@@ -73,6 +73,7 @@ export const SentEmails: FC<SentEmailsProps> = ({
 							(contact?.firstName && contact.firstName.trim()) ||
 							(contact?.lastName && contact.lastName.trim())
 					);
+					const contactTitle = (contact as any)?.title || (contact as any)?.headline || '';
 
 					return (
 						<div
@@ -113,10 +114,10 @@ export const SentEmails: FC<SentEmailsProps> = ({
 
 							{/* Fixed top-right info (Title + Location) - matching drafts table design */}
 							<div className="absolute top-[6px] right-[4px] flex flex-col items-start gap-[2px] pointer-events-none">
-								{contact?.headline ? (
+								{contactTitle ? (
 									<div className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden">
 										<ScrollableText
-											text={contact.headline}
+											text={contactTitle}
 											className="text-[10px] text-black leading-none"
 											scrollPixelsPerSecond={60}
 										/>
@@ -195,7 +196,7 @@ export const SentEmails: FC<SentEmailsProps> = ({
 							<div className="flex flex-col justify-center h-full pl-[30px] gap-[2px] pr-[30px]">
 								{/* Row 1 & 2: Name / Company */}
 								{(() => {
-									const topRowMargin = contact?.headline
+									const topRowMargin = contactTitle
 										? 'mr-[220px]'
 										: 'mr-[120px]';
 									if (hasSeparateName) {

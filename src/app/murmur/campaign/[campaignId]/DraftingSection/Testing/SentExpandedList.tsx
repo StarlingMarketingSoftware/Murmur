@@ -296,6 +296,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 								  'Contact'
 								: 'Unknown Contact';
 							const isSelected = selectedSentIds.has(email.id as number);
+							const contactTitle = contact?.title || contact?.headline || '';
 
 							return (
 								<div
@@ -371,10 +372,10 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 											) : null}
 										</div>
 
-										{contact?.headline ? (
+										{contactTitle ? (
 											<div className="w-[110px] h-[10px] rounded-[3.71px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
 												<ScrollableText
-													text={contact.headline}
+													text={contactTitle}
 													className="text-[8px] text-black leading-none px-1"
 												/>
 											</div>

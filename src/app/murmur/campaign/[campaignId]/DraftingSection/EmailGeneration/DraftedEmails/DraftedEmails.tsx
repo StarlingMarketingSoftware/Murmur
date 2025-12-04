@@ -55,12 +55,28 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 
 	if (selectedDraft) {
 		const contact = contacts?.find((c) => c.id === selectedDraft.contactId);
-		const contactName = contact
-			? contact.name ||
+		const contactTitle = contact?.headline || contact?.title || '';
+		// Check if we have a separate name (not just company)
+		const hasName = Boolean(
+			contact?.name?.trim() ||
+			contact?.firstName?.trim() ||
+			contact?.lastName?.trim()
+		);
+		const displayName = contact
+			? contact.name?.trim() ||
 			  `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
-			  contact.company ||
-			  'Contact'
-			: 'Unknown Contact';
+			  ''
+			: '';
+		const companyName = contact?.company || '';
+		const fullStateName = (contact?.state as string) || '';
+		const stateAbbr = getStateAbbreviation(fullStateName) || '';
+		const normalizedState = fullStateName.trim();
+		const lowercaseCanadianProvinceNames = canadianProvinceNames.map((s) => s.toLowerCase());
+		const isCanadianProvince =
+			lowercaseCanadianProvinceNames.includes(normalizedState.toLowerCase()) ||
+			canadianProvinceAbbreviations.includes(normalizedState.toUpperCase()) ||
+			canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+		const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
 
 		return (
 			<div style={{ width: '499px', height: '703px', position: 'relative' }}>
@@ -69,7 +85,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					style={{
 						width: '100%',
 						height: '100%',
-						border: '2px solid #ABABAB',
+						border: '3px solid #000000',
 						borderRadius: '8px',
 						position: 'relative',
 						display: 'flex',
@@ -81,17 +97,100 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						style={{
 							borderTopLeftRadius: '8px',
 							borderTopRightRadius: '8px',
-							borderBottom: '2px solid #ABABAB',
+							borderBottomWidth: '2px',
+							borderBottomStyle: 'solid',
+							borderBottomColor: '#000000',
 							padding: '12px 16px',
+							boxSizing: 'border-box',
 							display: 'flex',
 							justifyContent: 'space-between',
-							alignItems: 'center',
+							alignItems: 'flex-start',
 							height: '48px',
 							backgroundColor: 'white',
+							position: 'relative',
 						}}
 					>
-						<div style={{ transform: 'translateY(-6px)' }}>
-							<div className="text-sm font-inter font-medium text-black">Drafts</div>
+						<div style={{ 
+							display: 'flex', 
+							flexDirection: 'column', 
+							justifyContent: 'center',
+							height: '100%',
+						}}>
+							{hasName && companyName ? (
+								<>
+									<div className="font-inter font-bold text-black leading-none" style={{ fontSize: '17px' }}>
+										{companyName}
+									</div>
+									<div className="font-inter font-normal text-black leading-none" style={{ fontSize: '11px', marginTop: '2px' }}>
+										{displayName}
+									</div>
+								</>
+							) : (
+								<div className="font-inter font-bold text-black leading-none" style={{ fontSize: '17px' }}>
+									{companyName || displayName || 'Unknown Contact'}
+								</div>
+							)}
+						</div>
+						<div
+							className="flex flex-col items-start"
+							style={{
+								position: 'absolute',
+								right: '63px',
+								bottom: '7px',
+								width: '152px',
+							}}
+						>
+							<div
+								className="flex items-center justify-start gap-2 w-full"
+								style={{ marginBottom: contactTitle ? '2px' : 0 }}
+							>
+								{stateAbbr ? (
+									isCanadianProvince ? (
+										<div
+											className="inline-flex items-center justify-center rounded-[4px] border border-black overflow-hidden flex-shrink-0"
+											style={{ width: '28px', height: '15px' }}
+											title="Canadian province"
+										>
+											<CanadianFlag width="100%" height="100%" className="w-full h-full" />
+										</div>
+									) : isUSAbbr ? (
+										<span
+											className="inline-flex items-center justify-center rounded-[4px] border text-[12px] leading-none font-bold flex-shrink-0"
+											style={{
+												width: '28px',
+												height: '15px',
+												backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
+												borderColor: '#000000',
+											}}
+										>
+											{stateAbbr}
+										</span>
+									) : (
+										<span
+											className="inline-flex items-center justify-center rounded-[6px] border flex-shrink-0"
+											style={{ width: '39px', height: '20px', borderColor: '#000000' }}
+										/>
+									)
+								) : null}
+
+								{contact?.city ? (
+									<ScrollableText
+										text={contact.city}
+										className="text-[12px] font-inter text-black leading-none max-w-[160px]"
+									/>
+								) : null}
+							</div>
+							{contactTitle ? (
+								<div
+									className="rounded-[6px] border border-black bg-[#E8EFFF] px-2 flex items-center justify-start"
+									style={{ width: '152px', height: '18px' }}
+								>
+									<ScrollableText
+										text={contactTitle}
+										className="text-[11px] font-inter text-black leading-none w-full"
+									/>
+								</div>
+							) : null}
 						</div>
 					</div>
 
@@ -110,11 +209,6 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						>
 							<X size={16} className="text-black" />
 						</Button>
-						{/* Recipient info */}
-						<div className="mb-3">
-							<div className="text-sm font-medium">{contactName}</div>
-						</div>
-
 						{/* Subject input */}
 						<div className="mb-3">
 							<input
@@ -201,6 +295,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									(contact?.lastName && contact.lastName.trim())
 							);
 
+							const contactTitle = contact?.headline || contact?.title || '';
 							return (
 								<div
 									key={draft.id}
@@ -281,10 +376,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 
 									{/* Fixed top-right info (Title + Location) - matching contacts table design */}
 									<div className="absolute top-[6px] right-[4px] flex flex-col items-start gap-[2px] pointer-events-none">
-										{contact?.headline ? (
+										{contactTitle ? (
 											<div className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden">
 												<ScrollableText
-													text={contact.headline}
+													text={contactTitle}
 													className="text-[10px] text-black leading-none"
 													scrollPixelsPerSecond={60}
 												/>
@@ -363,7 +458,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									<div className="flex flex-col justify-center h-full pl-[30px] gap-[2px] pr-[30px]">
 										{/* Row 1 & 2: Name / Company */}
 										{(() => {
-											const topRowMargin = contact?.headline
+											const topRowMargin = contactTitle
 												? 'mr-[220px]'
 												: 'mr-[120px]';
 											if (hasSeparateName) {
