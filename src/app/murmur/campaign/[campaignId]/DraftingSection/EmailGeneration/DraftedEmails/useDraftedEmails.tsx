@@ -40,6 +40,10 @@ export interface DraftedEmailsProps {
 	goToSearch?: () => void;
 	/** Optional: callback to navigate to the Inbox tab */
 	goToInbox?: () => void;
+	/** Optional: callback invoked when a draft is rejected in preview */
+	onRejectDraft?: (draftId: number) => void;
+	/** Optional: callback invoked when a draft is approved in preview */
+	onApproveDraft?: (draftId: number) => void;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {

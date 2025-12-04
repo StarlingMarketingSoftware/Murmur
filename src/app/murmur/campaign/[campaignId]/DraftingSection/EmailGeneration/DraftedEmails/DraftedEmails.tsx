@@ -507,6 +507,12 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						borderBottomLeftRadius: '8px',
 						backgroundColor: '#D5FFCB',
 					}}
+					onClick={() => {
+						if (selectedDraft) {
+							props.onApproveDraft?.(selectedDraft.id);
+							handleNavigateNext();
+						}
+					}}
 				>
 					<span>Approve</span>
 					<ApproveCheckIcon />
@@ -533,6 +539,12 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						borderTopRightRadius: '8px',
 						borderBottomRightRadius: '8px',
 						backgroundColor: '#E17272',
+					}}
+					onClick={() => {
+						if (selectedDraft) {
+							props.onRejectDraft?.(selectedDraft.id);
+							handleNavigateNext();
+						}
 					}}
 				>
 					<span>Reject</span>

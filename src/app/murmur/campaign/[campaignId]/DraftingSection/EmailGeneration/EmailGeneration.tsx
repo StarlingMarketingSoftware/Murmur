@@ -58,6 +58,37 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 	const isMobile = useIsMobile();
 	const isDraftPreviewOpen = Boolean(selectedDraft);
+	const [rejectedDraftIds, setRejectedDraftIds] = useState<Set<number>>(new Set());
+
+	const handleRejectDraft = useCallback((draftId: number) => {
+		setRejectedDraftIds((prev) => {
+			if (prev.has(draftId)) return prev;
+			const next = new Set(prev);
+			next.add(draftId);
+			return next;
+		});
+	}, []);
+
+	useEffect(() => {
+		setRejectedDraftIds((prev) => {
+			if (prev.size === 0) return prev;
+			const validIds = new Set(draftEmails.map((draft) => draft.id));
+			let removed = false;
+			prev.forEach((id) => {
+				if (!validIds.has(id)) {
+					removed = true;
+				}
+			});
+			if (!removed) return prev;
+			const next = new Set<number>();
+			prev.forEach((id) => {
+				if (validIds.has(id)) {
+					next.add(id);
+				}
+			});
+			return next;
+		});
+	}, [draftEmails]);
 
 	// Sending preview: shows the email currently being sent
 	const [sendingPreview, setSendingPreview] = useState<{
@@ -377,6 +408,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 													hideSendButton
 													rowWidth={366}
 													rowHeight={92}
+													rejectedDraftIds={rejectedDraftIds}
 												/>
 											) : (
 												<MiniEmailStructure
@@ -467,6 +499,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												fromName={campaign?.identity?.name}
 												fromEmail={campaign?.identity?.email}
 												subject={form.watch('subject')}
+												onRejectDraft={handleRejectDraft}
 											/>
 										</DraggableBox>
 									),

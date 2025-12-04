@@ -44,6 +44,10 @@ export interface DraftsExpandedListProps {
 	rowWidth?: number;
 	/** Optional per-row height override (px) */
 	rowHeight?: number;
+	/** Optional set of draft ids marked as rejected */
+	rejectedDraftIds?: Set<number>;
+	/** Optional set of draft ids marked as approved */
+	approvedDraftIds?: Set<number>;
 }
 
 const DraftsHeaderChrome: FC<{
@@ -163,6 +167,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	whiteSectionHeight: customWhiteSectionHeight,
 	rowWidth,
 	rowHeight,
+	rejectedDraftIds,
+	approvedDraftIds,
 }) => {
 	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
 	const lastClickedRef = useRef<number | null>(null);
@@ -462,6 +468,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								  'Contact'
 								: 'Unknown Contact';
 							const isSelected = selectedDraftIds.has(draft.id as number);
+							const isRejected = rejectedDraftIds?.has(draft.id as number) ?? false;
+							const isApproved = approvedDraftIds?.has(draft.id as number) ?? false;
 							const contactTitle = contact?.headline || contact?.title || '';
 							return (
 								<div
@@ -487,19 +495,53 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									}}
 									onClick={(e) => handleDraftClick(draft.id as number, e)}
 								>
-									{/* Used-contact indicator - vertically centered */}
+									{/* Used-contact indicator - stacked above reject/approve when both present */}
 									{usedContactIdsSet.has(draft.contactId) && (
 										<span
 											className="absolute left-[8px]"
 											title="Used in a previous campaign"
 											style={{
-												top: '50%',
-												transform: 'translateY(-50%)',
-												width: '16px',
-												height: '16px',
+												top: (isRejected || isApproved) ? 'calc(50% - 16px)' : '50%',
+												transform: (isRejected || isApproved) ? 'none' : 'translateY(-50%)',
+												width: '13px',
+												height: '13px',
 												borderRadius: '50%',
 												border: '1px solid #000000',
 												backgroundColor: '#DAE6FE',
+											}}
+										/>
+									)}
+									{/* Rejected indicator - stacked below used-contact when both present */}
+									{isRejected && (
+										<span
+											className="absolute left-[8px]"
+											title="Marked for rejection"
+											aria-label="Rejected draft"
+											style={{
+												top: usedContactIdsSet.has(draft.contactId) ? 'calc(50% + 3px)' : '50%',
+												transform: usedContactIdsSet.has(draft.contactId) ? 'none' : 'translateY(-50%)',
+												width: '13px',
+												height: '13px',
+												borderRadius: '50%',
+												border: '1px solid #000000',
+												backgroundColor: '#A03C3C',
+											}}
+										/>
+									)}
+									{/* Approved indicator - stacked below used-contact when both present */}
+									{isApproved && (
+										<span
+											className="absolute left-[8px]"
+											title="Marked for approval"
+											aria-label="Approved draft"
+											style={{
+												top: usedContactIdsSet.has(draft.contactId) ? 'calc(50% + 3px)' : '50%',
+												transform: usedContactIdsSet.has(draft.contactId) ? 'none' : 'translateY(-50%)',
+												width: '13px',
+												height: '13px',
+												borderRadius: '50%',
+												border: '1px solid #000000',
+												backgroundColor: '#69AF69',
 											}}
 										/>
 									)}
