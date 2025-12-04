@@ -38,32 +38,37 @@ export interface DraftsExpandedListProps {
 	height?: number;
 	/** When true, hides the footer send button */
 	hideSendButton?: boolean;
+	/** Custom height for the white header section in pixels */
+	whiteSectionHeight?: number;
 }
 
 const DraftsHeaderChrome: FC<{
 	offsetY?: number;
 	hasData?: boolean;
 	isAllTab?: boolean;
-}> = ({ offsetY = 0, hasData = true, isAllTab = false }) => {
+	whiteSectionHeight?: number;
+}> = ({ offsetY = 0, hasData = true, isAllTab = false, whiteSectionHeight }) => {
+	const isBottomView = whiteSectionHeight === 15;
 	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
 	const pillBorderColor = hasData ? '#000000' : '#B0B0B0';
 	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
 	const pillBgColor = hasData ? '#EFDAAF' : '#FFAEAE';
-	const dotSize = isAllTab ? 6 : 9;
+	const dotSize = isBottomView ? 5 : isAllTab ? 6 : 9;
 	// First dot is 29px from the left
-	const dot1Left = 29;
-	const dot2Left = isAllTab ? 177.5 : 176;
-	const dot3Left = isAllTab ? 236.5 : 235;
+	const dot1Left = isBottomView ? 18 : 29;
+	const dot2Left = isBottomView ? 110 : isAllTab ? 177.5 : 176;
+	const dot3Left = isBottomView ? 146 : isAllTab ? 236.5 : 235;
 	// Pill dimensions for All tab
-	const pillWidth = isAllTab ? 50 : 72;
+	const pillWidth = isBottomView ? 40 : isAllTab ? 50 : 72;
 	// Center pill between first and second dots
 	const midpointBetweenDots = (dot1Left + dot2Left) / 2;
 	const pillLeft = midpointBetweenDots - pillWidth / 2;
-	const pillHeight = isAllTab ? 15 : 22;
-	const pillBorderRadius = isAllTab ? 7.5 : 11;
-	const pillFontSize = isAllTab ? '10px' : '13px';
+	const pillHeight = isBottomView ? 10 : isAllTab ? 15 : 22;
+	const pillBorderRadius = isBottomView ? 5 : isAllTab ? 7.5 : 11;
+	const pillFontSize = isBottomView ? '8px' : isAllTab ? '10px' : '13px';
 	// Center dots vertically with the pill - calculate both positions relative to each other
-	const pillTop = 3 + offsetY;
+	const pillTop =
+		whiteSectionHeight !== undefined ? (whiteSectionHeight - pillHeight) / 2 : 3 + offsetY;
 	const pillCenterY = pillTop + pillHeight / 2;
 	const dotTop = Math.round(pillCenterY - dotSize / 2);
 
@@ -151,6 +156,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	width = 376,
 	height = 426,
 	hideSendButton = false,
+	whiteSectionHeight: customWhiteSectionHeight,
 }) => {
 	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
 	const lastClickedRef = useRef<number | null>(null);
@@ -221,7 +227,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	// Special hack for "All" tab: if height is exactly 347px, we apply a thicker 3px border
 	// to match the other elements in that layout. Otherwise standard 2px border.
 	const isAllTab = height === 347;
-	const whiteSectionHeight = isAllTab ? 20 : 28;
+	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
+	const isBottomView = customWhiteSectionHeight === 15;
 
 	const handleSendSelected = async () => {
 		console.log('handleSendSelected called', { isSendDisabled, selectedDraftIds });
@@ -342,7 +349,11 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 		<div
 			className={cn(
 				'relative max-[480px]:w-[96.27vw] rounded-md flex flex-col overflow-visible',
-				isAllTab ? 'border-[3px] border-black' : 'border-2 border-black/30'
+				isBottomView
+					? 'border-2 border-black'
+					: isAllTab
+					? 'border-[3px] border-black'
+					: 'border-2 border-black/30'
 			)}
 			style={{
 				width: `${width}px`,
@@ -353,12 +364,13 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 			aria-label="Expanded drafts preview"
 		>
 			{/* Header row (no explicit divider; let the background change from white to yellow like the main table) */}
-			<DraftsHeaderChrome isAllTab={isAllTab} />
+			<DraftsHeaderChrome isAllTab={isAllTab} whiteSectionHeight={customWhiteSectionHeight} />
 			<div
 				className={cn(
-					'flex items-center gap-2 h-[28px] px-3 shrink-0',
+					'flex items-center gap-2 px-3 shrink-0',
 					onHeaderClick ? 'cursor-pointer' : ''
 				)}
+				style={{ height: `${whiteSectionHeight}px` }}
 				role={onHeaderClick ? 'button' : undefined}
 				tabIndex={onHeaderClick ? 0 : undefined}
 				onClick={onHeaderClick}
@@ -393,20 +405,35 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				</div>
 			)}
 
-			<div className="relative flex-1 flex flex-col pb-2 pt-2 min-h-0 px-2">
+			<div
+				className={cn(
+					'relative flex-1 flex flex-col min-h-0',
+					isBottomView ? 'px-[2px] pt-0 pb-0' : 'px-2 pt-2 pb-2'
+				)}
+			>
 				{/* Scrollable list */}
 				<CustomScrollbar
 					className="flex-1 drafting-table-content"
 					thumbWidth={2}
-					thumbColor="#000000"
+					thumbColor={isBottomView ? 'transparent' : '#000000'}
 					trackColor="transparent"
-					offsetRight={-14}
+					offsetRight={isBottomView ? -7 : -14}
 					contentClassName="overflow-x-hidden"
-					alwaysShow
+					alwaysShow={!isBottomView}
 				>
 					<div
-						className="space-y-2 pb-2 flex flex-col items-center"
-						style={{ paddingTop: isAllTab ? '3px' : `${38 - whiteSectionHeight}px` }}
+						className={cn(
+							'flex flex-col items-center',
+							isBottomView ? 'space-y-1 pb-0' : 'space-y-2 pb-2'
+						)}
+						style={{
+							paddingTop:
+								customWhiteSectionHeight !== undefined
+									? '2px'
+									: isAllTab
+									? '3px'
+									: `${38 - whiteSectionHeight}px`,
+						}}
 					>
 						{drafts.map((draft) => {
 							const contact = contacts?.find((c) => c.id === draft.contactId);
@@ -421,7 +448,10 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								<div
 									key={draft.id}
 									className={cn(
-										'cursor-pointer relative select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
+										'cursor-pointer relative select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
+										isBottomView
+											? 'w-[225px] h-[49px]'
+											: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
 										isSelected && 'bg-[#FFDF9F]'
 									)}
 									onMouseDown={(e) => {
@@ -550,10 +580,17 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								</div>
 							);
 						})}
-						{Array.from({ length: Math.max(0, 4 - drafts.length) }).map((_, idx) => (
+						{Array.from({
+							length: Math.max(0, (isBottomView ? 2 : 4) - drafts.length),
+						}).map((_, idx) => (
 							<div
 								key={`draft-placeholder-${idx}`}
-								className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#FFDC9E] p-2"
+								className={cn(
+									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#FFDC9E] p-2',
+									isBottomView
+										? 'w-[225px] h-[49px]'
+										: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
+								)}
 							/>
 						))}
 					</div>
@@ -568,7 +605,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 						disabled={isSendDisabled}
 						className={cn(
 							'w-full max-w-[356px] max-[480px]:max-w-none h-[26px] rounded-[6px] bg-[#B5E2B5] border border-black flex items-center justify-center text-[12px] font-medium',
-							isSendDisabled && 'opacity-50 cursor-not-allowed'
+							isSendDisabled && 'opacity-50 cursor-not-allowed',
+							isBottomView && 'w-[225px] max-w-none'
 						)}
 						onClick={handleSendSelected}
 					>

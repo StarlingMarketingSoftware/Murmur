@@ -8,6 +8,11 @@ import { getStateAbbreviation } from '@/utils/string';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
+import { DraftsExpandedList } from '../../Testing/DraftsExpandedList';
+import { SentExpandedList } from '../../Testing/SentExpandedList';
+import { InboxExpandedList } from '../../Testing/InboxExpandedList';
+import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { EmailStatus } from '@/constants/prismaEnums';
 import {
 	canadianProvinceAbbreviations,
 	canadianProvinceNames,
@@ -749,6 +754,19 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 	const router = useRouter();
 	const searchInfo = useMemo(() => parseSearchFromCampaign(campaign), [campaign]);
 
+	const { data: drafts } = useGetEmails({
+		filters: { campaignId: campaign?.id?.toString() },
+		enabled: !!campaign?.id,
+	});
+
+	const { data: sentEmails } = useGetEmails({
+		filters: {
+			campaignId: campaign?.id?.toString(),
+			status: EmailStatus.sent,
+		},
+		enabled: !!campaign?.id,
+	});
+
 	const [activeSection, setActiveSection] = useState<'why' | 'what' | 'where' | null>(
 		null
 	);
@@ -803,6 +821,23 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 	const usedContactIdsSet = useMemo(
 		() => new Set(usedContactIds || []),
 		[usedContactIds]
+	);
+
+	// Build contact lookup by email for inbox
+	const allContacts = props.allContacts || props.contacts;
+	const contactByEmail = useMemo(() => {
+		const map: Record<string, typeof allContacts[0]> = {};
+		for (const c of allContacts) {
+			if (c.email) {
+				map[c.email.toLowerCase().trim()] = c;
+			}
+		}
+		return map;
+	}, [allContacts]);
+
+	const allowedSenderEmails = useMemo(
+		() => allContacts.map((c) => c.email).filter(Boolean) as string[],
+		[allContacts]
 	);
 
 	const selectedCount = selectedContactIds.size;
@@ -1246,6 +1281,33 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 					)}
 				</div>
 			)}
+
+			{/* Bottom Panels: Drafts, Sent, and Inbox */}
+			<div className="mt-[35px] flex justify-center gap-[15px]">
+				<DraftsExpandedList
+					drafts={drafts || []}
+					contacts={props.allContacts || props.contacts}
+					width={233}
+					height={125}
+					whiteSectionHeight={15}
+					hideSendButton={true}
+				/>
+				<SentExpandedList
+					sent={sentEmails || []}
+					contacts={props.allContacts || props.contacts}
+					width={233}
+					height={125}
+					whiteSectionHeight={15}
+				/>
+				<InboxExpandedList
+					contacts={props.allContacts || props.contacts}
+					allowedSenderEmails={allowedSenderEmails}
+					contactByEmail={contactByEmail}
+					width={233}
+					height={125}
+					whiteSectionHeight={15}
+				/>
+			</div>
 		</div>
 	);
 };

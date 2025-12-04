@@ -32,6 +32,7 @@ export interface ContactsSelectionProps {
 	 * Callback to navigate to the inbox tab.
 	 */
 	goToInbox?: () => void;
+	allContacts?: ContactWithName[];
 }
 
 export const useContactsSelection = (props: ContactsSelectionProps) => {

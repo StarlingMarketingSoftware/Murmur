@@ -1834,6 +1834,31 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										/>
 									</div>
 								)}
+
+								{/* Bottom Panels: Drafts, Sent, and Inbox */}
+								<div className="mt-[35px] flex justify-center gap-[15px]">
+									<DraftsExpandedList
+										drafts={draftEmails}
+										contacts={contacts || []}
+										width={233}
+										height={125}
+										whiteSectionHeight={15}
+										hideSendButton={true}
+									/>
+									<SentExpandedList
+										sent={sentEmails}
+										contacts={contacts || []}
+										width={233}
+										height={125}
+										whiteSectionHeight={15}
+									/>
+									<InboxExpandedList
+										contacts={contacts || []}
+										width={233}
+										height={125}
+										whiteSectionHeight={15}
+									/>
+								</div>
 							</div>
 						)}
 
@@ -1875,6 +1900,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							<div className="flex items-center justify-center min-h-[300px]">
 								<ContactsSelection
 									contacts={contactsAvailableForDrafting}
+									allContacts={contacts}
 									selectedContactIds={contactsTabSelectedIds}
 									setSelectedContactIds={setContactsTabSelectedIds}
 									handleContactSelection={handleContactsTabSelection}
