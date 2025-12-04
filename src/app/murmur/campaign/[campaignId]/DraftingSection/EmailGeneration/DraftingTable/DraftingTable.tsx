@@ -5,29 +5,32 @@ import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { urls } from '@/constants/urls';
 
-export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isAllTab?: boolean }> = ({
+export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isAllTab?: boolean; whiteSectionHeight?: number }> = ({
 	offsetY = 0,
 	hasData = true,
 	isAllTab = false,
+	whiteSectionHeight,
 }) => {
+	const isBottomView = whiteSectionHeight === 15;
 	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
 	const pillBorderColor = hasData ? '#8D5B5B' : '#B0B0B0';
 	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
 	const pillBgColor = hasData ? '#F5DADA' : '#FFAEAE';
-	const dotSize = isAllTab ? 6 : 9;
+	const dotSize = isBottomView ? 5 : isAllTab ? 6 : 9;
 	// Adjust left position to center smaller dots (add 1.5px to keep same visual center)
-	const dot1Left = isAllTab ? 118.5 : 117;
-	const dot2Left = isAllTab ? 177.5 : 176;
-	const dot3Left = isAllTab ? 236.5 : 235;
+	const dot1Left = isBottomView ? 75 : isAllTab ? 118.5 : 117;
+	const dot2Left = isBottomView ? 110 : isAllTab ? 177.5 : 176;
+	const dot3Left = isBottomView ? 146 : isAllTab ? 236.5 : 235;
 	// Pill dimensions for All tab
-	const pillWidth = isAllTab ? 50 : 72;
-	const pillHeight = isAllTab ? 15 : 22;
-	const pillBorderRadius = isAllTab ? 7.5 : 11;
-	const pillFontSize = isAllTab ? '10px' : '13px';
+	const pillWidth = isBottomView ? 40 : isAllTab ? 50 : 72;
+	const pillHeight = isBottomView ? 10 : isAllTab ? 15 : 22;
+	const pillBorderRadius = isBottomView ? 5 : isAllTab ? 7.5 : 11;
+	const pillFontSize = isBottomView ? '8px' : isAllTab ? '10px' : '13px';
 	// Center dots vertically with the pill - calculate both positions relative to each other
-	const pillTop = 3 + offsetY;
+	const pillTop = whiteSectionHeight !== undefined ? (whiteSectionHeight - pillHeight) / 2 : 3 + offsetY;
 	const pillCenterY = pillTop + pillHeight / 2;
 	const dotTop = Math.round(pillCenterY - dotSize / 2);
+	const pillLeft = isBottomView ? 18 : 21;
 
 	return (
 		<>
@@ -35,7 +38,7 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isA
 				style={{
 					position: 'absolute',
 					top: `${pillTop}px`,
-					left: '21px',
+					left: `${pillLeft}px`,
 					width: `${pillWidth}px`,
 					height: `${pillHeight}px`,
 					backgroundColor: pillBgColor,

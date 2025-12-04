@@ -62,6 +62,10 @@ export interface ContactsExpandedListProps {
 	 * When provided, this overrides the default dashboard navigation behavior.
 	 */
 	onSearchFromMiniBar?: (params: { why: string; what: string; where: string }) => void;
+	/**
+	 * Custom height for the white header section in pixels.
+	 */
+	whiteSectionHeight?: number;
 }
 
 export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
@@ -79,6 +83,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	campaign,
 	showSearchBar = true,
 	onSearchFromMiniBar,
+	whiteSectionHeight: customWhiteSectionHeight,
 }) => {
 	const router = useRouter();
 	const [internalSelectedContactIds, setInternalSelectedContactIds] = useState<
@@ -216,13 +221,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	 * to match the other elements in that layout. Otherwise standard 1px border.
 	 */
 	const isAllTab = height === 263;
-	const whiteSectionHeight = isAllTab ? 20 : 28;
+	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
+	const isBottomView = customWhiteSectionHeight === 15;
 
 	return (
 		<div
 			className={cn(
 				'relative max-[480px]:w-[96.27vw] rounded-md flex flex-col overflow-visible',
-				isAllTab ? 'border-[3px] border-black' : 'border border-black'
+				isBottomView
+					? 'border-2 border-black'
+					: isAllTab
+					? 'border-[3px] border-black'
+					: 'border border-black'
 			)}
 			style={{
 				width: typeof resolvedWidth === 'number' ? `${resolvedWidth}px` : resolvedWidth,
@@ -234,12 +244,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			aria-label="Expanded contacts preview"
 		>
 			{/* Header row (no explicit divider; let the background change from white to pink like the main table) */}
-			<ContactsHeaderChrome isAllTab={isAllTab} />
+			<ContactsHeaderChrome isAllTab={isAllTab} whiteSectionHeight={customWhiteSectionHeight} />
 			<div
 				className={cn(
-					'flex items-center gap-2 h-[28px] px-3 shrink-0',
+					'flex items-center gap-2 px-3 shrink-0',
 					onHeaderClick ? 'cursor-pointer' : ''
 				)}
+				style={{ height: `${whiteSectionHeight}px` }}
 				role={onHeaderClick ? 'button' : undefined}
 				tabIndex={onHeaderClick ? 0 : undefined}
 				onClick={onHeaderClick}
@@ -252,7 +263,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				}}
 			></div>
 
-			{showSearchBar && (
+			{showSearchBar && !isBottomView && (
 				<div className="pt-2 flex justify-center">
 					<MiniSearchBar
 						activeSection={activeSection}
@@ -274,30 +285,45 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				</div>
 			)}
 
-			{/* Selected count row, shared across all layouts */}
-			<div className="px-3 mt-1 mb-0 flex items-center justify-center relative text-[14px] font-inter font-medium text-black/70">
-				<span>{selectedCount} Selected</span>
-				<button
-					type="button"
-					className="absolute right-3 bg-transparent border-none p-0 hover:text-black text-[14px] font-inter font-medium text-black/70 cursor-pointer"
-					onClick={handleSelectAllToggle}
-				>
-					{areAllSelected ? 'Deselect All' : 'Select All'}
-				</button>
-			</div>
+			{/* Selected count row, shared across all layouts - hidden in bottom view */}
+			{!isBottomView && (
+				<div className="px-3 mt-1 mb-0 flex items-center justify-center relative text-[14px] font-inter font-medium text-black/70">
+					<span>{selectedCount} Selected</span>
+					<button
+						type="button"
+						className="absolute right-3 bg-transparent border-none p-0 hover:text-black text-[14px] font-inter font-medium text-black/70 cursor-pointer"
+						onClick={handleSelectAllToggle}
+					>
+						{areAllSelected ? 'Deselect All' : 'Select All'}
+					</button>
+				</div>
+			)}
 
-			<div className="relative flex-1 flex flex-col pb-2 pt-2 min-h-0">
+			<div
+				className={cn(
+					'relative flex-1 flex flex-col min-h-0',
+					isBottomView ? 'px-[2px] pt-0 pb-0' : 'pb-2 pt-2'
+				)}
+			>
 				{/* Scrollable list */}
 				<CustomScrollbar
 					className="flex-1 drafting-table-content"
 					thumbWidth={2}
-					thumbColor="#000000"
+					thumbColor={isBottomView ? 'transparent' : '#000000'}
 					trackColor="transparent"
-					offsetRight={-6}
+					offsetRight={isBottomView ? -7 : -6}
 					contentClassName="overflow-x-hidden"
-					alwaysShow
+					alwaysShow={!isBottomView}
 				>
-					<div className="space-y-2 pb-2 flex flex-col items-center">
+					<div
+						className={cn(
+							'flex flex-col items-center',
+							isBottomView ? 'space-y-1 pb-0' : 'space-y-2 pb-2'
+						)}
+						style={{
+							paddingTop: customWhiteSectionHeight !== undefined ? '2px' : undefined,
+						}}
+					>
 						{contacts.map((contact) => {
 							const fullName =
 								contact.name ||
@@ -308,7 +334,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 								<div
 									key={contact.id}
 									className={cn(
-										'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[370px] max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none',
+										'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none',
+										isBottomView
+											? 'w-[225px] h-[49px]'
+											: 'w-[370px] max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]',
 										isSelected && 'bg-[#EAAEAE]'
 									)}
 									onMouseDown={(e) => {
@@ -621,11 +650,16 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 								</div>
 							);
 						})}
-						{Array.from({ length: Math.max(0, minRows - contacts.length) }).map(
+						{Array.from({ length: Math.max(0, (isBottomView ? 2 : minRows) - contacts.length) }).map(
 							(_, idx) => (
 								<div
 									key={`placeholder-${idx}`}
-									className="select-none w-[370px] max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#EB8586]"
+									className={cn(
+										'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#EB8586]',
+										isBottomView
+											? 'w-[225px] h-[49px]'
+											: 'w-[370px] max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]'
+									)}
 								/>
 							)
 						)}

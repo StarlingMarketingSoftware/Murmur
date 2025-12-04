@@ -26,24 +26,28 @@ export interface InboxExpandedListProps {
 	width?: number;
 	/** Custom height in pixels */
 	height?: number;
+	/** Custom height for the white header section in pixels */
+	whiteSectionHeight?: number;
 }
 
 const InboxHeaderChrome: FC<{
 	offsetY?: number;
 	hasData?: boolean;
 	isAllTab?: boolean;
-}> = ({ offsetY = 0, hasData = true, isAllTab = false }) => {
+	whiteSectionHeight?: number;
+}> = ({ offsetY = 0, hasData = true, isAllTab = false, whiteSectionHeight }) => {
+	const isBottomView = whiteSectionHeight === 15;
 	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
 	const pillBorderColor = hasData ? '#000000' : '#B0B0B0';
 	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
 	const pillBgColor = hasData ? '#CCDFF4' : '#FFAEAE';
-	const dotSize = isAllTab ? 6 : 9;
+	const dotSize = isBottomView ? 5 : isAllTab ? 6 : 9;
 	// First dot is 29px from the left
-	const dot1Left = 29;
-	const originalDot2Left = isAllTab ? 177.5 : 176;
-	const dot3Left = isAllTab ? 236.5 : 235;
+	const dot1Left = isBottomView ? 18 : 29;
+	const originalDot2Left = isBottomView ? 110 : isAllTab ? 177.5 : 176;
+	const dot3Left = isBottomView ? 146 : isAllTab ? 236.5 : 235;
 	// Pill dimensions for All tab
-	const pillWidth = isAllTab ? 50 : 72;
+	const pillWidth = isBottomView ? 40 : isAllTab ? 50 : 72;
 	// Center pill between first and second dots (this will be the new dot2 position)
 	const midpointBetweenDots = (dot1Left + originalDot2Left) / 2;
 	const newDot2Left = midpointBetweenDots - dotSize / 2;
@@ -51,11 +55,12 @@ const InboxHeaderChrome: FC<{
 	const pillLeft = dot3Left - pillWidth / 2;
 	// Third dot now goes where the pill was (at original dot2 position)
 	const newDot3Left = originalDot2Left - dotSize / 2;
-	const pillHeight = isAllTab ? 15 : 22;
-	const pillBorderRadius = isAllTab ? 7.5 : 11;
-	const pillFontSize = isAllTab ? '10px' : '13px';
+	const pillHeight = isBottomView ? 10 : isAllTab ? 15 : 22;
+	const pillBorderRadius = isBottomView ? 5 : isAllTab ? 7.5 : 11;
+	const pillFontSize = isBottomView ? '8px' : isAllTab ? '10px' : '13px';
 	// Center dots vertically with the pill - calculate both positions relative to each other
-	const pillTop = 3 + offsetY;
+	const pillTop =
+		whiteSectionHeight !== undefined ? (whiteSectionHeight - pillHeight) / 2 : 3 + offsetY;
 	const pillCenterY = pillTop + pillHeight / 2;
 	const dotTop = Math.round(pillCenterY - dotSize / 2);
 
@@ -183,6 +188,7 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 	onHeaderClick,
 	width = 376,
 	height = 426,
+	whiteSectionHeight: customWhiteSectionHeight,
 }) => {
 	// Fetch ALL inbound emails (same as InboxSection)
 	const { data: allInboundEmails } = useGetInboundEmails();
@@ -190,7 +196,8 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 	// Special hack for "All" tab: if height is exactly 347px, we apply a thicker 3px border
 	// to match the other elements in that layout. Otherwise standard 2px border.
 	const isAllTab = height === 347;
-	const whiteSectionHeight = isAllTab ? 20 : 28;
+	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
+	const isBottomView = customWhiteSectionHeight === 15;
 
 	// Filter to only show emails from campaign contacts
 	const inboundEmails = useMemo(() => {
@@ -211,7 +218,11 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 		<div
 			className={cn(
 				'relative max-[480px]:w-[96.27vw] rounded-md flex flex-col overflow-visible',
-				isAllTab ? 'border-[3px] border-black' : 'border-2 border-black/30'
+				isBottomView
+					? 'border-2 border-black'
+					: isAllTab
+					? 'border-[3px] border-black'
+					: 'border-2 border-black/30'
 			)}
 			style={{
 				width: `${width}px`,
@@ -221,19 +232,14 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 			role="region"
 			aria-label="Expanded inbox preview"
 		>
-			{/* Header background to prevent content from showing through */}
-			<div
-				className="absolute top-0 left-0 right-0 bg-white z-[5]"
-				style={{ height: `${whiteSectionHeight}px`, borderRadius: 'inherit' }}
-			/>
 			{/* Header row (no explicit divider; let the background change from white to blue like the main table) */}
-			<InboxHeaderChrome isAllTab={isAllTab} />
+			<InboxHeaderChrome isAllTab={isAllTab} whiteSectionHeight={customWhiteSectionHeight} />
 			<div
 				className={cn(
 					'flex items-center gap-2 px-3 shrink-0',
-					isAllTab ? 'h-0' : 'h-[28px]',
 					onHeaderClick ? 'cursor-pointer' : ''
 				)}
+				style={{ height: `${whiteSectionHeight}px` }}
 				role={onHeaderClick ? 'button' : undefined}
 				tabIndex={onHeaderClick ? 0 : undefined}
 				onClick={onHeaderClick}
@@ -248,23 +254,33 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 
 			<div
 				className={cn(
-					'relative flex-1 flex flex-col pb-2 min-h-0 px-2 overflow-hidden',
-					isAllTab ? 'pt-0' : 'pt-2'
+					'relative flex-1 flex flex-col min-h-0',
+					isBottomView ? 'px-[2px] pt-0 pb-0' : 'px-2 pt-2 pb-2'
 				)}
 			>
 				{/* Scrollable list */}
 				<CustomScrollbar
 					className="flex-1 drafting-table-content"
 					thumbWidth={2}
-					thumbColor="#000000"
+					thumbColor={isBottomView ? 'transparent' : '#000000'}
 					trackColor="transparent"
-					offsetRight={-14}
+					offsetRight={isBottomView ? -7 : -14}
 					contentClassName="overflow-x-hidden"
-					alwaysShow
+					alwaysShow={!isBottomView}
 				>
 					<div
-						className="space-y-2 pb-2 flex flex-col items-center"
-						style={{ paddingTop: isAllTab ? '31px' : `${38 - whiteSectionHeight}px` }}
+						className={cn(
+							'flex flex-col items-center',
+							isBottomView ? 'space-y-1 pb-0' : 'space-y-2 pb-2'
+						)}
+						style={{
+							paddingTop:
+								customWhiteSectionHeight !== undefined
+									? '2px'
+									: isAllTab
+									? '31px'
+									: `${38 - whiteSectionHeight}px`,
+						}}
 					>
 						{inboundEmails.map((email) => {
 							const contact = resolveContactForEmail(email, contactByEmail);
@@ -274,7 +290,10 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 								<div
 									key={email.id}
 									className={cn(
-										'transition-colors relative select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2'
+										'transition-colors relative select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
+										isBottomView
+											? 'w-[225px] h-[49px]'
+											: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
 									)}
 								>
 									{/* Fixed top-right info (Location + Title) */}
@@ -388,14 +407,19 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 								</div>
 							);
 						})}
-						{Array.from({ length: Math.max(0, 4 - inboundEmails.length) }).map(
-							(_, idx) => (
-								<div
-									key={`inbox-placeholder-${idx}`}
-									className="select-none w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#5EB6D6] p-2"
-								/>
-							)
-						)}
+						{Array.from({
+							length: Math.max(0, (isBottomView ? 2 : 4) - inboundEmails.length),
+						}).map((_, idx) => (
+							<div
+								key={`inbox-placeholder-${idx}`}
+								className={cn(
+									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#5EB6D6] p-2',
+									isBottomView
+										? 'w-[225px] h-[49px]'
+										: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
+								)}
+							/>
+						))}
 					</div>
 				</CustomScrollbar>
 			</div>

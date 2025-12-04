@@ -1,0 +1,38 @@
+import { CommonIconProps } from '@/utils';
+import { FC } from 'react';
+
+const RightArrow: FC<CommonIconProps> = (props) => {
+	const { width = 45, height = 85, className } = props;
+	return (
+		<svg
+			width={width}
+			height={height}
+			viewBox="0 0 45 85"
+			fill="none"
+			xmlns="http://www.w3.org/2000/svg"
+			className={className}
+		>
+			<g opacity="0.6">
+				<line
+					y1="-1.5"
+					x2="59.63"
+					y2="-1.5"
+					transform="matrix(0.705683 0.708528 0.708528 -0.705683 2.16016 0)"
+					stroke="#A0A0A0"
+					strokeWidth="3"
+				/>
+				<line
+					y1="-1.5"
+					x2="59.63"
+					y2="-1.5"
+					transform="matrix(-0.708487 0.705723 0.705723 0.708487 44.3633 42.4453)"
+					stroke="#A0A0A0"
+					strokeWidth="3"
+				/>
+			</g>
+		</svg>
+	);
+};
+
+export default RightArrow;
+
