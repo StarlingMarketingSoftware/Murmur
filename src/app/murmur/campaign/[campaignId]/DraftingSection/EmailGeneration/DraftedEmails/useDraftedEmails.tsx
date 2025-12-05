@@ -40,10 +40,10 @@ export interface DraftedEmailsProps {
 	goToSearch?: () => void;
 	/** Optional: callback to navigate to the Inbox tab */
 	goToInbox?: () => void;
-	/** Optional: callback invoked when a draft is rejected in preview */
-	onRejectDraft?: (draftId: number) => void;
-	/** Optional: callback invoked when a draft is approved in preview */
-	onApproveDraft?: (draftId: number) => void;
+	/** Optional: callback invoked when a draft is rejected in preview (toggle behavior) */
+	onRejectDraft?: (draftId: number, currentlyRejected?: boolean) => void;
+	/** Optional: callback invoked when a draft is approved in preview (toggle behavior) */
+	onApproveDraft?: (draftId: number, currentlyApproved?: boolean) => void;
 	/** Optional: callback invoked when regenerating a draft using AI */
 	onRegenerateDraft?: (draft: EmailWithRelations) => Promise<{ subject: string; message: string } | null>;
 	/** Optional: drafts marked for rejection (for UI badges) */

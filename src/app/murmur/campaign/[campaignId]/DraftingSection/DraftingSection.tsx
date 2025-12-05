@@ -133,11 +133,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const isDraftPreviewOpen = view === 'drafting' && Boolean(selectedDraft);
 
 	const handleRejectDraft = useCallback(
-		async (draftId: number) => {
+		async (draftId: number, currentlyRejected?: boolean) => {
 			try {
 				await updateEmail({
 					id: draftId,
-					data: { reviewStatus: ReviewStatus.rejected },
+					data: { reviewStatus: currentlyRejected ? null : ReviewStatus.rejected },
 				});
 			} catch (error) {
 				console.error('Failed to update draft review status:', error);
@@ -148,11 +148,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	);
 
 	const handleApproveDraft = useCallback(
-		async (draftId: number) => {
+		async (draftId: number, currentlyApproved?: boolean) => {
 			try {
 				await updateEmail({
 					id: draftId,
-					data: { reviewStatus: ReviewStatus.approved },
+					data: { reviewStatus: currentlyApproved ? null : ReviewStatus.approved },
 				});
 			} catch (error) {
 				console.error('Failed to update draft review status:', error);
@@ -1671,6 +1671,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													rowHeight={92}
 													rejectedDraftIds={rejectedDraftIds}
 													approvedDraftIds={approvedDraftIds}
+													previewedDraftId={selectedDraft?.id}
+													isPreviewMode
+													onDraftPreviewClick={setSelectedDraft}
 												/>
 											</div>
 										) : (

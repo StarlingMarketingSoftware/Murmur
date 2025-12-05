@@ -48,6 +48,12 @@ export interface DraftsExpandedListProps {
 	rejectedDraftIds?: Set<number>;
 	/** Optional set of draft ids marked as approved */
 	approvedDraftIds?: Set<number>;
+	/** Optional ID of the draft currently being previewed */
+	previewedDraftId?: number | null;
+	/** When true, clicking a draft opens it in preview instead of selecting it */
+	isPreviewMode?: boolean;
+	/** Callback when a draft is clicked in preview mode */
+	onDraftPreviewClick?: (draft: EmailWithRelations) => void;
 }
 
 const DraftsHeaderChrome: FC<{
@@ -169,6 +175,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	rowHeight,
 	rejectedDraftIds,
 	approvedDraftIds,
+	previewedDraftId,
+	isPreviewMode = false,
+	onDraftPreviewClick,
 }) => {
 	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
 	const lastClickedRef = useRef<number | null>(null);
@@ -192,7 +201,14 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 		[usedContactIds]
 	);
 
-	const handleDraftClick = (draftId: number, e: MouseEvent) => {
+	const handleDraftClick = (draft: EmailWithRelations, e: MouseEvent) => {
+		// In preview mode, clicking opens the draft in the preview panel
+		if (isPreviewMode && onDraftPreviewClick) {
+			onDraftPreviewClick(draft);
+			return;
+		}
+
+		const draftId = draft.id as number;
 		if (e.shiftKey && lastClickedRef.current !== null) {
 			// Prevent text selection on shift-click
 			e.preventDefault();
@@ -467,9 +483,11 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								  contact.company ||
 								  'Contact'
 								: 'Unknown Contact';
-							const isSelected = selectedDraftIds.has(draft.id as number);
+							// In preview mode, don't show selection state - only show previewed state
+							const isSelected = !isPreviewMode && selectedDraftIds.has(draft.id as number);
 							const isRejected = rejectedDraftIds?.has(draft.id as number) ?? false;
 							const isApproved = approvedDraftIds?.has(draft.id as number) ?? false;
+							const isPreviewed = previewedDraftId === draft.id;
 							const contactTitle = contact?.headline || contact?.title || '';
 							return (
 								<div
@@ -480,7 +498,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											? 'w-[225px] h-[49px]'
 											: !hasCustomRowSize &&
 											  'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
-										isSelected && 'bg-[#FFDF9F]'
+										isPreviewed && 'bg-[#FDDEA5]',
+										isSelected && !isPreviewed && 'bg-[#FFDF9F]'
 									)}
 									style={
 										isBottomView
@@ -491,9 +510,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											  }
 									}
 									onMouseDown={(e) => {
-										if (e.shiftKey) e.preventDefault();
+										if (e.shiftKey && !isPreviewMode) e.preventDefault();
 									}}
-									onClick={(e) => handleDraftClick(draft.id as number, e)}
+									onClick={(e) => handleDraftClick(draft, e)}
 								>
 									{/* Used-contact indicator - stacked above reject/approve when both present */}
 									{usedContactIdsSet.has(draft.contactId) && (

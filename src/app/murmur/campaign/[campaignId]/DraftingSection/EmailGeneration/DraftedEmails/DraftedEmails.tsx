@@ -545,8 +545,12 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					}}
 					onClick={() => {
 						if (selectedDraft) {
-							props.onApproveDraft?.(selectedDraft.id);
-							handleNavigateNext();
+							const isCurrentlyApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
+							props.onApproveDraft?.(selectedDraft.id, isCurrentlyApproved);
+							// Only navigate to next if we're approving, not toggling off
+							if (!isCurrentlyApproved) {
+								handleNavigateNext();
+							}
 						}
 					}}
 				>
@@ -584,8 +588,12 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					}}
 					onClick={() => {
 						if (selectedDraft) {
-							props.onRejectDraft?.(selectedDraft.id);
-							handleNavigateNext();
+							const isCurrentlyRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
+							props.onRejectDraft?.(selectedDraft.id, isCurrentlyRejected);
+							// Only navigate to next if we're rejecting, not toggling off
+							if (!isCurrentlyRejected) {
+								handleNavigateNext();
+							}
 						}
 					}}
 				>
