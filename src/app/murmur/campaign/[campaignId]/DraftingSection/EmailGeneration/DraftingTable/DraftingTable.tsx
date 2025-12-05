@@ -122,6 +122,11 @@ interface DraftingTableProps {
 	goToSearch?: () => void;
 	goToDrafts?: () => void;
 	goToInbox?: () => void;
+	selectedCount?: number;
+	/** Filter state for Drafts table */
+	statusFilter?: 'all' | 'approved' | 'rejected';
+	/** Callback to change status filter */
+	onStatusFilterChange?: (filter: 'all' | 'approved' | 'rejected') => void;
 }
 export const DraftingTable: FC<DraftingTableProps> = ({
 	title,
@@ -138,6 +143,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	goToSearch,
 	goToDrafts,
 	goToInbox,
+	selectedCount = 0,
+	statusFilter = 'all',
+	onStatusFilterChange,
 }) => {
 	const router = useRouter();
 	const isContacts = title === 'Contacts';
@@ -298,6 +306,76 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				</>
 			)}
 
+			{/* Filter tabs in gray section for Drafts */}
+			{isDrafts && hasData && onStatusFilterChange && (
+				<div
+					style={{
+						position: 'absolute',
+						top: '32px',
+						left: 0,
+						right: 0,
+						zIndex: 10,
+					}}
+				>
+					<span 
+						className="text-[11px] font-inter font-medium text-black"
+						style={{ position: 'absolute', left: '16px' }}
+					>
+						Show
+					</span>
+					<div style={{ position: 'absolute', left: '109px', display: 'flex', gap: '37px' }}>
+						{(['all', 'approved', 'rejected'] as const).map((tab) => {
+							const isActive = statusFilter === tab;
+							const labels: Record<typeof tab, string> = {
+								all: 'All Drafts',
+								approved: 'Approved',
+								rejected: 'Rejected',
+							};
+							return (
+								<button
+									key={tab}
+									type="button"
+									style={{
+										width: '62px',
+										height: '17px',
+										fontSize: '10px',
+										fontWeight: 600,
+										borderRadius: '6px',
+										border: 'none',
+										backgroundColor: isActive ? '#949494' : '#D9D9D9',
+										color: isActive ? '#FFFFFF' : '#000000',
+										cursor: 'pointer',
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+										padding: 0,
+									}}
+									onClick={() => onStatusFilterChange(tab)}
+								>
+									{labels[tab]}
+								</button>
+							);
+						})}
+					</div>
+				</div>
+			)}
+
+			{/* Selection counter in yellow section for Drafts */}
+			{isDrafts && hasData && (
+				<div
+					style={{
+						position: 'absolute',
+						top: '60px',
+						left: '50%',
+						transform: 'translateX(-50%)',
+						zIndex: 10,
+					}}
+					className="text-[12px] font-inter font-medium text-black"
+				>
+					{selectedCount} Selected
+				</div>
+			)}
+
 			{/* Top-left text label */}
 			<div
 				data-drafting-top-label
@@ -315,7 +393,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					border: isContacts
 						? '2px solid #000000'
 						: isDrafts
-						? '2px solid #A8833A'
+						? '3px solid #000000'
 						: isSent
 						? '2px solid #19670F'
 						: '2px solid #ABABAB',
@@ -329,7 +407,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							: '#FFAEAE'
 						: isDrafts
 						? hasData
-							? 'linear-gradient(to bottom, #ffffff 26px, #FFDC9E 26px)'
+							? 'linear-gradient(to bottom, #ffffff 26px, #E7E7E7 26px, #E7E7E7 55px, #FFDC9E 55px)'
 							: '#F8D69A'
 						: isSent
 						? hasData
@@ -370,7 +448,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 								transform: isCompactHeader
 									? isContacts
 										? 'translateY(103px)'
-										: isDrafts || isSent
+										: isDrafts
+										? 'translateY(57px)'
+										: isSent
 										? 'translateY(30px)'
 										: 'translateY(-2px)'
 									: 'translateY(6px)',
@@ -414,14 +494,16 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 								? '105px'
 								: isContacts
 								? '68px'
-								: isDrafts || isSent
+								: isDrafts
+								? '57px'
+								: isSent
 								? '32px'
 								: 0,
 					}}
 					thumbWidth={2}
 					thumbColor="#000000"
 					trackColor="transparent"
-					offsetRight={-5}
+					offsetRight={-6}
 				>
 					{isPending ? (
 						<div className="flex items-center justify-center h-full">

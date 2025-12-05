@@ -40,6 +40,14 @@ export interface DraftsExpandedListProps {
 	hideSendButton?: boolean;
 	/** Custom height for the white header section in pixels */
 	whiteSectionHeight?: number;
+	/** Optional per-row width override (px) */
+	rowWidth?: number;
+	/** Optional per-row height override (px) */
+	rowHeight?: number;
+	/** Optional set of draft ids marked as rejected */
+	rejectedDraftIds?: Set<number>;
+	/** Optional set of draft ids marked as approved */
+	approvedDraftIds?: Set<number>;
 }
 
 const DraftsHeaderChrome: FC<{
@@ -157,6 +165,10 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	height = 426,
 	hideSendButton = false,
 	whiteSectionHeight: customWhiteSectionHeight,
+	rowWidth,
+	rowHeight,
+	rejectedDraftIds,
+	approvedDraftIds,
 }) => {
 	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
 	const lastClickedRef = useRef<number | null>(null);
@@ -229,6 +241,15 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	const isAllTab = height === 347;
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
 	const isBottomView = customWhiteSectionHeight === 15;
+	const resolvedRowWidth = rowWidth ?? 356;
+	const resolvedRowHeight = rowHeight ?? 64;
+	const hasCustomRowSize = Boolean(rowWidth || rowHeight);
+	const horizontalPaddingClass = hasCustomRowSize
+		? 'px-0'
+		: isBottomView
+		? 'px-[2px]'
+		: 'px-2';
+	const verticalPaddingClass = isBottomView ? 'pt-0 pb-0' : 'pt-2 pb-2';
 
 	const handleSendSelected = async () => {
 		console.log('handleSendSelected called', { isSendDisabled, selectedDraftIds });
@@ -408,7 +429,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 			<div
 				className={cn(
 					'relative flex-1 flex flex-col min-h-0',
-					isBottomView ? 'px-[2px] pt-0 pb-0' : 'px-2 pt-2 pb-2'
+					horizontalPaddingClass,
+					verticalPaddingClass
 				)}
 			>
 				{/* Scrollable list */}
@@ -417,7 +439,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 					thumbWidth={2}
 					thumbColor={isBottomView ? 'transparent' : '#000000'}
 					trackColor="transparent"
-					offsetRight={isBottomView ? -7 : -14}
+					offsetRight={
+						isBottomView ? -7 : hasCustomRowSize ? -4 : -14
+					}
 					contentClassName="overflow-x-hidden"
 					alwaysShow={!isBottomView}
 				>
@@ -444,34 +468,80 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								  'Contact'
 								: 'Unknown Contact';
 							const isSelected = selectedDraftIds.has(draft.id as number);
+							const isRejected = rejectedDraftIds?.has(draft.id as number) ?? false;
+							const isApproved = approvedDraftIds?.has(draft.id as number) ?? false;
+							const contactTitle = contact?.headline || contact?.title || '';
 							return (
 								<div
 									key={draft.id}
 									className={cn(
-										'cursor-pointer relative select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
+										'cursor-pointer relative select-none overflow-visible rounded-[8px] border-2 border-[#000000] bg-white p-2',
 										isBottomView
 											? 'w-[225px] h-[49px]'
-											: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
+											: !hasCustomRowSize &&
+											  'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
 										isSelected && 'bg-[#FFDF9F]'
 									)}
+									style={
+										isBottomView
+											? undefined
+											: {
+													width: hasCustomRowSize ? `${resolvedRowWidth}px` : undefined,
+													height: hasCustomRowSize ? `${resolvedRowHeight}px` : undefined,
+											  }
+									}
 									onMouseDown={(e) => {
 										if (e.shiftKey) e.preventDefault();
 									}}
 									onClick={(e) => handleDraftClick(draft.id as number, e)}
 								>
-									{/* Used-contact indicator - vertically centered */}
+									{/* Used-contact indicator - stacked above reject/approve when both present */}
 									{usedContactIdsSet.has(draft.contactId) && (
 										<span
 											className="absolute left-[8px]"
 											title="Used in a previous campaign"
 											style={{
-												top: '50%',
-												transform: 'translateY(-50%)',
-												width: '16px',
-												height: '16px',
+												top: (isRejected || isApproved) ? 'calc(50% - 16px)' : '50%',
+												transform: (isRejected || isApproved) ? 'none' : 'translateY(-50%)',
+												width: '13px',
+												height: '13px',
 												borderRadius: '50%',
 												border: '1px solid #000000',
 												backgroundColor: '#DAE6FE',
+											}}
+										/>
+									)}
+									{/* Rejected indicator - stacked below used-contact when both present */}
+									{isRejected && (
+										<span
+											className="absolute left-[8px]"
+											title="Marked for rejection"
+											aria-label="Rejected draft"
+											style={{
+												top: usedContactIdsSet.has(draft.contactId) ? 'calc(50% + 3px)' : '50%',
+												transform: usedContactIdsSet.has(draft.contactId) ? 'none' : 'translateY(-50%)',
+												width: '13px',
+												height: '13px',
+												borderRadius: '50%',
+												border: '1px solid #000000',
+												backgroundColor: '#A03C3C',
+											}}
+										/>
+									)}
+									{/* Approved indicator - stacked below used-contact when both present */}
+									{isApproved && (
+										<span
+											className="absolute left-[8px]"
+											title="Marked for approval"
+											aria-label="Approved draft"
+											style={{
+												top: usedContactIdsSet.has(draft.contactId) ? 'calc(50% + 3px)' : '50%',
+												transform: usedContactIdsSet.has(draft.contactId) ? 'none' : 'translateY(-50%)',
+												width: '13px',
+												height: '13px',
+												borderRadius: '50%',
+												border: '1px solid #000000',
+												backgroundColor: '#69AF69',
 											}}
 										/>
 									)}
@@ -533,10 +603,10 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											) : null}
 										</div>
 
-										{contact?.headline ? (
+										{contactTitle ? (
 											<div className="w-[92px] h-[10px] rounded-[3.71px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
 												<ScrollableText
-													text={contact.headline}
+													text={contactTitle}
 													className="text-[8px] text-black leading-none px-1"
 												/>
 											</div>
@@ -589,8 +659,17 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#FFDC9E] p-2',
 									isBottomView
 										? 'w-[225px] h-[49px]'
-										: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
+										: !hasCustomRowSize &&
+										  'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
 								)}
+								style={
+									isBottomView
+										? undefined
+										: {
+												width: hasCustomRowSize ? `${resolvedRowWidth}px` : undefined,
+												height: hasCustomRowSize ? `${resolvedRowHeight}px` : undefined,
+										  }
+								}
 							/>
 						))}
 					</div>

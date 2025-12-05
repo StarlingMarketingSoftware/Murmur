@@ -88,6 +88,48 @@ export type HybridBlockPrompts = {
 	blocks: HybridBlockPrompt[];
 };
 
+const normalizeGeminiResponse = (text: string) =>
+	text
+		.replace(/[“”]/g, '"')
+		.replace(/[‘’]/g, "'")
+		.replace(/[‐‑‒–—―]/g, '-');
+
+const decodeGeminiValue = (value: string) =>
+	value
+		.replace(/\\n/g, '\n')
+		.replace(/\\r/g, '')
+		.replace(/\\t/g, '\t')
+		.replace(/\\"/g, '"')
+		.replace(/\\\\/g, '\\')
+		.trim();
+
+const extractGeminiField = (
+	response: string,
+	field: 'subject' | 'message'
+): string | null => {
+	const normalized = normalizeGeminiResponse(response);
+	const flags = field === 'message' ? 'is' : 'i';
+	const quotedRegex = new RegExp(
+		`${field}["']?\\s*:\\s*(["'])([\\s\\S]*?)\\1`,
+		flags
+	);
+	const quotedMatch = normalized.match(quotedRegex);
+	if (quotedMatch?.[2]) {
+		return decodeGeminiValue(quotedMatch[2]);
+	}
+
+	const unquotedRegex = new RegExp(
+		`${field}["']?\\s*:\\s*([^,\\n\\r{}]+)`,
+		'i'
+	);
+	const unquotedMatch = normalized.match(unquotedRegex);
+	if (unquotedMatch?.[1]) {
+		return decodeGeminiValue(unquotedMatch[1]);
+	}
+
+	return null;
+};
+
 export const draftingFormSchema = z.object({
 	isAiSubject: z.boolean().default(true),
 	subject: z.string().default(''),
@@ -616,21 +658,19 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			console.error('[Full AI] Failed response was:', geminiResponse);
 
 			// Better fallback: try to extract subject and message as plain text
-			const subjectMatch = geminiResponse.match(/subject[:\s]+["']?([^"'\n]+)["']?/i);
-			const messageMatch = geminiResponse.match(
-				/message[:\s]+["']?([\s\S]+?)["']?(?:\}|$)/i
-			);
+			const fallbackSubject = extractGeminiField(geminiResponse, 'subject');
+			const fallbackMessage = extractGeminiField(geminiResponse, 'message');
 
-			if (subjectMatch && messageMatch) {
+			if (fallbackMessage) {
 				geminiParsed = {
-					subject: subjectMatch[1].trim(),
-					message: messageMatch[1].trim(),
+					subject: fallbackSubject || `Email regarding ${recipient.company || 'your inquiry'}`,
+					message: fallbackMessage,
 				};
-				console.log('[Full AI] Extracted from plain text fallback');
+				console.log('[Full AI] Extracted from relaxed parser fallback');
 			} else {
 				// Last resort: use the Gemini response as message and generate a subject
 				geminiParsed = {
-					subject: `Email regarding ${recipient.company || 'your inquiry'}`,
+					subject: fallbackSubject || `Email regarding ${recipient.company || 'your inquiry'}`,
 					message: geminiResponse,
 				};
 				console.log('[Full AI] Using Gemini response as fallback');
@@ -717,15 +757,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			console.error('[Hybrid] Gemini JSON parse failed:', e);
 
 			// Fallback: try to extract from plain text
-			const subjectMatch = geminiResponse.match(/subject[:\s]+["']?([^"'\n]+)["']?/i);
-			const messageMatch = geminiResponse.match(
-				/message[:\s]+["']?([\s\S]+?)["']?(?:\}|$)/i
-			);
+			const fallbackSubject = extractGeminiField(geminiResponse, 'subject');
+			const fallbackMessage = extractGeminiField(geminiResponse, 'message');
 
-			if (subjectMatch && messageMatch) {
+			if (fallbackMessage) {
 				geminiParsed = {
-					subject: subjectMatch[1].trim(),
-					message: messageMatch[1].trim(),
+					subject: fallbackSubject || 'Email draft',
+					message: fallbackMessage,
 				};
 			} else {
 				throw new Error('Gemini response failed to be parsed');
@@ -1366,7 +1404,7 @@ The improved prompt should result in more personalized, engaging, and effective 
 		const controller = new AbortController();
 		setAbortController(controller);
 
-		const BATCH_SIZE = 10;
+		const BATCH_SIZE = 3;
 		let successfulEmails = 0;
 		let stoppedDueToCredits = false;
 

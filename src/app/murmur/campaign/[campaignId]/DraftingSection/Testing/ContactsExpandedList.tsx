@@ -330,6 +330,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 								`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
 							const isSelected = currentSelectedIds.has(contact.id);
 							const isUsed = usedContactIdsSet.has(contact.id);
+							const contactTitle = contact.title || contact.headline || '';
 							return (
 								<div
 									key={contact.id}
@@ -377,10 +378,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 											</div>
 											{/* Top Right - Title */}
 											<div className="pr-2 pl-1 flex items-center h-[23px]">
-												{contact.headline ? (
+												{contactTitle ? (
 													<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
 														<ScrollableText
-															text={contact.headline}
+															text={contactTitle}
 															className="text-[10px] text-black leading-none"
 															scrollPixelsPerSecond={60}
 														/>
@@ -499,13 +500,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 											</div>
 
 											{/* Right column - Title or Location */}
-											{contact.headline ? (
+											{contactTitle ? (
 												<>
 													{/* Top Right - Title */}
 													<div className="pr-2 pl-1 flex items-center h-[23px]">
 														<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
 															<ScrollableText
-																text={contact.headline}
+																text={contactTitle}
 																className="text-[10px] text-black leading-none"
 															/>
 														</div>

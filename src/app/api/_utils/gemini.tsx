@@ -2,7 +2,7 @@ export const fetchGemini = async (
 	model: string,
 	prompt: string,
 	content: string,
-	options?: { timeoutMs?: number }
+	options?: { timeoutMs?: number; maxOutputTokens?: number }
 ): Promise<string> => {
 	const controller = new AbortController();
 	const timeoutMs = options?.timeoutMs ?? 30000; // 30s default timeout for Gemini
@@ -37,7 +37,7 @@ export const fetchGemini = async (
 						temperature: 0.7,
 						topK: 40,
 						topP: 0.95,
-						maxOutputTokens: 8192,
+						maxOutputTokens: options?.maxOutputTokens ?? 4096,
 					},
 					safetySettings: [
 						{
@@ -70,6 +70,22 @@ export const fetchGemini = async (
 		}
 
 		if (!res.candidates || !res.candidates[0]?.content?.parts?.[0]?.text) {
+			const finishReason = res.candidates?.[0]?.finishReason;
+			const thoughtsTokenCount = res.usageMetadata?.thoughtsTokenCount;
+			
+			// Better error message for thinking models that hit token limits
+			if (finishReason === 'MAX_TOKENS' && thoughtsTokenCount > 0) {
+				console.error('[Gemini] Thinking model exhausted tokens during reasoning:', {
+					finishReason,
+					thoughtsTokenCount,
+					totalTokenCount: res.usageMetadata?.totalTokenCount,
+					model: res.modelVersion,
+				});
+				throw new Error(
+					`Model used ${thoughtsTokenCount} tokens for reasoning and hit the limit before generating output. Try again or use a faster model.`
+				);
+			}
+			
 			console.error('[Gemini] Invalid response structure:', res);
 			throw new Error('Invalid response from Gemini API');
 		}

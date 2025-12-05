@@ -1,11 +1,11 @@
-import { FC, ReactNode, useCallback, useEffect, useState } from 'react';
+import { FC, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { EmailGenerationProps, useEmailGeneration } from './useEmailGeneration';
 import { cn } from '@/utils';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { useMe } from '@/hooks/useMe';
-import { EmailStatus } from '@/constants/prismaEnums';
+import { EmailStatus, ReviewStatus } from '@/constants/prismaEnums';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { StripeSubscriptionStatus } from '@/types';
@@ -18,6 +18,7 @@ import { SentEmails } from './SentEmails/SentEmails';
 import DraftPreviewBox from './DraftPreviewBox';
 import DraggableBox from './DraggableBox';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { DraftsExpandedList } from '../Testing/DraftsExpandedList';
 
 export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	const {
@@ -56,6 +57,18 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	const { isLivePreviewVisible, livePreviewContactId, livePreviewMessage } = props;
 
 	const isMobile = useIsMobile();
+	const isDraftPreviewOpen = Boolean(selectedDraft);
+
+	// Compute rejected draft IDs from persisted reviewStatus
+	const rejectedDraftIds = useMemo(() => {
+		const ids = new Set<number>();
+		draftEmails.forEach((email) => {
+			if ((email as { reviewStatus?: string }).reviewStatus === ReviewStatus.rejected) {
+				ids.add(email.id);
+			}
+		});
+		return ids;
+	}, [draftEmails]);
 
 	// Sending preview: shows the email currently being sent
 	const [sendingPreview, setSendingPreview] = useState<{
@@ -162,6 +175,21 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	});
 	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
+
+	const handleRejectDraft = useCallback(
+		async (draftId: number) => {
+			try {
+				await updateEmail({
+					id: draftId,
+					data: { reviewStatus: ReviewStatus.rejected },
+				});
+			} catch (error) {
+				console.error('Failed to update draft review status:', error);
+				toast.error('Failed to reject draft');
+			}
+		},
+		[updateEmail]
+	);
 
 	// Custom send handler without dialog dependencies
 	const handleSend = async () => {
@@ -366,17 +394,30 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												previewDraft || isLivePreviewVisible ? 'z-10' : undefined
 											}
 										>
-											<MiniEmailStructure
-												form={form}
-												onDraft={handleDraftButtonClick}
-												isDraftDisabled={
-													isGenerationDisabled() || selectedContactIds.size === 0
-												}
-												isPendingGeneration={isPendingGeneration}
-												generationProgress={generationProgress}
-												generationTotal={generationTotal}
-												onCancel={cancelGeneration}
-											/>
+											{isDraftPreviewOpen ? (
+												<DraftsExpandedList
+													drafts={draftEmails}
+													contacts={contacts}
+													width={376}
+													height={587}
+													hideSendButton
+													rowWidth={366}
+													rowHeight={92}
+													rejectedDraftIds={rejectedDraftIds}
+												/>
+											) : (
+												<MiniEmailStructure
+													form={form}
+													onDraft={handleDraftButtonClick}
+													isDraftDisabled={
+														isGenerationDisabled() || selectedContactIds.size === 0
+													}
+													isPendingGeneration={isPendingGeneration}
+													generationProgress={generationProgress}
+													generationTotal={generationTotal}
+													onCancel={cancelGeneration}
+												/>
+											)}
 										</DraggableBox>
 									),
 									'draft-preview': (
@@ -453,6 +494,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												fromName={campaign?.identity?.name}
 												fromEmail={campaign?.identity?.email}
 												subject={form.watch('subject')}
+												onRejectDraft={handleRejectDraft}
+												rejectedDraftIds={rejectedDraftIds}
 											/>
 										</DraggableBox>
 									),

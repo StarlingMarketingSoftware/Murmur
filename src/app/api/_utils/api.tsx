@@ -87,12 +87,23 @@ export const apiServerError = (
 	return NextResponse.json({ success: false, error: message }, { status: 500 });
 };
 
+export const apiGatewayTimeout = (
+	message: string = 'Upstream service timed out'
+): NextResponse => {
+	console.error(message);
+	return NextResponse.json({ success: false, error: message }, { status: 504 });
+};
+
 export const handleApiError = (error: Error | unknown): NextResponse => {
 	console.error(error);
 	if (error instanceof z.ZodError) {
 		return apiBadRequest(`Validation error: ${error.message}`);
 	}
 	if (error instanceof Error) {
+		// Normalize AbortError (e.g., fetch aborted due to timeout) to 504
+		if (error.name === 'AbortError') {
+			return apiGatewayTimeout('Gemini request timed out');
+		}
 		return apiServerError(error.message);
 	}
 	return apiServerError();

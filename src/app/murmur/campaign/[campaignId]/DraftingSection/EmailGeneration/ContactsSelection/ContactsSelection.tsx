@@ -931,6 +931,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								const fullName =
 									contact.name ||
 									`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+								const contactTitle = contact.title || contact.headline || '';
 
 								// Left column - Name and Company
 								if (fullName) {
@@ -959,10 +960,10 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 											{/* Top Right - Title */}
 											<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
-												{contact.headline ? (
+												{contactTitle ? (
 													<div className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden">
 														<ScrollableText
-															text={contact.headline}
+															text={contactTitle}
 															className="text-[10px] text-black leading-none"
 															scrollPixelsPerSecond={60}
 														/>
@@ -1072,13 +1073,13 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 											</div>
 
 											{/* Right column - Title or Location */}
-											{contact.headline ? (
+											{contactTitle ? (
 												<>
 													{/* Top Right - Title */}
 													<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
 														<div className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden">
 															<ScrollableText
-																text={contact.headline}
+																text={contactTitle}
 																className="text-[10px] text-black leading-none"
 																scrollPixelsPerSecond={60}
 															/>
