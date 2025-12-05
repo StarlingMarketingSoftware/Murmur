@@ -476,7 +476,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											: !hasCustomRowSize &&
 											  'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
 										isPreviewed && 'bg-[#FDDEA5]',
-										isSelected && !isPreviewed && 'bg-[#FFDF9F]'
+										isSelected && !isPreviewed && 'bg-[#FFDF9F]',
+										isPreviewMode && !isPreviewed && 'hover:bg-[#FFEDCA]'
 									)}
 									style={
 										isBottomView

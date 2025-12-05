@@ -241,6 +241,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		}
 		return draftEmails;
 	}, [draftEmails, props.approvedDraftIds, props.rejectedDraftIds, statusFilter]);
+	const approvedCount = props.approvedDraftIds?.size ?? 0;
+	const rejectedCount = props.rejectedDraftIds?.size ?? 0;
 	const selectedCount = selectedDraftIds.size;
 	const hasSelection = selectedCount > 0;
 	const toCount = selectedCount; // used in confirmation details
@@ -635,6 +637,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				selectedCount={selectedDraftIds.size}
 				statusFilter={statusFilter}
 				onStatusFilterChange={setStatusFilter}
+				approvedCount={approvedCount}
+				rejectedCount={rejectedCount}
+				totalDraftsCount={draftEmails.length}
 			>
 				<>
 					<div className="overflow-visible w-full flex flex-col gap-2 items-center">
@@ -662,8 +667,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								<div
 									key={draft.id}
 									className={cn(
-										'cursor-pointer transition-colors relative select-none w-[489px] h-[97px] overflow-visible rounded-[8px] border-2 border-[#000000] bg-white p-2 group/draft',
-										isSelected && 'bg-[#E8EFFF]'
+										'cursor-pointer relative select-none w-[489px] h-[97px] overflow-visible border-2 p-2 group/draft',
+										isSelected
+											? 'rounded-none bg-[#A4D996] border-[#FFFFFF]'
+											: 'rounded-[8px] bg-white border-[#000000] hover:bg-[#F9E5BA]'
 									)}
 									onMouseDown={(e) => {
 										// Prevent text selection on shift-click
@@ -679,22 +686,20 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									onMouseLeave={() => {
 										onContactHover?.(null);
 									}}
-									onClick={(e) => {
-										handleDraftSelect(draft, e);
+									onClick={() => {
+										handleDraftDoubleClick(draft);
 										if (contact) {
 											onContactClick?.(contact);
 										}
 									}}
-									onDoubleClick={() => handleDraftDoubleClick(draft)}
 								>
-									{/* Used-contact indicator - vertically centered */}
+									{/* Used-contact indicator - 11px from top */}
 									{usedContactIdsSet.has(draft.contactId) && (
 										<span
 											className="absolute left-[8px]"
 											title="Used in a previous campaign"
 											style={{
-												top: isRejected || isApproved ? 'calc(50% - 10px)' : hasSeparateName ? '50%' : '30px',
-												transform: 'translateY(-50%)',
+												top: '11px',
 												width: '16px',
 												height: '16px',
 												borderRadius: '50%',
@@ -710,8 +715,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											title="Marked for rejection"
 											aria-label="Rejected draft"
 											style={{
-												top: usedContactIdsSet.has(draft.contactId) ? 'calc(50% + 10px)' : '50%',
-												transform: 'translateY(-50%)',
+												top: usedContactIdsSet.has(draft.contactId) ? '33px' : '11px',
 												width: '16px',
 												height: '16px',
 												borderRadius: '50%',
@@ -727,8 +731,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											title="Marked for approval"
 											aria-label="Approved draft"
 											style={{
-												top: usedContactIdsSet.has(draft.contactId) ? 'calc(50% + 10px)' : '50%',
-												transform: 'translateY(-50%)',
+												top: usedContactIdsSet.has(draft.contactId) ? '33px' : '11px',
 												width: '16px',
 												height: '16px',
 												borderRadius: '50%',
@@ -737,6 +740,28 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											}}
 										/>
 									)}
+									{/* Checkbox indicator - visible on hover only */}
+									<span
+										className="absolute hidden group-hover/draft:block cursor-pointer"
+										style={{
+											left: '10px',
+											bottom: '10px',
+											width: '15px',
+											height: '15px',
+											borderRadius: '1px',
+											border: isSelected ? '2px solid #FFFFFF' : '2px solid #676767',
+											backgroundColor: isSelected ? '#22C21C' : 'transparent',
+										}}
+										onClick={(e) => {
+											e.stopPropagation();
+											e.preventDefault();
+											handleDraftSelect(draft, e);
+										}}
+										onDoubleClick={(e) => {
+											e.stopPropagation();
+											e.preventDefault();
+										}}
+									/>
 									{/* Delete button */}
 									<Button
 										type="button"
@@ -923,7 +948,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						{Array.from({ length: Math.max(0, 6 - filteredDrafts.length) }).map((_, idx) => (
 							<div
 								key={`draft-placeholder-${idx}`}
-								className="select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#FFCD73] p-2"
+								className="select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#FFDC9E] p-2"
 							/>
 						))}
 					</div>
