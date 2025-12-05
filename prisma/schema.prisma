@@ -120,20 +120,21 @@ model Contact {
 }
 
 model Email {
-  subject    String
-  message    String
-  status     EmailStatus @default(draft)
-  sentAt     DateTime?
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  userId     String
-  id         Int         @id @default(autoincrement())
-  campaignId Int
-  contactId  Int
-  campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  contact    Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  user       User        @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
-  replies    InboundEmail[] @relation("EmailReplies")
+  subject      String
+  message      String
+  status       EmailStatus    @default(draft)
+  reviewStatus ReviewStatus?
+  sentAt       DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  userId       String
+  id           Int            @id @default(autoincrement())
+  campaignId   Int
+  contactId    Int
+  campaign     Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact      Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  replies      InboundEmail[] @relation("EmailReplies")
 
   @@index([campaignId])
 }
@@ -299,6 +300,11 @@ enum EmailStatus {
   scheduled
   sent
   failed
+}
+
+enum ReviewStatus {
+  approved
+  rejected
 }
 
 enum EmailVerificationStatus {

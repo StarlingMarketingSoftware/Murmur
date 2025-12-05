@@ -18,6 +18,7 @@ const patchEmailSchema = z.object({
 	subject: z.string().min(1).optional(),
 	message: z.string().min(1).optional(),
 	status: z.nativeEnum(EmailStatus).optional(),
+	reviewStatus: z.enum(['approved', 'rejected']).nullable().optional(),
 	sentAt: z.union([z.date(), z.string().datetime()]).optional(),
 });
 export type PatchEmailData = z.infer<typeof patchEmailSchema>;
@@ -30,7 +31,17 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 		}
 
 		const { id } = await params;
-		const body = await req.json();
+		let body;
+		try {
+			body = await req.json();
+		} catch {
+			return apiBadRequest('Invalid or missing request body');
+		}
+
+		if (!body || typeof body !== 'object') {
+			return apiBadRequest('Request body must be a valid JSON object');
+		}
+
 		const validatedData = patchEmailSchema.safeParse(body);
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);

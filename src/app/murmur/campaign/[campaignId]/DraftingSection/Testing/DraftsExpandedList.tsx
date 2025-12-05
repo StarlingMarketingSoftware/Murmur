@@ -475,7 +475,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								<div
 									key={draft.id}
 									className={cn(
-										'cursor-pointer relative select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
+										'cursor-pointer relative select-none overflow-visible rounded-[8px] border-2 border-[#000000] bg-white p-2',
 										isBottomView
 											? 'w-[225px] h-[49px]'
 											: !hasCustomRowSize &&

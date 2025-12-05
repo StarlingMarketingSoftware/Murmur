@@ -1,11 +1,11 @@
-import { FC, ReactNode, useCallback, useEffect, useState } from 'react';
+import { FC, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { EmailGenerationProps, useEmailGeneration } from './useEmailGeneration';
 import { cn } from '@/utils';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { useMe } from '@/hooks/useMe';
-import { EmailStatus } from '@/constants/prismaEnums';
+import { EmailStatus, ReviewStatus } from '@/constants/prismaEnums';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { StripeSubscriptionStatus } from '@/types';
@@ -58,36 +58,16 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 
 	const isMobile = useIsMobile();
 	const isDraftPreviewOpen = Boolean(selectedDraft);
-	const [rejectedDraftIds, setRejectedDraftIds] = useState<Set<number>>(new Set());
 
-	const handleRejectDraft = useCallback((draftId: number) => {
-		setRejectedDraftIds((prev) => {
-			if (prev.has(draftId)) return prev;
-			const next = new Set(prev);
-			next.add(draftId);
-			return next;
+	// Compute rejected draft IDs from persisted reviewStatus
+	const rejectedDraftIds = useMemo(() => {
+		const ids = new Set<number>();
+		draftEmails.forEach((email) => {
+			if ((email as { reviewStatus?: string }).reviewStatus === ReviewStatus.rejected) {
+				ids.add(email.id);
+			}
 		});
-	}, []);
-
-	useEffect(() => {
-		setRejectedDraftIds((prev) => {
-			if (prev.size === 0) return prev;
-			const validIds = new Set(draftEmails.map((draft) => draft.id));
-			let removed = false;
-			prev.forEach((id) => {
-				if (!validIds.has(id)) {
-					removed = true;
-				}
-			});
-			if (!removed) return prev;
-			const next = new Set<number>();
-			prev.forEach((id) => {
-				if (validIds.has(id)) {
-					next.add(id);
-				}
-			});
-			return next;
-		});
+		return ids;
 	}, [draftEmails]);
 
 	// Sending preview: shows the email currently being sent
@@ -195,6 +175,21 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	});
 	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
+
+	const handleRejectDraft = useCallback(
+		async (draftId: number) => {
+			try {
+				await updateEmail({
+					id: draftId,
+					data: { reviewStatus: ReviewStatus.rejected },
+				});
+			} catch (error) {
+				console.error('Failed to update draft review status:', error);
+				toast.error('Failed to reject draft');
+			}
+		},
+		[updateEmail]
+	);
 
 	// Custom send handler without dialog dependencies
 	const handleSend = async () => {
@@ -500,6 +495,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												fromEmail={campaign?.identity?.email}
 												subject={form.watch('subject')}
 												onRejectDraft={handleRejectDraft}
+												rejectedDraftIds={rejectedDraftIds}
 											/>
 										</DraggableBox>
 									),

@@ -13,7 +13,7 @@ import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/Camp
 import { useGetContacts, useGetLocations } from '@/hooks/queryHooks/useContacts';
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useEditEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
-import { EmailStatus, EmailVerificationStatus, DraftingMode } from '@/constants/prismaEnums';
+import { EmailStatus, EmailVerificationStatus, DraftingMode, ReviewStatus } from '@/constants/prismaEnums';
 import { ContactsSelection } from './EmailGeneration/ContactsSelection/ContactsSelection';
 import { SentEmails } from './EmailGeneration/SentEmails/SentEmails';
 import { DraftedEmails } from './EmailGeneration/DraftedEmails/DraftedEmails';
@@ -53,7 +53,7 @@ import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { useGemini } from '@/hooks/useGemini';
 import { GEMINI_FULL_AI_PROMPT, GEMINI_HYBRID_PROMPT } from '@/constants/ai';
-import { Contact, Identity, HybridBlock } from '@prisma/client';
+import { Contact, Identity } from '@prisma/client';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -131,40 +131,36 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const isMobile = useIsMobile();
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	const isDraftPreviewOpen = view === 'drafting' && Boolean(selectedDraft);
-	const [rejectedDraftIds, setRejectedDraftIds] = useState<Set<number>>(new Set());
-	const [approvedDraftIds, setApprovedDraftIds] = useState<Set<number>>(new Set());
 
-	const handleRejectDraft = useCallback((draftId: number) => {
-		setRejectedDraftIds((prev) => {
-			if (prev.has(draftId)) return prev;
-			const next = new Set(prev);
-			next.add(draftId);
-			return next;
-		});
-		// Remove from approved if it was approved
-		setApprovedDraftIds((prev) => {
-			if (!prev.has(draftId)) return prev;
-			const next = new Set(prev);
-			next.delete(draftId);
-			return next;
-		});
-	}, []);
+	const handleRejectDraft = useCallback(
+		async (draftId: number) => {
+			try {
+				await updateEmail({
+					id: draftId,
+					data: { reviewStatus: ReviewStatus.rejected },
+				});
+			} catch (error) {
+				console.error('Failed to update draft review status:', error);
+				toast.error('Failed to reject draft');
+			}
+		},
+		[updateEmail]
+	);
 
-	const handleApproveDraft = useCallback((draftId: number) => {
-		setApprovedDraftIds((prev) => {
-			if (prev.has(draftId)) return prev;
-			const next = new Set(prev);
-			next.add(draftId);
-			return next;
-		});
-		// Remove from rejected if it was rejected
-		setRejectedDraftIds((prev) => {
-			if (!prev.has(draftId)) return prev;
-			const next = new Set(prev);
-			next.delete(draftId);
-			return next;
-		});
-	}, []);
+	const handleApproveDraft = useCallback(
+		async (draftId: number) => {
+			try {
+				await updateEmail({
+					id: draftId,
+					data: { reviewStatus: ReviewStatus.approved },
+				});
+			} catch (error) {
+				console.error('Failed to update draft review status:', error);
+				toast.error('Failed to approve draft');
+			}
+		},
+		[updateEmail]
+	);
 
 	// Gemini hook for regenerating drafts
 	const { mutateAsync: callGemini } = useGemini({ suppressToasts: true });
@@ -727,40 +723,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const sentEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.sent);
 	const sentCount = sentEmails.length;
 
-	// Clean up rejected IDs when drafts change
-	useEffect(() => {
-		setRejectedDraftIds((prev) => {
-			if (prev.size === 0) return prev;
-			const validIds = new Set(draftEmails.map((draft) => draft.id));
-			let hasInvalid = false;
-			prev.forEach((id) => {
-				if (!validIds.has(id)) hasInvalid = true;
-			});
-			if (!hasInvalid) return prev;
-			const next = new Set<number>();
-			prev.forEach((id) => {
-				if (validIds.has(id)) next.add(id);
-			});
-			return next;
+	// Compute rejected and approved draft IDs from persisted reviewStatus
+	const rejectedDraftIds = useMemo(() => {
+		const ids = new Set<number>();
+		draftEmails.forEach((email) => {
+			if (email.reviewStatus === ReviewStatus.rejected) {
+				ids.add(email.id);
+			}
 		});
+		return ids;
 	}, [draftEmails]);
 
-	// Clean up approved IDs when drafts change
-	useEffect(() => {
-		setApprovedDraftIds((prev) => {
-			if (prev.size === 0) return prev;
-			const validIds = new Set(draftEmails.map((draft) => draft.id));
-			let hasInvalid = false;
-			prev.forEach((id) => {
-				if (!validIds.has(id)) hasInvalid = true;
-			});
-			if (!hasInvalid) return prev;
-			const next = new Set<number>();
-			prev.forEach((id) => {
-				if (validIds.has(id)) next.add(id);
-			});
-			return next;
+	const approvedDraftIds = useMemo(() => {
+		const ids = new Set<number>();
+		draftEmails.forEach((email) => {
+			if (email.reviewStatus === ReviewStatus.approved) {
+				ids.add(email.id);
+			}
 		});
+		return ids;
 	}, [draftEmails]);
 
 	// Contacts that are still eligible for drafting in this campaign:
@@ -2177,6 +2158,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										onRejectDraft={handleRejectDraft}
 										onApproveDraft={handleApproveDraft}
 										onRegenerateDraft={handleRegenerateDraft}
+										rejectedDraftIds={rejectedDraftIds}
+										approvedDraftIds={approvedDraftIds}
 									/>
 
 									{/* Bottom Panels: Contacts, Sent, and Inbox */}

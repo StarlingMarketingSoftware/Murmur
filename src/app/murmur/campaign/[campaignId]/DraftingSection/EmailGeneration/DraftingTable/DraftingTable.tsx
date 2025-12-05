@@ -123,6 +123,10 @@ interface DraftingTableProps {
 	goToDrafts?: () => void;
 	goToInbox?: () => void;
 	selectedCount?: number;
+	/** Filter state for Drafts table */
+	statusFilter?: 'all' | 'approved' | 'rejected';
+	/** Callback to change status filter */
+	onStatusFilterChange?: (filter: 'all' | 'approved' | 'rejected') => void;
 }
 export const DraftingTable: FC<DraftingTableProps> = ({
 	title,
@@ -140,6 +144,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	goToDrafts,
 	goToInbox,
 	selectedCount = 0,
+	statusFilter = 'all',
+	onStatusFilterChange,
 }) => {
 	const router = useRouter();
 	const isContacts = title === 'Contacts';
@@ -298,6 +304,60 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						}}
 					/>
 				</>
+			)}
+
+			{/* Filter tabs in gray section for Drafts */}
+			{isDrafts && hasData && onStatusFilterChange && (
+				<div
+					style={{
+						position: 'absolute',
+						top: '32px',
+						left: 0,
+						right: 0,
+						zIndex: 10,
+					}}
+				>
+					<span 
+						className="text-[11px] font-inter font-medium text-black"
+						style={{ position: 'absolute', left: '16px' }}
+					>
+						Show
+					</span>
+					<div style={{ position: 'absolute', left: '109px', display: 'flex', gap: '37px' }}>
+						{(['all', 'approved', 'rejected'] as const).map((tab) => {
+							const isActive = statusFilter === tab;
+							const labels: Record<typeof tab, string> = {
+								all: 'All Drafts',
+								approved: 'Approved',
+								rejected: 'Rejected',
+							};
+							return (
+								<button
+									key={tab}
+									type="button"
+									style={{
+										width: '62px',
+										height: '17px',
+										fontSize: '10px',
+										fontWeight: 600,
+										borderRadius: '6px',
+										border: 'none',
+										backgroundColor: isActive ? '#949494' : '#D9D9D9',
+										color: isActive ? '#FFFFFF' : '#000000',
+										cursor: 'pointer',
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+										padding: 0,
+									}}
+									onClick={() => onStatusFilterChange(tab)}
+								>
+									{labels[tab]}
+								</button>
+							);
+						})}
+					</div>
+				</div>
 			)}
 
 			{/* Selection counter in yellow section for Drafts */}

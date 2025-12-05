@@ -46,6 +46,10 @@ export interface DraftedEmailsProps {
 	onApproveDraft?: (draftId: number) => void;
 	/** Optional: callback invoked when regenerating a draft using AI */
 	onRegenerateDraft?: (draft: EmailWithRelations) => Promise<{ subject: string; message: string } | null>;
+	/** Optional: drafts marked for rejection (for UI badges) */
+	rejectedDraftIds?: Set<number>;
+	/** Optional: drafts marked for approval (for UI badges) */
+	approvedDraftIds?: Set<number>;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {
