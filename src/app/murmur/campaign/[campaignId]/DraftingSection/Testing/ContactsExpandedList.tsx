@@ -37,42 +37,19 @@ export interface ContactsExpandedListProps {
 	 */
 	selectedContactIds?: Set<number>;
 	onContactSelectionChange?: (updater: (prev: Set<number>) => Set<number>) => void;
-	/**
-	 * Optional explicit dimensions so the same component can be reused
-	 * in compact "mini" layouts (e.g. pinned panel on the Writing tab)
-	 * as well as the full-height drafting sidebar.
-	 */
 	width?: number | string;
 	height?: number | string;
-	/**
-	 * Minimum number of rows to display (fills remaining space with empty placeholders).
-	 * Defaults to 7.
-	 */
 	minRows?: number;
-	/**
-	 * Campaign used to prefill the mini search bar query (optional).
-	 */
 	campaign?: CampaignWithRelations;
-	/**
-	 * Whether to show the mini search bar under the header. Defaults to true.
-	 */
 	showSearchBar?: boolean;
-	/**
-	 * Optional callback for when the mini search bar triggers a search.
-	 * When provided, this overrides the default dashboard navigation behavior.
-	 */
+	
 	onSearchFromMiniBar?: (params: { why: string; what: string; where: string }) => void;
-	/**
-	 * Custom height for the white header section in pixels.
-	 */
 	whiteSectionHeight?: number;
 }
 
 export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	contacts,
 	onHeaderClick,
-	// Note: onDraftSelected, isDraftDisabled, isPendingGeneration are available
-	// in props interface for future use but not currently wired up.
 	onContactClick,
 	onContactHover,
 	selectedContactIds,
@@ -173,23 +150,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		'state-first'
 	);
 
-	// Handle search button click
 	const handleSearch = () => {
-		// Always compute the current values first
 		const payload = {
 			why: whyValue,
 			what: whatValue,
 			where: whereValue,
 		};
 
-		// If the parent provided a handler (e.g., to drive the in-campaign Search tab),
-		// use that instead of navigating away.
 		if (onSearchFromMiniBar) {
 			onSearchFromMiniBar(payload);
 			return;
 		}
 
-		// Fallback: preserve original behavior of kicking off a dashboard search
 		let searchQuery = '';
 		if (payload.why) {
 			searchQuery += payload.why + ' ';
@@ -216,10 +188,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const resolvedWidth = width ?? 376;
 	const resolvedHeight = height ?? 424;
 
-	/**
-	 * Special hack for "All" tab: if height is exactly 263px, we apply a thicker 3px border
-	 * to match the other elements in that layout. Otherwise standard 1px border.
-	 */
 	const isAllTab = height === 263;
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
 	const isBottomView = customWhiteSectionHeight === 15;
@@ -243,7 +211,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			role="region"
 			aria-label="Expanded contacts preview"
 		>
-			{/* Header row (no explicit divider; let the background change from white to pink like the main table) */}
 			<ContactsHeaderChrome isAllTab={isAllTab} whiteSectionHeight={customWhiteSectionHeight} />
 			<div
 				className={cn(
@@ -285,7 +252,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				</div>
 			)}
 
-			{/* Selected count row, shared across all layouts - hidden in bottom view */}
 			{!isBottomView && (
 				<div className="px-3 mt-1 mb-0 flex items-center justify-center relative text-[14px] font-inter font-medium text-black/70">
 					<span>{selectedCount} Selected</span>
@@ -376,7 +342,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 													{fullName}
 												</div>
 											</div>
-											{/* Top Right - Title */}
 											<div className="pr-2 pl-1 flex items-center h-[23px]">
 												{contactTitle ? (
 													<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
@@ -390,7 +355,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 													<div className="w-full" />
 												)}
 											</div>
-											{/* Bottom Left - Company */}
 											<div className="pl-3 pr-1 flex items-center h-[22px]">
 												{!fullName && isUsed && (
 													<span
@@ -479,7 +443,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 										</>
 									) : (
 										<>
-											{/* Left column - Company vertically centered */}
 											<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
 												{isUsed && (
 													<span
@@ -499,7 +462,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 												</div>
 											</div>
 
-											{/* Right column - Title or Location */}
 											{contactTitle ? (
 												<>
 													{/* Top Right - Title */}
