@@ -609,7 +609,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					) : isDrafts || isSent ? (
 						<div
 							className="overflow-visible w-full flex flex-col items-center"
-							style={{ gap: '11px' }}
+							style={{ gap: '10px' }}
 						>
 							{Array.from({ length: 8 }).map((_, idx) => {
 								// For drafts/sent empty state: boxes 2-5 (idx 1-4) are 52px, all others are 85px
