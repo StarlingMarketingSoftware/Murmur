@@ -8,6 +8,11 @@ export const EmailStatus = {
 	failed: 'failed',
 } as const;
 
+export const ReviewStatus = {
+	approved: 'approved',
+	rejected: 'rejected',
+} as const;
+
 export const DraftingMode = {
 	ai: 'ai',
 	hybrid: 'hybrid',
@@ -45,6 +50,7 @@ export const ContactVerificationRequestStatus = {
 
 // Type exports
 export type EmailStatus = (typeof EmailStatus)[keyof typeof EmailStatus];
+export type ReviewStatus = (typeof ReviewStatus)[keyof typeof ReviewStatus];
 export type DraftingMode = (typeof DraftingMode)[keyof typeof DraftingMode];
 export type DraftingTone = (typeof DraftingTone)[keyof typeof DraftingTone];
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];

@@ -2,8 +2,17 @@ import { useDeleteEmail, useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
 import { convertHtmlToPlainText } from '@/utils';
-import { Dispatch, SetStateAction, useState, useRef } from 'react';
+import { Dispatch, SetStateAction, useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+
+const plainTextToHtml = (text: string) =>
+	text
+		.split('\n\n')
+		.map((paragraph) => {
+			const withBreaks = paragraph.replace(/\n/g, '<br>');
+			return `<p>${withBreaks}</p>`;
+		})
+		.join('');
 
 export interface DraftedEmailsProps {
 	contacts: ContactWithName[];
@@ -31,6 +40,16 @@ export interface DraftedEmailsProps {
 	goToSearch?: () => void;
 	/** Optional: callback to navigate to the Inbox tab */
 	goToInbox?: () => void;
+	/** Optional: callback invoked when a draft is rejected in preview */
+	onRejectDraft?: (draftId: number) => void;
+	/** Optional: callback invoked when a draft is approved in preview */
+	onApproveDraft?: (draftId: number) => void;
+	/** Optional: callback invoked when regenerating a draft using AI */
+	onRegenerateDraft?: (draft: EmailWithRelations) => Promise<{ subject: string; message: string } | null>;
+	/** Optional: drafts marked for rejection (for UI badges) */
+	rejectedDraftIds?: Set<number>;
+	/** Optional: drafts marked for approval (for UI badges) */
+	approvedDraftIds?: Set<number>;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {
@@ -116,30 +135,112 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 
 	const [editedSubject, setEditedSubject] = useState('');
 	const [editedMessage, setEditedMessage] = useState('');
+	const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const lastSavedValuesRef = useRef<{ subject: string; message: string } | null>(null);
 	const { mutateAsync: updateEmail, isPending: isPendingUpdate } = useEditEmail();
+
+	useEffect(() => {
+		if (autoSaveTimeoutRef.current) {
+			clearTimeout(autoSaveTimeoutRef.current);
+			autoSaveTimeoutRef.current = null;
+		}
+
+		if (!selectedDraft) {
+			setEditedSubject('');
+			setEditedMessage('');
+			lastSavedValuesRef.current = null;
+			return;
+		}
+
+		const nextSubject = selectedDraft.subject || '';
+		const plainMessage = convertHtmlToPlainText(selectedDraft.message);
+		setEditedSubject(nextSubject);
+		setEditedMessage(plainMessage);
+		lastSavedValuesRef.current = {
+			subject: nextSubject,
+			message: plainMessage,
+		};
+	}, [selectedDraft]);
+
+	const saveDraft = useCallback(
+		async (
+			subjectToSave: string,
+			messageToSave: string,
+			options?: { silent?: boolean }
+		) => {
+			if (!selectedDraft) return;
+
+			try {
+				const htmlMessage = plainTextToHtml(messageToSave);
+				await updateEmail({
+					id: selectedDraft.id.toString(),
+					data: {
+						subject: subjectToSave,
+						message: htmlMessage,
+					},
+				});
+
+				lastSavedValuesRef.current = {
+					subject: subjectToSave,
+					message: messageToSave,
+				};
+
+				setSelectedDraft((prev) => {
+					if (!prev || prev.id !== selectedDraft.id) return prev;
+					return {
+						...prev,
+						subject: subjectToSave,
+						message: htmlMessage,
+					};
+				});
+
+				if (!options?.silent) {
+					toast.success('Draft updated successfully');
+				}
+			} catch {
+				if (options?.silent) {
+					toast.error('Failed to auto-save draft changes');
+				} else {
+					toast.error('Failed to update draft');
+				}
+			}
+		},
+		[selectedDraft, setSelectedDraft, updateEmail]
+	);
+
+	useEffect(() => {
+		if (!selectedDraft) return;
+
+		const lastSaved = lastSavedValuesRef.current;
+		const hasChanges =
+			!lastSaved ||
+			lastSaved.subject !== editedSubject ||
+			lastSaved.message !== editedMessage;
+
+		if (!hasChanges) return;
+
+		if (autoSaveTimeoutRef.current) {
+			clearTimeout(autoSaveTimeoutRef.current);
+		}
+
+		autoSaveTimeoutRef.current = setTimeout(() => {
+			saveDraft(editedSubject, editedMessage, { silent: true });
+		}, 1500);
+
+		return () => {
+			if (autoSaveTimeoutRef.current) {
+				clearTimeout(autoSaveTimeoutRef.current);
+				autoSaveTimeoutRef.current = null;
+			}
+		};
+	}, [editedSubject, editedMessage, saveDraft, selectedDraft]);
 
 	const handleSave = async () => {
 		if (!selectedDraft) return;
 		try {
-			const paragraphs = editedMessage.split('\n\n');
-			const htmlMessage = paragraphs
-				.map((para) => {
-					// Within each paragraph, convert single newlines to <br>
-					const withBreaks = para.replace(/\n/g, '<br>');
-					return `<p>${withBreaks}</p>`;
-				})
-				.join('');
-
-			await updateEmail({
-				id: selectedDraft.id.toString(),
-				data: {
-					subject: editedSubject,
-					message: htmlMessage,
-				},
-			});
-			toast.success('Draft updated successfully');
+			await saveDraft(editedSubject, editedMessage);
 		} catch {
-			toast.error('Failed to update draft');
+			// saveDraft already handles toast messaging
 		}
 	};
 
@@ -147,6 +248,7 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		setSelectedDraft(null);
 		setEditedSubject('');
 		setEditedMessage('');
+		lastSavedValuesRef.current = null;
 	};
 
 	return {

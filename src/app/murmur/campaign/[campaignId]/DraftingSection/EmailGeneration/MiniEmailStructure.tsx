@@ -747,7 +747,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									isAiSubject ? 'bg-[#E0E0E0]' : 'bg-white'
 								)}
 							>
-								<div className="pl-2 flex items-center h-full shrink-0 w-[90px] bg-transparent">
+								<div className="pl-2 flex items-center h-full shrink-0 w-[105px] bg-transparent">
 									<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
 										{isAiSubject ? 'Auto Subject' : 'Subject'}
 									</span>

@@ -51,10 +51,13 @@ export function ScrollProvider({ children }: ScrollProviderProps) {
 		// Skip if not on client or if window is not available
 		if (!isClient || typeof window === 'undefined') return;
 
-		// If mobile on dashboard, disable Lenis smooth scrolling entirely
+		// Disable Lenis smooth scrolling on campaign pages (all users) and mobile dashboard
 		const isDashboardPage =
 			typeof pathname === 'string' && pathname.startsWith('/murmur/dashboard');
-		if (isMobile === true && isDashboardPage) {
+		const isCampaignPage =
+			typeof pathname === 'string' && pathname.startsWith('/murmur/campaign');
+		
+		if (isCampaignPage || (isMobile === true && isDashboardPage)) {
 			// Ensure any existing Lenis instance is destroyed and classes updated
 			try {
 				if (lenisRef.current) {

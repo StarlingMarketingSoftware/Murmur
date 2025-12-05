@@ -25,7 +25,7 @@ interface EditEmailData {
 
 export const useGetEmails = (options: EmailQueryOptions) => {
 	return useQuery({
-		queryKey: [...EMAIL_QUERY_KEYS.list()],
+		queryKey: [...EMAIL_QUERY_KEYS.list(), options.filters],
 		queryFn: async () => {
 			const url = appendQueryParamsToUrl(urls.api.emails.index, options.filters);
 			const response = await _fetch(url);
