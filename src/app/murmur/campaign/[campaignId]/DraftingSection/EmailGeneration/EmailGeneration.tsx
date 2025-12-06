@@ -406,7 +406,11 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												rejectedDraftIds={rejectedDraftIds}
 												previewedDraftId={selectedDraft?.id}
 												isPreviewMode
-												onDraftPreviewClick={setSelectedDraft}
+												onDraftPreviewClick={(draft) =>
+													setSelectedDraft((prev) =>
+														prev?.id === draft.id ? null : draft
+													)
+												}
 											/>
 											) : (
 												<MiniEmailStructure

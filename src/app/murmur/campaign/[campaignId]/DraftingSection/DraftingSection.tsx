@@ -1704,7 +1704,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													approvedDraftIds={approvedDraftIds}
 													previewedDraftId={selectedDraft?.id}
 													isPreviewMode
-													onDraftPreviewClick={setSelectedDraft}
+													onDraftPreviewClick={(draft) =>
+														setSelectedDraft((prev) =>
+															prev?.id === draft.id ? null : draft
+														)
+													}
 												/>
 											</div>
 										) : (
