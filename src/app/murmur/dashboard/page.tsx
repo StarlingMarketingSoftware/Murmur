@@ -1870,8 +1870,8 @@ const DashboardContent = () => {
 																	<div
 																		className="absolute top-[10px] right-[10px] rounded-[12px] shadow-lg flex flex-col"
 																		style={{
-																			width: '390px',
-																			height: '801px',
+																			width: '433px',
+																			height: '870px',
 																			maxHeight: 'calc(100% - 20px)',
 																			backgroundColor: '#AFD6EF',
 																			border: '3px solid #143883',
@@ -2101,6 +2101,47 @@ const DashboardContent = () => {
 																				);
 																			})}
 																		</CustomScrollbar>
+																		<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
+																			<Button
+																				isLoading={
+																					isPendingCreateCampaign ||
+																					isPendingBatchUpdateContacts
+																				}
+																				variant="primary-light"
+																				bold
+																				className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
+																					selectedContacts.length === 0
+																						? 'opacity-[0.62]'
+																						: 'opacity-100'
+																				}`}
+																				style={
+																					selectedContacts.length === 0
+																						? { height: '39px', filter: 'grayscale(100%)' }
+																						: { height: '39px' }
+																				}
+																				onClick={() => {
+																					if (selectedContacts.length === 0) return;
+																					handleCreateCampaign();
+																				}}
+																			>
+																				<span className="relative z-20">Create Campaign</span>
+																				<div
+																					className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+																					onClick={(e) => {
+																						e.stopPropagation();
+																						handleSelectAll();
+																					}}
+																				>
+																					<span className="text-black text-[14px] font-medium">
+																						All
+																					</span>
+																				</div>
+																				<span
+																					aria-hidden="true"
+																					className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+																				/>
+																			</Button>
+																		</div>
 																	</div>
 																)}
 																{!(
@@ -2166,7 +2207,7 @@ const DashboardContent = () => {
 																				className="absolute rounded-[8px] shadow-lg flex flex-col"
 																				style={{
 																					top: '68px',
-																					right: '410px',
+																					right: '460px',
 																					width: '310px',
 																					height: containerHeight,
 																					maxHeight: 'calc(100% - 20px)',
