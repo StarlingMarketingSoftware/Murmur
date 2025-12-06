@@ -78,6 +78,9 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	} | null>(null);
 	const isSendingPreviewVisible = Boolean(sendingPreview);
 
+	// Status filter for drafts tab
+	const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'rejected'>('all');
+
 	// Position the contacts overlay behind the mini email structure when previewing
 	const [contactsOverlayPos, setContactsOverlayPos] = useState<{
 		left: number;
@@ -177,11 +180,11 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 
 	const handleRejectDraft = useCallback(
-		async (draftId: number) => {
+		async (draftId: number, currentlyRejected?: boolean) => {
 			try {
 				await updateEmail({
 					id: draftId,
-					data: { reviewStatus: ReviewStatus.rejected },
+					data: { reviewStatus: currentlyRejected ? null : ReviewStatus.rejected },
 				});
 			} catch (error) {
 				console.error('Failed to update draft review status:', error);
@@ -394,17 +397,24 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												previewDraft || isLivePreviewVisible ? 'z-10' : undefined
 											}
 										>
-											{isDraftPreviewOpen ? (
-												<DraftsExpandedList
-													drafts={draftEmails}
-													contacts={contacts}
-													width={376}
-													height={587}
-													hideSendButton
-													rowWidth={366}
-													rowHeight={92}
-													rejectedDraftIds={rejectedDraftIds}
-												/>
+										{isDraftPreviewOpen ? (
+											<DraftsExpandedList
+												drafts={draftEmails}
+												contacts={contacts}
+												width={376}
+												height={587}
+												hideSendButton
+												rowWidth={366}
+												rowHeight={92}
+												rejectedDraftIds={rejectedDraftIds}
+												previewedDraftId={selectedDraft?.id}
+												isPreviewMode
+												onDraftPreviewClick={(draft) =>
+													setSelectedDraft((prev) =>
+														prev?.id === draft.id ? null : draft
+													)
+												}
+											/>
 											) : (
 												<MiniEmailStructure
 													form={form}
@@ -496,6 +506,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												subject={form.watch('subject')}
 												onRejectDraft={handleRejectDraft}
 												rejectedDraftIds={rejectedDraftIds}
+												statusFilter={statusFilter}
+												onStatusFilterChange={setStatusFilter}
 											/>
 										</DraggableBox>
 									),

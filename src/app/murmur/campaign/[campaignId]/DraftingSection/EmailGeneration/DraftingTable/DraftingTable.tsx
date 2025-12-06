@@ -1,9 +1,11 @@
-import { FC, ReactNode } from 'react';
+import { FC, ReactNode, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { urls } from '@/constants/urls';
+import ApproveCheckIcon from '@/components/atoms/svg/ApproveCheckIcon';
+import RejectXIcon from '@/components/atoms/svg/RejectXIcon';
 
 export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isAllTab?: boolean; whiteSectionHeight?: number }> = ({
 	offsetY = 0,
@@ -127,6 +129,12 @@ interface DraftingTableProps {
 	statusFilter?: 'all' | 'approved' | 'rejected';
 	/** Callback to change status filter */
 	onStatusFilterChange?: (filter: 'all' | 'approved' | 'rejected') => void;
+	/** Count of approved drafts */
+	approvedCount?: number;
+	/** Count of rejected drafts */
+	rejectedCount?: number;
+	/** Total count of all drafts */
+	totalDraftsCount?: number;
 }
 export const DraftingTable: FC<DraftingTableProps> = ({
 	title,
@@ -146,8 +154,14 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	selectedCount = 0,
 	statusFilter = 'all',
 	onStatusFilterChange,
+	approvedCount = 0,
+	rejectedCount = 0,
+	totalDraftsCount = 0,
 }) => {
 	const router = useRouter();
+	const [isDraftsCounterHovered, setIsDraftsCounterHovered] = useState(false);
+	const [isApprovedCounterHovered, setIsApprovedCounterHovered] = useState(false);
+	const [isRejectedCounterHovered, setIsRejectedCounterHovered] = useState(false);
 	const isContacts = title === 'Contacts';
 	const isCompactHeader = isContacts || title === 'Drafts' || title === 'Sent';
 	const showTitle = !isContacts && title !== 'Drafts' && title !== 'Sent';
@@ -241,6 +255,39 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				</>
 			)}
 
+			{/* Box above Drafts table - hidden on approved/rejected tabs */}
+			{isDrafts && statusFilter === 'all' && (
+				<div
+					style={{
+						position: 'absolute',
+						top: '-31px',
+						left: '50%',
+						transform: 'translateX(-50%)',
+						width: '95px',
+						height: '21px',
+						border: '2px solid #000000',
+						borderRadius: '8px',
+						backgroundColor: 'transparent',
+						zIndex: 10,
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						gap: '8px',
+					}}
+				>
+					{/* Approved count */}
+					<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+						<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{approvedCount}</span>
+						<ApproveCheckIcon width={12} height={9} className="text-black" />
+					</div>
+					{/* Rejected count */}
+					<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+						<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{rejectedCount}</span>
+						<RejectXIcon width={10} height={10} className="text-black" />
+					</div>
+				</div>
+			)}
+
 			{/* New Sent Pill */}
 			{isSent && (
 				<>
@@ -315,15 +362,11 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						left: 0,
 						right: 0,
 						zIndex: 10,
+						display: 'flex',
+						justifyContent: 'center',
 					}}
 				>
-					<span 
-						className="text-[11px] font-inter font-medium text-black"
-						style={{ position: 'absolute', left: '16px' }}
-					>
-						Show
-					</span>
-					<div style={{ position: 'absolute', left: '109px', display: 'flex', gap: '37px' }}>
+					<div style={{ display: 'flex', gap: '37px' }}>
 						{(['all', 'approved', 'rejected'] as const).map((tab) => {
 							const isActive = statusFilter === tab;
 							const labels: Record<typeof tab, string> = {
@@ -342,7 +385,13 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 										fontWeight: 600,
 										borderRadius: '6px',
 										border: 'none',
-										backgroundColor: isActive ? '#949494' : '#D9D9D9',
+										backgroundColor: isActive
+											? tab === 'approved'
+												? '#559855'
+												: tab === 'rejected'
+												? '#A03C3C'
+												: '#949494'
+											: '#D9D9D9',
 										color: isActive ? '#FFFFFF' : '#000000',
 										cursor: 'pointer',
 										display: 'flex',
@@ -360,21 +409,6 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				</div>
 			)}
 
-			{/* Selection counter in yellow section for Drafts */}
-			{isDrafts && hasData && (
-				<div
-					style={{
-						position: 'absolute',
-						top: '60px',
-						left: '50%',
-						transform: 'translateX(-50%)',
-						zIndex: 10,
-					}}
-					className="text-[12px] font-inter font-medium text-black"
-				>
-					{selectedCount} Selected
-				</div>
-			)}
 
 			{/* Top-left text label */}
 			<div
@@ -468,6 +502,178 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					)}
 				</div>
 
+				{/* Green section for Approved tab */}
+				{isDrafts && hasData && statusFilter === 'approved' && (
+					<div
+						style={{
+							position: 'absolute',
+							top: '52px',
+							left: 0,
+							right: 0,
+							height: '29px',
+							backgroundColor: '#559855',
+							zIndex: 9,
+							display: 'grid',
+							gridTemplateColumns: '1fr 1fr 1fr',
+							alignItems: 'center',
+							padding: '0 16px',
+						}}
+					>
+						<div 
+							style={{ 
+								position: 'relative',
+							}}
+							onMouseEnter={() => setIsApprovedCounterHovered(true)}
+							onMouseLeave={() => setIsApprovedCounterHovered(false)}
+						>
+							{isApprovedCounterHovered && (
+								<div
+									onClick={handleClick}
+									style={{
+										width: '15px',
+										height: '15px',
+										border: areAllSelected ? '2px solid #559855' : '2px solid #FFFFFF',
+										borderRadius: '1px',
+										backgroundColor: areAllSelected ? '#FFFFFF' : 'transparent',
+										cursor: 'pointer',
+									}}
+								/>
+							)}
+							{!isApprovedCounterHovered && (
+								<span className="text-[14px] font-inter font-medium text-white text-left">
+									{approvedCount} Approved
+								</span>
+							)}
+						</div>
+						<span className="text-[14px] font-inter font-medium text-white text-center">
+							{selectedCount} Selected
+						</span>
+						<button
+							type="button"
+							onClick={handleClick}
+							className="text-[14px] font-inter font-medium text-white hover:underline bg-transparent border-none cursor-pointer text-right"
+						>
+							Select All
+						</button>
+					</div>
+				)}
+
+				{/* Red section for Rejected tab */}
+				{isDrafts && hasData && statusFilter === 'rejected' && (
+					<div
+						style={{
+							position: 'absolute',
+							top: '52px',
+							left: 0,
+							right: 0,
+							height: '29px',
+							backgroundColor: '#A03C3C',
+							zIndex: 9,
+							display: 'grid',
+							gridTemplateColumns: '1fr 1fr 1fr',
+							alignItems: 'center',
+							padding: '0 16px',
+						}}
+					>
+						<div 
+							style={{ 
+								position: 'relative',
+							}}
+							onMouseEnter={() => setIsRejectedCounterHovered(true)}
+							onMouseLeave={() => setIsRejectedCounterHovered(false)}
+						>
+							{isRejectedCounterHovered && (
+								<div
+									onClick={handleClick}
+									style={{
+										width: '15px',
+										height: '15px',
+										border: areAllSelected ? '2px solid #A03C3C' : '2px solid #FFFFFF',
+										borderRadius: '1px',
+										backgroundColor: areAllSelected ? '#FFFFFF' : 'transparent',
+										cursor: 'pointer',
+									}}
+								/>
+							)}
+							{!isRejectedCounterHovered && (
+								<span className="text-[14px] font-inter font-medium text-white text-left">
+									{rejectedCount} Rejected
+								</span>
+							)}
+						</div>
+						<span className="text-[14px] font-inter font-medium text-white text-center">
+							{selectedCount} Selected
+						</span>
+						<button
+							type="button"
+							onClick={handleClick}
+							className="text-[14px] font-inter font-medium text-white hover:underline bg-transparent border-none cursor-pointer text-right"
+						>
+							Select All
+						</button>
+					</div>
+				)}
+
+				{/* Yellow section for All Drafts tab */}
+			{isDrafts && hasData && statusFilter === 'all' && (
+				<div
+					style={{
+						position: 'absolute',
+						top: '52px',
+						left: 0,
+						right: 0,
+						height: '29px',
+						backgroundColor: '#FFDC9E',
+						zIndex: 9,
+						display: 'grid',
+						gridTemplateColumns: '1fr 1fr 1fr',
+						alignItems: 'center',
+						padding: '0 16px',
+					}}
+				>
+					<div 
+						style={{ 
+							position: 'relative',
+							transition: 'none !important',
+							animation: 'none !important',
+						}}
+						onMouseEnter={() => setIsDraftsCounterHovered(true)}
+						onMouseLeave={() => setIsDraftsCounterHovered(false)}
+					>
+						{isDraftsCounterHovered && (
+							<div
+								onClick={handleClick}
+								style={{
+									width: '15px',
+									height: '15px',
+									border: areAllSelected ? '2px solid #FFFFFF' : '2px solid #000000',
+									borderRadius: '1px',
+									backgroundColor: areAllSelected ? '#000000' : 'transparent',
+									cursor: 'pointer',
+								}}
+							/>
+						)}
+						{!isDraftsCounterHovered && (
+							<span 
+								className="text-[14px] font-inter font-medium text-black text-left"
+							>
+								{totalDraftsCount} Drafts
+							</span>
+						)}
+					</div>
+						<span className="text-[14px] font-inter font-medium text-black text-center">
+							{selectedCount} Selected
+						</span>
+						<button
+							type="button"
+							onClick={handleClick}
+							className="text-[14px] font-inter font-medium text-black hover:underline bg-transparent border-none cursor-pointer text-right"
+						>
+							Select All
+						</button>
+					</div>
+				)}
+
 				{/* Top content area (e.g., mini searchbar for contacts) */}
 				{isContacts && topContent && hasData && (
 					<div
@@ -495,7 +701,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 								: isContacts
 								? '68px'
 								: isDrafts
-								? '57px'
+								? '66px'
 								: isSent
 								? '32px'
 								: 0,
@@ -514,7 +720,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					) : isDrafts || isSent ? (
 						<div
 							className="overflow-visible w-full flex flex-col items-center"
-							style={{ gap: '11px' }}
+							style={{ gap: '10px' }}
 						>
 							{Array.from({ length: 8 }).map((_, idx) => {
 								// For drafts/sent empty state: boxes 2-5 (idx 1-4) are 52px, all others are 85px

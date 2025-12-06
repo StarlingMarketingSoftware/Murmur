@@ -224,8 +224,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 
 	const [showConfirm, setShowConfirm] = useState(false);
 	const [isRegenerating, setIsRegenerating] = useState(false);
-	const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'rejected'>('all');
-
+	const [isHoveringAllButton, setIsHoveringAllButton] = useState(false);
 	// Used contacts indicator
 	const { data: usedContactIds } = useGetUsedContactIds();
 	const usedContactIdsSet = useMemo(
@@ -233,14 +232,19 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		[usedContactIds]
 	);
 	const filteredDrafts = useMemo(() => {
-		if (statusFilter === 'approved') {
+		if (props.statusFilter === 'approved') {
 			return draftEmails.filter((d) => props.approvedDraftIds?.has(d.id));
 		}
-		if (statusFilter === 'rejected') {
+		if (props.statusFilter === 'rejected') {
 			return draftEmails.filter((d) => props.rejectedDraftIds?.has(d.id));
 		}
 		return draftEmails;
-	}, [draftEmails, props.approvedDraftIds, props.rejectedDraftIds, statusFilter]);
+	}, [draftEmails, props.approvedDraftIds, props.rejectedDraftIds, props.statusFilter]);
+	const approvedCount = props.approvedDraftIds?.size ?? 0;
+	const rejectedCount = props.rejectedDraftIds?.size ?? 0;
+	const allFilteredSelected =
+		filteredDrafts.length > 0 &&
+		filteredDrafts.every((draft) => selectedDraftIds.has(draft.id));
 	const selectedCount = selectedDraftIds.size;
 	const hasSelection = selectedCount > 0;
 	const toCount = selectedCount; // used in confirmation details
@@ -281,6 +285,16 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		() => handleNavigateDraft('next'),
 		[handleNavigateDraft]
 	);
+
+	const handleRegenerateSelectedDrafts = useCallback(async () => {
+		if (!props.onRegenerateDraft) return;
+		const selected = filteredDrafts.filter((d) => selectedDraftIds.has(d.id));
+		for (const draft of selected) {
+			// Sequential to reuse existing regeneration flow with existing toasts
+			// and state updates.
+			await props.onRegenerateDraft(draft);
+		}
+	}, [filteredDrafts, props, selectedDraftIds]);
 
 	const handleRegenerate = useCallback(async () => {
 		if (!selectedDraft || !onRegenerateDraft || isRegenerating) return;
@@ -331,9 +345,12 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 			canadianProvinceAbbreviations.includes(normalizedState.toUpperCase()) ||
 			canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
 		const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+		const isDraftApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
+		const isDraftRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
+		const hasStatusBar = isDraftApproved || isDraftRejected;
 
 		return (
-			<div className="flex flex-col items-center">
+			<div className="flex flex-col items-center" style={{ marginTop: '25px' }}>
 				<div style={{ width: '499px', height: '703px', position: 'relative' }}>
 				{/* Container box with header - matching the table view */}
 				<div
@@ -458,11 +475,184 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						</div>
 					</div>
 
+					{/* Approved status bar - 6px from header, 11px above subject box */}
+					{isDraftApproved && (
+						<div
+							style={{
+								backgroundColor: '#FFDC9E',
+								paddingTop: '6px',
+								paddingBottom: '11px',
+							}}
+						>
+							<div
+								style={{
+									height: '30px',
+									backgroundColor: '#8FC981',
+									display: 'flex',
+									alignItems: 'center',
+									paddingLeft: '12px',
+									borderTop: '2px solid #000000',
+									borderBottom: '2px solid #000000',
+									position: 'relative',
+								}}
+							>
+								<span className="font-inter font-semibold text-[14px] text-black">
+									Approved
+								</span>
+								<span 
+									className="font-inter font-medium text-[14px] text-black" 
+									style={{ 
+										position: 'absolute', 
+										left: '50%', 
+										transform: 'translateX(-50%)',
+										textAlign: 'center',
+									}}
+								>
+									Send this Email
+								</span>
+								{/* Left divider - 54px from right edge (15px + 39px) */}
+								<div
+									style={{
+										position: 'absolute',
+										right: '54px',
+										top: 0,
+										bottom: 0,
+										width: '2px',
+										backgroundColor: '#000000',
+									}}
+								/>
+								{/* Send button container - between the two dividers */}
+								<button
+									type="button"
+									className="font-inter font-semibold text-[9px] text-black hover:bg-[#4a9d41] flex items-center justify-center"
+									style={{
+										position: 'absolute',
+										right: '17px',
+										width: '37px',
+										height: '100%',
+										backgroundColor: '#59B44E',
+										border: 'none',
+										cursor: props.isSendingDisabled ? 'not-allowed' : 'pointer',
+										opacity: props.isSendingDisabled ? 0.6 : 1,
+									}}
+									disabled={props.isSendingDisabled}
+									onClick={async () => {
+										if (selectedDraft && !props.isSendingDisabled) {
+											// Select only the current draft and send it
+											props.setSelectedDraftIds(new Set([selectedDraft.id]));
+											// Small delay to ensure state is updated before sending
+											await new Promise((resolve) => setTimeout(resolve, 50));
+											await props.onSend();
+										}
+									}}
+								>
+									Send
+								</button>
+								{/* Right divider - 15px from right edge */}
+								<div
+									style={{
+										position: 'absolute',
+										right: '15px',
+										top: 0,
+										bottom: 0,
+										width: '2px',
+										backgroundColor: '#000000',
+									}}
+								/>
+							</div>
+						</div>
+					)}
+
+					{/* Rejected status bar - 6px from header, 11px above subject box */}
+					{isDraftRejected && (
+						<div
+							style={{
+								backgroundColor: '#FFDC9E',
+								paddingTop: '6px',
+								paddingBottom: '11px',
+							}}
+						>
+							<div
+								style={{
+									height: '30px',
+									backgroundColor: '#E8A0A0',
+									display: 'flex',
+									alignItems: 'center',
+									paddingLeft: '12px',
+									borderTop: '2px solid #000000',
+									borderBottom: '2px solid #000000',
+									position: 'relative',
+								}}
+							>
+								<span className="font-inter font-semibold text-[14px] text-black">
+									Rejected
+								</span>
+								<span 
+									className="font-inter font-medium text-[14px] text-black" 
+									style={{ 
+										position: 'absolute', 
+										left: '50%', 
+										transform: 'translateX(-50%)',
+										textAlign: 'center',
+									}}
+								>
+									Delete this Email
+								</span>
+								{/* Left divider - 54px from right edge (15px + 39px) */}
+								<div
+									style={{
+										position: 'absolute',
+										right: '54px',
+										top: 0,
+										bottom: 0,
+										width: '2px',
+										backgroundColor: '#000000',
+									}}
+								/>
+								{/* Delete button container - between the two dividers */}
+								<button
+									type="button"
+									className="font-inter font-semibold text-[9px] text-black hover:bg-[#c44a4a] flex items-center justify-center"
+									style={{
+										position: 'absolute',
+										right: '17px',
+										width: '37px',
+										height: '100%',
+										backgroundColor: '#D65C5C',
+										border: 'none',
+										cursor: isPendingDeleteEmail ? 'not-allowed' : 'pointer',
+										opacity: isPendingDeleteEmail ? 0.6 : 1,
+									}}
+									disabled={isPendingDeleteEmail}
+									onClick={async (e) => {
+										if (selectedDraft) {
+											await handleDeleteDraft(e, selectedDraft.id);
+											setSelectedDraft(null);
+										}
+									}}
+								>
+									Delete
+								</button>
+								{/* Right divider - 15px from right edge */}
+								<div
+									style={{
+										position: 'absolute',
+										right: '15px',
+										top: 0,
+										bottom: 0,
+										width: '2px',
+										backgroundColor: '#000000',
+									}}
+								/>
+							</div>
+						</div>
+					)}
+
 					{/* Editor container */}
 					<div
 						className="flex-1 overflow-hidden flex flex-col relative"
 						data-lenis-prevent
-						style={{ margin: '0', border: 'none', padding: '6px 12px 12px 12px', borderBottomLeftRadius: '5px', borderBottomRightRadius: '5px', backgroundColor: '#FFDC9E' }}
+						style={{ margin: '0', border: 'none', padding: hasStatusBar ? '0 12px 12px 12px' : '6px 12px 12px 12px', borderBottomLeftRadius: '5px', borderBottomRightRadius: '5px', backgroundColor: '#FFDC9E' }}
 					>
 						{/* Subject input */}
 						<div className="flex justify-center" style={{ marginBottom: '8px' }}>
@@ -479,7 +669,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						<div className="flex justify-center flex-1">
 							<div
 								className="bg-white border-2 border-black rounded-[4px] overflow-hidden"
-								style={{ width: '470px', height: '587px' }}
+								style={{ width: '470px', height: hasStatusBar ? '531px' : '587px' }}
 							>
 								<ScrollableTextarea
 									value={editedMessage}
@@ -545,8 +735,12 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					}}
 					onClick={() => {
 						if (selectedDraft) {
-							props.onApproveDraft?.(selectedDraft.id);
-							handleNavigateNext();
+							const isCurrentlyApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
+							props.onApproveDraft?.(selectedDraft.id, isCurrentlyApproved);
+							// Only navigate to next if we're approving, not toggling off
+							if (!isCurrentlyApproved) {
+								handleNavigateNext();
+							}
 						}
 					}}
 				>
@@ -584,8 +778,12 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					}}
 					onClick={() => {
 						if (selectedDraft) {
-							props.onRejectDraft?.(selectedDraft.id);
-							handleNavigateNext();
+							const isCurrentlyRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
+							props.onRejectDraft?.(selectedDraft.id, isCurrentlyRejected);
+							// Only navigate to next if we're rejecting, not toggling off
+							if (!isCurrentlyRejected) {
+								handleNavigateNext();
+							}
 						}
 					}}
 				>
@@ -609,13 +807,11 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	}
 
 	return (
-		<div className="flex flex-col gap-2 items-center">
+		<div className="flex flex-col gap-2 items-center" style={{ marginTop: '25px' }}>
 			{/* Right table - Generated Drafts */}
 			<DraftingTable
-				handleClick={handleSelectAllDrafts}
-				areAllSelected={
-					selectedDraftIds.size === draftEmails.length && draftEmails.length > 0
-				}
+				handleClick={() => handleSelectAllDrafts(filteredDrafts)}
+				areAllSelected={allFilteredSelected}
 				hasData={draftEmails.length > 0}
 				noDataMessage="No drafts generated"
 				noDataDescription='Click "Generate Drafts" to create emails for the selected contacts'
@@ -625,12 +821,15 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				goToSearch={props.goToSearch}
 				goToInbox={props.goToInbox}
 				selectedCount={selectedDraftIds.size}
-				statusFilter={statusFilter}
-				onStatusFilterChange={setStatusFilter}
+				statusFilter={props.statusFilter}
+				onStatusFilterChange={props.onStatusFilterChange}
+				approvedCount={approvedCount}
+				rejectedCount={rejectedCount}
+				totalDraftsCount={draftEmails.length}
 			>
 				<>
-					<div className="overflow-visible w-full flex flex-col gap-2 items-center">
-						{filteredDrafts.map((draft) => {
+					<div className="overflow-visible w-full flex flex-col items-center">
+						{filteredDrafts.map((draft, idx) => {
 							const contact = contacts?.find((c) => c.id === draft.contactId);
 							const contactName = contact
 								? contact.name ||
@@ -639,6 +838,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								  'Contact'
 								: 'Unknown Contact';
 							const isSelected = selectedDraftIds.has(draft.id);
+							const prevDraft = filteredDrafts[idx - 1];
+							const isPrevSelected = prevDraft && selectedDraftIds.has(prevDraft.id);
 							const isRejected = props.rejectedDraftIds?.has(draft.id) ?? false;
 							const isApproved = props.approvedDraftIds?.has(draft.id) ?? false;
 
@@ -650,13 +851,47 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							);
 
 							const contactTitle = contact?.headline || contact?.title || '';
+							
+							// Determine spacing: if both this and previous are selected, use green connector, otherwise normal gap
+							const showConnector = isSelected && isPrevSelected;
+							
+							// Check if next is selected for bottom cap
+							const nextDraft = filteredDrafts[idx + 1];
+							const isNextSelected = nextDraft && selectedDraftIds.has(nextDraft.id);
+							
+							// Caps for first/last in selection group
+							const isFirstInGroup = isSelected && !isPrevSelected;
+							const isLastInGroup = isSelected && !isNextSelected;
+							
+							// Colors based on tab
+							const isRejectedTab = props.statusFilter === 'rejected';
+							const selectedBgColor = isRejectedTab ? 'bg-[#D99696]' : 'bg-[#A4D996]';
+							const connectorColor = isRejectedTab ? 'bg-[#A34C4C]' : 'bg-[#43A24C]';
+							
 							return (
-								<div
-									key={draft.id}
-									className={cn(
-										'cursor-pointer transition-colors relative select-none w-[489px] h-[97px] overflow-visible rounded-[8px] border-2 border-[#000000] bg-white p-2 group/draft',
-										isSelected && 'bg-[#E8EFFF]'
+								<>
+									{/* Connector between adjacent selected items */}
+									{showConnector && (
+										<div
+											key={`connector-${draft.id}`}
+											className={cn("w-[499px] h-[10px]", connectorColor)}
+										/>
 									)}
+									{/* Normal gap spacer when not showing connector */}
+									{!showConnector && idx > 0 && (
+										<div key={`spacer-${draft.id}`} className="h-[10px]" />
+									)}
+									<div
+										key={draft.id}
+										className={cn(
+											'cursor-pointer relative select-none h-[97px] overflow-visible border-2 p-2 group/draft',
+											isSelected
+												? cn('w-[499px] rounded-none border-[#FFFFFF]', selectedBgColor)
+												: cn(
+														'w-[489px] rounded-[8px] border-[#000000]',
+														isHoveringAllButton ? 'bg-[#FFEDCA]' : 'bg-white hover:bg-[#F9E5BA]'
+												  )
+										)}
 									onMouseDown={(e) => {
 										// Prevent text selection on shift-click
 										if (e.shiftKey) {
@@ -671,22 +906,35 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									onMouseLeave={() => {
 										onContactHover?.(null);
 									}}
-									onClick={(e) => {
-										handleDraftSelect(draft, e);
+									onClick={() => {
+										handleDraftDoubleClick(draft);
 										if (contact) {
 											onContactClick?.(contact);
 										}
 									}}
-									onDoubleClick={() => handleDraftDoubleClick(draft)}
 								>
-									{/* Used-contact indicator - vertically centered */}
+									{/* Top cap - 6px above first selected in group */}
+									{isFirstInGroup && (
+										<div
+											className={cn("absolute left-0 right-0 h-[6px] pointer-events-none", connectorColor)}
+											style={{ top: '-8px' }}
+										/>
+									)}
+									{/* Bottom cap - 6px below last selected in group */}
+									{isLastInGroup && (
+										<div
+											className={cn("absolute left-0 right-0 h-[6px] pointer-events-none", connectorColor)}
+											style={{ bottom: '-8px' }}
+										/>
+									)}
+									{/* Used-contact indicator - 11px from top */}
 									{usedContactIdsSet.has(draft.contactId) && (
 										<span
-											className="absolute left-[8px]"
+											className="absolute"
 											title="Used in a previous campaign"
 											style={{
-												top: isRejected || isApproved ? 'calc(50% - 10px)' : hasSeparateName ? '50%' : '30px',
-												transform: 'translateY(-50%)',
+												left: isSelected ? '13px' : '8px',
+												top: '11px',
 												width: '16px',
 												height: '16px',
 												borderRadius: '50%',
@@ -698,12 +946,12 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									{/* Rejected indicator - stacked below used-contact when present */}
 									{isRejected && (
 										<span
-											className="absolute left-[8px]"
+											className="absolute"
 											title="Marked for rejection"
 											aria-label="Rejected draft"
 											style={{
-												top: usedContactIdsSet.has(draft.contactId) ? 'calc(50% + 10px)' : '50%',
-												transform: 'translateY(-50%)',
+												left: isSelected ? '13px' : '8px',
+												top: usedContactIdsSet.has(draft.contactId) ? '33px' : '11px',
 												width: '16px',
 												height: '16px',
 												borderRadius: '50%',
@@ -715,12 +963,12 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									{/* Approved indicator - stacked below used-contact when present */}
 									{isApproved && (
 										<span
-											className="absolute left-[8px]"
+											className="absolute"
 											title="Marked for approval"
 											aria-label="Approved draft"
 											style={{
-												top: usedContactIdsSet.has(draft.contactId) ? 'calc(50% + 10px)' : '50%',
-												transform: 'translateY(-50%)',
+												left: isSelected ? '13px' : '8px',
+												top: usedContactIdsSet.has(draft.contactId) ? '33px' : '11px',
 												width: '16px',
 												height: '16px',
 												borderRadius: '50%',
@@ -729,12 +977,34 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											}}
 										/>
 									)}
+									{/* Checkbox indicator - visible on hover only */}
+									<span
+										className="absolute hidden group-hover/draft:block cursor-pointer"
+										style={{
+											left: isSelected ? '15px' : '10px',
+											bottom: '10px',
+											width: '15px',
+											height: '15px',
+											borderRadius: '1px',
+											border: isSelected ? '2px solid #FFFFFF' : '2px solid #676767',
+											backgroundColor: isSelected ? '#22C21C' : 'transparent',
+										}}
+										onClick={(e) => {
+											e.stopPropagation();
+											e.preventDefault();
+											handleDraftSelect(draft, e);
+										}}
+										onDoubleClick={(e) => {
+											e.stopPropagation();
+											e.preventDefault();
+										}}
+									/>
 									{/* Delete button */}
 									<Button
 										type="button"
 										variant="icon"
 										onClick={(e) => handleDeleteDraft(e, draft.id)}
-										className="absolute top-[50px] right-[2px] p-1 transition-colors z-10 group hidden group-hover/draft:block"
+										className={cn("absolute top-[50px] p-1 transition-colors z-10 group hidden group-hover/draft:block", isSelected ? "right-[7px]" : "right-[2px]")}
 									>
 										<X size={16} className="text-gray-500 group-hover:text-red-500" />
 									</Button>
@@ -752,7 +1022,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 												handleDraftDoubleClick(draft);
 											}
 										}}
-										className="absolute top-[72px] right-[2px] p-1 transition-colors z-20 hidden group-hover/draft:block"
+										className={cn("absolute top-[72px] p-1 transition-colors z-20 hidden group-hover/draft:block", isSelected ? "right-[7px]" : "right-[2px]")}
 										aria-label="Preview draft"
 									>
 										<PreviewIcon
@@ -763,7 +1033,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									</Button>
 
 									{/* Fixed top-right info (Title + Location) - matching contacts table design */}
-									<div className="absolute top-[6px] right-[4px] flex flex-col items-start gap-[2px] pointer-events-none">
+									<div 
+										className="absolute top-[6px] flex flex-col items-start gap-[2px] pointer-events-none"
+										style={{ right: isSelected ? '9px' : '4px' }}
+									>
 										{contactTitle ? (
 											<div className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden">
 												<ScrollableText
@@ -843,7 +1116,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									</div>
 
 									{/* Content flex column */}
-									<div className="flex flex-col justify-center h-full pl-[30px] gap-[2px] pr-[30px]">
+									<div className={cn(
+										"flex flex-col justify-center h-full gap-[2px]",
+										isSelected ? "pl-[35px] pr-[35px]" : "pl-[30px] pr-[30px]"
+									)}>
 										{/* Row 1 & 2: Name / Company */}
 										{(() => {
 											const topRowMargin = contactTitle
@@ -910,13 +1186,19 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										</div>
 									</div>
 								</div>
-							);
+							</>
+						);
 						})}
 						{Array.from({ length: Math.max(0, 6 - filteredDrafts.length) }).map((_, idx) => (
-							<div
-								key={`draft-placeholder-${idx}`}
-								className="select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#FFCD73] p-2"
-							/>
+							<>
+								{(idx > 0 || filteredDrafts.length > 0) && (
+									<div key={`placeholder-spacer-${idx}`} className="h-[10px]" />
+								)}
+								<div
+									key={`draft-placeholder-${idx}`}
+									className="select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#FFDC9E] p-2"
+								/>
+							</>
 						))}
 					</div>
 				</>
@@ -969,79 +1251,88 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						</div>
 					</div>
 
+					{/** Action buttons (send/regenerate) */}
 					<div className="relative w-[475px] h-[40px] mx-auto">
-						{hasSelection ? (
-							props.isSendingDisabled ? (
-								<UpgradeSubscriptionDrawer
-									triggerButtonText={
-										showConfirm
-											? 'Click to Confirm and Send'
-											: hasSelection
-											? `Send ${selectedCount} Selected`
-											: 'Send'
-									}
-									buttonVariant="primary"
-									className={cn(
-										'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] !flex !items-center !justify-center',
-										hasSelection
-											? '!bg-[#C7F2C9] !border-[#349A37] hover:!bg-[#B9E7BC] cursor-pointer'
-											: '!bg-[#E0E0E0] !border-[#A0A0A0] !cursor-not-allowed !opacity-60 pointer-events-none'
-									)}
-									message={
-										props.isFreeTrial
-											? `Your free trial subscription does not include the ability to send emails. To send the emails\'ve drafted, please upgrade your subscription to the paid version.`
-											: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
-									}
-								/>
-							) : (
-								<div className="w-full h-full rounded-[4px] border-[3px] border-[#000000] flex overflow-hidden">
-									<button
-										type="button"
+						{/** Label strings depend on the tab (send vs regenerate) */}
+						{(() => {
+							const isRejectedTab = props.statusFilter === 'rejected';
+							const actionVerb = isRejectedTab ? 'Regenerate' : 'Send';
+							const confirmLabel = `Click to Confirm and ${actionVerb}`;
+							const actionLabel = hasSelection
+								? `${actionVerb} ${selectedCount} Selected`
+								: actionVerb;
+
+							return hasSelection ? (
+								props.isSendingDisabled ? (
+									<UpgradeSubscriptionDrawer
+										triggerButtonText={showConfirm ? confirmLabel : actionLabel}
+										buttonVariant="primary"
 										className={cn(
-											'flex-1 h-full flex items-center justify-center text-center text-black font-inter font-normal text-[17px] pl-[62px]',
+											'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] !flex !items-center !justify-center',
 											hasSelection
-												? 'bg-[#FFDC9F] hover:bg-[#F4C87E] cursor-pointer'
-												: 'bg-[#E0E0E0] cursor-not-allowed opacity-60'
+												? '!bg-[#C7F2C9] !border-[#349A37] hover:!bg-[#B9E7BC] cursor-pointer'
+												: '!bg-[#E0E0E0] !border-[#A0A0A0] !cursor-not-allowed !opacity-60 pointer-events-none'
 										)}
-										onClick={async () => {
-											if (!hasSelection) return;
-											if (!showConfirm) {
+										message={
+											props.isFreeTrial
+												? `Your free trial subscription does not include the ability to send emails. To send the emails\'ve drafted, please upgrade your subscription to the paid version.`
+												: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
+										}
+									/>
+								) : (
+									<div className="w-full h-full rounded-[4px] border-[3px] border-[#000000] flex overflow-hidden">
+										<button
+											type="button"
+											className={cn(
+												'flex-1 h-full flex items-center justify-center text-center text-black font-inter font-normal text-[17px] pl-[62px]',
+												hasSelection
+													? 'bg-[#FFDC9F] hover:bg-[#F4C87E] cursor-pointer'
+													: 'bg-[#E0E0E0] cursor-not-allowed opacity-60'
+											)}
+											onClick={async () => {
+												if (!hasSelection) return;
+												if (!showConfirm) {
+													setShowConfirm(true);
+													setTimeout(() => setShowConfirm(false), 10000);
+													return;
+												}
+												setShowConfirm(false);
+												if (isRejectedTab) {
+													await handleRegenerateSelectedDrafts();
+												} else {
+													await props.onSend();
+												}
+											}}
+											disabled={!hasSelection}
+										>
+											{showConfirm ? confirmLabel : actionLabel}
+										</button>
+
+										{/* Right section "All" button */}
+										<button
+											type="button"
+											className="w-[62px] h-full bg-[#C69A4D] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#B2863F] cursor-pointer border-l-[2px] border-[#000000]"
+											onMouseEnter={() => setIsHoveringAllButton(true)}
+											onMouseLeave={() => setIsHoveringAllButton(false)}
+											onClick={(e) => {
+												e.stopPropagation();
+											handleSelectAllDrafts(filteredDrafts);
 												setShowConfirm(true);
 												setTimeout(() => setShowConfirm(false), 10000);
-												return;
-											}
-											setShowConfirm(false);
-											await props.onSend();
-										}}
-										disabled={!hasSelection}
-									>
-										{showConfirm
-											? 'Click to Confirm and Send'
-											: hasSelection
-											? `Send ${selectedCount} Selected`
-											: 'Send'}
-									</button>
-
-									{/* Right section "All" button */}
-									<button
-										type="button"
-										className="w-[62px] h-full bg-[#C69A4D] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#B2863F] cursor-pointer border-l-[2px] border-[#000000]"
-										onClick={(e) => {
-											e.stopPropagation();
-											handleSelectAllDrafts();
-											setShowConfirm(true);
-											setTimeout(() => setShowConfirm(false), 10000);
-										}}
-									>
-										All
-									</button>
+											}}
+										>
+											All
+										</button>
+									</div>
+								)
+							) : (
+								<div className="w-full h-full flex items-center justify-center text-center text-[15px] font-inter text-black">
+									{props.statusFilter === 'rejected'
+										? 'Select Drafts to Regenerate'
+										: 'Select Drafts and Send Emails'}
 								</div>
-							)
-						) : (
-							<div className="w-full h-full flex items-center justify-center text-center text-[15px] font-inter text-black">
-								Select Drafts and Send Emails
-							</div>
-						)}
+							);
+						})()}
 					</div>
 				</div>
 			)}

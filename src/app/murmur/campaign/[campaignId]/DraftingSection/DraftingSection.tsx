@@ -133,11 +133,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const isDraftPreviewOpen = view === 'drafting' && Boolean(selectedDraft);
 
 	const handleRejectDraft = useCallback(
-		async (draftId: number) => {
+		async (draftId: number, currentlyRejected?: boolean) => {
 			try {
 				await updateEmail({
 					id: draftId,
-					data: { reviewStatus: ReviewStatus.rejected },
+					data: { reviewStatus: currentlyRejected ? null : ReviewStatus.rejected },
 				});
 			} catch (error) {
 				console.error('Failed to update draft review status:', error);
@@ -148,11 +148,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	);
 
 	const handleApproveDraft = useCallback(
-		async (draftId: number) => {
+		async (draftId: number, currentlyApproved?: boolean) => {
 			try {
 				await updateEmail({
 					id: draftId,
-					data: { reviewStatus: ReviewStatus.approved },
+					data: { reviewStatus: currentlyApproved ? null : ReviewStatus.approved },
 				});
 			} catch (error) {
 				console.error('Failed to update draft review status:', error);
@@ -202,12 +202,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					const fullAutomatedBlock = values.hybridBlockPrompts?.find(
 						(block: HybridBlockPrompt) => block.type === 'full_automated'
 					);
-					const fullAiPrompt = fullAutomatedBlock?.value || '';
-
-					if (!fullAiPrompt.trim()) {
-						toast.error('Please add a prompt in the Writing tab first');
-						return null;
-					}
+					const fullAiPrompt =
+						(fullAutomatedBlock?.value?.trim() ??
+							values.fullAiPrompt?.trim() ??
+							campaign.fullAiPrompt?.trim() ??
+							'') || 'Generate an outreach email.';
 
 					const populatedSystemPrompt = GEMINI_FULL_AI_PROMPT.replace(
 						'{recipient_first_name}',
@@ -266,7 +265,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					]);
 
 					const stringifiedHybridBlocks = generateEmailTemplateFromBlocks(hybridBlocks);
-					const geminiPrompt = `**RECIPIENT**\n${stringifiedRecipient}\n\n**SENDER**\n${stringifiedSender}\n\n**PROMPT**\n${values.hybridPrompt || ''}\n\n**EMAIL TEMPLATE**\n${stringifiedHybridBlocks}\n\n**PROMPTS**\n${generatePromptsFromBlocks(
+					const hybridPrompt =
+						(values.hybridPrompt?.trim() ??
+							campaign.hybridPrompt?.trim() ??
+							'') ||
+						'Generate a professional email based on the template below.';
+					const geminiPrompt = `**RECIPIENT**\n${stringifiedRecipient}\n\n**SENDER**\n${stringifiedSender}\n\n**PROMPT**\n${hybridPrompt}\n\n**EMAIL TEMPLATE**\n${stringifiedHybridBlocks}\n\n**PROMPTS**\n${generatePromptsFromBlocks(
 						hybridBlocks
 					)}`;
 
@@ -348,7 +352,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				return null;
 			}
 		},
-		[contacts, campaign.identity, getDraftingModeFromBlocks, form, callGemini, updateEmail, queryClient]
+		[
+			contacts,
+			campaign.identity,
+			campaign.fullAiPrompt,
+			campaign.hybridPrompt,
+			getDraftingModeFromBlocks,
+			form,
+			callGemini,
+			updateEmail,
+			queryClient,
+		]
 	);
 
 	const clampedPromptScore =
@@ -690,10 +704,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	};
 
-	// State for drafts selection in the Drafts tab
-	const [draftsTabSelectedIds, setDraftsTabSelectedIds] = useState<Set<number>>(
-		new Set()
-	);
+	// State for drafts selection in the Drafts tab by filter
+	const [draftStatusFilter, setDraftStatusFilter] = useState<'all' | 'approved' | 'rejected'>('all');
+	const [draftSelectionsByFilter, setDraftSelectionsByFilter] = useState<{
+		all: Set<number>;
+		approved: Set<number>;
+		rejected: Set<number>;
+	}>({
+		all: new Set<number>(),
+		approved: new Set<number>(),
+		rejected: new Set<number>(),
+	});
+	const draftsTabSelectedIds = draftSelectionsByFilter[draftStatusFilter];
+	const setDraftsTabSelectedIds = (
+		value: Set<number> | ((prev: Set<number>) => Set<number>)
+	) => {
+		setDraftSelectionsByFilter((prev) => {
+			const current = prev[draftStatusFilter];
+			const nextSet = typeof value === 'function' ? value(current) : value;
+			return { ...prev, [draftStatusFilter]: nextSet };
+		});
+	};
 	const [, setIsDraftDialogOpen] = useState(false);
 	const handleDraftSelection = (draftId: number) => {
 		setDraftsTabSelectedIds((prev) => {
@@ -1671,6 +1702,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													rowHeight={92}
 													rejectedDraftIds={rejectedDraftIds}
 													approvedDraftIds={approvedDraftIds}
+													previewedDraftId={selectedDraft?.id}
+													isPreviewMode
+													onDraftPreviewClick={(draft) =>
+														setSelectedDraft((prev) =>
+															prev?.id === draft.id ? null : draft
+														)
+													}
 												/>
 											</div>
 										) : (
@@ -2160,6 +2198,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										onRegenerateDraft={handleRegenerateDraft}
 										rejectedDraftIds={rejectedDraftIds}
 										approvedDraftIds={approvedDraftIds}
+										statusFilter={draftStatusFilter}
+										onStatusFilterChange={setDraftStatusFilter}
 									/>
 
 									{/* Bottom Panels: Contacts, Sent, and Inbox */}
