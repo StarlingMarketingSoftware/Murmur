@@ -333,6 +333,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 			canadianProvinceAbbreviations.includes(normalizedState.toUpperCase()) ||
 			canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
 		const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+		const isDraftApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
+		const isDraftRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
+		const hasStatusBar = isDraftApproved || isDraftRejected;
 
 		return (
 			<div className="flex flex-col items-center">
@@ -460,11 +463,184 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						</div>
 					</div>
 
+					{/* Approved status bar - 6px from header, 11px above subject box */}
+					{isDraftApproved && (
+						<div
+							style={{
+								backgroundColor: '#FFDC9E',
+								paddingTop: '6px',
+								paddingBottom: '11px',
+							}}
+						>
+							<div
+								style={{
+									height: '30px',
+									backgroundColor: '#8FC981',
+									display: 'flex',
+									alignItems: 'center',
+									paddingLeft: '12px',
+									borderTop: '2px solid #000000',
+									borderBottom: '2px solid #000000',
+									position: 'relative',
+								}}
+							>
+								<span className="font-inter font-semibold text-[14px] text-black">
+									Approved
+								</span>
+								<span 
+									className="font-inter font-medium text-[14px] text-black" 
+									style={{ 
+										position: 'absolute', 
+										left: '50%', 
+										transform: 'translateX(-50%)',
+										textAlign: 'center',
+									}}
+								>
+									Send this Email
+								</span>
+								{/* Left divider - 54px from right edge (15px + 39px) */}
+								<div
+									style={{
+										position: 'absolute',
+										right: '54px',
+										top: 0,
+										bottom: 0,
+										width: '2px',
+										backgroundColor: '#000000',
+									}}
+								/>
+								{/* Send button container - between the two dividers */}
+								<button
+									type="button"
+									className="font-inter font-semibold text-[9px] text-black hover:bg-[#4a9d41] flex items-center justify-center"
+									style={{
+										position: 'absolute',
+										right: '17px',
+										width: '37px',
+										height: '100%',
+										backgroundColor: '#59B44E',
+										border: 'none',
+										cursor: props.isSendingDisabled ? 'not-allowed' : 'pointer',
+										opacity: props.isSendingDisabled ? 0.6 : 1,
+									}}
+									disabled={props.isSendingDisabled}
+									onClick={async () => {
+										if (selectedDraft && !props.isSendingDisabled) {
+											// Select only the current draft and send it
+											props.setSelectedDraftIds(new Set([selectedDraft.id]));
+											// Small delay to ensure state is updated before sending
+											await new Promise((resolve) => setTimeout(resolve, 50));
+											await props.onSend();
+										}
+									}}
+								>
+									Send
+								</button>
+								{/* Right divider - 15px from right edge */}
+								<div
+									style={{
+										position: 'absolute',
+										right: '15px',
+										top: 0,
+										bottom: 0,
+										width: '2px',
+										backgroundColor: '#000000',
+									}}
+								/>
+							</div>
+						</div>
+					)}
+
+					{/* Rejected status bar - 6px from header, 11px above subject box */}
+					{isDraftRejected && (
+						<div
+							style={{
+								backgroundColor: '#FFDC9E',
+								paddingTop: '6px',
+								paddingBottom: '11px',
+							}}
+						>
+							<div
+								style={{
+									height: '30px',
+									backgroundColor: '#E8A0A0',
+									display: 'flex',
+									alignItems: 'center',
+									paddingLeft: '12px',
+									borderTop: '2px solid #000000',
+									borderBottom: '2px solid #000000',
+									position: 'relative',
+								}}
+							>
+								<span className="font-inter font-semibold text-[14px] text-black">
+									Rejected
+								</span>
+								<span 
+									className="font-inter font-medium text-[14px] text-black" 
+									style={{ 
+										position: 'absolute', 
+										left: '50%', 
+										transform: 'translateX(-50%)',
+										textAlign: 'center',
+									}}
+								>
+									Delete this Email
+								</span>
+								{/* Left divider - 54px from right edge (15px + 39px) */}
+								<div
+									style={{
+										position: 'absolute',
+										right: '54px',
+										top: 0,
+										bottom: 0,
+										width: '2px',
+										backgroundColor: '#000000',
+									}}
+								/>
+								{/* Delete button container - between the two dividers */}
+								<button
+									type="button"
+									className="font-inter font-semibold text-[9px] text-black hover:bg-[#c44a4a] flex items-center justify-center"
+									style={{
+										position: 'absolute',
+										right: '17px',
+										width: '37px',
+										height: '100%',
+										backgroundColor: '#D65C5C',
+										border: 'none',
+										cursor: isPendingDeleteEmail ? 'not-allowed' : 'pointer',
+										opacity: isPendingDeleteEmail ? 0.6 : 1,
+									}}
+									disabled={isPendingDeleteEmail}
+									onClick={async (e) => {
+										if (selectedDraft) {
+											await handleDeleteDraft(e, selectedDraft.id);
+											setSelectedDraft(null);
+										}
+									}}
+								>
+									Delete
+								</button>
+								{/* Right divider - 15px from right edge */}
+								<div
+									style={{
+										position: 'absolute',
+										right: '15px',
+										top: 0,
+										bottom: 0,
+										width: '2px',
+										backgroundColor: '#000000',
+									}}
+								/>
+							</div>
+						</div>
+					)}
+
 					{/* Editor container */}
 					<div
 						className="flex-1 overflow-hidden flex flex-col relative"
 						data-lenis-prevent
-						style={{ margin: '0', border: 'none', padding: '6px 12px 12px 12px', borderBottomLeftRadius: '5px', borderBottomRightRadius: '5px', backgroundColor: '#FFDC9E' }}
+						style={{ margin: '0', border: 'none', padding: hasStatusBar ? '0 12px 12px 12px' : '6px 12px 12px 12px', borderBottomLeftRadius: '5px', borderBottomRightRadius: '5px', backgroundColor: '#FFDC9E' }}
 					>
 						{/* Subject input */}
 						<div className="flex justify-center" style={{ marginBottom: '8px' }}>
@@ -481,7 +657,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						<div className="flex justify-center flex-1">
 							<div
 								className="bg-white border-2 border-black rounded-[4px] overflow-hidden"
-								style={{ width: '470px', height: '587px' }}
+								style={{ width: '470px', height: hasStatusBar ? '531px' : '587px' }}
 							>
 								<ScrollableTextarea
 									value={editedMessage}
@@ -677,13 +853,18 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							const isFirstInGroup = isSelected && !isPrevSelected;
 							const isLastInGroup = isSelected && !isNextSelected;
 							
+							// Colors based on tab
+							const isRejectedTab = statusFilter === 'rejected';
+							const selectedBgColor = isRejectedTab ? 'bg-[#D99696]' : 'bg-[#A4D996]';
+							const connectorColor = isRejectedTab ? 'bg-[#A34C4C]' : 'bg-[#43A24C]';
+							
 							return (
 								<>
-									{/* Green connector between adjacent selected items */}
+									{/* Connector between adjacent selected items */}
 									{showConnector && (
 										<div
 											key={`connector-${draft.id}`}
-											className="w-[499px] h-[10px] bg-[#43A24C]"
+											className={cn("w-[499px] h-[10px]", connectorColor)}
 										/>
 									)}
 									{/* Normal gap spacer when not showing connector */}
@@ -695,7 +876,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										className={cn(
 											'cursor-pointer relative select-none h-[97px] overflow-visible border-2 p-2 group/draft',
 											isSelected
-												? 'w-[499px] rounded-none bg-[#A4D996] border-[#FFFFFF]'
+												? cn('w-[499px] rounded-none border-[#FFFFFF]', selectedBgColor)
 												: 'w-[489px] rounded-[8px] bg-white border-[#000000] hover:bg-[#F9E5BA]'
 										)}
 									onMouseDown={(e) => {
@@ -719,17 +900,17 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										}
 									}}
 								>
-									{/* Top cap - 6px green above first selected in group */}
+									{/* Top cap - 6px above first selected in group */}
 									{isFirstInGroup && (
 										<div
-											className="absolute left-0 right-0 h-[6px] bg-[#43A24C] pointer-events-none"
+											className={cn("absolute left-0 right-0 h-[6px] pointer-events-none", connectorColor)}
 											style={{ top: '-8px' }}
 										/>
 									)}
-									{/* Bottom cap - 6px green below last selected in group */}
+									{/* Bottom cap - 6px below last selected in group */}
 									{isLastInGroup && (
 										<div
-											className="absolute left-0 right-0 h-[6px] bg-[#43A24C] pointer-events-none"
+											className={cn("absolute left-0 right-0 h-[6px] pointer-events-none", connectorColor)}
 											style={{ bottom: '-8px' }}
 										/>
 									)}
