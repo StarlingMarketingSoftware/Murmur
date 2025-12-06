@@ -41,6 +41,7 @@ export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
 	view?: 'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 	goToDrafting?: () => void;
+	goToAll?: () => void;
 	/**
 	 * Optional callback to switch the campaign page into the Writing tab.
 	 */

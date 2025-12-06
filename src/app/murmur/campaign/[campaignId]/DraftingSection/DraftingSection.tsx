@@ -1,4 +1,5 @@
 import { FC, Fragment, useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { DraftingSectionProps, useDraftingSection, HybridBlockPrompt } from './useDraftingSection';
 import { Form } from '@/components/ui/form';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
@@ -24,6 +25,7 @@ import { useMe } from '@/hooks/useMe';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ContactWithName } from '@/types/contact';
+import { CampaignsTable } from '@/components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { TestPreviewPanel } from '@/components/molecules/TestPreviewPanel/TestPreviewPanel';
 import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
@@ -54,6 +56,9 @@ import { stateBadgeColorMap } from '@/constants/ui';
 import { useGemini } from '@/hooks/useGemini';
 import { GEMINI_FULL_AI_PROMPT, GEMINI_HYBRID_PROMPT } from '@/constants/ai';
 import { Contact, Identity } from '@prisma/client';
+import BottomHomeIcon from '@/components/atoms/_svg/BottomHomeIcon';
+import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
+import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -81,6 +86,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const {
 		view = 'testing',
 		goToDrafting,
+		goToAll,
 		goToWriting,
 		onOpenIdentityDialog,
 		onGoToSearch,
@@ -129,9 +135,71 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 
+	const router = useRouter();
 	const isMobile = useIsMobile();
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	const isDraftPreviewOpen = view === 'drafting' && Boolean(selectedDraft);
+
+	// Bottom hover box state
+	const [showBottomBox, setShowBottomBox] = useState(false);
+	const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
+	const [showCampaignsTable, setShowCampaignsTable] = useState(false);
+	const handleGoToDashboard = useCallback(() => {
+		router.push('/murmur/dashboard');
+	}, [router]);
+
+	const handleGoToAll = useCallback(() => {
+		if (goToAll) {
+			goToAll();
+			return;
+		}
+		if (campaign?.id) {
+			router.push(`/murmur/campaign/${campaign.id}?tab=all`);
+			return;
+		}
+		router.push('/murmur/campaign');
+	}, [campaign?.id, goToAll, router]);
+
+	const handleToggleCampaignsTable = useCallback(() => {
+		setShowCampaignsTable((prev) => !prev);
+	}, []);
+	const bottomBarIcons = useMemo(
+		() => [
+			{ key: 'home', element: <BottomHomeIcon aria-label="Home icon" />, onClick: handleGoToDashboard },
+			{ key: 'arrow', element: <BottomArrowIcon aria-label="Arrow icon" />, onClick: handleGoToAll },
+			{ key: 'folder', element: <BottomFolderIcon aria-label="Folder icon" />, onClick: handleToggleCampaignsTable },
+		],
+		[handleGoToAll, handleGoToDashboard, handleToggleCampaignsTable]
+	);
+
+	// Hide campaigns table whenever the footer is not visible
+	useEffect(() => {
+		if (!showBottomBox && showCampaignsTable) {
+			setShowCampaignsTable(false);
+		}
+	}, [showBottomBox, showCampaignsTable]);
+
+	const handleBottomHoverEnter = () => {
+		if (showBottomBox || hoverTimerRef.current) return;
+		hoverTimerRef.current = setTimeout(() => {
+			setShowBottomBox(true);
+			hoverTimerRef.current = null;
+		}, 2000);
+	};
+
+	const handleBottomHoverLeave = () => {
+		if (hoverTimerRef.current) {
+			clearTimeout(hoverTimerRef.current);
+			hoverTimerRef.current = null;
+		}
+		setShowBottomBox(false);
+	};
+
+	useEffect(() => {
+		return () => {
+			if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+		};
+	}, []);
 
 	const handleRejectDraft = useCallback(
 		async (draftId: number, currentlyRejected?: boolean) => {
@@ -3188,8 +3256,59 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							</div>
 						)} */}
 					</div>
+
+					{/* Hover area below expanded lists to reveal bottom box */}
+					<div className="relative w-screen max-w-none mt-10 pb-10" aria-hidden="true" />
 				</form>
 			</Form>
+
+			{/* Fixed hover zone at the bottom of the viewport */}
+			<div
+				className="fixed inset-x-0 bottom-0 h-[200px] z-50"
+				onMouseEnter={handleBottomHoverEnter}
+				onMouseLeave={handleBottomHoverLeave}
+			>
+				{/* Invisible capture area */}
+				<div className="absolute inset-0 pointer-events-auto" />
+
+				{/* Revealed bar lives inside the hover zone so moving into it won't dismiss */}
+				{showBottomBox && (
+					<div
+						className="absolute left-1/2 -translate-x-1/2 z-50 flex items-center justify-center text-black font-inter text-[14px] font-medium"
+						style={{
+							width: '816px',
+							height: '34px',
+							bottom: 0,
+							backgroundColor: '#F5F5F5',
+							border: '2px solid #000000',
+							borderRadius: '0px',
+						}}
+						aria-label="Bottom navigation reveal"
+					>
+						<div className="flex items-center justify-center gap-8">
+							{bottomBarIcons.map((icon) => (
+								<button
+									key={icon.key}
+									type="button"
+									className="flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
+									onClick={icon.onClick}
+									aria-label={icon.element.props['aria-label'] || icon.key}
+								>
+									{icon.element}
+								</button>
+							))}
+						</div>
+					</div>
+				)}
+			</div>
+
+			{showBottomBox && showCampaignsTable && (
+				<div className="fixed left-1/2 -translate-x-1/2 bottom-[40px] z-[60]">
+					<div className="bg-white rounded-[12px] overflow-hidden">
+						<CampaignsTable />
+					</div>
+				</div>
+			)}
 
 			<UpgradeSubscriptionDrawer
 				message="You have run out of drafting credits! Please upgrade your plan."
