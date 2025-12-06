@@ -202,12 +202,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					const fullAutomatedBlock = values.hybridBlockPrompts?.find(
 						(block: HybridBlockPrompt) => block.type === 'full_automated'
 					);
-					const fullAiPrompt = fullAutomatedBlock?.value || '';
-
-					if (!fullAiPrompt.trim()) {
-						toast.error('Please add a prompt in the Writing tab first');
-						return null;
-					}
+					const fullAiPrompt =
+						(fullAutomatedBlock?.value?.trim() ??
+							values.fullAiPrompt?.trim() ??
+							campaign.fullAiPrompt?.trim() ??
+							'') || 'Generate an outreach email.';
 
 					const populatedSystemPrompt = GEMINI_FULL_AI_PROMPT.replace(
 						'{recipient_first_name}',
@@ -266,7 +265,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					]);
 
 					const stringifiedHybridBlocks = generateEmailTemplateFromBlocks(hybridBlocks);
-					const geminiPrompt = `**RECIPIENT**\n${stringifiedRecipient}\n\n**SENDER**\n${stringifiedSender}\n\n**PROMPT**\n${values.hybridPrompt || ''}\n\n**EMAIL TEMPLATE**\n${stringifiedHybridBlocks}\n\n**PROMPTS**\n${generatePromptsFromBlocks(
+					const hybridPrompt =
+						(values.hybridPrompt?.trim() ??
+							campaign.hybridPrompt?.trim() ??
+							'') ||
+						'Generate a professional email based on the template below.';
+					const geminiPrompt = `**RECIPIENT**\n${stringifiedRecipient}\n\n**SENDER**\n${stringifiedSender}\n\n**PROMPT**\n${hybridPrompt}\n\n**EMAIL TEMPLATE**\n${stringifiedHybridBlocks}\n\n**PROMPTS**\n${generatePromptsFromBlocks(
 						hybridBlocks
 					)}`;
 
@@ -348,7 +352,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				return null;
 			}
 		},
-		[contacts, campaign.identity, getDraftingModeFromBlocks, form, callGemini, updateEmail, queryClient]
+		[
+			contacts,
+			campaign.identity,
+			campaign.fullAiPrompt,
+			campaign.hybridPrompt,
+			getDraftingModeFromBlocks,
+			form,
+			callGemini,
+			updateEmail,
+			queryClient,
+		]
 	);
 
 	const clampedPromptScore =

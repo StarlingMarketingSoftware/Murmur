@@ -285,6 +285,16 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		[handleNavigateDraft]
 	);
 
+	const handleRegenerateSelectedDrafts = useCallback(async () => {
+		if (!props.onRegenerateDraft) return;
+		const selected = filteredDrafts.filter((d) => selectedDraftIds.has(d.id));
+		for (const draft of selected) {
+			// Sequential to reuse existing regeneration flow with existing toasts
+			// and state updates.
+			await props.onRegenerateDraft(draft);
+		}
+	}, [filteredDrafts, props, selectedDraftIds]);
+
 	const handleRegenerate = useCallback(async () => {
 		if (!selectedDraft || !onRegenerateDraft || isRegenerating) return;
 		
@@ -1237,79 +1247,86 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						</div>
 					</div>
 
+					{/** Action buttons (send/regenerate) */}
 					<div className="relative w-[475px] h-[40px] mx-auto">
-						{hasSelection ? (
-							props.isSendingDisabled ? (
-								<UpgradeSubscriptionDrawer
-									triggerButtonText={
-										showConfirm
-											? 'Click to Confirm and Send'
-											: hasSelection
-											? `Send ${selectedCount} Selected`
-											: 'Send'
-									}
-									buttonVariant="primary"
-									className={cn(
-										'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] !flex !items-center !justify-center',
-										hasSelection
-											? '!bg-[#C7F2C9] !border-[#349A37] hover:!bg-[#B9E7BC] cursor-pointer'
-											: '!bg-[#E0E0E0] !border-[#A0A0A0] !cursor-not-allowed !opacity-60 pointer-events-none'
-									)}
-									message={
-										props.isFreeTrial
-											? `Your free trial subscription does not include the ability to send emails. To send the emails\'ve drafted, please upgrade your subscription to the paid version.`
-											: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
-									}
-								/>
-							) : (
-								<div className="w-full h-full rounded-[4px] border-[3px] border-[#000000] flex overflow-hidden">
-									<button
-										type="button"
+						{/** Label strings depend on the tab (send vs regenerate) */}
+						{(() => {
+							const isRejectedTab = props.statusFilter === 'rejected';
+							const actionVerb = isRejectedTab ? 'Regenerate' : 'Send';
+							const confirmLabel = `Click to Confirm and ${actionVerb}`;
+							const actionLabel = hasSelection
+								? `${actionVerb} ${selectedCount} Selected`
+								: actionVerb;
+
+							return hasSelection ? (
+								props.isSendingDisabled ? (
+									<UpgradeSubscriptionDrawer
+										triggerButtonText={showConfirm ? confirmLabel : actionLabel}
+										buttonVariant="primary"
 										className={cn(
-											'flex-1 h-full flex items-center justify-center text-center text-black font-inter font-normal text-[17px] pl-[62px]',
+											'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] !flex !items-center !justify-center',
 											hasSelection
-												? 'bg-[#FFDC9F] hover:bg-[#F4C87E] cursor-pointer'
-												: 'bg-[#E0E0E0] cursor-not-allowed opacity-60'
+												? '!bg-[#C7F2C9] !border-[#349A37] hover:!bg-[#B9E7BC] cursor-pointer'
+												: '!bg-[#E0E0E0] !border-[#A0A0A0] !cursor-not-allowed !opacity-60 pointer-events-none'
 										)}
-										onClick={async () => {
-											if (!hasSelection) return;
-											if (!showConfirm) {
+										message={
+											props.isFreeTrial
+												? `Your free trial subscription does not include the ability to send emails. To send the emails\'ve drafted, please upgrade your subscription to the paid version.`
+												: `You have run out of sending credits. Please upgrade your subscription to a higher tier to receive more sending credits.`
+										}
+									/>
+								) : (
+									<div className="w-full h-full rounded-[4px] border-[3px] border-[#000000] flex overflow-hidden">
+										<button
+											type="button"
+											className={cn(
+												'flex-1 h-full flex items-center justify-center text-center text-black font-inter font-normal text-[17px] pl-[62px]',
+												hasSelection
+													? 'bg-[#FFDC9F] hover:bg-[#F4C87E] cursor-pointer'
+													: 'bg-[#E0E0E0] cursor-not-allowed opacity-60'
+											)}
+											onClick={async () => {
+												if (!hasSelection) return;
+												if (!showConfirm) {
+													setShowConfirm(true);
+													setTimeout(() => setShowConfirm(false), 10000);
+													return;
+												}
+												setShowConfirm(false);
+												if (isRejectedTab) {
+													await handleRegenerateSelectedDrafts();
+												} else {
+													await props.onSend();
+												}
+											}}
+											disabled={!hasSelection}
+										>
+											{showConfirm ? confirmLabel : actionLabel}
+										</button>
+
+										{/* Right section "All" button */}
+										<button
+											type="button"
+											className="w-[62px] h-full bg-[#C69A4D] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#B2863F] cursor-pointer border-l-[2px] border-[#000000]"
+											onClick={(e) => {
+												e.stopPropagation();
+											handleSelectAllDrafts(filteredDrafts);
 												setShowConfirm(true);
 												setTimeout(() => setShowConfirm(false), 10000);
-												return;
-											}
-											setShowConfirm(false);
-											await props.onSend();
-										}}
-										disabled={!hasSelection}
-									>
-										{showConfirm
-											? 'Click to Confirm and Send'
-											: hasSelection
-											? `Send ${selectedCount} Selected`
-											: 'Send'}
-									</button>
-
-									{/* Right section "All" button */}
-									<button
-										type="button"
-										className="w-[62px] h-full bg-[#C69A4D] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#B2863F] cursor-pointer border-l-[2px] border-[#000000]"
-										onClick={(e) => {
-											e.stopPropagation();
-											handleSelectAllDrafts(filteredDrafts);
-											setShowConfirm(true);
-											setTimeout(() => setShowConfirm(false), 10000);
-										}}
-									>
-										All
-									</button>
+											}}
+										>
+											All
+										</button>
+									</div>
+								)
+							) : (
+								<div className="w-full h-full flex items-center justify-center text-center text-[15px] font-inter text-black">
+									{props.statusFilter === 'rejected'
+										? 'Select Drafts to Regenerate'
+										: 'Select Drafts and Send Emails'}
 								</div>
-							)
-						) : (
-							<div className="w-full h-full flex items-center justify-center text-center text-[15px] font-inter text-black">
-								Select Drafts and Send Emails
-							</div>
-						)}
+							);
+						})()}
 					</div>
 				</div>
 			)}
