@@ -107,6 +107,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		trackFocusedField,
 		handleGenerateDrafts,
 		generationProgress,
+		scoreFullAutomatedPrompt,
 		// These are kept available for future use but not in current view:
 		// setGenerationProgress,
 		// cancelGeneration,
@@ -374,6 +375,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const suggestionText1 = promptSuggestions?.[0] || '';
 	const suggestionText2 = promptSuggestions?.[1] || '';
+	const suggestionText3 = promptSuggestions?.[2] || '';
+
+	// Track if the HybridPromptInput is focused to show/hide suggestions box
+	const [isPromptInputFocused, setIsPromptInputFocused] = useState(false);
+	const suggestionBoxRef = useRef<HTMLDivElement>(null);
+	
+	// Handle focus changes, but don't hide if focus moved to suggestion box
+	const handlePromptInputFocusChange = useCallback((isFocused: boolean) => {
+		if (isFocused) {
+			setIsPromptInputFocused(true);
+		} else {
+			// Check if focus moved to the suggestion box
+			setTimeout(() => {
+				const activeElement = document.activeElement;
+				if (suggestionBoxRef.current?.contains(activeElement)) {
+					// Focus is in the suggestion box, keep it visible
+					return;
+				}
+				setIsPromptInputFocused(false);
+			}, 50);
+		}
+	}, []);
 
 	const promptScoreDisplayLabel =
 		clampedPromptScore == null
@@ -1388,7 +1411,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												style={{
 													width: '375px',
-													height: view === 'search' ? '557px' : '274px',
+													height: '557px',
 													overflow: 'visible',
 												}}
 											>
@@ -1407,22 +1430,38 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
 													isPendingGeneration={isPendingGeneration}
 													width={375}
-													height={view === 'search' ? 557 : 274}
-													minRows={view === 'search' ? 8 : 5}
+													height={557}
+													minRows={8}
 													onSearchFromMiniBar={handleMiniContactsSearch}
 												/>
 											</div>
-											{view === 'testing' && (suggestionText1 || suggestionText2) && (
+											{view === 'testing' && isPromptInputFocused && (suggestionText1 || suggestionText2) && (
 												<div
+													ref={suggestionBoxRef}
+													tabIndex={-1}
+													onBlur={(e) => {
+														// Check if focus is moving outside the suggestion box and prompt input
+														const relatedTarget = e.relatedTarget as HTMLElement | null;
+														const promptInputContainer = document.querySelector('[data-hpi-container]');
+														if (
+															!suggestionBoxRef.current?.contains(relatedTarget) &&
+															!promptInputContainer?.contains(relatedTarget)
+														) {
+															setIsPromptInputFocused(false);
+														}
+													}}
 													style={{
-														width: '377px',
-														height: '249px',
-														marginTop: '-5px', // 16px gap - 5px = 11px
+														width: '405px',
+														height: '319px',
+														position: 'absolute',
+														top: '115px',
+														left: '-15px',
+														zIndex: 10,
 														background:
 															'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
 														border: '2px solid #000000',
 														borderRadius: '7px',
-														position: 'relative',
+														overflow: 'hidden',
 													}}
 												>
 													<div
@@ -1504,8 +1543,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														}}
 														style={{
 															position: 'absolute',
-															top: '83px', // 34px + 44px + 5px
-															left: '6px',
+															top: '83px',
+															left: '22px',
 															width: '39px',
 															height: '32px',
 															backgroundColor: '#C2C2C2',
@@ -1530,7 +1569,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														style={{
 															position: 'absolute',
 															top: '83px',
-															left: '50px', // 6px + 39px + 5px
+															left: '66px',
 															width: '196px',
 															height: '32px',
 															backgroundColor: '#D7F0FF',
@@ -1678,6 +1717,67 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																}}
 															>
 																{suggestionText2 || ''}
+															</div>
+														</div>
+													</div>
+													{/* Third box below */}
+													<div
+														style={{
+															position: 'absolute',
+															top: '251px', // 187px + 56px + 8px
+															left: '50%',
+															transform: 'translateX(-50%)',
+															width: '362px',
+															height: '56px',
+															backgroundColor: '#359D4D',
+															border: '2px solid #000000',
+															borderRadius: '8px',
+														}}
+													>
+														{/* Section indicator */}
+														<div
+															className="absolute font-inter font-bold"
+															style={{
+																top: '4.5px',
+																left: '8px',
+																fontSize: '11.5px',
+																color: '#000000',
+															}}
+														>
+															[3]
+														</div>
+														{/* Inner box */}
+														<div
+															style={{
+																position: 'absolute',
+																top: '0',
+																bottom: '0',
+																margin: 'auto',
+																left: '25px',
+																width: '324px',
+																height: '48px',
+																backgroundColor: '#FFFFFF',
+																border: '2px solid #000000',
+																borderRadius: '8px',
+																display: 'flex',
+																alignItems: 'center',
+																padding: '4px 8px',
+																overflow: 'hidden',
+															}}
+														>
+															<div
+																style={{
+																	fontFamily: 'Inter, system-ui, sans-serif',
+																	fontSize: '11px',
+																	lineHeight: '1.3',
+																	color: '#000000',
+																	wordBreak: 'break-word',
+																	whiteSpace: 'normal',
+																	overflow: 'hidden',
+																	textOverflow: 'ellipsis',
+																}}
+															>
+																{suggestionText3 || ''}
 															</div>
 														</div>
 													</div>
@@ -2109,6 +2209,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											setContactsTabSelectedIds(allIds);
 										}
 									}}
+									onGetSuggestions={scoreFullAutomatedPrompt}
+									onUpscalePrompt={upscalePrompt}
+									isUpscalingPrompt={isUpscalingPrompt}
+									onFocusChange={handlePromptInputFocusChange}
 								/>
 								{/* Right panel for Testing view - positioned absolutely */}
 								{false && (
