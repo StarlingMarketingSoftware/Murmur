@@ -35,8 +35,10 @@ import React, {
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
+import UpscaleIcon from '@/components/atoms/_svg/UpscaleIcon';
 import { DraggableHighlight } from '../DragAndDrop/DraggableHighlight';
 import DraggableBox from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraggableBox';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 interface SortableAIBlockProps {
 	block: {
 		value: HybridBlock;
@@ -56,6 +58,9 @@ interface SortableAIBlockProps {
 	) => void;
 	showTestPreview?: boolean;
 	testMessage?: string | null;
+	onGetSuggestions?: (prompt: string) => Promise<void>;
+	onUpscalePrompt?: () => Promise<void>;
+	isUpscalingPrompt?: boolean;
 }
 
 const SortableAIBlock = ({
@@ -67,6 +72,9 @@ const SortableAIBlock = ({
 	onExpand,
 	trackFocusedField,
 	showTestPreview,
+	onGetSuggestions,
+	onUpscalePrompt,
+	isUpscalingPrompt,
 }: SortableAIBlockProps) => {
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
 		useSortable({ id });
@@ -257,7 +265,7 @@ const SortableAIBlock = ({
 								? 'p-0 h-full'
 								: 'p-2 h-full max-[480px]:py-[2px]'
 							: isFullAutomatedBlock
-							? 'px-4 pt-0 pb-4'
+							? 'pl-4 pr-0 pt-0 pb-4'
 							: isTextBlock
 							? 'px-4 pt-2 pb-4'
 							: 'p-4'
@@ -755,53 +763,123 @@ const SortableAIBlock = ({
 															<p>Type anything you want to include</p>
 														</div>
 													)}
-													<Textarea
-														placeholder={
-															isFullAutomatedBlock
-																? ''
-																: 'placeholder' in block
-																? (block as { placeholder?: string }).placeholder || ''
-																: ''
-														}
-														onClick={(e) => e.stopPropagation()}
-														className={cn(
-															'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 max-[480px]:placeholder:text-[10px]',
-															isIntroductionBlock
-																? '!bg-[#DADAFC] [&]:!bg-[#DADAFC]'
-																: 'bg-white',
-															isFullAutomatedBlock
-																? 'h-[150px] px-0 resize-none full-auto-textarea'
-																: '',
-															shouldShowRedStyling ? 'placeholder:text-[#A20000]' : '',
-															(isIntroductionBlock || isResearchBlock || isActionBlock) &&
-																'font-inter placeholder:italic placeholder:text-[#5d5d5d]'
-														)}
-														style={
-															isIntroductionBlock
-																? { backgroundColor: '#DADAFC' }
-																: undefined
-														}
-														{...fieldProps}
-														onFocus={(e) => {
-															trackFocusedField?.(
-																`hybridBlockPrompts.${fieldIndex}.value`,
-																e.target as HTMLTextAreaElement
-															);
-														}}
-														onBlur={(e) => {
-															if (isTextBlock) {
-																setHasBeenTouched(true);
+													{isFullAutomatedBlock ? (
+														<CustomScrollbar
+															style={{ height: '115px' }}
+															thumbWidth={2}
+															thumbColor="#000000"
+															trackColor="transparent"
+															offsetRight={2}
+															className="w-full"
+															contentClassName="hide-native-scrollbar"
+															lockHorizontalScroll
+														>
+															<Textarea
+																placeholder=""
+																onClick={(e) => e.stopPropagation()}
+																className={cn(
+																	'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 max-[480px]:placeholder:text-[10px]',
+																	'bg-white',
+																	'min-h-[115px] w-full pl-0 pr-4 resize-none overflow-hidden [field-sizing:fixed]'
+																)}
+																{...fieldProps}
+																onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+																	const target = e.currentTarget;
+																	target.style.height = 'auto';
+																	target.style.height = target.scrollHeight + 'px';
+																}}
+																onFocus={(e) => {
+																	trackFocusedField?.(
+																		`hybridBlockPrompts.${fieldIndex}.value`,
+																		e.target as HTMLTextAreaElement
+																	);
+																}}
+																ref={(el) => {
+																	fieldProps.ref(el);
+																	if (el) {
+																		el.style.height = 'auto';
+																		el.style.height =
+																			Math.max(115, el.scrollHeight) + 'px';
+																	}
+																}}
+															/>
+														</CustomScrollbar>
+													) : (
+														<Textarea
+															placeholder={
+																'placeholder' in block
+																	? (block as { placeholder?: string }).placeholder || ''
+																	: ''
 															}
-															fieldProps.onBlur(e);
-														}}
-														onChange={(e) => {
-															if (isTextBlock && e.target.value) {
-																setHasBeenTouched(true);
+															onClick={(e) => e.stopPropagation()}
+															className={cn(
+																'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 max-[480px]:placeholder:text-[10px]',
+																isIntroductionBlock
+																	? '!bg-[#DADAFC] [&]:!bg-[#DADAFC]'
+																	: 'bg-white',
+																shouldShowRedStyling
+																	? 'placeholder:text-[#A20000]'
+																	: '',
+																(isIntroductionBlock ||
+																	isResearchBlock ||
+																	isActionBlock) &&
+																	'font-inter placeholder:italic placeholder:text-[#5d5d5d]'
+															)}
+															style={
+																isIntroductionBlock
+																	? { backgroundColor: '#DADAFC' }
+																	: undefined
 															}
-															fieldProps.onChange(e);
-														}}
-													/>
+															{...fieldProps}
+															onFocus={(e) => {
+																trackFocusedField?.(
+																	`hybridBlockPrompts.${fieldIndex}.value`,
+																	e.target as HTMLTextAreaElement
+																);
+															}}
+															onBlur={(e) => {
+																if (isTextBlock) {
+																	setHasBeenTouched(true);
+																}
+																fieldProps.onBlur(e);
+															}}
+															onChange={(e) => {
+																if (isTextBlock && e.target.value) {
+																	setHasBeenTouched(true);
+																}
+																fieldProps.onChange(e);
+															}}
+														/>
+													)}
 												</div>
+												{/* Gray bottom section for Full Auto block */}
+												{isFullAutomatedBlock && (
+													<div className="w-[calc(100%+32px)] -mx-4 h-[35px] bg-[#F5F5F5] -mb-4 flex items-center">
+														<button
+															type="button"
+															onClick={() => {
+																const currentValue = form.getValues(`hybridBlockPrompts.${fieldIndex}.value`) || '';
+																onGetSuggestions?.(currentValue);
+															}}
+															className="w-[115px] h-[20px] ml-[15px] bg-[#D7F0FF] border-2 border-black rounded-[5px] text-[11px] font-inter font-semibold cursor-pointer"
+														>
+															Get Suggestions
+														</button>
+														<button
+															type="button"
+															onClick={() => {
+																if (!isUpscalingPrompt) {
+																	onUpscalePrompt?.();
+																}
+															}}
+															disabled={isUpscalingPrompt}
+															className="w-[73px] h-[20px] ml-[6px] bg-[#D7F0FF] border-2 border-black rounded-[5px] text-[11px] font-inter font-semibold flex items-center justify-center gap-[2px] cursor-pointer"
+														>
+															<span>Upscale</span>
+															<UpscaleIcon width="12" height="12" />
+														</button>
+													</div>
+												)}
 											</>
 										);
 									})()
@@ -887,6 +965,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		isTest,
 		contact,
 		onGoToDrafting,
+		onGetSuggestions,
+		onUpscalePrompt,
+		isUpscalingPrompt,
 	} = useHybridPromptInput(props);
 
 	const {
@@ -1689,6 +1770,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		trackFocusedField={trackFocusedField}
 																		showTestPreview={showTestPreview}
 																		testMessage={testMessage}
+																		onGetSuggestions={onGetSuggestions}
+																		onUpscalePrompt={onUpscalePrompt}
+																		isUpscalingPrompt={isUpscalingPrompt}
 																	/>
 																</div>
 																{/* Plus button under hybrid blocks */}

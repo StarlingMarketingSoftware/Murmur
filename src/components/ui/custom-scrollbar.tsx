@@ -208,7 +208,7 @@ export function CustomScrollbar({
 				ref={scrollContainerRef}
 				onScroll={onScroll}
 				className={cn(
-					'h-full scrollbar-hide',
+					'h-full scrollbar-hide hide-native-scrollbar',
 					!disableOverflowClass && 'overflow-y-auto',
 					contentClassName
 				)}

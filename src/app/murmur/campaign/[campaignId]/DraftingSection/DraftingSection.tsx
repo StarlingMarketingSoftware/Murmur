@@ -107,6 +107,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		trackFocusedField,
 		handleGenerateDrafts,
 		generationProgress,
+		scoreFullAutomatedPrompt,
 		// These are kept available for future use but not in current view:
 		// setGenerationProgress,
 		// cancelGeneration,
@@ -2109,6 +2110,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											setContactsTabSelectedIds(allIds);
 										}
 									}}
+									onGetSuggestions={scoreFullAutomatedPrompt}
+									onUpscalePrompt={upscalePrompt}
+									isUpscalingPrompt={isUpscalingPrompt}
 								/>
 								{/* Right panel for Testing view - positioned absolutely */}
 								{false && (

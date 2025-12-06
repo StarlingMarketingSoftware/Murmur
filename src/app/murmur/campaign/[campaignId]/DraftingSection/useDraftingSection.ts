@@ -1774,5 +1774,6 @@ The improved prompt should result in more personalized, engaging, and effective 
 		livePreviewContactId,
 		livePreviewMessage,
 		livePreviewSubject,
+		scoreFullAutomatedPrompt,
 	};
 };
