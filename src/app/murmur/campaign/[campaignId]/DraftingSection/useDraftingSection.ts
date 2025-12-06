@@ -826,9 +826,9 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 			Judge by how many details they have about themselves. 
 
 			Return ONLY a valid JSON object with this exact shape and no extra commentary or formatting:
-			{"score": 75, "label": "Good", "suggestion1": "First one-sentence suggestion to improve the prompt.", "suggestion2": "Second one-sentence suggestion to improve the prompt."}
+			{"score": 75, "label": "Good", "suggestion1": "First one-sentence suggestion to improve the prompt.", "suggestion2": "Second one-sentence suggestion to improve the prompt.", "suggestion3": "Third one-sentence suggestion to improve the prompt."}
 			DON'T USE THE WORD "AI" IN THE SUGGESTIONS.
-			Each suggestion MUST be a single, complete sentence (no bullet points) and should be as specific and actionable as possible.`;
+			Each suggestion MUST be a single, complete sentence (no bullet points) and should be as specific and actionable as possible. Each suggestion should be unique and different from the others.`;
 
 			const scoringContent = `PROMPT:\n${trimmed}`;
 
@@ -853,6 +853,7 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 					label?: string;
 					suggestion1?: string;
 					suggestion2?: string;
+					suggestion3?: string;
 					suggestions?: string[];
 				};
 
@@ -907,7 +908,7 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 						? 'Good'
 						: 'Fair';
 
-				// Extract up to two suggestions from the model response
+				// Extract up to three suggestions from the model response
 				const rawSuggestions: string[] = [];
 
 				if (
@@ -922,12 +923,18 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 				) {
 					rawSuggestions.push(parsed.suggestion2.trim());
 				}
+				if (
+					typeof parsed.suggestion3 === 'string' &&
+					parsed.suggestion3.trim().length > 0
+				) {
+					rawSuggestions.push(parsed.suggestion3.trim());
+				}
 				if (Array.isArray(parsed.suggestions)) {
 					for (const s of parsed.suggestions) {
 						if (
 							typeof s === 'string' &&
 							s.trim().length > 0 &&
-							rawSuggestions.length < 2
+							rawSuggestions.length < 3
 						) {
 							rawSuggestions.push(s.trim());
 						}
@@ -943,7 +950,7 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 				};
 
 				const normalizedSuggestions = rawSuggestions
-					.slice(0, 2)
+					.slice(0, 3)
 					.map(normalizeToSingleSentence)
 					.filter((s) => s.length > 0);
 

@@ -100,6 +100,10 @@ export interface HybridPromptInputProps {
 	 * Optional: indicates if upscaling is currently in progress.
 	 */
 	isUpscalingPrompt?: boolean;
+	/**
+	 * Optional: invoked when focus state changes within the prompt input area.
+	 */
+	onFocusChange?: (isFocused: boolean) => void;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {
@@ -116,6 +120,7 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		onGetSuggestions,
 		onUpscalePrompt,
 		isUpscalingPrompt,
+		onFocusChange,
 	} = props;
 
 	/* HOOKS */
@@ -486,5 +491,6 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		onGetSuggestions,
 		onUpscalePrompt,
 		isUpscalingPrompt,
+		onFocusChange,
 	};
 };

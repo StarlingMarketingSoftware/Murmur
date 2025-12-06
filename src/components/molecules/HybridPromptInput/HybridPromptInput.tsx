@@ -968,6 +968,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		onGetSuggestions,
 		onUpscalePrompt,
 		isUpscalingPrompt,
+		onFocusChange,
 	} = useHybridPromptInput(props);
 
 	const {
@@ -1163,6 +1164,22 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const modeDividerRef = useRef<HTMLDivElement>(null);
 	const [overlayTopPx, setOverlayTopPx] = useState<number | null>(null);
 
+	// Track focus state for the entire prompt input area
+	const focusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const handleContainerFocus = () => {
+		if (focusTimeoutRef.current) {
+			clearTimeout(focusTimeoutRef.current);
+			focusTimeoutRef.current = null;
+		}
+		onFocusChange?.(true);
+	};
+	const handleContainerBlur = () => {
+		// Use a small timeout to check if focus moved to another element within the container
+		focusTimeoutRef.current = setTimeout(() => {
+			onFocusChange?.(false);
+		}, 100);
+	};
+
 	const [highlightStyle, setHighlightStyle] = useState({
 		left: 0,
 		width: 0,
@@ -1346,6 +1363,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							} relative overflow-visible`}
 							style={!compactLeftOnly ? { backgroundColor: '#A6E2A8' } : undefined}
 							data-hpi-container
+							onFocus={handleContainerFocus}
+							onBlur={handleContainerBlur}
 						>
 							{/* Mobile-only gradient background overlay starting under Mode divider */}
 							{isMobile && !showTestPreview && overlayTopPx !== null && (
