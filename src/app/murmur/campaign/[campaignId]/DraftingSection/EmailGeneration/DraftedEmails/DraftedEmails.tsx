@@ -224,8 +224,6 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 
 	const [showConfirm, setShowConfirm] = useState(false);
 	const [isRegenerating, setIsRegenerating] = useState(false);
-	const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'rejected'>('all');
-
 	// Used contacts indicator
 	const { data: usedContactIds } = useGetUsedContactIds();
 	const usedContactIdsSet = useMemo(
@@ -233,16 +231,19 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		[usedContactIds]
 	);
 	const filteredDrafts = useMemo(() => {
-		if (statusFilter === 'approved') {
+		if (props.statusFilter === 'approved') {
 			return draftEmails.filter((d) => props.approvedDraftIds?.has(d.id));
 		}
-		if (statusFilter === 'rejected') {
+		if (props.statusFilter === 'rejected') {
 			return draftEmails.filter((d) => props.rejectedDraftIds?.has(d.id));
 		}
 		return draftEmails;
-	}, [draftEmails, props.approvedDraftIds, props.rejectedDraftIds, statusFilter]);
+	}, [draftEmails, props.approvedDraftIds, props.rejectedDraftIds, props.statusFilter]);
 	const approvedCount = props.approvedDraftIds?.size ?? 0;
 	const rejectedCount = props.rejectedDraftIds?.size ?? 0;
+	const allFilteredSelected =
+		filteredDrafts.length > 0 &&
+		filteredDrafts.every((draft) => selectedDraftIds.has(draft.id));
 	const selectedCount = selectedDraftIds.size;
 	const hasSelection = selectedCount > 0;
 	const toCount = selectedCount; // used in confirmation details
@@ -798,10 +799,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		<div className="flex flex-col gap-2 items-center">
 			{/* Right table - Generated Drafts */}
 			<DraftingTable
-				handleClick={handleSelectAllDrafts}
-				areAllSelected={
-					selectedDraftIds.size === draftEmails.length && draftEmails.length > 0
-				}
+				handleClick={() => handleSelectAllDrafts(filteredDrafts)}
+				areAllSelected={allFilteredSelected}
 				hasData={draftEmails.length > 0}
 				noDataMessage="No drafts generated"
 				noDataDescription='Click "Generate Drafts" to create emails for the selected contacts'
@@ -811,8 +810,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				goToSearch={props.goToSearch}
 				goToInbox={props.goToInbox}
 				selectedCount={selectedDraftIds.size}
-				statusFilter={statusFilter}
-				onStatusFilterChange={setStatusFilter}
+				statusFilter={props.statusFilter}
+				onStatusFilterChange={props.onStatusFilterChange}
 				approvedCount={approvedCount}
 				rejectedCount={rejectedCount}
 				totalDraftsCount={draftEmails.length}
@@ -854,7 +853,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							const isLastInGroup = isSelected && !isNextSelected;
 							
 							// Colors based on tab
-							const isRejectedTab = statusFilter === 'rejected';
+							const isRejectedTab = props.statusFilter === 'rejected';
 							const selectedBgColor = isRejectedTab ? 'bg-[#D99696]' : 'bg-[#A4D996]';
 							const connectorColor = isRejectedTab ? 'bg-[#A34C4C]' : 'bg-[#43A24C]';
 							
@@ -1297,7 +1296,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										className="w-[62px] h-full bg-[#C69A4D] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#B2863F] cursor-pointer border-l-[2px] border-[#000000]"
 										onClick={(e) => {
 											e.stopPropagation();
-											handleSelectAllDrafts();
+											handleSelectAllDrafts(filteredDrafts);
 											setShowConfirm(true);
 											setTimeout(() => setShowConfirm(false), 10000);
 										}}

@@ -690,10 +690,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	};
 
-	// State for drafts selection in the Drafts tab
-	const [draftsTabSelectedIds, setDraftsTabSelectedIds] = useState<Set<number>>(
-		new Set()
-	);
+	// State for drafts selection in the Drafts tab by filter
+	const [draftStatusFilter, setDraftStatusFilter] = useState<'all' | 'approved' | 'rejected'>('all');
+	const [draftSelectionsByFilter, setDraftSelectionsByFilter] = useState<{
+		all: Set<number>;
+		approved: Set<number>;
+		rejected: Set<number>;
+	}>({
+		all: new Set<number>(),
+		approved: new Set<number>(),
+		rejected: new Set<number>(),
+	});
+	const draftsTabSelectedIds = draftSelectionsByFilter[draftStatusFilter];
+	const setDraftsTabSelectedIds = (
+		value: Set<number> | ((prev: Set<number>) => Set<number>)
+	) => {
+		setDraftSelectionsByFilter((prev) => {
+			const current = prev[draftStatusFilter];
+			const nextSet = typeof value === 'function' ? value(current) : value;
+			return { ...prev, [draftStatusFilter]: nextSet };
+		});
+	};
 	const [, setIsDraftDialogOpen] = useState(false);
 	const handleDraftSelection = (draftId: number) => {
 		setDraftsTabSelectedIds((prev) => {
@@ -2163,6 +2180,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										onRegenerateDraft={handleRegenerateDraft}
 										rejectedDraftIds={rejectedDraftIds}
 										approvedDraftIds={approvedDraftIds}
+										statusFilter={draftStatusFilter}
+										onStatusFilterChange={setDraftStatusFilter}
 									/>
 
 									{/* Bottom Panels: Contacts, Sent, and Inbox */}

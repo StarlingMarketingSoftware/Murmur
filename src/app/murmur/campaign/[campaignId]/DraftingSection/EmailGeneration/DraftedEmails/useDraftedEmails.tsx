@@ -50,6 +50,10 @@ export interface DraftedEmailsProps {
 	rejectedDraftIds?: Set<number>;
 	/** Optional: drafts marked for approval (for UI badges) */
 	approvedDraftIds?: Set<number>;
+	/** Current status filter for Drafts tab */
+	statusFilter: 'all' | 'approved' | 'rejected';
+	/** Callback to change status filter */
+	onStatusFilterChange: (filter: 'all' | 'approved' | 'rejected') => void;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {
@@ -115,15 +119,20 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		setEditedMessage(plainMessage);
 	};
 
-	const handleSelectAllDrafts = () => {
-		if (selectedDraftIds.size === draftEmails?.length && draftEmails?.length > 0) {
+	const handleSelectAllDrafts = (targetDrafts?: EmailWithRelations[]) => {
+		const draftsToSelect = targetDrafts ?? draftEmails;
+		const ids = draftsToSelect.map((d) => d.id);
+		const allSelected = ids.length > 0 && ids.every((id) => selectedDraftIds.has(id));
+
+		if (allSelected) {
 			setSelectedDraftIds(new Set());
 			lastClickedRef.current = null;
-		} else {
-			setSelectedDraftIds(new Set(draftEmails?.map((d) => d.id) || []));
-			if (draftEmails.length > 0) {
-				lastClickedRef.current = draftEmails[draftEmails.length - 1].id;
-			}
+			return;
+		}
+
+		setSelectedDraftIds(new Set(ids));
+		if (ids.length > 0) {
+			lastClickedRef.current = ids[ids.length - 1];
 		}
 	};
 
