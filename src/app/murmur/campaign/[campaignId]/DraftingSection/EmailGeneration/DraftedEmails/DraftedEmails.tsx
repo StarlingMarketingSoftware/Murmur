@@ -224,6 +224,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 
 	const [showConfirm, setShowConfirm] = useState(false);
 	const [isRegenerating, setIsRegenerating] = useState(false);
+	const [isHoveringAllButton, setIsHoveringAllButton] = useState(false);
 	// Used contacts indicator
 	const { data: usedContactIds } = useGetUsedContactIds();
 	const usedContactIdsSet = useMemo(
@@ -349,7 +350,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		const hasStatusBar = isDraftApproved || isDraftRejected;
 
 		return (
-			<div className="flex flex-col items-center">
+			<div className="flex flex-col items-center" style={{ marginTop: '25px' }}>
 				<div style={{ width: '499px', height: '703px', position: 'relative' }}>
 				{/* Container box with header - matching the table view */}
 				<div
@@ -806,7 +807,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	}
 
 	return (
-		<div className="flex flex-col gap-2 items-center">
+		<div className="flex flex-col gap-2 items-center" style={{ marginTop: '25px' }}>
 			{/* Right table - Generated Drafts */}
 			<DraftingTable
 				handleClick={() => handleSelectAllDrafts(filteredDrafts)}
@@ -886,7 +887,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											'cursor-pointer relative select-none h-[97px] overflow-visible border-2 p-2 group/draft',
 											isSelected
 												? cn('w-[499px] rounded-none border-[#FFFFFF]', selectedBgColor)
-												: 'w-[489px] rounded-[8px] bg-white border-[#000000] hover:bg-[#F9E5BA]'
+												: cn(
+														'w-[489px] rounded-[8px] border-[#000000]',
+														isHoveringAllButton ? 'bg-[#FFEDCA]' : 'bg-white hover:bg-[#F9E5BA]'
+												  )
 										)}
 									onMouseDown={(e) => {
 										// Prevent text selection on shift-click
@@ -1308,6 +1312,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										<button
 											type="button"
 											className="w-[62px] h-full bg-[#C69A4D] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#B2863F] cursor-pointer border-l-[2px] border-[#000000]"
+											onMouseEnter={() => setIsHoveringAllButton(true)}
+											onMouseLeave={() => setIsHoveringAllButton(false)}
 											onClick={(e) => {
 												e.stopPropagation();
 											handleSelectAllDrafts(filteredDrafts);

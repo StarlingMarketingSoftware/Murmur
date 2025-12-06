@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { urls } from '@/constants/urls';
+import ApproveCheckIcon from '@/components/atoms/svg/ApproveCheckIcon';
+import RejectXIcon from '@/components/atoms/svg/RejectXIcon';
 
 export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isAllTab?: boolean; whiteSectionHeight?: number }> = ({
 	offsetY = 0,
@@ -248,6 +250,39 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						}}
 					/>
 				</>
+			)}
+
+			{/* Box above Drafts table - hidden on approved/rejected tabs */}
+			{isDrafts && statusFilter === 'all' && (
+				<div
+					style={{
+						position: 'absolute',
+						top: '-31px',
+						left: '50%',
+						transform: 'translateX(-50%)',
+						width: '95px',
+						height: '21px',
+						border: '2px solid #000000',
+						borderRadius: '8px',
+						backgroundColor: 'transparent',
+						zIndex: 10,
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						gap: '8px',
+					}}
+				>
+					{/* Approved count */}
+					<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+						<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{approvedCount}</span>
+						<ApproveCheckIcon width={12} height={9} className="text-black" />
+					</div>
+					{/* Rejected count */}
+					<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+						<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{rejectedCount}</span>
+						<RejectXIcon width={10} height={10} className="text-black" />
+					</div>
+				</div>
 			)}
 
 			{/* New Sent Pill */}
