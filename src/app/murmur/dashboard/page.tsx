@@ -755,7 +755,6 @@ const DashboardContent = () => {
 		}
 	}, [activeSection]);
 
-	// Focus input when section becomes active (only for free-text sections)
 	useEffect(() => {
 		if (activeSection === 'what' && whatInputRef.current) {
 			whatInputRef.current.focus();
@@ -1912,7 +1911,6 @@ const DashboardContent = () => {
 																				{isAllSelected ? 'Deselect All' : 'Select all'}
 																			</button>
 																		</div>
-																		{/* Scrollable contact list */}
 																		<CustomScrollbar
 																			className="flex-1 min-h-0"
 																			contentClassName="p-[6px] pb-[14px] space-y-[7px]"
@@ -2105,7 +2103,6 @@ const DashboardContent = () => {
 																		</CustomScrollbar>
 																	</div>
 																)}
-																{/* Research panel - appears to left of search results when hovering (compact) - hidden while loading */}
 																{!(
 																	isSearchPending ||
 																	isLoadingContacts ||
@@ -2113,7 +2110,6 @@ const DashboardContent = () => {
 																) &&
 																	hoveredContact &&
 																	(() => {
-																		// Parse metadata sections [1], [2], etc.
 																		const parseMetadataSections = (
 																			metadata: string | null | undefined
 																		) => {

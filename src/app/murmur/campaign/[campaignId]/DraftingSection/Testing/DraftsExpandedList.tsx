@@ -29,25 +29,21 @@ export interface DraftsExpandedListProps {
 	drafts: EmailWithRelations[];
 	contacts: ContactWithName[];
 	onHeaderClick?: () => void;
-	// Live Send Preview callbacks for status panel
 	onSendingPreviewUpdate?: (args: { contactId: number; subject?: string }) => void;
 	onSendingPreviewReset?: () => void;
-	/** Custom width in pixels */
 	width?: number;
-	/** Custom height in pixels */
 	height?: number;
-	/** When true, hides the footer send button */
 	hideSendButton?: boolean;
-	/** Custom height for the white header section in pixels */
 	whiteSectionHeight?: number;
-	/** Optional per-row width override (px) */
 	rowWidth?: number;
-	/** Optional per-row height override (px) */
 	rowHeight?: number;
-	/** Optional set of draft ids marked as rejected */
 	rejectedDraftIds?: Set<number>;
-	/** Optional set of draft ids marked as approved */
 	approvedDraftIds?: Set<number>;
+	previewedDraftId?: number | null;
+	/** When true, clicking a draft opens it in preview instead of selecting it */
+	isPreviewMode?: boolean;
+	/** Callback when a draft is clicked in preview mode */
+	onDraftPreviewClick?: (draft: EmailWithRelations) => void;
 }
 
 const DraftsHeaderChrome: FC<{
@@ -62,19 +58,15 @@ const DraftsHeaderChrome: FC<{
 	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
 	const pillBgColor = hasData ? '#EFDAAF' : '#FFAEAE';
 	const dotSize = isBottomView ? 5 : isAllTab ? 6 : 9;
-	// First dot is 29px from the left
 	const dot1Left = isBottomView ? 18 : 29;
 	const dot2Left = isBottomView ? 110 : isAllTab ? 177.5 : 176;
 	const dot3Left = isBottomView ? 146 : isAllTab ? 236.5 : 235;
-	// Pill dimensions for All tab
 	const pillWidth = isBottomView ? 40 : isAllTab ? 50 : 72;
-	// Center pill between first and second dots
 	const midpointBetweenDots = (dot1Left + dot2Left) / 2;
 	const pillLeft = midpointBetweenDots - pillWidth / 2;
 	const pillHeight = isBottomView ? 10 : isAllTab ? 15 : 22;
 	const pillBorderRadius = isBottomView ? 5 : isAllTab ? 7.5 : 11;
 	const pillFontSize = isBottomView ? '8px' : isAllTab ? '10px' : '13px';
-	// Center dots vertically with the pill - calculate both positions relative to each other
 	const pillTop =
 		whiteSectionHeight !== undefined ? (whiteSectionHeight - pillHeight) / 2 : 3 + offsetY;
 	const pillCenterY = pillTop + pillHeight / 2;
@@ -121,7 +113,7 @@ const DraftsHeaderChrome: FC<{
 						justifyContent: 'center',
 						alignItems: 'center',
 						height: '100%',
-						marginTop: isAllTab ? '-1px' : 0, // Optical alignment adjustment
+						marginTop: isAllTab ? '-1px' : 0,
 					}}
 				>
 					Drafts
@@ -169,6 +161,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	rowHeight,
 	rejectedDraftIds,
 	approvedDraftIds,
+	previewedDraftId,
+	isPreviewMode = false,
+	onDraftPreviewClick,
 }) => {
 	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
 	const lastClickedRef = useRef<number | null>(null);
@@ -192,7 +187,13 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 		[usedContactIds]
 	);
 
-	const handleDraftClick = (draftId: number, e: MouseEvent) => {
+	const handleDraftClick = (draft: EmailWithRelations, e: MouseEvent) => {
+		if (isPreviewMode && onDraftPreviewClick) {
+			onDraftPreviewClick(draft);
+			return;
+		}
+
+		const draftId = draft.id as number;
 		if (e.shiftKey && lastClickedRef.current !== null) {
 			// Prevent text selection on shift-click
 			e.preventDefault();
@@ -233,11 +234,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 		}
 	};
 
-	// Keep footer button disabled state in sync if used later
 	const isSendDisabled = selectedDraftIds.size === 0 || isSending;
 
-	// Special hack for "All" tab: if height is exactly 347px, we apply a thicker 3px border
-	// to match the other elements in that layout. Otherwise standard 2px border.
 	const isAllTab = height === 347;
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
 	const isBottomView = customWhiteSectionHeight === 15;
@@ -284,13 +282,11 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 		const emailsToProcess = selectedDrafts.slice(0, emailsWeCanSend);
 
 		setIsSending(true);
-		// Initialize status panel Send Preview
 		if (onSendingPreviewReset) onSendingPreviewReset();
 		let successfulSends = 0;
 		try {
 			for (let i = 0; i < emailsToProcess.length; i++) {
 				const email = emailsToProcess[i];
-				// Update Send Preview row live with current email
 				if (onSendingPreviewUpdate) {
 					onSendingPreviewUpdate({
 						contactId: email.contactId,
@@ -298,7 +294,6 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 					});
 				}
 				try {
-					// Find the contact email from the contacts array
 					const contact = contacts.find((c) => c.id === email.contactId);
 					const recipientEmail = email.contact?.email || contact?.email;
 
@@ -324,7 +319,6 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							data: { status: EmailStatus.sent, sentAt: new Date() },
 						});
 						successfulSends++;
-						// Hide Send Preview immediately after this email is sent
 						if (onSendingPreviewReset) onSendingPreviewReset();
 					}
 				} catch (err) {
@@ -332,7 +326,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				}
 			}
 
-			// Update user credits
+			// Update credits per user with this
 			if (user && successfulSends > 0) {
 				const newCreditBalance = Math.max(0, sendingCredits - successfulSends);
 				await editUser({
@@ -384,7 +378,6 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 			role="region"
 			aria-label="Expanded drafts preview"
 		>
-			{/* Header row (no explicit divider; let the background change from white to yellow like the main table) */}
 			<DraftsHeaderChrome isAllTab={isAllTab} whiteSectionHeight={customWhiteSectionHeight} />
 			<div
 				className={cn(
@@ -467,9 +460,11 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								  contact.company ||
 								  'Contact'
 								: 'Unknown Contact';
-							const isSelected = selectedDraftIds.has(draft.id as number);
+							// having a totally different selection view logic for preview and selected, where preview will show the selected state
+							const isSelected = !isPreviewMode && selectedDraftIds.has(draft.id as number);
 							const isRejected = rejectedDraftIds?.has(draft.id as number) ?? false;
 							const isApproved = approvedDraftIds?.has(draft.id as number) ?? false;
+							const isPreviewed = previewedDraftId === draft.id;
 							const contactTitle = contact?.headline || contact?.title || '';
 							return (
 								<div
@@ -480,7 +475,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											? 'w-[225px] h-[49px]'
 											: !hasCustomRowSize &&
 											  'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
-										isSelected && 'bg-[#FFDF9F]'
+										isPreviewed && 'bg-[#FDDEA5]',
+										isSelected && !isPreviewed && 'bg-[#FFDF9F]',
+										isPreviewMode && !isPreviewed && 'hover:bg-[#FFEDCA]'
 									)}
 									style={
 										isBottomView
@@ -491,9 +488,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											  }
 									}
 									onMouseDown={(e) => {
-										if (e.shiftKey) e.preventDefault();
+										if (e.shiftKey && !isPreviewMode) e.preventDefault();
 									}}
-									onClick={(e) => handleDraftClick(draft.id as number, e)}
+									onClick={(e) => handleDraftClick(draft, e)}
 								>
 									{/* Used-contact indicator - stacked above reject/approve when both present */}
 									{usedContactIdsSet.has(draft.contactId) && (
@@ -528,7 +525,6 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											}}
 										/>
 									)}
-									{/* Approved indicator - stacked below used-contact when both present */}
 									{isApproved && (
 										<span
 											className="absolute left-[8px]"
@@ -676,7 +672,6 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				</CustomScrollbar>
 			</div>
 
-			{/* Footer bar */}
 			{!hideSendButton && (
 				<div className="flex justify-center w-full mt-2">
 					<button

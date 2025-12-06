@@ -40,16 +40,20 @@ export interface DraftedEmailsProps {
 	goToSearch?: () => void;
 	/** Optional: callback to navigate to the Inbox tab */
 	goToInbox?: () => void;
-	/** Optional: callback invoked when a draft is rejected in preview */
-	onRejectDraft?: (draftId: number) => void;
-	/** Optional: callback invoked when a draft is approved in preview */
-	onApproveDraft?: (draftId: number) => void;
+	/** Optional: callback invoked when a draft is rejected in preview (toggle behavior) */
+	onRejectDraft?: (draftId: number, currentlyRejected?: boolean) => void;
+	/** Optional: callback invoked when a draft is approved in preview (toggle behavior) */
+	onApproveDraft?: (draftId: number, currentlyApproved?: boolean) => void;
 	/** Optional: callback invoked when regenerating a draft using AI */
 	onRegenerateDraft?: (draft: EmailWithRelations) => Promise<{ subject: string; message: string } | null>;
 	/** Optional: drafts marked for rejection (for UI badges) */
 	rejectedDraftIds?: Set<number>;
 	/** Optional: drafts marked for approval (for UI badges) */
 	approvedDraftIds?: Set<number>;
+	/** Current status filter for Drafts tab */
+	statusFilter: 'all' | 'approved' | 'rejected';
+	/** Callback to change status filter */
+	onStatusFilterChange: (filter: 'all' | 'approved' | 'rejected') => void;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {
@@ -115,15 +119,20 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		setEditedMessage(plainMessage);
 	};
 
-	const handleSelectAllDrafts = () => {
-		if (selectedDraftIds.size === draftEmails?.length && draftEmails?.length > 0) {
+	const handleSelectAllDrafts = (targetDrafts?: EmailWithRelations[]) => {
+		const draftsToSelect = targetDrafts ?? draftEmails;
+		const ids = draftsToSelect.map((d) => d.id);
+		const allSelected = ids.length > 0 && ids.every((id) => selectedDraftIds.has(id));
+
+		if (allSelected) {
 			setSelectedDraftIds(new Set());
 			lastClickedRef.current = null;
-		} else {
-			setSelectedDraftIds(new Set(draftEmails?.map((d) => d.id) || []));
-			if (draftEmails.length > 0) {
-				lastClickedRef.current = draftEmails[draftEmails.length - 1].id;
-			}
+			return;
+		}
+
+		setSelectedDraftIds(new Set(ids));
+		if (ids.length > 0) {
+			lastClickedRef.current = ids[ids.length - 1];
 		}
 	};
 

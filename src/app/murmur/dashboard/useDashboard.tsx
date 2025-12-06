@@ -72,11 +72,9 @@ export const useDashboard = () => {
 		},
 	});
 
-	/* HOOKS */
-	// useMe will return undefined values for unauthenticated users
+		/* HOOKS */
 	const { isFreeTrial, user } = useMe() || { isFreeTrial: false, user: null };
 
-	// User can search if they have an active subscription OR are on a free trial
 	const canSearch =
 		user?.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE ||
 		user?.stripeSubscriptionStatus === StripeSubscriptionStatus.TRIALING;
@@ -126,14 +124,12 @@ export const useDashboard = () => {
 		}
 	}, [isLoadingContacts, isRefetchingContacts, isSearchPending]);
 
-	// Initialize selected contacts as empty (no contacts selected by default)
 	useEffect(() => {
 		if (contacts) {
-			setSelectedContacts([]); // Start with no contacts selected
+			setSelectedContacts([]);
 		}
 	}, [contacts]);
 
-	// Watch for changes in selectedContacts to update isAllSelected
 	useEffect(() => {
 		if (contacts && selectedContacts.length > 0) {
 			setIsAllSelected(selectedContacts.length === contacts.length);
@@ -142,10 +138,8 @@ export const useDashboard = () => {
 		}
 	}, [selectedContacts, contacts]);
 
-	// Trigger search when parameters change
 	useEffect(() => {
 		if (hasSearched && activeSearchQuery && activeSearchQuery.trim().length > 0) {
-			// Query should automatically run when enabled
 			console.log('Search triggered with query:', activeSearchQuery);
 		}
 	}, [hasSearched, activeSearchQuery, activeExcludeUsedContacts, limit]);
@@ -218,9 +212,7 @@ export const useDashboard = () => {
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? false);
 		setLimit(50);
 		setHasSearched(true);
-		// Default to map view when a search is performed
 		setIsMapView(true);
-		// The query will automatically run when the state updates enable it
 	};
 
 	const handleResetSearch = () => {
@@ -232,7 +224,6 @@ export const useDashboard = () => {
 	const handleSelectAll = () => {
 		if (!contacts || contacts.length === 0) return;
 
-		// In table view, use the table instance so checkbox UI stays in sync
 		if (!isMapView && tableInstance) {
 			if (isAllSelected) {
 				tableInstance.toggleAllRowsSelected(false);
@@ -265,19 +256,14 @@ export const useDashboard = () => {
 
 		await batchUpdateContacts({ updates });
 
-		// Generate a clean campaign name from the search query
 		const generateCampaignName = (searchQuery: string): string => {
-			// Remove [booking] or [promotion] prefix (case insensitive)
 			let cleanedQuery = searchQuery.replace(/^\[(booking|promotion)\]\s*/i, '');
 
-			// Extract location from parentheses at the end
 			const locationMatch = cleanedQuery.match(/\(([^)]+)\)\s*$/);
 			const location = locationMatch ? locationMatch[1] : null;
 
-			// Remove the parentheses and content from the query
 			cleanedQuery = cleanedQuery.replace(/\s*\([^)]+\)\s*$/, '').trim();
 
-			// If we found a location, format as "[search term] in [location]"
 			if (location) {
 				return capitalize(`${cleanedQuery} in ${location}`);
 			}
@@ -338,24 +324,20 @@ export const useDashboard = () => {
 		}
 	}, [usedContactIds]);
 
-	// Helper function to compute name from firstName and lastName
 	const computeName = useCallback((contact: ContactWithName): string => {
 		const firstName = contact.firstName || '';
 		const lastName = contact.lastName || '';
 		return `${firstName} ${lastName}`.trim();
 	}, []);
 
-	// Helper to check if a contact has a name
 	const contactHasName = useCallback((contact: ContactWithName): boolean => {
 		const firstName = contact.firstName || '';
 		const lastName = contact.lastName || '';
 		return firstName.length > 0 || lastName.length > 0;
 	}, []);
 
-	// Build columns for the table
 	const isMobile = useIsMobile();
 	const columns = useMemo(() => {
-		// Desktop columns (existing layout)
 		const allColumns: ColumnDef<ContactWithName>[] = [
 			{
 				accessorKey: 'company',
@@ -482,7 +464,7 @@ export const useDashboard = () => {
 			},
 			{
 				accessorKey: 'title',
-				size: 250, // Even width distribution
+				size: 250,
 				header: () => <span className="sr-only">Title</span>,
 				cell: ({ row }) => {
 					const text = (row.getValue('title') as string) || '';
@@ -575,7 +557,7 @@ export const useDashboard = () => {
 			},
 			{
 				accessorKey: 'email',
-				size: 280, // Even width distribution
+				size: 280,
 				header: () => <span className="sr-only">Email</span>,
 				cell: ({ row }) => {
 					const email = (row.getValue('email') as string) || '';
