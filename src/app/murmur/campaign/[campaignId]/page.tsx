@@ -40,6 +40,7 @@ const Murmur = () => {
 		if (tabParam === 'drafting') return 'drafting';
 		if (tabParam === 'sent') return 'sent';
 		if (tabParam === 'search') return 'search';
+		if (tabParam === 'all') return 'all';
 		return 'testing';
 	};
 	
@@ -293,6 +294,7 @@ const Murmur = () => {
 							campaign={campaign}
 							view={activeView}
 							goToDrafting={() => setActiveView('drafting')}
+							goToAll={() => setActiveView('all')}
 							goToWriting={() => setActiveView('testing')}
 							onGoToSearch={() => setActiveView('search')}
 							goToContacts={() => setActiveView('contacts')}
