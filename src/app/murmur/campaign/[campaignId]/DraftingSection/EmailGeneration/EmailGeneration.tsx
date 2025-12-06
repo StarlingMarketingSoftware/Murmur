@@ -78,6 +78,9 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	} | null>(null);
 	const isSendingPreviewVisible = Boolean(sendingPreview);
 
+	// Status filter for drafts tab
+	const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'rejected'>('all');
+
 	// Position the contacts overlay behind the mini email structure when previewing
 	const [contactsOverlayPos, setContactsOverlayPos] = useState<{
 		left: number;
@@ -503,6 +506,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												subject={form.watch('subject')}
 												onRejectDraft={handleRejectDraft}
 												rejectedDraftIds={rejectedDraftIds}
+												statusFilter={statusFilter}
+												onStatusFilterChange={setStatusFilter}
 											/>
 										</DraggableBox>
 									),

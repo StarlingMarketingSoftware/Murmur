@@ -1,4 +1,4 @@
-import { FC, ReactNode } from 'react';
+import { FC, ReactNode, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
@@ -159,6 +159,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	totalDraftsCount = 0,
 }) => {
 	const router = useRouter();
+	const [isDraftsCounterHovered, setIsDraftsCounterHovered] = useState(false);
+	const [isApprovedCounterHovered, setIsApprovedCounterHovered] = useState(false);
+	const [isRejectedCounterHovered, setIsRejectedCounterHovered] = useState(false);
 	const isContacts = title === 'Contacts';
 	const isCompactHeader = isContacts || title === 'Drafts' || title === 'Sent';
 	const showTitle = !isContacts && title !== 'Drafts' && title !== 'Sent';
@@ -516,9 +519,32 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							padding: '0 16px',
 						}}
 					>
-						<span className="text-[14px] font-inter font-medium text-white text-left">
-							{approvedCount} Approved
-						</span>
+						<div 
+							style={{ 
+								position: 'relative',
+							}}
+							onMouseEnter={() => setIsApprovedCounterHovered(true)}
+							onMouseLeave={() => setIsApprovedCounterHovered(false)}
+						>
+							{isApprovedCounterHovered && (
+								<div
+									onClick={handleClick}
+									style={{
+										width: '15px',
+										height: '15px',
+										border: areAllSelected ? '2px solid #559855' : '2px solid #FFFFFF',
+										borderRadius: '1px',
+										backgroundColor: areAllSelected ? '#FFFFFF' : 'transparent',
+										cursor: 'pointer',
+									}}
+								/>
+							)}
+							{!isApprovedCounterHovered && (
+								<span className="text-[14px] font-inter font-medium text-white text-left">
+									{approvedCount} Approved
+								</span>
+							)}
+						</div>
 						<span className="text-[14px] font-inter font-medium text-white text-center">
 							{selectedCount} Selected
 						</span>
@@ -549,9 +575,32 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							padding: '0 16px',
 						}}
 					>
-						<span className="text-[14px] font-inter font-medium text-white text-left">
-							{rejectedCount} Rejected
-						</span>
+						<div 
+							style={{ 
+								position: 'relative',
+							}}
+							onMouseEnter={() => setIsRejectedCounterHovered(true)}
+							onMouseLeave={() => setIsRejectedCounterHovered(false)}
+						>
+							{isRejectedCounterHovered && (
+								<div
+									onClick={handleClick}
+									style={{
+										width: '15px',
+										height: '15px',
+										border: areAllSelected ? '2px solid #A03C3C' : '2px solid #FFFFFF',
+										borderRadius: '1px',
+										backgroundColor: areAllSelected ? '#FFFFFF' : 'transparent',
+										cursor: 'pointer',
+									}}
+								/>
+							)}
+							{!isRejectedCounterHovered && (
+								<span className="text-[14px] font-inter font-medium text-white text-left">
+									{rejectedCount} Rejected
+								</span>
+							)}
+						</div>
 						<span className="text-[14px] font-inter font-medium text-white text-center">
 							{selectedCount} Selected
 						</span>
@@ -566,25 +615,52 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				)}
 
 				{/* Yellow section for All Drafts tab */}
-				{isDrafts && hasData && statusFilter === 'all' && (
-					<div
-						style={{
-							position: 'absolute',
-							top: '52px',
-							left: 0,
-							right: 0,
-							height: '29px',
-							backgroundColor: '#FFDC9E',
-							zIndex: 9,
-							display: 'grid',
-							gridTemplateColumns: '1fr 1fr 1fr',
-							alignItems: 'center',
-							padding: '0 16px',
+			{isDrafts && hasData && statusFilter === 'all' && (
+				<div
+					style={{
+						position: 'absolute',
+						top: '52px',
+						left: 0,
+						right: 0,
+						height: '29px',
+						backgroundColor: '#FFDC9E',
+						zIndex: 9,
+						display: 'grid',
+						gridTemplateColumns: '1fr 1fr 1fr',
+						alignItems: 'center',
+						padding: '0 16px',
+					}}
+				>
+					<div 
+						style={{ 
+							position: 'relative',
+							transition: 'none !important',
+							animation: 'none !important',
 						}}
+						onMouseEnter={() => setIsDraftsCounterHovered(true)}
+						onMouseLeave={() => setIsDraftsCounterHovered(false)}
 					>
-						<span className="text-[14px] font-inter font-medium text-black text-left">
-							{totalDraftsCount} Drafts
-						</span>
+						{isDraftsCounterHovered && (
+							<div
+								onClick={handleClick}
+								style={{
+									width: '15px',
+									height: '15px',
+									border: areAllSelected ? '2px solid #FFFFFF' : '2px solid #000000',
+									borderRadius: '1px',
+									backgroundColor: areAllSelected ? '#000000' : 'transparent',
+									cursor: 'pointer',
+								}}
+							/>
+						)}
+						{!isDraftsCounterHovered && (
+							<span 
+								className="text-[14px] font-inter font-medium text-black text-left"
+							>
+								{totalDraftsCount} Drafts
+							</span>
+						)}
+					</div>
 						<span className="text-[14px] font-inter font-medium text-black text-center">
 							{selectedCount} Selected
 						</span>
