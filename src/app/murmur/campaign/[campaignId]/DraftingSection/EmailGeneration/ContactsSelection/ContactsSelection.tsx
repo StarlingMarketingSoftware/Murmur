@@ -778,7 +778,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 	const debouncedWhereValue = useDebounce(whereValue, 300);
 	const { data: locationResults, isLoading: isLoadingLocations } = useGetLocations(
 		debouncedWhereValue,
-		'state-first'
+		'state'
 	);
 
 	// Handle search button click - trigger search in campaign's Search tab, or fallback to dashboard

@@ -517,7 +517,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const debouncedWhereValue = useDebounce(searchWhereValue, 300);
 	const { data: locationResults, isLoading: isLoadingLocations } = useGetLocations(
 		debouncedWhereValue,
-		'state-first'
+		'state'
 	);
 	const isPromotion = searchWhyValue === '[Promotion]';
 

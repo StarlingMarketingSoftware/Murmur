@@ -56,8 +56,61 @@ const stateAbbreviations: Record<string, string> = {
 	'west virginia': 'WV',
 	wisconsin: 'WI',
 	wyoming: 'WY',
-	'district of columbia': 'DC',
 };
+
+// Canonical list of 50 US states (no cities or territories)
+const US_STATES: { name: string; abbr: string }[] = [
+	{ name: 'Alabama', abbr: 'AL' },
+	{ name: 'Alaska', abbr: 'AK' },
+	{ name: 'Arizona', abbr: 'AZ' },
+	{ name: 'Arkansas', abbr: 'AR' },
+	{ name: 'California', abbr: 'CA' },
+	{ name: 'Colorado', abbr: 'CO' },
+	{ name: 'Connecticut', abbr: 'CT' },
+	{ name: 'Delaware', abbr: 'DE' },
+	{ name: 'Florida', abbr: 'FL' },
+	{ name: 'Georgia', abbr: 'GA' },
+	{ name: 'Hawaii', abbr: 'HI' },
+	{ name: 'Idaho', abbr: 'ID' },
+	{ name: 'Illinois', abbr: 'IL' },
+	{ name: 'Indiana', abbr: 'IN' },
+	{ name: 'Iowa', abbr: 'IA' },
+	{ name: 'Kansas', abbr: 'KS' },
+	{ name: 'Kentucky', abbr: 'KY' },
+	{ name: 'Louisiana', abbr: 'LA' },
+	{ name: 'Maine', abbr: 'ME' },
+	{ name: 'Maryland', abbr: 'MD' },
+	{ name: 'Massachusetts', abbr: 'MA' },
+	{ name: 'Michigan', abbr: 'MI' },
+	{ name: 'Minnesota', abbr: 'MN' },
+	{ name: 'Mississippi', abbr: 'MS' },
+	{ name: 'Missouri', abbr: 'MO' },
+	{ name: 'Montana', abbr: 'MT' },
+	{ name: 'Nebraska', abbr: 'NE' },
+	{ name: 'Nevada', abbr: 'NV' },
+	{ name: 'New Hampshire', abbr: 'NH' },
+	{ name: 'New Jersey', abbr: 'NJ' },
+	{ name: 'New Mexico', abbr: 'NM' },
+	{ name: 'New York', abbr: 'NY' },
+	{ name: 'North Carolina', abbr: 'NC' },
+	{ name: 'North Dakota', abbr: 'ND' },
+	{ name: 'Ohio', abbr: 'OH' },
+	{ name: 'Oklahoma', abbr: 'OK' },
+	{ name: 'Oregon', abbr: 'OR' },
+	{ name: 'Pennsylvania', abbr: 'PA' },
+	{ name: 'Rhode Island', abbr: 'RI' },
+	{ name: 'South Carolina', abbr: 'SC' },
+	{ name: 'South Dakota', abbr: 'SD' },
+	{ name: 'Tennessee', abbr: 'TN' },
+	{ name: 'Texas', abbr: 'TX' },
+	{ name: 'Utah', abbr: 'UT' },
+	{ name: 'Vermont', abbr: 'VT' },
+	{ name: 'Virginia', abbr: 'VA' },
+	{ name: 'Washington', abbr: 'WA' },
+	{ name: 'West Virginia', abbr: 'WV' },
+	{ name: 'Wisconsin', abbr: 'WI' },
+	{ name: 'Wyoming', abbr: 'WY' },
+];
 
 // Helper to reverse map abbreviations to full state names (approximate)
 // Used for expanding search query
@@ -73,6 +126,21 @@ function getStateAbbreviation(stateName: string): string {
 	const normalized = stateName.trim().toLowerCase();
 	if (/^[A-Z]{2}$/.test(stateName.trim())) return stateName.trim();
 	return stateAbbreviations[normalized] || stateName;
+}
+
+function getAllStateSuggestions(cleanQuery?: string) {
+	const q = cleanQuery?.trim().toLowerCase() || '';
+
+	return US_STATES.filter(({ name, abbr }) => {
+		if (!q) return true;
+		const nameLc = name.toLowerCase();
+		const abbrLc = abbr.toLowerCase();
+		return nameLc.includes(q) || abbrLc.startsWith(q);
+	}).map(({ name }) => ({
+		city: '',
+		state: name,
+		label: name,
+	}));
 }
 
 function isCity(city: string, state: string): boolean {
@@ -264,30 +332,7 @@ function buildCitySearchTerms(cleanQuery: string): string[] {
 }
 
 async function fetchStateSuggestions(cleanQuery: string) {
-	const searchTerms = buildStateSearchTerms(cleanQuery);
-
-	const stateResults = await prisma.contact.findMany({
-		where: {
-			OR: searchTerms.flatMap((term) => [
-				{ state: { startsWith: term, mode: 'insensitive' } },
-				{ state: { contains: term, mode: 'insensitive' } },
-			]),
-			state: { not: null },
-		},
-		select: {
-			state: true,
-		},
-		distinct: ['state'],
-		take: 20,
-	});
-
-	return stateResults
-		.filter((r) => r.state)
-		.map((r) => ({
-			city: '',
-			state: r.state!,
-			label: r.state!,
-		}));
+	return getAllStateSuggestions(cleanQuery);
 }
 
 interface CitySuggestionOptions {
@@ -400,11 +445,11 @@ export async function GET(req: NextRequest) {
 		const query = searchParams.get('query');
 		const mode = searchParams.get('mode'); // 'state', 'state-first', or undefined
 
-		if (!query || query.length < 1) {
+		if ((!query || query.length < 1) && mode !== 'state') {
 			return apiResponse([]);
 		}
 
-		const cleanQuery = query.trim();
+		const cleanQuery = (query || '').trim();
 
 		if (mode === 'state-first') {
 			const [stateLocations, cityLocations] = await Promise.all([

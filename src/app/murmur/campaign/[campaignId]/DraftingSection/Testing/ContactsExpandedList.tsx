@@ -147,7 +147,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const debouncedWhereValue = useDebounce(whereValue, 300);
 	const { data: locationResults, isLoading: isLoadingLocations } = useGetLocations(
 		debouncedWhereValue,
-		'state-first'
+		'state'
 	);
 
 	const handleSearch = () => {

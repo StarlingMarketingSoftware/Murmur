@@ -333,10 +333,14 @@ export interface LocationResult {
 }
 
 export const useGetLocations = (query: string, mode?: 'state' | 'state-first') => {
+	const isStateOnly = mode === 'state';
+
 	return useQuery<LocationResult[]>({
 		queryKey: ['locations', query, mode],
 		queryFn: async () => {
-			if (!query || query.length < 1) return [];
+			// For state-only mode, allow empty query to return all states
+			if (!query && !isStateOnly) return [];
+
 			const url = appendQueryParamsToUrl(urls.api.contacts.locations.index, {
 				query,
 				mode,
@@ -347,7 +351,7 @@ export const useGetLocations = (query: string, mode?: 'state' | 'state-first') =
 			}
 			return response.json();
 		},
-		enabled: query.length >= 1,
+		enabled: isStateOnly || query.length >= 1,
 		staleTime: 1000 * 60 * 5, // 5 minutes
 	});
 };
