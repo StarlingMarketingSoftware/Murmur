@@ -6,6 +6,7 @@ import { ContactWithName } from '@/types/contact';
 import { cn } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import OpenIcon from '@/components/atoms/svg/OpenIcon';
 import { getStateAbbreviation } from '@/utils/string';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import {
@@ -19,6 +20,7 @@ export interface SentExpandedListProps {
 	sent: EmailWithRelations[];
 	contacts: ContactWithName[];
 	onHeaderClick?: () => void;
+	onOpenSent?: () => void;
 	/** Custom width in pixels */
 	width?: number;
 	/** Custom height in pixels */
@@ -138,6 +140,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 	sent,
 	contacts,
 	onHeaderClick,
+	onOpenSent,
 	width = 376,
 	height = 426,
 	whiteSectionHeight: customWhiteSectionHeight,
@@ -237,6 +240,30 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 					}
 				}}
 			></div>
+
+			{isAllTab && (
+				<div
+					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
+					style={{ top: 1, right: 4 }}
+					onClick={onOpenSent}
+					role={onOpenSent ? 'button' : undefined}
+					tabIndex={onOpenSent ? 0 : undefined}
+					onKeyDown={(e) => {
+						if (!onOpenSent) return;
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							onOpenSent();
+						}
+					}}
+				>
+					<span className="text-[10px] font-medium leading-none text-[#B3B3B3] font-inter">
+						Open
+					</span>
+					<div style={{ marginTop: '1px' }}>
+						<OpenIcon />
+					</div>
+				</div>
+			)}
 
 			{/* Selection counter and Select All row - absolutely positioned */}
 			{isAllTab && (

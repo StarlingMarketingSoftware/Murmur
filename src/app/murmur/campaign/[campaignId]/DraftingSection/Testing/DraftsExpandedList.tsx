@@ -18,6 +18,7 @@ import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
+import OpenIcon from '@/components/atoms/svg/OpenIcon';
 import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import {
 	canadianProvinceAbbreviations,
@@ -29,6 +30,7 @@ export interface DraftsExpandedListProps {
 	drafts: EmailWithRelations[];
 	contacts: ContactWithName[];
 	onHeaderClick?: () => void;
+	onOpenDrafts?: () => void;
 	onSendingPreviewUpdate?: (args: { contactId: number; subject?: string }) => void;
 	onSendingPreviewReset?: () => void;
 	width?: number;
@@ -151,6 +153,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	drafts,
 	contacts,
 	onHeaderClick,
+	onOpenDrafts,
 	onSendingPreviewUpdate,
 	onSendingPreviewReset,
 	width = 376,
@@ -398,6 +401,30 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 					}
 				}}
 			></div>
+
+			{isAllTab && (
+				<div
+					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
+					style={{ top: 1, right: 4 }}
+					onClick={onOpenDrafts}
+					role={onOpenDrafts ? 'button' : undefined}
+					tabIndex={onOpenDrafts ? 0 : undefined}
+					onKeyDown={(e) => {
+						if (!onOpenDrafts) return;
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							onOpenDrafts();
+						}
+					}}
+				>
+					<span className="text-[10px] font-medium leading-none text-[#B3B3B3] font-inter">
+						Open
+					</span>
+					<div style={{ marginTop: '1px' }}>
+						<OpenIcon />
+					</div>
+				</div>
+			)}
 
 			{/* Selection counter and Select All row - absolutely positioned */}
 			{isAllTab && (

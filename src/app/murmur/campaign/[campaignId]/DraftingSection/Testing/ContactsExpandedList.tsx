@@ -9,6 +9,7 @@ import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
+import OpenIcon from '@/components/atoms/svg/OpenIcon';
 import {
 	canadianProvinceAbbreviations,
 	canadianProvinceNames,
@@ -45,6 +46,7 @@ export interface ContactsExpandedListProps {
 	
 	onSearchFromMiniBar?: (params: { why: string; what: string; where: string }) => void;
 	whiteSectionHeight?: number;
+	onOpenContacts?: () => void;
 }
 
 export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
@@ -61,6 +63,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	showSearchBar = true,
 	onSearchFromMiniBar,
 	whiteSectionHeight: customWhiteSectionHeight,
+	onOpenContacts,
 }) => {
 	const router = useRouter();
 	const [internalSelectedContactIds, setInternalSelectedContactIds] = useState<
@@ -229,6 +232,30 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					}
 				}}
 			></div>
+
+			{isAllTab && (
+				<div
+					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
+					style={{ top: 1, right: 4 }}
+					onClick={onOpenContacts}
+					role={onOpenContacts ? 'button' : undefined}
+					tabIndex={onOpenContacts ? 0 : undefined}
+					onKeyDown={(e) => {
+						if (!onOpenContacts) return;
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							onOpenContacts();
+						}
+					}}
+				>
+					<span className="text-[10px] font-medium leading-none text-[#B3B3B3] font-inter">
+						Open
+					</span>
+					<div style={{ marginTop: '1px' }}>
+						<OpenIcon />
+					</div>
+				</div>
+			)}
 
 			{showSearchBar && !isBottomView && (
 				<div className="pt-2 flex justify-center">

@@ -58,6 +58,10 @@ export interface DraftingSectionProps {
 	 * Optional callback to switch the campaign page into the Inbox tab.
 	 */
 	goToInbox?: () => void;
+	/**
+	 * Optional callback to switch the campaign page into the Sent tab.
+	 */
+	goToSent?: () => void;
 }
 
 type GeneratedEmail = {

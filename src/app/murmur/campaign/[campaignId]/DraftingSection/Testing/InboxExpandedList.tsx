@@ -5,6 +5,7 @@ import { ContactWithName } from '@/types/contact';
 import { cn } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import OpenIcon from '@/components/atoms/svg/OpenIcon';
 import { getStateAbbreviation } from '@/utils/string';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import {
@@ -22,6 +23,7 @@ export interface InboxExpandedListProps {
 	/** Map of sender email -> contact for canonical name lookup */
 	contactByEmail?: Record<string, ContactWithName>;
 	onHeaderClick?: () => void;
+	onOpenInbox?: () => void;
 	/** Custom width in pixels */
 	width?: number;
 	/** Custom height in pixels */
@@ -183,9 +185,11 @@ const getCanonicalContactName = (
 };
 
 export const InboxExpandedList: FC<InboxExpandedListProps> = ({
+	contacts,
 	allowedSenderEmails,
 	contactByEmail,
 	onHeaderClick,
+	onOpenInbox,
 	width = 376,
 	height = 426,
 	whiteSectionHeight: customWhiteSectionHeight,
@@ -254,6 +258,30 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 					}
 				}}
 			></div>
+
+			{isAllTab && (
+				<div
+					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
+					style={{ top: 1, right: 4 }}
+					onClick={onOpenInbox}
+					role={onOpenInbox ? 'button' : undefined}
+					tabIndex={onOpenInbox ? 0 : undefined}
+					onKeyDown={(e) => {
+						if (!onOpenInbox) return;
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							onOpenInbox();
+						}
+					}}
+				>
+					<span className="text-[10px] font-medium leading-none text-[#B3B3B3] font-inter">
+						Open
+					</span>
+					<div style={{ marginTop: '1px' }}>
+						<OpenIcon />
+					</div>
+				</div>
+			)}
 
 			<div
 				className={cn(

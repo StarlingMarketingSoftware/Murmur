@@ -299,6 +299,7 @@ const Murmur = () => {
 							onGoToSearch={() => setActiveView('search')}
 							goToContacts={() => setActiveView('contacts')}
 							goToInbox={() => setActiveView('inbox')}
+							goToSent={() => setActiveView('sent')}
 							onOpenIdentityDialog={() => {
 								setIdentityDialogOrigin('campaign');
 								setIsIdentityDialogOpen(true);

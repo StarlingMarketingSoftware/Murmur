@@ -92,6 +92,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		onGoToSearch,
 		goToInbox,
 		goToContacts,
+	goToSent,
 	} = props;
 	const {
 		campaign,
@@ -2319,6 +2320,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										height={125}
 										whiteSectionHeight={15}
 										hideSendButton={true}
+											onOpenDrafts={goToDrafting}
 									/>
 									<SentExpandedList
 										sent={sentEmails}
@@ -2326,12 +2328,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										width={233}
 										height={125}
 										whiteSectionHeight={15}
+											onOpenSent={goToSent}
 									/>
 									<InboxExpandedList
 										contacts={contacts || []}
 										width={233}
 										height={125}
 										whiteSectionHeight={15}
+										onOpenInbox={goToInbox}
 									/>
 								</div>
 							</div>
@@ -2382,6 +2386,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											height={125}
 											whiteSectionHeight={15}
 											showSearchBar={false}
+										onOpenContacts={goToContacts}
 										/>
 										<SentExpandedList
 											sent={sentEmails}
@@ -2389,12 +2394,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											width={233}
 											height={125}
 											whiteSectionHeight={15}
+											onOpenSent={goToSent}
 										/>
 										<InboxExpandedList
 											contacts={contacts || []}
 											width={233}
 											height={125}
 											whiteSectionHeight={15}
+											onOpenInbox={goToInbox}
 										/>
 									</div>
 								</div>
@@ -2446,6 +2453,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										height={125}
 										whiteSectionHeight={15}
 										showSearchBar={false}
+										onOpenContacts={goToContacts}
 									/>
 									<DraftsExpandedList
 										drafts={draftEmails}
@@ -2454,12 +2462,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										height={125}
 										whiteSectionHeight={15}
 										hideSendButton={true}
+										onOpenDrafts={goToDrafting}
 									/>
 									<InboxExpandedList
 										contacts={contacts || []}
 										width={233}
 										height={125}
 										whiteSectionHeight={15}
+										onOpenInbox={goToInbox}
 									/>
 								</div>
 							</div>
@@ -2818,6 +2828,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										height={125}
 										whiteSectionHeight={15}
 										showSearchBar={false}
+										onOpenContacts={goToContacts}
 									/>
 									<DraftsExpandedList
 										drafts={draftEmails}
@@ -2826,6 +2837,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										height={125}
 										whiteSectionHeight={15}
 										hideSendButton={true}
+											onOpenDrafts={goToDrafting}
 									/>
 									<SentExpandedList
 										sent={sentEmails}
@@ -2833,6 +2845,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										width={233}
 										height={125}
 										whiteSectionHeight={15}
+										onOpenSent={goToSent}
 									/>
 								</div>
 							</div>
@@ -2880,6 +2893,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												height={263}
 												minRows={5}
 												onSearchFromMiniBar={handleMiniContactsSearch}
+												onOpenContacts={goToContacts}
 											/>
 										</div>
 										{/* Research Panel */}
@@ -3194,6 +3208,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											width={372}
 											height={347}
 											hideSendButton
+											onOpenDrafts={goToDrafting}
 										/>
 										{/* Row 2: Draft Preview */}
 										<DraftPreviewExpandedList
@@ -3220,6 +3235,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											contacts={contacts || []}
 											width={372}
 											height={347}
+											onOpenSent={goToSent}
 										/>
 										{/* Row 2: Inbox */}
 										<InboxExpandedList
@@ -3228,6 +3244,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											contactByEmail={campaignContactsByEmail}
 											width={372}
 											height={347}
+											onOpenInbox={goToInbox}
 										/>
 									</div>
 								</div>
