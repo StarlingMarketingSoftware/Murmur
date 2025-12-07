@@ -197,6 +197,8 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 	const isAllTab = height === 347;
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
 	const isBottomView = customWhiteSectionHeight === 15;
+	const isFullyEmpty = sent.length === 0;
+	const placeholderBgColor = isFullyEmpty ? '#3DAC61' : '#5AB477';
 
 	return (
 		<div
@@ -272,7 +274,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 					trackColor="transparent"
 					offsetRight={isBottomView ? -7 : -14}
 					contentClassName="overflow-x-hidden"
-					alwaysShow={!isBottomView}
+					alwaysShow={!isBottomView && !isFullyEmpty}
 				>
 					<div
 						className={cn(
@@ -284,7 +286,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 								customWhiteSectionHeight !== undefined
 									? '2px'
 									: isAllTab
-									? '8px'
+									? `${39 - whiteSectionHeight}px`
 									: `${38 - whiteSectionHeight}px`,
 						}}
 					>
@@ -444,11 +446,12 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 							<div
 								key={`sent-placeholder-${idx}`}
 								className={cn(
-									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#5AB477] p-2',
+									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] p-2',
 									isBottomView
 										? 'w-[225px] h-[49px]'
 										: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
 								)}
+								style={{ backgroundColor: placeholderBgColor }}
 							/>
 						))}
 					</div>

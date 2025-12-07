@@ -214,6 +214,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 		});
 	}, [allInboundEmails, allowedSenderEmails]);
 
+	const isFullyEmpty = inboundEmails.length === 0;
+	const placeholderBgColor = isFullyEmpty ? '#3D9DC0' : '#5EB6D6';
+
 	return (
 		<div
 			className={cn(
@@ -266,7 +269,7 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 					trackColor="transparent"
 					offsetRight={isBottomView ? -7 : -14}
 					contentClassName="overflow-x-hidden"
-					alwaysShow={!isBottomView}
+					alwaysShow={!isBottomView && !isFullyEmpty}
 				>
 					<div
 						className={cn(
@@ -278,7 +281,7 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 								customWhiteSectionHeight !== undefined
 									? '2px'
 									: isAllTab
-									? '31px'
+									? `${31 - whiteSectionHeight}px`
 									: `${38 - whiteSectionHeight}px`,
 						}}
 					>
@@ -413,11 +416,12 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 							<div
 								key={`inbox-placeholder-${idx}`}
 								className={cn(
-									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#5EB6D6] p-2',
+									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] p-2',
 									isBottomView
 										? 'w-[225px] h-[49px]'
 										: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
 								)}
+								style={{ backgroundColor: placeholderBgColor }}
 							/>
 						))}
 					</div>

@@ -242,6 +242,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	const resolvedRowWidth = rowWidth ?? 356;
 	const resolvedRowHeight = rowHeight ?? 64;
 	const hasCustomRowSize = Boolean(rowWidth || rowHeight);
+	const isFullyEmpty = drafts.length === 0;
+	const placeholderBgColor = isFullyEmpty ? '#FDCF7D' : '#FFDC9E';
 	const horizontalPaddingClass = hasCustomRowSize
 		? 'px-0'
 		: isBottomView
@@ -436,7 +438,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 						isBottomView ? -7 : hasCustomRowSize ? -4 : -14
 					}
 					contentClassName="overflow-x-hidden"
-					alwaysShow={!isBottomView}
+					alwaysShow={!isBottomView && !isFullyEmpty}
 				>
 					<div
 						className={cn(
@@ -448,7 +450,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								customWhiteSectionHeight !== undefined
 									? '2px'
 									: isAllTab
-									? '8px'
+									? `${39 - whiteSectionHeight}px`
 									: `${38 - whiteSectionHeight}px`,
 						}}
 					>
@@ -652,7 +654,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							<div
 								key={`draft-placeholder-${idx}`}
 								className={cn(
-									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#FFDC9E] p-2',
+									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] p-2',
 									isBottomView
 										? 'w-[225px] h-[49px]'
 										: !hasCustomRowSize &&
@@ -660,8 +662,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								)}
 								style={
 									isBottomView
-										? undefined
+										? { backgroundColor: placeholderBgColor }
 										: {
+												backgroundColor: placeholderBgColor,
 												width: hasCustomRowSize ? `${resolvedRowWidth}px` : undefined,
 												height: hasCustomRowSize ? `${resolvedRowHeight}px` : undefined,
 										  }
