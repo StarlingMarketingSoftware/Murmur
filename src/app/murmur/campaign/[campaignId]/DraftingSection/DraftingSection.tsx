@@ -2855,9 +2855,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* All tab */}
 						{view === 'all' && (
 							<div className="mt-6 flex justify-center">
-								<div className="flex flex-row items-start gap-4">
+								<div className="flex flex-row items-start" style={{ gap: '30px' }}>
 									{/* Left column: Campaign Header + Contacts + Research */}
-									<div className="flex flex-col items-center gap-4">
+									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										<CampaignHeaderBox
 											campaignId={campaign?.id}
 											campaignName={campaign?.name || 'Untitled Campaign'}
@@ -2867,13 +2867,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											draftCount={draftCount}
 											sentCount={sentCount}
 											onFromClick={onOpenIdentityDialog}
+											width={330}
 										/>
 										<div
 											style={{
-												width: '373px',
+												width: '330px',
 												height: '263px',
 												overflow: 'visible',
-												marginTop: '-1px', // Align bottom with MiniEmailStructure (349px) vs (Header 71px + Gap 16px + Contacts 263px = 350px)
+												marginTop: '-24px', // Align bottom with MiniEmailStructure (349px): Header 71px + Gap 39px - 24px + Contacts 263px = 349px
 											}}
 										>
 											<ContactsExpandedList
@@ -2890,7 +2891,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
 												isPendingGeneration={isPendingGeneration}
-												width={373}
+												width={330}
 												height={263}
 												minRows={5}
 												onSearchFromMiniBar={handleMiniContactsSearch}
@@ -2903,15 +2904,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											hideAllText={contactsAvailableForDrafting.length === 0}
 											hideSummaryIfBullets={true}
 											height={347}
+											width={330}
+											boxWidth={315}
 											compactHeader
 										/>
 									</div>
 									{/* Column 2: Writing (Row 1) + Suggestion (Row 2) */}
-									<div className="flex flex-col items-center gap-4">
+									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* Row 1: Mini Email Structure */}
 										<div
 											style={{
-												width: '375px',
+												width: '330px',
 												height: '349px',
 												overflow: 'visible',
 											}}
@@ -2938,7 +2941,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Row 2: Suggestion Box */}
 										<div
 											style={{
-												width: '377px',
+												width: '330px',
 												height: '347px',
 												background:
 													'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
@@ -2966,7 +2969,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													top: '34px',
 													left: '50%',
 													transform: 'translateX(-50%)',
-													width: '369px',
+													width: '322px',
 													height: '44px',
 													backgroundColor: '#FFFFFF',
 													border: '2px solid #000000',
@@ -3053,7 +3056,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													position: 'absolute',
 													top: '83px',
 													left: '50px',
-													width: '196px',
+													width: '155px',
 													height: '32px',
 													backgroundColor: '#D7F0FF',
 													border: '2px solid #000000',
@@ -3071,7 +3074,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														<span
 															style={{
 																fontFamily: 'Inter, system-ui, sans-serif',
-																fontSize: '17px',
+																fontSize: '13px',
 																fontWeight: 500,
 																color: '#000000',
 																lineHeight: '1',
@@ -3080,7 +3083,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
 														</span>
 														<div style={{ flexShrink: 0 }}>
-															<UpscaleIcon width="24" height="24" />
+															<UpscaleIcon width="20" height="20" />
 														</div>
 													</>
 												)}
@@ -3092,11 +3095,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													top: '123px',
 													left: '50%',
 													transform: 'translateX(-50%)',
-													width: '362px',
+													width: '315px',
 													height: '46px',
 													backgroundColor: '#A6E0B4',
 													border: '2px solid #000000',
 													borderRadius: '8px',
+													overflow: 'hidden',
 												}}
 											>
 												<div
@@ -3116,28 +3120,31 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														top: '0',
 														bottom: '0',
 														margin: 'auto',
-														right: '12px',
-														width: '299px',
+														right: '6px',
+														width: '260px',
 														height: '39px',
 														backgroundColor: clampedPromptScore == null ? '#A6E0B4' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
 														alignItems: 'center',
-														padding: '4px 8px',
+														padding: '4px 6px',
 														overflow: 'hidden',
 													}}
 												>
 													<div
 														style={{
 															fontFamily: 'Inter, system-ui, sans-serif',
-															fontSize: '11px',
+															fontSize: '10px',
 															lineHeight: '1.3',
 															color: suggestionText1 ? '#000000' : '#888888',
 															wordBreak: 'break-word',
 															whiteSpace: 'normal',
 															overflow: 'hidden',
 															textOverflow: 'ellipsis',
+															display: '-webkit-box',
+															WebkitLineClamp: 2,
+															WebkitBoxOrient: 'vertical',
 														}}
 													>
 														{suggestionText1 || (clampedPromptScore != null ? 'Add your prompt to get suggestions' : '')}
@@ -3151,11 +3158,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													top: '187px',
 													left: '50%',
 													transform: 'translateX(-50%)',
-													width: '362px',
+													width: '315px',
 													height: '46px',
 													backgroundColor: '#5BCB75',
 													border: '2px solid #000000',
 													borderRadius: '8px',
+													overflow: 'hidden',
 												}}
 											>
 												<div
@@ -3175,28 +3183,31 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														top: '0',
 														bottom: '0',
 														margin: 'auto',
-														right: '12px',
-														width: '299px',
+														right: '6px',
+														width: '260px',
 														height: '39px',
 														backgroundColor: clampedPromptScore == null ? '#5BCB75' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
 														alignItems: 'center',
-														padding: '4px 8px',
+														padding: '4px 6px',
 														overflow: 'hidden',
 													}}
 												>
 													<div
 														style={{
 															fontFamily: 'Inter, system-ui, sans-serif',
-															fontSize: '11px',
+															fontSize: '10px',
 															lineHeight: '1.3',
 															color: suggestionText2 ? '#000000' : '#888888',
 															wordBreak: 'break-word',
 															whiteSpace: 'normal',
 															overflow: 'hidden',
 															textOverflow: 'ellipsis',
+															display: '-webkit-box',
+															WebkitLineClamp: 2,
+															WebkitBoxOrient: 'vertical',
 														}}
 													>
 														{suggestionText2 || (clampedPromptScore != null ? 'More suggestions will appear here' : '')}
@@ -3210,11 +3221,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													top: '251px',
 													left: '50%',
 													transform: 'translateX(-50%)',
-													width: '362px',
+													width: '315px',
 													height: '46px',
 													backgroundColor: '#359D4D',
 													border: '2px solid #000000',
 													borderRadius: '8px',
+													overflow: 'hidden',
 												}}
 											>
 												<div
@@ -3234,28 +3246,31 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														top: '0',
 														bottom: '0',
 														margin: 'auto',
-														right: '12px',
-														width: '299px',
+														right: '6px',
+														width: '260px',
 														height: '39px',
 														backgroundColor: clampedPromptScore == null ? '#359D4D' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
 														alignItems: 'center',
-														padding: '4px 8px',
+														padding: '4px 6px',
 														overflow: 'hidden',
 													}}
 												>
 													<div
 														style={{
 															fontFamily: 'Inter, system-ui, sans-serif',
-															fontSize: '11px',
+															fontSize: '10px',
 															lineHeight: '1.3',
 															color: suggestionText3 ? '#000000' : '#888888',
 															wordBreak: 'break-word',
 															whiteSpace: 'normal',
 															overflow: 'hidden',
 															textOverflow: 'ellipsis',
+															display: '-webkit-box',
+															WebkitLineClamp: 2,
+															WebkitBoxOrient: 'vertical',
 														}}
 													>
 														{suggestionText3 || (clampedPromptScore != null ? 'Additional suggestions here' : '')}
@@ -3266,12 +3281,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									</div>
 
 									{/* Column 3: Drafts (Row 1) + Preview (Row 2) */}
-									<div className="flex flex-col items-center gap-4">
+									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* Row 1: Drafts */}
 										<DraftsExpandedList
 											drafts={draftEmails}
 											contacts={contacts || []}
-											width={372}
+											width={330}
 											height={347}
 											hideSendButton
 											onOpenDrafts={goToDrafting}
@@ -3288,18 +3303,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													  }
 													: null
 											}
-											width={372}
+											width={330}
 											height={347}
 										/>
 									</div>
 
 									{/* Column 4: Sent (Row 1) + Inbox (Row 2) */}
-									<div className="flex flex-col items-center gap-4">
+									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* Row 1: Sent */}
 										<SentExpandedList
 											sent={sentEmails}
 											contacts={contacts || []}
-											width={372}
+											width={330}
 											height={347}
 											onOpenSent={goToSent}
 										/>
@@ -3308,7 +3323,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											contacts={contacts || []}
 											allowedSenderEmails={campaignContactEmails}
 											contactByEmail={campaignContactsByEmail}
-											width={372}
+											width={330}
 											height={347}
 											onOpenInbox={goToInbox}
 										/>

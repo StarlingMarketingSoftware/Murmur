@@ -26,9 +26,13 @@ export interface ContactResearchPanelProps {
 	 */
 	height?: string | number;
 	/**
-	 * Width override for the inner content boxes. Defaults to 360px.
+	 * Width override for the panel and inner content boxes. Defaults to 360px for inner boxes, 375px for outer.
 	 */
 	boxWidth?: number;
+	/**
+	 * Width override for the outer container. Defaults to boxWidth + 15 (or 375px).
+	 */
+	width?: number;
 	/**
 	 * When true, uses a compact 19px header with smaller font (for All tab).
 	 */
@@ -86,8 +90,11 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	hideSummaryIfBullets = false,
 	height,
 	boxWidth = 360,
+	width,
 	compactHeader = false,
 }) => {
+	// Outer container width: use explicit width prop, or derive from boxWidth + 15 (for default 375px appearance)
+	const containerWidth = width ?? (boxWidth + 15);
 	// Header dimensions based on compact mode
 	const headerHeight = compactHeader ? 19 : 24;
 	const headerFontSize = compactHeader ? '11px' : '14px';
@@ -131,7 +138,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				className
 			)}
 			style={{
-				width: '375px',
+				width: `${containerWidth}px`,
 				height: containerHeight,
 				...style,
 			}}
@@ -178,7 +185,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						top: `${headerHeight + 6}px`,
 						left: '50%',
 						transform: 'translateX(-50%)',
-						width: '361px',
+						width: `${containerWidth - 14}px`,
 						height: '40px',
 					}}
 				>

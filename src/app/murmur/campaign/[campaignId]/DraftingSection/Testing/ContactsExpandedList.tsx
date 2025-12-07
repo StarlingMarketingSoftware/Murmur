@@ -190,6 +190,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	// Allow callers to override dimensions; default to the original sidebar size
 	const resolvedWidth = width ?? 376;
 	const resolvedHeight = height ?? 424;
+	// Inner content width (search bar, rows) - leaves ~10px padding on sides
+	const innerWidth = typeof resolvedWidth === 'number' ? resolvedWidth - 10 : 370;
 
 	const isAllTab = height === 263;
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
@@ -272,7 +274,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						isLoadingLocations={isLoadingLocations}
 						debouncedWhereValue={debouncedWhereValue}
 						onSearch={handleSearch}
-						width="370px"
+						width={`${innerWidth}px`}
 						height="44px"
 						borderRadius="4px"
 					/>
@@ -333,9 +335,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 										'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none relative',
 										isBottomView
 											? 'w-[225px] h-[49px]'
-											: 'w-[370px] max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]',
+											: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]',
 										isSelected && 'bg-[#EAAEAE]'
 									)}
+									style={!isBottomView ? { width: `${innerWidth}px` } : undefined}
 									onMouseDown={(e) => {
 										if (e.shiftKey) e.preventDefault();
 									}}
@@ -627,8 +630,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 										'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#EB8586]',
 										isBottomView
 											? 'w-[225px] h-[49px]'
-											: 'w-[370px] max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]'
+											: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]'
 									)}
+									style={!isBottomView ? { width: `${innerWidth}px` } : undefined}
 								/>
 							)
 						)}

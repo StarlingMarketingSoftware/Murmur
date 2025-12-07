@@ -14,6 +14,7 @@ interface CampaignHeaderBoxProps {
 	draftCount: number;
 	sentCount: number;
 	onFromClick?: () => void;
+	width?: number;
 }
 
 const getContactsFillColor = (): string => '#F5DADA';
@@ -29,6 +30,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	draftCount,
 	sentCount,
 	onFromClick,
+	width = 374,
 }) => {
 	const [isEditing, setIsEditing] = useState(false);
 	const [editedName, setEditedName] = useState(campaignName);
@@ -80,10 +82,10 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 		<div
 			className="bg-white border-[2px] border-black rounded-[8px] flex flex-col px-3 pt-0 pb-1 box-border"
 			style={{
-				width: '374px',
+				width: `${width}px`,
 				height: '71px',
-				minWidth: '374px',
-				maxWidth: '374px',
+				minWidth: `${width}px`,
+				maxWidth: `${width}px`,
 				minHeight: '71px',
 				maxHeight: '71px',
 			}}

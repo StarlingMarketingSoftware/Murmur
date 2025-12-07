@@ -261,7 +261,7 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 				{/* Email subject box - 8px below 2nd divider (44px + 8px = 52px from top) */}
 				<div
 					style={{
-						width: '356px',
+						width: `${width - 20}px`,
 						height: '33px',
 						border: '2px solid #000000',
 						borderRadius: '6px',
@@ -279,7 +279,7 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 				{/* Draft body box */}
 				<div
 					style={{
-						width: '356px',
+						width: `${width - 20}px`,
 						border: '2px solid #000000',
 						borderRadius: '6px',
 						backgroundColor: innerBoxBg,
