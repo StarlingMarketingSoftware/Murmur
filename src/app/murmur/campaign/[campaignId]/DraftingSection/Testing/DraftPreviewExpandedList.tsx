@@ -67,6 +67,18 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 		);
 	}, [useLive, livePreview?.contactId, fallbackDraft?.contactId]);
 
+	// Determine if we're in an empty state (no content to display)
+	const isEmpty = useMemo(() => {
+		const hasLiveContent = livePreview?.visible && (livePreview?.message || livePreview?.subject);
+		const hasFallbackContent = fallbackDraft?.message || fallbackDraft?.subject;
+		return !hasLiveContent && !hasFallbackContent;
+	}, [livePreview?.visible, livePreview?.message, livePreview?.subject, fallbackDraft?.message, fallbackDraft?.subject]);
+
+	// Background color for inner boxes - blue when empty, white when has content
+	const innerBoxBg = isEmpty ? '#B6E2FF' : 'white';
+	// Outer container background - darker blue when empty, lighter when has content
+	const outerBg = isEmpty ? '#BAD1FB' : '#B6E2FF';
+
 	const contact = useMemo(
 		() => contacts.find((c) => c.id === effectiveContactId) || null,
 		[contacts, effectiveContactId]
@@ -115,14 +127,14 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 	return (
 		<div
 			className={cn(
-				'max-[480px]:w-[96.27vw] rounded-md bg-[#BAD1FB] pb-2 flex flex-col relative',
+				'max-[480px]:w-[96.27vw] rounded-md pb-2 flex flex-col relative',
 				isAllTab ? 'border-[3px] border-black' : 'border-2 border-black/30'
 			)}
-			style={{ width: `${width}px`, height: `${height}px` }}
+			style={{ width: `${width}px`, height: `${height}px`, backgroundColor: outerBg }}
 			role="region"
 			aria-label="Expanded draft preview"
 		>
-			{/* White section between the two divider lines - shows contact info */}
+			{/* Section between the two divider lines - shows contact info */}
 			<div
 				style={{
 					position: 'absolute',
@@ -130,69 +142,71 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 					left: 0,
 					right: 0,
 					height: '29px',
-					backgroundColor: '#FFFFFF',
+					backgroundColor: innerBoxBg,
 					display: 'flex',
 					alignItems: 'center',
 					paddingLeft: '10px',
 					paddingRight: '10px',
 				}}
 			>
-				<div className="flex items-center justify-between w-full h-full">
-					{/* Left side: Name and Company */}
-					<div className="flex flex-col justify-center min-w-0 flex-1">
-						<div className="font-inter font-bold text-[12px] leading-tight truncate">
-							{contactName}
-						</div>
-						{showCompanyLine && (
-							<div className="text-[10px] leading-tight truncate">
-								{contact?.company}
+				{!isEmpty && (
+					<div className="flex items-center justify-between w-full h-full">
+						{/* Left side: Name and Company */}
+						<div className="flex flex-col justify-center min-w-0 flex-1">
+							<div className="font-inter font-bold text-[12px] leading-tight truncate">
+								{contactName}
 							</div>
-						)}
-					</div>
-					{/* Right side: State, City, Title */}
-					<div className="flex flex-col items-start justify-center gap-[2px] flex-shrink-0 ml-2 h-full">
-						<div className="flex items-center gap-1">
-							{stateAbbr ? (
-								<span
-									className="inline-flex items-center justify-center font-inter font-normal leading-none"
+							{showCompanyLine && (
+								<div className="text-[10px] leading-tight truncate">
+									{contact?.company}
+								</div>
+							)}
+						</div>
+						{/* Right side: State, City, Title */}
+						<div className="flex flex-col items-start justify-center gap-[2px] flex-shrink-0 ml-2 h-full">
+							<div className="flex items-center gap-1">
+								{stateAbbr ? (
+									<span
+										className="inline-flex items-center justify-center font-inter font-normal leading-none"
+										style={{
+											width: '18px',
+											height: '11px',
+											borderRadius: '3px',
+											border: '0.5px solid #000000',
+											backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
+											fontSize: '8px',
+										}}
+									>
+										{stateAbbr}
+									</span>
+								) : null}
+								{contact?.city ? (
+									<span className="text-[8px] leading-none truncate max-w-[50px]">
+										{contact.city}
+									</span>
+								) : null}
+							</div>
+							{contact?.title ? (
+								<div
+									className="px-1 flex items-center bg-[#E8EFFF] overflow-hidden"
 									style={{
-										width: '18px',
+										maxWidth: '100px',
 										height: '11px',
 										borderRadius: '3px',
 										border: '0.5px solid #000000',
-										backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
-										fontSize: '8px',
 									}}
 								>
-									{stateAbbr}
-								</span>
-							) : null}
-							{contact?.city ? (
-								<span className="text-[8px] leading-none truncate max-w-[50px]">
-									{contact.city}
-								</span>
+									<span
+										className="font-inter font-normal leading-none truncate"
+										style={{ fontSize: '7px' }}
+									>
+										{contact.title}
+									</span>
+								</div>
 							) : null}
 						</div>
-						{contact?.title ? (
-							<div
-								className="px-1 flex items-center bg-[#E8EFFF] overflow-hidden"
-								style={{
-									maxWidth: '100px',
-									height: '11px',
-									borderRadius: '3px',
-									border: '0.5px solid #000000',
-								}}
-							>
-								<span
-									className="font-inter font-normal leading-none truncate"
-									style={{ fontSize: '7px' }}
-								>
-									{contact.title}
-								</span>
-							</div>
-						) : null}
 					</div>
-				</div>
+				)}
 			</div>
 
 			{/* Horizontal divider line - exactly 15px from top */}
@@ -236,7 +250,7 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 					}
 				}}
 			>
-				<span className="font-bold text-black text-sm">Draft Preview</span>
+				<span className="font-inter font-semibold text-black text-[8px]">Draft Preview</span>
 			</div>
 
 			{/* Body - Direct rendering without DraftPreviewBox wrapper */}
@@ -251,13 +265,15 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 						height: '33px',
 						border: '2px solid #000000',
 						borderRadius: '6px',
-						backgroundColor: 'white',
+						backgroundColor: innerBoxBg,
 					}}
 					className="overflow-hidden flex-shrink-0 flex items-center px-3"
 				>
-					<span className="font-inter font-bold text-[13px] leading-tight truncate">
-						{subjectLine || 'No subject'}
-					</span>
+					{!isEmpty && (
+						<span className="font-inter font-bold text-[13px] leading-tight truncate">
+							{subjectLine || 'No subject'}
+						</span>
+					)}
 				</div>
 
 				{/* Draft body box */}
@@ -266,10 +282,11 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 						width: '356px',
 						border: '2px solid #000000',
 						borderRadius: '6px',
-						backgroundColor: 'white',
+						backgroundColor: innerBoxBg,
 					}}
 					className="flex-1 overflow-hidden drafting-table-content"
 				>
+					{!isEmpty && (
 					<CustomScrollbar
 						className="h-full"
 						thumbWidth={2}
@@ -284,6 +301,7 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 							{plainMessage || 'No content'}
 						</div>
 					</CustomScrollbar>
+				)}
 				</div>
 			</div>
 		</div>
