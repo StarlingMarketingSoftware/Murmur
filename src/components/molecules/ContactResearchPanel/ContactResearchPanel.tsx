@@ -339,20 +339,22 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				// Filter to only boxes that have data
 				const visibleBoxes = boxConfigs.filter((config) => metadataSections[config.key]);
 
+				// Compact mode spacing for All tab (when height is passed)
+				const boxHeight = height ? 44 : 52;
+				const boxSpacing = height ? 52 : 65;
+				const innerBoxHeight = height ? 36 : 43;
+
 				const content = visibleBoxes.map((config, index) => (
 					<div
 						key={config.key}
 						// Relative to the scroll container now
 						className="absolute"
 						style={{
-							// Original top was 76 + index * 65
-							// Scroll container starts at 67px
-							// New relative top = 76 - 67 + index * 65 = 9 + index * 65
-							top: `${9 + index * 65}px`,
+							top: `${6 + index * boxSpacing}px`,
 							left: '50%',
 							transform: 'translateX(-50%)',
 							width: `${boxWidth}px`,
-							height: '52px',
+							height: `${boxHeight}px`,
 							backgroundColor: config.color,
 							border: '2px solid #000000',
 							borderRadius: '8px',
@@ -362,7 +364,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						<div
 							className="absolute font-inter font-bold"
 							style={{
-								top: '4.5px',
+								top: '4px',
 								left: '8px',
 								fontSize: '11.5px',
 								color: hideAllText ? 'transparent' : '#000000',
@@ -378,7 +380,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								transform: 'translateY(-50%)',
 								right: '10px',
 								width: `${innerBoxWidth}px`,
-								height: '43px',
+								height: `${innerBoxHeight}px`,
 								backgroundColor: hideAllText ? config.color : '#FFFFFF',
 								border: '1px solid #000000',
 								borderRadius: '6px',
@@ -386,7 +388,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						>
 							<div className="w-full h-full px-2 flex items-center overflow-hidden">
 								<div
-									className="w-full text-[12px] leading-[1.3] text-black font-inter"
+									className="w-full text-[11px] leading-[1.25] text-black font-inter"
 									style={{
 										display: '-webkit-box',
 										WebkitLineClamp: 2,
@@ -417,6 +419,37 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				const contentStartTop = compactHeader ? headerHeight + 50 : headerHeight + 43;
 
 				if (height) {
+					// Calculate if content fits without scrolling
+					const numericHeight = typeof height === 'number' ? height : parseInt(String(height), 10) || 400;
+					const availableHeight = numericHeight - contentStartTop;
+					const contentHeight = 6 + visibleBoxes.length * boxSpacing + 10;
+					const needsScroll = contentHeight > availableHeight;
+
+					// If content fits, render without scroll wrapper
+					if (!needsScroll) {
+						return (
+							<div
+								className="absolute w-full left-0"
+								style={{
+									top: `${contentStartTop}px`,
+									height: `${availableHeight}px`,
+									overflow: 'hidden',
+								}}
+							>
+								<div
+									style={{
+										height: `${contentHeight}px`,
+										position: 'relative',
+										width: '100%',
+									}}
+								>
+									{content}
+								</div>
+							</div>
+						);
+					}
+
+					// Content needs scrolling
 					return (
 						<div
 							id="research-bullets-scroll-wrapper"
@@ -445,8 +478,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 							>
 								<div
 									style={{
-										// Ensure content has enough height to scroll
-										height: `${9 + visibleBoxes.length * 65 + 14}px`, // +14 for bottom padding
+										height: `${contentHeight}px`,
 										position: 'relative',
 										width: '100%',
 									}}
@@ -459,18 +491,18 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				}
 
 				// Original rendering for non-fixed height (absolute relative to main container)
-				// Use contentStartTop + 9 (padding) for first item positioning
-				const baseTop = compactHeader ? headerHeight + 59 : headerHeight + 52;
+				// Use contentStartTop + 6 (padding) for first item positioning
+				const baseTop = compactHeader ? headerHeight + 56 : headerHeight + 52;
 				return visibleBoxes.map((config, index) => (
 					<div
 						key={config.key}
 						className="absolute"
 						style={{
-							top: `${baseTop + index * 65}px`,
+							top: `${baseTop + index * boxSpacing}px`,
 							left: '50%',
 							transform: 'translateX(-50%)',
 							width: `${boxWidth}px`,
-							height: '52px',
+							height: `${boxHeight}px`,
 							backgroundColor: config.color,
 							border: '2px solid #000000',
 							borderRadius: '8px',
@@ -480,7 +512,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						<div
 							className="absolute font-inter font-bold"
 							style={{
-								top: '4.5px',
+								top: '4px',
 								left: '8px',
 								fontSize: '11.5px',
 								color: hideAllText ? 'transparent' : '#000000',
@@ -496,7 +528,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								transform: 'translateY(-50%)',
 								right: '10px',
 								width: `${innerBoxWidth}px`,
-								height: '43px',
+								height: `${innerBoxHeight}px`,
 								backgroundColor: hideAllText ? config.color : '#FFFFFF',
 								border: '1px solid #000000',
 								borderRadius: '6px',
@@ -504,7 +536,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						>
 							<div className="w-full h-full px-2 flex items-center overflow-hidden">
 								<div
-									className="w-full text-[12px] leading-[1.3] text-black font-inter"
+									className="w-full text-[11px] leading-[1.25] text-black font-inter"
 									style={{
 										display: '-webkit-box',
 										WebkitLineClamp: 2,
