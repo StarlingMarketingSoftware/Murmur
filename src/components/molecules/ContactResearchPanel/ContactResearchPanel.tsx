@@ -4,6 +4,7 @@ import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { cn } from '@/utils';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import ResearchMap from '@/components/atoms/_svg/ResearchMap';
 
 export interface ContactResearchPanelProps {
 	contact: ContactWithName | null | undefined;
@@ -28,6 +29,10 @@ export interface ContactResearchPanelProps {
 	 * Width override for the inner content boxes. Defaults to 360px.
 	 */
 	boxWidth?: number;
+	/**
+	 * When true, uses a compact 19px header with smaller font (for All tab).
+	 */
+	compactHeader?: boolean;
 }
 
 // Parse metadata sections [1], [2], etc. from the contact metadata field.
@@ -81,7 +86,11 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	hideSummaryIfBullets = false,
 	height,
 	boxWidth = 360,
+	compactHeader = false,
 }) => {
+	// Header dimensions based on compact mode
+	const headerHeight = compactHeader ? 19 : 24;
+	const headerFontSize = compactHeader ? '11px' : '14px';
 	// Calculate inner box widths based on outer box width
 	const innerBoxWidth = boxWidth - 41; // 360 - 41 = 319 default
 	const summaryInnerWidth = boxWidth - 10; // 360 - 10 = 350 default
@@ -129,16 +138,22 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 			<div
 				className="absolute top-0 left-0 w-full rounded-t-[5px]"
 				style={{
-					height: '24px',
+					height: `${headerHeight}px`,
 					backgroundColor: '#E8EFFF',
 				}}
 			/>
 
 			{/* Title */}
-			<div className="absolute top-[12px] left-[16px] -translate-y-1/2 z-10">
+			<div
+				className="absolute left-[16px] -translate-y-1/2 z-10"
+				style={{ top: `${headerHeight / 2}px` }}
+			>
 				<span
-					className="font-secondary font-bold text-[14px] leading-none text-black"
-					style={hideAllText ? { color: 'transparent' } : undefined}
+					className="font-secondary font-bold leading-none text-black"
+					style={{
+						fontSize: headerFontSize,
+						...(hideAllText ? { color: 'transparent' } : {}),
+					}}
 				>
 					Research
 				</span>
@@ -148,64 +163,46 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 			<div
 				className="absolute left-0 w-full bg-black z-10"
 				style={{
-					top: '24px',
+					top: `${headerHeight}px`,
 					height: '2px',
 				}}
 			/>
 
-			{/* Contact info bar */}
-			<div
-				className="absolute left-0 w-full bg-[#FFFFFF]"
-				style={{
-					top: '26px',
-					height: '40px',
-				}}
-			>
-				<div className="w-full h-full px-3 flex items-center justify-between overflow-hidden">
-					<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
-						<div
-							className="font-inter font-bold text-[16px] leading-none truncate text-black"
-							style={hideAllText ? { color: 'transparent' } : undefined}
-						>
-							{(() => {
-								const fullName = `${contact.firstName || ''} ${
-									contact.lastName || ''
-								}`.trim();
-								const nameToDisplay =
-									fullName || contact.name || contact.company || 'Unknown';
-								return nameToDisplay;
-							})()}
-						</div>
-						{/* Only show company if we are displaying a person's name above, and it's different from the company name */}
-						{(() => {
-							const fullName = `${contact.firstName || ''} ${
-								contact.lastName || ''
-							}`.trim();
-							const hasName =
-								fullName.length > 0 || (contact.name && contact.name.length > 0);
-							// If we are showing the company as the main title (because no name), don't show it again here
-							if (!hasName) return null;
-
-							return (
-								<div
-									className="text-[12px] leading-tight truncate text-black mt-[2px]"
-									style={hideAllText ? { color: 'transparent' } : undefined}
-								>
-									{contact.company || ''}
-								</div>
-							);
-						})()}
-					</div>
-
-					<div className="flex items-center gap-3 flex-shrink-0">
-						<div className="flex flex-col items-end gap-[2px] max-w-[140px]">
-							<div className="flex items-center gap-1 w-full justify-end overflow-hidden">
+			{/* Contact info bar - boxed version for compact header (All tab) */}
+			{compactHeader ? (
+				<div
+					className="absolute bg-[#FFFFFF] border-2 border-black rounded-[7px]"
+					style={{
+						top: `${headerHeight + 6}px`,
+						left: '50%',
+						transform: 'translateX(-50%)',
+						width: '361px',
+						height: '40px',
+					}}
+				>
+					<div className="w-full h-full pl-3 pr-[12px] flex items-center justify-between overflow-hidden">
+						<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
+							<div
+								className="font-inter font-bold text-[14px] leading-none truncate text-black"
+								style={hideAllText ? { color: 'transparent' } : undefined}
+							>
+								{(() => {
+									const fullName = `${contact.firstName || ''} ${
+										contact.lastName || ''
+									}`.trim();
+									const nameToDisplay =
+										fullName || contact.name || contact.company || 'Unknown';
+									return nameToDisplay;
+								})()}
+							</div>
+							{/* State badge and location on second row */}
+							<div className="flex items-center gap-1 mt-[3px]">
 								{(() => {
 									const stateAbbr = getStateAbbreviation(contact.state || '') || '';
 									if (stateAbbr && stateBadgeColorMap[stateAbbr]) {
 										return (
 											<span
-												className="inline-flex items-center justify-center h-[16px] px-[6px] rounded-[4px] border border-black text-[11px] font-bold leading-none flex-shrink-0"
+												className="inline-flex items-center justify-center h-[14px] px-[5px] rounded-[3px] border border-black text-[10px] font-bold leading-none flex-shrink-0"
 												style={{
 													backgroundColor: stateBadgeColorMap[stateAbbr],
 												}}
@@ -218,30 +215,116 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 									}
 									return null;
 								})()}
-								{(contact.title || contact.headline) && (
-									<div className="px-2 py-[2px] rounded-[8px] bg-[#E8EFFF] border border-black max-w-full truncate">
-										<span
-											className="text-[10px] leading-none text-black block truncate"
-											style={hideAllText ? { color: 'transparent' } : undefined}
-										>
-											{contact.title || contact.headline}
-										</span>
-									</div>
+								{(contact.city || contact.state) && (
+									<span
+										className="text-[11px] leading-none text-black truncate"
+										style={hideAllText ? { color: 'transparent' } : undefined}
+									>
+										{contact.city || contact.state || ''}
+									</span>
 								)}
 							</div>
 						</div>
+
+						{/* Map thumbnail placeholder */}
+						<div className="flex-shrink-0">
+							<ResearchMap />
+						</div>
 					</div>
 				</div>
-			</div>
+			) : (
+				<>
+					{/* Original contact info bar */}
+					<div
+						className="absolute left-0 w-full bg-[#FFFFFF]"
+						style={{
+							top: `${headerHeight + 2}px`,
+							height: '40px',
+						}}
+					>
+						<div className="w-full h-full px-3 flex items-center justify-between overflow-hidden">
+							<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
+								<div
+									className="font-inter font-bold text-[16px] leading-none truncate text-black"
+									style={hideAllText ? { color: 'transparent' } : undefined}
+								>
+									{(() => {
+										const fullName = `${contact.firstName || ''} ${
+											contact.lastName || ''
+										}`.trim();
+										const nameToDisplay =
+											fullName || contact.name || contact.company || 'Unknown';
+										return nameToDisplay;
+									})()}
+								</div>
+								{/* Only show company if we are displaying a person's name above, and it's different from the company name */}
+								{(() => {
+									const fullName = `${contact.firstName || ''} ${
+										contact.lastName || ''
+									}`.trim();
+									const hasName =
+										fullName.length > 0 || (contact.name && contact.name.length > 0);
+									// If we are showing the company as the main title (because no name), don't show it again here
+									if (!hasName) return null;
 
-			{/* Divider under contact info */}
-			<div
-				className="absolute left-0 w-full bg-black z-10"
-				style={{
-					top: '66px',
-					height: '1px',
-				}}
-			/>
+									return (
+										<div
+											className="text-[12px] leading-tight truncate text-black mt-[2px]"
+											style={hideAllText ? { color: 'transparent' } : undefined}
+										>
+											{contact.company || ''}
+										</div>
+									);
+								})()}
+							</div>
+
+							<div className="flex items-center gap-3 flex-shrink-0">
+								<div className="flex flex-col items-end gap-[2px] max-w-[140px]">
+									<div className="flex items-center gap-1 w-full justify-end overflow-hidden">
+										{(() => {
+											const stateAbbr = getStateAbbreviation(contact.state || '') || '';
+											if (stateAbbr && stateBadgeColorMap[stateAbbr]) {
+												return (
+													<span
+														className="inline-flex items-center justify-center h-[16px] px-[6px] rounded-[4px] border border-black text-[11px] font-bold leading-none flex-shrink-0"
+														style={{
+															backgroundColor: stateBadgeColorMap[stateAbbr],
+														}}
+													>
+														<span style={hideAllText ? { color: 'transparent' } : undefined}>
+															{stateAbbr}
+														</span>
+													</span>
+												);
+											}
+											return null;
+										})()}
+										{(contact.title || contact.headline) && (
+											<div className="px-2 py-[2px] rounded-[8px] bg-[#E8EFFF] border border-black max-w-full truncate">
+												<span
+													className="text-[10px] leading-none text-black block truncate"
+													style={hideAllText ? { color: 'transparent' } : undefined}
+												>
+													{contact.title || contact.headline}
+												</span>
+											</div>
+										)}
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					{/* Divider under contact info - only for non-compact */}
+					<div
+						className="absolute left-0 w-full bg-black z-10"
+						style={{
+							top: `${headerHeight + 42}px`,
+							height: '1px',
+						}}
+					/>
+				</>
+			)}
 
 			{/* Research result boxes - only show if data exists */}
 			{(() => {
@@ -328,13 +411,18 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				// When height is NOT fixed, the container grows, so no scroll needed.
 				// When height IS fixed (e.g. 352px), scrolling is needed.
 
+				// Calculate content start position based on header type
+				// Compact: header (19) + gap (6) + contact box (40) + gap (4) = 69
+				// Non-compact: header + divider (2) + contact bar (40) + divider (1) = headerHeight + 43
+				const contentStartTop = compactHeader ? headerHeight + 50 : headerHeight + 43;
+
 				if (height) {
 					return (
 						<div
 							id="research-bullets-scroll-wrapper"
 							className="absolute w-full left-0 bottom-0"
 							style={{
-								top: '67px', // Below header/divider
+								top: `${contentStartTop}px`, // Below header/contact info
 							}}
 						>
 							<style>{`
@@ -371,12 +459,14 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				}
 
 				// Original rendering for non-fixed height (absolute relative to main container)
+				// Use contentStartTop + 9 (padding) for first item positioning
+				const baseTop = compactHeader ? headerHeight + 59 : headerHeight + 52;
 				return visibleBoxes.map((config, index) => (
 					<div
 						key={config.key}
 						className="absolute"
 						style={{
-							top: `${76 + index * 65}px`,
+							top: `${baseTop + index * 65}px`,
 							left: '50%',
 							transform: 'translateX(-50%)',
 							width: `${boxWidth}px`,

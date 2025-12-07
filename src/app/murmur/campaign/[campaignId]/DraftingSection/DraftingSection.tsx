@@ -2903,6 +2903,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											hideAllText={contactsAvailableForDrafting.length === 0}
 											hideSummaryIfBullets={true}
 											height={347}
+											compactHeader
 										/>
 									</div>
 									{/* Column 2: Writing (Row 1) + Suggestion (Row 2) */}
