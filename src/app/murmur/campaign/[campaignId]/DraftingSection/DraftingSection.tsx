@@ -3198,6 +3198,65 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													</div>
 												</div>
 											</div>
+											{/* Suggestion 3 */}
+											<div
+												style={{
+													position: 'absolute',
+													top: '251px',
+													left: '50%',
+													transform: 'translateX(-50%)',
+													width: '362px',
+													height: '56px',
+													backgroundColor: '#359D4D',
+													border: '2px solid #000000',
+													borderRadius: '8px',
+												}}
+											>
+												<div
+													className="absolute font-inter font-bold"
+													style={{
+														top: '4.5px',
+														left: '8px',
+														fontSize: '11.5px',
+														color: '#000000',
+													}}
+												>
+													[3]
+												</div>
+												<div
+													style={{
+														position: 'absolute',
+														top: '0',
+														bottom: '0',
+														margin: 'auto',
+														left: '25px',
+														width: '324px',
+														height: '48px',
+														backgroundColor: '#FFFFFF',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+														display: 'flex',
+														alignItems: 'center',
+														padding: '4px 8px',
+														overflow: 'hidden',
+													}}
+												>
+													<div
+														style={{
+															fontFamily: 'Inter, system-ui, sans-serif',
+															fontSize: '11px',
+															lineHeight: '1.3',
+															color: suggestionText3 ? '#000000' : '#888888',
+															wordBreak: 'break-word',
+															whiteSpace: 'normal',
+															overflow: 'hidden',
+															textOverflow: 'ellipsis',
+														}}
+													>
+														{suggestionText3 || 'Additional suggestions here'}
+													</div>
+												</div>
+											</div>
 										</div>
 									</div>
 
