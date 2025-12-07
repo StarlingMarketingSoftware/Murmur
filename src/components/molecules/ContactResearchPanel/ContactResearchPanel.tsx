@@ -100,25 +100,27 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 		[contact?.metadata]
 	);
 
-	// If there is no contact, don't render the panel at all.
-	// For contacts without metadata, keep the panel visible but show an empty state.
-	if (!contact) {
-		return null;
-	}
+	// Determine if we're in a "loading" state (no contact yet)
+	const isLoading = !contact;
 
 	const parsedSectionsCount = Object.keys(metadataSections).length;
 	const hasAnyParsedSections = parsedSectionsCount > 0;
-	const shouldHideSummary = hasAnyParsedSections && hideSummaryIfBullets;
+	// Hide summary when: (1) we have parsed sections and hideSummaryIfBullets is true, OR
+	// (2) we're loading and hideSummaryIfBullets is true (since we show placeholder boxes)
+	const shouldHideSummary = (hasAnyParsedSections || isLoading) && hideSummaryIfBullets;
+
+	// When loading (no contact), show 3 placeholder boxes
+	const displaySectionsCount = isLoading ? 3 : parsedSectionsCount;
 
 	const containerHeight = height
 		? height
 		: shouldHideSummary
-		? `${77 + 65 * parsedSectionsCount}px`
-		: !hasAnyParsedSections
+		? `${77 + 65 * displaySectionsCount}px`
+		: !hasAnyParsedSections && !isLoading
 		? '423px'
-		: parsedSectionsCount === 3
+		: displaySectionsCount === 3
 		? '540px'
-		: parsedSectionsCount === 4
+		: displaySectionsCount === 4
 		? '580px'
 		: '630px';
 
@@ -152,7 +154,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					className="font-secondary font-bold leading-none text-black"
 					style={{
 						fontSize: headerFontSize,
-						...(hideAllText ? { color: 'transparent' } : {}),
+						...(hideAllText || isLoading ? { color: 'transparent' } : {}),
 					}}
 				>
 					Research
@@ -184,21 +186,23 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
 							<div
 								className="font-inter font-bold text-[14px] leading-none truncate text-black"
-								style={hideAllText ? { color: 'transparent' } : undefined}
+								style={hideAllText || isLoading ? { color: 'transparent' } : undefined}
 							>
 								{(() => {
-									const fullName = `${contact.firstName || ''} ${
-										contact.lastName || ''
+									if (isLoading) return 'Loading...';
+									const fullName = `${contact?.firstName || ''} ${
+										contact?.lastName || ''
 									}`.trim();
 									const nameToDisplay =
-										fullName || contact.name || contact.company || 'Unknown';
+										fullName || contact?.name || contact?.company || 'Unknown';
 									return nameToDisplay;
 								})()}
 							</div>
 							{/* State badge and location on second row */}
 							<div className="flex items-center gap-1 mt-[3px]">
 								{(() => {
-									const stateAbbr = getStateAbbreviation(contact.state || '') || '';
+									if (isLoading) return null;
+									const stateAbbr = getStateAbbreviation(contact?.state || '') || '';
 									if (stateAbbr && stateBadgeColorMap[stateAbbr]) {
 										return (
 											<span
@@ -215,12 +219,12 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 									}
 									return null;
 								})()}
-								{(contact.city || contact.state) && (
+								{!isLoading && (contact?.city || contact?.state) && (
 									<span
 										className="text-[11px] leading-none text-black truncate"
 										style={hideAllText ? { color: 'transparent' } : undefined}
 									>
-										{contact.city || contact.state || ''}
+										{contact?.city || contact?.state || ''}
 									</span>
 								)}
 							</div>
@@ -246,24 +250,26 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 							<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
 								<div
 									className="font-inter font-bold text-[16px] leading-none truncate text-black"
-									style={hideAllText ? { color: 'transparent' } : undefined}
+									style={hideAllText || isLoading ? { color: 'transparent' } : undefined}
 								>
 									{(() => {
-										const fullName = `${contact.firstName || ''} ${
-											contact.lastName || ''
+										if (isLoading) return 'Loading...';
+										const fullName = `${contact?.firstName || ''} ${
+											contact?.lastName || ''
 										}`.trim();
 										const nameToDisplay =
-											fullName || contact.name || contact.company || 'Unknown';
+											fullName || contact?.name || contact?.company || 'Unknown';
 										return nameToDisplay;
 									})()}
 								</div>
 								{/* Only show company if we are displaying a person's name above, and it's different from the company name */}
 								{(() => {
-									const fullName = `${contact.firstName || ''} ${
-										contact.lastName || ''
+									if (isLoading) return null;
+									const fullName = `${contact?.firstName || ''} ${
+										contact?.lastName || ''
 									}`.trim();
 									const hasName =
-										fullName.length > 0 || (contact.name && contact.name.length > 0);
+										fullName.length > 0 || (contact?.name && contact?.name.length > 0);
 									// If we are showing the company as the main title (because no name), don't show it again here
 									if (!hasName) return null;
 
@@ -272,7 +278,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 											className="text-[12px] leading-tight truncate text-black mt-[2px]"
 											style={hideAllText ? { color: 'transparent' } : undefined}
 										>
-											{contact.company || ''}
+											{contact?.company || ''}
 										</div>
 									);
 								})()}
@@ -282,7 +288,8 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								<div className="flex flex-col items-end gap-[2px] max-w-[140px]">
 									<div className="flex items-center gap-1 w-full justify-end overflow-hidden">
 										{(() => {
-											const stateAbbr = getStateAbbreviation(contact.state || '') || '';
+											if (isLoading) return null;
+											const stateAbbr = getStateAbbreviation(contact?.state || '') || '';
 											if (stateAbbr && stateBadgeColorMap[stateAbbr]) {
 												return (
 													<span
@@ -299,13 +306,13 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 											}
 											return null;
 										})()}
-										{(contact.title || contact.headline) && (
+										{!isLoading && (contact?.title || contact?.headline) && (
 											<div className="px-2 py-[2px] rounded-[8px] bg-[#E8EFFF] border border-black max-w-full truncate">
 												<span
 													className="text-[10px] leading-none text-black block truncate"
 													style={hideAllText ? { color: 'transparent' } : undefined}
 												>
-													{contact.title || contact.headline}
+													{contact?.title || contact?.headline}
 												</span>
 											</div>
 										)}
@@ -326,7 +333,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				</>
 			)}
 
-			{/* Research result boxes - only show if data exists */}
+			{/* Research result boxes - show placeholders when loading, or actual data */}
 			{(() => {
 				const boxConfigs = [
 					{ key: '1', color: '#158BCF' },
@@ -336,8 +343,10 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					{ key: '5', color: '#D7F0FF' },
 				] as const;
 
-				// Filter to only boxes that have data
-				const visibleBoxes = boxConfigs.filter((config) => metadataSections[config.key]);
+				// When loading, show first 3 placeholder boxes; otherwise filter to boxes with data
+				const visibleBoxes = isLoading
+					? boxConfigs.slice(0, 3)
+					: boxConfigs.filter((config) => metadataSections[config.key]);
 
 				// Compact mode spacing for All tab (when height is passed)
 				const boxHeight = height ? 44 : 52;
@@ -367,7 +376,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								top: '4px',
 								left: '8px',
 								fontSize: '11.5px',
-								color: hideAllText ? 'transparent' : '#000000',
+								color: hideAllText || isLoading ? 'transparent' : '#000000',
 							}}
 						>
 							[{config.key}]
@@ -381,7 +390,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								right: '10px',
 								width: `${innerBoxWidth}px`,
 								height: `${innerBoxHeight}px`,
-								backgroundColor: hideAllText ? config.color : '#FFFFFF',
+								backgroundColor: hideAllText || isLoading ? config.color : '#FFFFFF',
 								border: '1px solid #000000',
 								borderRadius: '6px',
 							}}
@@ -394,7 +403,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 										WebkitLineClamp: 2,
 										WebkitBoxOrient: 'vertical',
 										overflow: 'hidden',
-										color: hideAllText ? 'transparent' : '#000000',
+										color: hideAllText || isLoading ? 'transparent' : '#000000',
 									}}
 								>
 									{metadataSections[config.key]}
@@ -404,7 +413,8 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					</div>
 				));
 
-				if (visibleBoxes.length === 0) return null;
+				// Always show boxes (either loading placeholders or data)
+				if (visibleBoxes.length === 0 && !isLoading) return null;
 
 				// If height is constrained (e.g. 352px), wrap in scrollbar
 				// If not constrained, just render the content in absolute position relative to main container?
@@ -515,7 +525,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								top: '4px',
 								left: '8px',
 								fontSize: '11.5px',
-								color: hideAllText ? 'transparent' : '#000000',
+								color: hideAllText || isLoading ? 'transparent' : '#000000',
 							}}
 						>
 							[{config.key}]
@@ -529,7 +539,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								right: '10px',
 								width: `${innerBoxWidth}px`,
 								height: `${innerBoxHeight}px`,
-								backgroundColor: hideAllText ? config.color : '#FFFFFF',
+								backgroundColor: hideAllText || isLoading ? config.color : '#FFFFFF',
 								border: '1px solid #000000',
 								borderRadius: '6px',
 							}}
@@ -542,7 +552,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 										WebkitLineClamp: 2,
 										WebkitBoxOrient: 'vertical',
 										overflow: 'hidden',
-										color: hideAllText ? 'transparent' : '#000000',
+										color: hideAllText || isLoading ? 'transparent' : '#000000',
 									}}
 								>
 									{metadataSections[config.key]}
@@ -559,12 +569,12 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					id="research-summary-box-shared"
 					className="absolute"
 					style={{
-						bottom: hasAnyParsedSections ? '14px' : '8px',
+						bottom: hasAnyParsedSections || isLoading ? '14px' : '8px',
 						left: '50%',
 						transform: 'translateX(-50%)',
 						width: `${boxWidth}px`,
-						height: hasAnyParsedSections ? '197px' : '336px',
-						backgroundColor: hasAnyParsedSections ? '#E9F7FF' : '#158BCF',
+						height: hasAnyParsedSections || isLoading ? '197px' : '336px',
+						backgroundColor: hasAnyParsedSections || isLoading ? '#E9F7FF' : '#158BCF',
 						border: '2px solid #000000',
 						borderRadius: '8px',
 					}}
@@ -585,7 +595,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					<div
 						className="absolute overflow-hidden"
 						style={{
-							...(hasAnyParsedSections
+							...(hasAnyParsedSections || isLoading
 								? {
 										top: '50%',
 										left: '50%',
@@ -601,11 +611,11 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								? typeof height === 'number'
 									? `${height - 53}px` // 352 - 53 = 299px (approx logic if fixed)
 									: 'calc(100% - 53px)'
-								: hasAnyParsedSections
+								: hasAnyParsedSections || isLoading
 								? '182px'
 								: '299px',
-							backgroundColor: hideAllText
-								? hasAnyParsedSections
+							backgroundColor: hideAllText || isLoading
+								? hasAnyParsedSections || isLoading
 									? '#E9F7FF'
 									: '#158BCF'
 								: '#FFFFFF',
