@@ -771,11 +771,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									</button>
 								</div>
 							</div>
-							<div className="h-[2px] bg-black w-full mb-1" />
+							<div className="h-[1px] bg-black w-full mt-[2px]" />
 						</div>
 
 						{/* Auto Subject */}
-						<div className="mb-3 w-[95%] max-[480px]:w-[89.33vw] mx-auto">
+						<div className="mt-[9px] mb-3 w-[95%] max-[480px]:w-[89.33vw] mx-auto">
 							<div
 								className={cn(
 									'flex items-center h-[25px] rounded-[8px] border-2 border-black overflow-hidden',
