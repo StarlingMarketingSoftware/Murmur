@@ -1510,23 +1510,14 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						</div>
 					) : (
 						<div
-							className="px-2 py-2 w-[95%] max-[480px]:w-[89.33vw] mx-auto rounded-[8px] border-2 bg-white"
-							style={{ borderColor: '#969696' }}
+							className="px-2 w-[95%] max-[480px]:w-[89.33vw] mx-auto rounded-[8px] border-2 bg-white flex items-start gap-2"
+							style={{ borderColor: '#969696', height: '56px' }}
 						>
-							<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
+							<div className="font-inter text-[12px] font-semibold text-black shrink-0 pt-2 pl-1">
 								Signature
 							</div>
 							<textarea
-								className={cn(
-									'w-full text-[12px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none max-[480px]:h-[40px] signature-textarea',
-									isCompactSignature
-										? hybridBlocks.some((b) => b.type === 'full_automated')
-											? 'h-[28px]'
-											: 'h-[36px]'
-										: hybridBlocks.some((b) => b.type === 'full_automated')
-										? 'h-[40px]'
-										: 'h-[58px]'
-								)}
+								className="flex-1 text-[12px] rounded-[6px] pt-2 pr-1 pb-1 resize-none outline-none focus:outline-none h-full bg-transparent signature-textarea"
 								value={signature}
 								onChange={(e) => updateSignature(e.target.value)}
 							/>

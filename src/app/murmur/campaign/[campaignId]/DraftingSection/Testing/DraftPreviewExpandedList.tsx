@@ -100,6 +100,13 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 		return convertHtmlToPlainText(fallbackDraft?.message || '');
 	}, [useLive, livePreview?.message, fallbackDraft?.message]);
 
+	const subjectLine = useMemo(() => {
+		if (useLive) {
+			return livePreview?.subject || '';
+		}
+		return fallbackDraft?.subject || '';
+	}, [useLive, livePreview?.subject, fallbackDraft?.subject]);
+
 	const stateAbbr = useMemo(() => {
 		if (!contact?.state) return '';
 		return getStateAbbreviation(contact.state) || '';
@@ -108,17 +115,114 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 	return (
 		<div
 			className={cn(
-				'max-[480px]:w-[96.27vw] rounded-md bg-[#B4CBF4] px-2 pb-2 flex flex-col',
+				'max-[480px]:w-[96.27vw] rounded-md bg-[#BAD1FB] pb-2 flex flex-col relative',
 				isAllTab ? 'border-[3px] border-black' : 'border-2 border-black/30'
 			)}
 			style={{ width: `${width}px`, height: `${height}px` }}
 			role="region"
 			aria-label="Expanded draft preview"
 		>
+			{/* White section between the two divider lines - shows contact info */}
+			<div
+				style={{
+					position: 'absolute',
+					top: '15px',
+					left: 0,
+					right: 0,
+					height: '29px',
+					backgroundColor: '#FFFFFF',
+					display: 'flex',
+					alignItems: 'center',
+					paddingLeft: '10px',
+					paddingRight: '10px',
+				}}
+			>
+				<div className="flex items-center justify-between w-full h-full">
+					{/* Left side: Name and Company */}
+					<div className="flex flex-col justify-center min-w-0 flex-1">
+						<div className="font-inter font-bold text-[12px] leading-tight truncate">
+							{contactName}
+						</div>
+						{showCompanyLine && (
+							<div className="text-[10px] leading-tight truncate">
+								{contact?.company}
+							</div>
+						)}
+					</div>
+					{/* Right side: State, City, Title */}
+					<div className="flex flex-col items-start justify-center gap-[2px] flex-shrink-0 ml-2 h-full">
+						<div className="flex items-center gap-1">
+							{stateAbbr ? (
+								<span
+									className="inline-flex items-center justify-center font-inter font-normal leading-none"
+									style={{
+										width: '18px',
+										height: '11px',
+										borderRadius: '3px',
+										border: '0.5px solid #000000',
+										backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
+										fontSize: '8px',
+									}}
+								>
+									{stateAbbr}
+								</span>
+							) : null}
+							{contact?.city ? (
+								<span className="text-[8px] leading-none truncate max-w-[50px]">
+									{contact.city}
+								</span>
+							) : null}
+						</div>
+						{contact?.title ? (
+							<div
+								className="px-1 flex items-center bg-[#E8EFFF] overflow-hidden"
+								style={{
+									maxWidth: '100px',
+									height: '11px',
+									borderRadius: '3px',
+									border: '0.5px solid #000000',
+								}}
+							>
+								<span
+									className="font-inter font-normal leading-none truncate"
+									style={{ fontSize: '7px' }}
+								>
+									{contact.title}
+								</span>
+							</div>
+						) : null}
+					</div>
+				</div>
+			</div>
+
+			{/* Horizontal divider line - exactly 15px from top */}
+			<div
+				style={{
+					position: 'absolute',
+					top: '15px',
+					left: 0,
+					right: 0,
+					height: '1px',
+					backgroundColor: '#000000',
+				}}
+			/>
+
+			{/* Second horizontal divider line - 29px below the first (44px from top) */}
+			<div
+				style={{
+					position: 'absolute',
+					top: '44px',
+					left: 0,
+					right: 0,
+					height: '1px',
+					backgroundColor: '#000000',
+				}}
+			/>
+
 			{/* Header */}
 			<div
 				className={cn(
-					'flex items-center gap-2 h-[21px] px-1',
+					'flex items-center gap-2 h-[15px] px-1',
 					onHeaderClick ? 'cursor-pointer' : ''
 				)}
 				role={onHeaderClick ? 'button' : undefined}
@@ -133,77 +237,27 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 				}}
 			>
 				<span className="font-bold text-black text-sm">Draft Preview</span>
-				<div className="self-stretch ml-auto flex items-center text-sm font-bold text-black/80 w-[46px] flex-shrink-0 pl-2">
-					<span className="w-[20px] text-center"></span>
-					<ArrowIcon />
-				</div>
 			</div>
 
 			{/* Body - Direct rendering without DraftPreviewBox wrapper */}
-			<div className="flex-1 flex flex-col items-center gap-2 pt-2 overflow-hidden">
-				{/* Contact info box */}
+			<div
+				className="flex-1 flex flex-col items-center gap-2 overflow-hidden"
+				style={{ marginTop: '37px' }}
+			>
+				{/* Email subject box - 8px below 2nd divider (44px + 8px = 52px from top) */}
 				<div
 					style={{
 						width: '356px',
-						height: '38px',
+						height: '33px',
 						border: '2px solid #000000',
 						borderRadius: '6px',
 						backgroundColor: 'white',
 					}}
-					className="overflow-hidden flex-shrink-0"
+					className="overflow-hidden flex-shrink-0 flex items-center px-3"
 				>
-					<div className="grid grid-cols-[1fr_auto] gap-2 h-full px-2 py-[2px] items-center">
-						<div className="flex flex-col justify-center">
-							<div className="font-inter font-bold text-[13px] leading-4 truncate">
-								{contactName}
-							</div>
-							<div className="text-[11px] leading-4 truncate">
-								{showCompanyLine ? contact?.company : ''}
-							</div>
-						</div>
-						<div className="flex flex-col items-start gap-0.5 overflow-hidden">
-							<div className="flex items-center gap-2 w-full">
-								{stateAbbr ? (
-									<span
-										className="inline-flex items-center justify-center font-inter font-normal leading-none"
-										style={{
-											width: '22px',
-											height: '13px',
-											borderRadius: '3px',
-											border: '0.5px solid #000000',
-											backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
-											fontSize: '10px',
-										}}
-									>
-										{stateAbbr}
-									</span>
-								) : null}
-								{contact?.city ? (
-									<span className="text-[9px] leading-none truncate max-w-[70px]">
-										{contact.city}
-									</span>
-								) : null}
-							</div>
-							{contact?.headline ? (
-								<div
-									className="px-2 flex items-center bg-[#E8EFFF] overflow-hidden"
-									style={{
-										width: '120px',
-										height: '15px',
-										borderRadius: '4px',
-										border: '0.5px solid #000000',
-									}}
-								>
-									<span
-										className="font-inter font-normal leading-none truncate"
-										style={{ fontSize: '8.5px' }}
-									>
-										{contact.headline}
-									</span>
-								</div>
-							) : null}
-						</div>
-					</div>
+					<span className="font-inter font-bold text-[13px] leading-tight truncate">
+						{subjectLine || 'No subject'}
+					</span>
 				</div>
 
 				{/* Draft body box */}
