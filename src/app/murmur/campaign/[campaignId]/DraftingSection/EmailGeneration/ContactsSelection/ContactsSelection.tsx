@@ -903,11 +903,13 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 				}
 			>
 				<div className="overflow-visible w-full flex flex-col gap-4 items-center">
-					{contacts.map((contact) => (
+					{contacts.map((contact) => {
+						const isUsedContact = usedContactIdsSet.has(contact.id);
+						return (
 						<div
 							key={contact.id}
 							className={cn(
-								'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[489px] h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none row-hover-scroll',
+								'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[489px] h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none row-hover-scroll relative',
 								selectedContactIds.has(contact.id) ? 'bg-[#EAAEAE]' : ''
 							)}
 							onMouseDown={(e) => {
@@ -927,11 +929,27 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								onContactClick?.(contact);
 							}}
 						>
+							{/* Used contact indicator - absolutely positioned, vertically centered */}
+							{isUsedContact && (
+								<span
+									className="absolute left-3 top-1/2 -translate-y-1/2"
+									title="Used in a previous campaign"
+									style={{
+										width: '16px',
+										height: '16px',
+										borderRadius: '50%',
+										border: '1px solid #000000',
+										backgroundColor: '#DAE6FE',
+									}}
+								/>
+							)}
 							{(() => {
 								const fullName =
 									contact.name ||
 									`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
 								const contactTitle = contact.title || contact.headline || '';
+								// Left padding: 12px base + 16px dot + 8px gap = 36px when used, else 12px
+								const leftPadding = isUsedContact ? 'pl-[36px]' : 'pl-3';
 
 								// Left column - Name and Company
 								if (fullName) {
@@ -939,20 +957,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 									return (
 										<>
 											{/* Top Left - Name */}
-											<div className="pl-3 pr-1 flex items-center h-[24px]">
-												{usedContactIdsSet.has(contact.id) && (
-													<span
-														className="inline-block shrink-0 mr-2"
-														title="Used in a previous campaign"
-														style={{
-															width: '16px',
-															height: '16px',
-															borderRadius: '50%',
-															border: '1px solid #000000',
-															backgroundColor: '#DAE6FE',
-														}}
-													/>
-												)}
+											<div className={cn(leftPadding, 'pr-1 flex items-center h-[24px]')}>
 												<div className="font-bold text-[11px] w-full truncate leading-tight">
 													{fullName}
 												</div>
@@ -974,7 +979,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 											</div>
 
 											{/* Bottom Left - Company */}
-											<div className="pl-3 pr-1 flex items-center h-[24px]">
+											<div className={cn(leftPadding, 'pr-1 flex items-center h-[24px]')}>
 												<div className="text-[15px] font-medium text-black w-full truncate leading-tight">
 													{contact.company || ''}
 												</div>
@@ -1053,20 +1058,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 									return (
 										<>
 											{/* Left column - Company vertically centered */}
-											<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
-												{usedContactIdsSet.has(contact.id) && (
-													<span
-														className="inline-block shrink-0 mr-2"
-														title="Used in a previous campaign"
-														style={{
-															width: '16px',
-															height: '16px',
-															borderRadius: '50%',
-															border: '1px solid #000000',
-															backgroundColor: '#DAE6FE',
-														}}
-													/>
-												)}
+											<div className={cn('row-span-2 pr-1 flex items-center h-full', leftPadding)}>
 												<div className="font-medium text-[15px] text-black w-full truncate leading-tight">
 													{contact.company || 'Contact'}
 												</div>
@@ -1226,7 +1218,8 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								}
 							})()}
 						</div>
-					))}
+					);
+					})}
 					{Array.from({ length: Math.max(0, 9 - contacts.length) }).map((_, idx) => (
 						<div
 							key={`placeholder-${idx}`}
