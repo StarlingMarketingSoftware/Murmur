@@ -1915,6 +1915,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														(view === 'contacts' &&
 															contactsAvailableForDrafting.length === 0)
 													}
+													onOpenWriting={goToWriting}
 												/>
 											</div>
 										)
@@ -2930,6 +2931,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												fullWidthMobile
 												hideAddTextButtons
 												height={349}
+												onOpenWriting={goToWriting}
 											/>
 										</div>
 										{/* Row 2: Suggestion Box */}

@@ -12,6 +12,7 @@ import {
 import { UseFormReturn } from 'react-hook-form';
 import { DraftingFormValues } from '../useDraftingSection';
 import { Button } from '@/components/ui/button';
+import OpenIcon from '@/components/atoms/svg/OpenIcon';
 import { HybridBlock } from '@prisma/client';
 import { cn } from '@/utils';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
@@ -37,6 +38,8 @@ interface MiniEmailStructureProps {
 	hideAllText?: boolean;
 	/** Optional height override for the container */
 	height?: number | string;
+	/** Optional callback to open the Writing tab (shows Open control when provided) */
+	onOpenWriting?: () => void;
 }
 
 export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
@@ -53,6 +56,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	hideAddTextButtons,
 	hideAllText,
 	height,
+	onOpenWriting,
 }) => {
 	const watchedHybridBlocks = form.watch('hybridBlockPrompts');
 	const hybridBlocks = useMemo(() => watchedHybridBlocks || [], [watchedHybridBlocks]);
@@ -573,6 +577,28 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				overflow: 'visible',
 			}}
 		>
+			{onOpenWriting && (
+				<div
+					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
+					style={{ top: 2, right: 4 }}
+					onClick={onOpenWriting}
+					role="button"
+					tabIndex={0}
+					onKeyDown={(e) => {
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							onOpenWriting();
+						}
+					}}
+				>
+					<span className="text-[10px] font-medium leading-none text-[#B3B3B3] font-inter">
+						Open
+					</span>
+					<div style={{ marginTop: '1px' }}>
+						<OpenIcon />
+					</div>
+				</div>
+			)}
 			{hideAllText && (
 				<style jsx global>{`
 					[data-mini-email-hide-text='true'],
@@ -654,7 +680,16 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				>
 					<div className="px-0 pb-3 max-[480px]:pb-2">
 						{/* Mode */}
-						<div className="w-full bg-white pt-2 rounded-t-[5px] relative">
+						<div className="w-full bg-white rounded-t-[5px] relative overflow-hidden">
+							{/* Top chrome spacer with divider to keep the Mode row clear */}
+							<div
+								className="h-[15px] w-full border-b border-black bg-[#F8F8F8] flex items-center pl-2"
+								style={{ borderTopLeftRadius: '5px', borderTopRightRadius: '5px' }}
+							>
+								<span className="font-inter font-semibold text-[9px] leading-none text-black">
+									Writing
+								</span>
+							</div>
 							{/* Inline step indicator for mobile landscape */}
 							{isMobileLandscape && (
 								<div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[12px] leading-none font-inter font-medium text-black">
@@ -674,7 +709,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									</svg>
 								</div>
 							)}
-							<div className="flex items-center gap-4 mb-1 w-[95%] mx-auto">
+							<div className="flex items-center gap-4 mb-1 w-[95%] mx-auto mt-1">
 								<span className="font-inter font-semibold text-[13px]">Mode</span>
 								<div ref={modeContainerRef} className="relative flex items-center gap-6">
 									<div
