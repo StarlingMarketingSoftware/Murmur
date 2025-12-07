@@ -469,7 +469,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const promptScoreDisplayLabel =
 		clampedPromptScore == null
-			? 'Prompt score pending'
+			? ''
 			: `${clampedPromptScore} - ${
 					promptQualityLabel ||
 					(clampedPromptScore >= 90
@@ -3039,7 +3039,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													opacity: hasPreviousPrompt ? 1 : 0.5,
 												}}
 											>
-												<UndoIcon width="24" height="24" />
+												{clampedPromptScore != null && <UndoIcon width="24" height="24" />}
 											</div>
 											{/* Upscale Prompt button */}
 											<div
@@ -3065,20 +3065,24 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													cursor: isUpscalingPrompt ? 'wait' : 'pointer',
 												}}
 											>
-												<span
-													style={{
-														fontFamily: 'Inter, system-ui, sans-serif',
-														fontSize: '17px',
-														fontWeight: 500,
-														color: '#000000',
-														lineHeight: '1',
-													}}
-												>
-													{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
-												</span>
-												<div style={{ flexShrink: 0 }}>
-													<UpscaleIcon width="24" height="24" />
-												</div>
+												{(clampedPromptScore != null || isUpscalingPrompt) && (
+													<>
+														<span
+															style={{
+																fontFamily: 'Inter, system-ui, sans-serif',
+																fontSize: '17px',
+																fontWeight: 500,
+																color: '#000000',
+																lineHeight: '1',
+															}}
+														>
+															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
+														</span>
+														<div style={{ flexShrink: 0 }}>
+															<UpscaleIcon width="24" height="24" />
+														</div>
+													</>
+												)}
 											</div>
 											{/* Suggestion 1 */}
 											<div
@@ -3114,7 +3118,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														left: '25px',
 														width: '324px',
 														height: '48px',
-														backgroundColor: '#FFFFFF',
+														backgroundColor: clampedPromptScore == null ? '#A6E0B4' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
@@ -3135,7 +3139,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															textOverflow: 'ellipsis',
 														}}
 													>
-														{suggestionText1 || 'Add your prompt to get suggestions'}
+														{suggestionText1 || (clampedPromptScore != null ? 'Add your prompt to get suggestions' : '')}
 													</div>
 												</div>
 											</div>
@@ -3173,7 +3177,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														left: '25px',
 														width: '324px',
 														height: '48px',
-														backgroundColor: '#FFFFFF',
+														backgroundColor: clampedPromptScore == null ? '#5BCB75' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
@@ -3194,7 +3198,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															textOverflow: 'ellipsis',
 														}}
 													>
-														{suggestionText2 || 'More suggestions will appear here'}
+														{suggestionText2 || (clampedPromptScore != null ? 'More suggestions will appear here' : '')}
 													</div>
 												</div>
 											</div>
@@ -3232,7 +3236,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														left: '25px',
 														width: '324px',
 														height: '48px',
-														backgroundColor: '#FFFFFF',
+														backgroundColor: clampedPromptScore == null ? '#359D4D' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
@@ -3253,7 +3257,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															textOverflow: 'ellipsis',
 														}}
 													>
-														{suggestionText3 || 'Additional suggestions here'}
+														{suggestionText3 || (clampedPromptScore != null ? 'Additional suggestions here' : '')}
 													</div>
 												</div>
 											</div>
