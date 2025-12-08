@@ -2348,7 +2348,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										drafts={draftEmails}
 										contacts={contacts || []}
 										width={233}
-										height={125}
+										height={117}
 										whiteSectionHeight={15}
 										hideSendButton={true}
 											onOpenDrafts={goToDrafting}
@@ -2490,7 +2490,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										drafts={draftEmails}
 										contacts={contacts || []}
 										width={233}
-										height={125}
+										height={117}
 										whiteSectionHeight={15}
 										hideSendButton={true}
 										onOpenDrafts={goToDrafting}
@@ -2865,7 +2865,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										drafts={draftEmails}
 										contacts={contacts || []}
 										width={233}
-										height={125}
+										height={117}
 										whiteSectionHeight={15}
 										hideSendButton={true}
 											onOpenDrafts={goToDrafting}

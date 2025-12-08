@@ -250,7 +250,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	const horizontalPaddingClass = hasCustomRowSize
 		? 'px-0'
 		: isBottomView
-		? 'px-[2px]'
+		? 'px-0'
 		: 'px-2';
 	const verticalPaddingClass = isBottomView ? 'pt-0 pb-0' : 'pt-2 pb-2';
 
@@ -470,12 +470,12 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 					<div
 						className={cn(
 							'flex flex-col items-center',
-							isBottomView ? 'space-y-1 pb-0' : 'space-y-2 pb-2'
+							isBottomView ? 'space-y-[5px] pb-0' : 'space-y-2 pb-2'
 						)}
 						style={{
 							paddingTop:
 								customWhiteSectionHeight !== undefined
-									? '2px'
+									? '6px'
 									: isAllTab
 									? `${39 - whiteSectionHeight}px`
 									: `${38 - whiteSectionHeight}px`,
@@ -501,7 +501,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									className={cn(
 										'cursor-pointer relative select-none overflow-visible rounded-[8px] border-2 border-[#000000] bg-white p-2',
 										isBottomView
-											? 'w-[225px] h-[49px]'
+											? 'w-[225px] h-[40px]'
 											: !hasCustomRowSize &&
 											  'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
 										isPreviewed && 'bg-[#FDDEA5]',
@@ -570,73 +570,115 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											}}
 										/>
 									)}
-									{/* Fixed top-right info (Location + Title) - match Drafting tab */}
-									<div className="absolute top-[6px] right-[28px] flex flex-col items-end gap-[2px] w-[92px] pointer-events-none">
-										<div className="flex items-center justify-start gap-1 h-[11.67px] w-[92px]">
-											{(() => {
-												const fullStateName = (contact?.state as string) || '';
-												const stateAbbr = getStateAbbreviation(fullStateName) || '';
-												const normalizedState = fullStateName.trim();
-												const lowercaseCanadianProvinceNames = canadianProvinceNames.map(
-													(s) => s.toLowerCase()
-												);
-												const isCanadianProvince =
-													lowercaseCanadianProvinceNames.includes(
-														normalizedState.toLowerCase()
-													) ||
-													canadianProvinceAbbreviations.includes(
-														normalizedState.toUpperCase()
-													) ||
-													canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
-												const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
-
-												if (!stateAbbr) return null;
-												return isCanadianProvince ? (
-													<div
-														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border overflow-hidden"
-														style={{ borderColor: '#000000' }}
-													>
-														<CanadianFlag
-															width="100%"
-															height="100%"
-															className="w-full h-full"
-														/>
-													</div>
-												) : isUSAbbr ? (
-													<span
-														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border text-[8px] leading-none font-bold"
-														style={{
-															backgroundColor:
-																stateBadgeColorMap[stateAbbr] || 'transparent',
-															borderColor: '#000000',
-														}}
-													>
-														{stateAbbr}
-													</span>
-												) : (
-													<span
-														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border"
-														style={{ borderColor: '#000000' }}
-													/>
-												);
-											})()}
-											{contact?.city ? (
-												<ScrollableText
-													text={contact.city}
-													className="text-[10px] text-black leading-none max-w-[70px]"
-												/>
-											) : null}
-										</div>
-
-										{contactTitle ? (
-											<div className="w-[92px] h-[10px] rounded-[3.71px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
+								{/* Fixed top-right info (Title + Location) - match Drafting tab */}
+								<div className={cn(
+									"absolute flex flex-col items-end pointer-events-none",
+									isBottomView
+										? "top-[4px] right-[4px] gap-[1px] w-[90px]"
+										: "top-[6px] right-[28px] gap-[2px] w-[92px]"
+								)}>
+									{/* Title row - on top */}
+									{contactTitle ? (
+										<div className={cn(
+											"bg-[#E8EFFF] border border-black overflow-hidden flex items-center",
+											isBottomView
+												? "h-[10px] rounded-[3px] px-1 w-full"
+												: "w-[92px] h-[10px] rounded-[3.71px] justify-center"
+										)}>
+											{isBottomView ? (
+												<span className="text-[7px] text-black leading-none truncate">
+													{contactTitle}
+												</span>
+											) : (
 												<ScrollableText
 													text={contactTitle}
 													className="text-[8px] text-black leading-none px-1"
 												/>
-											</div>
+											)}
+										</div>
+									) : null}
+
+									{/* Location row - below title */}
+									<div className={cn(
+										"flex items-center justify-start",
+										isBottomView ? "gap-0.5 h-[10px] w-[90px]" : "gap-1 h-[11.67px] w-[92px]"
+									)}>
+										{(() => {
+											const fullStateName = (contact?.state as string) || '';
+											const stateAbbr = getStateAbbreviation(fullStateName) || '';
+											const normalizedState = fullStateName.trim();
+											const lowercaseCanadianProvinceNames = canadianProvinceNames.map(
+												(s) => s.toLowerCase()
+											);
+											const isCanadianProvince =
+												lowercaseCanadianProvinceNames.includes(
+													normalizedState.toLowerCase()
+												) ||
+												canadianProvinceAbbreviations.includes(
+													normalizedState.toUpperCase()
+												) ||
+												canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+											const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+											if (!stateAbbr) return null;
+											return isCanadianProvince ? (
+												<div
+													className={cn(
+														"inline-flex items-center justify-center border overflow-hidden",
+														isBottomView
+															? "w-[20px] h-[10px] rounded-[2px]"
+															: "w-[17.81px] h-[11.67px] rounded-[3.44px]"
+													)}
+													style={{ borderColor: '#000000' }}
+												>
+													<CanadianFlag
+														width="100%"
+														height="100%"
+														className="w-full h-full"
+													/>
+												</div>
+											) : isUSAbbr ? (
+												<span
+													className={cn(
+														"inline-flex items-center justify-center border leading-none font-bold",
+														isBottomView
+															? "w-[20px] h-[10px] rounded-[2px] text-[7px]"
+															: "w-[17.81px] h-[11.67px] rounded-[3.44px] text-[8px]"
+													)}
+													style={{
+														backgroundColor:
+															stateBadgeColorMap[stateAbbr] || 'transparent',
+														borderColor: '#000000',
+													}}
+												>
+													{stateAbbr}
+												</span>
+											) : (
+												<span
+													className={cn(
+														"inline-flex items-center justify-center border",
+														isBottomView
+															? "w-[20px] h-[10px] rounded-[2px]"
+															: "w-[17.81px] h-[11.67px] rounded-[3.44px]"
+													)}
+													style={{ borderColor: '#000000' }}
+												/>
+											);
+										})()}
+										{contact?.city ? (
+											isBottomView ? (
+												<span className="text-[7px] text-black leading-none truncate max-w-[50px]">
+													{contact.city}
+												</span>
+											) : (
+												<ScrollableText
+													text={contact.city}
+													className="text-[10px] text-black leading-none max-w-[70px]"
+												/>
+											)
 										) : null}
 									</div>
+								</div>
 
 									{/* Content grid */}
 									<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px] pl-[22px]">
@@ -682,14 +724,14 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								key={`draft-placeholder-${idx}`}
 								className={cn(
 									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] p-2',
-									isBottomView
-										? 'w-[225px] h-[49px]'
-										: !hasCustomRowSize &&
-										  'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
-								)}
-								style={
-									isBottomView
-										? { backgroundColor: placeholderBgColor }
+								isBottomView
+									? 'w-[225px] h-[40px]'
+									: !hasCustomRowSize &&
+									  'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
+							)}
+							style={
+								isBottomView
+									? { backgroundColor: placeholderBgColor }
 										: {
 												backgroundColor: placeholderBgColor,
 												width: hasCustomRowSize ? `${resolvedRowWidth}px` : undefined,

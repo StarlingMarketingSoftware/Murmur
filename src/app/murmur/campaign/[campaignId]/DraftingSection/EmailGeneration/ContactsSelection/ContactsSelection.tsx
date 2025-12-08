@@ -1282,7 +1282,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 					drafts={drafts || []}
 					contacts={props.allContacts || props.contacts}
 					width={233}
-					height={125}
+					height={117}
 					whiteSectionHeight={15}
 					hideSendButton={true}
 				/>
