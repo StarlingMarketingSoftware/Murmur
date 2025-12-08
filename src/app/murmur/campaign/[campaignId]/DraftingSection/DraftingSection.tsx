@@ -3531,14 +3531,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				</form>
 			</Form>
 
-			{/* Fixed hover zone at the bottom of the viewport */}
+			{/* Fixed hover zone at the bottom of the viewport - expands when campaigns table is visible */}
 			<div
-				className="fixed inset-x-0 bottom-0 h-[200px] z-50"
+				className={`fixed inset-x-0 bottom-0 z-50 ${showCampaignsTable ? 'h-[320px]' : 'h-[200px]'}`}
 				onMouseEnter={handleBottomHoverEnter}
 				onMouseLeave={handleBottomHoverLeave}
 			>
 				{/* Invisible capture area */}
 				<div className="absolute inset-0 pointer-events-auto" />
+
+				{/* Campaigns table - positioned inside hover zone */}
+				{showBottomBox && showCampaignsTable && (
+					<div className="absolute left-1/2 -translate-x-1/2 bottom-[40px] z-[60]">
+						<div className="campaigns-popup-wrapper bg-[#EDEDED] rounded-[12px] overflow-hidden w-[891px] h-[242px] border-2 border-[#8C8C8C]">
+							<CampaignsTable />
+						</div>
+					</div>
+				)}
 
 				{/* Revealed bar lives inside the hover zone so moving into it won't dismiss */}
 				{showBottomBox && (
@@ -3577,14 +3586,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					</div>
 				)}
 			</div>
-
-			{showBottomBox && showCampaignsTable && (
-				<div className="fixed left-1/2 -translate-x-1/2 bottom-[40px] z-[60]">
-					<div className="bg-white rounded-[12px] overflow-hidden">
-						<CampaignsTable />
-					</div>
-				</div>
-			)}
 
 			<UpgradeSubscriptionDrawer
 				message="You have run out of drafting credits! Please upgrade your plan."

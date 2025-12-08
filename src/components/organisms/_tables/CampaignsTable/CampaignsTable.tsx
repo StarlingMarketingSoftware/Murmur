@@ -211,27 +211,21 @@ export const CampaignsTable: FC = () => {
 	}
 
 	return (
-		<Card className="relative border-none bg-transparent w-full max-w-[1132px] mx-auto !p-0">
+		<Card className="relative border-none bg-transparent w-full max-w-[1132px] mx-auto !p-0 !my-0">
 			{isPending && <Spinner size="medium" className="absolute top-2 right-2" />}
-			<CardHeader
-				className={`bg-transparent ${
-					shouldShowMobileFeatures ? 'mobile-portrait-card-header' : 'px-0 pb-0'
-				}`}
-			>
-				<CardTitle
-					className={`text-left ${
-						shouldShowMobileFeatures
-							? 'text-[10px] font-secondary font-medium'
-							: 'text-[14px] font-secondary font-medium mb-0.5 hidden'
-					}`}
-					variant="secondary"
-				>
-					Your Campaigns
-				</CardTitle>
-			</CardHeader>
+			{shouldShowMobileFeatures && (
+				<CardHeader className="bg-transparent mobile-portrait-card-header">
+					<CardTitle
+						className="text-left text-[10px] font-secondary font-medium"
+						variant="secondary"
+					>
+						Your Campaigns
+					</CardTitle>
+				</CardHeader>
+			)}
 			<CardContent
-				className={`w-full px-0 pb-6 pt-0 ${
-					shouldShowMobileFeatures ? 'mobile-portrait-card-content' : 'space-y-2'
+				className={`w-full px-0 pt-0 ${
+					shouldShowMobileFeatures ? 'pb-6 mobile-portrait-card-content' : 'pb-0'
 				}`}
 			>
 				<div
@@ -308,7 +302,7 @@ export const CampaignsTable: FC = () => {
 							// Desktop mode: normal table with delete column
 							<CustomTable
 								variant="secondary"
-								containerClassName="border-none rounded-[8px] my-campaigns-table !bg-[#EDEDED] !w-[891px] !mx-auto !px-[4.5px] !pt-[4.5px]"
+								containerClassName="border-none rounded-[8px] my-campaigns-table !bg-[#EDEDED] !w-[891px] !mx-auto !p-0"
 								headerClassName="[&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[4px] [&_th:last-child]:rounded-tr-[4px]"
 								rowClassName="!bg-[#EDEDED] !border-0"
 								handleRowClick={handleRowClick}
