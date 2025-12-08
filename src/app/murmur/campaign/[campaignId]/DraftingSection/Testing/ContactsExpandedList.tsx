@@ -238,7 +238,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			{(isAllTab || isBottomView) && (
 				<div
 					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
-					style={{ top: isBottomView ? 3 : 1, right: isBottomView ? 4 : 4 }}
+					style={{ top: isBottomView ? 1 : -1, right: isBottomView ? 4 : 4 }}
 					onClick={onOpenContacts}
 					role={onOpenContacts ? 'button' : undefined}
 					tabIndex={onOpenContacts ? 0 : undefined}

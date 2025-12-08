@@ -402,10 +402,10 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				}}
 			></div>
 
-			{isAllTab && (
+			{(isAllTab || isBottomView) && (
 				<div
 					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
-					style={{ top: 1, right: 4 }}
+					style={{ top: isBottomView ? 1 : -1, right: isBottomView ? 4 : 4 }}
 					onClick={onOpenDrafts}
 					role={onOpenDrafts ? 'button' : undefined}
 					tabIndex={onOpenDrafts ? 0 : undefined}
@@ -417,11 +417,14 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 						}
 					}}
 				>
-					<span className="text-[10px] font-medium leading-none text-[#B3B3B3] font-inter">
+					<span className={cn(
+						"font-medium leading-none text-[#B3B3B3] font-inter",
+						isBottomView ? "text-[8px]" : "text-[10px]"
+					)}>
 						Open
 					</span>
-					<div style={{ marginTop: '1px' }}>
-						<OpenIcon />
+					<div className="flex items-center" style={{ marginTop: isBottomView ? 0 : '1px' }}>
+						<OpenIcon width={isBottomView ? 10 : undefined} height={isBottomView ? 10 : undefined} />
 					</div>
 				</div>
 			)}
