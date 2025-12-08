@@ -3554,12 +3554,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						}}
 						aria-label="Bottom navigation reveal"
 					>
-						<div className="flex items-center justify-center gap-8">
+						<div className="flex items-center justify-center gap-0">
 							{bottomBarIcons.map((icon) => (
 								<button
 									key={icon.key}
 									type="button"
-									className="flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
+									className="flex items-center justify-center border-0 p-0 cursor-pointer transition-colors"
+									style={{
+										width: '65px',
+										height: '30px',
+										backgroundColor: 'transparent',
+									}}
+									onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#D9D9D9')}
+									onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
 									onClick={icon.onClick}
 									aria-label={icon.element.props['aria-label'] || icon.key}
 								>
