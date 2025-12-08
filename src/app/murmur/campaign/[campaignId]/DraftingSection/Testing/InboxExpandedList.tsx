@@ -302,12 +302,12 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 					<div
 						className={cn(
 							'flex flex-col items-center',
-							isBottomView ? 'space-y-1 pb-0' : 'space-y-2 pb-2'
+							isBottomView ? 'space-y-[5px] pb-0' : 'space-y-2 pb-2'
 						)}
 						style={{
 							paddingTop:
 								customWhiteSectionHeight !== undefined
-									? '2px'
+									? '6px'
 									: isAllTab
 									? `${31 - whiteSectionHeight}px`
 									: `${38 - whiteSectionHeight}px`,
@@ -323,13 +323,43 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 									className={cn(
 										'transition-colors relative select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
 										isBottomView
-											? 'w-[225px] h-[49px]'
+											? 'w-[225px] h-[40px]'
 											: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
 									)}
 								>
-									{/* Fixed top-right info (Location + Title) */}
-									<div className="absolute top-[6px] right-[6px] flex flex-col items-end gap-[2px] w-[110px] pointer-events-none">
-										<div className="flex items-center justify-start gap-1 h-[11.67px] w-full">
+									{/* Fixed top-right info (Title + Location) */}
+									<div className={cn(
+										"absolute flex flex-col items-end pointer-events-none",
+										isBottomView
+											? "top-[4px] right-[4px] gap-[1px] w-[90px]"
+											: "top-[6px] right-[6px] gap-[2px] w-[110px]"
+									)}>
+										{/* Title row - on top */}
+										{contact?.headline ? (
+											<div className={cn(
+												"bg-[#E8EFFF] border border-black overflow-hidden flex items-center",
+												isBottomView
+													? "h-[10px] rounded-[3px] px-1 w-full"
+													: "w-[110px] h-[10px] rounded-[3.71px] justify-center"
+											)}>
+												{isBottomView ? (
+													<span className="text-[7px] text-black leading-none truncate">
+														{contact.headline}
+													</span>
+												) : (
+													<ScrollableText
+														text={contact.headline}
+														className="text-[8px] text-black leading-none px-1"
+													/>
+												)}
+											</div>
+										) : null}
+
+										{/* Location row - below title */}
+										<div className={cn(
+											"flex items-center justify-start",
+											isBottomView ? "gap-0.5 h-[10px] w-[90px]" : "gap-1 h-[11.67px] w-full"
+										)}>
 											{(() => {
 												const fullStateName = (contact?.state as string) || '';
 												const stateAbbr = getStateAbbreviation(fullStateName) || '';
@@ -350,7 +380,12 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 												if (!stateAbbr) return null;
 												return isCanadianProvince ? (
 													<div
-														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border overflow-hidden"
+														className={cn(
+															"inline-flex items-center justify-center border overflow-hidden",
+															isBottomView
+																? "w-[20px] h-[10px] rounded-[2px]"
+																: "w-[17.81px] h-[11.67px] rounded-[3.44px]"
+														)}
 														style={{ borderColor: '#000000' }}
 														title="Canadian province"
 													>
@@ -362,7 +397,12 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 													</div>
 												) : isUSAbbr ? (
 													<span
-														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border text-[8px] leading-none font-bold"
+														className={cn(
+															"inline-flex items-center justify-center border leading-none font-bold",
+															isBottomView
+																? "w-[20px] h-[10px] rounded-[2px] text-[7px]"
+																: "w-[17.81px] h-[11.67px] rounded-[3.44px] text-[8px]"
+														)}
 														style={{
 															backgroundColor:
 																stateBadgeColorMap[stateAbbr] || 'transparent',
@@ -373,68 +413,114 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 													</span>
 												) : (
 													<span
-														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border"
+														className={cn(
+															"inline-flex items-center justify-center border",
+															isBottomView
+																? "w-[20px] h-[10px] rounded-[2px]"
+																: "w-[17.81px] h-[11.67px] rounded-[3.44px]"
+														)}
 														style={{ borderColor: '#000000' }}
 													/>
 												);
 											})()}
 											{contact?.city ? (
-												<ScrollableText
-													text={contact.city}
-													className="text-[10px] text-black leading-none max-w-[80px]"
-												/>
+												isBottomView ? (
+													<span className="text-[7px] text-black leading-none truncate max-w-[50px]">
+														{contact.city}
+													</span>
+												) : (
+													<ScrollableText
+														text={contact.city}
+														className="text-[10px] text-black leading-none max-w-[80px]"
+													/>
+												)
 											) : null}
 										</div>
-
-										{contact?.headline ? (
-											<div className="w-[110px] h-[10px] rounded-[3.71px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
-												<ScrollableText
-													text={contact.headline}
-													className="text-[8px] text-black leading-none px-1"
-												/>
-											</div>
-										) : null}
 									</div>
 
 									{/* Content grid */}
-									<div className="grid grid-cols-1 grid-rows-4 h-full pr-[120px] pl-[22px]">
-										{/* Row 1: Name */}
-										<div className="row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
-											<div className="font-bold text-[11px] truncate leading-none">
-												{contactName}
+									{isBottomView ? (
+										/* Bottom view: compact 4-row layout */
+										<div className="grid grid-cols-1 grid-rows-4 h-full pr-[95px] pl-[22px]">
+											{/* Row 1: Name */}
+											<div className="flex items-center h-[8px] overflow-hidden">
+												<div className="font-bold text-[9px] truncate leading-none">
+													{contactName}
+												</div>
+											</div>
+											{/* Row 2: Company */}
+											<div className="flex items-center h-[6px] overflow-hidden">
+												{(() => {
+													const hasSeparateName = Boolean(
+														contact &&
+															((contact.firstName && contact.firstName.trim()) ||
+																(contact.lastName && contact.lastName.trim()))
+													);
+													return (
+														<div className="text-[8px] text-black truncate leading-none">
+															{hasSeparateName ? contact?.company || '' : ''}
+														</div>
+													);
+												})()}
+											</div>
+											{/* Row 3: Subject */}
+											<div className="flex items-center h-[6px] overflow-hidden">
+												<div className="text-[7px] text-black truncate leading-none">
+													{email.subject || 'No subject'}
+												</div>
+											</div>
+											{/* Row 4: Email body preview */}
+											<div className="flex items-center h-[6px] overflow-hidden mt-[2px]">
+												<div className="text-[7px] text-gray-500 truncate leading-none">
+													{email.bodyPlain
+														? email.bodyPlain.substring(0, 40)
+														: email.bodyHtml
+														? email.bodyHtml.replace(/<[^>]*>/g, '').substring(0, 40)
+														: 'No content'}
+												</div>
 											</div>
 										</div>
-
-										{/* Row 2: Company (only when there is a separate name) */}
-										{(() => {
-											const hasSeparateName = Boolean(
-												contact &&
-													((contact.firstName && contact.firstName.trim()) ||
-														(contact.lastName && contact.lastName.trim()))
-											);
-											return (
-												<div className="row-start-2 col-start-1 flex items-center pr-2 h-[16px] max-[480px]:h-[12px]">
-													<div className="text-[11px] text-black truncate leading-none">
-														{hasSeparateName ? contact?.company || '' : ''}
-													</div>
+									) : (
+										/* Normal view: 4-row layout */
+										<div className="grid grid-cols-1 grid-rows-4 h-full pr-[120px] pl-[22px]">
+											{/* Row 1: Name */}
+											<div className="row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
+												<div className="font-bold text-[11px] truncate leading-none">
+													{contactName}
 												</div>
-											);
-										})()}
+											</div>
 
-										{/* Row 3: Subject */}
-										<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
-											{email.subject || 'No subject'}
-										</div>
+											{/* Row 2: Company (only when there is a separate name) */}
+											{(() => {
+												const hasSeparateName = Boolean(
+													contact &&
+														((contact.firstName && contact.firstName.trim()) ||
+															(contact.lastName && contact.lastName.trim()))
+												);
+												return (
+													<div className="row-start-2 col-start-1 flex items-center pr-2 h-[16px] max-[480px]:h-[12px]">
+														<div className="text-[11px] text-black truncate leading-none">
+															{hasSeparateName ? contact?.company || '' : ''}
+														</div>
+													</div>
+												);
+											})()}
 
-										{/* Row 4: Message preview */}
-										<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px]">
-											{email.bodyPlain
-												? email.bodyPlain.substring(0, 60) + '...'
-												: email.bodyHtml
-												? email.bodyHtml.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
-												: 'No content'}
+											{/* Row 3: Subject */}
+											<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
+												{email.subject || 'No subject'}
+											</div>
+
+											{/* Row 4: Message preview */}
+											<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px]">
+												{email.bodyPlain
+													? email.bodyPlain.substring(0, 60) + '...'
+													: email.bodyHtml
+													? email.bodyHtml.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
+													: 'No content'}
+											</div>
 										</div>
-									</div>
+									)}
 								</div>
 							);
 						})}
@@ -446,7 +532,7 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 								className={cn(
 									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] p-2',
 									isBottomView
-										? 'w-[225px] h-[49px]'
+										? 'w-[225px] h-[40px]'
 										: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
 								)}
 								style={{ backgroundColor: placeholderBgColor }}

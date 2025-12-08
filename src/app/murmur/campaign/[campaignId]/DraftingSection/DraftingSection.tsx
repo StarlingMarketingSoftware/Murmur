@@ -2357,14 +2357,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										sent={sentEmails}
 										contacts={contacts || []}
 										width={233}
-										height={125}
+										height={117}
 										whiteSectionHeight={15}
 											onOpenSent={goToSent}
 									/>
 									<InboxExpandedList
 										contacts={contacts || []}
 										width={233}
-										height={125}
+										height={117}
 										whiteSectionHeight={15}
 										onOpenInbox={goToInbox}
 									/>
@@ -2423,14 +2423,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											sent={sentEmails}
 											contacts={contacts || []}
 											width={233}
-											height={125}
+											height={117}
 											whiteSectionHeight={15}
 											onOpenSent={goToSent}
 										/>
 										<InboxExpandedList
 											contacts={contacts || []}
 											width={233}
-											height={125}
+											height={117}
 											whiteSectionHeight={15}
 											onOpenInbox={goToInbox}
 										/>
@@ -2498,7 +2498,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									<InboxExpandedList
 										contacts={contacts || []}
 										width={233}
-										height={125}
+										height={117}
 										whiteSectionHeight={15}
 										onOpenInbox={goToInbox}
 									/>
@@ -2874,7 +2874,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										sent={sentEmails}
 										contacts={contacts || []}
 										width={233}
-										height={125}
+										height={117}
 										whiteSectionHeight={15}
 										onOpenSent={goToSent}
 									/>
