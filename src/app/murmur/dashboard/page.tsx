@@ -963,7 +963,7 @@ const DashboardContent = () => {
 																		</div>
 																		{/* What Section */}
 																		<div
-																			className={`absolute left-[172px] top-[-1px] h-[64px] cursor-pointer border ${
+																			className={`absolute left-[172px] top-[-1px] h-[64px] cursor-pointer border overflow-hidden ${
 																				activeSection === 'what'
 																					? 'w-[161px] bg-white border-black z-30 rounded-[8px]'
 																					: `w-[160px] border-transparent ${
@@ -977,7 +977,7 @@ const DashboardContent = () => {
 																			<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
 																				What
 																			</div>
-																			<div className="absolute left-[24px] top-[42px] w-[124px] h-[12px]">
+																			<div className="absolute left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
 																				{activeSection === 'what' ? (
 																					<input
 																						ref={whatInputRef}
@@ -1005,12 +1005,15 @@ const DashboardContent = () => {
 																					/>
 																				) : (
 																					<div
-																						className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap hover:text-black/60 transition-colors"
+																						className="absolute top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
 																						style={{
 																							height: '12px',
 																							lineHeight: '12px',
 																							padding: '0',
 																							margin: '0',
+																							color: whatValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
+																							maskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
+																							WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
 																						}}
 																					>
 																						{whatValue || 'Add Recipients'}
@@ -1020,7 +1023,7 @@ const DashboardContent = () => {
 																		</div>
 																		{/* Where Section */}
 																		<div
-																			className={`absolute left-[332px] top-[-1px] h-[64px] cursor-pointer border ${
+																			className={`absolute left-[332px] top-[-1px] h-[64px] cursor-pointer border overflow-hidden ${
 																				activeSection === 'where'
 																					? 'w-[201px] bg-white border-black z-30 rounded-[8px]'
 																					: `w-[200px] border-transparent ${
@@ -1034,7 +1037,7 @@ const DashboardContent = () => {
 																			<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
 																				Where
 																			</div>
-																			<div className="absolute left-[24px] top-[42px] w-[156px] h-[12px]">
+																			<div className="absolute left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
 																				{activeSection === 'where' ? (
 																					<div className="absolute top-0 left-0 w-full h-full flex items-center gap-[2px]">
 																						<input
@@ -1066,12 +1069,15 @@ const DashboardContent = () => {
 																					</div>
 																				) : (
 																					<div
-																						className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap hover:text-black/60 transition-colors"
+																						className="absolute top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
 																						style={{
 																							height: '12px',
 																							lineHeight: '12px',
 																							padding: '0',
 																							margin: '0',
+																							color: hasWhereValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
+																							maskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
+																							WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
 																						}}
 																					>
 																						{hasWhereValue ? whereValue : 'Search States'}
