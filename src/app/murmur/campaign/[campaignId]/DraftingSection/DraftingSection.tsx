@@ -145,6 +145,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [showBottomBox, setShowBottomBox] = useState(false);
 	const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
 	const [showCampaignsTable, setShowCampaignsTable] = useState(false);
+
+	// All tab hover states
+	const [isContactsHovered, setIsContactsHovered] = useState(false);
+	const [isWritingHovered, setIsWritingHovered] = useState(false);
+	const [isDraftsHovered, setIsDraftsHovered] = useState(false);
+	const [isSentHovered, setIsSentHovered] = useState(false);
+	const [isInboxHovered, setIsInboxHovered] = useState(false);
 	const handleGoToDashboard = useCallback(() => {
 		router.push('/murmur/dashboard');
 	}, [router]);
@@ -2875,28 +2882,56 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												height: '263px',
 												overflow: 'visible',
 												marginTop: '-24px', // Align bottom with MiniEmailStructure (349px): Header 71px + Gap 39px - 24px + Contacts 263px = 349px
+												position: 'relative',
+												cursor: 'pointer',
+											}}
+											onMouseEnter={() => setIsContactsHovered(true)}
+											onMouseLeave={() => setIsContactsHovered(false)}
+											onClick={() => {
+												setIsContactsHovered(false);
+												goToContacts();
 											}}
 										>
-											<ContactsExpandedList
-												contacts={contactsAvailableForDrafting}
-												campaign={campaign}
-												selectedContactIds={contactsTabSelectedIds}
-												onContactSelectionChange={(updater) =>
-													setContactsTabSelectedIds((prev) => updater(new Set(prev)))
-												}
-												onContactClick={handleResearchContactClick}
-												onContactHover={handleResearchContactHover}
-												onDraftSelected={async (ids) => {
-													await handleGenerateDrafts(ids);
-												}}
-												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
-												isPendingGeneration={isPendingGeneration}
-												width={330}
-												height={263}
-												minRows={5}
-												onSearchFromMiniBar={handleMiniContactsSearch}
-												onOpenContacts={goToContacts}
-											/>
+											{/* Hover box */}
+											{isContactsHovered && (
+												<div
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: '50%',
+														transform: 'translate(-50%, -50%)',
+														width: '364px',
+														height: '278px',
+														backgroundColor: 'transparent',
+														border: '6px solid #D75152',
+														borderRadius: '0px',
+														zIndex: 10,
+														pointerEvents: 'none',
+													}}
+												/>
+											)}
+											<div style={{ position: 'relative', zIndex: 20 }}>
+												<ContactsExpandedList
+													contacts={contactsAvailableForDrafting}
+													campaign={campaign}
+													selectedContactIds={contactsTabSelectedIds}
+													onContactSelectionChange={(updater) =>
+														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
+													}
+													onContactClick={handleResearchContactClick}
+													onContactHover={handleResearchContactHover}
+													onDraftSelected={async (ids) => {
+														await handleGenerateDrafts(ids);
+													}}
+													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isPendingGeneration={isPendingGeneration}
+													width={330}
+													height={263}
+													minRows={5}
+													onSearchFromMiniBar={handleMiniContactsSearch}
+													onOpenContacts={goToContacts}
+												/>
+											</div>
 										</div>
 										{/* Research Panel */}
 										<ContactResearchPanel
@@ -2917,26 +2952,54 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												width: '330px',
 												height: '349px',
 												overflow: 'visible',
+												position: 'relative',
+												cursor: 'pointer',
+											}}
+											onMouseEnter={() => setIsWritingHovered(true)}
+											onMouseLeave={() => setIsWritingHovered(false)}
+											onClick={() => {
+												setIsWritingHovered(false);
+												goToWriting();
 											}}
 										>
-											<MiniEmailStructure
-												form={form}
-												onDraft={() =>
-													handleGenerateDrafts(
-														contactsAvailableForDrafting.map((c) => c.id)
-													)
-												}
-												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
-												isPendingGeneration={isPendingGeneration}
-												generationProgress={generationProgress}
-												generationTotal={contactsAvailableForDrafting.length}
-												hideTopChrome
-												hideFooter
-												fullWidthMobile
-												hideAddTextButtons
-												height={349}
-												onOpenWriting={goToWriting}
-											/>
+											{/* Hover box */}
+											{isWritingHovered && (
+												<div
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: '50%',
+														transform: 'translate(-50%, -50%)',
+														width: '364px',
+														height: '364px',
+														backgroundColor: 'transparent',
+														border: '6px solid #37B73B',
+														borderRadius: '0px',
+														zIndex: 10,
+														pointerEvents: 'none',
+													}}
+												/>
+											)}
+											<div style={{ position: 'relative', zIndex: 20 }}>
+												<MiniEmailStructure
+													form={form}
+													onDraft={() =>
+														handleGenerateDrafts(
+															contactsAvailableForDrafting.map((c) => c.id)
+														)
+													}
+													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isPendingGeneration={isPendingGeneration}
+													generationProgress={generationProgress}
+													generationTotal={contactsAvailableForDrafting.length}
+													hideTopChrome
+													hideFooter
+													fullWidthMobile
+													hideAddTextButtons
+													height={349}
+													onOpenWriting={goToWriting}
+												/>
+											</div>
 										</div>
 										{/* Row 2: Suggestion Box */}
 										<div
@@ -3283,14 +3346,50 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									{/* Column 3: Drafts (Row 1) + Preview (Row 2) */}
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* Row 1: Drafts */}
-										<DraftsExpandedList
-											drafts={draftEmails}
-											contacts={contacts || []}
-											width={330}
-											height={347}
-											hideSendButton
-											onOpenDrafts={goToDrafting}
-										/>
+										<div
+											style={{
+												width: '330px',
+												height: '347px',
+												overflow: 'visible',
+												position: 'relative',
+												cursor: 'pointer',
+											}}
+											onMouseEnter={() => setIsDraftsHovered(true)}
+											onMouseLeave={() => setIsDraftsHovered(false)}
+											onClick={() => {
+												setIsDraftsHovered(false);
+												goToDrafting();
+											}}
+										>
+											{/* Hover box */}
+											{isDraftsHovered && (
+												<div
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: '50%',
+														transform: 'translate(-50%, -50%)',
+														width: '364px',
+														height: '364px',
+														backgroundColor: 'transparent',
+														border: '6px solid #E6AF4D',
+														borderRadius: '0px',
+														zIndex: 10,
+														pointerEvents: 'none',
+													}}
+												/>
+											)}
+											<div style={{ position: 'relative', zIndex: 20 }}>
+												<DraftsExpandedList
+													drafts={draftEmails}
+													contacts={contacts || []}
+													width={330}
+													height={347}
+													hideSendButton
+													onOpenDrafts={goToDrafting}
+												/>
+											</div>
+										</div>
 										{/* Row 2: Draft Preview */}
 										<DraftPreviewExpandedList
 											contacts={contacts || []}
@@ -3311,22 +3410,94 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									{/* Column 4: Sent (Row 1) + Inbox (Row 2) */}
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* Row 1: Sent */}
-										<SentExpandedList
-											sent={sentEmails}
-											contacts={contacts || []}
-											width={330}
-											height={347}
-											onOpenSent={goToSent}
-										/>
+										<div
+											style={{
+												width: '330px',
+												height: '347px',
+												overflow: 'visible',
+												position: 'relative',
+												cursor: 'pointer',
+											}}
+											onMouseEnter={() => setIsSentHovered(true)}
+											onMouseLeave={() => setIsSentHovered(false)}
+											onClick={() => {
+												setIsSentHovered(false);
+												goToSent();
+											}}
+										>
+											{/* Hover box */}
+											{isSentHovered && (
+												<div
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: '50%',
+														transform: 'translate(-50%, -50%)',
+														width: '364px',
+														height: '364px',
+														backgroundColor: 'transparent',
+														border: '6px solid #2CA954',
+														borderRadius: '0px',
+														zIndex: 10,
+														pointerEvents: 'none',
+													}}
+												/>
+											)}
+											<div style={{ position: 'relative', zIndex: 20 }}>
+												<SentExpandedList
+													sent={sentEmails}
+													contacts={contacts || []}
+													width={330}
+													height={347}
+													onOpenSent={goToSent}
+												/>
+											</div>
+										</div>
 										{/* Row 2: Inbox */}
-										<InboxExpandedList
-											contacts={contacts || []}
-											allowedSenderEmails={campaignContactEmails}
-											contactByEmail={campaignContactsByEmail}
-											width={330}
-											height={347}
-											onOpenInbox={goToInbox}
-										/>
+										<div
+											style={{
+												width: '330px',
+												height: '347px',
+												overflow: 'visible',
+												position: 'relative',
+												cursor: 'pointer',
+											}}
+											onMouseEnter={() => setIsInboxHovered(true)}
+											onMouseLeave={() => setIsInboxHovered(false)}
+											onClick={() => {
+												setIsInboxHovered(false);
+												goToInbox();
+											}}
+										>
+											{/* Hover box */}
+											{isInboxHovered && (
+												<div
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: '50%',
+														transform: 'translate(-50%, -50%)',
+														width: '364px',
+														height: '364px',
+														backgroundColor: 'transparent',
+														border: '6px solid #5EB6D6',
+														borderRadius: '0px',
+														zIndex: 10,
+														pointerEvents: 'none',
+													}}
+												/>
+											)}
+											<div style={{ position: 'relative', zIndex: 20 }}>
+												<InboxExpandedList
+													contacts={contacts || []}
+													allowedSenderEmails={campaignContactEmails}
+													contactByEmail={campaignContactsByEmail}
+													width={330}
+													height={347}
+													onOpenInbox={goToInbox}
+												/>
+											</div>
+										</div>
 									</div>
 								</div>
 							</div>
