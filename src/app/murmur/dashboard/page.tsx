@@ -1572,7 +1572,11 @@ const DashboardContent = () => {
 																			<input
 																				value={whatValue}
 																				onChange={(e) => setWhatValue(e.target.value)}
-																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary overflow-hidden placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+																				style={{
+																					maskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
+																					WebkitMaskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
+																				}}
 																				placeholder="What"
 																				onFocus={(e) => {
 																					setActiveSection('what');
@@ -1601,7 +1605,11 @@ const DashboardContent = () => {
 																			<input
 																				value={whereValue}
 																				onChange={(e) => setWhereValue(e.target.value)}
-																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary overflow-hidden placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+																				style={{
+																					maskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
+																					WebkitMaskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
+																				}}
 																				placeholder="Where"
 																				onFocus={(e) => {
 																					setActiveSection('where');
