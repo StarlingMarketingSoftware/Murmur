@@ -3556,16 +3556,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 			{/* Fixed hover zone at the bottom of the viewport - expands when campaigns table is visible */}
 			<div
-				className={`fixed inset-x-0 bottom-0 z-50 ${showCampaignsTable ? 'h-[320px]' : 'h-[200px]'}`}
-				onMouseEnter={handleBottomHoverEnter}
+				className={`fixed inset-x-0 bottom-0 z-50 pointer-events-none ${showCampaignsTable ? 'h-[320px]' : 'h-[200px]'}`}
 				onMouseLeave={handleBottomHoverLeave}
 			>
-				{/* Invisible capture area */}
-				<div className="absolute inset-0 pointer-events-auto" />
+				{/* Thin hover trigger at the very bottom - only active when bottom box is hidden */}
+				{!showBottomBox && (
+					<div 
+						className="absolute inset-x-0 bottom-0 h-[40px] pointer-events-auto" 
+						onMouseEnter={handleBottomHoverEnter}
+					/>
+				)}
+				
+				{/* Full capture area - only active when bottom box is shown to keep it open */}
+				{showBottomBox && (
+					<div 
+						className="absolute inset-0 pointer-events-auto" 
+						onMouseEnter={handleBottomHoverEnter}
+					/>
+				)}
 
 				{/* Campaigns table - positioned inside hover zone */}
 				{showBottomBox && showCampaignsTable && (
-					<div className="absolute left-1/2 -translate-x-1/2 bottom-[40px] z-[60]">
+					<div className="absolute left-1/2 -translate-x-1/2 bottom-[40px] z-[60] pointer-events-auto">
 						<div className="campaigns-popup-wrapper bg-[#EDEDED] rounded-[12px] overflow-hidden w-[891px] h-[242px] border-2 border-[#8C8C8C]">
 							<CampaignsTable />
 						</div>
@@ -3575,7 +3587,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				{/* Revealed bar lives inside the hover zone so moving into it won't dismiss */}
 				{showBottomBox && (
 					<div
-						className="absolute left-1/2 -translate-x-1/2 z-50 flex items-center justify-center text-black font-inter text-[14px] font-medium"
+						className="absolute left-1/2 -translate-x-1/2 z-50 flex items-center justify-center text-black font-inter text-[14px] font-medium pointer-events-auto"
 						style={{
 							width: '816px',
 							height: '34px',
