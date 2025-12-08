@@ -2413,8 +2413,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									<div className="mt-[35px] flex justify-center gap-[15px]">
 										<ContactsExpandedList
 											contacts={contactsAvailableForDrafting}
-											width={233}
-											height={125}
+											width={232}
+											height={117}
 											whiteSectionHeight={15}
 											showSearchBar={false}
 										onOpenContacts={goToContacts}
@@ -2480,8 +2480,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<div className="mt-[35px] flex justify-center gap-[15px]">
 									<ContactsExpandedList
 										contacts={contactsAvailableForDrafting}
-										width={233}
-										height={125}
+										width={232}
+										height={117}
 										whiteSectionHeight={15}
 										showSearchBar={false}
 										onOpenContacts={goToContacts}
@@ -2855,8 +2855,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<div className="mt-[35px] flex justify-center gap-[15px]">
 									<ContactsExpandedList
 										contacts={contactsAvailableForDrafting}
-										width={233}
-										height={125}
+										width={232}
+										height={117}
 										whiteSectionHeight={15}
 										showSearchBar={false}
 										onOpenContacts={goToContacts}

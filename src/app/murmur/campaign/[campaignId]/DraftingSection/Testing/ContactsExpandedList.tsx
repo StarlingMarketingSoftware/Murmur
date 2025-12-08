@@ -235,10 +235,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				}}
 			></div>
 
-			{isAllTab && (
+			{(isAllTab || isBottomView) && (
 				<div
 					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
-					style={{ top: 1, right: 4 }}
+					style={{ top: isBottomView ? 3 : 1, right: isBottomView ? 4 : 4 }}
 					onClick={onOpenContacts}
 					role={onOpenContacts ? 'button' : undefined}
 					tabIndex={onOpenContacts ? 0 : undefined}
@@ -250,11 +250,14 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						}
 					}}
 				>
-					<span className="text-[10px] font-medium leading-none text-[#B3B3B3] font-inter">
+					<span className={cn(
+						"font-medium leading-none text-[#B3B3B3] font-inter",
+						isBottomView ? "text-[8px]" : "text-[10px]"
+					)}>
 						Open
 					</span>
-					<div style={{ marginTop: '1px' }}>
-						<OpenIcon />
+					<div className="flex items-center" style={{ marginTop: isBottomView ? 0 : '1px' }}>
+						<OpenIcon width={isBottomView ? 10 : undefined} height={isBottomView ? 10 : undefined} />
 					</div>
 				</div>
 			)}
@@ -331,13 +334,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							return (
 								<div
 									key={contact.id}
-									className={cn(
-										'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none relative',
-										isBottomView
-											? 'w-[225px] h-[49px]'
-											: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]',
-										isSelected && 'bg-[#EAAEAE]'
-									)}
+							className={cn(
+								'cursor-pointer transition-colors overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none relative grid grid-cols-2 grid-rows-2',
+								isBottomView
+									? 'w-[224px] h-[28px]'
+									: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]',
+								isSelected && 'bg-[#EAAEAE]'
+							)}
 									style={!isBottomView ? { width: `${innerWidth}px` } : undefined}
 									onMouseDown={(e) => {
 										if (e.shiftKey) e.preventDefault();
@@ -356,18 +359,181 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									{/* Used contact indicator - absolutely positioned, vertically centered */}
 									{isUsed && (
 										<span
-											className="absolute left-3 top-1/2 -translate-y-1/2"
+											className={cn(
+												"absolute top-1/2 -translate-y-1/2",
+												isBottomView ? "left-2" : "left-3"
+											)}
 											title="Used in a previous campaign"
 											style={{
-												width: '16px',
-												height: '16px',
+												width: isBottomView ? '12px' : '16px',
+												height: isBottomView ? '12px' : '16px',
 												borderRadius: '50%',
 												border: '1px solid #000000',
 												backgroundColor: '#DAE6FE',
 											}}
 										/>
 									)}
-									{fullName ? (
+									{/* Bottom view - compact 2-row layout */}
+									{isBottomView ? (
+										<>
+											{fullName ? (
+												<>
+													{/* Top Left - Name */}
+													<div className={cn(isUsed ? 'pl-[22px]' : 'pl-2', 'pr-1 flex items-center h-[12px] overflow-hidden')}>
+														<div className="font-bold text-[9px] w-full truncate leading-none">
+															{fullName}
+														</div>
+													</div>
+													{/* Top Right - Title */}
+													<div className="pr-1.5 pl-0.5 flex items-center justify-start h-[12px]">
+														{contactTitle ? (
+															<div className="h-[10px] rounded-[3px] px-1 flex items-center max-w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																<span className="text-[7px] text-black leading-none truncate">
+																	{contactTitle}
+																</span>
+															</div>
+														) : null}
+													</div>
+													{/* Bottom Left - Company */}
+													<div className={cn(isUsed ? 'pl-[22px]' : 'pl-2', 'pr-1 flex items-center h-[12px] overflow-hidden')}>
+														{contact.company && (
+															<div className="text-[8px] text-black w-full truncate leading-none">
+																{contact.company}
+															</div>
+														)}
+													</div>
+													{/* Bottom Right - Location */}
+													<div className="pr-1.5 pl-0.5 flex items-center justify-start h-[12px]">
+														{(contact.city || contact.state) && (
+															<div className="flex items-center gap-0.5">
+																{(() => {
+																	const fullStateName = (contact.state as string) || '';
+																	const stateAbbr = getStateAbbreviation(fullStateName) || '';
+																	const normalizedState = fullStateName.trim();
+																	const lowercaseCanadianProvinceNames =
+																		canadianProvinceNames.map((s) => s.toLowerCase());
+																	const isCanadianProvince =
+																		lowercaseCanadianProvinceNames.includes(
+																			normalizedState.toLowerCase()
+																		) ||
+																		canadianProvinceAbbreviations.includes(
+																			normalizedState.toUpperCase()
+																		) ||
+																		canadianProvinceAbbreviations.includes(
+																			stateAbbr.toUpperCase()
+																		);
+																	const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+																	if (!stateAbbr) return null;
+																	return isCanadianProvince ? (
+																		<div
+																			className="inline-flex items-center justify-center w-[20px] h-[10px] rounded-[2px] border overflow-hidden"
+																			style={{ borderColor: '#000000' }}
+																			title="Canadian province"
+																		>
+																			<CanadianFlag
+																				width="100%"
+																				height="100%"
+																				className="w-full h-full"
+																			/>
+																		</div>
+																	) : isUSAbbr ? (
+																		<span
+																			className="inline-flex items-center justify-center w-[20px] h-[10px] rounded-[2px] border text-[7px] leading-none font-bold"
+																			style={{
+																				backgroundColor:
+																					stateBadgeColorMap[stateAbbr] || 'transparent',
+																				borderColor: '#000000',
+																			}}
+																		>
+																			{stateAbbr}
+																		</span>
+																	) : null;
+																})()}
+																{contact.city && (
+																	<span className="text-[7px] text-black leading-none truncate max-w-[50px]">
+																		{contact.city}
+																	</span>
+																)}
+															</div>
+														)}
+													</div>
+												</>
+											) : (
+												<>
+													{/* Left - Company only, centered vertically across both rows */}
+													<div className={cn(isUsed ? 'pl-[22px]' : 'pl-2', 'pr-1 row-span-2 flex items-center overflow-hidden')}>
+														<div className="font-bold text-[9px] w-full truncate leading-none">
+															{contact.company || 'Contact'}
+														</div>
+													</div>
+													{/* Right column spans both rows for title + location stacked */}
+													<div className="pr-1.5 pl-0.5 row-span-2 flex flex-col justify-center gap-0.5 overflow-hidden">
+														{contactTitle && (
+															<div className="h-[10px] rounded-[3px] px-1 flex items-center max-w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																<span className="text-[7px] text-black leading-none truncate">
+																	{contactTitle}
+																</span>
+															</div>
+														)}
+														{(contact.city || contact.state) && (
+															<div className="flex items-center gap-0.5">
+																{(() => {
+																	const fullStateName = (contact.state as string) || '';
+																	const stateAbbr = getStateAbbreviation(fullStateName) || '';
+																	const normalizedState = fullStateName.trim();
+																	const lowercaseCanadianProvinceNames =
+																		canadianProvinceNames.map((s) => s.toLowerCase());
+																	const isCanadianProvince =
+																		lowercaseCanadianProvinceNames.includes(
+																			normalizedState.toLowerCase()
+																		) ||
+																		canadianProvinceAbbreviations.includes(
+																			normalizedState.toUpperCase()
+																		) ||
+																		canadianProvinceAbbreviations.includes(
+																			stateAbbr.toUpperCase()
+																		);
+																	const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+																	if (!stateAbbr) return null;
+																	return isCanadianProvince ? (
+																		<div
+																			className="inline-flex items-center justify-center w-[20px] h-[10px] rounded-[2px] border overflow-hidden"
+																			style={{ borderColor: '#000000' }}
+																			title="Canadian province"
+																		>
+																			<CanadianFlag
+																				width="100%"
+																				height="100%"
+																				className="w-full h-full"
+																			/>
+																		</div>
+																	) : isUSAbbr ? (
+																		<span
+																			className="inline-flex items-center justify-center w-[20px] h-[10px] rounded-[2px] border text-[7px] leading-none font-bold"
+																			style={{
+																				backgroundColor:
+																					stateBadgeColorMap[stateAbbr] || 'transparent',
+																				borderColor: '#000000',
+																			}}
+																		>
+																			{stateAbbr}
+																		</span>
+																	) : null;
+																})()}
+																{contact.city && (
+																	<span className="text-[7px] text-black leading-none truncate max-w-[50px]">
+																		{contact.city}
+																	</span>
+																)}
+															</div>
+														)}
+													</div>
+												</>
+											)}
+										</>
+									) : fullName ? (
 										<>
 											{/* Top Left - Name */}
 											<div className={cn(leftPadding, 'pr-1 flex items-center h-[23px]')}>
@@ -622,20 +788,20 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 								</div>
 							);
 						})}
-						{Array.from({ length: Math.max(0, (isBottomView ? 2 : minRows) - contacts.length) }).map(
-							(_, idx) => (
-								<div
-									key={`placeholder-${idx}`}
-									className={cn(
-										'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#EB8586]',
-										isBottomView
-											? 'w-[225px] h-[49px]'
-											: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]'
-									)}
-									style={!isBottomView ? { width: `${innerWidth}px` } : undefined}
-								/>
-							)
-						)}
+					{Array.from({ length: Math.max(0, (isBottomView ? 3 : minRows) - contacts.length) }).map(
+						(_, idx) => (
+							<div
+								key={`placeholder-${idx}`}
+								className={cn(
+									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#EB8586]',
+									isBottomView
+										? 'w-[224px] h-[28px]'
+										: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]'
+								)}
+								style={!isBottomView ? { width: `${innerWidth}px` } : undefined}
+							/>
+						)
+					)}
 					</div>
 				</CustomScrollbar>
 			</div>
