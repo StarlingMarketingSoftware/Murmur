@@ -314,7 +314,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						content: userPrompt,
 					});
 				} else if (draftingMode === DraftingMode.hybrid) {
-					// Hybrid mode - use the hybrid blocks
 					const hybridBlocks = values.hybridBlockPrompts?.filter(
 						(block: HybridBlockPrompt) => block.type !== 'full_automated'
 					) || [];
@@ -383,7 +382,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						throw new Error('Missing required fields');
 					}
 				} catch {
-					// Fallback: try to extract from plain text
 					const subjectMatch = geminiResponse.match(/subject["']?\s*:\s*["']([^"']+)["']/i);
 					const messageMatch = geminiResponse.match(/message["']?\s*:\s*["']([\s\S]*?)["']\s*[,}]/i);
 					
@@ -393,22 +391,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					};
 				}
 
-				// Clean up the response
 				const cleanedSubject = removeEmDashes(parsed.subject);
 				const cleanedMessageText = removeEmDashes(parsed.message);
 
-				// Get signature and font from form values
 				const signatureText = values.signature || `Thank you,\n${campaign.identity?.name || ''}`;
 				const font = values.font || 'Arial';
 
-				// Convert to rich text with signature
 				const richTextMessage = convertAiResponseToRichTextEmail(
 					cleanedMessageText,
 					font,
 					signatureText
 				);
 
-				// Update the email in the database
 				await updateEmail({
 					id: draft.id.toString(),
 					data: {
@@ -417,11 +411,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					},
 				});
 
-				// Invalidate queries to refresh the data
 				queryClient.invalidateQueries({ queryKey: ['emails'] });
 
 				toast.success('Draft regenerated successfully');
-				// Return the plain text with signature for the preview
 				const messageWithSignature = `${cleanedMessageText}\n\n${signatureText}`;
 				return { subject: cleanedSubject, message: messageWithSignature };
 			} catch (error) {
@@ -458,16 +450,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [isPromptInputFocused, setIsPromptInputFocused] = useState(false);
 	const suggestionBoxRef = useRef<HTMLDivElement>(null);
 	
-	// Handle focus changes, but don't hide if focus moved to suggestion box
 	const handlePromptInputFocusChange = useCallback((isFocused: boolean) => {
 		if (isFocused) {
 			setIsPromptInputFocused(true);
 		} else {
-			// Check if focus moved to the suggestion box
 			setTimeout(() => {
 				const activeElement = document.activeElement;
 				if (suggestionBoxRef.current?.contains(activeElement)) {
-					// Focus is in the suggestion box, keep it visible
 					return;
 				}
 				setIsPromptInputFocused(false);
@@ -475,9 +464,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	}, []);
 
-	// Handler that uses the appropriate suggestions function based on the mode
-	// In Manual mode (all text blocks), we critique the actual email content
-	// In other modes, we analyze the prompt quality
 	const handleGetSuggestions = useCallback(
 		async (text: string) => {
 			const blocks = form.getValues('hybridBlockPrompts');
@@ -487,10 +473,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				blocks.every((b: { type: string }) => b.type === 'text');
 
 			if (isManualMode) {
-				// In Manual mode, critique the actual email writing
 				await critiqueManualEmailText(text);
 			} else {
-				// In other modes (Full Auto, Hybrid), analyze the prompt
 				await scoreFullAutomatedPrompt(text);
 			}
 		},
@@ -511,7 +495,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						: 'Fair')
 			  }`;
 
-	// State for contacts selection in the Contacts tab
 	const [contactsTabSelectedIds, setContactsTabSelectedIds] = useState<Set<number>>(
 		new Set()
 	);
@@ -527,12 +510,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		});
 	};
 
-	// State for search tab map selection
 	const [searchTabSelectedContacts, setSearchTabSelectedContacts] = useState<number[]>(
 		[]
 	);
 
-	// State for mini searchbar dropdowns
 	const [searchActiveSection, setSearchActiveSection] = useState<
 		'why' | 'what' | 'where' | null
 	>(null);
@@ -544,7 +525,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const whatInputRef = useRef<HTMLInputElement>(null);
 	const whereInputRef = useRef<HTMLInputElement>(null);
 
-	// Debounce and location search for mini searchbar
 	const debouncedWhereValue = useDebounce(searchWhereValue, 300);
 	const { data: locationResults, isLoading: isLoadingLocations } = useGetLocations(
 		debouncedWhereValue,
@@ -552,21 +532,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	);
 	const isPromotion = searchWhyValue === '[Promotion]';
 
-	// Initialize searchWhereValue from first contact's state
 	useEffect(() => {
 		if (contacts?.[0]?.state && !searchWhereValue) {
 			setSearchWhereValue(contacts[0].state);
 		}
 	}, [contacts, searchWhereValue]);
 
-	// Update searchWhatValue when campaign name changes
 	useEffect(() => {
 		if (campaign?.name) {
 			setSearchWhatValue(campaign.name);
 		}
 	}, [campaign?.name]);
 
-	// Handle clicks outside to close search dropdowns
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
 			const target = event.target as HTMLElement;
@@ -588,7 +565,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	}, [searchActiveSection]);
 
-	// Focus input when section becomes active
 	useEffect(() => {
 		if (searchActiveSection === 'what' && whatInputRef.current) {
 			whatInputRef.current.focus();
@@ -774,7 +750,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			return;
 		}
 
-		// Get the first user contact list ID from the campaign
 		const userContactListId = campaign?.userContactLists?.[0]?.id;
 		if (!userContactListId) {
 			toast.error('Campaign has no contact list');
