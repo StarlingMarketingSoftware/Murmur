@@ -394,14 +394,20 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 															</div>
 														) : null}
 													</div>
-													{/* Bottom Left - Company */}
-													<div className={cn(isUsed ? 'pl-[22px]' : 'pl-2', 'pr-1 flex items-center h-[12px] overflow-hidden')}>
-														{contact.company && (
-															<div className="text-[8px] text-black w-full truncate leading-none">
-																{contact.company}
-															</div>
-														)}
-													</div>
+								{/* Bottom Left - Company */}
+								<div className={cn(isUsed ? 'pl-[22px]' : 'pl-2', 'pr-1 flex items-center h-[12px] overflow-hidden')}>
+									{contact.company && (
+										<div
+											className="text-[8px] text-black w-full overflow-hidden whitespace-nowrap leading-none"
+											style={{
+												maskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+												WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+											}}
+										>
+											{contact.company}
+										</div>
+									)}
+								</div>
 													{/* Bottom Right - Location */}
 													<div className="pr-1.5 pl-0.5 flex items-center justify-start h-[12px]">
 														{(contact.city || contact.state) && (
@@ -461,12 +467,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 												</>
 											) : (
 												<>
-													{/* Left - Company only, centered vertically across both rows */}
-													<div className={cn(isUsed ? 'pl-[22px]' : 'pl-2', 'pr-1 row-span-2 flex items-center overflow-hidden')}>
-														<div className="font-bold text-[9px] w-full truncate leading-none">
-															{contact.company || 'Contact'}
-														</div>
-													</div>
+								{/* Left - Company only, centered vertically across both rows */}
+								<div className={cn(isUsed ? 'pl-[22px]' : 'pl-2', 'pr-1 row-span-2 flex items-center overflow-hidden')}>
+									<div
+										className="font-bold text-[9px] w-full overflow-hidden whitespace-nowrap leading-none"
+										style={{
+											maskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+											WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+										}}
+									>
+										{contact.company || 'Contact'}
+									</div>
+								</div>
 													{/* Right column spans both rows for title + location stacked */}
 													<div className="pr-1.5 pl-0.5 row-span-2 flex flex-col justify-center gap-0.5 overflow-hidden">
 														{contactTitle && (
@@ -554,12 +566,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 													<div className="w-full" />
 												)}
 											</div>
-											{/* Bottom Left - Company */}
-											<div className={cn(leftPadding, 'pr-1 flex items-center h-[22px]')}>
-												<div className="text-[11px] text-black w-full truncate leading-tight">
-													{contact.company || ''}
-												</div>
-											</div>
+							{/* Bottom Left - Company */}
+							<div className={cn(leftPadding, 'pr-1 flex items-center h-[22px]')}>
+								<div
+									className="text-[11px] text-black w-full overflow-hidden whitespace-nowrap leading-tight"
+									style={{
+										maskImage: 'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+										WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+									}}
+								>
+									{contact.company || ''}
+								</div>
+							</div>
 											{/* Bottom Right - Location */}
 											<div className="pr-2 pl-1 flex items-center h-[22px]">
 												{contact.city || contact.state ? (
@@ -630,12 +648,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 										</>
 									) : (
 										<>
-											{/* Left column - Company vertically centered */}
-											<div className={cn('row-span-2 pr-1 flex items-center h-full', leftPadding)}>
-												<div className="font-bold text-[11px] text-black w-full truncate leading-tight">
-													{contact.company || 'Contact'}
-												</div>
-											</div>
+								{/* Left column - Company vertically centered */}
+							<div className={cn('row-span-2 pr-1 flex items-center h-full', leftPadding)}>
+								<div
+									className="font-bold text-[11px] text-black w-full overflow-hidden whitespace-nowrap leading-tight"
+									style={{
+										maskImage: 'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+										WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+									}}
+								>
+									{contact.company || 'Contact'}
+								</div>
+							</div>
 
 											{contactTitle ? (
 												<>
