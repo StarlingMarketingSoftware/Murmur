@@ -115,6 +115,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		handleGenerateDrafts,
 		generationProgress,
 		scoreFullAutomatedPrompt,
+		critiqueManualEmailText,
 		// These are kept available for future use but not in current view:
 		// setGenerationProgress,
 		// cancelGeneration,
@@ -473,6 +474,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			}, 50);
 		}
 	}, []);
+
+	// Handler that uses the appropriate suggestions function based on the mode
+	// In Manual mode (all text blocks), we critique the actual email content
+	// In other modes, we analyze the prompt quality
+	const handleGetSuggestions = useCallback(
+		async (text: string) => {
+			const blocks = form.getValues('hybridBlockPrompts');
+			const isManualMode =
+				blocks &&
+				blocks.length > 0 &&
+				blocks.every((b: { type: string }) => b.type === 'text');
+
+			if (isManualMode) {
+				// In Manual mode, critique the actual email writing
+				await critiqueManualEmailText(text);
+			} else {
+				// In other modes (Full Auto, Hybrid), analyze the prompt
+				await scoreFullAutomatedPrompt(text);
+			}
+		},
+		[form, critiqueManualEmailText, scoreFullAutomatedPrompt]
+	);
 
 	const promptScoreDisplayLabel =
 		clampedPromptScore == null
@@ -2286,7 +2309,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											setContactsTabSelectedIds(allIds);
 										}
 									}}
-									onGetSuggestions={scoreFullAutomatedPrompt}
+									onGetSuggestions={handleGetSuggestions}
 									onUpscalePrompt={upscalePrompt}
 									isUpscalingPrompt={isUpscalingPrompt}
 									onFocusChange={handlePromptInputFocusChange}

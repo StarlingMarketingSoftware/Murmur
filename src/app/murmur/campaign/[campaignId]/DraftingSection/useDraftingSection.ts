@@ -971,6 +971,183 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 	);
 
 	/**
+	 * Critique actual email content written in Manual mode.
+	 * Unlike scoreFullAutomatedPrompt which evaluates prompts, this evaluates
+	 * the actual email text for quality, tone, professionalism, and effectiveness.
+	 */
+	const critiqueManualEmailText = useCallback(
+		async (emailText: string) => {
+			const trimmed = emailText.trim();
+			if (!trimmed) {
+				setPromptQualityScore(null);
+				setPromptQualityLabel(null);
+				setPromptSuggestions([]);
+				return;
+			}
+
+			const scoringModel =
+				GEMINI_MODEL_OPTIONS.gemini25FlashLite ||
+				GEMINI_MODEL_OPTIONS.gemini25Flash ||
+				GEMINI_MODEL_OPTIONS.gemini2Flash;
+
+			const critiquePrompt = `You are an expert email writing coach helping a musician improve their outreach emails to venues and promoters.
+
+Analyze the EMAIL TEXT below and provide constructive feedback. Assign a quality score between 60 and 100 inclusive, where:
+- 60–69 = Needs Work
+- 70–79 = Good
+- 80–89 = Great
+- 90–100 = Excellent
+
+Evaluate the email based on:
+1. Clarity and readability - Is the message clear and easy to understand?
+2. Professionalism - Does it sound professional without being too formal?
+3. Personalization - Does it feel personal or generic?
+4. Call to action - Is there a clear ask or next step?
+5. Length - Is it appropriately concise or too long/short?
+6. Tone - Is it friendly, confident, and engaging?
+7. Grammar and spelling - Are there any obvious errors?
+
+Return ONLY a valid JSON object with this exact shape and no extra commentary or formatting:
+{"score": 75, "label": "Good", "suggestion1": "First one-sentence suggestion to improve the email.", "suggestion2": "Second one-sentence suggestion to improve the email.", "suggestion3": "Third one-sentence suggestion to improve the email."}
+
+Each suggestion MUST be a single, complete sentence (no bullet points) and should be specific, actionable feedback about the email writing itself. Focus on how to make the email more effective at getting a response.`;
+
+			const scoringContent = `EMAIL TEXT:\n${trimmed}`;
+
+			try {
+				const raw = await callGemini({
+					model: scoringModel,
+					prompt: critiquePrompt,
+					content: scoringContent,
+				});
+
+				let cleaned = raw;
+				// Strip optional markdown fences
+				cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+				// Try to isolate a JSON object if extra text slipped through
+				const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+				if (jsonMatch) {
+					cleaned = jsonMatch[0];
+				}
+
+				type CritiqueResponse = {
+					score?: number | string;
+					label?: string;
+					suggestion1?: string;
+					suggestion2?: string;
+					suggestion3?: string;
+					suggestions?: string[];
+				};
+
+				let parsed: CritiqueResponse = {};
+				try {
+					parsed = JSON.parse(cleaned) as CritiqueResponse;
+				} catch (parseError) {
+					console.warn(
+						'[Email Critique] JSON parse failed, attempting numeric fallback',
+						parseError
+					);
+				}
+
+				let rawScore: number | null = null;
+				if (typeof parsed.score === 'number') {
+					rawScore = parsed.score;
+				} else if (typeof parsed.score === 'string') {
+					const numeric = Number(parsed.score.replace(/[^\d.]/g, ''));
+					rawScore = Number.isFinite(numeric) ? numeric : null;
+				}
+
+				// Fallback: pull first 60–100-ish number out of the text
+				if (rawScore === null) {
+					const match = cleaned.match(/\b(6[0-9]|7[0-9]|8[0-9]|9[0-9]|100)\b/);
+					if (match) {
+						rawScore = Number(match[0]);
+					}
+				}
+
+				if (rawScore === null || Number.isNaN(rawScore)) {
+					console.warn(
+						'[Email Critique] Unable to extract numeric score from Gemini response:',
+						raw
+					);
+					return;
+				}
+
+				let score = Math.round(rawScore);
+				score = Math.max(60, Math.min(100, score));
+
+				const labelFromModel =
+					typeof parsed.label === 'string' && parsed.label.trim().length > 0
+						? parsed.label.trim()
+						: undefined;
+
+				const fallbackLabel =
+					score >= 90
+						? 'Excellent'
+						: score >= 80
+						? 'Great'
+						: score >= 70
+						? 'Good'
+						: 'Needs Work';
+
+				// Extract up to three suggestions from the model response
+				const rawSuggestions: string[] = [];
+
+				if (
+					typeof parsed.suggestion1 === 'string' &&
+					parsed.suggestion1.trim().length > 0
+				) {
+					rawSuggestions.push(parsed.suggestion1.trim());
+				}
+				if (
+					typeof parsed.suggestion2 === 'string' &&
+					parsed.suggestion2.trim().length > 0
+				) {
+					rawSuggestions.push(parsed.suggestion2.trim());
+				}
+				if (
+					typeof parsed.suggestion3 === 'string' &&
+					parsed.suggestion3.trim().length > 0
+				) {
+					rawSuggestions.push(parsed.suggestion3.trim());
+				}
+				if (Array.isArray(parsed.suggestions)) {
+					for (const s of parsed.suggestions) {
+						if (
+							typeof s === 'string' &&
+							s.trim().length > 0 &&
+							rawSuggestions.length < 3
+						) {
+							rawSuggestions.push(s.trim());
+						}
+					}
+				}
+
+				const normalizeToSingleSentence = (text: string) => {
+					const collapsed = text.replace(/\s+/g, ' ').trim();
+					if (!collapsed) return '';
+					const sentenceMatch = collapsed.match(/[^.!?]+[.!?]/);
+					const sentence = sentenceMatch ? sentenceMatch[0] : collapsed;
+					return sentence.trim();
+				};
+
+				const normalizedSuggestions = rawSuggestions
+					.slice(0, 3)
+					.map(normalizeToSingleSentence)
+					.filter((s) => s.length > 0);
+
+				setPromptQualityScore(score);
+				setPromptQualityLabel(labelFromModel || fallbackLabel);
+				setPromptSuggestions(normalizedSuggestions);
+			} catch (error) {
+				console.error('[Email Critique] Gemini evaluation failed:', error);
+				setPromptSuggestions([]);
+			}
+		},
+		[callGemini]
+	);
+
+	/**
 	 * Upscale the current Full Auto prompt using Gemini 2.5 Flash.
 	 * Makes the prompt deeper, longer, and more detailed.
 	 */
@@ -1787,5 +1964,6 @@ The improved prompt should result in more personalized, engaging, and effective 
 		livePreviewMessage,
 		livePreviewSubject,
 		scoreFullAutomatedPrompt,
+		critiqueManualEmailText,
 	};
 };
