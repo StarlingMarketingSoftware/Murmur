@@ -792,16 +792,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	};
 
-	// Handler for closing a search tab
 	const handleCloseSearchTab = (tabId: string) => {
 		setSearchTabs((tabs) => tabs.filter((tab) => tab.id !== tabId));
-		// If we're closing the active tab, switch to Original
 		if (activeSearchTabId === tabId) {
 			setActiveSearchTabId(null);
 		}
 	};
 
-	// State for drafts selection in the Drafts tab by filter
 	const [draftStatusFilter, setDraftStatusFilter] = useState<'all' | 'approved' | 'rejected'>('all');
 	const [draftSelectionsByFilter, setDraftSelectionsByFilter] = useState<{
 		all: Set<number>;
@@ -835,7 +832,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		});
 	};
 
-	// Get contact and email counts for the header box
 	const contactListIds = campaign?.userContactLists?.map((l) => l.id) || [];
 	const { data: headerContacts } = useGetContacts({
 		filters: { contactListIds },
@@ -851,7 +847,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const sentEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.sent);
 	const sentCount = sentEmails.length;
 
-	// Compute rejected and approved draft IDs from persisted reviewStatus
 	const rejectedDraftIds = useMemo(() => {
 		const ids = new Set<number>();
 		draftEmails.forEach((email) => {
@@ -872,8 +867,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		return ids;
 	}, [draftEmails]);
 
-	// Contacts that are still eligible for drafting in this campaign:
-	// hide any contact that already has a draft email for this campaign.
 	const draftedContactIds = new Set(draftEmails.map((e) => e.contactId));
 	const contactsAvailableForDrafting = (contacts || []).filter(
 		(contact) => !draftedContactIds.has(contact.id)
@@ -881,30 +874,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const isSendingDisabled = isFreeTrial || (user?.sendingCredits || 0) === 0;
 
-	// Selected contact for shared research panel (persistent on click)
 	const [selectedContactForResearch, setSelectedContactForResearch] =
 		useState<ContactWithName | null>(null);
-	// Hovered contact for temporary preview
 	const [hoveredContactForResearch, setHoveredContactForResearch] =
-		useState<ContactWithName | null>(null);
-	// Track whether the user has explicitly selected a contact (via click)
+		useState<ContactWithName | null>(null);	
 	const [hasUserSelectedResearchContact, setHasUserSelectedResearchContact] =
 		useState(false);
-	// Whether to show the Test Preview panel in place of the Research panel (desktop only)
 	const [showTestPreview, setShowTestPreview] = useState(false);
 
-	// Display priority: hovered contact > selected contact
 	const displayedContactForResearch =
 		hoveredContactForResearch || selectedContactForResearch;
 
-	// Default to the first contact in the campaign for the research panel
 	useEffect(() => {
 		if (!selectedContactForResearch && contacts && contacts.length > 0) {
 			setSelectedContactForResearch(contacts[0]);
 		}
 	}, [contacts, selectedContactForResearch]);
 
-	// Ensure selected IDs only reference contacts that are still available for drafting.
 	useEffect(() => {
 		if (!contactsAvailableForDrafting) return;
 		const availableIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
@@ -925,7 +911,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		});
 	}, [contactsAvailableForDrafting, setContactsTabSelectedIds]);
 
-	// Handlers to coordinate hover / selection behavior for the research panel
 	const handleResearchContactClick = (contact: ContactWithName | null) => {
 		if (!contact) return;
 		setSelectedContactForResearch(contact);
@@ -934,15 +919,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const handleResearchContactHover = (contact: ContactWithName | null) => {
 		if (contact) {
-			// Always update the currently hovered contact
 			setHoveredContactForResearch(contact);
 			return;
 		}
 
-		// When hover ends (null), decide what to show:
-		// - If the user has explicitly selected a contact, fall back to that selection
-		//   by clearing the hover state.
-		// - If not, keep showing the last hovered contact by leaving hover state as-is.
 		if (hasUserSelectedResearchContact) {
 			setHoveredContactForResearch(null);
 		}
@@ -1042,18 +1022,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	};
 
-	// Sender email addresses for all contacts in this campaign.
-	// Used to scope the in‑campaign inbox so it only shows replies
-	// from contacts that belong to this campaign.
 	const campaignContactEmails = contacts
 		? contacts
 				.map((contact) => contact.email)
 				.filter((email): email is string => Boolean(email))
 		: undefined;
 
-	// Map of email -> contact for this campaign, used by the Inbox tab
-	// so that replies are labeled with the campaign's canonical contact
-	// name/company rather than whatever name is in the incoming email.
 	const campaignContactsByEmail = useMemo(() => {
 		if (!contacts) return undefined;
 		const map: Record<string, ContactWithName> = {};
@@ -1479,7 +1453,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										sentCount={sentCount}
 										onFromClick={onOpenIdentityDialog}
 									/>
-									{/* For the Writing (testing) and Search tabs, show a mini contacts table instead of mini email structure. */}
 									{view === 'testing' || view === 'search' ? (
 										<>
 											<div

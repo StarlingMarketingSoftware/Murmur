@@ -1175,8 +1175,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 												className="text-[14px] font-inter font-semibold text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2"
 												style={{
 													WebkitMaskImage:
-														'linear-gradient(90deg, #000 78%, transparent 100%)',
-													maskImage: 'linear-gradient(90deg, #000 78%, transparent 100%)',
+														'linear-gradient(90deg, #000 96%, transparent 100%)',
+													maskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
 												}}
 											>
 												{draft.subject || 'No subject'}
@@ -1189,8 +1189,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 												className="text-[10px] text-gray-500 leading-none whitespace-nowrap overflow-hidden w-full pr-2"
 												style={{
 													WebkitMaskImage:
-														'linear-gradient(90deg, #000 78%, transparent 100%)',
-													maskImage: 'linear-gradient(90deg, #000 78%, transparent 100%)',
+														'linear-gradient(90deg, #000 96%, transparent 100%)',
+													maskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
 												}}
 											>
 												{draft.message
