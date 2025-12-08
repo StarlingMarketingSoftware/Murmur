@@ -1955,7 +1955,7 @@ const DashboardContent = () => {
 																					<div
 																						key={contact.id}
 																						data-contact-id={contact.id}
-																						className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none"
+																						className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none relative"
 																						style={{
 																							backgroundColor: isSelected
 																								? '#C9EAFF'
@@ -1980,6 +1980,23 @@ const DashboardContent = () => {
 																						}
 																						onMouseLeave={() => setHoveredContact(null)}
 																					>
+																						{/* Centered used contact dot */}
+																						{fullName && isUsed && (
+																							<span
+																								className="absolute shrink-0"
+																								title="Used in a previous campaign"
+																								style={{
+																									width: '16px',
+																									height: '16px',
+																									borderRadius: '50%',
+																									border: '1px solid #000000',
+																									backgroundColor: '#DAE6FE',
+																									left: '12px',
+																									top: '50%',
+																									transform: 'translateY(-50%)',
+																								}}
+																							/>
+																						)}
 																						{fullName ? (
 																							<>
 																								{/* Top Left - Name */}
@@ -1987,13 +2004,9 @@ const DashboardContent = () => {
 																									{isUsed && (
 																										<span
 																											className="inline-block shrink-0 mr-2"
-																											title="Used in a previous campaign"
 																											style={{
 																												width: '16px',
 																												height: '16px',
-																												borderRadius: '50%',
-																												border: '1px solid #000000',
-																												backgroundColor: '#DAE6FE',
 																											}}
 																										/>
 																									)}
@@ -2015,6 +2028,15 @@ const DashboardContent = () => {
 																								</div>
 																								{/* Bottom Left - Company */}
 																								<div className="pl-3 pr-1 flex items-center h-[22px]">
+																									{isUsed && (
+																										<span
+																											className="inline-block shrink-0 mr-2"
+																											style={{
+																												width: '16px',
+																												height: '16px',
+																											}}
+																										/>
+																									)}
 																									<div className="text-[11px] text-black w-full truncate leading-tight">
 																										{company}
 																									</div>
