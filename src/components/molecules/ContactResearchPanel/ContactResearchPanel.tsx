@@ -444,16 +444,17 @@ top: isExpanded ? '28px' : '50%',
 									isExpanded ? "items-start pt-2" : "items-center"
 								)}>
 									<div
-										className="w-full text-[15px] leading-[1.25] text-black font-inter"
+										className="w-full text-[15px] leading-[1.25] text-black font-inter relative"
 										style={{
-											display: '-webkit-box',
-											WebkitLineClamp: isExpanded ? 7 : 2,
-											WebkitBoxOrient: 'vertical',
+											maxHeight: isExpanded ? '8.75em' : '2.5em',
 											overflow: 'hidden',
 											color: hideAllText || isLoading ? 'transparent' : '#000000',
 										}}
 									>
 										{metadataSections[config.key]}
+										{!hideAllText && !isLoading && (
+											<div className="absolute bottom-0 right-0 w-12 h-[1.25em] bg-gradient-to-r from-transparent to-white pointer-events-none" />
+										)}
 									</div>
 								</div>
 								{/* Chevron icon */}
@@ -636,16 +637,17 @@ top: isExpanded ? '28px' : '50%',
 									isExpanded ? "items-start pt-2" : "items-center"
 								)}>
 									<div
-										className="w-full text-[15px] leading-[1.25] text-black font-inter"
+										className="w-full text-[15px] leading-[1.25] text-black font-inter relative"
 										style={{
-											display: '-webkit-box',
-											WebkitLineClamp: isExpanded ? 7 : 2,
-											WebkitBoxOrient: 'vertical',
+											maxHeight: isExpanded ? '8.75em' : '2.5em',
 											overflow: 'hidden',
 											color: hideAllText || isLoading ? 'transparent' : '#000000',
 										}}
 									>
 										{metadataSections[config.key]}
+										{!hideAllText && !isLoading && (
+											<div className="absolute bottom-0 right-0 w-12 h-[1.25em] bg-gradient-to-r from-transparent to-white pointer-events-none" />
+										)}
 									</div>
 								</div>
 								{/* Chevron icon */}

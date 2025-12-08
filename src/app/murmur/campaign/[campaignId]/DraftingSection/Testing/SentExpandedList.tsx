@@ -482,7 +482,15 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 										<div className="grid grid-cols-1 grid-rows-4 h-full pr-[95px] pl-[22px]">
 											{/* Row 1: Name */}
 											<div className="flex items-center h-[8px] overflow-hidden">
-												<div className="font-bold text-[9px] truncate leading-none">
+												<div
+													className="font-bold text-[9px] leading-none whitespace-nowrap overflow-hidden w-full pr-1"
+													style={{
+														WebkitMaskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+														maskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+													}}
+												>
 													{contactName}
 												</div>
 											</div>
@@ -494,7 +502,15 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 															(contact?.lastName && contact.lastName.trim())
 													);
 													return (
-														<div className="text-[8px] text-black truncate leading-none">
+														<div
+															className="text-[8px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-1"
+															style={{
+																WebkitMaskImage:
+																	'linear-gradient(90deg, #000 96%, transparent 100%)',
+																maskImage:
+																	'linear-gradient(90deg, #000 96%, transparent 100%)',
+															}}
+														>
 															{hasSeparateName ? contact?.company || '' : ''}
 														</div>
 													);
@@ -502,15 +518,31 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 											</div>
 											{/* Row 3: Subject */}
 											<div className="flex items-center h-[6px] overflow-hidden">
-												<div className="text-[7px] text-black truncate leading-none">
+												<div
+													className="text-[7px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-1"
+													style={{
+														WebkitMaskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+														maskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+													}}
+												>
 													{email.subject || 'No subject'}
 												</div>
 											</div>
 											{/* Row 4: Email body preview */}
 											<div className="flex items-center h-[6px] overflow-hidden mt-[2px]">
-												<div className="text-[7px] text-gray-500 truncate leading-none">
+												<div
+													className="text-[7px] text-gray-500 leading-none whitespace-nowrap overflow-hidden w-full pr-1"
+													style={{
+														WebkitMaskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+														maskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+													}}
+												>
 													{email.message
-														? email.message.replace(/<[^>]*>/g, '').substring(0, 40)
+														? email.message.replace(/<[^>]*>/g, '')
 														: 'No content'}
 												</div>
 											</div>
@@ -520,7 +552,15 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 										<div className="grid grid-cols-1 grid-rows-4 h-full pr-[120px] pl-[22px]">
 											{/* Row 1: Name */}
 											<div className="row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
-												<div className="font-bold text-[11px] truncate leading-none">
+												<div
+													className="font-bold text-[11px] leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+													style={{
+														WebkitMaskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+														maskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+													}}
+												>
 													{contactName}
 												</div>
 											</div>
@@ -532,8 +572,16 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 														(contact?.lastName && contact.lastName.trim())
 												);
 												return (
-													<div className="row-start-2 col-start-1 flex items-center pr-2 h-[16px] max-[480px]:h-[12px]">
-														<div className="text-[11px] text-black truncate leading-none">
+													<div className="row-start-2 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
+														<div
+															className="text-[11px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+															style={{
+																WebkitMaskImage:
+																	'linear-gradient(90deg, #000 96%, transparent 100%)',
+																maskImage:
+																	'linear-gradient(90deg, #000 96%, transparent 100%)',
+															}}
+														>
 															{hasSeparateName ? contact?.company || '' : ''}
 														</div>
 													</div>
@@ -541,15 +589,35 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 											})()}
 
 											{/* Row 3: Subject */}
-											<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
-												{email.subject || 'No subject'}
+											<div className="row-start-3 col-span-1 flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
+												<div
+													className="text-[10px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+													style={{
+														WebkitMaskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+														maskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+													}}
+												>
+													{email.subject || 'No subject'}
+												</div>
 											</div>
 
 											{/* Row 4: Message preview */}
-											<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px]">
-												{email.message
-													? email.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
-													: 'No content'}
+											<div className="row-start-4 col-span-1 flex items-center h-[16px] max-[480px]:h-[12px]">
+												<div
+													className="text-[10px] text-gray-500 leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+													style={{
+														WebkitMaskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+														maskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+													}}
+												>
+													{email.message
+														? email.message.replace(/<[^>]*>/g, '')
+														: 'No content'}
+												</div>
 											</div>
 										</div>
 									)}
