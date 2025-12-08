@@ -681,39 +681,81 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								</div>
 
 									{/* Content grid */}
-									<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px] pl-[22px]">
-										{/* Row 1: Name */}
-										<div className="row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
-											<div className="font-bold text-[11px] truncate leading-none">
-												{contactName}
+									{isBottomView ? (
+										/* Bottom view: compact 4-row layout */
+										<div className="grid grid-cols-1 grid-rows-4 h-full pr-[95px] pl-[22px]">
+											{/* Row 1: Name */}
+											<div className="flex items-center h-[8px] overflow-hidden">
+												<div className="font-bold text-[9px] truncate leading-none">
+													{contactName}
+												</div>
+											</div>
+											{/* Row 2: Company */}
+											<div className="flex items-center h-[6px] overflow-hidden">
+												{(() => {
+													const hasSeparateName = Boolean(
+														(contact?.name && contact.name.trim()) ||
+															(contact?.firstName && contact.firstName.trim()) ||
+															(contact?.lastName && contact.lastName.trim())
+													);
+													return (
+														<div className="text-[8px] text-black truncate leading-none">
+															{hasSeparateName ? contact?.company || '' : ''}
+														</div>
+													);
+												})()}
+											</div>
+											{/* Row 3: Subject */}
+											<div className="flex items-center h-[6px] overflow-hidden">
+												<div className="text-[7px] text-black truncate leading-none">
+													{draft.subject || 'No subject'}
+												</div>
+											</div>
+											{/* Row 4: Email body preview */}
+											<div className="flex items-center h-[6px] overflow-hidden mt-[2px]">
+												<div className="text-[7px] text-gray-500 truncate leading-none">
+													{draft.message
+														? draft.message.replace(/<[^>]*>/g, '').substring(0, 40)
+														: 'No content'}
+												</div>
 											</div>
 										</div>
-										{/* Row 2: Company (when separate name exists) */}
-										{(() => {
-											const hasSeparateName = Boolean(
-												(contact?.name && contact.name.trim()) ||
-													(contact?.firstName && contact.firstName.trim()) ||
-													(contact?.lastName && contact.lastName.trim())
-											);
-											return (
-												<div className="row-start-2 col-start-1 flex items-center pr-2 h-[16px] max-[480px]:h-[12px]">
-													<div className="text-[11px] text-black truncate leading-none">
-														{hasSeparateName ? contact?.company || '' : ''}
-													</div>
+									) : (
+										/* Normal view: 4-row layout */
+										<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px] pl-[22px]">
+											{/* Row 1: Name */}
+											<div className="row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
+												<div className="font-bold text-[11px] truncate leading-none">
+													{contactName}
 												</div>
-											);
-										})()}
-										{/* Row 3: Subject */}
-										<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
-											{draft.subject || 'No subject'}
+											</div>
+											{/* Row 2: Company (when separate name exists) */}
+											{(() => {
+												const hasSeparateName = Boolean(
+													(contact?.name && contact.name.trim()) ||
+														(contact?.firstName && contact.firstName.trim()) ||
+														(contact?.lastName && contact.lastName.trim())
+												);
+												return (
+													<div className="row-start-2 col-start-1 flex items-center pr-2 h-[16px] max-[480px]:h-[12px]">
+														<div className="text-[11px] text-black truncate leading-none">
+															{hasSeparateName ? contact?.company || '' : ''}
+														</div>
+													</div>
+												);
+											})()}
+											{/* Row 3: Subject */}
+											<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
+												{draft.subject || 'No subject'}
+											</div>
+											{/* Row 4: Message preview */}
+											<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px]">
+												{draft.message
+													? draft.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
+													: 'No content'}
+											</div>
 										</div>
-										{/* Row 4: Message preview */}
-										<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px]">
-											{draft.message
-												? draft.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
-												: 'No content'}
-										</div>
-									</div>
+									)}
 								</div>
 							);
 						})}
