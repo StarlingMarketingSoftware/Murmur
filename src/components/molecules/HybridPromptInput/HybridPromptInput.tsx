@@ -186,14 +186,18 @@ const SortableAIBlock = ({
 				isIntroductionBlock && 'border-2 border-[#6673FF] bg-background',
 				isResearchBlock && 'border-2 border-[#1010E7] bg-background',
 				isActionBlock && 'border-2 border-[#0E0E7F] bg-background',
+				isTextBlock && 'border-[3px] border-[#187124] bg-background',
 				!isIntroductionBlock &&
 					!isResearchBlock &&
 					!isActionBlock &&
+					!isTextBlock &&
 					'border-2 border-gray-300 bg-background',
-				isTextBlock
-					? showTestPreview
-						? 'w-[426px] max-[480px]:w-[89.33vw] min-h-[44px]'
-						: 'w-[89.33vw] max-w-[475px] min-h-[80px]'
+			isTextBlock
+				? showTestPreview
+					? 'w-[426px] max-[480px]:w-[89.33vw] min-h-[44px]'
+					: isManualModeSelected
+					? 'w-[89.33vw] max-w-[475px] min-h-[188px]'
+					: 'w-[89.33vw] max-w-[475px] min-h-[80px]'
 					: isCompactBlock
 					? showTestPreview
 						? `w-[426px] max-[480px]:w-[89.33vw] ${
@@ -212,10 +216,9 @@ const SortableAIBlock = ({
 				!isIntroductionBlock &&
 					!isResearchBlock &&
 					!isActionBlock &&
+					!isTextBlock &&
 					(shouldShowRedStyling
 						? 'border-[#A20000]'
-						: isTextBlock
-						? 'border-primary'
 						: 'border-secondary'),
 				isDragging ? 'opacity-50 z-50 transform-gpu' : ''
 			)}
@@ -262,6 +265,8 @@ const SortableAIBlock = ({
 						'flex items-center w-full',
 						isCompactBlock
 							? isAdvancedEnabled
+								? 'p-0 h-full'
+								: isTextBlock && isManualModeSelected
 								? 'p-0 h-full'
 								: 'p-2 h-full max-[480px]:py-[2px]'
 							: isFullAutomatedBlock
@@ -328,13 +333,19 @@ const SortableAIBlock = ({
 									isAdvancedEnabled
 										? 'flex flex-col'
 										: isTextBlock
-										? 'flex items-start'
+										? isManualModeSelected
+											? 'flex flex-col'
+											: 'flex items-start'
 										: 'flex items-center'
 								)}
 							>
 								{isTextBlock ? (
 									<>
-										<div className="flex flex-col justify-start w-[90px]">
+										{/* Top section with Text label */}
+										<div className={cn(
+											'flex items-center',
+											isManualModeSelected ? 'h-[29px] pl-2 w-full bg-[#A6E0B4]' : 'w-[90px]'
+										)}>
 											<span
 												className={cn(
 													'font-inter font-medium text-[17px] leading-[14px]',
@@ -344,6 +355,11 @@ const SortableAIBlock = ({
 												Text
 											</span>
 										</div>
+										{/* Horizontal divider for Manual mode text blocks */}
+										{isManualModeSelected && (
+											<div className="w-full border-b-2 border-black" />
+										)}
+										{/* Textarea - below divider in Manual mode, inline otherwise */}
 										{(() => {
 											const fieldProps = form.register(
 												`hybridBlockPrompts.${fieldIndex}.value`
@@ -358,8 +374,7 @@ const SortableAIBlock = ({
 														'flex-1 outline-none focus:outline-none text-sm border-0 ring-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 p-0 resize-none overflow-hidden bg-transparent min-h-0 appearance-none rounded-none',
 														(isIntroductionBlock || isResearchBlock || isActionBlock) &&
 															'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
-														'pl-0',
-														'pr-12',
+														isManualModeSelected ? 'pl-2 pt-2 pr-4 pb-[35px]' : 'pl-0 pr-12',
 														// Make placeholder text much smaller on mobile portrait when in Manual mode
 														isManualModeSelected && 'max-[480px]:placeholder:text-[10px]'
 													)}
@@ -941,6 +956,24 @@ const SortableAIBlock = ({
 				</div>
 				{/* End of Block content container */}
 			</div>
+			{/* Bottom section - 31px with gray background, only for text blocks */}
+			{isTextBlock && (
+				<div
+					className="absolute bottom-0 left-0 right-0 h-[31px] flex items-center"
+					style={{ backgroundColor: '#F5F5F5' }}
+				>
+					<button
+						type="button"
+						onClick={() => {
+							const currentValue = form.getValues(`hybridBlockPrompts.${fieldIndex}.value`) || '';
+							onGetSuggestions?.(currentValue);
+						}}
+						className="w-[115px] h-[20px] ml-[15px] bg-[#D7F0FF] border-2 border-black rounded-[5px] text-[11px] font-inter font-semibold cursor-pointer"
+					>
+						Get Suggestions
+					</button>
+				</div>
+			)}
 		</div>
 	);
 };
