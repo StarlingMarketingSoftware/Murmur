@@ -980,7 +980,13 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 											{/* Bottom Left - Company */}
 											<div className={cn(leftPadding, 'pr-1 flex items-center h-[24px]')}>
-												<div className="text-[15px] font-medium text-black w-full truncate leading-tight">
+												<div
+													className="text-[15px] font-medium text-black w-full whitespace-nowrap overflow-hidden leading-tight"
+													style={{
+														maskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+														WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+													}}
+												>
 													{contact.company || ''}
 												</div>
 											</div>
@@ -1059,7 +1065,13 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 										<>
 											{/* Left column - Company vertically centered */}
 											<div className={cn('row-span-2 pr-1 flex items-center h-full', leftPadding)}>
-												<div className="font-medium text-[15px] text-black w-full truncate leading-tight">
+												<div
+													className="font-medium text-[15px] text-black w-full whitespace-nowrap overflow-hidden leading-tight"
+													style={{
+														maskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+														WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+													}}
+												>
 													{contact.company || 'Contact'}
 												</div>
 											</div>
