@@ -105,8 +105,13 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					/>
 				) : (
 					<div
-						className="font-normal text-[26px] leading-none truncate text-black cursor-text h-[26px]"
-						style={{ fontFamily: 'Times New Roman, Times, serif' }}
+						className="font-normal text-[26px] leading-none whitespace-nowrap overflow-hidden text-black cursor-text h-[26px]"
+						style={{
+							fontFamily: 'Times New Roman, Times, serif',
+							maskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
+							WebkitMaskImage:
+								'linear-gradient(to right, black 90%, transparent 100%)',
+						}}
 						onClick={() => setIsEditing(true)}
 						title="Click to edit"
 					>
