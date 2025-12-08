@@ -255,11 +255,15 @@ export const MiniSearchBar: FC<{
 								/>
 							) : (
 								<div
-									className="font-semibold whitespace-nowrap truncate hover:text-black/60 transition-colors"
+									className="font-semibold whitespace-nowrap hover:text-black/60 transition-colors"
 									style={{
 										fontSize: isCompact ? '9px' : '11px',
 										lineHeight: '12px',
 										color: whatValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
+										maskImage:
+											'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+										WebkitMaskImage:
+											'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
 									}}
 								>
 									{whatValue || 'Add Recipients'}
@@ -324,11 +328,15 @@ export const MiniSearchBar: FC<{
 								/>
 							) : (
 								<div
-									className="font-semibold whitespace-nowrap truncate hover:text-black/60 transition-colors"
+									className="font-semibold whitespace-nowrap hover:text-black/60 transition-colors"
 									style={{
 										fontSize: isCompact ? '9px' : '11px',
 										lineHeight: '12px',
 										color: whereValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
+										maskImage:
+											'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+										WebkitMaskImage:
+											'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
 									}}
 								>
 									{whereValue || 'Search Destinations'}

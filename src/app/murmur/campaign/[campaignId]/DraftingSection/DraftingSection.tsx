@@ -2655,7 +2655,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															ref={whatInputRef}
 															value={searchWhatValue}
 															onChange={(e) => setSearchWhatValue(e.target.value)}
-															className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+															className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+															style={{
+																maskImage:
+																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+																WebkitMaskImage:
+																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+															}}
 															placeholder="What"
 															onFocus={(e) => {
 																setSearchActiveSection('what');
@@ -2679,7 +2685,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															ref={whereInputRef}
 															value={searchWhereValue}
 															onChange={(e) => setSearchWhereValue(e.target.value)}
-															className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+															className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+															style={{
+																maskImage:
+																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+																WebkitMaskImage:
+																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+															}}
 															placeholder="Where"
 															onFocus={(e) => {
 																setSearchActiveSection('where');
