@@ -858,11 +858,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												ref={(el) => {
 													blockRefs.current[b.id] = el;
 												}}
-												className={cn(
-													'rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden relative',
-													draftingMode === 'hybrid'
-														? 'w-[351px] ml-[2.5%]'
-														: 'w-[95%] max-[480px]:w-[89.33vw] mx-auto',
+											className={cn(
+												'rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden relative',
+												draftingMode === 'hybrid'
+													? 'w-[93%] ml-[2.5%]'
+													: 'w-[95%] max-[480px]:w-[89.33vw] mx-auto',
 													isExpanded
 														? 'h-[78px]'
 														: draftingMode === 'hybrid'
@@ -1035,7 +1035,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											<Fragment key={b.id}>
 												<div
 													className={cn(
-														'rounded-[8px] border-2 border-black overflow-hidden relative w-[351px] ml-[2.5%]',
+														'rounded-[8px] border-2 border-black overflow-hidden relative w-[93%] ml-[2.5%]',
 														isTextExpanded ? 'h-[78px]' : 'h-[26px]'
 													)}
 													style={{ backgroundColor: '#A2E2AF' }}
@@ -1122,7 +1122,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												className={cn(
 													'rounded-[8px] border-2 bg-white relative overflow-hidden',
 													draftingMode === 'hybrid'
-														? 'w-[351px] ml-[2.5%]'
+														? 'w-[93%] ml-[2.5%]'
 														: 'w-[95%] max-[480px]:w-[89.33vw] mx-auto',
 													b.type === 'full_automated' && 'mini-full-auto-card',
 													b.type !== 'full_automated' && 'px-2 py-1'
@@ -1368,7 +1368,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											<div
 												key={`mini-ph-${slot}`}
 												className={cn(
-													'w-[351px] ml-[2.5%] h-[26px] flex items-center justify-end',
+													'w-[93%] ml-[2.5%] h-[26px] flex items-center justify-end',
 													isMobileLandscape && 'h-[24px]'
 												)}
 											>
@@ -1408,7 +1408,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							{draftingMode === 'hybrid' ? (
 								<div className="w-[95%] max-[480px]:w-[89.33vw] mx-auto flex items-center justify-between">
 									<div
-										className="w-[312px] max-[480px]:flex-1 max-[480px]:mr-2 h-[30px] px-2 flex items-center gap-2 rounded-[8px] border-2 bg-white"
+										className="flex-1 mr-2 h-[30px] px-2 flex items-center gap-2 rounded-[8px] border-2 bg-white"
 										style={{ borderColor: '#969696' }}
 									>
 										<div className="font-inter text-[12px] font-semibold text-black shrink-0">
@@ -1475,7 +1475,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					{draftingMode === 'hybrid' ? (
 						<div className="w-[95%] mx-auto flex items-center justify-between">
 							<div
-								className="w-[312px] h-[30px] px-2 flex items-center gap-2 rounded-[8px] border-2 bg-white"
+								className="flex-1 mr-2 h-[30px] px-2 flex items-center gap-2 rounded-[8px] border-2 bg-white"
 								style={{ borderColor: '#969696' }}
 							>
 								<div className="font-inter text-[12px] font-semibold text-black shrink-0">
