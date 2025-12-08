@@ -1,10 +1,11 @@
-import { FC, useMemo } from 'react';
+import { FC, useMemo, useState } from 'react';
 import { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { cn } from '@/utils';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import ResearchMap from '@/components/atoms/_svg/ResearchMap';
+import ResearchChevron from '@/components/atoms/_svg/ResearchChevron';
 
 export interface ContactResearchPanelProps {
 	contact: ContactWithName | null | undefined;
@@ -93,6 +94,9 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	width,
 	compactHeader = false,
 }) => {
+	// Track which box is expanded (null = none expanded)
+	const [expandedBox, setExpandedBox] = useState<string | null>(null);
+
 	// Outer container width: use explicit width prop, or derive from boxWidth + 15 (for default 375px appearance)
 	const containerWidth = width ?? (boxWidth + 15);
 	// Header dimensions based on compact mode
@@ -119,7 +123,15 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	// When loading (no contact), show 3 placeholder boxes
 	const displaySectionsCount = isLoading ? 3 : parsedSectionsCount;
 
-	const containerHeight = height
+	// Expanded box dimensions
+	const expandedOuterHeight = 161;
+	const expandedInnerHeight = 123;
+	const normalOuterHeight = height ? 44 : 52;
+	const normalInnerHeight = height ? 36 : 43;
+	const expansionDiff = expandedOuterHeight - normalOuterHeight; // 109px difference
+
+	// Calculate container height accounting for expansion
+	const baseContainerHeight = height
 		? height
 		: shouldHideSummary
 		? `${77 + 65 * displaySectionsCount}px`
@@ -130,6 +142,13 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 		: displaySectionsCount === 4
 		? '580px'
 		: '630px';
+
+	// Add expansion difference if a box is expanded
+	const containerHeight = expandedBox
+		? typeof baseContainerHeight === 'number'
+			? baseContainerHeight + expansionDiff
+			: `calc(${baseContainerHeight} + ${expansionDiff}px)`
+		: baseContainerHeight;
 
 	return (
 		<div
@@ -356,69 +375,103 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					: boxConfigs.filter((config) => metadataSections[config.key]);
 
 				// Compact mode spacing for All tab (when height is passed)
-				const boxHeight = height ? 44 : 52;
 				const boxSpacing = height ? 52 : 65;
-				const innerBoxHeight = height ? 36 : 43;
 
-				const content = visibleBoxes.map((config, index) => (
-					<div
-						key={config.key}
-						// Relative to the scroll container now
-						className="absolute"
-						style={{
-							top: `${6 + index * boxSpacing}px`,
-							left: '50%',
-							transform: 'translateX(-50%)',
-							width: `${boxWidth}px`,
-							height: `${boxHeight}px`,
-							backgroundColor: config.color,
-							border: '2px solid #000000',
-							borderRadius: '8px',
-						}}
-					>
-						{/* Section indicator */}
+				// Calculate cumulative top position accounting for expanded boxes
+				const getBoxTop = (index: number) => {
+					let top = 6;
+					for (let i = 0; i < index; i++) {
+						const isExpanded = expandedBox === visibleBoxes[i].key;
+						top += isExpanded ? expandedOuterHeight + 13 : boxSpacing;
+					}
+					return top;
+				};
+
+				const content = visibleBoxes.map((config, index) => {
+					const isExpanded = expandedBox === config.key;
+					const currentBoxHeight = isExpanded ? expandedOuterHeight : normalOuterHeight;
+					const currentInnerHeight = isExpanded ? expandedInnerHeight : normalInnerHeight;
+
+					return (
 						<div
-							className="absolute font-inter font-bold"
+							key={config.key}
+							// Relative to the scroll container now
+							className="absolute cursor-pointer"
 							style={{
-								top: '4px',
-								left: '8px',
-								fontSize: '11.5px',
-								color: hideAllText || isLoading ? 'transparent' : '#000000',
+								top: `${getBoxTop(index)}px`,
+								left: '50%',
+								transform: 'translateX(-50%)',
+								width: `${boxWidth}px`,
+								height: `${currentBoxHeight}px`,
+								backgroundColor: config.color,
+								border: '2px solid #000000',
+								borderRadius: '8px',
+							}}
+							onClick={() => {
+								if (!isLoading && !hideAllText) {
+									setExpandedBox(isExpanded ? null : config.key);
+								}
 							}}
 						>
-							[{config.key}]
-						</div>
-						{/* Inner content box */}
-						<div
-							className="absolute overflow-hidden"
-							style={{
-								top: '50%',
-								transform: 'translateY(-50%)',
-								right: '10px',
-								width: `${innerBoxWidth}px`,
-								height: `${innerBoxHeight}px`,
-								backgroundColor: hideAllText || isLoading ? config.color : '#FFFFFF',
-								border: '1px solid #000000',
-								borderRadius: '6px',
-							}}
-						>
-							<div className="w-full h-full px-2 flex items-center overflow-hidden">
+							{/* Section indicator */}
+							<div
+								className="absolute font-inter font-bold"
+								style={{
+									top: '4px',
+									left: '8px',
+									fontSize: '11.5px',
+									color: hideAllText || isLoading ? 'transparent' : '#000000',
+								}}
+							>
+								[{config.key}]
+							</div>
+							{/* Inner content box */}
+							<div
+								className="absolute overflow-hidden"
+								style={{
+top: isExpanded ? '28px' : '50%',
+								transform: isExpanded ? 'none' : 'translateY(-50%)',
+									right: '10px',
+									width: `${innerBoxWidth}px`,
+									height: `${currentInnerHeight}px`,
+									backgroundColor: hideAllText || isLoading ? config.color : '#FFFFFF',
+									border: '1px solid #000000',
+									borderRadius: '6px',
+								}}
+							>
+								<div className={cn(
+									"w-full h-full pl-2 pr-6 flex overflow-hidden",
+									isExpanded ? "items-start pt-2" : "items-center"
+								)}>
+									<div
+										className="w-full text-[15px] leading-[1.25] text-black font-inter"
+										style={{
+											display: '-webkit-box',
+											WebkitLineClamp: isExpanded ? 7 : 2,
+											WebkitBoxOrient: 'vertical',
+											overflow: 'hidden',
+											color: hideAllText || isLoading ? 'transparent' : '#000000',
+										}}
+									>
+										{metadataSections[config.key]}
+									</div>
+								</div>
+								{/* Chevron icon */}
 								<div
-									className="w-full text-[11px] leading-[1.25] text-black font-inter"
+									className="absolute"
 									style={{
-										display: '-webkit-box',
-										WebkitLineClamp: 2,
-										WebkitBoxOrient: 'vertical',
-										overflow: 'hidden',
-										color: hideAllText || isLoading ? 'transparent' : '#000000',
+										top: isExpanded ? '8px' : '50%',
+										transform: isExpanded ? 'rotate(-90deg)' : 'translateY(-50%)',
+										right: '8px',
+										opacity: hideAllText || isLoading ? 0 : 1,
 									}}
 								>
-									{metadataSections[config.key]}
+									<ResearchChevron color={config.color} />
 								</div>
 							</div>
 						</div>
-					</div>
-				));
+					);
+				});
 
 				// Always show boxes (either loading placeholders or data)
 				if (visibleBoxes.length === 0 && !isLoading) return null;
@@ -439,7 +492,13 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					// Calculate if content fits without scrolling
 					const numericHeight = typeof height === 'number' ? height : parseInt(String(height), 10) || 400;
 					const availableHeight = numericHeight - contentStartTop;
-					const contentHeight = 6 + visibleBoxes.length * boxSpacing + 10;
+					// Calculate content height accounting for any expanded box
+					let contentHeight = 6;
+					for (let i = 0; i < visibleBoxes.length; i++) {
+						const isExp = expandedBox === visibleBoxes[i].key;
+						contentHeight += isExp ? expandedOuterHeight + 13 : boxSpacing;
+					}
+					contentHeight += 10;
 					const needsScroll = contentHeight > availableHeight;
 
 					// If content fits, render without scroll wrapper
@@ -510,64 +569,101 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				// Original rendering for non-fixed height (absolute relative to main container)
 				// Use contentStartTop + 6 (padding) for first item positioning
 				const baseTop = compactHeader ? headerHeight + 56 : headerHeight + 52;
-				return visibleBoxes.map((config, index) => (
-					<div
-						key={config.key}
-						className="absolute"
-						style={{
-							top: `${baseTop + index * boxSpacing}px`,
-							left: '50%',
-							transform: 'translateX(-50%)',
-							width: `${boxWidth}px`,
-							height: `${boxHeight}px`,
-							backgroundColor: config.color,
-							border: '2px solid #000000',
-							borderRadius: '8px',
-						}}
-					>
-						{/* Section indicator */}
+				
+				// Calculate cumulative top position accounting for expanded boxes
+				const getAbsoluteBoxTop = (index: number) => {
+					let top = baseTop;
+					for (let i = 0; i < index; i++) {
+						const isExp = expandedBox === visibleBoxes[i].key;
+						top += isExp ? expandedOuterHeight + 13 : boxSpacing;
+					}
+					return top;
+				};
+
+				return visibleBoxes.map((config, index) => {
+					const isExpanded = expandedBox === config.key;
+					const currentBoxHeight = isExpanded ? expandedOuterHeight : normalOuterHeight;
+					const currentInnerHeight = isExpanded ? expandedInnerHeight : normalInnerHeight;
+
+					return (
 						<div
-							className="absolute font-inter font-bold"
+							key={config.key}
+							className="absolute cursor-pointer"
 							style={{
-								top: '4px',
-								left: '8px',
-								fontSize: '11.5px',
-								color: hideAllText || isLoading ? 'transparent' : '#000000',
+								top: `${getAbsoluteBoxTop(index)}px`,
+								left: '50%',
+								transform: 'translateX(-50%)',
+								width: `${boxWidth}px`,
+								height: `${currentBoxHeight}px`,
+								backgroundColor: config.color,
+								border: '2px solid #000000',
+								borderRadius: '8px',
+							}}
+							onClick={() => {
+								if (!isLoading && !hideAllText) {
+									setExpandedBox(isExpanded ? null : config.key);
+								}
 							}}
 						>
-							[{config.key}]
-						</div>
-						{/* Inner content box */}
-						<div
-							className="absolute overflow-hidden"
-							style={{
-								top: '50%',
-								transform: 'translateY(-50%)',
-								right: '10px',
-								width: `${innerBoxWidth}px`,
-								height: `${innerBoxHeight}px`,
-								backgroundColor: hideAllText || isLoading ? config.color : '#FFFFFF',
-								border: '1px solid #000000',
-								borderRadius: '6px',
-							}}
-						>
-							<div className="w-full h-full px-2 flex items-center overflow-hidden">
+							{/* Section indicator */}
+							<div
+								className="absolute font-inter font-bold"
+								style={{
+									top: '4px',
+									left: '8px',
+									fontSize: '11.5px',
+									color: hideAllText || isLoading ? 'transparent' : '#000000',
+								}}
+							>
+								[{config.key}]
+							</div>
+							{/* Inner content box */}
+							<div
+								className="absolute overflow-hidden"
+								style={{
+top: isExpanded ? '28px' : '50%',
+								transform: isExpanded ? 'none' : 'translateY(-50%)',
+									right: '10px',
+									width: `${innerBoxWidth}px`,
+									height: `${currentInnerHeight}px`,
+									backgroundColor: hideAllText || isLoading ? config.color : '#FFFFFF',
+									border: '1px solid #000000',
+									borderRadius: '6px',
+								}}
+							>
+								<div className={cn(
+									"w-full h-full pl-2 pr-6 flex overflow-hidden",
+									isExpanded ? "items-start pt-2" : "items-center"
+								)}>
+									<div
+										className="w-full text-[15px] leading-[1.25] text-black font-inter"
+										style={{
+											display: '-webkit-box',
+											WebkitLineClamp: isExpanded ? 7 : 2,
+											WebkitBoxOrient: 'vertical',
+											overflow: 'hidden',
+											color: hideAllText || isLoading ? 'transparent' : '#000000',
+										}}
+									>
+										{metadataSections[config.key]}
+									</div>
+								</div>
+								{/* Chevron icon */}
 								<div
-									className="w-full text-[11px] leading-[1.25] text-black font-inter"
+									className="absolute"
 									style={{
-										display: '-webkit-box',
-										WebkitLineClamp: 2,
-										WebkitBoxOrient: 'vertical',
-										overflow: 'hidden',
-										color: hideAllText || isLoading ? 'transparent' : '#000000',
+										top: isExpanded ? '8px' : '50%',
+										transform: isExpanded ? 'rotate(-90deg)' : 'translateY(-50%)',
+										right: '8px',
+										opacity: hideAllText || isLoading ? 0 : 1,
 									}}
 								>
-									{metadataSections[config.key]}
+									<ResearchChevron color={config.color} />
 								</div>
 							</div>
 						</div>
-					</div>
-				));
+					);
+				});
 			})()}
 
 			{/* Summary box at bottom */}

@@ -262,7 +262,7 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 			{(isAllTab || isBottomView) && (
 				<div
 					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
-					style={{ top: isBottomView ? 1 : -1, right: isBottomView ? 4 : 4 }}
+					style={{ top: isBottomView ? 1 : 1, right: isBottomView ? 4 : 4 }}
 					onClick={onOpenInbox}
 					role={onOpenInbox ? 'button' : undefined}
 					tabIndex={onOpenInbox ? 0 : undefined}
