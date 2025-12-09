@@ -334,10 +334,11 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 								<div
 									key={email.id}
 									className={cn(
-										'cursor-pointer transition-colors relative select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
+										'cursor-pointer transition-colors relative select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white',
 										isBottomView
-											? 'w-[225px] h-[40px]'
+											? 'w-[224px] h-[28px]'
 											: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
+										!isBottomView && 'p-2',
 										isSelected && 'bg-[#A8E6A8]'
 									)}
 									onMouseDown={(e) => {
@@ -356,8 +357,8 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 											style={{
 												top: '50%',
 												transform: 'translateY(-50%)',
-												width: isBottomView ? '12px' : '16px',
-												height: isBottomView ? '12px' : '16px',
+												width: isBottomView ? '12px' : isAllTab ? '13px' : '16px',
+												height: isBottomView ? '12px' : isAllTab ? '13px' : '16px',
 												borderRadius: '50%',
 												border: '1px solid #000000',
 												backgroundColor: '#DAE6FE',
@@ -366,20 +367,28 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 									)}
 
 									{/* Fixed top-right info (Title + Location) */}
-									<div className={cn(
-										"absolute flex flex-col items-end pointer-events-none",
-										isBottomView
-											? "top-[4px] right-[4px] gap-[1px] w-[90px]"
-											: "top-[6px] right-[6px] gap-[2px] w-[110px]"
-									)}>
+									<div
+										className={cn(
+											"absolute flex flex-col items-end pointer-events-none",
+											isBottomView
+												? "top-[4px] right-[4px] gap-[1px] w-[90px]"
+												: isAllTab
+												? "top-[4px] right-[8px] gap-[2px] w-[158px]"
+												: "top-[6px] right-[6px] gap-[2px] w-[110px]"
+										)}
+									>
 										{/* Title row - on top */}
 										{contactTitle ? (
-											<div className={cn(
-												"bg-[#E8EFFF] border border-black overflow-hidden flex items-center",
-												isBottomView
-													? "h-[10px] rounded-[3px] px-1 w-full"
-													: "w-[110px] h-[10px] rounded-[3.71px] justify-center"
-											)}>
+											<div
+												className={cn(
+													"bg-[#E8EFFF] border border-black overflow-hidden flex items-center",
+													isBottomView
+														? "h-[10px] rounded-[3px] px-1 w-full"
+														: isAllTab
+														? "w-[158px] h-[15px] rounded-[5px] justify-center"
+														: "w-[110px] h-[10px] rounded-[3.71px] justify-center"
+												)}
+											>
 												{isBottomView ? (
 													<span className="text-[7px] text-black leading-none truncate">
 														{contactTitle}
@@ -394,10 +403,16 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 										) : null}
 
 										{/* Location row - below title */}
-										<div className={cn(
-											"flex items-center justify-start",
-											isBottomView ? "gap-0.5 h-[10px] w-[90px]" : "gap-1 h-[11.67px] w-full"
-										)}>
+										<div
+											className={cn(
+												"flex items-center justify-start",
+												isBottomView
+													? "gap-0.5 h-[10px] w-[90px]"
+													: isAllTab
+													? "gap-1 h-[14px] w-[158px]"
+													: "gap-1 h-[11.67px] w-full"
+											)}
+										>
 											{(() => {
 												const fullStateName = (contact?.state as string) || '';
 												const stateAbbr = getStateAbbreviation(fullStateName) || '';
@@ -422,6 +437,8 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 															"inline-flex items-center justify-center border overflow-hidden",
 															isBottomView
 																? "w-[20px] h-[10px] rounded-[2px]"
+																: isAllTab
+																? "w-[27px] h-[14px] rounded-[4px]"
 																: "w-[17.81px] h-[11.67px] rounded-[3.44px]"
 														)}
 														style={{ borderColor: '#000000' }}
@@ -439,6 +456,8 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 															"inline-flex items-center justify-center border leading-none font-bold",
 															isBottomView
 																? "w-[20px] h-[10px] rounded-[2px] text-[7px]"
+																: isAllTab
+																? "w-[27px] h-[14px] rounded-[4px] text-[9px]"
 																: "w-[17.81px] h-[11.67px] rounded-[3.44px] text-[8px]"
 														)}
 														style={{
@@ -455,6 +474,8 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 															"inline-flex items-center justify-center border",
 															isBottomView
 																? "w-[20px] h-[10px] rounded-[2px]"
+																: isAllTab
+																? "w-[27px] h-[14px] rounded-[4px]"
 																: "w-[17.81px] h-[11.67px] rounded-[3.44px]"
 														)}
 														style={{ borderColor: '#000000' }}
@@ -478,10 +499,10 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 
 									{/* Content grid */}
 									{isBottomView ? (
-										/* Bottom view: compact 4-row layout */
-										<div className="grid grid-cols-1 grid-rows-4 h-full pr-[95px] pl-[22px]">
+										/* Bottom view: compact layout with name + company (no subject/body) */
+										<div className="grid grid-cols-1 grid-rows-2 h-full pr-[95px] pl-[22px]">
 											{/* Row 1: Name */}
-											<div className="flex items-center h-[8px] overflow-hidden">
+											<div className="flex items-center h-[12px] overflow-hidden">
 												<div
 													className="font-bold text-[9px] leading-none whitespace-nowrap overflow-hidden w-full pr-1"
 													style={{
@@ -495,7 +516,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 												</div>
 											</div>
 											{/* Row 2: Company */}
-											<div className="flex items-center h-[6px] overflow-hidden">
+											<div className="flex items-center h-[12px] overflow-hidden">
 												{(() => {
 													const hasSeparateName = Boolean(
 														(contact?.firstName && contact.firstName.trim()) ||
@@ -515,36 +536,6 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 														</div>
 													);
 												})()}
-											</div>
-											{/* Row 3: Subject */}
-											<div className="flex items-center h-[6px] overflow-hidden">
-												<div
-													className="text-[7px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-1"
-													style={{
-														WebkitMaskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-														maskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-													}}
-												>
-													{email.subject || 'No subject'}
-												</div>
-											</div>
-											{/* Row 4: Email body preview */}
-											<div className="flex items-center h-[6px] overflow-hidden mt-[2px]">
-												<div
-													className="text-[7px] text-gray-500 leading-none whitespace-nowrap overflow-hidden w-full pr-1"
-													style={{
-														WebkitMaskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-														maskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-													}}
-												>
-													{email.message
-														? email.message.replace(/<[^>]*>/g, '')
-														: 'No content'}
-												</div>
 											</div>
 										</div>
 									) : (
@@ -589,7 +580,12 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 											})()}
 
 											{/* Row 3: Subject */}
-											<div className="row-start-3 col-span-1 flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
+											<div
+												className={cn(
+													'row-start-3 col-span-1 flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]',
+													isAllTab && 'mt-[2px]'
+												)}
+											>
 												<div
 													className="text-[10px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2"
 													style={{
@@ -625,15 +621,16 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 							);
 						})}
 						{Array.from({
-							length: Math.max(0, (isBottomView ? 2 : 4) - sent.length),
+							length: Math.max(0, (isBottomView ? 3 : 4) - sent.length),
 						}).map((_, idx) => (
 							<div
 								key={`sent-placeholder-${idx}`}
 								className={cn(
-									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] p-2',
+									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000]',
 									isBottomView
-										? 'w-[225px] h-[40px]'
-										: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
+										? 'w-[224px] h-[28px]'
+										: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
+									!isBottomView && 'p-2'
 								)}
 								style={{ backgroundColor: placeholderBgColor }}
 							/>
