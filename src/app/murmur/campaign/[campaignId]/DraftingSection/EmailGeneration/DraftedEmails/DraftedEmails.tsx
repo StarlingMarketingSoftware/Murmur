@@ -654,6 +654,93 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						data-lenis-prevent
 						style={{ margin: '0', border: 'none', padding: hasStatusBar ? '0 12px 12px 12px' : '6px 12px 12px 12px', borderBottomLeftRadius: '5px', borderBottomRightRadius: '5px', backgroundColor: '#FFDC9E' }}
 					>
+						{/* Vertical divider line 20px from right - bottom area only */}
+						<div
+							style={{
+								position: 'absolute',
+								right: '20px',
+								top: hasStatusBar ? '578px' : '640px',
+								bottom: 0,
+								width: '1px',
+								backgroundColor: '#000000',
+							}}
+						/>
+						{/* Second divider line 94px to the left of the first one (20 + 94 = 114) */}
+						<div
+							style={{
+								position: 'absolute',
+								right: '114px',
+								top: hasStatusBar ? '578px' : '640px',
+								bottom: 0,
+								width: '1px',
+								backgroundColor: '#000000',
+							}}
+						/>
+						{/* Delete button between lines */}
+						<button
+							type="button"
+							onClick={async (e) => {
+								if (selectedDraft) {
+									await handleDeleteDraft(e, selectedDraft.id);
+									setSelectedDraft(null);
+								}
+							}}
+							disabled={isPendingDeleteEmail}
+							className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
+							style={{
+								right: '20px',
+								width: '94px',
+								top: hasStatusBar ? '578px' : '640px',
+								bottom: 0,
+							}}
+						>
+							{isPendingDeleteEmail ? '...' : 'Delete'}
+						</button>
+						{/* Third divider line 5px to the left of the second one (114 + 5 = 119) */}
+						<div
+							style={{
+								position: 'absolute',
+								right: '119px',
+								top: hasStatusBar ? '578px' : '640px',
+								bottom: 0,
+								width: '1px',
+								backgroundColor: '#000000',
+							}}
+						/>
+						{/* Fourth divider line 92px to the left of the third one (119 + 92 = 211) */}
+						<div
+							style={{
+								position: 'absolute',
+								right: '211px',
+								top: hasStatusBar ? '578px' : '640px',
+								bottom: 0,
+								width: '1px',
+								backgroundColor: '#000000',
+							}}
+						/>
+						{/* Send button between lines */}
+						<button
+							type="button"
+							onClick={async () => {
+								if (selectedDraft && !props.isSendingDisabled) {
+									// Select only the current draft and send it
+									props.setSelectedDraftIds(new Set([selectedDraft.id]));
+									// Small delay to ensure state is updated before sending
+									await new Promise((resolve) => setTimeout(resolve, 50));
+									await props.onSend();
+								}
+							}}
+							disabled={props.isSendingDisabled}
+							className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
+							style={{
+								right: '119px',
+								width: '92px',
+								top: hasStatusBar ? '578px' : '640px',
+								bottom: 0,
+							}}
+						>
+							Send
+						</button>
 						{/* Subject input */}
 						<div className="flex justify-center" style={{ marginBottom: '8px' }}>
 							<input
