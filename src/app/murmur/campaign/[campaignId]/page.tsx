@@ -1,5 +1,8 @@
 'use client';
 
+// Force server-rendering (no static path generation) to avoid Clerk chunk build errors
+export const dynamic = 'force-dynamic';
+
 import { useCampaignDetail } from './useCampaignDetail';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { IdentityDialog } from '@/components/organisms/_dialogs/IdentityDialog/IdentityDialog';
