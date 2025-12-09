@@ -478,7 +478,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 						style={{
 							paddingTop:
 								customWhiteSectionHeight !== undefined
-									? '6px'
+									? '2px'
 									: isAllTab
 									? `${39 - whiteSectionHeight}px`
 									: `${38 - whiteSectionHeight}px`,

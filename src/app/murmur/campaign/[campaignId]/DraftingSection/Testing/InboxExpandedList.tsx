@@ -311,7 +311,7 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 						style={{
 							paddingTop:
 								customWhiteSectionHeight !== undefined
-									? '6px'
+									? '2px'
 									: isAllTab
 									? `${31 - whiteSectionHeight}px`
 									: `${38 - whiteSectionHeight}px`,
