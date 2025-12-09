@@ -8,10 +8,11 @@
 		}
 	],
 	"functions": {
-		"src/app/api/contacts/route.ts": { "maxDuration": 60 },
-		"src/app/api/mistral/route.ts": { "maxDuration": 60 },
+		"src/app/api/contacts/route.ts": { "maxDuration": 60, "memory": 1024 },
+		"src/app/api/mistral/route.ts": { "maxDuration": 60, "memory": 1024 },
 		"src/app/api/**/route.ts": { "maxDuration": 30 },
-		"app/api/**/route.ts": { "maxDuration": 30 }
+		"app/api/**/route.ts": { "maxDuration": 30 },
+		"src/app/murmur/campaign/[campaignId]/page.tsx": { "maxDuration": 60, "memory": 1024 }
 	},
 	"env": {
 		"NODE_OPTIONS": "--max-old-space-size=8192"

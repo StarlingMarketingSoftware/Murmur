@@ -21,6 +21,19 @@ const nextConfig: NextConfig = {
 	compiler: {
 		removeConsole: process.env.NODE_ENV === 'production',
 	},
+	// Reduce serverless function size and provisioning time
+	experimental: {
+		optimizePackageImports: [
+			'@clerk/nextjs',
+			'@tanstack/react-query',
+			'lucide-react',
+			'react-icons',
+			'@tiptap/react',
+			'@tiptap/starter-kit',
+			'lodash',
+			'date-fns',
+		],
+	},
 };
 
 export default nextConfig;
