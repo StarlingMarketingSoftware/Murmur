@@ -678,7 +678,16 @@ top: isExpanded ? '28px' : '50%',
 						left: '50%',
 						transform: 'translateX(-50%)',
 						width: `${boxWidth}px`,
-						height: hasAnyParsedSections || isLoading ? '197px' : '336px',
+						// When height is fixed and only showing summary (no bullet points):
+						// Calculate height to fit within container minus header/contact bar area
+						// Compact header: header(19) + divider(2) + gap(6) + contact box(40) + gap(4) + bottom(8) = ~79px
+						height: hasAnyParsedSections || isLoading 
+							? '197px' 
+							: height 
+								? typeof height === 'number'
+									? `${height - 79}px`
+									: 'calc(100% - 79px)'
+								: '336px',
 						backgroundColor: hasAnyParsedSections || isLoading ? '#E9F7FF' : '#158BCF',
 						border: '2px solid #000000',
 						borderRadius: '8px',
@@ -712,13 +721,14 @@ top: isExpanded ? '28px' : '50%',
 										transform: 'translateX(-50%)',
 								  }),
 							width: `${summaryInnerWidth}px`,
-							height: height
-								? typeof height === 'number'
-									? `${height - 53}px` // 352 - 53 = 299px (approx logic if fixed)
-									: 'calc(100% - 53px)'
-								: hasAnyParsedSections || isLoading
+							// Inner box height: relative to summary box height (subtract ~18px for padding)
+							height: hasAnyParsedSections || isLoading
 								? '182px'
-								: '299px',
+								: height
+									? typeof height === 'number'
+										? `${height - 79 - 18}px` // Summary box height minus padding
+										: 'calc(100% - 97px)'
+									: '299px',
 							backgroundColor: hideAllText || isLoading
 								? hasAnyParsedSections || isLoading
 									? '#E9F7FF'
