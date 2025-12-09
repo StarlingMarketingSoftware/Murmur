@@ -86,6 +86,24 @@ export interface HybridPromptInputProps {
 	 * Optional: invoked when the user clicks the "All" button to select all contacts.
 	 */
 	onSelectAllContacts?: () => void;
+	/**
+	 * Optional: invoked when the user clicks the "Get Suggestions" button.
+	 * Triggers the prompt scoring and suggestions box.
+	 */
+	onGetSuggestions?: (prompt: string) => Promise<void>;
+	/**
+	 * Optional: invoked when the user clicks the "Upscale" button.
+	 * Triggers the prompt upscaling functionality.
+	 */
+	onUpscalePrompt?: () => Promise<void>;
+	/**
+	 * Optional: indicates if upscaling is currently in progress.
+	 */
+	isUpscalingPrompt?: boolean;
+	/**
+	 * Optional: invoked when focus state changes within the prompt input area.
+	 */
+	onFocusChange?: (isFocused: boolean) => void;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {
@@ -99,6 +117,10 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		contact,
 		forceShowTestPreview,
 		onGoToDrafting,
+		onGetSuggestions,
+		onUpscalePrompt,
+		isUpscalingPrompt,
+		onFocusChange,
 	} = props;
 
 	/* HOOKS */
@@ -466,5 +488,9 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		isTest,
 		contact,
 		onGoToDrafting,
+		onGetSuggestions,
+		onUpscalePrompt,
+		isUpscalingPrompt,
+		onFocusChange,
 	};
 };

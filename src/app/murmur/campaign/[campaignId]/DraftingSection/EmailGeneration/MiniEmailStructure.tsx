@@ -12,6 +12,7 @@ import {
 import { UseFormReturn } from 'react-hook-form';
 import { DraftingFormValues } from '../useDraftingSection';
 import { Button } from '@/components/ui/button';
+import OpenIcon from '@/components/atoms/svg/OpenIcon';
 import { HybridBlock } from '@prisma/client';
 import { cn } from '@/utils';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
@@ -37,6 +38,8 @@ interface MiniEmailStructureProps {
 	hideAllText?: boolean;
 	/** Optional height override for the container */
 	height?: number | string;
+	/** Optional callback to open the Writing tab (shows Open control when provided) */
+	onOpenWriting?: () => void;
 }
 
 export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
@@ -53,6 +56,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	hideAddTextButtons,
 	hideAllText,
 	height,
+	onOpenWriting,
 }) => {
 	const watchedHybridBlocks = form.watch('hybridBlockPrompts');
 	const hybridBlocks = useMemo(() => watchedHybridBlocks || [], [watchedHybridBlocks]);
@@ -573,6 +577,28 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				overflow: 'visible',
 			}}
 		>
+			{onOpenWriting && (
+				<div
+					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
+					style={{ top: 2, right: 4 }}
+					onClick={onOpenWriting}
+					role="button"
+					tabIndex={0}
+					onKeyDown={(e) => {
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							onOpenWriting();
+						}
+					}}
+				>
+					<span className="text-[10px] font-medium leading-none text-[#B3B3B3] font-inter">
+						Open
+					</span>
+					<div style={{ marginTop: '1px' }}>
+						<OpenIcon />
+					</div>
+				</div>
+			)}
 			{hideAllText && (
 				<style jsx global>{`
 					[data-mini-email-hide-text='true'],
@@ -654,7 +680,16 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				>
 					<div className="px-0 pb-3 max-[480px]:pb-2">
 						{/* Mode */}
-						<div className="w-full bg-white pt-2 rounded-t-[5px] relative">
+						<div className="w-full bg-white rounded-t-[5px] relative overflow-hidden">
+							{/* Top chrome spacer with divider to keep the Mode row clear */}
+							<div
+								className="h-[15px] w-full border-b border-black bg-[#F8F8F8] flex items-center pl-2"
+								style={{ borderTopLeftRadius: '5px', borderTopRightRadius: '5px' }}
+							>
+								<span className="font-inter font-semibold text-[9px] leading-none text-black">
+									Writing
+								</span>
+							</div>
 							{/* Inline step indicator for mobile landscape */}
 							{isMobileLandscape && (
 								<div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[12px] leading-none font-inter font-medium text-black">
@@ -674,7 +709,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									</svg>
 								</div>
 							)}
-							<div className="flex items-center gap-4 mb-1 w-[95%] mx-auto">
+							<div className="flex items-center gap-4 mb-1 w-[95%] mx-auto mt-1">
 								<span className="font-inter font-semibold text-[13px]">Mode</span>
 								<div ref={modeContainerRef} className="relative flex items-center gap-6">
 									<div
@@ -736,11 +771,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									</button>
 								</div>
 							</div>
-							<div className="h-[2px] bg-black w-full mb-1" />
+							<div className="h-[1px] bg-black w-full mt-[2px]" />
 						</div>
 
 						{/* Auto Subject */}
-						<div className="mb-3 w-[95%] max-[480px]:w-[89.33vw] mx-auto">
+						<div className="mt-[9px] mb-3 w-[95%] max-[480px]:w-[89.33vw] mx-auto">
 							<div
 								className={cn(
 									'flex items-center h-[25px] rounded-[8px] border-2 border-black overflow-hidden',
@@ -823,11 +858,11 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												ref={(el) => {
 													blockRefs.current[b.id] = el;
 												}}
-												className={cn(
-													'rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden relative',
-													draftingMode === 'hybrid'
-														? 'w-[351px] ml-[2.5%]'
-														: 'w-[95%] max-[480px]:w-[89.33vw] mx-auto',
+											className={cn(
+												'rounded-[8px] border-2 bg-[#DADAFC] overflow-hidden relative',
+												draftingMode === 'hybrid'
+													? 'w-[93%] ml-[2.5%]'
+													: 'w-[95%] max-[480px]:w-[89.33vw] mx-auto',
 													isExpanded
 														? 'h-[78px]'
 														: draftingMode === 'hybrid'
@@ -1000,7 +1035,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											<Fragment key={b.id}>
 												<div
 													className={cn(
-														'rounded-[8px] border-2 border-black overflow-hidden relative w-[351px] ml-[2.5%]',
+														'rounded-[8px] border-2 border-black overflow-hidden relative w-[93%] ml-[2.5%]',
 														isTextExpanded ? 'h-[78px]' : 'h-[26px]'
 													)}
 													style={{ backgroundColor: '#A2E2AF' }}
@@ -1087,7 +1122,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												className={cn(
 													'rounded-[8px] border-2 bg-white relative overflow-hidden',
 													draftingMode === 'hybrid'
-														? 'w-[351px] ml-[2.5%]'
+														? 'w-[93%] ml-[2.5%]'
 														: 'w-[95%] max-[480px]:w-[89.33vw] mx-auto',
 													b.type === 'full_automated' && 'mini-full-auto-card',
 													b.type !== 'full_automated' && 'px-2 py-1'
@@ -1333,7 +1368,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											<div
 												key={`mini-ph-${slot}`}
 												className={cn(
-													'w-[351px] ml-[2.5%] h-[26px] flex items-center justify-end',
+													'w-[93%] ml-[2.5%] h-[26px] flex items-center justify-end',
 													isMobileLandscape && 'h-[24px]'
 												)}
 											>
@@ -1373,7 +1408,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							{draftingMode === 'hybrid' ? (
 								<div className="w-[95%] max-[480px]:w-[89.33vw] mx-auto flex items-center justify-between">
 									<div
-										className="w-[312px] max-[480px]:flex-1 max-[480px]:mr-2 h-[30px] px-2 flex items-center gap-2 rounded-[8px] border-2 bg-white"
+										className="flex-1 mr-2 h-[30px] px-2 flex items-center gap-2 rounded-[8px] border-2 bg-white"
 										style={{ borderColor: '#969696' }}
 									>
 										<div className="font-inter text-[12px] font-semibold text-black shrink-0">
@@ -1440,7 +1475,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					{draftingMode === 'hybrid' ? (
 						<div className="w-[95%] mx-auto flex items-center justify-between">
 							<div
-								className="w-[312px] h-[30px] px-2 flex items-center gap-2 rounded-[8px] border-2 bg-white"
+								className="flex-1 mr-2 h-[30px] px-2 flex items-center gap-2 rounded-[8px] border-2 bg-white"
 								style={{ borderColor: '#969696' }}
 							>
 								<div className="font-inter text-[12px] font-semibold text-black shrink-0">
@@ -1475,23 +1510,14 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						</div>
 					) : (
 						<div
-							className="px-2 py-2 w-[95%] max-[480px]:w-[89.33vw] mx-auto rounded-[8px] border-2 bg-white"
-							style={{ borderColor: '#969696' }}
+							className="px-2 w-[95%] max-[480px]:w-[89.33vw] mx-auto rounded-[8px] border-2 bg-white flex items-start gap-2"
+							style={{ borderColor: '#969696', height: '56px' }}
 						>
-							<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
+							<div className="font-inter text-[12px] font-semibold text-black shrink-0 pt-2 pl-1">
 								Signature
 							</div>
 							<textarea
-								className={cn(
-									'w-full text-[12px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none max-[480px]:h-[40px] signature-textarea',
-									isCompactSignature
-										? hybridBlocks.some((b) => b.type === 'full_automated')
-											? 'h-[28px]'
-											: 'h-[36px]'
-										: hybridBlocks.some((b) => b.type === 'full_automated')
-										? 'h-[40px]'
-										: 'h-[58px]'
-								)}
+								className="flex-1 text-[12px] rounded-[6px] pt-2 pr-1 pb-1 resize-none outline-none focus:outline-none h-full bg-transparent signature-textarea"
 								value={signature}
 								onChange={(e) => updateSignature(e.target.value)}
 							/>

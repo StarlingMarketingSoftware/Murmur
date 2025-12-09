@@ -1481,6 +1481,28 @@ body {
 	margin-top: 1rem !important;
 }
 
+/* Campaigns popup wrapper - remove all whitespace in the campaign page footer popup */
+.campaigns-popup-wrapper {
+	display: flex;
+	flex-direction: column;
+}
+
+.campaigns-popup-wrapper > * {
+	margin: 0 !important;
+	padding: 0 !important;
+}
+
+.campaigns-popup-wrapper .campaigns-table-container {
+	height: 100%;
+}
+
+.campaigns-popup-wrapper .my-campaigns-table {
+	height: 100% !important;
+	max-height: 100% !important;
+	min-height: 100% !important;
+	border-radius: 12px !important;
+}
+
 /* Campaigns table container with fixed height */
 .campaigns-table-container {
 	max-height: none;
@@ -1491,9 +1513,9 @@ body {
 
 /* Set a compact, scrollable height for the My Campaigns table */
 .campaigns-table-container .my-campaigns-table {
-	height: 172px !important;
-	max-height: 172px !important;
-	min-height: 172px !important; /* Force exact height */
+	height: 242px !important;
+	max-height: 242px !important;
+	min-height: 242px !important; /* Force exact height - fits 6 campaigns */
 	position: relative !important;
 	display: block !important; /* Ensure it's a block element */
 }
@@ -1505,9 +1527,9 @@ body {
 
 /* Override default h-[429px] class when campaigns table uses constrainHeight */
 .campaigns-table-container .my-campaigns-table.h-\[429px\] {
-	height: 172px !important;
-	max-height: 172px !important;
-	min-height: 172px !important;
+	height: 242px !important;
+	max-height: 242px !important;
+	min-height: 242px !important;
 }
 
 /* Force hide ALL native scrollbars in campaigns table and its children */
@@ -1597,7 +1619,7 @@ body {
 /* Ensure proper scrolling behavior for campaigns table with custom scrollbar */
 .campaigns-table-container .my-campaigns-table {
 	position: relative !important;
-	height: 172px !important;
+	height: 242px !important;
 }
 
 /* Ensure the scrollbar components have proper dimensions and scrolling */
@@ -5159,3 +5181,4 @@ body.murmur-mobile .search-input-icon-btn {
 		}
 	}
 }
+

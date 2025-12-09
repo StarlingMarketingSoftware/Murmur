@@ -1,10 +1,10 @@
 'use client';
 
+// Force server-rendering (no static path generation) to avoid Clerk chunk build errors
+export const dynamic = 'force-dynamic';
+
 import { useCampaignDetail } from './useCampaignDetail';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
-import { IdentityDialog } from '@/components/organisms/_dialogs/IdentityDialog/IdentityDialog';
-import { DraftingSection } from './DraftingSection/DraftingSection';
-import { CampaignRightPanel } from '@/components/organisms/CampaignRightPanel/CampaignRightPanel';
 import { useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import Link from 'next/link';
@@ -13,6 +13,31 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { useState, useEffect } from 'react';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
+import nextDynamic from 'next/dynamic';
+
+// Dynamically import heavy components to reduce initial bundle size and prevent Vercel timeout
+const DraftingSection = nextDynamic(
+	() => import('./DraftingSection/DraftingSection').then((mod) => mod.DraftingSection),
+	{
+		loading: () => <Spinner />,
+	}
+);
+
+const IdentityDialog = nextDynamic(
+	() =>
+		import('@/components/organisms/_dialogs/IdentityDialog/IdentityDialog').then(
+			(mod) => mod.IdentityDialog
+		),
+	{}
+);
+
+const CampaignRightPanel = nextDynamic(
+	() =>
+		import('@/components/organisms/CampaignRightPanel/CampaignRightPanel').then(
+			(mod) => mod.CampaignRightPanel
+		),
+	{}
+);
 
 const Murmur = () => {
 	// Add campaign-specific class to body for background styling
@@ -40,6 +65,7 @@ const Murmur = () => {
 		if (tabParam === 'drafting') return 'drafting';
 		if (tabParam === 'sent') return 'sent';
 		if (tabParam === 'search') return 'search';
+		if (tabParam === 'all') return 'all';
 		return 'testing';
 	};
 	
@@ -85,7 +111,6 @@ const Murmur = () => {
 	if (isMobile === null) {
 		return null;
 	}
-
 	// Hide underlying content and show a white overlay when we require the user to set up an identity
 	// or while the full-screen User Settings dialog is open. This prevents any visual "glimpses" and
 	// ensures a premium, smooth transition with no scale effects.
@@ -293,10 +318,12 @@ const Murmur = () => {
 							campaign={campaign}
 							view={activeView}
 							goToDrafting={() => setActiveView('drafting')}
+							goToAll={() => setActiveView('all')}
 							goToWriting={() => setActiveView('testing')}
 							onGoToSearch={() => setActiveView('search')}
 							goToContacts={() => setActiveView('contacts')}
 							goToInbox={() => setActiveView('inbox')}
+							goToSent={() => setActiveView('sent')}
 							onOpenIdentityDialog={() => {
 								setIdentityDialogOrigin('campaign');
 								setIsIdentityDialogOpen(true);
@@ -714,3 +741,4 @@ const Murmur = () => {
 };
 
 export default Murmur;
+

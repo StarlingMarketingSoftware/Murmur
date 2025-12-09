@@ -359,6 +359,17 @@ export async function GET(req: NextRequest) {
 			: isBookingSearch
 			? rawQuery.replace(/^\s*\[booking\]\s*/i, '')
 			: rawQuery;
+		const isWineBeerSpiritsQuery = (() => {
+			const normalized = rawQueryForParsing.toLowerCase();
+			const hasWine = /\bwine\b/.test(normalized);
+			const hasBeer = /\bbeer\b/.test(normalized);
+			const hasSpirits = /\bspirits?\b/.test(normalized);
+			if (!(hasWine && hasBeer && hasSpirits)) return false;
+			// Prefer matches where the three appear in the canonical order but allow any punctuation
+			return /\bwine[^a-zA-Z0-9]+beer[^a-zA-Z0-9]+(and\s+)?spirits?/.test(
+				normalized
+			);
+		})();
 		const parentheticalLocation = extractParentheticalLocation(rawQueryForParsing);
 		if (parentheticalLocation && !locationFilter) {
 			locationFilter = parentheticalLocation.originalText;
@@ -1374,6 +1385,93 @@ export async function GET(req: NextRequest) {
 				}
 				// If still empty and vector requested, let vector path try below
 			}
+		}
+
+		// Special-case: wine/beer/spirits queries - return only beverage venue titles
+		if (isWineBeerSpiritsQuery) {
+			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200));
+			const beveragePrefixes = ['Wineries', 'Distilleries', 'Breweries', 'Cideries'];
+
+			const baseWhere: Prisma.ContactWhereInput = {
+				id: addedContactIds.length > 0 ? { notIn: addedContactIds } : undefined,
+				emailValidationStatus: verificationStatus
+					? { equals: verificationStatus }
+					: undefined,
+			};
+
+			const stateStrictAnd: Prisma.ContactWhereInput[] = [];
+			if (forceStateAny && forceStateAny.length > 0) {
+				stateStrictAnd.push({
+					OR: forceStateAny.map((s) => ({
+						state: { equals: s, mode: 'insensitive' },
+					})),
+				});
+			} else if (queryJson.state) {
+				stateStrictAnd.push({
+					state: { equals: queryJson.state, mode: 'insensitive' },
+				});
+			}
+
+			const cityStrictAnd: Prisma.ContactWhereInput[] = [];
+			if (forceCityExactCity) {
+				cityStrictAnd.push({
+					city: { equals: forceCityExactCity, mode: 'insensitive' },
+				});
+			} else if (forceCityAny && forceCityAny.length > 0) {
+				cityStrictAnd.push({
+					OR: forceCityAny.map((c) => ({
+						city: { equals: c, mode: 'insensitive' },
+					})),
+				});
+			}
+
+			const primary = await prisma.contact.findMany({
+				where: {
+					AND: [
+						baseWhere,
+						...stateStrictAnd,
+						...cityStrictAnd,
+						{
+							OR: beveragePrefixes.map((p) => ({
+								title: { mode: 'insensitive', startsWith: p },
+							})),
+						},
+					],
+				},
+				orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+				take: finalLimit,
+			});
+
+			const results = primary.slice();
+			if (results.length < finalLimit) {
+				const filler = await prisma.contact.findMany({
+					where: {
+						AND: [
+							baseWhere,
+							...stateStrictAnd,
+							...cityStrictAnd,
+							{
+								OR: beveragePrefixes.map((p) => ({
+									title: { mode: 'insensitive', contains: p },
+								})),
+							},
+						],
+					},
+					orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+					take: finalLimit - results.length,
+				});
+				const seen = new Set(results.map((c) => c.id));
+				for (const c of filler) {
+					if (seen.has(c.id)) continue;
+					results.push(c);
+					seen.add(c.id);
+					if (results.length >= finalLimit) break;
+				}
+			}
+
+			// Do not apply booking title-prefix filtering here; this flow enforces the
+			// beverage categories directly.
+			return apiResponse(results.slice(0, finalLimit));
 		}
 
 		// Special-case: Booking searches - filter to specific title prefixes and respect strict state if present

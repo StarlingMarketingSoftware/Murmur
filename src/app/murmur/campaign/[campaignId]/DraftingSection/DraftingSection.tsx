@@ -1,4 +1,5 @@
 import { FC, Fragment, useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { DraftingSectionProps, useDraftingSection, HybridBlockPrompt } from './useDraftingSection';
 import { Form } from '@/components/ui/form';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
@@ -24,6 +25,7 @@ import { useMe } from '@/hooks/useMe';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ContactWithName } from '@/types/contact';
+import { CampaignsTable } from '@/components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { TestPreviewPanel } from '@/components/molecules/TestPreviewPanel/TestPreviewPanel';
 import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
@@ -54,6 +56,9 @@ import { stateBadgeColorMap } from '@/constants/ui';
 import { useGemini } from '@/hooks/useGemini';
 import { GEMINI_FULL_AI_PROMPT, GEMINI_HYBRID_PROMPT } from '@/constants/ai';
 import { Contact, Identity } from '@prisma/client';
+import BottomHomeIcon from '@/components/atoms/_svg/BottomHomeIcon';
+import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
+import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -81,11 +86,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const {
 		view = 'testing',
 		goToDrafting,
+		goToAll,
 		goToWriting,
 		onOpenIdentityDialog,
 		onGoToSearch,
 		goToInbox,
 		goToContacts,
+	goToSent,
 	} = props;
 	const {
 		campaign,
@@ -107,6 +114,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		trackFocusedField,
 		handleGenerateDrafts,
 		generationProgress,
+		scoreFullAutomatedPrompt,
+		critiqueManualEmailText,
 		// These are kept available for future use but not in current view:
 		// setGenerationProgress,
 		// cancelGeneration,
@@ -128,9 +137,78 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 
+	const router = useRouter();
 	const isMobile = useIsMobile();
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	const isDraftPreviewOpen = view === 'drafting' && Boolean(selectedDraft);
+
+	// Bottom hover box state
+	const [showBottomBox, setShowBottomBox] = useState(false);
+	const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
+	const [showCampaignsTable, setShowCampaignsTable] = useState(false);
+
+	// All tab hover states
+	const [isContactsHovered, setIsContactsHovered] = useState(false);
+	const [isWritingHovered, setIsWritingHovered] = useState(false);
+	const [isDraftsHovered, setIsDraftsHovered] = useState(false);
+	const [isSentHovered, setIsSentHovered] = useState(false);
+	const [isInboxHovered, setIsInboxHovered] = useState(false);
+	const handleGoToDashboard = useCallback(() => {
+		router.push('/murmur/dashboard');
+	}, [router]);
+
+	const handleGoToAll = useCallback(() => {
+		if (goToAll) {
+			goToAll();
+			return;
+		}
+		if (campaign?.id) {
+			router.push(`/murmur/campaign/${campaign.id}?tab=all`);
+			return;
+		}
+		router.push('/murmur/campaign');
+	}, [campaign?.id, goToAll, router]);
+
+	const handleToggleCampaignsTable = useCallback(() => {
+		setShowCampaignsTable((prev) => !prev);
+	}, []);
+	const bottomBarIcons = useMemo(
+		() => [
+			{ key: 'home', element: <BottomHomeIcon aria-label="Home icon" />, onClick: handleGoToDashboard },
+			{ key: 'arrow', element: <BottomArrowIcon aria-label="Arrow icon" />, onClick: handleGoToAll },
+			{ key: 'folder', element: <BottomFolderIcon aria-label="Folder icon" />, onClick: handleToggleCampaignsTable },
+		],
+		[handleGoToAll, handleGoToDashboard, handleToggleCampaignsTable]
+	);
+
+	// Hide campaigns table whenever the footer is not visible
+	useEffect(() => {
+		if (!showBottomBox && showCampaignsTable) {
+			setShowCampaignsTable(false);
+		}
+	}, [showBottomBox, showCampaignsTable]);
+
+	const handleBottomHoverEnter = () => {
+		if (showBottomBox || hoverTimerRef.current) return;
+		hoverTimerRef.current = setTimeout(() => {
+			setShowBottomBox(true);
+			hoverTimerRef.current = null;
+		}, 2000);
+	};
+
+	const handleBottomHoverLeave = () => {
+		if (hoverTimerRef.current) {
+			clearTimeout(hoverTimerRef.current);
+			hoverTimerRef.current = null;
+		}
+		setShowBottomBox(false);
+	};
+
+	useEffect(() => {
+		return () => {
+			if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+		};
+	}, []);
 
 	const handleRejectDraft = useCallback(
 		async (draftId: number, currentlyRejected?: boolean) => {
@@ -236,7 +314,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						content: userPrompt,
 					});
 				} else if (draftingMode === DraftingMode.hybrid) {
-					// Hybrid mode - use the hybrid blocks
 					const hybridBlocks = values.hybridBlockPrompts?.filter(
 						(block: HybridBlockPrompt) => block.type !== 'full_automated'
 					) || [];
@@ -305,7 +382,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						throw new Error('Missing required fields');
 					}
 				} catch {
-					// Fallback: try to extract from plain text
 					const subjectMatch = geminiResponse.match(/subject["']?\s*:\s*["']([^"']+)["']/i);
 					const messageMatch = geminiResponse.match(/message["']?\s*:\s*["']([\s\S]*?)["']\s*[,}]/i);
 					
@@ -315,22 +391,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					};
 				}
 
-				// Clean up the response
 				const cleanedSubject = removeEmDashes(parsed.subject);
 				const cleanedMessageText = removeEmDashes(parsed.message);
 
-				// Get signature and font from form values
 				const signatureText = values.signature || `Thank you,\n${campaign.identity?.name || ''}`;
 				const font = values.font || 'Arial';
 
-				// Convert to rich text with signature
 				const richTextMessage = convertAiResponseToRichTextEmail(
 					cleanedMessageText,
 					font,
 					signatureText
 				);
 
-				// Update the email in the database
 				await updateEmail({
 					id: draft.id.toString(),
 					data: {
@@ -339,11 +411,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					},
 				});
 
-				// Invalidate queries to refresh the data
 				queryClient.invalidateQueries({ queryKey: ['emails'] });
 
 				toast.success('Draft regenerated successfully');
-				// Return the plain text with signature for the preview
 				const messageWithSignature = `${cleanedMessageText}\n\n${signatureText}`;
 				return { subject: cleanedSubject, message: messageWithSignature };
 			} catch (error) {
@@ -374,10 +444,46 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const suggestionText1 = promptSuggestions?.[0] || '';
 	const suggestionText2 = promptSuggestions?.[1] || '';
+	const suggestionText3 = promptSuggestions?.[2] || '';
+
+	// Track if the HybridPromptInput is focused to show/hide suggestions box
+	const [isPromptInputFocused, setIsPromptInputFocused] = useState(false);
+	const suggestionBoxRef = useRef<HTMLDivElement>(null);
+	
+	const handlePromptInputFocusChange = useCallback((isFocused: boolean) => {
+		if (isFocused) {
+			setIsPromptInputFocused(true);
+		} else {
+			setTimeout(() => {
+				const activeElement = document.activeElement;
+				if (suggestionBoxRef.current?.contains(activeElement)) {
+					return;
+				}
+				setIsPromptInputFocused(false);
+			}, 50);
+		}
+	}, []);
+
+	const handleGetSuggestions = useCallback(
+		async (text: string) => {
+			const blocks = form.getValues('hybridBlockPrompts');
+			const isManualMode =
+				blocks &&
+				blocks.length > 0 &&
+				blocks.every((b: { type: string }) => b.type === 'text');
+
+			if (isManualMode) {
+				await critiqueManualEmailText(text);
+			} else {
+				await scoreFullAutomatedPrompt(text);
+			}
+		},
+		[form, critiqueManualEmailText, scoreFullAutomatedPrompt]
+	);
 
 	const promptScoreDisplayLabel =
 		clampedPromptScore == null
-			? 'Prompt score pending'
+			? ''
 			: `${clampedPromptScore} - ${
 					promptQualityLabel ||
 					(clampedPromptScore >= 90
@@ -389,7 +495,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						: 'Fair')
 			  }`;
 
-	// State for contacts selection in the Contacts tab
 	const [contactsTabSelectedIds, setContactsTabSelectedIds] = useState<Set<number>>(
 		new Set()
 	);
@@ -405,12 +510,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		});
 	};
 
-	// State for search tab map selection
 	const [searchTabSelectedContacts, setSearchTabSelectedContacts] = useState<number[]>(
 		[]
 	);
 
-	// State for mini searchbar dropdowns
 	const [searchActiveSection, setSearchActiveSection] = useState<
 		'why' | 'what' | 'where' | null
 	>(null);
@@ -422,29 +525,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const whatInputRef = useRef<HTMLInputElement>(null);
 	const whereInputRef = useRef<HTMLInputElement>(null);
 
-	// Debounce and location search for mini searchbar
 	const debouncedWhereValue = useDebounce(searchWhereValue, 300);
 	const { data: locationResults, isLoading: isLoadingLocations } = useGetLocations(
 		debouncedWhereValue,
-		'state-first'
+		'state'
 	);
 	const isPromotion = searchWhyValue === '[Promotion]';
 
-	// Initialize searchWhereValue from first contact's state
 	useEffect(() => {
 		if (contacts?.[0]?.state && !searchWhereValue) {
 			setSearchWhereValue(contacts[0].state);
 		}
 	}, [contacts, searchWhereValue]);
 
-	// Update searchWhatValue when campaign name changes
 	useEffect(() => {
 		if (campaign?.name) {
 			setSearchWhatValue(campaign.name);
 		}
 	}, [campaign?.name]);
 
-	// Handle clicks outside to close search dropdowns
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
 			const target = event.target as HTMLElement;
@@ -466,7 +565,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	}, [searchActiveSection]);
 
-	// Focus input when section becomes active
 	useEffect(() => {
 		if (searchActiveSection === 'what' && whatInputRef.current) {
 			whatInputRef.current.focus();
@@ -652,7 +750,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			return;
 		}
 
-		// Get the first user contact list ID from the campaign
 		const userContactListId = campaign?.userContactLists?.[0]?.id;
 		if (!userContactListId) {
 			toast.error('Campaign has no contact list');
@@ -695,16 +792,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	};
 
-	// Handler for closing a search tab
 	const handleCloseSearchTab = (tabId: string) => {
 		setSearchTabs((tabs) => tabs.filter((tab) => tab.id !== tabId));
-		// If we're closing the active tab, switch to Original
 		if (activeSearchTabId === tabId) {
 			setActiveSearchTabId(null);
 		}
 	};
 
-	// State for drafts selection in the Drafts tab by filter
 	const [draftStatusFilter, setDraftStatusFilter] = useState<'all' | 'approved' | 'rejected'>('all');
 	const [draftSelectionsByFilter, setDraftSelectionsByFilter] = useState<{
 		all: Set<number>;
@@ -738,7 +832,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		});
 	};
 
-	// Get contact and email counts for the header box
 	const contactListIds = campaign?.userContactLists?.map((l) => l.id) || [];
 	const { data: headerContacts } = useGetContacts({
 		filters: { contactListIds },
@@ -754,7 +847,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const sentEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.sent);
 	const sentCount = sentEmails.length;
 
-	// Compute rejected and approved draft IDs from persisted reviewStatus
 	const rejectedDraftIds = useMemo(() => {
 		const ids = new Set<number>();
 		draftEmails.forEach((email) => {
@@ -775,8 +867,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		return ids;
 	}, [draftEmails]);
 
-	// Contacts that are still eligible for drafting in this campaign:
-	// hide any contact that already has a draft email for this campaign.
 	const draftedContactIds = new Set(draftEmails.map((e) => e.contactId));
 	const contactsAvailableForDrafting = (contacts || []).filter(
 		(contact) => !draftedContactIds.has(contact.id)
@@ -784,30 +874,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const isSendingDisabled = isFreeTrial || (user?.sendingCredits || 0) === 0;
 
-	// Selected contact for shared research panel (persistent on click)
 	const [selectedContactForResearch, setSelectedContactForResearch] =
 		useState<ContactWithName | null>(null);
-	// Hovered contact for temporary preview
 	const [hoveredContactForResearch, setHoveredContactForResearch] =
-		useState<ContactWithName | null>(null);
-	// Track whether the user has explicitly selected a contact (via click)
+		useState<ContactWithName | null>(null);	
 	const [hasUserSelectedResearchContact, setHasUserSelectedResearchContact] =
 		useState(false);
-	// Whether to show the Test Preview panel in place of the Research panel (desktop only)
 	const [showTestPreview, setShowTestPreview] = useState(false);
 
-	// Display priority: hovered contact > selected contact
 	const displayedContactForResearch =
 		hoveredContactForResearch || selectedContactForResearch;
 
-	// Default to the first contact in the campaign for the research panel
 	useEffect(() => {
 		if (!selectedContactForResearch && contacts && contacts.length > 0) {
 			setSelectedContactForResearch(contacts[0]);
 		}
 	}, [contacts, selectedContactForResearch]);
 
-	// Ensure selected IDs only reference contacts that are still available for drafting.
 	useEffect(() => {
 		if (!contactsAvailableForDrafting) return;
 		const availableIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
@@ -828,7 +911,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		});
 	}, [contactsAvailableForDrafting, setContactsTabSelectedIds]);
 
-	// Handlers to coordinate hover / selection behavior for the research panel
 	const handleResearchContactClick = (contact: ContactWithName | null) => {
 		if (!contact) return;
 		setSelectedContactForResearch(contact);
@@ -837,15 +919,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const handleResearchContactHover = (contact: ContactWithName | null) => {
 		if (contact) {
-			// Always update the currently hovered contact
 			setHoveredContactForResearch(contact);
 			return;
 		}
 
-		// When hover ends (null), decide what to show:
-		// - If the user has explicitly selected a contact, fall back to that selection
-		//   by clearing the hover state.
-		// - If not, keep showing the last hovered contact by leaving hover state as-is.
 		if (hasUserSelectedResearchContact) {
 			setHoveredContactForResearch(null);
 		}
@@ -945,18 +1022,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	};
 
-	// Sender email addresses for all contacts in this campaign.
-	// Used to scope the in‑campaign inbox so it only shows replies
-	// from contacts that belong to this campaign.
 	const campaignContactEmails = contacts
 		? contacts
 				.map((contact) => contact.email)
 				.filter((email): email is string => Boolean(email))
 		: undefined;
 
-	// Map of email -> contact for this campaign, used by the Inbox tab
-	// so that replies are labeled with the campaign's canonical contact
-	// name/company rather than whatever name is in the incoming email.
 	const campaignContactsByEmail = useMemo(() => {
 		if (!contacts) return undefined;
 		const map: Record<string, ContactWithName> = {};
@@ -1382,13 +1453,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										sentCount={sentCount}
 										onFromClick={onOpenIdentityDialog}
 									/>
-									{/* For the Writing (testing) and Search tabs, show a mini contacts table instead of mini email structure. */}
 									{view === 'testing' || view === 'search' ? (
 										<>
 											<div
 												style={{
 													width: '375px',
-													height: view === 'search' ? '557px' : '274px',
+													height: '557px',
 													overflow: 'visible',
 												}}
 											>
@@ -1407,22 +1477,38 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
 													isPendingGeneration={isPendingGeneration}
 													width={375}
-													height={view === 'search' ? 557 : 274}
-													minRows={view === 'search' ? 8 : 5}
+													height={557}
+													minRows={8}
 													onSearchFromMiniBar={handleMiniContactsSearch}
 												/>
 											</div>
-											{view === 'testing' && (suggestionText1 || suggestionText2) && (
+											{view === 'testing' && isPromptInputFocused && (suggestionText1 || suggestionText2) && (
 												<div
+													ref={suggestionBoxRef}
+													tabIndex={-1}
+													onBlur={(e) => {
+														// Check if focus is moving outside the suggestion box and prompt input
+														const relatedTarget = e.relatedTarget as HTMLElement | null;
+														const promptInputContainer = document.querySelector('[data-hpi-container]');
+														if (
+															!suggestionBoxRef.current?.contains(relatedTarget) &&
+															!promptInputContainer?.contains(relatedTarget)
+														) {
+															setIsPromptInputFocused(false);
+														}
+													}}
 													style={{
-														width: '377px',
-														height: '249px',
-														marginTop: '-5px', // 16px gap - 5px = 11px
+														width: '405px',
+														height: '319px',
+														position: 'absolute',
+														top: '115px',
+														left: '-15px',
+														zIndex: 10,
 														background:
 															'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
 														border: '2px solid #000000',
 														borderRadius: '7px',
-														position: 'relative',
+														overflow: 'hidden',
 													}}
 												>
 													<div
@@ -1504,8 +1590,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														}}
 														style={{
 															position: 'absolute',
-															top: '83px', // 34px + 44px + 5px
-															left: '6px',
+															top: '83px',
+															left: '22px',
 															width: '39px',
 															height: '32px',
 															backgroundColor: '#C2C2C2',
@@ -1530,7 +1616,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														style={{
 															position: 'absolute',
 															top: '83px',
-															left: '50px', // 6px + 39px + 5px
+															left: '66px',
 															width: '196px',
 															height: '32px',
 															backgroundColor: '#D7F0FF',
@@ -1681,6 +1767,67 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															</div>
 														</div>
 													</div>
+													{/* Third box below */}
+													<div
+														style={{
+															position: 'absolute',
+															top: '251px', // 187px + 56px + 8px
+															left: '50%',
+															transform: 'translateX(-50%)',
+															width: '362px',
+															height: '56px',
+															backgroundColor: '#359D4D',
+															border: '2px solid #000000',
+															borderRadius: '8px',
+														}}
+													>
+														{/* Section indicator */}
+														<div
+															className="absolute font-inter font-bold"
+															style={{
+																top: '4.5px',
+																left: '8px',
+																fontSize: '11.5px',
+																color: '#000000',
+															}}
+														>
+															[3]
+														</div>
+														{/* Inner box */}
+														<div
+															style={{
+																position: 'absolute',
+																top: '0',
+																bottom: '0',
+																margin: 'auto',
+																left: '25px',
+																width: '324px',
+																height: '48px',
+																backgroundColor: '#FFFFFF',
+																border: '2px solid #000000',
+																borderRadius: '8px',
+																display: 'flex',
+																alignItems: 'center',
+																padding: '4px 8px',
+																overflow: 'hidden',
+															}}
+														>
+															<div
+																style={{
+																	fontFamily: 'Inter, system-ui, sans-serif',
+																	fontSize: '11px',
+																	lineHeight: '1.3',
+																	color: '#000000',
+																	wordBreak: 'break-word',
+																	whiteSpace: 'normal',
+																	overflow: 'hidden',
+																	textOverflow: 'ellipsis',
+																}}
+															>
+																{suggestionText3 || ''}
+															</div>
+														</div>
+													</div>
 												</div>
 											)}
 										</>
@@ -1746,6 +1893,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														(view === 'contacts' &&
 															contactsAvailableForDrafting.length === 0)
 													}
+													onOpenWriting={goToWriting}
 												/>
 											</div>
 										)
@@ -2109,6 +2257,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											setContactsTabSelectedIds(allIds);
 										}
 									}}
+									onGetSuggestions={handleGetSuggestions}
+									onUpscalePrompt={upscalePrompt}
+									isUpscalingPrompt={isUpscalingPrompt}
+									onFocusChange={handlePromptInputFocusChange}
 								/>
 								{/* Right panel for Testing view - positioned absolutely */}
 								{false && (
@@ -2144,22 +2296,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										drafts={draftEmails}
 										contacts={contacts || []}
 										width={233}
-										height={125}
+										height={117}
 										whiteSectionHeight={15}
 										hideSendButton={true}
+											onOpenDrafts={goToDrafting}
 									/>
 									<SentExpandedList
 										sent={sentEmails}
 										contacts={contacts || []}
 										width={233}
-										height={125}
+										height={117}
 										whiteSectionHeight={15}
+											onOpenSent={goToSent}
 									/>
 									<InboxExpandedList
 										contacts={contacts || []}
 										width={233}
-										height={125}
+										height={117}
 										whiteSectionHeight={15}
+										onOpenInbox={goToInbox}
 									/>
 								</div>
 							</div>
@@ -2206,23 +2361,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									<div className="mt-[35px] flex justify-center gap-[15px]">
 										<ContactsExpandedList
 											contacts={contactsAvailableForDrafting}
-											width={233}
-											height={125}
+											width={232}
+											height={117}
 											whiteSectionHeight={15}
 											showSearchBar={false}
+										onOpenContacts={goToContacts}
 										/>
 										<SentExpandedList
 											sent={sentEmails}
 											contacts={contacts || []}
 											width={233}
-											height={125}
+											height={117}
 											whiteSectionHeight={15}
+											onOpenSent={goToSent}
 										/>
 										<InboxExpandedList
 											contacts={contacts || []}
 											width={233}
-											height={125}
+											height={117}
 											whiteSectionHeight={15}
+											onOpenInbox={goToInbox}
 										/>
 									</div>
 								</div>
@@ -2270,24 +2428,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<div className="mt-[35px] flex justify-center gap-[15px]">
 									<ContactsExpandedList
 										contacts={contactsAvailableForDrafting}
-										width={233}
-										height={125}
+										width={232}
+										height={117}
 										whiteSectionHeight={15}
 										showSearchBar={false}
+										onOpenContacts={goToContacts}
 									/>
 									<DraftsExpandedList
 										drafts={draftEmails}
 										contacts={contacts || []}
 										width={233}
-										height={125}
+										height={117}
 										whiteSectionHeight={15}
 										hideSendButton={true}
+										onOpenDrafts={goToDrafting}
 									/>
 									<InboxExpandedList
 										contacts={contacts || []}
 										width={233}
-										height={125}
+										height={117}
 										whiteSectionHeight={15}
+										onOpenInbox={goToInbox}
 									/>
 								</div>
 							</div>
@@ -2494,7 +2655,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															ref={whatInputRef}
 															value={searchWhatValue}
 															onChange={(e) => setSearchWhatValue(e.target.value)}
-															className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+															className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+															style={{
+																maskImage:
+																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+																WebkitMaskImage:
+																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+															}}
 															placeholder="What"
 															onFocus={(e) => {
 																setSearchActiveSection('what');
@@ -2518,7 +2685,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															ref={whereInputRef}
 															value={searchWhereValue}
 															onChange={(e) => setSearchWhereValue(e.target.value)}
-															className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+															className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+															style={{
+																maskImage:
+																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+																WebkitMaskImage:
+																	'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+															}}
 															placeholder="Where"
 															onFocus={(e) => {
 																setSearchActiveSection('where');
@@ -2642,25 +2815,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<div className="mt-[35px] flex justify-center gap-[15px]">
 									<ContactsExpandedList
 										contacts={contactsAvailableForDrafting}
-										width={233}
-										height={125}
+										width={232}
+										height={117}
 										whiteSectionHeight={15}
 										showSearchBar={false}
+										onOpenContacts={goToContacts}
 									/>
 									<DraftsExpandedList
 										drafts={draftEmails}
 										contacts={contacts || []}
 										width={233}
-										height={125}
+										height={117}
 										whiteSectionHeight={15}
 										hideSendButton={true}
+											onOpenDrafts={goToDrafting}
 									/>
 									<SentExpandedList
 										sent={sentEmails}
 										contacts={contacts || []}
 										width={233}
-										height={125}
+										height={117}
 										whiteSectionHeight={15}
+										onOpenSent={goToSent}
 									/>
 								</div>
 							</div>
@@ -2669,9 +2845,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* All tab */}
 						{view === 'all' && (
 							<div className="mt-6 flex justify-center">
-								<div className="flex flex-row items-start gap-4">
+								<div className="flex flex-row items-start" style={{ gap: '30px' }}>
 									{/* Left column: Campaign Header + Contacts + Research */}
-									<div className="flex flex-col items-center gap-4">
+									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										<CampaignHeaderBox
 											campaignId={campaign?.id}
 											campaignName={campaign?.name || 'Untitled Campaign'}
@@ -2681,34 +2857,64 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											draftCount={draftCount}
 											sentCount={sentCount}
 											onFromClick={onOpenIdentityDialog}
+											width={330}
 										/>
 										<div
 											style={{
-												width: '373px',
+												width: '330px',
 												height: '263px',
 												overflow: 'visible',
-												marginTop: '-1px', // Align bottom with MiniEmailStructure (349px) vs (Header 71px + Gap 16px + Contacts 263px = 350px)
+												marginTop: '-24px', // Align bottom with MiniEmailStructure (349px): Header 71px + Gap 39px - 24px + Contacts 263px = 349px
+												position: 'relative',
+												cursor: 'pointer',
+											}}
+											onMouseEnter={() => setIsContactsHovered(true)}
+											onMouseLeave={() => setIsContactsHovered(false)}
+											onClick={() => {
+												setIsContactsHovered(false);
+												goToContacts?.();
 											}}
 										>
-											<ContactsExpandedList
-												contacts={contactsAvailableForDrafting}
-												campaign={campaign}
-												selectedContactIds={contactsTabSelectedIds}
-												onContactSelectionChange={(updater) =>
-													setContactsTabSelectedIds((prev) => updater(new Set(prev)))
-												}
-												onContactClick={handleResearchContactClick}
-												onContactHover={handleResearchContactHover}
-												onDraftSelected={async (ids) => {
-													await handleGenerateDrafts(ids);
-												}}
-												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
-												isPendingGeneration={isPendingGeneration}
-												width={373}
-												height={263}
-												minRows={5}
-												onSearchFromMiniBar={handleMiniContactsSearch}
-											/>
+											{/* Hover box */}
+											{isContactsHovered && (
+												<div
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: '50%',
+														transform: 'translate(-50%, -50%)',
+														width: '364px',
+														height: '278px',
+														backgroundColor: 'transparent',
+														border: '6px solid #D75152',
+														borderRadius: '0px',
+														zIndex: 10,
+														pointerEvents: 'none',
+													}}
+												/>
+											)}
+											<div style={{ position: 'relative', zIndex: 20 }}>
+												<ContactsExpandedList
+													contacts={contactsAvailableForDrafting}
+													campaign={campaign}
+													selectedContactIds={contactsTabSelectedIds}
+													onContactSelectionChange={(updater) =>
+														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
+													}
+													onContactClick={handleResearchContactClick}
+													onContactHover={handleResearchContactHover}
+													onDraftSelected={async (ids) => {
+														await handleGenerateDrafts(ids);
+													}}
+													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isPendingGeneration={isPendingGeneration}
+													width={330}
+													height={263}
+													minRows={5}
+													onSearchFromMiniBar={handleMiniContactsSearch}
+													onOpenContacts={goToContacts}
+												/>
+											</div>
 										</div>
 										{/* Research Panel */}
 										<ContactResearchPanel
@@ -2716,40 +2922,72 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											hideAllText={contactsAvailableForDrafting.length === 0}
 											hideSummaryIfBullets={true}
 											height={347}
+											width={330}
+											boxWidth={315}
+											compactHeader
 										/>
 									</div>
 									{/* Column 2: Writing (Row 1) + Suggestion (Row 2) */}
-									<div className="flex flex-col items-center gap-4">
+									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* Row 1: Mini Email Structure */}
 										<div
 											style={{
-												width: '375px',
+												width: '330px',
 												height: '349px',
 												overflow: 'visible',
+												position: 'relative',
+												cursor: 'pointer',
+											}}
+											onMouseEnter={() => setIsWritingHovered(true)}
+											onMouseLeave={() => setIsWritingHovered(false)}
+											onClick={() => {
+												setIsWritingHovered(false);
+												goToWriting?.();
 											}}
 										>
-											<MiniEmailStructure
-												form={form}
-												onDraft={() =>
-													handleGenerateDrafts(
-														contactsAvailableForDrafting.map((c) => c.id)
-													)
-												}
-												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
-												isPendingGeneration={isPendingGeneration}
-												generationProgress={generationProgress}
-												generationTotal={contactsAvailableForDrafting.length}
-												hideTopChrome
-												hideFooter
-												fullWidthMobile
-												hideAddTextButtons
-												height={349}
-											/>
+											{/* Hover box */}
+											{isWritingHovered && (
+												<div
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: '50%',
+														transform: 'translate(-50%, -50%)',
+														width: '364px',
+														height: '364px',
+														backgroundColor: 'transparent',
+														border: '6px solid #37B73B',
+														borderRadius: '0px',
+														zIndex: 10,
+														pointerEvents: 'none',
+													}}
+												/>
+											)}
+											<div style={{ position: 'relative', zIndex: 20 }}>
+												<MiniEmailStructure
+													form={form}
+													onDraft={() =>
+														handleGenerateDrafts(
+															contactsAvailableForDrafting.map((c) => c.id)
+														)
+													}
+													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isPendingGeneration={isPendingGeneration}
+													generationProgress={generationProgress}
+													generationTotal={contactsAvailableForDrafting.length}
+													hideTopChrome
+													hideFooter
+													fullWidthMobile
+													hideAddTextButtons
+													height={349}
+													onOpenWriting={goToWriting}
+												/>
+											</div>
 										</div>
 										{/* Row 2: Suggestion Box */}
 										<div
 											style={{
-												width: '377px',
+												width: '330px',
 												height: '347px',
 												background:
 													'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
@@ -2777,7 +3015,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													top: '34px',
 													left: '50%',
 													transform: 'translateX(-50%)',
-													width: '369px',
+													width: '322px',
 													height: '44px',
 													backgroundColor: '#FFFFFF',
 													border: '2px solid #000000',
@@ -2851,7 +3089,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													opacity: hasPreviousPrompt ? 1 : 0.5,
 												}}
 											>
-												<UndoIcon width="24" height="24" />
+												{clampedPromptScore != null && <UndoIcon width="24" height="24" />}
 											</div>
 											{/* Upscale Prompt button */}
 											<div
@@ -2864,7 +3102,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													position: 'absolute',
 													top: '83px',
 													left: '50px',
-													width: '196px',
+													width: '155px',
 													height: '32px',
 													backgroundColor: '#D7F0FF',
 													border: '2px solid #000000',
@@ -2877,20 +3115,24 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													cursor: isUpscalingPrompt ? 'wait' : 'pointer',
 												}}
 											>
-												<span
-													style={{
-														fontFamily: 'Inter, system-ui, sans-serif',
-														fontSize: '17px',
-														fontWeight: 500,
-														color: '#000000',
-														lineHeight: '1',
-													}}
-												>
-													{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
-												</span>
-												<div style={{ flexShrink: 0 }}>
-													<UpscaleIcon width="24" height="24" />
-												</div>
+												{(clampedPromptScore != null || isUpscalingPrompt) && (
+													<>
+														<span
+															style={{
+																fontFamily: 'Inter, system-ui, sans-serif',
+																fontSize: '13px',
+																fontWeight: 500,
+																color: '#000000',
+																lineHeight: '1',
+															}}
+														>
+															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
+														</span>
+														<div style={{ flexShrink: 0 }}>
+															<UpscaleIcon width="20" height="20" />
+														</div>
+													</>
+												)}
 											</div>
 											{/* Suggestion 1 */}
 											<div
@@ -2899,11 +3141,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													top: '123px',
 													left: '50%',
 													transform: 'translateX(-50%)',
-													width: '362px',
-													height: '56px',
+													width: '315px',
+													height: '46px',
 													backgroundColor: '#A6E0B4',
 													border: '2px solid #000000',
 													borderRadius: '8px',
+													overflow: 'hidden',
 												}}
 											>
 												<div
@@ -2923,31 +3166,34 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														top: '0',
 														bottom: '0',
 														margin: 'auto',
-														left: '25px',
-														width: '324px',
-														height: '48px',
-														backgroundColor: '#FFFFFF',
+														right: '6px',
+														width: '260px',
+														height: '39px',
+														backgroundColor: clampedPromptScore == null ? '#A6E0B4' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
 														alignItems: 'center',
-														padding: '4px 8px',
+														padding: '4px 6px',
 														overflow: 'hidden',
 													}}
 												>
 													<div
 														style={{
 															fontFamily: 'Inter, system-ui, sans-serif',
-															fontSize: '11px',
+															fontSize: '10px',
 															lineHeight: '1.3',
 															color: suggestionText1 ? '#000000' : '#888888',
 															wordBreak: 'break-word',
 															whiteSpace: 'normal',
 															overflow: 'hidden',
 															textOverflow: 'ellipsis',
+															display: '-webkit-box',
+															WebkitLineClamp: 2,
+															WebkitBoxOrient: 'vertical',
 														}}
 													>
-														{suggestionText1 || 'Add your prompt to get suggestions'}
+														{suggestionText1 || (clampedPromptScore != null ? 'Add your prompt to get suggestions' : '')}
 													</div>
 												</div>
 											</div>
@@ -2958,11 +3204,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													top: '187px',
 													left: '50%',
 													transform: 'translateX(-50%)',
-													width: '362px',
-													height: '56px',
+													width: '315px',
+													height: '46px',
 													backgroundColor: '#5BCB75',
 													border: '2px solid #000000',
 													borderRadius: '8px',
+													overflow: 'hidden',
 												}}
 											>
 												<div
@@ -2982,31 +3229,97 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														top: '0',
 														bottom: '0',
 														margin: 'auto',
-														left: '25px',
-														width: '324px',
-														height: '48px',
-														backgroundColor: '#FFFFFF',
+														right: '6px',
+														width: '260px',
+														height: '39px',
+														backgroundColor: clampedPromptScore == null ? '#5BCB75' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
 														alignItems: 'center',
-														padding: '4px 8px',
+														padding: '4px 6px',
 														overflow: 'hidden',
 													}}
 												>
 													<div
 														style={{
 															fontFamily: 'Inter, system-ui, sans-serif',
-															fontSize: '11px',
+															fontSize: '10px',
 															lineHeight: '1.3',
 															color: suggestionText2 ? '#000000' : '#888888',
 															wordBreak: 'break-word',
 															whiteSpace: 'normal',
 															overflow: 'hidden',
 															textOverflow: 'ellipsis',
+															display: '-webkit-box',
+															WebkitLineClamp: 2,
+															WebkitBoxOrient: 'vertical',
 														}}
 													>
-														{suggestionText2 || 'More suggestions will appear here'}
+														{suggestionText2 || (clampedPromptScore != null ? 'More suggestions will appear here' : '')}
+													</div>
+												</div>
+											</div>
+											{/* Suggestion 3 */}
+											<div
+												style={{
+													position: 'absolute',
+													top: '251px',
+													left: '50%',
+													transform: 'translateX(-50%)',
+													width: '315px',
+													height: '46px',
+													backgroundColor: '#359D4D',
+													border: '2px solid #000000',
+													borderRadius: '8px',
+													overflow: 'hidden',
+												}}
+											>
+												<div
+													className="absolute font-inter font-bold"
+													style={{
+														top: '4.5px',
+														left: '8px',
+														fontSize: '11.5px',
+														color: '#000000',
+													}}
+												>
+													[3]
+												</div>
+												<div
+													style={{
+														position: 'absolute',
+														top: '0',
+														bottom: '0',
+														margin: 'auto',
+														right: '6px',
+														width: '260px',
+														height: '39px',
+														backgroundColor: clampedPromptScore == null ? '#359D4D' : '#FFFFFF',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+														display: 'flex',
+														alignItems: 'center',
+														padding: '4px 6px',
+														overflow: 'hidden',
+													}}
+												>
+													<div
+														style={{
+															fontFamily: 'Inter, system-ui, sans-serif',
+															fontSize: '10px',
+															lineHeight: '1.3',
+															color: suggestionText3 ? '#000000' : '#888888',
+															wordBreak: 'break-word',
+															whiteSpace: 'normal',
+															overflow: 'hidden',
+															textOverflow: 'ellipsis',
+															display: '-webkit-box',
+															WebkitLineClamp: 2,
+															WebkitBoxOrient: 'vertical',
+														}}
+													>
+														{suggestionText3 || (clampedPromptScore != null ? 'Additional suggestions here' : '')}
 													</div>
 												</div>
 											</div>
@@ -3014,15 +3327,52 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									</div>
 
 									{/* Column 3: Drafts (Row 1) + Preview (Row 2) */}
-									<div className="flex flex-col items-center gap-4">
+									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* Row 1: Drafts */}
-										<DraftsExpandedList
-											drafts={draftEmails}
-											contacts={contacts || []}
-											width={372}
-											height={347}
-											hideSendButton
-										/>
+										<div
+											style={{
+												width: '330px',
+												height: '347px',
+												overflow: 'visible',
+												position: 'relative',
+												cursor: 'pointer',
+											}}
+											onMouseEnter={() => setIsDraftsHovered(true)}
+											onMouseLeave={() => setIsDraftsHovered(false)}
+											onClick={() => {
+												setIsDraftsHovered(false);
+												goToDrafting?.();
+											}}
+										>
+											{/* Hover box */}
+											{isDraftsHovered && (
+												<div
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: '50%',
+														transform: 'translate(-50%, -50%)',
+														width: '364px',
+														height: '364px',
+														backgroundColor: 'transparent',
+														border: '6px solid #E6AF4D',
+														borderRadius: '0px',
+														zIndex: 10,
+														pointerEvents: 'none',
+													}}
+												/>
+											)}
+											<div style={{ position: 'relative', zIndex: 20 }}>
+												<DraftsExpandedList
+													drafts={draftEmails}
+													contacts={contacts || []}
+													width={330}
+													height={347}
+													hideSendButton
+													onOpenDrafts={goToDrafting}
+												/>
+											</div>
+										</div>
 										{/* Row 2: Draft Preview */}
 										<DraftPreviewExpandedList
 											contacts={contacts || []}
@@ -3035,28 +3385,102 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													  }
 													: null
 											}
-											width={372}
+											width={330}
 											height={347}
 										/>
 									</div>
 
 									{/* Column 4: Sent (Row 1) + Inbox (Row 2) */}
-									<div className="flex flex-col items-center gap-4">
+									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* Row 1: Sent */}
-										<SentExpandedList
-											sent={sentEmails}
-											contacts={contacts || []}
-											width={372}
-											height={347}
-										/>
+										<div
+											style={{
+												width: '330px',
+												height: '347px',
+												overflow: 'visible',
+												position: 'relative',
+												cursor: 'pointer',
+											}}
+											onMouseEnter={() => setIsSentHovered(true)}
+											onMouseLeave={() => setIsSentHovered(false)}
+											onClick={() => {
+												setIsSentHovered(false);
+												goToSent?.();
+											}}
+										>
+											{/* Hover box */}
+											{isSentHovered && (
+												<div
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: '50%',
+														transform: 'translate(-50%, -50%)',
+														width: '364px',
+														height: '364px',
+														backgroundColor: 'transparent',
+														border: '6px solid #2CA954',
+														borderRadius: '0px',
+														zIndex: 10,
+														pointerEvents: 'none',
+													}}
+												/>
+											)}
+											<div style={{ position: 'relative', zIndex: 20 }}>
+												<SentExpandedList
+													sent={sentEmails}
+													contacts={contacts || []}
+													width={330}
+													height={347}
+													onOpenSent={goToSent}
+												/>
+											</div>
+										</div>
 										{/* Row 2: Inbox */}
-										<InboxExpandedList
-											contacts={contacts || []}
-											allowedSenderEmails={campaignContactEmails}
-											contactByEmail={campaignContactsByEmail}
-											width={372}
-											height={347}
-										/>
+										<div
+											style={{
+												width: '330px',
+												height: '347px',
+												overflow: 'visible',
+												position: 'relative',
+												cursor: 'pointer',
+											}}
+											onMouseEnter={() => setIsInboxHovered(true)}
+											onMouseLeave={() => setIsInboxHovered(false)}
+											onClick={() => {
+												setIsInboxHovered(false);
+												goToInbox?.();
+											}}
+										>
+											{/* Hover box */}
+											{isInboxHovered && (
+												<div
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: '50%',
+														transform: 'translate(-50%, -50%)',
+														width: '364px',
+														height: '364px',
+														backgroundColor: 'transparent',
+														border: '6px solid #5EB6D6',
+														borderRadius: '0px',
+														zIndex: 10,
+														pointerEvents: 'none',
+													}}
+												/>
+											)}
+											<div style={{ position: 'relative', zIndex: 20 }}>
+												<InboxExpandedList
+													contacts={contacts || []}
+													allowedSenderEmails={campaignContactEmails}
+													contactByEmail={campaignContactsByEmail}
+													width={330}
+													height={347}
+													onOpenInbox={goToInbox}
+												/>
+											</div>
+										</div>
 									</div>
 								</div>
 							</div>
@@ -3084,8 +3508,79 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							</div>
 						)} */}
 					</div>
+
+					{/* Hover area below expanded lists to reveal bottom box */}
+					<div className="relative w-screen max-w-none mt-10 pb-10" aria-hidden="true" />
 				</form>
 			</Form>
+
+			{/* Fixed hover zone at the bottom of the viewport - expands when campaigns table is visible */}
+			<div
+				className={`fixed inset-x-0 bottom-0 z-50 pointer-events-none ${showCampaignsTable ? 'h-[320px]' : 'h-[200px]'}`}
+				onMouseLeave={handleBottomHoverLeave}
+			>
+				{/* Thin hover trigger at the very bottom - only active when bottom box is hidden */}
+				{!showBottomBox && (
+					<div 
+						className="absolute inset-x-0 bottom-0 h-[40px] pointer-events-auto" 
+						onMouseEnter={handleBottomHoverEnter}
+					/>
+				)}
+				
+				{/* Full capture area - only active when bottom box is shown to keep it open */}
+				{showBottomBox && (
+					<div 
+						className="absolute inset-0 pointer-events-auto" 
+						onMouseEnter={handleBottomHoverEnter}
+					/>
+				)}
+
+				{/* Campaigns table - positioned inside hover zone */}
+				{showBottomBox && showCampaignsTable && (
+					<div className="absolute left-1/2 -translate-x-1/2 bottom-[40px] z-[60] pointer-events-auto">
+						<div className="campaigns-popup-wrapper bg-[#EDEDED] rounded-[12px] overflow-hidden w-[891px] h-[242px] border-2 border-[#8C8C8C]">
+							<CampaignsTable />
+						</div>
+					</div>
+				)}
+
+				{/* Revealed bar lives inside the hover zone so moving into it won't dismiss */}
+				{showBottomBox && (
+					<div
+						className="absolute left-1/2 -translate-x-1/2 z-50 flex items-center justify-center text-black font-inter text-[14px] font-medium pointer-events-auto"
+						style={{
+							width: '816px',
+							height: '34px',
+							bottom: 0,
+							backgroundColor: '#F5F5F5',
+							border: '2px solid #000000',
+							borderRadius: '0px',
+						}}
+						aria-label="Bottom navigation reveal"
+					>
+						<div className="flex items-center justify-center gap-0">
+							{bottomBarIcons.map((icon) => (
+								<button
+									key={icon.key}
+									type="button"
+									className="flex items-center justify-center border-0 p-0 cursor-pointer transition-colors"
+									style={{
+										width: '65px',
+										height: '30px',
+										backgroundColor: 'transparent',
+									}}
+									onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#D9D9D9')}
+									onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+									onClick={icon.onClick}
+									aria-label={icon.element.props['aria-label'] || icon.key}
+								>
+									{icon.element}
+								</button>
+							))}
+						</div>
+					</div>
+				)}
+			</div>
 
 			<UpgradeSubscriptionDrawer
 				message="You have run out of drafting credits! Please upgrade your plan."
