@@ -905,8 +905,8 @@ const DashboardContent = () => {
 																			: ''
 																	}`}
 																>
-																	<Input
-																		className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent md:!h-[72px] md:pr-[80px]"
+																<Input
+																		className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !h-[72px] pr-[70px] md:pr-[80px]"
 																		placeholder=""
 																		style={{
 																			accentColor: 'transparent',
@@ -919,28 +919,18 @@ const DashboardContent = () => {
 																	/>
 																	{/* New 532x64px element - Added border-black and z-20 */}
 																	<div
-																		className={`search-sections-container hidden md:block absolute left-[4px] top-1/2 -translate-y-1/2 w-[532px] h-[64px] rounded-[8px] border z-20 font-secondary ${
+																		className={`search-sections-container absolute left-[4px] right-[68px] top-1/2 -translate-y-1/2 h-[64px] rounded-[8px] border z-20 font-secondary flex items-center ${
 																			activeSection
 																				? 'bg-[#EFEFEF] border-transparent'
 																				: 'bg-white border-black'
 																		}`}
 																	>
-																		<div
-																			className={`absolute left-[172px] top-0 bottom-0 w-[2px] bg-black/10 ${
-																				activeSection ? 'hidden' : ''
-																			}`}
-																		/>
-																		<div
-																			className={`absolute left-[332px] top-0 bottom-0 w-[2px] bg-black/10 ${
-																				activeSection ? 'hidden' : ''
-																			}`}
-																		/>
 																		{/* Why Section */}
 																		<div
-																			className={`absolute left-0 top-[-1px] h-[64px] cursor-pointer border ${
+																			className={`relative h-full cursor-pointer border flex-1 min-w-0 ${
 																				activeSection === 'why'
-																					? 'w-[174px] bg-white border-black z-30 rounded-[8px]'
-																					: `w-[172px] border-transparent ${
+																					? 'bg-white border-black z-30 rounded-[8px]'
+																					: `border-transparent ${
 																							activeSection
 																								? 'hover:bg-[#F9F9F9]'
 																								: 'hover:bg-black/5'
@@ -951,7 +941,7 @@ const DashboardContent = () => {
 																			<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
 																				Why
 																			</div>
-																			<div className="absolute left-[24px] top-[42px] w-[144px] h-[12px]">
+																			<div className="absolute left-[24px] right-[4px] top-[42px] h-[12px] overflow-hidden">
 																				<div
 																					className="absolute top-0 left-0 font-semibold text-[12px] whitespace-nowrap"
 																					style={{
@@ -969,12 +959,17 @@ const DashboardContent = () => {
 																				</div>
 																			</div>
 																		</div>
+																		<div
+																			className={`w-[2px] h-full bg-black/10 flex-shrink-0 ${
+																				activeSection ? 'hidden' : ''
+																			}`}
+																		/>
 																		{/* What Section */}
 																		<div
-																			className={`absolute left-[172px] top-[-1px] h-[64px] cursor-pointer border overflow-hidden ${
+																			className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
 																				activeSection === 'what'
-																					? 'w-[161px] bg-white border-black z-30 rounded-[8px]'
-																					: `w-[160px] border-transparent ${
+																					? 'bg-white border-black z-30 rounded-[8px]'
+																					: `border-transparent ${
 																							activeSection
 																								? 'hover:bg-[#F9F9F9]'
 																								: 'hover:bg-black/5'
@@ -1029,12 +1024,17 @@ const DashboardContent = () => {
 																				)}
 																			</div>
 																		</div>
+																		<div
+																			className={`w-[2px] h-full bg-black/10 flex-shrink-0 ${
+																				activeSection ? 'hidden' : ''
+																			}`}
+																		/>
 																		{/* Where Section */}
 																		<div
-																			className={`absolute left-[332px] top-[-1px] h-[64px] cursor-pointer border overflow-hidden ${
+																			className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
 																				activeSection === 'where'
-																					? 'w-[201px] bg-white border-black z-30 rounded-[8px]'
-																					: `w-[200px] border-transparent ${
+																					? 'bg-white border-black z-30 rounded-[8px]'
+																					: `border-transparent ${
 																							activeSection
 																								? 'hover:bg-[#F9F9F9]'
 																								: 'hover:bg-black/5'
@@ -1097,7 +1097,7 @@ const DashboardContent = () => {
 																	{/* Desktop Search Button */}
 																	<button
 																		type="submit"
-																		className="hidden md:flex absolute right-[6px] items-center justify-center w-[58px] h-[62px] transition-colors z-40 cursor-pointer group"
+																		className="flex absolute right-[6px] items-center justify-center w-[58px] h-[62px] transition-colors z-40 cursor-pointer group"
 																		style={{
 																			top: '50%',
 																			transform: 'translateY(-50%)',
@@ -1123,7 +1123,7 @@ const DashboardContent = () => {
 																	{/* Mobile-only submit icon inside input */}
 																	<button
 																		type="submit"
-																		className="search-input-icon-btn"
+																		className="search-input-icon-btn hidden"
 																		aria-label="Search"
 																	>
 																		<SearchIconMobile />

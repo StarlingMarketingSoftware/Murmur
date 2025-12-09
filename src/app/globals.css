@@ -4524,8 +4524,8 @@ body.murmur-mobile .search-bar-wrapper .flex-wrap > .h-\[39px\] {
 	}
 }
 
-/* Desktop: constrain hero search input to 603x72 with 8px radius */
-@media (min-width: 1024px) {
+/* Tablet & desktop: constrain hero search input to 603x72 with 8px radius */
+@media (min-width: 768px) {
 	.search-bar-wrapper:not(.search-bar-active) .search-input-group {
 		width: 603px !important;
 		max-width: 603px !important;
