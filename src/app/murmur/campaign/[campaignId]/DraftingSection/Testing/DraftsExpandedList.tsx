@@ -574,20 +574,28 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 										/>
 									)}
 								{/* Fixed top-right info (Title + Location) - match Drafting tab */}
-								<div className={cn(
-									"absolute flex flex-col items-end pointer-events-none",
-									isBottomView
-										? "top-[4px] right-[4px] gap-[1px] w-[90px]"
-										: "top-[4px] right-[8px] gap-[2px] w-[169px]"
-								)}>
+								<div
+									className={cn(
+										'absolute flex flex-col items-end pointer-events-none',
+										isBottomView
+											? 'top-[4px] right-[4px] gap-[1px] w-[90px]'
+											: isAllTab
+											? 'top-[4px] right-[8px] gap-[2px] w-[158px]'
+											: 'top-[4px] right-[8px] gap-[2px] w-[169px]'
+									)}
+								>
 									{/* Title row - on top */}
 									{contactTitle ? (
-										<div className={cn(
-											"bg-[#E8EFFF] border border-black overflow-hidden flex items-center",
-											isBottomView
-												? "h-[10px] rounded-[3px] px-1 w-full"
-												: "w-[169px] h-[21px] rounded-[5px] justify-center"
-										)}>
+										<div
+											className={cn(
+												'bg-[#E8EFFF] border border-black overflow-hidden flex items-center',
+												isBottomView
+													? 'h-[10px] rounded-[3px] px-1 w-full'
+													: isAllTab
+													? 'w-[158px] h-[15px] rounded-[5px] justify-center'
+													: 'w-[169px] h-[21px] rounded-[5px] justify-center'
+											)}
+										>
 											{isBottomView ? (
 												<span className="text-[7px] text-black leading-none truncate">
 													{contactTitle}
@@ -602,10 +610,16 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									) : null}
 
 									{/* Location row - below title */}
-									<div className={cn(
-										"flex items-center justify-start",
-										isBottomView ? "gap-0.5 h-[10px] w-[90px]" : "gap-1 h-[19px] w-[169px]"
-									)}>
+									<div
+										className={cn(
+											'flex items-center justify-start',
+											isBottomView
+												? 'gap-0.5 h-[10px] w-[90px]'
+												: isAllTab
+												? 'gap-1 h-[14px] w-[158px]'
+												: 'gap-1 h-[19px] w-[169px]'
+										)}
+									>
 										{(() => {
 											const fullStateName = (contact?.state as string) || '';
 											const stateAbbr = getStateAbbreviation(fullStateName) || '';
@@ -627,10 +641,12 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											return isCanadianProvince ? (
 												<div
 													className={cn(
-														"inline-flex items-center justify-center border overflow-hidden",
+														'inline-flex items-center justify-center border overflow-hidden',
 														isBottomView
-															? "w-[20px] h-[10px] rounded-[2px]"
-															: "w-[29px] h-[19px] rounded-[4px]"
+															? 'w-[20px] h-[10px] rounded-[2px]'
+															: isAllTab
+															? 'w-[27px] h-[14px] rounded-[4px]'
+															: 'w-[29px] h-[19px] rounded-[4px]'
 													)}
 													style={{ borderColor: '#000000' }}
 												>
@@ -643,10 +659,12 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											) : isUSAbbr ? (
 												<span
 													className={cn(
-														"inline-flex items-center justify-center border leading-none font-bold",
+														'inline-flex items-center justify-center border leading-none font-bold',
 														isBottomView
-															? "w-[20px] h-[10px] rounded-[2px] text-[7px]"
-															: "w-[29px] h-[19px] rounded-[4px] text-[10px]"
+															? 'w-[20px] h-[10px] rounded-[2px] text-[7px]'
+															: isAllTab
+															? 'w-[27px] h-[14px] rounded-[4px] text-[9px]'
+															: 'w-[29px] h-[19px] rounded-[4px] text-[10px]'
 													)}
 													style={{
 														backgroundColor:
@@ -659,10 +677,12 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											) : (
 												<span
 													className={cn(
-														"inline-flex items-center justify-center border",
+														'inline-flex items-center justify-center border',
 														isBottomView
-															? "w-[20px] h-[10px] rounded-[2px]"
-															: "w-[29px] h-[19px] rounded-[4px]"
+															? 'w-[20px] h-[10px] rounded-[2px]'
+															: isAllTab
+															? 'w-[27px] h-[14px] rounded-[4px]'
+															: 'w-[29px] h-[19px] rounded-[4px]'
 													)}
 													style={{ borderColor: '#000000' }}
 												/>
