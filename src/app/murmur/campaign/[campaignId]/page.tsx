@@ -89,7 +89,6 @@ const Murmur = () => {
 	if (isMobile === null) {
 		return null;
 	}
-
 	// Hide underlying content and show a white overlay when we require the user to set up an identity
 	// or while the full-screen User Settings dialog is open. This prevents any visual "glimpses" and
 	// ensures a premium, smooth transition with no scale effects.
@@ -720,3 +719,4 @@ const Murmur = () => {
 };
 
 export default Murmur;
+
