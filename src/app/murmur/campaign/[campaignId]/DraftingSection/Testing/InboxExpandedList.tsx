@@ -311,7 +311,7 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 						style={{
 							paddingTop:
 								customWhiteSectionHeight !== undefined
-									? '6px'
+									? '2px'
 									: isAllTab
 									? `${31 - whiteSectionHeight}px`
 									: `${38 - whiteSectionHeight}px`,
@@ -325,10 +325,11 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 								<div
 									key={email.id}
 									className={cn(
-										'transition-colors relative select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
+										'transition-colors relative select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white',
 										isBottomView
-											? 'w-[225px] h-[40px]'
-											: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
+											? 'w-[224px] h-[28px]'
+											: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
+										!isBottomView && 'p-2'
 									)}
 								>
 									{/* Fixed top-right info (Title + Location) */}
@@ -444,16 +445,24 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 
 									{/* Content grid */}
 									{isBottomView ? (
-										/* Bottom view: compact 4-row layout */
-										<div className="grid grid-cols-1 grid-rows-4 h-full pr-[95px] pl-[22px]">
+										/* Bottom view: compact layout with name + company (no subject/body) */
+										<div className="grid grid-cols-1 grid-rows-2 h-full pr-[95px] pl-[22px]">
 											{/* Row 1: Name */}
-											<div className="flex items-center h-[8px] overflow-hidden">
-												<div className="font-bold text-[9px] truncate leading-none">
+											<div className="flex items-center h-[12px] overflow-hidden">
+												<div
+													className="font-bold text-[9px] leading-none whitespace-nowrap overflow-hidden w-full pr-1"
+													style={{
+														WebkitMaskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+														maskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+													}}
+												>
 													{contactName}
 												</div>
 											</div>
 											{/* Row 2: Company */}
-											<div className="flex items-center h-[6px] overflow-hidden">
+											<div className="flex items-center h-[12px] overflow-hidden">
 												{(() => {
 													const hasSeparateName = Boolean(
 														contact &&
@@ -461,27 +470,19 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 																(contact.lastName && contact.lastName.trim()))
 													);
 													return (
-														<div className="text-[8px] text-black truncate leading-none">
+														<div
+															className="text-[8px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-1"
+															style={{
+																WebkitMaskImage:
+																	'linear-gradient(90deg, #000 96%, transparent 100%)',
+																maskImage:
+																	'linear-gradient(90deg, #000 96%, transparent 100%)',
+															}}
+														>
 															{hasSeparateName ? contact?.company || '' : ''}
 														</div>
 													);
 												})()}
-											</div>
-											{/* Row 3: Subject */}
-											<div className="flex items-center h-[6px] overflow-hidden">
-												<div className="text-[7px] text-black truncate leading-none">
-													{email.subject || 'No subject'}
-												</div>
-											</div>
-											{/* Row 4: Email body preview */}
-											<div className="flex items-center h-[6px] overflow-hidden mt-[2px]">
-												<div className="text-[7px] text-gray-500 truncate leading-none">
-													{email.bodyPlain
-														? email.bodyPlain.substring(0, 40)
-														: email.bodyHtml
-														? email.bodyHtml.replace(/<[^>]*>/g, '').substring(0, 40)
-														: 'No content'}
-												</div>
 											</div>
 										</div>
 									) : (
@@ -529,15 +530,16 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 							);
 						})}
 						{Array.from({
-							length: Math.max(0, (isBottomView ? 2 : 4) - inboundEmails.length),
+							length: Math.max(0, (isBottomView ? 3 : 4) - inboundEmails.length),
 						}).map((_, idx) => (
 							<div
 								key={`inbox-placeholder-${idx}`}
 								className={cn(
-									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] p-2',
+									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000]',
 									isBottomView
-										? 'w-[225px] h-[40px]'
-										: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
+										? 'w-[224px] h-[28px]'
+										: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
+									!isBottomView && 'p-2'
 								)}
 								style={{ backgroundColor: placeholderBgColor }}
 							/>

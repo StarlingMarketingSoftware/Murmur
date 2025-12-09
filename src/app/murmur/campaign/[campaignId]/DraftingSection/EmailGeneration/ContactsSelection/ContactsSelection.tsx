@@ -1310,7 +1310,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 					sent={sentEmails || []}
 					contacts={props.allContacts || props.contacts}
 					width={233}
-					height={125}
+					height={117}
 					whiteSectionHeight={15}
 				/>
 				<InboxExpandedList
@@ -1318,7 +1318,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 					allowedSenderEmails={allowedSenderEmails}
 					contactByEmail={contactByEmail}
 					width={233}
-					height={125}
+					height={117}
 					whiteSectionHeight={15}
 				/>
 			</div>
