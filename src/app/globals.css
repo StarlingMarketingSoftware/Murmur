@@ -5182,3 +5182,107 @@ body.murmur-mobile .search-input-icon-btn {
 	}
 }
 
+/* ============================================
+   NARROW DESKTOP BREAKPOINT (<=960px)
+   Proportionally scaling table for desktop
+   Scales from 960px viewport down to 630px
+   ============================================ */
+
+/* Base narrow desktop styles - apply at 960px and below */
+@media (max-width: 960px) {
+	/* Table width scales proportionally: 
+	   At 960px viewport -> ~750px table
+	   At 630px viewport -> 460px table
+	   Using clamp for smooth scaling */
+	.narrow-desktop-table {
+		/* Scale proportionally with viewport */
+		width: clamp(460px, calc(100vw - 210px), 750px) !important;
+		max-width: clamp(460px, calc(100vw - 210px), 750px) !important;
+	}
+
+	/* Metric boxes scale proportionally */
+	.narrow-desktop-table .metric-box {
+		/* Height scales: 20px at 960px -> 18px at 630px */
+		height: clamp(18px, calc(15px + 0.5vw), 20px) !important;
+		min-height: clamp(18px, calc(15px + 0.5vw), 20px) !important;
+		/* Width scales: 80px at 960px -> 40px at 630px */
+		width: clamp(40px, calc(-8px + 9vw), 80px) !important;
+		min-width: clamp(40px, calc(-8px + 9vw), 80px) !important;
+		/* Font scales: 13px at 960px -> 11px at 630px */
+		font-size: clamp(11px, calc(9px + 0.3vw), 13px) !important;
+		padding: 0 4px !important;
+	}
+
+	/* Adjust metrics grid gap proportionally */
+	.narrow-desktop-table .metrics-grid-container {
+		/* Gap scales: 12px at 960px -> 6px at 630px */
+		gap: clamp(6px, calc(0px + 1vw), 12px) !important;
+	}
+
+	.narrow-desktop-table .metrics-header-grid {
+		gap: clamp(6px, calc(0px + 1vw), 12px) !important;
+	}
+
+	/* Hide metric separators in narrow desktop */
+	.narrow-desktop-table .metric-separator {
+		display: none !important;
+	}
+
+	/* Campaign name font scales */
+	.narrow-desktop-table .campaign-name-text {
+		font-size: clamp(14px, calc(11px + 0.5vw), 17px) !important;
+	}
+
+	/* Header labels scale */
+	.narrow-desktop-table .metrics-header-label {
+		font-size: clamp(10px, calc(7px + 0.5vw), 13px) !important;
+	}
+
+	/* Column sizing - flexible */
+	.narrow-desktop-table thead th:first-child,
+	.narrow-desktop-table tbody td:first-child {
+		width: 40% !important;
+		min-width: 0 !important;
+	}
+
+	.narrow-desktop-table thead th:nth-child(2),
+	.narrow-desktop-table tbody td:nth-child(2) {
+		width: auto !important;
+		flex: 1 !important;
+	}
+
+	/* Row height adjustments */
+	.narrow-desktop-table tbody tr {
+		min-height: 36px !important;
+	}
+}
+
+/* At the smallest end (630px and below), lock to minimum sizes */
+@media (max-width: 630px) {
+	.narrow-desktop-table {
+		width: 460px !important;
+		max-width: 460px !important;
+	}
+
+	.narrow-desktop-table .metric-box {
+		height: 18px !important;
+		min-height: 18px !important;
+		width: 40px !important;
+		min-width: 40px !important;
+		font-size: 11px !important;
+	}
+
+	.narrow-desktop-table .metrics-grid-container,
+	.narrow-desktop-table .metrics-header-grid {
+		gap: 6px !important;
+	}
+
+	.narrow-desktop-table .campaign-name-text {
+		font-size: 14px !important;
+	}
+
+	.narrow-desktop-table .metrics-header-label {
+		font-size: 10px !important;
+	}
+}
+
