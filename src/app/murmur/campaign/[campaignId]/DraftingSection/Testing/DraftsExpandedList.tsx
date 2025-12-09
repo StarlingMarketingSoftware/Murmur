@@ -578,7 +578,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									"absolute flex flex-col items-end pointer-events-none",
 									isBottomView
 										? "top-[4px] right-[4px] gap-[1px] w-[90px]"
-										: "top-[6px] right-[28px] gap-[2px] w-[92px]"
+										: "top-[4px] right-[8px] gap-[2px] w-[169px]"
 								)}>
 									{/* Title row - on top */}
 									{contactTitle ? (
@@ -586,7 +586,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											"bg-[#E8EFFF] border border-black overflow-hidden flex items-center",
 											isBottomView
 												? "h-[10px] rounded-[3px] px-1 w-full"
-												: "w-[92px] h-[10px] rounded-[3.71px] justify-center"
+												: "w-[169px] h-[21px] rounded-[5px] justify-center"
 										)}>
 											{isBottomView ? (
 												<span className="text-[7px] text-black leading-none truncate">
@@ -595,7 +595,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											) : (
 												<ScrollableText
 													text={contactTitle}
-													className="text-[8px] text-black leading-none px-1"
+													className="text-[11px] text-black leading-none px-1"
 												/>
 											)}
 										</div>
@@ -604,7 +604,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									{/* Location row - below title */}
 									<div className={cn(
 										"flex items-center justify-start",
-										isBottomView ? "gap-0.5 h-[10px] w-[90px]" : "gap-1 h-[11.67px] w-[92px]"
+										isBottomView ? "gap-0.5 h-[10px] w-[90px]" : "gap-1 h-[19px] w-[169px]"
 									)}>
 										{(() => {
 											const fullStateName = (contact?.state as string) || '';
@@ -630,7 +630,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 														"inline-flex items-center justify-center border overflow-hidden",
 														isBottomView
 															? "w-[20px] h-[10px] rounded-[2px]"
-															: "w-[17.81px] h-[11.67px] rounded-[3.44px]"
+															: "w-[29px] h-[19px] rounded-[4px]"
 													)}
 													style={{ borderColor: '#000000' }}
 												>
@@ -646,7 +646,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 														"inline-flex items-center justify-center border leading-none font-bold",
 														isBottomView
 															? "w-[20px] h-[10px] rounded-[2px] text-[7px]"
-															: "w-[17.81px] h-[11.67px] rounded-[3.44px] text-[8px]"
+															: "w-[29px] h-[19px] rounded-[4px] text-[10px]"
 													)}
 													style={{
 														backgroundColor:
@@ -662,7 +662,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 														"inline-flex items-center justify-center border",
 														isBottomView
 															? "w-[20px] h-[10px] rounded-[2px]"
-															: "w-[17.81px] h-[11.67px] rounded-[3.44px]"
+															: "w-[29px] h-[19px] rounded-[4px]"
 													)}
 													style={{ borderColor: '#000000' }}
 												/>
@@ -676,7 +676,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											) : (
 												<ScrollableText
 													text={contact.city}
-													className="text-[10px] text-black leading-none max-w-[70px]"
+													className="text-[11px] text-black leading-none max-w-[130px]"
 												/>
 											)
 										) : null}
@@ -794,7 +794,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 												);
 											})()}
 											{/* Row 3: Subject */}
-											<div className="row-start-3 col-span-1 flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
+											<div className="row-start-3 col-span-1 flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px] mt-[4px]">
 												<div
 													className="text-[10px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2"
 													style={{
