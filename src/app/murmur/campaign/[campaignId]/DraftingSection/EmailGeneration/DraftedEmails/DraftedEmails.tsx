@@ -654,6 +654,93 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						data-lenis-prevent
 						style={{ margin: '0', border: 'none', padding: hasStatusBar ? '0 12px 12px 12px' : '6px 12px 12px 12px', borderBottomLeftRadius: '5px', borderBottomRightRadius: '5px', backgroundColor: '#FFDC9E' }}
 					>
+						{/* Vertical divider line 20px from right - bottom area only */}
+						<div
+							style={{
+								position: 'absolute',
+								right: '20px',
+								top: hasStatusBar ? '578px' : '640px',
+								bottom: 0,
+								width: '1px',
+								backgroundColor: '#000000',
+							}}
+						/>
+						{/* Second divider line 94px to the left of the first one (20 + 94 = 114) */}
+						<div
+							style={{
+								position: 'absolute',
+								right: '114px',
+								top: hasStatusBar ? '578px' : '640px',
+								bottom: 0,
+								width: '1px',
+								backgroundColor: '#000000',
+							}}
+						/>
+						{/* Delete button between lines */}
+						<button
+							type="button"
+							onClick={async (e) => {
+								if (selectedDraft) {
+									await handleDeleteDraft(e, selectedDraft.id);
+									setSelectedDraft(null);
+								}
+							}}
+							disabled={isPendingDeleteEmail}
+							className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
+							style={{
+								right: '20px',
+								width: '94px',
+								top: hasStatusBar ? '578px' : '640px',
+								bottom: 0,
+							}}
+						>
+							{isPendingDeleteEmail ? '...' : 'Delete'}
+						</button>
+						{/* Third divider line 5px to the left of the second one (114 + 5 = 119) */}
+						<div
+							style={{
+								position: 'absolute',
+								right: '119px',
+								top: hasStatusBar ? '578px' : '640px',
+								bottom: 0,
+								width: '1px',
+								backgroundColor: '#000000',
+							}}
+						/>
+						{/* Fourth divider line 92px to the left of the third one (119 + 92 = 211) */}
+						<div
+							style={{
+								position: 'absolute',
+								right: '211px',
+								top: hasStatusBar ? '578px' : '640px',
+								bottom: 0,
+								width: '1px',
+								backgroundColor: '#000000',
+							}}
+						/>
+						{/* Send button between lines */}
+						<button
+							type="button"
+							onClick={async () => {
+								if (selectedDraft && !props.isSendingDisabled) {
+									// Select only the current draft and send it
+									props.setSelectedDraftIds(new Set([selectedDraft.id]));
+									// Small delay to ensure state is updated before sending
+									await new Promise((resolve) => setTimeout(resolve, 50));
+									await props.onSend();
+								}
+							}}
+							disabled={props.isSendingDisabled}
+							className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
+							style={{
+								right: '119px',
+								width: '92px',
+								top: hasStatusBar ? '578px' : '640px',
+								bottom: 0,
+							}}
+						>
+							Send
+						</button>
 						{/* Subject input */}
 						<div className="flex justify-center" style={{ marginBottom: '8px' }}>
 							<input
@@ -1276,8 +1363,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								? `${actionVerb} ${selectedCount} Selected`
 								: actionVerb;
 
-							return hasSelection ? (
-								props.isSendingDisabled ? (
+							return (
+								(hasSelection && props.isSendingDisabled) ? (
 									<UpgradeSubscriptionDrawer
 										triggerButtonText={showConfirm ? confirmLabel : actionLabel}
 										buttonVariant="primary"
@@ -1298,10 +1385,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										<button
 											type="button"
 											className={cn(
-												'flex-1 h-full flex items-center justify-center text-center text-black font-inter font-normal text-[17px] pl-[62px]',
+												'flex-1 h-full flex items-center justify-center text-center text-black font-inter font-normal text-[17px] pl-[89px]',
 												hasSelection
 													? 'bg-[#FFDC9F] hover:bg-[#F4C87E] cursor-pointer'
-													: 'bg-[#E0E0E0] cursor-not-allowed opacity-60'
+													: 'bg-[#FFFFFF] cursor-default'
 											)}
 											onClick={async () => {
 												if (!hasSelection) return;
@@ -1319,18 +1406,23 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											}}
 											disabled={!hasSelection}
 										>
-											{showConfirm ? confirmLabel : actionLabel}
+											{hasSelection ? (showConfirm ? confirmLabel : actionLabel) : actionVerb}
 										</button>
 
 										{/* Right section "All" button */}
 										<button
 											type="button"
-											className="w-[62px] h-full bg-[#C69A4D] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#B2863F] cursor-pointer border-l-[2px] border-[#000000]"
+											className={cn(
+												'w-[89px] h-full flex items-center justify-center font-inter font-normal text-[17px] text-black cursor-pointer border-l-[2px] border-[#000000]',
+												isRejectedTab
+													? 'bg-[#C76A6A] hover:bg-[#B34E4E]'
+													: 'bg-[#7CB67C] hover:bg-[#6FA36F]'
+											)}
 											onMouseEnter={() => setIsHoveringAllButton(true)}
 											onMouseLeave={() => setIsHoveringAllButton(false)}
 											onClick={(e) => {
 												e.stopPropagation();
-											handleSelectAllDrafts(filteredDrafts);
+												handleSelectAllDrafts(filteredDrafts);
 												setShowConfirm(true);
 												setTimeout(() => setShowConfirm(false), 10000);
 											}}
@@ -1339,12 +1431,6 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										</button>
 									</div>
 								)
-							) : (
-								<div className="w-full h-full flex items-center justify-center text-center text-[15px] font-inter text-black">
-									{props.statusFilter === 'rejected'
-										? 'Select Drafts to Regenerate'
-										: 'Select Drafts and Send Emails'}
-								</div>
 							);
 						})()}
 					</div>

@@ -478,7 +478,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 						style={{
 							paddingTop:
 								customWhiteSectionHeight !== undefined
-									? '6px'
+									? '2px'
 									: isAllTab
 									? `${39 - whiteSectionHeight}px`
 									: `${38 - whiteSectionHeight}px`,
@@ -498,15 +498,17 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							const isApproved = approvedDraftIds?.has(draft.id as number) ?? false;
 							const isPreviewed = previewedDraftId === draft.id;
 							const contactTitle = contact?.headline || contact?.title || '';
+							const indicatorLeftClass = isBottomView ? 'left-2' : 'left-[8px]';
 							return (
 								<div
 									key={draft.id}
 									className={cn(
-										'cursor-pointer relative select-none overflow-visible rounded-[8px] border-2 border-[#000000] bg-white p-2',
+										'cursor-pointer relative select-none overflow-visible rounded-[8px] border-2 border-[#000000] bg-white',
 										isBottomView
-											? 'w-[225px] h-[40px]'
+											? 'w-[224px] h-[28px]'
 											: !hasCustomRowSize &&
 											  'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
+										!isBottomView && 'p-2',
 										isPreviewed && 'bg-[#FDDEA5]',
 										isSelected && !isPreviewed && 'bg-[#FFDF9F]',
 										isPreviewMode && !isPreviewed && 'hover:bg-[#FFEDCA]'
@@ -527,13 +529,13 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									{/* Used-contact indicator - stacked above reject/approve when both present */}
 									{usedContactIdsSet.has(draft.contactId) && (
 										<span
-											className="absolute left-[8px]"
+											className={cn('absolute', indicatorLeftClass)}
 											title="Used in a previous campaign"
 											style={{
 												top: (isRejected || isApproved) ? 'calc(50% - 16px)' : '50%',
 												transform: (isRejected || isApproved) ? 'none' : 'translateY(-50%)',
-												width: '13px',
-												height: '13px',
+												width: isBottomView ? '12px' : '13px',
+												height: isBottomView ? '12px' : '13px',
 												borderRadius: '50%',
 												border: '1px solid #000000',
 												backgroundColor: '#DAE6FE',
@@ -543,14 +545,14 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									{/* Rejected indicator - stacked below used-contact when both present */}
 									{isRejected && (
 										<span
-											className="absolute left-[8px]"
+											className={cn('absolute', indicatorLeftClass)}
 											title="Marked for rejection"
 											aria-label="Rejected draft"
 											style={{
 												top: usedContactIdsSet.has(draft.contactId) ? 'calc(50% + 3px)' : '50%',
 												transform: usedContactIdsSet.has(draft.contactId) ? 'none' : 'translateY(-50%)',
-												width: '13px',
-												height: '13px',
+												width: isBottomView ? '12px' : '13px',
+												height: isBottomView ? '12px' : '13px',
 												borderRadius: '50%',
 												border: '1px solid #000000',
 												backgroundColor: '#A03C3C',
@@ -559,14 +561,14 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									)}
 									{isApproved && (
 										<span
-											className="absolute left-[8px]"
+											className={cn('absolute', indicatorLeftClass)}
 											title="Marked for approval"
 											aria-label="Approved draft"
 											style={{
 												top: usedContactIdsSet.has(draft.contactId) ? 'calc(50% + 3px)' : '50%',
 												transform: usedContactIdsSet.has(draft.contactId) ? 'none' : 'translateY(-50%)',
-												width: '13px',
-												height: '13px',
+												width: isBottomView ? '12px' : '13px',
+												height: isBottomView ? '12px' : '13px',
 												borderRadius: '50%',
 												border: '1px solid #000000',
 												backgroundColor: '#69AF69',
@@ -574,20 +576,28 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 										/>
 									)}
 								{/* Fixed top-right info (Title + Location) - match Drafting tab */}
-								<div className={cn(
-									"absolute flex flex-col items-end pointer-events-none",
-									isBottomView
-										? "top-[4px] right-[4px] gap-[1px] w-[90px]"
-										: "top-[6px] right-[28px] gap-[2px] w-[92px]"
-								)}>
+								<div
+									className={cn(
+										'absolute flex flex-col items-end pointer-events-none',
+										isBottomView
+											? 'top-[4px] right-[4px] gap-[1px] w-[90px]'
+											: isAllTab
+											? 'top-[4px] right-[8px] gap-[2px] w-[158px]'
+											: 'top-[4px] right-[8px] gap-[2px] w-[169px]'
+									)}
+								>
 									{/* Title row - on top */}
 									{contactTitle ? (
-										<div className={cn(
-											"bg-[#E8EFFF] border border-black overflow-hidden flex items-center",
-											isBottomView
-												? "h-[10px] rounded-[3px] px-1 w-full"
-												: "w-[92px] h-[10px] rounded-[3.71px] justify-center"
-										)}>
+										<div
+											className={cn(
+												'bg-[#E8EFFF] border border-black overflow-hidden flex items-center',
+												isBottomView
+													? 'h-[10px] rounded-[3px] px-1 w-full'
+													: isAllTab
+													? 'w-[158px] h-[15px] rounded-[5px] justify-center'
+													: 'w-[169px] h-[21px] rounded-[5px] justify-center'
+											)}
+										>
 											{isBottomView ? (
 												<span className="text-[7px] text-black leading-none truncate">
 													{contactTitle}
@@ -595,17 +605,23 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											) : (
 												<ScrollableText
 													text={contactTitle}
-													className="text-[8px] text-black leading-none px-1"
+													className="text-[11px] text-black leading-none px-1"
 												/>
 											)}
 										</div>
 									) : null}
 
 									{/* Location row - below title */}
-									<div className={cn(
-										"flex items-center justify-start",
-										isBottomView ? "gap-0.5 h-[10px] w-[90px]" : "gap-1 h-[11.67px] w-[92px]"
-									)}>
+									<div
+										className={cn(
+											'flex items-center justify-start',
+											isBottomView
+												? 'gap-0.5 h-[10px] w-[90px]'
+												: isAllTab
+												? 'gap-1 h-[14px] w-[158px]'
+												: 'gap-1 h-[19px] w-[169px]'
+										)}
+									>
 										{(() => {
 											const fullStateName = (contact?.state as string) || '';
 											const stateAbbr = getStateAbbreviation(fullStateName) || '';
@@ -627,10 +643,12 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											return isCanadianProvince ? (
 												<div
 													className={cn(
-														"inline-flex items-center justify-center border overflow-hidden",
+														'inline-flex items-center justify-center border overflow-hidden',
 														isBottomView
-															? "w-[20px] h-[10px] rounded-[2px]"
-															: "w-[17.81px] h-[11.67px] rounded-[3.44px]"
+															? 'w-[20px] h-[10px] rounded-[2px]'
+															: isAllTab
+															? 'w-[27px] h-[14px] rounded-[4px]'
+															: 'w-[29px] h-[19px] rounded-[4px]'
 													)}
 													style={{ borderColor: '#000000' }}
 												>
@@ -643,10 +661,12 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											) : isUSAbbr ? (
 												<span
 													className={cn(
-														"inline-flex items-center justify-center border leading-none font-bold",
+														'inline-flex items-center justify-center border leading-none font-bold',
 														isBottomView
-															? "w-[20px] h-[10px] rounded-[2px] text-[7px]"
-															: "w-[17.81px] h-[11.67px] rounded-[3.44px] text-[8px]"
+															? 'w-[20px] h-[10px] rounded-[2px] text-[7px]'
+															: isAllTab
+															? 'w-[27px] h-[14px] rounded-[4px] text-[9px]'
+															: 'w-[29px] h-[19px] rounded-[4px] text-[10px]'
 													)}
 													style={{
 														backgroundColor:
@@ -659,10 +679,12 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											) : (
 												<span
 													className={cn(
-														"inline-flex items-center justify-center border",
+														'inline-flex items-center justify-center border',
 														isBottomView
-															? "w-[20px] h-[10px] rounded-[2px]"
-															: "w-[17.81px] h-[11.67px] rounded-[3.44px]"
+															? 'w-[20px] h-[10px] rounded-[2px]'
+															: isAllTab
+															? 'w-[27px] h-[14px] rounded-[4px]'
+															: 'w-[29px] h-[19px] rounded-[4px]'
 													)}
 													style={{ borderColor: '#000000' }}
 												/>
@@ -676,7 +698,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											) : (
 												<ScrollableText
 													text={contact.city}
-													className="text-[10px] text-black leading-none max-w-[70px]"
+													className="text-[11px] text-black leading-none max-w-[130px]"
 												/>
 											)
 										) : null}
@@ -685,10 +707,10 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 
 									{/* Content grid */}
 									{isBottomView ? (
-										/* Bottom view: compact 4-row layout */
-										<div className="grid grid-cols-1 grid-rows-4 h-full pr-[95px] pl-[22px]">
+										/* Bottom view: compact layout matching Contacts bottom view (no subject/body) */
+										<div className="grid grid-cols-1 grid-rows-2 h-full pr-[95px] pl-[22px]">
 											{/* Row 1: Name */}
-											<div className="flex items-center h-[8px] overflow-hidden">
+											<div className="flex items-center h-[12px] overflow-hidden">
 												<div
 													className="font-bold text-[9px] leading-none whitespace-nowrap overflow-hidden w-full pr-1"
 													style={{
@@ -702,7 +724,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 												</div>
 											</div>
 											{/* Row 2: Company */}
-											<div className="flex items-center h-[6px] overflow-hidden">
+											<div className="flex items-center h-[12px] overflow-hidden">
 												{(() => {
 													const hasSeparateName = Boolean(
 														(contact?.name && contact.name.trim()) ||
@@ -723,34 +745,6 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 														</div>
 													);
 												})()}
-											</div>
-											{/* Row 3: Subject */}
-											<div className="flex items-center h-[6px] overflow-hidden">
-												<div
-													className="text-[7px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-1"
-													style={{
-														WebkitMaskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-														maskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-													}}
-												>
-													{draft.subject || 'No subject'}
-												</div>
-											</div>
-											{/* Row 4: Email body preview */}
-											<div className="flex items-center h-[6px] overflow-hidden mt-[2px]">
-												<div
-													className="text-[7px] text-gray-500 leading-none whitespace-nowrap overflow-hidden w-full pr-1"
-													style={{
-														WebkitMaskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-														maskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-													}}
-												>
-													{draft.message ? draft.message.replace(/<[^>]*>/g, '') : 'No content'}
-												</div>
 											</div>
 										</div>
 									) : (
@@ -794,7 +788,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 												);
 											})()}
 											{/* Row 3: Subject */}
-											<div className="row-start-3 col-span-1 flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
+											<div className="row-start-3 col-span-1 flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px] mt-[4px]">
 												<div
 													className="text-[10px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2"
 													style={{
@@ -827,17 +821,18 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							);
 						})}
 						{Array.from({
-							length: Math.max(0, (isBottomView ? 2 : 4) - drafts.length),
+							length: Math.max(0, (isBottomView ? 3 : 4) - drafts.length),
 						}).map((_, idx) => (
 							<div
 								key={`draft-placeholder-${idx}`}
 								className={cn(
-									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] p-2',
-								isBottomView
-									? 'w-[225px] h-[40px]'
-									: !hasCustomRowSize &&
-									  'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
-							)}
+									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000]',
+									isBottomView
+										? 'w-[224px] h-[28px]'
+										: !hasCustomRowSize &&
+										  'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
+									!isBottomView && 'p-2'
+								)}
 							style={
 								isBottomView
 									? { backgroundColor: placeholderBgColor }

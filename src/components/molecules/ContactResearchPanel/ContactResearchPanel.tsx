@@ -674,11 +674,23 @@ top: isExpanded ? '28px' : '50%',
 					id="research-summary-box-shared"
 					className="absolute"
 					style={{
-						bottom: hasAnyParsedSections || isLoading ? '14px' : '8px',
+						// When height is fixed and only showing summary, position from top to match [1] box spacing
+						// Content area starts at headerHeight + 50 = 69px (compact), first box at +6px = 75px
+						...(height && !hasAnyParsedSections && !isLoading
+							? { top: `${headerHeight + 50 + 6}px` }
+							: { bottom: hasAnyParsedSections || isLoading ? '14px' : '8px' }),
 						left: '50%',
 						transform: 'translateX(-50%)',
 						width: `${boxWidth}px`,
-						height: hasAnyParsedSections || isLoading ? '197px' : '336px',
+						// When height is fixed and only showing summary (no bullet points):
+						// Calculate height: container - top offset (75px) - bottom margin (8px)
+						height: hasAnyParsedSections || isLoading 
+							? '197px' 
+							: height 
+								? typeof height === 'number'
+									? `${height - (headerHeight + 50 + 6) - 8}px`
+									: 'calc(100% - 83px)'
+								: '336px',
 						backgroundColor: hasAnyParsedSections || isLoading ? '#E9F7FF' : '#158BCF',
 						border: '2px solid #000000',
 						borderRadius: '8px',
@@ -712,13 +724,16 @@ top: isExpanded ? '28px' : '50%',
 										transform: 'translateX(-50%)',
 								  }),
 							width: `${summaryInnerWidth}px`,
-							height: height
-								? typeof height === 'number'
-									? `${height - 53}px` // 352 - 53 = 299px (approx logic if fixed)
-									: 'calc(100% - 53px)'
-								: hasAnyParsedSections || isLoading
+							// Inner box height: relative to summary box height (subtract ~18px for padding)
+							// Summary box height = height - (headerHeight + 50 + 6) - 8 = height - headerHeight - 64
+							// Inner height = summary height - 18 = height - headerHeight - 82
+							height: hasAnyParsedSections || isLoading
 								? '182px'
-								: '299px',
+								: height
+									? typeof height === 'number'
+										? `${height - headerHeight - 82}px`
+										: 'calc(100% - 101px)'
+									: '299px',
 							backgroundColor: hideAllText || isLoading
 								? hasAnyParsedSections || isLoading
 									? '#E9F7FF'
