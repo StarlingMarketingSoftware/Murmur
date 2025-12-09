@@ -2872,7 +2872,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onMouseLeave={() => setIsContactsHovered(false)}
 											onClick={() => {
 												setIsContactsHovered(false);
-												goToContacts();
+												goToContacts?.();
 											}}
 										>
 											{/* Hover box */}
@@ -2942,7 +2942,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onMouseLeave={() => setIsWritingHovered(false)}
 											onClick={() => {
 												setIsWritingHovered(false);
-												goToWriting();
+												goToWriting?.();
 											}}
 										>
 											{/* Hover box */}
@@ -3341,7 +3341,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onMouseLeave={() => setIsDraftsHovered(false)}
 											onClick={() => {
 												setIsDraftsHovered(false);
-												goToDrafting();
+												goToDrafting?.();
 											}}
 										>
 											{/* Hover box */}
@@ -3405,7 +3405,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onMouseLeave={() => setIsSentHovered(false)}
 											onClick={() => {
 												setIsSentHovered(false);
-												goToSent();
+												goToSent?.();
 											}}
 										>
 											{/* Hover box */}
@@ -3449,7 +3449,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onMouseLeave={() => setIsInboxHovered(false)}
 											onClick={() => {
 												setIsInboxHovered(false);
-												goToInbox();
+												goToInbox?.();
 											}}
 										>
 											{/* Hover box */}

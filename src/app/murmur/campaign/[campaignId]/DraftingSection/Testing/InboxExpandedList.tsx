@@ -185,6 +185,7 @@ const getCanonicalContactName = (
 };
 
 export const InboxExpandedList: FC<InboxExpandedListProps> = ({
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	contacts,
 	allowedSenderEmails,
 	contactByEmail,

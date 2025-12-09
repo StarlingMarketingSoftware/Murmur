@@ -262,36 +262,6 @@ function getSuggestionScore(
 	return score;
 }
 
-function buildStateSearchTerms(cleanQuery: string): string[] {
-	const terms = [cleanQuery];
-
-	if (cleanQuery.includes(',')) {
-		const parts = cleanQuery.split(',');
-		const statePart = parts[parts.length - 1].trim();
-
-		let fullState = abbreviationToState[statePart.toUpperCase()];
-		if (!fullState && statePart.length > 2) {
-			fullState = statePart;
-		}
-
-		if (fullState) {
-			terms.push(fullState);
-		} else if (statePart.length > 0) {
-			terms.push(statePart);
-		}
-	}
-
-	if (cleanQuery.length === 2) {
-		const fullState = abbreviationToState[cleanQuery.toUpperCase()];
-		if (fullState) terms.push(fullState);
-	}
-
-	const possibleAbbr = stateAbbreviations[cleanQuery.toLowerCase()];
-	if (possibleAbbr) terms.push(possibleAbbr);
-
-	return Array.from(new Set(terms.filter(Boolean)));
-}
-
 function buildCitySearchTerms(cleanQuery: string): string[] {
 	const terms = [cleanQuery];
 
