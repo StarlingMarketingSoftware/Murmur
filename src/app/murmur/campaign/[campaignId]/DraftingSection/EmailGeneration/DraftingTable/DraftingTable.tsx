@@ -27,7 +27,7 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isA
 	const pillWidth = isBottomView ? 40 : isAllTab ? 50 : 72;
 	const pillHeight = isBottomView ? 10 : isAllTab ? 15 : 22;
 	const pillBorderRadius = isBottomView ? 5 : isAllTab ? 7.5 : 11;
-	const pillFontSize = isBottomView ? '8px' : isAllTab ? '10px' : '13px';
+	const pillFontSize = isBottomView ? '6px' : isAllTab ? '10px' : '13px';
 	// Center dots vertically with the pill - calculate both positions relative to each other
 	const pillTop = whiteSectionHeight !== undefined ? (whiteSectionHeight - pillHeight) / 2 : 3 + offsetY;
 	const pillCenterY = pillTop + pillHeight / 2;
@@ -63,7 +63,7 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isA
 						justifyContent: 'center',
 						alignItems: 'center',
 						height: '100%',
-						marginTop: isAllTab ? '-1px' : 0 // Optical alignment adjustment
+						marginTop: isBottomView ? '-1px' : isAllTab ? '-1px' : 0 // Optical alignment adjustment
 					}}
 				>
 					Contacts

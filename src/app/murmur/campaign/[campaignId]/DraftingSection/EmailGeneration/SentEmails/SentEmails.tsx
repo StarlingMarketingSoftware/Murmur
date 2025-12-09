@@ -245,17 +245,27 @@ export const SentEmails: FC<SentEmailsProps> = ({
 
 								{/* Row 3: Subject */}
 								<div className="flex items-center min-h-[14px]">
-									<div className="text-[14px] font-inter font-semibold text-black truncate leading-none">
+									<div
+										className="text-[14px] font-inter font-semibold text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+										style={{
+											WebkitMaskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
+											maskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
+										}}
+									>
 										{email.subject || 'No subject'}
 									</div>
 								</div>
 
 								{/* Row 4: Message preview */}
 								<div className="flex items-center min-h-[14px]">
-									<div className="text-[10px] text-gray-500 truncate leading-none">
-										{email.message
-											? email.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
-											: 'No content'}
+									<div
+										className="text-[10px] text-gray-500 leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+										style={{
+											WebkitMaskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
+											maskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
+										}}
+									>
+										{email.message ? email.message.replace(/<[^>]*>/g, '') : 'No content'}
 									</div>
 								</div>
 							</div>

@@ -88,7 +88,7 @@ const DashboardContent = () => {
 	const debouncedWhereValue = useDebounce(whereValue, 300);
 	const { data: locationResults, isLoading: isLoadingLocations } = useGetLocations(
 		debouncedWhereValue,
-		'state-first'
+		'state'
 	);
 
 	const renderDesktopSearchDropdowns = () => {
@@ -963,7 +963,7 @@ const DashboardContent = () => {
 																		</div>
 																		{/* What Section */}
 																		<div
-																			className={`absolute left-[172px] top-[-1px] h-[64px] cursor-pointer border ${
+																			className={`absolute left-[172px] top-[-1px] h-[64px] cursor-pointer border overflow-hidden ${
 																				activeSection === 'what'
 																					? 'w-[161px] bg-white border-black z-30 rounded-[8px]'
 																					: `w-[160px] border-transparent ${
@@ -977,7 +977,7 @@ const DashboardContent = () => {
 																			<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
 																				What
 																			</div>
-																			<div className="absolute left-[24px] top-[42px] w-[124px] h-[12px]">
+																			<div className="absolute left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
 																				{activeSection === 'what' ? (
 																					<input
 																						ref={whatInputRef}
@@ -1005,12 +1005,15 @@ const DashboardContent = () => {
 																					/>
 																				) : (
 																					<div
-																						className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap hover:text-black/60 transition-colors"
+																						className="absolute top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
 																						style={{
 																							height: '12px',
 																							lineHeight: '12px',
 																							padding: '0',
 																							margin: '0',
+																							color: whatValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
+																							maskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
+																							WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
 																						}}
 																					>
 																						{whatValue || 'Add Recipients'}
@@ -1020,7 +1023,7 @@ const DashboardContent = () => {
 																		</div>
 																		{/* Where Section */}
 																		<div
-																			className={`absolute left-[332px] top-[-1px] h-[64px] cursor-pointer border ${
+																			className={`absolute left-[332px] top-[-1px] h-[64px] cursor-pointer border overflow-hidden ${
 																				activeSection === 'where'
 																					? 'w-[201px] bg-white border-black z-30 rounded-[8px]'
 																					: `w-[200px] border-transparent ${
@@ -1034,7 +1037,7 @@ const DashboardContent = () => {
 																			<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
 																				Where
 																			</div>
-																			<div className="absolute left-[24px] top-[42px] w-[156px] h-[12px]">
+																			<div className="absolute left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
 																				{activeSection === 'where' ? (
 																					<div className="absolute top-0 left-0 w-full h-full flex items-center gap-[2px]">
 																						<input
@@ -1066,12 +1069,15 @@ const DashboardContent = () => {
 																					</div>
 																				) : (
 																					<div
-																						className="absolute top-0 left-0 font-semibold text-black/42 text-[12px] whitespace-nowrap hover:text-black/60 transition-colors"
+																						className="absolute top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
 																						style={{
 																							height: '12px',
 																							lineHeight: '12px',
 																							padding: '0',
 																							margin: '0',
+																							color: hasWhereValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
+																							maskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
+																							WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
 																						}}
 																					>
 																						{hasWhereValue ? whereValue : 'Search States'}
@@ -1566,7 +1572,11 @@ const DashboardContent = () => {
 																			<input
 																				value={whatValue}
 																				onChange={(e) => setWhatValue(e.target.value)}
-																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary overflow-hidden placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+																				style={{
+																					maskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
+																					WebkitMaskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
+																				}}
 																				placeholder="What"
 																				onFocus={(e) => {
 																					setActiveSection('what');
@@ -1595,7 +1605,11 @@ const DashboardContent = () => {
 																			<input
 																				value={whereValue}
 																				onChange={(e) => setWhereValue(e.target.value)}
-																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary truncate placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary overflow-hidden placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+																				style={{
+																					maskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
+																					WebkitMaskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
+																				}}
 																				placeholder="Where"
 																				onFocus={(e) => {
 																					setActiveSection('where');
@@ -1870,8 +1884,8 @@ const DashboardContent = () => {
 																	<div
 																		className="absolute top-[10px] right-[10px] rounded-[12px] shadow-lg flex flex-col"
 																		style={{
-																			width: '390px',
-																			height: '801px',
+																			width: '433px',
+																			height: '870px',
 																			maxHeight: 'calc(100% - 20px)',
 																			backgroundColor: '#AFD6EF',
 																			border: '3px solid #143883',
@@ -1941,7 +1955,7 @@ const DashboardContent = () => {
 																					<div
 																						key={contact.id}
 																						data-contact-id={contact.id}
-																						className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none"
+																						className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none relative"
 																						style={{
 																							backgroundColor: isSelected
 																								? '#C9EAFF'
@@ -1966,6 +1980,23 @@ const DashboardContent = () => {
 																						}
 																						onMouseLeave={() => setHoveredContact(null)}
 																					>
+																						{/* Centered used contact dot */}
+																						{fullName && isUsed && (
+																							<span
+																								className="absolute shrink-0"
+																								title="Used in a previous campaign"
+																								style={{
+																									width: '16px',
+																									height: '16px',
+																									borderRadius: '50%',
+																									border: '1px solid #000000',
+																									backgroundColor: '#DAE6FE',
+																									left: '12px',
+																									top: '50%',
+																									transform: 'translateY(-50%)',
+																								}}
+																							/>
+																						)}
 																						{fullName ? (
 																							<>
 																								{/* Top Left - Name */}
@@ -1973,13 +2004,9 @@ const DashboardContent = () => {
 																									{isUsed && (
 																										<span
 																											className="inline-block shrink-0 mr-2"
-																											title="Used in a previous campaign"
 																											style={{
 																												width: '16px',
 																												height: '16px',
-																												borderRadius: '50%',
-																												border: '1px solid #000000',
-																												backgroundColor: '#DAE6FE',
 																											}}
 																										/>
 																									)}
@@ -2001,6 +2028,15 @@ const DashboardContent = () => {
 																								</div>
 																								{/* Bottom Left - Company */}
 																								<div className="pl-3 pr-1 flex items-center h-[22px]">
+																									{isUsed && (
+																										<span
+																											className="inline-block shrink-0 mr-2"
+																											style={{
+																												width: '16px',
+																												height: '16px',
+																											}}
+																										/>
+																									)}
 																									<div className="text-[11px] text-black w-full truncate leading-tight">
 																										{company}
 																									</div>
@@ -2101,6 +2137,47 @@ const DashboardContent = () => {
 																				);
 																			})}
 																		</CustomScrollbar>
+																		<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
+																			<Button
+																				isLoading={
+																					isPendingCreateCampaign ||
+																					isPendingBatchUpdateContacts
+																				}
+																				variant="primary-light"
+																				bold
+																				className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
+																					selectedContacts.length === 0
+																						? 'opacity-[0.62]'
+																						: 'opacity-100'
+																				}`}
+																				style={
+																					selectedContacts.length === 0
+																						? { height: '39px', filter: 'grayscale(100%)' }
+																						: { height: '39px' }
+																				}
+																				onClick={() => {
+																					if (selectedContacts.length === 0) return;
+																					handleCreateCampaign();
+																				}}
+																			>
+																				<span className="relative z-20">Create Campaign</span>
+																				<div
+																					className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+																					onClick={(e) => {
+																						e.stopPropagation();
+																						handleSelectAll();
+																					}}
+																				>
+																					<span className="text-black text-[14px] font-medium">
+																						All
+																					</span>
+																				</div>
+																				<span
+																					aria-hidden="true"
+																					className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+																				/>
+																			</Button>
+																		</div>
 																	</div>
 																)}
 																{!(
@@ -2166,7 +2243,7 @@ const DashboardContent = () => {
 																				className="absolute rounded-[8px] shadow-lg flex flex-col"
 																				style={{
 																					top: '68px',
-																					right: '410px',
+																					right: '460px',
 																					width: '310px',
 																					height: containerHeight,
 																					maxHeight: 'calc(100% - 20px)',

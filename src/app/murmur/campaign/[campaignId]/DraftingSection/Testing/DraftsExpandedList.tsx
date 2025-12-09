@@ -18,6 +18,7 @@ import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
+import OpenIcon from '@/components/atoms/svg/OpenIcon';
 import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import {
 	canadianProvinceAbbreviations,
@@ -29,6 +30,7 @@ export interface DraftsExpandedListProps {
 	drafts: EmailWithRelations[];
 	contacts: ContactWithName[];
 	onHeaderClick?: () => void;
+	onOpenDrafts?: () => void;
 	onSendingPreviewUpdate?: (args: { contactId: number; subject?: string }) => void;
 	onSendingPreviewReset?: () => void;
 	width?: number;
@@ -151,6 +153,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	drafts,
 	contacts,
 	onHeaderClick,
+	onOpenDrafts,
 	onSendingPreviewUpdate,
 	onSendingPreviewReset,
 	width = 376,
@@ -242,10 +245,12 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	const resolvedRowWidth = rowWidth ?? 356;
 	const resolvedRowHeight = rowHeight ?? 64;
 	const hasCustomRowSize = Boolean(rowWidth || rowHeight);
+	const isFullyEmpty = drafts.length === 0;
+	const placeholderBgColor = isFullyEmpty ? '#FDCF7D' : '#FFDC9E';
 	const horizontalPaddingClass = hasCustomRowSize
 		? 'px-0'
 		: isBottomView
-		? 'px-[2px]'
+		? 'px-0'
 		: 'px-2';
 	const verticalPaddingClass = isBottomView ? 'pt-0 pb-0' : 'pt-2 pb-2';
 
@@ -397,6 +402,33 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				}}
 			></div>
 
+			{(isAllTab || isBottomView) && (
+				<div
+					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
+					style={{ top: isBottomView ? 1 : -1, right: isBottomView ? 4 : 4 }}
+					onClick={onOpenDrafts}
+					role={onOpenDrafts ? 'button' : undefined}
+					tabIndex={onOpenDrafts ? 0 : undefined}
+					onKeyDown={(e) => {
+						if (!onOpenDrafts) return;
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							onOpenDrafts();
+						}
+					}}
+				>
+					<span className={cn(
+						"font-medium leading-none text-[#B3B3B3] font-inter",
+						isBottomView ? "text-[8px]" : "text-[10px]"
+					)}>
+						Open
+					</span>
+					<div className="flex items-center" style={{ marginTop: isBottomView ? 0 : '1px' }}>
+						<OpenIcon width={isBottomView ? 10 : undefined} height={isBottomView ? 10 : undefined} />
+					</div>
+				</div>
+			)}
+
 			{/* Selection counter and Select All row - absolutely positioned */}
 			{isAllTab && (
 				<div
@@ -436,19 +468,19 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 						isBottomView ? -7 : hasCustomRowSize ? -4 : -14
 					}
 					contentClassName="overflow-x-hidden"
-					alwaysShow={!isBottomView}
+					alwaysShow={!isBottomView && !isFullyEmpty}
 				>
 					<div
 						className={cn(
 							'flex flex-col items-center',
-							isBottomView ? 'space-y-1 pb-0' : 'space-y-2 pb-2'
+							isBottomView ? 'space-y-[5px] pb-0' : 'space-y-2 pb-2'
 						)}
 						style={{
 							paddingTop:
 								customWhiteSectionHeight !== undefined
-									? '2px'
+									? '6px'
 									: isAllTab
-									? '8px'
+									? `${39 - whiteSectionHeight}px`
 									: `${38 - whiteSectionHeight}px`,
 						}}
 					>
@@ -472,7 +504,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									className={cn(
 										'cursor-pointer relative select-none overflow-visible rounded-[8px] border-2 border-[#000000] bg-white p-2',
 										isBottomView
-											? 'w-[225px] h-[49px]'
+											? 'w-[225px] h-[40px]'
 											: !hasCustomRowSize &&
 											  'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
 										isPreviewed && 'bg-[#FDDEA5]',
@@ -541,108 +573,256 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											}}
 										/>
 									)}
-									{/* Fixed top-right info (Location + Title) - match Drafting tab */}
-									<div className="absolute top-[6px] right-[28px] flex flex-col items-end gap-[2px] w-[92px] pointer-events-none">
-										<div className="flex items-center justify-start gap-1 h-[11.67px] w-[92px]">
-											{(() => {
-												const fullStateName = (contact?.state as string) || '';
-												const stateAbbr = getStateAbbreviation(fullStateName) || '';
-												const normalizedState = fullStateName.trim();
-												const lowercaseCanadianProvinceNames = canadianProvinceNames.map(
-													(s) => s.toLowerCase()
-												);
-												const isCanadianProvince =
-													lowercaseCanadianProvinceNames.includes(
-														normalizedState.toLowerCase()
-													) ||
-													canadianProvinceAbbreviations.includes(
-														normalizedState.toUpperCase()
-													) ||
-													canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
-												const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
-
-												if (!stateAbbr) return null;
-												return isCanadianProvince ? (
-													<div
-														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border overflow-hidden"
-														style={{ borderColor: '#000000' }}
-													>
-														<CanadianFlag
-															width="100%"
-															height="100%"
-															className="w-full h-full"
-														/>
-													</div>
-												) : isUSAbbr ? (
-													<span
-														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border text-[8px] leading-none font-bold"
-														style={{
-															backgroundColor:
-																stateBadgeColorMap[stateAbbr] || 'transparent',
-															borderColor: '#000000',
-														}}
-													>
-														{stateAbbr}
-													</span>
-												) : (
-													<span
-														className="inline-flex items-center justify-center w-[17.81px] h-[11.67px] rounded-[3.44px] border"
-														style={{ borderColor: '#000000' }}
-													/>
-												);
-											})()}
-											{contact?.city ? (
-												<ScrollableText
-													text={contact.city}
-													className="text-[10px] text-black leading-none max-w-[70px]"
-												/>
-											) : null}
-										</div>
-
-										{contactTitle ? (
-											<div className="w-[92px] h-[10px] rounded-[3.71px] bg-[#E8EFFF] border border-black overflow-hidden flex items-center justify-center">
+								{/* Fixed top-right info (Title + Location) - match Drafting tab */}
+								<div className={cn(
+									"absolute flex flex-col items-end pointer-events-none",
+									isBottomView
+										? "top-[4px] right-[4px] gap-[1px] w-[90px]"
+										: "top-[6px] right-[28px] gap-[2px] w-[92px]"
+								)}>
+									{/* Title row - on top */}
+									{contactTitle ? (
+										<div className={cn(
+											"bg-[#E8EFFF] border border-black overflow-hidden flex items-center",
+											isBottomView
+												? "h-[10px] rounded-[3px] px-1 w-full"
+												: "w-[92px] h-[10px] rounded-[3.71px] justify-center"
+										)}>
+											{isBottomView ? (
+												<span className="text-[7px] text-black leading-none truncate">
+													{contactTitle}
+												</span>
+											) : (
 												<ScrollableText
 													text={contactTitle}
 													className="text-[8px] text-black leading-none px-1"
 												/>
-											</div>
-										) : null}
-									</div>
-
-									{/* Content grid */}
-									<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px] pl-[22px]">
-										{/* Row 1: Name */}
-										<div className="row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
-											<div className="font-bold text-[11px] truncate leading-none">
-												{contactName}
-											</div>
+											)}
 										</div>
-										{/* Row 2: Company (when separate name exists) */}
+									) : null}
+
+									{/* Location row - below title */}
+									<div className={cn(
+										"flex items-center justify-start",
+										isBottomView ? "gap-0.5 h-[10px] w-[90px]" : "gap-1 h-[11.67px] w-[92px]"
+									)}>
 										{(() => {
-											const hasSeparateName = Boolean(
-												(contact?.name && contact.name.trim()) ||
-													(contact?.firstName && contact.firstName.trim()) ||
-													(contact?.lastName && contact.lastName.trim())
+											const fullStateName = (contact?.state as string) || '';
+											const stateAbbr = getStateAbbreviation(fullStateName) || '';
+											const normalizedState = fullStateName.trim();
+											const lowercaseCanadianProvinceNames = canadianProvinceNames.map(
+												(s) => s.toLowerCase()
 											);
-											return (
-												<div className="row-start-2 col-start-1 flex items-center pr-2 h-[16px] max-[480px]:h-[12px]">
-													<div className="text-[11px] text-black truncate leading-none">
-														{hasSeparateName ? contact?.company || '' : ''}
-													</div>
+											const isCanadianProvince =
+												lowercaseCanadianProvinceNames.includes(
+													normalizedState.toLowerCase()
+												) ||
+												canadianProvinceAbbreviations.includes(
+													normalizedState.toUpperCase()
+												) ||
+												canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+											const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+											if (!stateAbbr) return null;
+											return isCanadianProvince ? (
+												<div
+													className={cn(
+														"inline-flex items-center justify-center border overflow-hidden",
+														isBottomView
+															? "w-[20px] h-[10px] rounded-[2px]"
+															: "w-[17.81px] h-[11.67px] rounded-[3.44px]"
+													)}
+													style={{ borderColor: '#000000' }}
+												>
+													<CanadianFlag
+														width="100%"
+														height="100%"
+														className="w-full h-full"
+													/>
 												</div>
+											) : isUSAbbr ? (
+												<span
+													className={cn(
+														"inline-flex items-center justify-center border leading-none font-bold",
+														isBottomView
+															? "w-[20px] h-[10px] rounded-[2px] text-[7px]"
+															: "w-[17.81px] h-[11.67px] rounded-[3.44px] text-[8px]"
+													)}
+													style={{
+														backgroundColor:
+															stateBadgeColorMap[stateAbbr] || 'transparent',
+														borderColor: '#000000',
+													}}
+												>
+													{stateAbbr}
+												</span>
+											) : (
+												<span
+													className={cn(
+														"inline-flex items-center justify-center border",
+														isBottomView
+															? "w-[20px] h-[10px] rounded-[2px]"
+															: "w-[17.81px] h-[11.67px] rounded-[3.44px]"
+													)}
+													style={{ borderColor: '#000000' }}
+												/>
 											);
 										})()}
-										{/* Row 3: Subject */}
-										<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
-											{draft.subject || 'No subject'}
-										</div>
-										{/* Row 4: Message preview */}
-										<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px]">
-											{draft.message
-												? draft.message.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
-												: 'No content'}
-										</div>
+										{contact?.city ? (
+											isBottomView ? (
+												<span className="text-[7px] text-black leading-none truncate max-w-[50px]">
+													{contact.city}
+												</span>
+											) : (
+												<ScrollableText
+													text={contact.city}
+													className="text-[10px] text-black leading-none max-w-[70px]"
+												/>
+											)
+										) : null}
 									</div>
+								</div>
+
+									{/* Content grid */}
+									{isBottomView ? (
+										/* Bottom view: compact 4-row layout */
+										<div className="grid grid-cols-1 grid-rows-4 h-full pr-[95px] pl-[22px]">
+											{/* Row 1: Name */}
+											<div className="flex items-center h-[8px] overflow-hidden">
+												<div
+													className="font-bold text-[9px] leading-none whitespace-nowrap overflow-hidden w-full pr-1"
+													style={{
+														WebkitMaskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+														maskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+													}}
+												>
+													{contactName}
+												</div>
+											</div>
+											{/* Row 2: Company */}
+											<div className="flex items-center h-[6px] overflow-hidden">
+												{(() => {
+													const hasSeparateName = Boolean(
+														(contact?.name && contact.name.trim()) ||
+															(contact?.firstName && contact.firstName.trim()) ||
+															(contact?.lastName && contact.lastName.trim())
+													);
+													return (
+														<div
+															className="text-[8px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-1"
+															style={{
+																WebkitMaskImage:
+																	'linear-gradient(90deg, #000 96%, transparent 100%)',
+																maskImage:
+																	'linear-gradient(90deg, #000 96%, transparent 100%)',
+															}}
+														>
+															{hasSeparateName ? contact?.company || '' : ''}
+														</div>
+													);
+												})()}
+											</div>
+											{/* Row 3: Subject */}
+											<div className="flex items-center h-[6px] overflow-hidden">
+												<div
+													className="text-[7px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-1"
+													style={{
+														WebkitMaskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+														maskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+													}}
+												>
+													{draft.subject || 'No subject'}
+												</div>
+											</div>
+											{/* Row 4: Email body preview */}
+											<div className="flex items-center h-[6px] overflow-hidden mt-[2px]">
+												<div
+													className="text-[7px] text-gray-500 leading-none whitespace-nowrap overflow-hidden w-full pr-1"
+													style={{
+														WebkitMaskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+														maskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+													}}
+												>
+													{draft.message ? draft.message.replace(/<[^>]*>/g, '') : 'No content'}
+												</div>
+											</div>
+										</div>
+									) : (
+										/* Normal view: 4-row layout */
+										<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px] pl-[22px]">
+											{/* Row 1: Name */}
+											<div className="row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
+												<div
+													className="font-bold text-[11px] leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+													style={{
+														WebkitMaskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+														maskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+													}}
+												>
+													{contactName}
+												</div>
+											</div>
+											{/* Row 2: Company (when separate name exists) */}
+											{(() => {
+												const hasSeparateName = Boolean(
+													(contact?.name && contact.name.trim()) ||
+														(contact?.firstName && contact.firstName.trim()) ||
+														(contact?.lastName && contact.lastName.trim())
+												);
+												return (
+													<div className="row-start-2 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
+														<div
+															className="text-[11px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+															style={{
+																WebkitMaskImage:
+																	'linear-gradient(90deg, #000 96%, transparent 100%)',
+																maskImage:
+																	'linear-gradient(90deg, #000 96%, transparent 100%)',
+															}}
+														>
+															{hasSeparateName ? contact?.company || '' : ''}
+														</div>
+													</div>
+												);
+											})()}
+											{/* Row 3: Subject */}
+											<div className="row-start-3 col-span-1 flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
+												<div
+													className="text-[10px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+													style={{
+														WebkitMaskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+														maskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+													}}
+												>
+													{draft.subject || 'No subject'}
+												</div>
+											</div>
+											{/* Row 4: Message preview */}
+											<div className="row-start-4 col-span-1 flex items-center h-[16px] max-[480px]:h-[12px]">
+												<div
+													className="text-[10px] text-gray-500 leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+													style={{
+														WebkitMaskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+														maskImage:
+															'linear-gradient(90deg, #000 96%, transparent 100%)',
+													}}
+												>
+													{draft.message ? draft.message.replace(/<[^>]*>/g, '') : 'No content'}
+												</div>
+											</div>
+										</div>
+									)}
 								</div>
 							);
 						})}
@@ -652,16 +832,17 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							<div
 								key={`draft-placeholder-${idx}`}
 								className={cn(
-									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#FFDC9E] p-2',
-									isBottomView
-										? 'w-[225px] h-[49px]'
-										: !hasCustomRowSize &&
-										  'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
-								)}
-								style={
-									isBottomView
-										? undefined
+									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] p-2',
+								isBottomView
+									? 'w-[225px] h-[40px]'
+									: !hasCustomRowSize &&
+									  'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]'
+							)}
+							style={
+								isBottomView
+									? { backgroundColor: placeholderBgColor }
 										: {
+												backgroundColor: placeholderBgColor,
 												width: hasCustomRowSize ? `${resolvedRowWidth}px` : undefined,
 												height: hasCustomRowSize ? `${resolvedRowHeight}px` : undefined,
 										  }

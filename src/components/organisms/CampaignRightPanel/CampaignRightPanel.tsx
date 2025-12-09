@@ -14,12 +14,12 @@ interface CampaignRightPanelProps {
 }
 
 export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({ className, view, onTabChange }) => {
-	// Position 20px to the right of the rightmost panel based on view
+	// Position to the right of the rightmost panel based on view
 	const getLeftPosition = () => {
 		if (view === 'all') {
-			// All view: 4 columns (373 + 377 + 372 + 372) + 3 gaps (48px) = 1542px total, centered
-			// Right edge at 50% + 771px, so position at 50% + 771px + 20px
-			return 'calc(50% + 791px)';
+			// All view: 4 columns (330px each) + 3 gaps (30px) = 1410px total, centered
+			// Right edge at 50% + 705px, so position at 50% + 705px + 39px
+			return 'calc(50% + 744px)';
 		}
 		if (view === 'search') {
 			// Search view: wider research panel (396px) at offset 384px + 32px
@@ -48,7 +48,24 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({ className, vie
 				left: leftPosition,
 			}}
 		>
-			<div className="flex flex-col items-center overflow-visible pt-[180px]">
+			<div className="relative flex flex-col items-center overflow-visible pt-[180px]">
+				{/* Border box for All tab - centered around the 6 SVG icons */}
+				{view === 'all' && (
+					<div
+						style={{
+							position: 'absolute',
+							top: '162px',
+							left: '50%',
+							transform: 'translateX(-50%)',
+							width: '112px',
+							height: '538px',
+							backgroundColor: 'transparent',
+							borderRadius: '8px',
+							border: '2px solid #D0D0D0',
+							zIndex: -1,
+						}}
+					/>
+				)}
 				<div 
 					className="relative flex items-center justify-center pointer-events-auto cursor-pointer"
 					onClick={() => onTabChange?.('search')}
@@ -68,7 +85,8 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({ className, vie
 					<SearchPanel style={{ display: 'block', position: 'relative', opacity: view === 'contacts' || view === 'testing' || view === 'drafting' || view === 'sent' || view === 'inbox' ? 0.3 : 1 }} />
 				</div>
 				<div 
-					className="relative flex items-center justify-center mt-4 pointer-events-auto cursor-pointer"
+					className="relative flex items-center justify-center pointer-events-auto cursor-pointer"
+					style={{ marginTop: '25px' }}
 					onClick={() => onTabChange?.('contacts')}
 				>
 					{view === 'contacts' && (
@@ -89,7 +107,8 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({ className, vie
 					<ContactsPanel style={{ display: 'block', position: 'relative', opacity: view === 'search' || view === 'testing' || view === 'drafting' || view === 'sent' || view === 'inbox' ? 0.3 : 1 }} />
 				</div>
 				<div 
-					className="relative flex items-center justify-center mt-4 pointer-events-auto cursor-pointer"
+					className="relative flex items-center justify-center pointer-events-auto cursor-pointer"
+					style={{ marginTop: '25px' }}
 					onClick={() => onTabChange?.('testing')}
 				>
 					{view === 'testing' && (
@@ -110,7 +129,8 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({ className, vie
 					<WritingPanel style={{ display: 'block', position: 'relative', opacity: view === 'search' || view === 'contacts' || view === 'drafting' || view === 'sent' || view === 'inbox' ? 0.3 : 1 }} />
 				</div>
 				<div 
-					className="relative flex items-center justify-center mt-4 pointer-events-auto cursor-pointer"
+					className="relative flex items-center justify-center pointer-events-auto cursor-pointer"
+					style={{ marginTop: '25px' }}
 					onClick={() => onTabChange?.('drafting')}
 				>
 					{view === 'drafting' && (
@@ -131,7 +151,8 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({ className, vie
 					<DraftsPanel style={{ display: 'block', position: 'relative', opacity: view === 'search' || view === 'contacts' || view === 'testing' || view === 'sent' || view === 'inbox' ? 0.3 : 1 }} />
 				</div>
 				<div 
-					className="relative flex items-center justify-center mt-4 pointer-events-auto cursor-pointer"
+					className="relative flex items-center justify-center pointer-events-auto cursor-pointer"
+					style={{ marginTop: '25px' }}
 					onClick={() => onTabChange?.('sent')}
 				>
 					{view === 'sent' && (
@@ -152,7 +173,8 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({ className, vie
 					<SentPanel style={{ display: 'block', position: 'relative', opacity: view === 'search' || view === 'contacts' || view === 'testing' || view === 'drafting' || view === 'inbox' ? 0.3 : 1 }} />
 				</div>
 				<div 
-					className="relative flex items-center justify-center mt-4 pointer-events-auto cursor-pointer"
+					className="relative flex items-center justify-center pointer-events-auto cursor-pointer"
+					style={{ marginTop: '25px' }}
 					onClick={() => onTabChange?.('inbox')}
 				>
 					{view === 'inbox' && (
