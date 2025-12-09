@@ -14,7 +14,7 @@
 		"reindex-from-production": "tsx --tsconfig tsconfig.json scripts/reindex-from-production.ts"
 	},
 	"engines": {
-		"node": "20.x"
+		"node": "18.x"
 	},
 	"prisma": {
 		"seed": "tsx --tsconfig tsconfig.json prisma/seed.ts"
