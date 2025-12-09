@@ -5,9 +5,6 @@ export const dynamic = 'force-dynamic';
 
 import { useCampaignDetail } from './useCampaignDetail';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
-import { IdentityDialog } from '@/components/organisms/_dialogs/IdentityDialog/IdentityDialog';
-import { DraftingSection } from './DraftingSection/DraftingSection';
-import { CampaignRightPanel } from '@/components/organisms/CampaignRightPanel/CampaignRightPanel';
 import { useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import Link from 'next/link';
@@ -16,6 +13,31 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { useState, useEffect } from 'react';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
+import nextDynamic from 'next/dynamic';
+
+// Dynamically import heavy components to reduce initial bundle size and prevent Vercel timeout
+const DraftingSection = nextDynamic(
+	() => import('./DraftingSection/DraftingSection').then((mod) => mod.DraftingSection),
+	{
+		loading: () => <Spinner />,
+	}
+);
+
+const IdentityDialog = nextDynamic(
+	() =>
+		import('@/components/organisms/_dialogs/IdentityDialog/IdentityDialog').then(
+			(mod) => mod.IdentityDialog
+		),
+	{}
+);
+
+const CampaignRightPanel = nextDynamic(
+	() =>
+		import('@/components/organisms/CampaignRightPanel/CampaignRightPanel').then(
+			(mod) => mod.CampaignRightPanel
+		),
+	{}
+);
 
 const Murmur = () => {
 	// Add campaign-specific class to body for background styling

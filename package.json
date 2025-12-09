@@ -7,14 +7,14 @@
 		"build": "cross-env NODE_OPTIONS=--max-old-space-size=8192 next build",
 		"start": "next start",
 		"lint": "next lint",
-		"vercel-build": "prisma generate && next build",
+		"vercel-build": "prisma generate && cross-env NODE_OPTIONS=--max-old-space-size=8192 next build",
 		"postinstall": "prisma generate",
 		"import-production-contacts": "tsx --tsconfig tsconfig.json scripts/import-production-contacts.ts",
 		"check-elasticsearch": "tsx --tsconfig tsconfig.json scripts/check-elasticsearch.tsx",
 		"reindex-from-production": "tsx --tsconfig tsconfig.json scripts/reindex-from-production.ts"
 	},
 	"engines": {
-		"node": "20.x"
+		"node": "24.x"
 	},
 	"prisma": {
 		"seed": "tsx --tsconfig tsconfig.json prisma/seed.ts"
