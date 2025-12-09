@@ -1363,8 +1363,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								? `${actionVerb} ${selectedCount} Selected`
 								: actionVerb;
 
-							return hasSelection ? (
-								props.isSendingDisabled ? (
+							return (
+								(hasSelection && props.isSendingDisabled) ? (
 									<UpgradeSubscriptionDrawer
 										triggerButtonText={showConfirm ? confirmLabel : actionLabel}
 										buttonVariant="primary"
@@ -1385,10 +1385,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										<button
 											type="button"
 											className={cn(
-												'flex-1 h-full flex items-center justify-center text-center text-black font-inter font-normal text-[17px] pl-[62px]',
+												'flex-1 h-full flex items-center justify-center text-center text-black font-inter font-normal text-[17px] pl-[89px]',
 												hasSelection
 													? 'bg-[#FFDC9F] hover:bg-[#F4C87E] cursor-pointer'
-													: 'bg-[#E0E0E0] cursor-not-allowed opacity-60'
+													: 'bg-[#FFFFFF] cursor-default'
 											)}
 											onClick={async () => {
 												if (!hasSelection) return;
@@ -1406,18 +1406,23 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											}}
 											disabled={!hasSelection}
 										>
-											{showConfirm ? confirmLabel : actionLabel}
+											{hasSelection ? (showConfirm ? confirmLabel : actionLabel) : actionVerb}
 										</button>
 
 										{/* Right section "All" button */}
 										<button
 											type="button"
-											className="w-[62px] h-full bg-[#C69A4D] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#B2863F] cursor-pointer border-l-[2px] border-[#000000]"
+											className={cn(
+												'w-[89px] h-full flex items-center justify-center font-inter font-normal text-[17px] text-black cursor-pointer border-l-[2px] border-[#000000]',
+												isRejectedTab
+													? 'bg-[#C76A6A] hover:bg-[#B34E4E]'
+													: 'bg-[#7CB67C] hover:bg-[#6FA36F]'
+											)}
 											onMouseEnter={() => setIsHoveringAllButton(true)}
 											onMouseLeave={() => setIsHoveringAllButton(false)}
 											onClick={(e) => {
 												e.stopPropagation();
-											handleSelectAllDrafts(filteredDrafts);
+												handleSelectAllDrafts(filteredDrafts);
 												setShowConfirm(true);
 												setTimeout(() => setShowConfirm(false), 10000);
 											}}
@@ -1426,12 +1431,6 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										</button>
 									</div>
 								)
-							) : (
-								<div className="w-full h-full flex items-center justify-center text-center text-[15px] font-inter text-black">
-									{props.statusFilter === 'rejected'
-										? 'Select Drafts to Regenerate'
-										: 'Select Drafts and Send Emails'}
-								</div>
 							);
 						})()}
 					</div>
