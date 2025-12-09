@@ -1,5 +1,5 @@
 {
-	"buildCommand": "npm run vercel-build",
+	"buildCommand": "NODE_OPTIONS=--max-old-space-size=8192 npm run vercel-build",
 	"outputDirectory": ".next",
 	"crons": [
 		{
@@ -13,8 +13,5 @@
 		"src/app/api/**/route.ts": { "maxDuration": 30 },
 		"app/api/**/route.ts": { "maxDuration": 30 },
 		"src/app/murmur/campaign/[campaignId]/page.tsx": { "maxDuration": 60 }
-	},
-	"env": {
-		"NODE_OPTIONS": "--max-old-space-size=4096"
 	}
 }
