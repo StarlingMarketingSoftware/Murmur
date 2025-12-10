@@ -1957,7 +1957,7 @@ const DashboardContent = () => {
 																			{/* Map label button in top-left of panel header */}
 																			<button
 																				type="button"
-																				onClick={handleCloseMapView}
+																				onClick={() => setIsMapView(false)}
 																				className="absolute left-[10px] top-[7px] flex items-center justify-center cursor-pointer"
 																				style={{
 																					width: '53px',
