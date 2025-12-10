@@ -180,6 +180,11 @@
 
 	--tw-scrollbar-track: #f3f4f6; /* gray-100 */
 	--tw-scrollbar-thumb: #d1d5db; /* gray-300 */
+
+	/* Dashboard desktop layout constants */
+	--dashboard-results-table-top: 305px;
+	--dashboard-mini-search-top: 129px;
+	--dashboard-helper-text-height: 16px;
 }
 
 .dark {
@@ -3282,6 +3287,137 @@ body {
 .results-appear {
 	width: 100%;
 	max-width: 100%;
+}
+
+/* Desktop: position dashboard search results elements at fixed offsets
+   from the very top of the page when viewing dashboard search results
+   in table view (non-map). */
+@media (min-width: 1024px) {
+	/* Position the mini search bar a fixed distance from the very top
+	   of the page when viewing dashboard search results. */
+	.dashboard-main-offset.search-active .results-search-bar-wrapper {
+		position: fixed;
+		top: var(--dashboard-mini-search-top);
+		left: 0;
+		right: 0;
+		margin-left: auto;
+		margin-right: auto;
+		z-index: 65;
+	}
+
+	/* Position the helper text so its bottom edge sits 38px above
+	   the search results table. */
+	.dashboard-main-offset.search-active .results-helper-text {
+		position: fixed;
+		top: calc(
+			var(--dashboard-results-table-top) - 38px - var(--dashboard-helper-text-height)
+		);
+		left: 0;
+		right: 0;
+		margin-left: auto;
+		margin-right: auto;
+		z-index: 64;
+	}
+
+	.dashboard-main-offset.search-active .search-results-table {
+		position: fixed;
+		top: var(--dashboard-results-table-top);
+		left: 0;
+		right: 0;
+		margin-left: auto;
+		margin-right: auto;
+		z-index: 60;
+	}
+
+	.dashboard-main-offset.search-active .search-results-map-toggle {
+		position: fixed;
+		top: calc(var(--dashboard-results-table-top) - 26px); /* table top minus button height & gap */
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 61;
+		pointer-events: auto;
+	}
+
+	.dashboard-main-offset.search-active .search-results-cta-wrapper {
+		position: fixed;
+		/* table top + table height (571px) + gap below table */
+		top: calc(var(--dashboard-results-table-top) + 571px + 20px);
+		left: 0;
+		right: 0;
+		margin-left: auto;
+		margin-right: auto;
+		z-index: 60;
+		pointer-events: auto;
+	}
+
+	.dashboard-main-offset.search-active .search-results-research-panel {
+		position: fixed;
+		top: var(--dashboard-results-table-top);
+		z-index: 62;
+	}
+}
+
+/* Narrow desktop (non-mobile): keep the search results console vertically
+   anchored even when the browser width drops below the 1024px breakpoint.
+   This preserves the ~305px offset from the very top of the page for the
+   table view, matching the full desktop behavior on resized laptop windows. */
+@media (max-width: 1023px) {
+	body:not(.murmur-mobile) .dashboard-main-offset.search-active .results-search-bar-wrapper {
+		position: fixed;
+		top: var(--dashboard-mini-search-top);
+		left: 0;
+		right: 0;
+		margin-left: auto;
+		margin-right: auto;
+		z-index: 65;
+	}
+
+	body:not(.murmur-mobile) .dashboard-main-offset.search-active .results-helper-text {
+		position: fixed;
+		top: calc(
+			var(--dashboard-results-table-top) - 38px - var(--dashboard-helper-text-height)
+		);
+		left: 0;
+		right: 0;
+		margin-left: auto;
+		margin-right: auto;
+		z-index: 64;
+	}
+
+	body:not(.murmur-mobile) .dashboard-main-offset.search-active .search-results-table {
+		position: fixed;
+		top: var(--dashboard-results-table-top);
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 60;
+	}
+
+	body:not(.murmur-mobile) .dashboard-main-offset.search-active .search-results-map-toggle {
+		position: fixed;
+		top: calc(var(--dashboard-results-table-top) - 26px); /* table top minus button height & gap */
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 61;
+		pointer-events: auto;
+	}
+
+	body:not(.murmur-mobile) .dashboard-main-offset.search-active .search-results-cta-wrapper {
+		position: fixed;
+		/* table top + table height (571px) + gap below table */
+		top: calc(var(--dashboard-results-table-top) + 571px + 20px);
+		left: 0;
+		right: 0;
+		margin-left: auto;
+		margin-right: auto;
+		z-index: 60;
+		pointer-events: auto;
+	}
+
+	body:not(.murmur-mobile) .dashboard-main-offset.search-active .search-results-research-panel {
+		position: fixed;
+		top: var(--dashboard-results-table-top);
+		z-index: 62;
+	}
 }
 
 .results-align {

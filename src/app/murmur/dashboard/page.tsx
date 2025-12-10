@@ -39,7 +39,10 @@ import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
-import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
+import {
+	ContactResearchPanel,
+	ContactResearchHorizontalStrip,
+} from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
 
 const DEFAULT_STATE_SUGGESTIONS = [
@@ -641,6 +644,11 @@ const DashboardContent = () => {
 		isSearchPending,
 		usedContactIdsSet,
 	} = useDashboard();
+
+	// When a contact is hovered on non‑mobile in table view, we switch
+	// from the mini search bar to the horizontal research strip.
+	const showHorizontalResearchStrip =
+		isMobile === false && !!hoveredContact && !isMapView;
 
 	// Clear hover state on mobile to prevent stuck hover
 	useEffect(() => {
@@ -1452,7 +1460,13 @@ const DashboardContent = () => {
 					!isLoadingContacts &&
 					!isRefetchingContacts &&
 					activeTab === 'search' && (
-						<div className="results-search-bar-wrapper w-full max-w-[650px] mx-auto px-4 relative">
+						<div
+							className={`results-search-bar-wrapper w-full max-w-[650px] mx-auto px-4 relative ${
+								// When the horizontal research strip is active (md–lg desktop),
+								// hide the mini search bar + helper text so the strip owns this area.
+								showHorizontalResearchStrip ? 'md:hidden xl:block' : ''
+							}`}
+						>
 							<div
 								className={`results-search-bar-inner ${
 									hoveredContact && !isMapView ? 'invisible' : ''
@@ -1666,13 +1680,12 @@ const DashboardContent = () => {
 										{/* Generate action removed; awaiting left-side SVG submit icon */}
 									</form>
 									{!isMapView && (
-										<div className="w-full flex flex-col items-center gap-2 mt-2">
+										<div className="w-full flex flex-col items-center gap-2 mt-2 results-helper-text">
 											<span
 												className="font-secondary text-center"
 												style={{ fontSize: '13px', fontWeight: 400, color: '#7f7f7f' }}
 											>
-												Select who you want to contact, or upload your own contacts via
-												TSV.
+												Select who you want to contact
 											</span>
 											{/* Hidden: Import button
 											<div className="flex justify-center">
@@ -1688,7 +1701,7 @@ const DashboardContent = () => {
 								</Form>
 							</div>
 							{hoveredContact && !isMobile && !isMapView && (
-								<div className="absolute inset-0 z-[90] flex items-start justify-center pointer-events-none bg-white">
+								<div className="absolute inset-0 z-[90] pointer-events-none bg-white hidden xl:flex items-start justify-center">
 									<div className="w-full max-w-[1132px] mx-auto px-4 py-3 text-center">
 										<div className="font-secondary font-bold text-[19px] leading-tight truncate">
 											{`${hoveredContact.firstName || ''} ${
@@ -2603,7 +2616,7 @@ const DashboardContent = () => {
 										<>
 											{/* Table View (default) */}
 											{/* Map button positioned above table on the right */}
-											<div className="w-full md:w-[1004px] mx-auto flex justify-end mb-[4px] relative z-[80]">
+											<div className="w-full max-w-[1004px] mx-auto flex justify-end mb-[4px] relative z-[80] search-results-map-toggle">
 												<button
 													type="button"
 													onClick={() => setIsMapView(true)}
@@ -2613,6 +2626,10 @@ const DashboardContent = () => {
 													Map
 												</button>
 											</div>
+											{/* Horizontal research strip for medium-width desktops (when side panel is hidden) */}
+											{showHorizontalResearchStrip && (
+												<ContactResearchHorizontalStrip contact={hoveredContact} />
+											)}
 											<Card className="border-0 shadow-none !p-0 w-full !my-0">
 												<CardContent className="!p-0 w-full">
 													<CustomTable
@@ -2692,14 +2709,14 @@ const DashboardContent = () => {
 											</Card>
 											{/* Desktop button (non-sticky) */}
 											{!isMobile && (
-												<div className="flex items-center justify-center w-full">
+												<div className="flex items-center justify-center w-full search-results-cta-wrapper">
 													<Button
 														isLoading={
 															isPendingCreateCampaign || isPendingBatchUpdateContacts
 														}
 														variant="primary-light"
 														bold
-														className="relative w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
+														className="relative w-full max-w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
 														onClick={() => {
 															if (selectedContacts.length === 0) return;
 															handleCreateCampaign();
@@ -2751,7 +2768,7 @@ const DashboardContent = () => {
 								{/* Right-side box */}
 								{!isMobile && hoveredContact && (
 									<div
-										className="hidden xl:block absolute top-0"
+										className="hidden xl:block search-results-research-panel"
 										style={{
 											left: 'calc(50% + 502px + 33px)',
 										}}

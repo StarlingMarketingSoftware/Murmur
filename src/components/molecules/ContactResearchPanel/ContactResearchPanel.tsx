@@ -764,3 +764,166 @@ top: isExpanded ? '28px' : '50%',
 };
 
 export default ContactResearchPanel;
+
+/**
+ * Horizontal, table-width version of the research panel.
+ *
+ * Intended for medium desktop widths where the right-side `ContactResearchPanel`
+ * would be off-screen. Renders a 2x3 grid:
+ * - Top-left: contact info summary box
+ * - Remaining 5 cells: research bullets [1]-[5] in the order:
+ *   [3]  [1]
+ *   [4]  [2]
+ *   [5]  (empty if missing)
+ *
+ * The layout is responsive but is designed around ~831px width and 224px height.
+ */
+export const ContactResearchHorizontalStrip: FC<
+	Pick<ContactResearchPanelProps, 'contact' | 'className' | 'style'>
+> = ({ contact, className, style }) => {
+	const metadataSections = useMemo(
+		() => parseMetadataSections(contact?.metadata),
+		[contact?.metadata]
+	);
+
+	const sectionKeys = Object.keys(metadataSections);
+	// Require at least 3 parsed sections to show this horizontal layout,
+	// mirroring the main panel behaviour.
+	if (!contact || sectionKeys.length < 3) {
+		return null;
+	}
+
+	// Colors match the vertical panel for visual consistency
+	const boxColorMap: Record<string, string> = {
+		'1': '#158BCF',
+		'2': '#43AEEC',
+		'3': '#7CC9F6',
+		'4': '#AADAF6',
+		'5': '#D7F0FF',
+	};
+
+	// Order for numbered bullets to roughly match the design mock
+	const orderedKeys: (keyof typeof boxColorMap)[] = ['3', '1', '4', '2', '5'];
+
+	const renderBulletCell = (key: keyof typeof boxColorMap) => {
+		const text = metadataSections[key];
+		const hasText = !!text;
+
+		// If this key isn't present, render a faint placeholder box to keep grid alignment
+		return (
+			<div key={key} className="min-h-[52px]">
+				<div
+					className="w-full h-[52px] rounded-[8px] border-2 border-black flex items-stretch"
+					style={{
+						backgroundColor: boxColorMap[key],
+						opacity: hasText ? 1 : 0.4,
+					}}
+				>
+					<div className="flex items-center justify-center px-2">
+						<span className="font-inter font-bold text-[11.5px] leading-none text-black">
+							[{key}]
+						</span>
+					</div>
+					<div className="flex-1 mr-[6px] my-[4px] bg-white border border-black rounded-[6px] px-[6px] py-[4px] flex items-center min-w-0">
+						{hasText ? (
+							<div
+								className="text-[13px] leading-[1.25] font-inter text-black"
+								style={{
+									display: '-webkit-box',
+									WebkitLineClamp: 2,
+									WebkitBoxOrient: 'vertical',
+									overflow: 'hidden',
+								}}
+							>
+								{text}
+							</div>
+						) : (
+							<div className="text-[13px] leading-[1.25] font-inter text-black/40 truncate">
+								—
+							</div>
+						)}
+					</div>
+				</div>
+			</div>
+		);
+	};
+
+	const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+	const displayName = fullName || contact.name || contact.company || 'Unknown';
+	const hasName = fullName.length > 0 || (contact.name && contact.name.length > 0);
+
+	const stateAbbr = getStateAbbreviation(contact.state || '') || '';
+
+	return (
+		<div
+			className={cn(
+				// Hidden on very small screens and on wide screens where the side panel is visible.
+				'hidden md:block xl:hidden relative mx-auto mb-4 bg-[#D8E5FB] border-[3px] border-black rounded-[7px]',
+				className
+			)}
+			style={{
+				maxWidth: '831px',
+				minHeight: '224px',
+				...style,
+			}}
+		>
+			<div className="px-3 pt-[6px] pb-3">
+				<div className="mb-2">
+					<span className="font-secondary font-bold text-[13px] leading-none text-black">
+						Research
+					</span>
+				</div>
+
+				<div className="grid grid-cols-2 gap-x-[12px] gap-y-[8px] auto-rows-[52px]">
+					{/* Top-left: contact summary info box */}
+					<div className="min-h-[52px]">
+						<div className="w-full h-[52px] rounded-[8px] border-2 border-black bg-white px-3 py-[6px] flex items-center justify-between gap-3">
+							<div className="flex flex-col justify-center min-w-0">
+								<div className="font-inter font-bold text-[14px] leading-tight truncate text-black">
+									{displayName}
+								</div>
+								{hasName && contact.company && (
+									<div className="text-[11px] leading-tight text-[#4b4b4b] truncate">
+										{contact.company}
+									</div>
+								)}
+								{!hasName && contact.title && (
+									<div className="text-[11px] leading-tight text-[#4b4b4b] truncate">
+										{contact.title}
+									</div>
+								)}
+							</div>
+							<div className="flex flex-col items-end gap-[2px] flex-shrink-0">
+								<div className="flex items-center gap-1">
+									{stateAbbr && stateBadgeColorMap[stateAbbr] && (
+										<span
+											className="inline-flex items-center justify-center h-[16px] px-[6px] rounded-[4px] border border-black text-[11px] font-bold leading-none"
+											style={{ backgroundColor: stateBadgeColorMap[stateAbbr] }}
+										>
+											{stateAbbr}
+										</span>
+									)}
+									{contact.city && (
+										<span className="text-[11px] leading-none text-black truncate max-w-[120px]">
+											{contact.city}
+										</span>
+									)}
+								</div>
+								{contact.title && (
+									<div className="max-w-[160px] px-2 py-[2px] rounded-[8px] bg-[#E8EFFF] border border-black">
+										<span className="text-[10px] leading-none text-black block truncate">
+											{contact.title}
+										</span>
+									</div>
+								)}
+							</div>
+						</div>
+					</div>
+
+					{/* Remaining cells: research bullets laid out in a 2x3 grid */}
+					{orderedKeys.map((key) => renderBulletCell(key))}
+				</div>
+			</div>
+		</div>
+	);
+};
