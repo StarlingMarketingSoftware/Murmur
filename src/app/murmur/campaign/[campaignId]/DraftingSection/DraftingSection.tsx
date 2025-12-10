@@ -2827,11 +2827,266 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													overflow: 'visible',
 												}}
 											>
-												<ContactResearchPanel
-													contact={displayedContactForResearch}
-													hideAllText={contactsAvailableForDrafting.length === 0}
-													className="!block"
-												/>
+												{/* Show search results table when search has been performed, otherwise show research panel */}
+												{hasCampaignSearched && !isSearching && searchResults && searchResults.length > 0 ? (
+													<div
+														className="bg-[#D8E5FB] border-[3px] border-[#143883] rounded-[7px] overflow-hidden flex flex-col"
+														style={{
+															width: '375px',
+															height: '557px',
+														}}
+													>
+														{/* Fixed header section */}
+														<div
+															className="flex-shrink-0 flex flex-col justify-center px-[6px]"
+															style={{ height: '44px' }}
+														>
+															<div className="flex items-center justify-between">
+																<span className="font-inter text-[13px] font-medium text-black pl-1">
+																	Search Results
+																</span>
+																<div className="flex flex-col items-end">
+																	<span className="font-inter text-[11px] text-black">
+																		{searchResultsSelectedContacts.length} selected
+																	</span>
+																	<button
+																		type="button"
+																		onClick={() => {
+																			if (
+																				searchResultsSelectedContacts.length ===
+																				searchResults.length
+																			) {
+																				setSearchResultsSelectedContacts([]);
+																			} else {
+																				setSearchResultsSelectedContacts(
+																					searchResults.map((c) => c.id)
+																				);
+																			}
+																		}}
+																		className="font-secondary text-[11px] font-medium text-black hover:underline"
+																	>
+																		{searchResultsSelectedContacts.length === searchResults.length
+																			? 'Deselect all'
+																			: 'Select all'}
+																	</button>
+																</div>
+															</div>
+														</div>
+														{/* Scrollable contact list */}
+														<CustomScrollbar
+															className="flex-1 min-h-0"
+															contentClassName="px-[6px] pb-[14px]"
+															thumbWidth={2}
+															thumbColor="#000000"
+															trackColor="transparent"
+															offsetRight={-6}
+															disableOverflowClass
+														>
+															<div className="space-y-[7px]">
+																{searchResults.map((contact) => {
+																	const isSelected = searchResultsSelectedContacts.includes(
+																		contact.id
+																	);
+																	const firstName = contact.firstName || '';
+																	const lastName = contact.lastName || '';
+																	const fullName =
+																		contact.name || `${firstName} ${lastName}`.trim();
+																	const company = contact.company || '';
+																	const headline = contact.headline || contact.title || '';
+																	const stateAbbr =
+																		getStateAbbreviation(contact.state || '') || '';
+																	const city = contact.city || '';
+
+																	return (
+																		<div
+																			key={contact.id}
+																			data-contact-id={contact.id}
+																			className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-[#ABABAB] select-none"
+																			style={{
+																				backgroundColor: isSelected ? '#C9EAFF' : '#FFFFFF',
+																			}}
+																			onClick={() => {
+																				if (isSelected) {
+																					setSearchResultsSelectedContacts(
+																						searchResultsSelectedContacts.filter(
+																							(id) => id !== contact.id
+																						)
+																					);
+																				} else {
+																					setSearchResultsSelectedContacts([
+																						...searchResultsSelectedContacts,
+																						contact.id,
+																					]);
+																				}
+																			}}
+																		>
+																			{fullName ? (
+																				<>
+																					{/* Top Left - Name */}
+																					<div className="pl-3 pr-1 flex items-center h-[23px]">
+																						<div className="font-bold text-[11px] w-full truncate leading-tight">
+																							{fullName}
+																						</div>
+																					</div>
+																					{/* Top Right - Title/Headline */}
+																					<div className="pr-2 pl-1 flex items-center h-[23px]">
+																						{headline ? (
+																							<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																								<span className="text-[10px] text-black leading-none truncate">
+																									{headline}
+																								</span>
+																							</div>
+																						) : (
+																							<div className="w-full" />
+																						)}
+																					</div>
+																					{/* Bottom Left - Company */}
+																					<div className="pl-3 pr-1 flex items-center h-[22px]">
+																						<div className="text-[11px] text-black w-full truncate leading-tight">
+																							{company}
+																						</div>
+																					</div>
+																					{/* Bottom Right - Location */}
+																					<div className="pr-2 pl-1 flex items-center h-[22px]">
+																						{city || stateAbbr ? (
+																							<div className="flex items-center gap-1 w-full">
+																								{stateAbbr && (
+																									<span
+																										className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																										style={{
+																											backgroundColor:
+																												stateBadgeColorMap[stateAbbr] ||
+																												'transparent',
+																											borderColor: '#000000',
+																										}}
+																									>
+																										{stateAbbr}
+																									</span>
+																								)}
+																								{city && (
+																									<span className="text-[10px] text-black leading-none truncate">
+																										{city}
+																									</span>
+																								)}
+																							</div>
+																						) : (
+																							<div className="w-full" />
+																						)}
+																					</div>
+																				</>
+																			) : (
+																				<>
+																					{/* No name - Company spans left column */}
+																					<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
+																						<div className="font-bold text-[11px] w-full truncate leading-tight">
+																							{company || '—'}
+																						</div>
+																					</div>
+																					{/* Top Right - Title/Headline */}
+																					<div className="pr-2 pl-1 flex items-center h-[23px]">
+																						{headline ? (
+																							<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																								<span className="text-[10px] text-black leading-none truncate">
+																									{headline}
+																								</span>
+																							</div>
+																						) : (
+																							<div className="w-full" />
+																						)}
+																					</div>
+																					{/* Bottom Right - Location */}
+																					<div className="pr-2 pl-1 flex items-center h-[22px]">
+																						{city || stateAbbr ? (
+																							<div className="flex items-center gap-1 w-full">
+																								{stateAbbr && (
+																									<span
+																										className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																										style={{
+																											backgroundColor:
+																												stateBadgeColorMap[stateAbbr] ||
+																												'transparent',
+																											borderColor: '#000000',
+																										}}
+																									>
+																										{stateAbbr}
+																									</span>
+																								)}
+																								{city && (
+																									<span className="text-[10px] text-black leading-none truncate">
+																										{city}
+																									</span>
+																								)}
+																							</div>
+																						) : (
+																							<div className="w-full" />
+																						)}
+																					</div>
+																				</>
+																			)}
+																		</div>
+																	);
+																})}
+															</div>
+														</CustomScrollbar>
+
+														{/* Footer with Add to Campaign button */}
+														{searchResultsSelectedContacts.length > 0 && (
+															<div className="w-full h-[50px] flex-shrink-0 bg-[#D8E5FB] flex items-center justify-center px-3">
+																<div className="relative flex w-full h-[36px] rounded-[6px] border-2 border-black overflow-hidden">
+																	<span
+																		className="absolute inset-0 flex items-center justify-center text-white font-serif font-medium text-[15px] pointer-events-none"
+																		style={{ zIndex: 1 }}
+																	>
+																		{isAddingToCampaign ? (
+																			<>
+																				<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+																				Adding...
+																			</>
+																		) : (
+																			'Add to Campaign'
+																		)}
+																	</span>
+																	<button
+																		type="button"
+																		onClick={handleAddSearchResultsToCampaign}
+																		disabled={
+																			searchResultsSelectedContacts.length === 0 ||
+																			isAddingToCampaign
+																		}
+																		className="flex-1 bg-[#62A967] hover:bg-[#529957] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+																	/>
+																	<div
+																		className="w-[2px]"
+																		style={{ backgroundColor: '#349A37', zIndex: 2 }}
+																	/>
+																	<button
+																		type="button"
+																		onClick={() => {
+																			if (
+																				searchResultsSelectedContacts.length !==
+																				searchResults.length
+																			) {
+																				setSearchResultsSelectedContacts(
+																					searchResults.map((c) => c.id)
+																				);
+																			}
+																		}}
+																		className="w-[50px] bg-[#7AD47A] hover:bg-[#6AC46A] text-black font-inter text-[13px] flex items-center justify-center transition-colors"
+																		style={{ zIndex: 2 }}
+																	>
+																		All
+																	</button>
+																</div>
+															</div>
+														)}
+													</div>
+												) : (
+													<ContactResearchPanel
+														contact={displayedContactForResearch}
+														hideAllText={contactsAvailableForDrafting.length === 0}
+														className="!block"
+													/>
+												)}
 											</div>
 										</div>
 									)}

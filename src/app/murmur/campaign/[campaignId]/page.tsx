@@ -83,8 +83,12 @@ const Murmur = () => {
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
 	// Hide right panel when arrows would overlap with it (below 1522px)
 	const [hideRightPanel, setHideRightPanel] = useState(false);
+	// Hide right panel on search tab at wider breakpoint (below 1796px)
+	const [hideRightPanelOnSearch, setHideRightPanelOnSearch] = useState(false);
 	// Hide arrows when they would overlap with content boxes (below 1317px)
 	const [hideArrowsAtBreakpoint, setHideArrowsAtBreakpoint] = useState(false);
+	// Hide arrows on search tab at wider breakpoint (below 1557px)
+	const [hideArrowsOnSearch, setHideArrowsOnSearch] = useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		const checkBreakpoints = () => {
@@ -92,7 +96,9 @@ const Murmur = () => {
 			setIsNarrowDesktop(width >= 952 && width < 1280);
 			setIsNarrowestDesktop(width < 952);
 			setHideRightPanel(width < 1522);
+			setHideRightPanelOnSearch(width < 1796);
 			setHideArrowsAtBreakpoint(width < 1317);
+			setHideArrowsOnSearch(width < 1557);
 		};
 		checkBreakpoints();
 		window.addEventListener('resize', checkBreakpoints);
@@ -119,7 +125,11 @@ const Murmur = () => {
 
 	// Hide fixed arrows when in narrow desktop + testing view (arrows show next to draft button instead)
 	// or when width < 1317px to prevent overlap with content boxes
-	const hideFixedArrows = (activeView === 'testing' && isNarrowDesktop) || hideArrowsAtBreakpoint;
+	// or when on search tab and width < 1557px
+	const hideFixedArrows =
+		(activeView === 'testing' && isNarrowDesktop) ||
+		hideArrowsAtBreakpoint ||
+		(activeView === 'search' && hideArrowsOnSearch);
 
 	// Tab navigation order
 	const tabOrder: Array<'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'> = [
@@ -809,8 +819,10 @@ const Murmur = () => {
 				</div>
 			</div>
 
-			{/* Right side panel - hidden on mobile and when width < 1522px to prevent arrow overlap */}
-			{!isMobile && !hideRightPanel && <CampaignRightPanel view={activeView} onTabChange={setActiveView} />}
+			{/* Right side panel - hidden on mobile, when width < 1522px, or on search tab when width < 1796px */}
+			{!isMobile && !hideRightPanel && !(activeView === 'search' && hideRightPanelOnSearch) && (
+				<CampaignRightPanel view={activeView} onTabChange={setActiveView} />
+			)}
 		</div>
 	);
 };
