@@ -14,6 +14,10 @@ import { useState, useEffect } from 'react';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import nextDynamic from 'next/dynamic';
+import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
+import { useGetContacts } from '@/hooks/queryHooks/useContacts';
+import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { EmailStatus } from '@/constants/prismaEnums';
 
 // Dynamically import heavy components to reduce initial bundle size and prevent Vercel timeout
 const DraftingSection = nextDynamic(
@@ -73,8 +77,10 @@ const Murmur = () => {
 		'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'
 	>(getInitialView());
 
-	// Narrow desktop detection for Writing tab compact layout (1024px - 1279px)
+	// Narrow desktop detection for Writing tab compact layout (952px - 1279px)
 	const [isNarrowDesktop, setIsNarrowDesktop] = useState(false);
+	// Narrowest desktop detection (< 952px) - header box above tabs
+	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
 	// Hide right panel when arrows would overlap with it (below 1522px)
 	const [hideRightPanel, setHideRightPanel] = useState(false);
 	// Hide arrows when they would overlap with content boxes (below 1317px)
@@ -83,7 +89,8 @@ const Murmur = () => {
 		if (typeof window === 'undefined') return;
 		const checkBreakpoints = () => {
 			const width = window.innerWidth;
-			setIsNarrowDesktop(width >= 1024 && width < 1280);
+			setIsNarrowDesktop(width >= 952 && width < 1280);
+			setIsNarrowestDesktop(width < 952);
 			setHideRightPanel(width < 1522);
 			setHideArrowsAtBreakpoint(width < 1317);
 		};
@@ -91,6 +98,24 @@ const Murmur = () => {
 		window.addEventListener('resize', checkBreakpoints);
 		return () => window.removeEventListener('resize', checkBreakpoints);
 	}, []);
+
+	// Fetch header data for narrowest desktop layout
+	const contactListIds = campaign?.userContactLists?.map((l) => l.id) || [];
+	const { data: headerContacts } = useGetContacts({
+		filters: { contactListIds },
+		enabled: contactListIds.length > 0 && isNarrowestDesktop && !isMobile,
+	});
+	const { data: headerEmails } = useGetEmails({
+		filters: { campaignId: campaign?.id },
+		enabled: !!campaign?.id && isNarrowestDesktop && !isMobile,
+	});
+
+	// Compute header metrics
+	const headerContactsCount = headerContacts?.length || 0;
+	const headerDraftCount = (headerEmails || []).filter((e) => e.status === EmailStatus.draft).length;
+	const headerSentCount = (headerEmails || []).filter((e) => e.status === EmailStatus.sent).length;
+	const headerToListNames = campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
+	const headerFromName = campaign?.identity?.name || '';
 
 	// Hide fixed arrows when in narrow desktop + testing view (arrows show next to draft button instead)
 	// or when width < 1317px to prevent overlap with content boxes
@@ -248,8 +273,28 @@ const Murmur = () => {
 						}
 					/>
 
+					{/* Campaign Header Box - shown above tabs at narrowest breakpoint (< 952px) */}
+					{!isMobile && isNarrowestDesktop && campaign && (
+						<div className="flex justify-center mb-4">
+							<CampaignHeaderBox
+								campaignId={campaign.id}
+								campaignName={campaign.name || 'Untitled Campaign'}
+								toListNames={headerToListNames}
+								fromName={headerFromName}
+								contactsCount={headerContactsCount}
+								draftCount={headerDraftCount}
+								sentCount={headerSentCount}
+								onFromClick={() => {
+									setIdentityDialogOrigin('campaign');
+									setIsIdentityDialogOpen(true);
+								}}
+								fullWidth
+							/>
+						</div>
+					)}
+
 					{/* View tabs - text-only Inter font (hidden in mobile landscape via local styles) */}
-					<div className="mt-2 flex justify-center mobile-landscape-hide">
+					<div className={cn("mt-2 flex justify-center mobile-landscape-hide", isNarrowestDesktop && !isMobile && "mt-0")}>
 						<div className="w-full max-w-[1250px] px-6">
 							<div className="flex gap-12 justify-center">
 								<button
@@ -357,6 +402,7 @@ const Murmur = () => {
 							}}
 							goToPreviousTab={goToPreviousTab}
 							goToNextTab={goToNextTab}
+							hideHeaderBox={isNarrowestDesktop && !isMobile}
 						/>
 					</div>
 					{/* using this to hide the default boxes in the drafting tab so we can add in a UI specific to mobile

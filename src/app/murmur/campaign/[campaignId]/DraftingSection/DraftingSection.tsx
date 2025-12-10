@@ -97,6 +97,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		goToSent,
 		goToPreviousTab,
 		goToNextTab,
+		hideHeaderBox,
 	} = props;
 	const {
 		campaign,
@@ -158,13 +159,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [isSentHovered, setIsSentHovered] = useState(false);
 	const [isInboxHovered, setIsInboxHovered] = useState(false);
 
-	// Narrow desktop detection for Writing tab compact layout (1024px - 1279px)
+	// Narrow desktop detection for Writing tab compact layout (952px - 1279px)
 	const [isNarrowDesktop, setIsNarrowDesktop] = useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		const checkNarrowDesktop = () => {
 			const width = window.innerWidth;
-			setIsNarrowDesktop(width >= 1024 && width < 1280);
+			setIsNarrowDesktop(width >= 952 && width < 1280);
 		};
 		checkNarrowDesktop();
 		window.addEventListener('resize', checkNarrowDesktop);
@@ -1444,7 +1445,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					<div className="relative w-full flex flex-col items-center">
 						{/* Persistent Campaign Header Box for specific tabs */}
 						{/* Hide this absolute panel in narrow desktop + testing mode - we'll use inline layout instead */}
+						{/* Also hide when hideHeaderBox is true (header rendered at page level for narrowest breakpoint) */}
 						{!isMobile &&
+							!hideHeaderBox &&
 							['testing', 'contacts', 'drafting', 'sent', 'search', 'inbox'].includes(
 								view
 							) &&

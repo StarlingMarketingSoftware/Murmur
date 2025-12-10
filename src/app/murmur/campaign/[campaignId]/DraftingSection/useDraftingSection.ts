@@ -70,6 +70,10 @@ export interface DraftingSectionProps {
 	 * Optional callback to navigate to the next tab.
 	 */
 	goToNextTab?: () => void;
+	/**
+	 * When true, the internal CampaignHeaderBox is hidden (used when the header is rendered at the page level).
+	 */
+	hideHeaderBox?: boolean;
 }
 
 type GeneratedEmail = {

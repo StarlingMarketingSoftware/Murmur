@@ -4,6 +4,7 @@ import { FC, useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
+import { cn } from '@/utils';
 
 interface CampaignHeaderBoxProps {
 	campaignId: number;
@@ -15,6 +16,10 @@ interface CampaignHeaderBoxProps {
 	sentCount: number;
 	onFromClick?: () => void;
 	width?: number;
+	/** When true, uses responsive width (matching writing box) with left-aligned content */
+	fullWidth?: boolean;
+	/** Additional className for the container */
+	className?: string;
 }
 
 const getContactsFillColor = (): string => '#F5DADA';
@@ -31,6 +36,8 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	sentCount,
 	onFromClick,
 	width = 374,
+	fullWidth = false,
+	className,
 }) => {
 	const [isEditing, setIsEditing] = useState(false);
 	const [editedName, setEditedName] = useState(campaignName);
@@ -80,15 +87,27 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 
 	return (
 		<div
-			className="bg-white border-[2px] border-black rounded-[8px] flex flex-col px-3 pt-0 pb-1 box-border"
-			style={{
-				width: `${width}px`,
-				height: '71px',
-				minWidth: `${width}px`,
-				maxWidth: `${width}px`,
-				minHeight: '71px',
-				maxHeight: '71px',
-			}}
+			className={cn(
+				'bg-white border-[2px] border-black rounded-[8px] flex flex-col px-3 pt-0 pb-1 box-border',
+				fullWidth && 'w-[96.27vw] max-w-[499px]',
+				className
+			)}
+			style={
+				fullWidth
+					? {
+							height: '71px',
+							minHeight: '71px',
+							maxHeight: '71px',
+					  }
+					: {
+							width: `${width}px`,
+							height: '71px',
+							minWidth: `${width}px`,
+							maxWidth: `${width}px`,
+							minHeight: '71px',
+							maxHeight: '71px',
+					  }
+			}
 		>
 			{/* Campaign Title */}
 			<div className="h-[26px] overflow-hidden flex-shrink-0">
@@ -124,9 +143,9 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 			<div className="flex-1" />
 
 			{/* To/From Row */}
-			<div className="flex items-center text-[11px] flex-shrink-0">
-				{/* To section - left half */}
-				<div className="flex items-center gap-1 w-1/2">
+			<div className={cn('flex items-center text-[11px] flex-shrink-0', fullWidth && 'gap-[20px]')}>
+				{/* To section */}
+				<div className={cn('flex items-center gap-1', !fullWidth && 'w-1/2')}>
 					<Link
 						href={urls.murmur.dashboard.index}
 						prefetch
@@ -152,8 +171,8 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					</span>
 				</div>
 
-				{/* From section - right half, starting at midpoint */}
-				<div className="flex items-center gap-1 w-1/2">
+				{/* From section */}
+				<div className={cn('flex items-center gap-1', !fullWidth && 'w-1/2')}>
 					<button
 						type="button"
 						onClick={onFromClick}
@@ -175,7 +194,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 			<div className="flex-1" />
 
 			{/* Metrics Row */}
-			<div className="flex items-center" style={{ gap: '20px' }}>
+			<div className={cn('flex items-center', fullWidth ? 'gap-[10px]' : 'gap-[20px]')}>
 				<div
 					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold"
 					style={{
