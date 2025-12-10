@@ -75,19 +75,26 @@ const Murmur = () => {
 
 	// Narrow desktop detection for Writing tab compact layout (1024px - 1279px)
 	const [isNarrowDesktop, setIsNarrowDesktop] = useState(false);
+	// Hide right panel when arrows would overlap with it (below 1522px)
+	const [hideRightPanel, setHideRightPanel] = useState(false);
+	// Hide arrows when they would overlap with content boxes (below 1317px)
+	const [hideArrowsAtBreakpoint, setHideArrowsAtBreakpoint] = useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
-		const checkNarrowDesktop = () => {
+		const checkBreakpoints = () => {
 			const width = window.innerWidth;
 			setIsNarrowDesktop(width >= 1024 && width < 1280);
+			setHideRightPanel(width < 1522);
+			setHideArrowsAtBreakpoint(width < 1317);
 		};
-		checkNarrowDesktop();
-		window.addEventListener('resize', checkNarrowDesktop);
-		return () => window.removeEventListener('resize', checkNarrowDesktop);
+		checkBreakpoints();
+		window.addEventListener('resize', checkBreakpoints);
+		return () => window.removeEventListener('resize', checkBreakpoints);
 	}, []);
 
 	// Hide fixed arrows when in narrow desktop + testing view (arrows show next to draft button instead)
-	const hideFixedArrows = activeView === 'testing' && isNarrowDesktop;
+	// or when width < 1317px to prevent overlap with content boxes
+	const hideFixedArrows = (activeView === 'testing' && isNarrowDesktop) || hideArrowsAtBreakpoint;
 
 	// Tab navigation order
 	const tabOrder: Array<'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'> = [
@@ -756,8 +763,8 @@ const Murmur = () => {
 				</div>
 			</div>
 
-			{/* Right side panel */}
-			{!isMobile && <CampaignRightPanel view={activeView} onTabChange={setActiveView} />}
+			{/* Right side panel - hidden on mobile and when width < 1522px to prevent arrow overlap */}
+			{!isMobile && !hideRightPanel && <CampaignRightPanel view={activeView} onTabChange={setActiveView} />}
 		</div>
 	);
 };
