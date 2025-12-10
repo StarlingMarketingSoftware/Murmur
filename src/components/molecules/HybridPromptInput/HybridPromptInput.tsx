@@ -1011,6 +1011,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		onDraftClick,
 		isDraftDisabled,
 		onSelectAllContacts,
+		isNarrowDesktop,
+		hideDraftButton,
 	} = props;
 
 	// Track if the user has attempted to Test to control error styling
@@ -2096,8 +2098,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										</div>
 								  )}
 						</div>
-						{!compactLeftOnly && !isPendingGeneration && (
-							<div className="relative w-[475px] h-[40px] mt-[10px] mx-auto">
+						{!compactLeftOnly && !isPendingGeneration && !hideDraftButton && (
+							<div
+								className={cn(
+									'relative h-[40px] mt-[10px] mx-auto',
+									isNarrowDesktop ? 'w-full max-w-[691px] px-4' : 'w-[475px]'
+								)}
+							>
 								{draftCount > 0 ? (
 									<>
 										<button

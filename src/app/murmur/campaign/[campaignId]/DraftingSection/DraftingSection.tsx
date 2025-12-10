@@ -153,6 +153,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [isDraftsHovered, setIsDraftsHovered] = useState(false);
 	const [isSentHovered, setIsSentHovered] = useState(false);
 	const [isInboxHovered, setIsInboxHovered] = useState(false);
+
+	// Narrow desktop detection for Writing tab compact layout (1024px - 1279px)
+	const [isNarrowDesktop, setIsNarrowDesktop] = useState(false);
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		const checkNarrowDesktop = () => {
+			const width = window.innerWidth;
+			setIsNarrowDesktop(width >= 1024 && width < 1280);
+		};
+		checkNarrowDesktop();
+		window.addEventListener('resize', checkNarrowDesktop);
+		return () => window.removeEventListener('resize', checkNarrowDesktop);
+	}, []);
 	const handleGoToDashboard = useCallback(() => {
 		router.push('/murmur/dashboard');
 	}, [router]);
@@ -1426,10 +1439,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					{/* Main content wrapper to anchor the persistent Header Box */}
 					<div className="relative w-full flex flex-col items-center">
 						{/* Persistent Campaign Header Box for specific tabs */}
+						{/* Hide this absolute panel in narrow desktop + testing mode - we'll use inline layout instead */}
 						{!isMobile &&
 							['testing', 'contacts', 'drafting', 'sent', 'search', 'inbox'].includes(
 								view
-							) && (
+							) &&
+							!(view === 'testing' && isNarrowDesktop) && (
 								<div
 									className="absolute hidden lg:flex flex-col"
 									style={{
@@ -1455,6 +1470,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									/>
 									{view === 'testing' || view === 'search' ? (
 										<>
+											{/* Regular full-size layout for wider viewports */}
 											<div
 												style={{
 													width: '375px',
@@ -2222,46 +2238,210 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 						{view === 'testing' && (
 							<div className="relative">
-								<HybridPromptInput
-									trackFocusedField={trackFocusedField}
-									testMessage={campaign?.testMessage}
-									handleGenerateTestDrafts={handleGenerateTestDrafts}
-									isGenerationDisabled={isGenerationDisabled}
-									isPendingGeneration={isPendingGeneration}
-									isTest={isTest}
-									contact={contacts?.[0]}
-									onGoToDrafting={goToDrafting}
-									onTestPreviewToggle={setShowTestPreview}
-									draftCount={contactsTabSelectedIds.size}
-									onDraftClick={async () => {
-										if (contactsTabSelectedIds.size === 0) {
-											toast.error('Select at least one contact to draft emails.');
-											return;
-										}
-										await handleGenerateDrafts(
-											Array.from(contactsTabSelectedIds.values())
-										);
-									}}
-									isDraftDisabled={
-										isPendingGeneration || contactsTabSelectedIds.size === 0
-									}
-									onSelectAllContacts={() => {
-										const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
-										const areAllSelected =
-											contactsTabSelectedIds.size === allIds.size &&
-											[...allIds].every((id) => contactsTabSelectedIds.has(id));
+								{/* Narrow desktop: grouped layout with left panel + writing box centered together */}
+								{isNarrowDesktop ? (
+									<div className="flex flex-col items-center">
+										{/* Row with both columns */}
+										<div className="flex flex-row items-start justify-center gap-[20px]">
+											{/* Left column: Campaign Header + Contacts + Research */}
+											<div className="flex flex-col" style={{ gap: '10px' }}>
+												<CampaignHeaderBox
+													campaignId={campaign?.id}
+													campaignName={campaign?.name || 'Untitled Campaign'}
+													toListNames={toListNames}
+													fromName={fromName}
+													contactsCount={contactsCount}
+													draftCount={draftCount}
+													sentCount={sentCount}
+													onFromClick={onOpenIdentityDialog}
+													width={330}
+												/>
+												{/* Compact Contacts table */}
+												<div
+													style={{
+														width: '330px',
+														height: '263px',
+														overflow: 'visible',
+													}}
+												>
+													<ContactsExpandedList
+														contacts={contactsAvailableForDrafting}
+														campaign={campaign}
+														selectedContactIds={contactsTabSelectedIds}
+														onContactSelectionChange={(updater) =>
+															setContactsTabSelectedIds((prev) => updater(new Set(prev)))
+														}
+														onContactClick={handleResearchContactClick}
+														onContactHover={handleResearchContactHover}
+														onDraftSelected={async (ids) => {
+															await handleGenerateDrafts(ids);
+														}}
+														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+														isPendingGeneration={isPendingGeneration}
+														width={330}
+														height={263}
+														minRows={5}
+														onSearchFromMiniBar={handleMiniContactsSearch}
+														onOpenContacts={goToContacts}
+													/>
+												</div>
+												{/* Compact Research panel */}
+												<ContactResearchPanel
+													contact={displayedContactForResearch}
+													hideAllText={contactsAvailableForDrafting.length === 0}
+													hideSummaryIfBullets={true}
+													height={347}
+													width={330}
+													boxWidth={315}
+													compactHeader
+													style={{ display: 'block' }}
+												/>
+											</div>
+											{/* Right column: Writing box */}
+											<div>
+												<HybridPromptInput
+													trackFocusedField={trackFocusedField}
+													testMessage={campaign?.testMessage}
+													handleGenerateTestDrafts={handleGenerateTestDrafts}
+													isGenerationDisabled={isGenerationDisabled}
+													isPendingGeneration={isPendingGeneration}
+													isTest={isTest}
+													contact={contacts?.[0]}
+													onGoToDrafting={goToDrafting}
+													onTestPreviewToggle={setShowTestPreview}
+													draftCount={contactsTabSelectedIds.size}
+													onDraftClick={async () => {
+														if (contactsTabSelectedIds.size === 0) {
+															toast.error('Select at least one contact to draft emails.');
+															return;
+														}
+														await handleGenerateDrafts(
+															Array.from(contactsTabSelectedIds.values())
+														);
+													}}
+													isDraftDisabled={
+														isPendingGeneration || contactsTabSelectedIds.size === 0
+													}
+													onSelectAllContacts={() => {
+														const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
+														const areAllSelected =
+															contactsTabSelectedIds.size === allIds.size &&
+															[...allIds].every((id) => contactsTabSelectedIds.has(id));
 
-										if (areAllSelected) {
-											setContactsTabSelectedIds(new Set());
-										} else {
-											setContactsTabSelectedIds(allIds);
+														if (areAllSelected) {
+															setContactsTabSelectedIds(new Set());
+														} else {
+															setContactsTabSelectedIds(allIds);
+														}
+													}}
+													onGetSuggestions={handleGetSuggestions}
+													onUpscalePrompt={upscalePrompt}
+													isUpscalingPrompt={isUpscalingPrompt}
+													onFocusChange={handlePromptInputFocusChange}
+													hideDraftButton={true}
+												/>
+											</div>
+										</div>
+										{/* Draft button - spans full width below both columns */}
+										{!isPendingGeneration && (
+											<div
+												className="relative h-[40px] mt-[10px] w-full px-4"
+												style={{ maxWidth: '691px' }}
+											>
+												{contactsTabSelectedIds.size > 0 ? (
+													<>
+														<button
+															type="button"
+															onClick={async () => {
+																if (contactsTabSelectedIds.size === 0) {
+																	toast.error('Select at least one contact to draft emails.');
+																	return;
+																}
+																await handleGenerateDrafts(
+																	Array.from(contactsTabSelectedIds.values())
+																);
+															}}
+															disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+															className={cn(
+																'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
+																isPendingGeneration || contactsTabSelectedIds.size === 0
+																	? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+																	: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+															)}
+														>
+															Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
+														</button>
+														{/* Right section "All" button */}
+														<button
+															type="button"
+															className="absolute right-[calc(1rem+3px)] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
+															onClick={() => {
+																const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
+																const areAllSelected =
+																	contactsTabSelectedIds.size === allIds.size &&
+																	[...allIds].every((id) => contactsTabSelectedIds.has(id));
+
+																if (areAllSelected) {
+																	setContactsTabSelectedIds(new Set());
+																} else {
+																	setContactsTabSelectedIds(allIds);
+																}
+															}}
+														>
+															All
+														</button>
+													</>
+												) : (
+													<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
+														Select Contacts and Draft Emails
+													</div>
+												)}
+											</div>
+										)}
+									</div>
+								) : (
+									/* Regular centered layout for wider viewports */
+									<HybridPromptInput
+										trackFocusedField={trackFocusedField}
+										testMessage={campaign?.testMessage}
+										handleGenerateTestDrafts={handleGenerateTestDrafts}
+										isGenerationDisabled={isGenerationDisabled}
+										isPendingGeneration={isPendingGeneration}
+										isTest={isTest}
+										contact={contacts?.[0]}
+										onGoToDrafting={goToDrafting}
+										onTestPreviewToggle={setShowTestPreview}
+										draftCount={contactsTabSelectedIds.size}
+										onDraftClick={async () => {
+											if (contactsTabSelectedIds.size === 0) {
+												toast.error('Select at least one contact to draft emails.');
+												return;
+											}
+											await handleGenerateDrafts(
+												Array.from(contactsTabSelectedIds.values())
+											);
+										}}
+										isDraftDisabled={
+											isPendingGeneration || contactsTabSelectedIds.size === 0
 										}
-									}}
-									onGetSuggestions={handleGetSuggestions}
-									onUpscalePrompt={upscalePrompt}
-									isUpscalingPrompt={isUpscalingPrompt}
-									onFocusChange={handlePromptInputFocusChange}
-								/>
+										onSelectAllContacts={() => {
+											const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
+											const areAllSelected =
+												contactsTabSelectedIds.size === allIds.size &&
+												[...allIds].every((id) => contactsTabSelectedIds.has(id));
+
+											if (areAllSelected) {
+												setContactsTabSelectedIds(new Set());
+											} else {
+												setContactsTabSelectedIds(allIds);
+											}
+										}}
+										onGetSuggestions={handleGetSuggestions}
+										onUpscalePrompt={upscalePrompt}
+										isUpscalingPrompt={isUpscalingPrompt}
+										onFocusChange={handlePromptInputFocusChange}
+									/>
+								)}
 								{/* Right panel for Testing view - positioned absolutely */}
 								{false && (
 									<div

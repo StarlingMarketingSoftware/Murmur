@@ -104,6 +104,14 @@ export interface HybridPromptInputProps {
 	 * Optional: invoked when focus state changes within the prompt input area.
 	 */
 	onFocusChange?: (isFocused: boolean) => void;
+	/**
+	 * Optional: indicates narrow desktop mode (1024px-1279px) for responsive layout adjustments.
+	 */
+	isNarrowDesktop?: boolean;
+	/**
+	 * Optional: hides the internal draft button (for when it's rendered externally).
+	 */
+	hideDraftButton?: boolean;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {
