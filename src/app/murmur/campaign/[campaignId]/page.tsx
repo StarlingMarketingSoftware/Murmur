@@ -73,6 +73,22 @@ const Murmur = () => {
 		'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'
 	>(getInitialView());
 
+	// Narrow desktop detection for Writing tab compact layout (1024px - 1279px)
+	const [isNarrowDesktop, setIsNarrowDesktop] = useState(false);
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		const checkNarrowDesktop = () => {
+			const width = window.innerWidth;
+			setIsNarrowDesktop(width >= 1024 && width < 1280);
+		};
+		checkNarrowDesktop();
+		window.addEventListener('resize', checkNarrowDesktop);
+		return () => window.removeEventListener('resize', checkNarrowDesktop);
+	}, []);
+
+	// Hide fixed arrows when in narrow desktop + testing view (arrows show next to draft button instead)
+	const hideFixedArrows = activeView === 'testing' && isNarrowDesktop;
+
 	// Tab navigation order
 	const tabOrder: Array<'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'> = [
 		'search',
@@ -117,33 +133,37 @@ const Murmur = () => {
 	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
 	return (
 		<div className="min-h-screen">
-			{/* Left navigation arrow - fixed position */}
-			<button
-				type="button"
-				onClick={goToPreviousTab}
-				className="fixed z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
-				style={{
-					left: '33px',
-					top: '467px',
-				}}
-				aria-label="Previous tab"
-			>
-				<LeftArrow />
-			</button>
+			{/* Left navigation arrow - fixed position (hidden in narrow desktop + testing) */}
+			{!hideFixedArrows && (
+				<button
+					type="button"
+					onClick={goToPreviousTab}
+					className="fixed z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
+					style={{
+						left: '33px',
+						top: '467px',
+					}}
+					aria-label="Previous tab"
+				>
+					<LeftArrow />
+				</button>
+			)}
 
-			{/* Right navigation arrow - fixed position */}
-			<button
-				type="button"
-				onClick={goToNextTab}
-				className="fixed z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
-				style={{
-					right: '33px',
-					top: '467px',
-				}}
-				aria-label="Next tab"
-			>
-				<RightArrow />
-			</button>
+			{/* Right navigation arrow - fixed position (hidden in narrow desktop + testing) */}
+			{!hideFixedArrows && (
+				<button
+					type="button"
+					onClick={goToNextTab}
+					className="fixed z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
+					style={{
+						right: '33px',
+						top: '467px',
+					}}
+					aria-label="Next tab"
+				>
+					<RightArrow />
+				</button>
+			)}
 
 			{/* Minimal header - just Back to Home link */}
 			<div data-slot="campaign-header">
@@ -328,6 +348,8 @@ const Murmur = () => {
 								setIdentityDialogOrigin('campaign');
 								setIsIdentityDialogOpen(true);
 							}}
+							goToPreviousTab={goToPreviousTab}
+							goToNextTab={goToNextTab}
 						/>
 					</div>
 					{/* using this to hide the default boxes in the drafting tab so we can add in a UI specific to mobile

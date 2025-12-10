@@ -59,6 +59,8 @@ import { Contact, Identity } from '@prisma/client';
 import BottomHomeIcon from '@/components/atoms/_svg/BottomHomeIcon';
 import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
 import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
+import LeftArrow from '@/components/atoms/_svg/LeftArrow';
+import RightArrow from '@/components/atoms/_svg/RightArrow';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -92,7 +94,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		onGoToSearch,
 		goToInbox,
 		goToContacts,
-	goToSent,
+		goToSent,
+		goToPreviousTab,
+		goToNextTab,
 	} = props;
 	const {
 		campaign,
@@ -2342,60 +2346,81 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												/>
 											</div>
 										</div>
-										{/* Draft button - spans full width below both columns */}
+										{/* Draft button with arrows - spans full width below both columns */}
 										{!isPendingGeneration && (
-											<div
-												className="relative h-[40px] mt-[10px] w-full px-4"
-												style={{ maxWidth: '691px' }}
-											>
-												{contactsTabSelectedIds.size > 0 ? (
-													<>
-														<button
-															type="button"
-															onClick={async () => {
-																if (contactsTabSelectedIds.size === 0) {
-																	toast.error('Select at least one contact to draft emails.');
-																	return;
-																}
-																await handleGenerateDrafts(
-																	Array.from(contactsTabSelectedIds.values())
-																);
-															}}
-															disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
-															className={cn(
-																'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
-																isPendingGeneration || contactsTabSelectedIds.size === 0
-																	? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
-																	: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
-															)}
-														>
-															Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
-														</button>
-														{/* Right section "All" button */}
-														<button
-															type="button"
-															className="absolute right-[calc(1rem+3px)] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
-															onClick={() => {
-																const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
-																const areAllSelected =
-																	contactsTabSelectedIds.size === allIds.size &&
-																	[...allIds].every((id) => contactsTabSelectedIds.has(id));
+											<div className="flex items-center justify-center gap-[29px] mt-[10px] w-full">
+												{/* Left arrow */}
+												<button
+													type="button"
+													onClick={goToPreviousTab}
+													className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+													aria-label="Previous tab"
+												>
+													<LeftArrow width="20" height="39" />
+												</button>
+												{/* Draft button container */}
+												<div
+													className="relative h-[40px] flex-1"
+													style={{ maxWidth: '691px' }}
+												>
+													{contactsTabSelectedIds.size > 0 ? (
+														<>
+															<button
+																type="button"
+																onClick={async () => {
+																	if (contactsTabSelectedIds.size === 0) {
+																		toast.error('Select at least one contact to draft emails.');
+																		return;
+																	}
+																	await handleGenerateDrafts(
+																		Array.from(contactsTabSelectedIds.values())
+																	);
+																}}
+																disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+																className={cn(
+																	'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
+																	isPendingGeneration || contactsTabSelectedIds.size === 0
+																		? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+																		: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+																)}
+															>
+																Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
+															</button>
+															{/* Right section "All" button */}
+															<button
+																type="button"
+																className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
+																onClick={() => {
+																	const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
+																	const areAllSelected =
+																		contactsTabSelectedIds.size === allIds.size &&
+																		[...allIds].every((id) => contactsTabSelectedIds.has(id));
 
-																if (areAllSelected) {
-																	setContactsTabSelectedIds(new Set());
-																} else {
-																	setContactsTabSelectedIds(allIds);
-																}
-															}}
-														>
-															All
-														</button>
-													</>
-												) : (
-													<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
-														Select Contacts and Draft Emails
-													</div>
-												)}
+																	if (areAllSelected) {
+																		setContactsTabSelectedIds(new Set());
+																	} else {
+																		setContactsTabSelectedIds(allIds);
+																	}
+																}}
+															>
+																All
+															</button>
+														</>
+													) : (
+														<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
+															Select Contacts and Draft Emails
+														</div>
+													)}
+												</div>
+												{/* Right arrow */}
+												<button
+													type="button"
+													onClick={goToNextTab}
+													className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+													aria-label="Next tab"
+												>
+													<RightArrow width="20" height="39" />
+												</button>
 											</div>
 										)}
 									</div>
