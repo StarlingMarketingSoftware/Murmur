@@ -4581,19 +4581,7 @@ body.murmur-mobile .search-input-icon-btn {
 	cursor: pointer;
 }
 
-/* Width-based fallback so it appears in responsive mode too */
-@media (max-width: 640px) {
-	.search-input-icon-btn {
-		display: inline-flex;
-		position: absolute;
-		right: 12px;
-		top: 50%;
-		transform: translateY(-50%);
-		width: 22px;
-		height: 22px;
-		z-index: 4;
-	}
-}
+/* Width-based fallback removed - desktop search icon is now always shown */
 
 .black-scrollbar-thumb::-webkit-scrollbar-thumb {
 	background-color: black;
