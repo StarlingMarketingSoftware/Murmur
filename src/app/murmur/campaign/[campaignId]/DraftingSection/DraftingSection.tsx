@@ -163,12 +163,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [isNarrowDesktop, setIsNarrowDesktop] = useState(false);
 	// Narrowest desktop detection (< 952px) - shows contacts table below writing box
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
+	// Search tab narrow detection (< 1414px) - reduces map box width
+	const [isSearchTabNarrow, setIsSearchTabNarrow] = useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		const checkBreakpoints = () => {
 			const width = window.innerWidth;
 			setIsNarrowDesktop(width >= 952 && width < 1280);
 			setIsNarrowestDesktop(width < 952);
+			setIsSearchTabNarrow(width < 1414);
 		};
 		checkBreakpoints();
 		window.addEventListener('resize', checkBreakpoints);
@@ -1454,13 +1457,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							['testing', 'contacts', 'drafting', 'sent', 'search', 'inbox'].includes(
 								view
 							) &&
-							!(view === 'testing' && isNarrowDesktop) && (
+							!(view === 'testing' && isNarrowDesktop) &&
+							!(view === 'search' && isSearchTabNarrow) && (
 								<div
 									className="absolute hidden lg:flex flex-col"
 									style={{
 										right:
 											view === 'search'
-												? 'calc(50% + 384px + 32px)'
+												? isSearchTabNarrow
+													? 'calc(50% + 249px + 37px)' // 37px left of narrow map box (498px / 2 = 249px)
+													: 'calc(50% + 384px + 32px)'
 												: view === 'inbox'
 												? 'calc(50% + 471.5px)'
 												: 'calc(50% + 250px + 32px)',
@@ -1488,25 +1494,33 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													overflow: 'visible',
 												}}
 											>
-												<ContactsExpandedList
-													contacts={contactsAvailableForDrafting}
-													campaign={campaign}
-													selectedContactIds={contactsTabSelectedIds}
-													onContactSelectionChange={(updater) =>
-														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
-													}
-													onContactClick={handleResearchContactClick}
-													onContactHover={handleResearchContactHover}
-													onDraftSelected={async (ids) => {
-														await handleGenerateDrafts(ids);
-													}}
-													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
-													isPendingGeneration={isPendingGeneration}
-													width={375}
-													height={557}
-													minRows={8}
-													onSearchFromMiniBar={handleMiniContactsSearch}
-												/>
+												{/* Show research panel instead of contacts list when search tab is narrow */}
+												{view === 'search' && isSearchTabNarrow ? (
+													<ContactResearchPanel
+														contact={displayedContactForResearch}
+														hideAllText={contactsAvailableForDrafting.length === 0}
+													/>
+												) : (
+													<ContactsExpandedList
+														contacts={contactsAvailableForDrafting}
+														campaign={campaign}
+														selectedContactIds={contactsTabSelectedIds}
+														onContactSelectionChange={(updater) =>
+															setContactsTabSelectedIds((prev) => updater(new Set(prev)))
+														}
+														onContactClick={handleResearchContactClick}
+														onContactHover={handleResearchContactHover}
+														onDraftSelected={async (ids) => {
+															await handleGenerateDrafts(ids);
+														}}
+														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+														isPendingGeneration={isPendingGeneration}
+														width={375}
+														height={557}
+														minRows={8}
+														onSearchFromMiniBar={handleMiniContactsSearch}
+													/>
+												)}
 											</div>
 											{view === 'testing' && isPromptInputFocused && (suggestionText1 || suggestionText2) && (
 												<div
@@ -1930,7 +1944,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* Shared Research / Test Preview panel to the right of the drafting tables / writing view */}
 						{!isMobile &&
 							['testing', 'contacts', 'drafting', 'sent', 'search', 'inbox'].includes(view) &&
-							!(view === 'search' && hasCampaignSearched) && (
+							!(view === 'search' && hasCampaignSearched) &&
+							!(view === 'search' && isSearchTabNarrow) && (
 								<div
 									className="absolute hidden xl:block"
 									style={{
@@ -1981,6 +1996,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							view === 'search' &&
 							hasCampaignSearched &&
 							!isSearching &&
+							!isSearchTabNarrow &&
 							searchResults &&
 							searchResults.length > 0 && (
 								<div
@@ -2789,16 +2805,46 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* Search tab - show the campaign contacts on a map */}
 						{view === 'search' && (
 							<div className="flex items-center justify-center min-h-[300px]">
-								{/* Outer container box */}
-								<div
-									className="relative rounded-[12px] overflow-hidden"
-									style={{
-										width: '768px',
-										height: '815px',
-										backgroundColor: '#AFD6EF',
-										border: '3px solid #143883',
-									}}
-								>
+								{/* Wrapper to center both left panel and map as one unit at narrow breakpoint */}
+								<div className={isSearchTabNarrow ? 'flex items-start gap-[37px]' : ''}>
+									{/* Left panel - header box + research panel (only at narrow breakpoint) */}
+									{isSearchTabNarrow && !isMobile && !hideHeaderBox && (
+										<div className="flex flex-col" style={{ gap: '16px', paddingTop: '29px' }}>
+											<CampaignHeaderBox
+												campaignId={campaign?.id}
+												campaignName={campaign?.name || 'Untitled Campaign'}
+												toListNames={toListNames}
+												fromName={fromName}
+												contactsCount={contactsCount}
+												draftCount={draftCount}
+												sentCount={sentCount}
+												onFromClick={onOpenIdentityDialog}
+											/>
+											<div
+												style={{
+													width: '375px',
+													height: '557px',
+													overflow: 'visible',
+												}}
+											>
+												<ContactResearchPanel
+													contact={displayedContactForResearch}
+													hideAllText={contactsAvailableForDrafting.length === 0}
+													className="!block"
+												/>
+											</div>
+										</div>
+									)}
+									{/* Outer container box */}
+									<div
+										className="relative rounded-[12px] overflow-hidden"
+										style={{
+											width: isSearchTabNarrow ? '498px' : '768px',
+											height: '815px',
+											backgroundColor: '#AFD6EF',
+											border: '3px solid #143883',
+										}}
+									>
 									{/* Search label */}
 									<span
 										className="absolute font-inter font-bold text-[14px] text-black"
@@ -2925,7 +2971,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												top: '12px',
 												left: '50%',
 												transform: 'translateX(-50%)',
-												width: '440px',
+												width: isSearchTabNarrow ? '380px' : '440px',
 												height: '49px',
 											}}
 										>
@@ -3120,7 +3166,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 									</div>
 								</div>
+								{/* Close wrapper div for centered left panel + map at narrow breakpoint */}
 							</div>
+						</div>
 						)}
 
 						{/* Inbox tab: reuse the dashboard inbox UI, but scoped and labeled by campaign contacts */}
