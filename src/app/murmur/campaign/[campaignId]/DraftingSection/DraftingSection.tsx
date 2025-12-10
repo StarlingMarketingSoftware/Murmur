@@ -2497,6 +2497,21 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												/>
 											</div>
 										)}
+										{/* Research panel below contacts at narrowest breakpoint */}
+										{isNarrowestDesktop && (
+											<div className="mt-[20px] w-full flex justify-center">
+												<ContactResearchPanel
+													contact={displayedContactForResearch}
+													hideAllText={contactsAvailableForDrafting.length === 0}
+													hideSummaryIfBullets={true}
+													height={400}
+													width={489}
+													boxWidth={474}
+													compactHeader
+													style={{ display: 'block' }}
+												/>
+											</div>
+										)}
 									</div>
 								)}
 								{/* Right panel for Testing view - positioned absolutely */}
