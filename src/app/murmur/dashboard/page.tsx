@@ -2576,13 +2576,14 @@ const DashboardContent = () => {
 																		);
 																	})()}
 																{/* Create Campaign button overlaid on map - only show when not loading */}
+																{/* Hidden below xl (1280px) to prevent overlap with right panel */}
 																{!isMobile &&
 																	!(
 																		isSearchPending ||
 																		isLoadingContacts ||
 																		isRefetchingContacts
 																	) && (
-																		<div className="absolute bottom-[10px] left-[10px] right-[10px] flex justify-center">
+																		<div className="absolute bottom-[10px] left-[10px] right-[10px] hidden xl:flex justify-center">
 																			<Button
 																				isLoading={
 																					isPendingCreateCampaign ||
