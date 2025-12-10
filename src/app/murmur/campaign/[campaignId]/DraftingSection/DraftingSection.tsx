@@ -161,15 +161,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	// Narrow desktop detection for Writing tab compact layout (952px - 1279px)
 	const [isNarrowDesktop, setIsNarrowDesktop] = useState(false);
+	// Narrowest desktop detection (< 952px) - shows contacts table below writing box
+	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
-		const checkNarrowDesktop = () => {
+		const checkBreakpoints = () => {
 			const width = window.innerWidth;
 			setIsNarrowDesktop(width >= 952 && width < 1280);
+			setIsNarrowestDesktop(width < 952);
 		};
-		checkNarrowDesktop();
-		window.addEventListener('resize', checkNarrowDesktop);
-		return () => window.removeEventListener('resize', checkNarrowDesktop);
+		checkBreakpoints();
+		window.addEventListener('resize', checkBreakpoints);
+		return () => window.removeEventListener('resize', checkBreakpoints);
 	}, []);
 	const handleGoToDashboard = useCallback(() => {
 		router.push('/murmur/dashboard');
@@ -2428,47 +2431,73 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										)}
 									</div>
 								) : (
-									/* Regular centered layout for wider viewports */
-									<HybridPromptInput
-										trackFocusedField={trackFocusedField}
-										testMessage={campaign?.testMessage}
-										handleGenerateTestDrafts={handleGenerateTestDrafts}
-										isGenerationDisabled={isGenerationDisabled}
-										isPendingGeneration={isPendingGeneration}
-										isTest={isTest}
-										contact={contacts?.[0]}
-										onGoToDrafting={goToDrafting}
-										onTestPreviewToggle={setShowTestPreview}
-										draftCount={contactsTabSelectedIds.size}
-										onDraftClick={async () => {
-											if (contactsTabSelectedIds.size === 0) {
-												toast.error('Select at least one contact to draft emails.');
-												return;
+									/* Regular centered layout for wider viewports, or narrowest breakpoint with contacts below */
+									<div className="flex flex-col items-center">
+										<HybridPromptInput
+											trackFocusedField={trackFocusedField}
+											testMessage={campaign?.testMessage}
+											handleGenerateTestDrafts={handleGenerateTestDrafts}
+											isGenerationDisabled={isGenerationDisabled}
+											isPendingGeneration={isPendingGeneration}
+											isTest={isTest}
+											contact={contacts?.[0]}
+											onGoToDrafting={goToDrafting}
+											onTestPreviewToggle={setShowTestPreview}
+											draftCount={contactsTabSelectedIds.size}
+											onDraftClick={async () => {
+												if (contactsTabSelectedIds.size === 0) {
+													toast.error('Select at least one contact to draft emails.');
+													return;
+												}
+												await handleGenerateDrafts(
+													Array.from(contactsTabSelectedIds.values())
+												);
+											}}
+											isDraftDisabled={
+												isPendingGeneration || contactsTabSelectedIds.size === 0
 											}
-											await handleGenerateDrafts(
-												Array.from(contactsTabSelectedIds.values())
-											);
-										}}
-										isDraftDisabled={
-											isPendingGeneration || contactsTabSelectedIds.size === 0
-										}
-										onSelectAllContacts={() => {
-											const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
-											const areAllSelected =
-												contactsTabSelectedIds.size === allIds.size &&
-												[...allIds].every((id) => contactsTabSelectedIds.has(id));
+											onSelectAllContacts={() => {
+												const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
+												const areAllSelected =
+													contactsTabSelectedIds.size === allIds.size &&
+													[...allIds].every((id) => contactsTabSelectedIds.has(id));
 
-											if (areAllSelected) {
-												setContactsTabSelectedIds(new Set());
-											} else {
-												setContactsTabSelectedIds(allIds);
-											}
-										}}
-										onGetSuggestions={handleGetSuggestions}
-										onUpscalePrompt={upscalePrompt}
-										isUpscalingPrompt={isUpscalingPrompt}
-										onFocusChange={handlePromptInputFocusChange}
-									/>
+												if (areAllSelected) {
+													setContactsTabSelectedIds(new Set());
+												} else {
+													setContactsTabSelectedIds(allIds);
+												}
+											}}
+											onGetSuggestions={handleGetSuggestions}
+											onUpscalePrompt={upscalePrompt}
+											isUpscalingPrompt={isUpscalingPrompt}
+											onFocusChange={handlePromptInputFocusChange}
+										/>
+										{/* Contacts table below writing box at narrowest breakpoint */}
+										{isNarrowestDesktop && (
+											<div className="mt-[20px] w-full flex justify-center">
+												<ContactsExpandedList
+													contacts={contactsAvailableForDrafting}
+													campaign={campaign}
+													selectedContactIds={contactsTabSelectedIds}
+													onContactSelectionChange={(updater) =>
+														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
+													}
+													onContactClick={handleResearchContactClick}
+													onContactHover={handleResearchContactHover}
+													onDraftSelected={async (ids) => {
+														await handleGenerateDrafts(ids);
+													}}
+													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													width={489}
+													height={349}
+													minRows={5}
+													onSearchFromMiniBar={handleMiniContactsSearch}
+													onOpenContacts={goToContacts}
+												/>
+											</div>
+										)}
+									</div>
 								)}
 								{/* Right panel for Testing view - positioned absolutely */}
 								{false && (
@@ -2498,33 +2527,35 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									</div>
 								)}
 
-								{/* Bottom Panels: Drafts, Sent, and Inbox */}
-								<div className="mt-[35px] flex justify-center gap-[15px]">
-									<DraftsExpandedList
-										drafts={draftEmails}
-										contacts={contacts || []}
-										width={233}
-										height={117}
-										whiteSectionHeight={15}
-										hideSendButton={true}
-											onOpenDrafts={goToDrafting}
-									/>
-									<SentExpandedList
-										sent={sentEmails}
-										contacts={contacts || []}
-										width={233}
-										height={117}
-										whiteSectionHeight={15}
-											onOpenSent={goToSent}
-									/>
-									<InboxExpandedList
-										contacts={contacts || []}
-										width={233}
-										height={117}
-										whiteSectionHeight={15}
-										onOpenInbox={goToInbox}
-									/>
-								</div>
+								{/* Bottom Panels: Drafts, Sent, and Inbox - hidden at narrowest breakpoint */}
+								{!hideHeaderBox && (
+									<div className="mt-[35px] flex justify-center gap-[15px]">
+										<DraftsExpandedList
+											drafts={draftEmails}
+											contacts={contacts || []}
+											width={233}
+											height={117}
+											whiteSectionHeight={15}
+											hideSendButton={true}
+												onOpenDrafts={goToDrafting}
+										/>
+										<SentExpandedList
+											sent={sentEmails}
+											contacts={contacts || []}
+											width={233}
+											height={117}
+											whiteSectionHeight={15}
+												onOpenSent={goToSent}
+										/>
+										<InboxExpandedList
+											contacts={contacts || []}
+											width={233}
+											height={117}
+											whiteSectionHeight={15}
+											onOpenInbox={goToInbox}
+										/>
+									</div>
+								)}
 							</div>
 						)}
 
