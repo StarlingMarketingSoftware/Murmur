@@ -1012,6 +1012,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		isDraftDisabled,
 		onSelectAllContacts,
 		isNarrowDesktop,
+		isNarrowestDesktop,
 		hideDraftButton,
 	} = props;
 
@@ -2102,7 +2103,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							<div
 								className={cn(
 									'relative h-[40px] mt-[10px] mx-auto',
-									isNarrowDesktop ? 'w-full max-w-[691px] px-4' : 'w-[475px]'
+									isNarrowDesktop
+										? 'w-full max-w-[691px] px-4'
+										: isNarrowestDesktop
+										? 'w-full max-w-[407px]'
+										: 'w-[475px]'
 								)}
 							>
 								{draftCount > 0 ? (

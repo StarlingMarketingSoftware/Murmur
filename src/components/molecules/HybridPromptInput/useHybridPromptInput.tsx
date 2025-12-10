@@ -109,6 +109,10 @@ export interface HybridPromptInputProps {
 	 */
 	isNarrowDesktop?: boolean;
 	/**
+	 * Optional: indicates narrowest desktop mode (< 952px) for responsive layout adjustments.
+	 */
+	isNarrowestDesktop?: boolean;
+	/**
 	 * Optional: hides the internal draft button (for when it's rendered externally).
 	 */
 	hideDraftButton?: boolean;
