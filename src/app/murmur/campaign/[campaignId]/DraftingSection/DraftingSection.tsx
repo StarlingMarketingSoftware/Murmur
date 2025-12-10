@@ -2804,7 +2804,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 						{/* Search tab - show the campaign contacts on a map */}
 						{view === 'search' && (
-							<div className="flex items-center justify-center min-h-[300px]">
+							<div className="flex flex-col items-center justify-center min-h-[300px]">
 								{/* Wrapper to center both left panel and map as one unit at narrow breakpoint */}
 								<div className={isSearchTabNarrow ? 'flex items-start gap-[37px]' : ''}>
 									{/* Left panel - header box + research panel (only at narrow breakpoint) */}
@@ -2835,6 +2835,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 									)}
+									{/* Map and button column container */}
+									<div className="flex flex-col items-center">
 									{/* Outer container box */}
 									<div
 										className="relative rounded-[12px] overflow-hidden"
@@ -3166,7 +3168,91 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 									</div>
 								</div>
+								</div>
 								{/* Close wrapper div for centered left panel + map at narrow breakpoint */}
+							</div>
+							{/* Add to Campaign button below the map - always visible, centered on page at narrow breakpoint */}
+							<div
+								className="flex items-center justify-center gap-[29px]"
+								style={{ marginTop: '25px' }}
+							>
+								{/* Left arrow - only at narrow breakpoint */}
+								{isSearchTabNarrow && (
+									<button
+										type="button"
+										onClick={goToPreviousTab}
+										className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+										aria-label="Previous tab"
+									>
+										<LeftArrow width="20" height="39" />
+									</button>
+								)}
+								{/* Button container */}
+								<div
+									className="relative flex rounded-[6px] border-2 border-black overflow-hidden"
+									style={{
+										width: isSearchTabNarrow ? '691px' : '528px',
+										height: '39px',
+									}}
+								>
+									{/* Absolutely centered text */}
+									<span
+										className="absolute inset-0 flex items-center justify-center text-black font-serif font-medium text-[15px] pointer-events-none"
+										style={{ zIndex: 1 }}
+									>
+										{isAddingToCampaign ? (
+											<>
+												<div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin mr-2" />
+												Adding...
+											</>
+										) : (
+											'Add to Campaign'
+										)}
+									</span>
+									{/* Clickable left area */}
+									<button
+										type="button"
+										onClick={handleAddSearchResultsToCampaign}
+										disabled={
+											searchResultsSelectedContacts.length === 0 ||
+											isAddingToCampaign
+										}
+										className="flex-1 bg-[#AFD6EF] hover:bg-[#9BC6DF] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+									/>
+									<div
+										className="w-[2px]"
+										style={{ backgroundColor: '#143883', zIndex: 2 }}
+									/>
+									<button
+										type="button"
+										onClick={() => {
+											if (
+												searchResults &&
+												searchResultsSelectedContacts.length !==
+												searchResults.length
+											) {
+												setSearchResultsSelectedContacts(
+													searchResults.map((c) => c.id)
+												);
+											}
+										}}
+										className="w-[50px] bg-[#43AEEC] hover:bg-[#3A9AD9] text-black font-inter text-[13px] flex items-center justify-center transition-colors"
+										style={{ zIndex: 2 }}
+									>
+										All
+									</button>
+								</div>
+								{/* Right arrow - only at narrow breakpoint */}
+								{isSearchTabNarrow && (
+									<button
+										type="button"
+										onClick={goToNextTab}
+										className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+										aria-label="Next tab"
+									>
+										<RightArrow width="20" height="39" />
+									</button>
+								)}
 							</div>
 						</div>
 						)}
