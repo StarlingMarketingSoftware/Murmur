@@ -88,6 +88,22 @@ const DashboardContent = () => {
 	const [userLocationName, setUserLocationName] = useState<string | null>(null);
 	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
+	// Narrowest desktop detection (< 952px) - single column layout for map view
+	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
+
+	// Detect narrow desktop breakpoint
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+
+		const handleResize = () => {
+			setIsNarrowestDesktop(window.innerWidth < 952);
+		};
+
+		handleResize();
+		window.addEventListener('resize', handleResize);
+		return () => window.removeEventListener('resize', handleResize);
+	}, []);
+
 	const debouncedWhereValue = useDebounce(whereValue, 300);
 	const { data: locationResults, isLoading: isLoadingLocations } = useGetLocations(
 		debouncedWhereValue,
@@ -1928,52 +1944,53 @@ const DashboardContent = () => {
 																zIndex: 98,
 															}}
 														/>
-														{/* Map container */}
-														<div
-															style={{
-																position: 'fixed',
-																top: '120px',
-																left: '9px',
-																right: '9px',
-																bottom: '9px',
-																zIndex: 99,
-															}}
-														>
-															<div className="w-full h-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden relative">
-																<SearchResultsMap
-																	contacts={contacts || []}
-																	selectedContacts={selectedContacts}
-																	onToggleSelection={(contactId) => {
-																		if (selectedContacts.includes(contactId)) {
-																			setSelectedContacts(
-																				selectedContacts.filter((id) => id !== contactId)
-																			);
-																		} else {
-																			setSelectedContacts([
-																				...selectedContacts,
-																				contactId,
-																			]);
+													{/* Map container */}
+													<div
+														style={{
+															position: 'fixed',
+															top: '120px',
+															left: '9px',
+															right: '9px',
+															bottom: '9px',
+															zIndex: 99,
+														}}
+													>
+														<div className="w-full h-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden relative">
+															<SearchResultsMap
+																contacts={contacts || []}
+																selectedContacts={selectedContacts}
+																onToggleSelection={(contactId) => {
+																	if (selectedContacts.includes(contactId)) {
+																		setSelectedContacts(
+																			selectedContacts.filter((id) => id !== contactId)
+																		);
+																	} else {
+																		setSelectedContacts([
+																			...selectedContacts,
+																			contactId,
+																		]);
+																	}
+																	// Scroll to the contact in the side panel
+																	setTimeout(() => {
+																		const contactElement = document.querySelector(
+																			`[data-contact-id="${contactId}"]`
+																		);
+																		if (contactElement) {
+																			contactElement.scrollIntoView({
+																				behavior: 'smooth',
+																				block: 'center',
+																			});
 																		}
-																		// Scroll to the contact in the side panel
-																		setTimeout(() => {
-																			const contactElement = document.querySelector(
-																				`[data-contact-id="${contactId}"]`
-																			);
-																			if (contactElement) {
-																				contactElement.scrollIntoView({
-																					behavior: 'smooth',
-																					block: 'center',
-																				});
-																			}
-																		}, 50);
-																	}}
-																/>
-																{/* Search Results overlay box on the right side - hidden while loading */}
-																{!(
-																	isSearchPending ||
-																	isLoadingContacts ||
-																	isRefetchingContacts
-																) && (
+																	}, 50);
+																}}
+															/>
+															{/* Search Results overlay box on the right side - hidden while loading and at narrowest breakpoint */}
+															{!(
+																isSearchPending ||
+																isLoadingContacts ||
+																isRefetchingContacts
+															) &&
+																!isNarrowestDesktop && (
 																	<div
 																		className="absolute top-[10px] right-[10px] rounded-[12px] shadow-lg flex flex-col"
 																		style={{
@@ -2627,8 +2644,260 @@ const DashboardContent = () => {
 																			</Button>
 																		</div>
 																	)}
-															</div>
+															{/* Single column search results panel overlay at bottom - narrowest breakpoint (< 952px) */}
+															{isNarrowestDesktop &&
+																!(
+																	isSearchPending ||
+																	isLoadingContacts ||
+																	isRefetchingContacts
+																) && (
+																	<div
+																		className="absolute left-[10px] right-[10px] bottom-[10px] rounded-[12px] shadow-lg flex flex-col"
+																		style={{
+																			height: '45%',
+																			maxHeight: 'calc(100% - 20px)',
+																			backgroundColor: '#AFD6EF',
+																			border: '3px solid #143883',
+																			overflow: 'hidden',
+																		}}
+																	>
+																		{/* Header area */}
+																		<div className="w-full h-[42px] flex-shrink-0 bg-[#AFD6EF] flex items-center justify-center px-4 relative">
+																	{/* Map label button in top-left of panel header */}
+																	<button
+																		type="button"
+																		onClick={() => setIsMapView(false)}
+																		className="absolute left-[10px] top-[7px] flex items-center justify-center cursor-pointer"
+																		style={{
+																			width: '53px',
+																			height: '19px',
+																			backgroundColor: '#CDEFC3',
+																			borderRadius: '4px',
+																			border: '2px solid #000000',
+																			fontFamily:
+																				'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																			fontSize: '13px',
+																			fontWeight: 600,
+																			lineHeight: '1',
+																		}}
+																	>
+																		Map
+																	</button>
+																	<span className="font-inter text-[13px] font-medium text-black">
+																		{selectedContacts.length} selected
+																	</span>
+																	<button
+																		type="button"
+																		onClick={handleSelectAll}
+																		className="font-secondary text-[12px] font-medium text-black hover:underline absolute right-[10px] top-1/2 -translate-y-1/2"
+																	>
+																		{isAllSelected ? 'Deselect All' : 'Select all'}
+																	</button>
+																</div>
+																<CustomScrollbar
+																	className="flex-1 min-h-0"
+																	contentClassName="p-[6px] pb-[14px] space-y-[7px]"
+																	thumbWidth={2}
+																	thumbColor="#000000"
+																	trackColor="transparent"
+																	offsetRight={-6}
+																	disableOverflowClass
+																>
+																	{(contacts || []).map((contact) => {
+																		const isSelected = selectedContacts.includes(
+																			contact.id
+																		);
+																		const isUsed = usedContactIdsSet.has(contact.id);
+																		const firstName = contact.firstName || '';
+																		const lastName = contact.lastName || '';
+																		const fullName =
+																			contact.name ||
+																			`${firstName} ${lastName}`.trim();
+																		const company = contact.company || '';
+																		const headline =
+																			contact.headline || contact.title || '';
+																		const stateAbbr =
+																			getStateAbbreviation(contact.state || '') || '';
+																		const city = contact.city || '';
+
+																		return (
+																			<div
+																				key={contact.id}
+																				data-contact-id={contact.id}
+																				className="cursor-pointer transition-colors flex w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none relative"
+																				style={{
+																					backgroundColor: isSelected
+																						? '#C9EAFF'
+																						: '#FFFFFF',
+																				}}
+																				onClick={() => {
+																					if (isSelected) {
+																						setSelectedContacts(
+																							selectedContacts.filter(
+																								(id) => id !== contact.id
+																							)
+																						);
+																					} else {
+																						setSelectedContacts([
+																							...selectedContacts,
+																							contact.id,
+																						]);
+																					}
+																				}}
+																				onMouseEnter={() =>
+																					setHoveredContact(contact)
+																				}
+																				onMouseLeave={() => setHoveredContact(null)}
+																			>
+																				{/* Left side - Name/Company and Location */}
+																				<div className="flex-1 min-w-0 flex flex-col justify-center pl-3 pr-2">
+																					{fullName ? (
+																						<>
+																							<div className="flex items-center">
+																								{isUsed && (
+																									<span
+																										className="inline-block shrink-0 mr-2"
+																										title="Used in a previous campaign"
+																										style={{
+																											width: '16px',
+																											height: '16px',
+																											borderRadius: '50%',
+																											border: '1px solid #000000',
+																											backgroundColor: '#DAE6FE',
+																										}}
+																									/>
+																								)}
+																								<div className="font-bold text-[11px] truncate leading-tight">
+																									{fullName}
+																								</div>
+																							</div>
+																							<div className="flex items-center mt-[2px]">
+																								{isUsed && (
+																									<span
+																										className="inline-block shrink-0 mr-2"
+																										style={{
+																											width: '16px',
+																											height: '16px',
+																										}}
+																									/>
+																								)}
+																								<div className="text-[11px] text-black truncate leading-tight">
+																									{company}
+																								</div>
+																							</div>
+																						</>
+																					) : (
+																						<div className="flex items-center">
+																							{isUsed && (
+																								<span
+																									className="inline-block shrink-0 mr-2"
+																									title="Used in a previous campaign"
+																									style={{
+																										width: '16px',
+																										height: '16px',
+																										borderRadius: '50%',
+																										border: '1px solid #000000',
+																										backgroundColor: '#DAE6FE',
+																									}}
+																								/>
+																							)}
+																							<div className="font-bold text-[11px] truncate leading-tight">
+																								{company || '—'}
+																							</div>
+																						</div>
+																					)}
+																				</div>
+																				{/* Right side - Title (fixed 230px width) */}
+																				<div className="flex-shrink-0 flex flex-col justify-center pr-2" style={{ width: '240px' }}>
+																					{headline ? (
+																						<div
+																							className="overflow-hidden flex items-center px-2"
+																							style={{
+																								width: '230px',
+																								height: '19px',
+																								backgroundColor: '#E8EFFF',
+																								border: '0.7px solid #000000',
+																								borderRadius: '8px',
+																							}}
+																						>
+																							<span className="text-[14px] text-black leading-none truncate">
+																								{headline}
+																							</span>
+																						</div>
+																					) : null}
+																					{(city || stateAbbr) && (
+																						<div className="flex items-center gap-1 mt-[4px]">
+																							{stateAbbr && (
+																								<span
+																									className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																									style={{
+																										backgroundColor:
+																											stateBadgeColorMap[
+																												stateAbbr
+																											] || 'transparent',
+																										borderColor: '#000000',
+																									}}
+																								>
+																									{stateAbbr}
+																								</span>
+																							)}
+																							{city && (
+																								<span className="text-[10px] text-black leading-none truncate">
+																									{city}
+																								</span>
+																							)}
+																						</div>
+																					)}
+																				</div>
+																			</div>
+																		);
+																	})}
+																</CustomScrollbar>
+																<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
+																	<Button
+																		isLoading={
+																			isPendingCreateCampaign ||
+																			isPendingBatchUpdateContacts
+																		}
+																		variant="primary-light"
+																		bold
+																		className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
+																			selectedContacts.length === 0
+																				? 'opacity-[0.62]'
+																				: 'opacity-100'
+																		}`}
+																		style={
+																			selectedContacts.length === 0
+																				? { height: '39px', filter: 'grayscale(100%)' }
+																				: { height: '39px' }
+																		}
+																		onClick={() => {
+																			if (selectedContacts.length === 0) return;
+																			handleCreateCampaign();
+																		}}
+																	>
+																		<span className="relative z-20">Create Campaign</span>
+																		<div
+																			className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+																			onClick={(e) => {
+																				e.stopPropagation();
+																				handleSelectAll();
+																			}}
+																		>
+																			<span className="text-black text-[14px] font-medium">
+																				All
+																			</span>
+																		</div>
+																		<span
+																			aria-hidden="true"
+																			className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+																		/>
+																		</Button>
+																	</div>
+																</div>
+															)}
 														</div>
+													</div>
 													</>,
 													document.body
 												)}
