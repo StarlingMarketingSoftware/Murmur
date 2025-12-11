@@ -165,6 +165,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
 	// Search tab narrow detection (< 1414px) - reduces map box width
 	const [isSearchTabNarrow, setIsSearchTabNarrow] = useState(false);
+	// All tab narrow detection (<= 1269px) - switches from 4x2 to 2x4 grid
+	const [isAllTabNarrow, setIsAllTabNarrow] = useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		const checkBreakpoints = () => {
@@ -172,6 +174,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			setIsNarrowDesktop(width >= 952 && width < 1280);
 			setIsNarrowestDesktop(width < 952);
 			setIsSearchTabNarrow(width < 1414);
+			setIsAllTabNarrow(width <= 1269);
 		};
 		checkBreakpoints();
 		window.addEventListener('resize', checkBreakpoints);
@@ -4530,7 +4533,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{view === 'all' && (
 							<div className="mt-6 flex justify-center">
 								<div className="flex flex-row items-start" style={{ gap: '30px' }}>
-									{/* Left column: Campaign Header + Contacts + Research */}
+									{/* Left column: Campaign Header + Contacts + Research (+ Preview in narrow mode) */}
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										<CampaignHeaderBox
 											campaignId={campaign?.id}
@@ -4600,6 +4603,53 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												/>
 											</div>
 										</div>
+										{/* In narrow mode (2x4 grid), add Drafts here after Contacts */}
+										{isAllTabNarrow && (
+											<div
+												style={{
+													width: '330px',
+													height: '347px',
+													overflow: 'visible',
+													position: 'relative',
+													cursor: 'pointer',
+												}}
+												onMouseEnter={() => setIsDraftsHovered(true)}
+												onMouseLeave={() => setIsDraftsHovered(false)}
+												onClick={() => {
+													setIsDraftsHovered(false);
+													goToDrafting?.();
+												}}
+											>
+												{/* Hover box */}
+												{isDraftsHovered && (
+													<div
+														style={{
+															position: 'absolute',
+															top: '50%',
+															left: '50%',
+															transform: 'translate(-50%, -50%)',
+															width: '364px',
+															height: '364px',
+															backgroundColor: 'transparent',
+															border: '6px solid #E6AF4D',
+															borderRadius: '0px',
+															zIndex: 10,
+															pointerEvents: 'none',
+														}}
+													/>
+												)}
+												<div style={{ position: 'relative', zIndex: 20 }}>
+													<DraftsExpandedList
+														drafts={draftEmails}
+														contacts={contacts || []}
+														width={330}
+														height={347}
+														hideSendButton
+														onOpenDrafts={goToDrafting}
+													/>
+												</div>
+											</div>
+										)}
 										{/* Research Panel */}
 										<ContactResearchPanel
 											contact={displayedContactForResearch}
@@ -4609,7 +4659,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											width={330}
 											boxWidth={315}
 											compactHeader
+											className="!block"
 										/>
+										{/* In narrow mode (2x4 grid), move Preview here */}
+										{isAllTabNarrow && (
+											<DraftPreviewExpandedList
+												contacts={contacts || []}
+												fallbackDraft={
+													draftEmails[0]
+														? {
+																contactId: draftEmails[0].contactId,
+																subject: draftEmails[0].subject,
+																message: draftEmails[0].message,
+														  }
+														: null
+												}
+												width={330}
+												height={347}
+											/>
+										)}
 									</div>
 									{/* Column 2: Writing (Row 1) + Suggestion (Row 2) */}
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
@@ -4668,6 +4736,52 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												/>
 											</div>
 										</div>
+										{/* In narrow mode, add Sent here (after Writing, before Suggestion) */}
+										{isAllTabNarrow && (
+											<div
+												style={{
+													width: '330px',
+													height: '347px',
+													overflow: 'visible',
+													position: 'relative',
+													cursor: 'pointer',
+												}}
+												onMouseEnter={() => setIsSentHovered(true)}
+												onMouseLeave={() => setIsSentHovered(false)}
+												onClick={() => {
+													setIsSentHovered(false);
+													goToSent?.();
+												}}
+											>
+												{/* Hover box */}
+												{isSentHovered && (
+													<div
+														style={{
+															position: 'absolute',
+															top: '50%',
+															left: '50%',
+															transform: 'translate(-50%, -50%)',
+															width: '364px',
+															height: '364px',
+															backgroundColor: 'transparent',
+															border: '6px solid #2CA954',
+															borderRadius: '0px',
+															zIndex: 10,
+															pointerEvents: 'none',
+														}}
+													/>
+												)}
+												<div style={{ position: 'relative', zIndex: 20 }}>
+													<SentExpandedList
+														sent={sentEmails}
+														contacts={contacts || []}
+														width={330}
+														height={347}
+														onOpenSent={goToSent}
+													/>
+												</div>
+											</div>
+										)}
 										{/* Row 2: Suggestion Box */}
 										<div
 											style={{
@@ -5008,8 +5122,61 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												</div>
 											</div>
 										</div>
+										{/* In narrow mode (2x4 grid), add Inbox here (after Suggestion) */}
+										{isAllTabNarrow && (
+											<>
+												{/* Inbox */}
+												<div
+													style={{
+														width: '330px',
+														height: '347px',
+														overflow: 'visible',
+														position: 'relative',
+														cursor: 'pointer',
+													}}
+													onMouseEnter={() => setIsInboxHovered(true)}
+													onMouseLeave={() => setIsInboxHovered(false)}
+													onClick={() => {
+														setIsInboxHovered(false);
+														goToInbox?.();
+													}}
+												>
+													{/* Hover box */}
+													{isInboxHovered && (
+														<div
+															style={{
+																position: 'absolute',
+																top: '50%',
+																left: '50%',
+																transform: 'translate(-50%, -50%)',
+																width: '364px',
+																height: '364px',
+																backgroundColor: 'transparent',
+																border: '6px solid #5EB6D6',
+																borderRadius: '0px',
+																zIndex: 10,
+																pointerEvents: 'none',
+															}}
+														/>
+													)}
+													<div style={{ position: 'relative', zIndex: 20 }}>
+														<InboxExpandedList
+															contacts={contacts || []}
+															allowedSenderEmails={campaignContactEmails}
+															contactByEmail={campaignContactsByEmail}
+															width={330}
+															height={347}
+															onOpenInbox={goToInbox}
+														/>
+													</div>
+												</div>
+											</>
+										)}
 									</div>
 
+									{/* Column 3 & 4: hidden in narrow mode (2x4 grid) */}
+									{!isAllTabNarrow && (
+									<>
 									{/* Column 3: Drafts (Row 1) + Preview (Row 2) */}
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* Row 1: Drafts */}
@@ -5166,6 +5333,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 									</div>
+									</>
+									)}
 								</div>
 							</div>
 						)}
