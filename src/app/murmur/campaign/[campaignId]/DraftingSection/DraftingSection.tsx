@@ -2830,32 +2830,34 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													</button>
 												</div>
 											)}
-											{/* Bottom Panels: Contacts, Sent, and Inbox - centered relative to container */}
-											<div className="mt-[35px] flex justify-center gap-[15px]">
-												<ContactsExpandedList
-													contacts={contactsAvailableForDrafting}
-													width={232}
-													height={117}
-													whiteSectionHeight={15}
-													showSearchBar={false}
-													onOpenContacts={goToContacts}
-												/>
-												<SentExpandedList
-													sent={sentEmails}
-													contacts={contacts || []}
-													width={233}
-													height={117}
-													whiteSectionHeight={15}
-													onOpenSent={goToSent}
-												/>
-												<InboxExpandedList
-													contacts={contacts || []}
-													width={233}
-													height={117}
-													whiteSectionHeight={15}
-													onOpenInbox={goToInbox}
-												/>
-											</div>
+											{/* Bottom Panels: Contacts, Sent, and Inbox - centered relative to container - hidden at narrowest breakpoint */}
+											{!isNarrowestDesktop && (
+												<div className="mt-[35px] flex justify-center gap-[15px]">
+													<ContactsExpandedList
+														contacts={contactsAvailableForDrafting}
+														width={232}
+														height={117}
+														whiteSectionHeight={15}
+														showSearchBar={false}
+														onOpenContacts={goToContacts}
+													/>
+													<SentExpandedList
+														sent={sentEmails}
+														contacts={contacts || []}
+														width={233}
+														height={117}
+														whiteSectionHeight={15}
+														onOpenSent={goToSent}
+													/>
+													<InboxExpandedList
+														contacts={contacts || []}
+														width={233}
+														height={117}
+														whiteSectionHeight={15}
+														onOpenInbox={goToInbox}
+													/>
+												</div>
+											)}
 										</div>
 									) : (
 										// Regular centered layout for wider viewports
@@ -2890,32 +2892,34 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onStatusFilterChange={setDraftStatusFilter}
 											/>
 
-											{/* Bottom Panels: Contacts, Sent, and Inbox */}
-											<div className="mt-[35px] flex justify-center gap-[15px]">
-												<ContactsExpandedList
-													contacts={contactsAvailableForDrafting}
-													width={232}
-													height={117}
-													whiteSectionHeight={15}
-													showSearchBar={false}
-													onOpenContacts={goToContacts}
-												/>
-												<SentExpandedList
-													sent={sentEmails}
-													contacts={contacts || []}
-													width={233}
-													height={117}
-													whiteSectionHeight={15}
-													onOpenSent={goToSent}
-												/>
-												<InboxExpandedList
-													contacts={contacts || []}
-													width={233}
-													height={117}
-													whiteSectionHeight={15}
-													onOpenInbox={goToInbox}
-												/>
-											</div>
+											{/* Bottom Panels: Contacts, Sent, and Inbox - hidden at narrowest breakpoint */}
+											{!isNarrowestDesktop && (
+												<div className="mt-[35px] flex justify-center gap-[15px]">
+													<ContactsExpandedList
+														contacts={contactsAvailableForDrafting}
+														width={232}
+														height={117}
+														whiteSectionHeight={15}
+														showSearchBar={false}
+														onOpenContacts={goToContacts}
+													/>
+													<SentExpandedList
+														sent={sentEmails}
+														contacts={contacts || []}
+														width={233}
+														height={117}
+														whiteSectionHeight={15}
+														onOpenSent={goToSent}
+													/>
+													<InboxExpandedList
+														contacts={contacts || []}
+														width={233}
+														height={117}
+														whiteSectionHeight={15}
+														onOpenInbox={goToInbox}
+													/>
+												</div>
+											)}
 										</div>
 									)}
 								</div>
