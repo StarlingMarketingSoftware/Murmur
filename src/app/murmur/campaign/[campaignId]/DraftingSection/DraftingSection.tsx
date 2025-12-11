@@ -3017,6 +3017,64 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												</button>
 											</div>
 										)}
+										{/* Research panel below draft button at narrowest breakpoint */}
+										{isNarrowestDesktop && (
+											<div className="mt-[20px] w-full flex justify-center">
+												<ContactResearchPanel
+													contact={displayedContactForResearch}
+													hideAllText={contactsAvailableForDrafting.length === 0}
+													hideSummaryIfBullets={true}
+													height={400}
+													width={489}
+													boxWidth={474}
+													compactHeader
+													style={{ display: 'block' }}
+												/>
+											</div>
+										)}
+										{/* Writing box below research panel at narrowest breakpoint */}
+										{isNarrowestDesktop && (
+											<div className="mt-[20px] w-full flex justify-center">
+												<HybridPromptInput
+													trackFocusedField={trackFocusedField}
+													testMessage={campaign?.testMessage}
+													handleGenerateTestDrafts={handleGenerateTestDrafts}
+													isGenerationDisabled={isGenerationDisabled}
+													isPendingGeneration={isPendingGeneration}
+													isTest={isTest}
+													contact={contacts?.[0]}
+													onGoToDrafting={goToDrafting}
+													onTestPreviewToggle={setShowTestPreview}
+													draftCount={contactsTabSelectedIds.size}
+													onDraftClick={async () => {
+														if (contactsTabSelectedIds.size === 0) {
+															toast.error('Select at least one contact to draft emails.');
+															return;
+														}
+														await handleGenerateDrafts(
+															Array.from(contactsTabSelectedIds.values())
+														);
+													}}
+													isDraftDisabled={
+														isPendingGeneration || contactsTabSelectedIds.size === 0
+													}
+													onSelectAllContacts={() => {
+														const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
+														const areAllSelected =
+															contactsTabSelectedIds.size === allIds.size &&
+															[...allIds].every((id) => contactsTabSelectedIds.has(id));
+
+														if (areAllSelected) {
+															setContactsTabSelectedIds(new Set());
+														} else {
+															setContactsTabSelectedIds(allIds);
+														}
+													}}
+													isNarrowestDesktop={isNarrowestDesktop}
+													hideDraftButton
+												/>
+											</div>
+										)}
 									</div>
 								)}
 							</div>
