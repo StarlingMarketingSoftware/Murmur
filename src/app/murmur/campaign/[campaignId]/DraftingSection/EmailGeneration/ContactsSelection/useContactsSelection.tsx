@@ -33,6 +33,11 @@ export interface ContactsSelectionProps {
 	 */
 	goToInbox?: () => void;
 	allContacts?: ContactWithName[];
+	/**
+	 * If true, the bottom panels (Drafts, Sent, Inbox) will not be rendered.
+	 * Useful when these panels are rendered separately in the parent layout.
+	 */
+	hideBottomPanels?: boolean;
 }
 
 export const useContactsSelection = (props: ContactsSelectionProps) => {

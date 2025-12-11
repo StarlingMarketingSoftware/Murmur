@@ -2738,14 +2738,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 						{/* Contacts tab - show the contacts table */}
 						{view === 'contacts' && (
-							<div className="flex items-center justify-center min-h-[300px]">
-								{/* Narrow desktop: grouped layout with left panel + contacts table centered together */}
+							<div className="w-full min-h-[300px]">
 								{isNarrowDesktop ? (
-									<div className="flex flex-col items-center">
-										{/* Row with both columns */}
-										<div className="flex flex-row items-start justify-center gap-[35px]">
-											{/* Left column: Campaign Header + Email Structure + Research */}
-											<div className="flex flex-col" style={{ gap: '10px' }}>
+									// Narrow desktop (952px - 1279px): center BOTH the left panel and contacts table together
+									// Fixed width container: left (330) + gap (35) + right (499) = 864px, centered with mx-auto
+									// Bottom panels are rendered separately and centered relative to the full container
+									<div className="flex flex-col items-center mx-auto" style={{ width: '864px' }}>
+										<div className="flex flex-row items-start gap-[35px] w-full">
+											{/* Left column: Campaign Header + Email Structure + Research - fixed 330px */}
+											<div className="flex flex-col flex-shrink-0" style={{ gap: '10px', width: '330px' }}>
 												<CampaignHeaderBox
 													campaignId={campaign?.id}
 													campaignName={campaign?.name || 'Untitled Campaign'}
@@ -2790,8 +2791,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													style={{ display: 'block' }}
 												/>
 											</div>
-											{/* Right column: Contacts table - wrapper with items-start to left-align content */}
-											<div className="flex flex-col items-start [&>*]:items-start">
+											{/* Right column: Contacts table - fixed 499px, overflow visible for bottom panels */}
+											<div className="flex-shrink-0 [&>*]:!items-start" style={{ width: '499px', overflow: 'visible' }}>
 												<ContactsSelection
 													contacts={contactsAvailableForDrafting}
 													allContacts={contacts}
@@ -2809,30 +2810,57 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													goToSearch={onGoToSearch}
 													goToDrafts={goToDrafting}
 													goToInbox={goToInbox}
+													hideBottomPanels
 												/>
 											</div>
+										</div>
+										{/* Bottom Panels: Drafts, Sent, and Inbox - centered relative to 864px container */}
+										<div className="mt-[35px] flex justify-center gap-[15px]">
+											<DraftsExpandedList
+												drafts={draftEmails}
+												contacts={contacts || []}
+												width={233}
+												height={117}
+												whiteSectionHeight={15}
+												hideSendButton={true}
+											/>
+											<SentExpandedList
+												sent={sentEmails}
+												contacts={contacts || []}
+												width={233}
+												height={117}
+												whiteSectionHeight={15}
+											/>
+											<InboxExpandedList
+												contacts={contacts || []}
+												width={233}
+												height={117}
+												whiteSectionHeight={15}
+											/>
 										</div>
 									</div>
 								) : (
 									/* Regular centered layout for wider viewports */
-									<ContactsSelection
-										contacts={contactsAvailableForDrafting}
-										allContacts={contacts}
-										selectedContactIds={contactsTabSelectedIds}
-										setSelectedContactIds={setContactsTabSelectedIds}
-										handleContactSelection={handleContactsTabSelection}
-										campaign={campaign}
-										onDraftEmails={async (ids) => {
-											await handleGenerateDrafts(ids);
-										}}
-										isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
-										onContactClick={handleResearchContactClick}
-										onContactHover={handleResearchContactHover}
-										onSearchFromMiniBar={handleMiniContactsSearch}
-										goToSearch={onGoToSearch}
-										goToDrafts={goToDrafting}
-										goToInbox={goToInbox}
-									/>
+									<div className="flex justify-center">
+										<ContactsSelection
+											contacts={contactsAvailableForDrafting}
+											allContacts={contacts}
+											selectedContactIds={contactsTabSelectedIds}
+											setSelectedContactIds={setContactsTabSelectedIds}
+											handleContactSelection={handleContactsTabSelection}
+											campaign={campaign}
+											onDraftEmails={async (ids) => {
+												await handleGenerateDrafts(ids);
+											}}
+											isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
+											onContactClick={handleResearchContactClick}
+											onContactHover={handleResearchContactHover}
+											onSearchFromMiniBar={handleMiniContactsSearch}
+											goToSearch={onGoToSearch}
+											goToDrafts={goToDrafting}
+											goToInbox={goToInbox}
+										/>
+									</div>
 								)}
 							</div>
 						)}
