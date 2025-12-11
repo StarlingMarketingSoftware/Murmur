@@ -3487,6 +3487,31 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										)}
 
+										{/* MiniEmailStructure below research panel at narrowest breakpoint (< 952px) */}
+										{isNarrowestDesktop && (
+											<div className="mt-[10px] w-full flex justify-center">
+												<div style={{ width: '489px' }}>
+													<MiniEmailStructure
+														form={form}
+														onDraft={() =>
+															handleGenerateDrafts(
+																contactsAvailableForDrafting.map((c) => c.id)
+															)
+														}
+														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+														isPendingGeneration={isPendingGeneration}
+														generationProgress={generationProgress}
+														generationTotal={contactsAvailableForDrafting.length}
+														hideTopChrome
+														hideFooter
+														fullWidthMobile
+														hideAddTextButtons
+														onOpenWriting={goToWriting}
+													/>
+												</div>
+											</div>
+										)}
+
 										{/* Bottom Panels: Contacts, Drafts, and Inbox - hidden at narrowest breakpoint (< 952px) */}
 										{!isNarrowestDesktop && (
 											<div className="mt-[35px] flex justify-center gap-[15px]">
