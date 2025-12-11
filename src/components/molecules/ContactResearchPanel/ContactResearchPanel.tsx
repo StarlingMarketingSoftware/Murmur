@@ -809,40 +809,37 @@ export const ContactResearchHorizontalStrip: FC<
 		const text = metadataSections[key];
 		const hasText = !!text;
 
-		// If this key isn't present, render a faint placeholder box to keep grid alignment
+		// If this key isn't present, render a placeholder box with just fill color and stroke
 		return (
 			<div key={key} className="min-h-[52px]">
 				<div
 					className="w-full h-[52px] rounded-[8px] border-2 border-black flex items-stretch"
 					style={{
 						backgroundColor: boxColorMap[key],
-						opacity: hasText ? 1 : 0.4,
 					}}
 				>
-					<div className="flex items-center justify-center px-2">
-						<span className="font-inter font-bold text-[11.5px] leading-none text-black">
-							[{key}]
-						</span>
-					</div>
-					<div className="flex-1 mr-[6px] my-[4px] bg-white border border-black rounded-[6px] px-[6px] py-[4px] flex items-center min-w-0">
-						{hasText ? (
-							<div
-								className="text-[13px] leading-[1.25] font-inter text-black"
-								style={{
-									display: '-webkit-box',
-									WebkitLineClamp: 2,
-									WebkitBoxOrient: 'vertical',
-									overflow: 'hidden',
-								}}
-							>
-								{text}
+					{hasText && (
+						<>
+							<div className="flex items-center justify-center px-2">
+								<span className="font-inter font-bold text-[11.5px] leading-none text-black">
+									[{key}]
+								</span>
 							</div>
-						) : (
-							<div className="text-[13px] leading-[1.25] font-inter text-black/40 truncate">
-								—
+							<div className="flex-1 mr-[6px] my-[4px] bg-white border border-black rounded-[6px] px-[6px] py-[4px] flex items-center min-w-0">
+								<div
+									className="text-[13px] leading-[1.25] font-inter text-black"
+									style={{
+										display: '-webkit-box',
+										WebkitLineClamp: 2,
+										WebkitBoxOrient: 'vertical',
+										overflow: 'hidden',
+									}}
+								>
+									{text}
+								</div>
 							</div>
-						)}
-					</div>
+						</>
+					)}
 				</div>
 			</div>
 		);
