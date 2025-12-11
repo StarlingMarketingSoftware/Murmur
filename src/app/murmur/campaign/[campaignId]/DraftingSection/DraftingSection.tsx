@@ -4532,6 +4532,625 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* All tab */}
 						{view === 'all' && (
 							<div className="mt-6 flex justify-center">
+								{/* Single column layout at narrowest breakpoint (< 952px) */}
+								{isNarrowestDesktop ? (
+									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
+										{/* 1. Campaign Header */}
+										<CampaignHeaderBox
+											campaignId={campaign?.id}
+											campaignName={campaign?.name || 'Untitled Campaign'}
+											toListNames={toListNames}
+											fromName={fromName}
+											contactsCount={contactsCount}
+											draftCount={draftCount}
+											sentCount={sentCount}
+											onFromClick={onOpenIdentityDialog}
+											width={330}
+										/>
+										{/* 2. Contacts */}
+										<div
+											style={{
+												width: '330px',
+												height: '263px',
+												overflow: 'visible',
+												position: 'relative',
+												cursor: 'pointer',
+											}}
+											onMouseEnter={() => setIsContactsHovered(true)}
+											onMouseLeave={() => setIsContactsHovered(false)}
+											onClick={() => {
+												setIsContactsHovered(false);
+												goToContacts?.();
+											}}
+										>
+											{isContactsHovered && (
+												<div
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: '50%',
+														transform: 'translate(-50%, -50%)',
+														width: '364px',
+														height: '278px',
+														backgroundColor: 'transparent',
+														border: '6px solid #D75152',
+														borderRadius: '0px',
+														zIndex: 10,
+														pointerEvents: 'none',
+													}}
+												/>
+											)}
+											<div style={{ position: 'relative', zIndex: 20 }}>
+												<ContactsExpandedList
+													contacts={contactsAvailableForDrafting}
+													campaign={campaign}
+													selectedContactIds={contactsTabSelectedIds}
+													onContactSelectionChange={(updater) =>
+														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
+													}
+													onContactClick={handleResearchContactClick}
+													onContactHover={handleResearchContactHover}
+													onDraftSelected={async (ids) => {
+														await handleGenerateDrafts(ids);
+													}}
+													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isPendingGeneration={isPendingGeneration}
+													width={330}
+													height={263}
+													minRows={5}
+													onSearchFromMiniBar={handleMiniContactsSearch}
+													onOpenContacts={goToContacts}
+												/>
+											</div>
+										</div>
+										{/* 3. Writing */}
+										<div
+											style={{
+												width: '330px',
+												height: '349px',
+												overflow: 'visible',
+												position: 'relative',
+												cursor: 'pointer',
+											}}
+											onMouseEnter={() => setIsWritingHovered(true)}
+											onMouseLeave={() => setIsWritingHovered(false)}
+											onClick={() => {
+												setIsWritingHovered(false);
+												goToWriting?.();
+											}}
+										>
+											{isWritingHovered && (
+												<div
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: '50%',
+														transform: 'translate(-50%, -50%)',
+														width: '364px',
+														height: '364px',
+														backgroundColor: 'transparent',
+														border: '6px solid #37B73B',
+														borderRadius: '0px',
+														zIndex: 10,
+														pointerEvents: 'none',
+													}}
+												/>
+											)}
+											<div style={{ position: 'relative', zIndex: 20 }}>
+												<MiniEmailStructure
+													form={form}
+													onDraft={() =>
+														handleGenerateDrafts(
+															contactsAvailableForDrafting.map((c) => c.id)
+														)
+													}
+													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isPendingGeneration={isPendingGeneration}
+													generationProgress={generationProgress}
+													generationTotal={contactsAvailableForDrafting.length}
+													hideTopChrome
+													hideFooter
+													fullWidthMobile
+													hideAddTextButtons
+													height={349}
+													onOpenWriting={goToWriting}
+												/>
+											</div>
+										</div>
+										{/* 4. Drafts */}
+										<div
+											style={{
+												width: '330px',
+												height: '347px',
+												overflow: 'visible',
+												position: 'relative',
+												cursor: 'pointer',
+											}}
+											onMouseEnter={() => setIsDraftsHovered(true)}
+											onMouseLeave={() => setIsDraftsHovered(false)}
+											onClick={() => {
+												setIsDraftsHovered(false);
+												goToDrafting?.();
+											}}
+										>
+											{isDraftsHovered && (
+												<div
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: '50%',
+														transform: 'translate(-50%, -50%)',
+														width: '364px',
+														height: '364px',
+														backgroundColor: 'transparent',
+														border: '6px solid #E6AF4D',
+														borderRadius: '0px',
+														zIndex: 10,
+														pointerEvents: 'none',
+													}}
+												/>
+											)}
+											<div style={{ position: 'relative', zIndex: 20 }}>
+												<DraftsExpandedList
+													drafts={draftEmails}
+													contacts={contacts || []}
+													width={330}
+													height={347}
+													hideSendButton
+													onOpenDrafts={goToDrafting}
+												/>
+											</div>
+										</div>
+										{/* 5. Sent */}
+										<div
+											style={{
+												width: '330px',
+												height: '347px',
+												overflow: 'visible',
+												position: 'relative',
+												cursor: 'pointer',
+											}}
+											onMouseEnter={() => setIsSentHovered(true)}
+											onMouseLeave={() => setIsSentHovered(false)}
+											onClick={() => {
+												setIsSentHovered(false);
+												goToSent?.();
+											}}
+										>
+											{isSentHovered && (
+												<div
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: '50%',
+														transform: 'translate(-50%, -50%)',
+														width: '364px',
+														height: '364px',
+														backgroundColor: 'transparent',
+														border: '6px solid #2CA954',
+														borderRadius: '0px',
+														zIndex: 10,
+														pointerEvents: 'none',
+													}}
+												/>
+											)}
+											<div style={{ position: 'relative', zIndex: 20 }}>
+												<SentExpandedList
+													sent={sentEmails}
+													contacts={contacts || []}
+													width={330}
+													height={347}
+													onOpenSent={goToSent}
+												/>
+											</div>
+										</div>
+										{/* 6. Research Panel */}
+										<ContactResearchPanel
+											contact={displayedContactForResearch}
+											hideAllText={contactsAvailableForDrafting.length === 0}
+											hideSummaryIfBullets={true}
+											height={347}
+											width={330}
+											boxWidth={315}
+											compactHeader
+											className="!block"
+										/>
+										{/* 7. Suggestion Box */}
+										<div
+											style={{
+												width: '330px',
+												height: '347px',
+												background:
+													'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
+												border: '3px solid #000000',
+												borderRadius: '7px',
+												position: 'relative',
+											}}
+										>
+											<div
+												style={{
+													height: '28px',
+													display: 'flex',
+													alignItems: 'center',
+													paddingLeft: '9px',
+												}}
+											>
+												<span className="font-inter font-bold text-[12px] leading-none text-black">
+													Suggestion
+												</span>
+											</div>
+											<div
+												style={{
+													position: 'absolute',
+													top: '34px',
+													left: '50%',
+													transform: 'translateX(-50%)',
+													width: '322px',
+													height: '44px',
+													backgroundColor: '#FFFFFF',
+													border: '2px solid #000000',
+													borderRadius: '7px',
+												}}
+											>
+												<div
+													style={{
+														position: 'absolute',
+														top: '6px',
+														left: '10px',
+														fontFamily: 'Inter, system-ui, sans-serif',
+														fontWeight: 700,
+														fontSize: '12px',
+														lineHeight: '14px',
+														color: '#000000',
+													}}
+												>
+													{promptScoreDisplayLabel}
+												</div>
+												<div
+													style={{
+														position: 'absolute',
+														bottom: '3px',
+														left: '4px',
+														width: '223px',
+														height: '12px',
+														backgroundColor: '#FFFFFF',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+														overflow: 'hidden',
+													}}
+												>
+													<div
+														style={{
+															position: 'absolute',
+															top: 0,
+															bottom: 0,
+															left: 0,
+															borderRadius: '999px',
+															backgroundColor: '#36B24A',
+															width: `${promptScoreFillPercent}%`,
+															maxWidth: '100%',
+															transition: 'width 250ms ease-out',
+														}}
+													/>
+												</div>
+											</div>
+											<div
+												onClick={() => {
+													if (hasPreviousPrompt) {
+														undoUpscalePrompt();
+													}
+												}}
+												style={{
+													position: 'absolute',
+													top: '83px',
+													left: '6px',
+													width: '39px',
+													height: '32px',
+													backgroundColor: '#C2C2C2',
+													border: '2px solid #000000',
+													borderRadius: '8px',
+													display: 'flex',
+													alignItems: 'center',
+													justifyContent: 'center',
+													cursor: hasPreviousPrompt ? 'pointer' : 'not-allowed',
+													opacity: hasPreviousPrompt ? 1 : 0.5,
+												}}
+											>
+												{clampedPromptScore != null && <UndoIcon width="24" height="24" />}
+											</div>
+											<div
+												onClick={() => {
+													if (!isUpscalingPrompt) {
+														upscalePrompt();
+													}
+												}}
+												style={{
+													position: 'absolute',
+													top: '83px',
+													left: '50px',
+													width: '155px',
+													height: '32px',
+													backgroundColor: '#D7F0FF',
+													border: '2px solid #000000',
+													borderRadius: '8px',
+													display: 'flex',
+													alignItems: 'center',
+													justifyContent: 'space-between',
+													paddingLeft: '10px',
+													paddingRight: '10px',
+													cursor: isUpscalingPrompt ? 'wait' : 'pointer',
+												}}
+											>
+												{(clampedPromptScore != null || isUpscalingPrompt) && (
+													<>
+														<span
+															style={{
+																fontFamily: 'Inter, system-ui, sans-serif',
+																fontSize: '13px',
+																fontWeight: 500,
+																color: '#000000',
+																lineHeight: '1',
+															}}
+														>
+															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
+														</span>
+														<div style={{ flexShrink: 0 }}>
+															<UpscaleIcon width="20" height="20" />
+														</div>
+													</>
+												)}
+											</div>
+											{/* Suggestion 1 */}
+											<div
+												style={{
+													position: 'absolute',
+													top: '123px',
+													left: '50%',
+													transform: 'translateX(-50%)',
+													width: '315px',
+													height: '46px',
+													backgroundColor: '#A6E0B4',
+													border: '2px solid #000000',
+													borderRadius: '8px',
+													overflow: 'hidden',
+												}}
+											>
+												<div
+													className="absolute font-inter font-bold"
+													style={{
+														top: '4.5px',
+														left: '8px',
+														fontSize: '11.5px',
+														color: '#000000',
+													}}
+												>
+													[1]
+												</div>
+												<div
+													style={{
+														position: 'absolute',
+														top: '0',
+														bottom: '0',
+														margin: 'auto',
+														right: '6px',
+														width: '260px',
+														height: '39px',
+														backgroundColor: clampedPromptScore == null ? '#A6E0B4' : '#FFFFFF',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+														display: 'flex',
+														alignItems: 'center',
+														padding: '4px 6px',
+														overflow: 'hidden',
+													}}
+												>
+													<div
+														style={{
+															fontFamily: 'Inter, system-ui, sans-serif',
+															fontSize: '10px',
+															lineHeight: '1.3',
+															color: suggestionText1 ? '#000000' : '#888888',
+															wordBreak: 'break-word',
+															whiteSpace: 'normal',
+															overflow: 'hidden',
+															textOverflow: 'ellipsis',
+															display: '-webkit-box',
+															WebkitLineClamp: 2,
+															WebkitBoxOrient: 'vertical',
+														}}
+													>
+														{suggestionText1 || (clampedPromptScore != null ? 'Add your prompt to get suggestions' : '')}
+													</div>
+												</div>
+											</div>
+											{/* Suggestion 2 */}
+											<div
+												style={{
+													position: 'absolute',
+													top: '187px',
+													left: '50%',
+													transform: 'translateX(-50%)',
+													width: '315px',
+													height: '46px',
+													backgroundColor: '#5BCB75',
+													border: '2px solid #000000',
+													borderRadius: '8px',
+													overflow: 'hidden',
+												}}
+											>
+												<div
+													className="absolute font-inter font-bold"
+													style={{
+														top: '4.5px',
+														left: '8px',
+														fontSize: '11.5px',
+														color: '#000000',
+													}}
+												>
+													[2]
+												</div>
+												<div
+													style={{
+														position: 'absolute',
+														top: '0',
+														bottom: '0',
+														margin: 'auto',
+														right: '6px',
+														width: '260px',
+														height: '39px',
+														backgroundColor: clampedPromptScore == null ? '#5BCB75' : '#FFFFFF',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+														display: 'flex',
+														alignItems: 'center',
+														padding: '4px 6px',
+														overflow: 'hidden',
+													}}
+												>
+													<div
+														style={{
+															fontFamily: 'Inter, system-ui, sans-serif',
+															fontSize: '10px',
+															lineHeight: '1.3',
+															color: suggestionText2 ? '#000000' : '#888888',
+															wordBreak: 'break-word',
+															whiteSpace: 'normal',
+															overflow: 'hidden',
+															textOverflow: 'ellipsis',
+															display: '-webkit-box',
+															WebkitLineClamp: 2,
+															WebkitBoxOrient: 'vertical',
+														}}
+													>
+														{suggestionText2 || (clampedPromptScore != null ? 'More suggestions will appear here' : '')}
+													</div>
+												</div>
+											</div>
+											{/* Suggestion 3 */}
+											<div
+												style={{
+													position: 'absolute',
+													top: '251px',
+													left: '50%',
+													transform: 'translateX(-50%)',
+													width: '315px',
+													height: '46px',
+													backgroundColor: '#359D4D',
+													border: '2px solid #000000',
+													borderRadius: '8px',
+													overflow: 'hidden',
+												}}
+											>
+												<div
+													className="absolute font-inter font-bold"
+													style={{
+														top: '4.5px',
+														left: '8px',
+														fontSize: '11.5px',
+														color: '#000000',
+													}}
+												>
+													[3]
+												</div>
+												<div
+													style={{
+														position: 'absolute',
+														top: '0',
+														bottom: '0',
+														margin: 'auto',
+														right: '6px',
+														width: '260px',
+														height: '39px',
+														backgroundColor: clampedPromptScore == null ? '#359D4D' : '#FFFFFF',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+														display: 'flex',
+														alignItems: 'center',
+														padding: '4px 6px',
+														overflow: 'hidden',
+													}}
+												>
+													<div
+														style={{
+															fontFamily: 'Inter, system-ui, sans-serif',
+															fontSize: '10px',
+															lineHeight: '1.3',
+															color: suggestionText3 ? '#000000' : '#888888',
+															wordBreak: 'break-word',
+															whiteSpace: 'normal',
+															overflow: 'hidden',
+															textOverflow: 'ellipsis',
+															display: '-webkit-box',
+															WebkitLineClamp: 2,
+															WebkitBoxOrient: 'vertical',
+														}}
+													>
+														{suggestionText3 || (clampedPromptScore != null ? 'Additional suggestions here' : '')}
+													</div>
+												</div>
+											</div>
+										</div>
+										{/* 8. Draft Preview */}
+										<DraftPreviewExpandedList
+											contacts={contacts || []}
+											fallbackDraft={
+												draftEmails[0]
+													? {
+															contactId: draftEmails[0].contactId,
+															subject: draftEmails[0].subject,
+															message: draftEmails[0].message,
+													  }
+													: null
+											}
+											width={330}
+											height={347}
+										/>
+										{/* 9. Inbox */}
+										<div
+											style={{
+												width: '330px',
+												height: '347px',
+												overflow: 'visible',
+												position: 'relative',
+												cursor: 'pointer',
+											}}
+											onMouseEnter={() => setIsInboxHovered(true)}
+											onMouseLeave={() => setIsInboxHovered(false)}
+											onClick={() => {
+												setIsInboxHovered(false);
+												goToInbox?.();
+											}}
+										>
+											{isInboxHovered && (
+												<div
+													style={{
+														position: 'absolute',
+														top: '50%',
+														left: '50%',
+														transform: 'translate(-50%, -50%)',
+														width: '364px',
+														height: '364px',
+														backgroundColor: 'transparent',
+														border: '6px solid #5EB6D6',
+														borderRadius: '0px',
+														zIndex: 10,
+														pointerEvents: 'none',
+													}}
+												/>
+											)}
+											<div style={{ position: 'relative', zIndex: 20 }}>
+												<InboxExpandedList
+													contacts={contacts || []}
+													allowedSenderEmails={campaignContactEmails}
+													contactByEmail={campaignContactsByEmail}
+													width={330}
+													height={347}
+													onOpenInbox={goToInbox}
+												/>
+											</div>
+										</div>
+									</div>
+								) : (
 								<div className="flex flex-row items-start" style={{ gap: '30px' }}>
 									{/* Left column: Campaign Header + Contacts + Research (+ Preview in narrow mode) */}
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
@@ -5336,6 +5955,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									</>
 									)}
 								</div>
+								)}
 							</div>
 						)}
 
