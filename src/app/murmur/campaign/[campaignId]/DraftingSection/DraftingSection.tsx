@@ -2743,8 +2743,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									// Narrow desktop (952px - 1279px): center BOTH the left panel and contacts table together
 									// Fixed width container: left (330) + gap (35) + right (499) = 864px, centered with mx-auto
 									// Bottom panels are rendered separately and centered relative to the full container
-									<div className="flex flex-col items-center mx-auto" style={{ width: '864px' }}>
-										<div className="flex flex-row items-start gap-[35px] w-full">
+									<div className="flex flex-col items-center mx-auto" style={{ width: '839px' }}>
+										<div className="flex flex-row items-start gap-[10px] w-full">
 											{/* Left column: Campaign Header + Email Structure + Research - fixed 330px */}
 											<div className="flex flex-col flex-shrink-0" style={{ gap: '10px', width: '330px' }}>
 												<CampaignHeaderBox
