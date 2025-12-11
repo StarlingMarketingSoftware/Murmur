@@ -85,6 +85,8 @@ const Murmur = () => {
 	const [hideRightPanel, setHideRightPanel] = useState(false);
 	// Hide right panel on search tab at wider breakpoint (below 1796px)
 	const [hideRightPanelOnSearch, setHideRightPanelOnSearch] = useState(false);
+	// Hide right panel on all tab at breakpoint (below 1665px)
+	const [hideRightPanelOnAll, setHideRightPanelOnAll] = useState(false);
 	// Hide arrows when they would overlap with content boxes (below 1317px)
 	const [hideArrowsAtBreakpoint, setHideArrowsAtBreakpoint] = useState(false);
 	// Hide arrows on search tab at wider breakpoint (below 1557px)
@@ -97,6 +99,7 @@ const Murmur = () => {
 			setIsNarrowestDesktop(width < 952);
 			setHideRightPanel(width < 1522);
 			setHideRightPanelOnSearch(width < 1796);
+			setHideRightPanelOnAll(width <= 1665);
 			setHideArrowsAtBreakpoint(width < 1317);
 			setHideArrowsOnSearch(width < 1557);
 		};
@@ -819,8 +822,8 @@ const Murmur = () => {
 				</div>
 			</div>
 
-			{/* Right side panel - hidden on mobile, when width < 1522px, or on search tab when width < 1796px */}
-			{!isMobile && !hideRightPanel && !(activeView === 'search' && hideRightPanelOnSearch) && (
+			{/* Right side panel - hidden on mobile, when width < 1522px, on search tab when width < 1796px, or on all tab when width <= 1665px */}
+			{!isMobile && !hideRightPanel && !(activeView === 'search' && hideRightPanelOnSearch) && !(activeView === 'all' && hideRightPanelOnAll) && (
 				<CampaignRightPanel view={activeView} onTabChange={setActiveView} />
 			)}
 		</div>
