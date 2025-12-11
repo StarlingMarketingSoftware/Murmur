@@ -91,6 +91,8 @@ const Murmur = () => {
 	const [hideArrowsAtBreakpoint, setHideArrowsAtBreakpoint] = useState(false);
 	// Hide arrows on search tab at wider breakpoint (below 1557px)
 	const [hideArrowsOnSearch, setHideArrowsOnSearch] = useState(false);
+	// Hide arrows on all tab at breakpoint (at or below 1396px)
+	const [hideArrowsOnAll, setHideArrowsOnAll] = useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		const checkBreakpoints = () => {
@@ -102,6 +104,7 @@ const Murmur = () => {
 			setHideRightPanelOnAll(width <= 1665);
 			setHideArrowsAtBreakpoint(width < 1317);
 			setHideArrowsOnSearch(width < 1557);
+			setHideArrowsOnAll(width <= 1396);
 		};
 		checkBreakpoints();
 		window.addEventListener('resize', checkBreakpoints);
@@ -129,10 +132,12 @@ const Murmur = () => {
 	// Hide fixed arrows when in narrow desktop + testing view (arrows show next to draft button instead)
 	// or when width < 1317px to prevent overlap with content boxes
 	// or when on search tab and width < 1557px
+	// or when on all tab and width <= 1396px
 	const hideFixedArrows =
 		(activeView === 'testing' && isNarrowDesktop) ||
 		hideArrowsAtBreakpoint ||
-		(activeView === 'search' && hideArrowsOnSearch);
+		(activeView === 'search' && hideArrowsOnSearch) ||
+		(activeView === 'all' && hideArrowsOnAll);
 
 	// Tab navigation order
 	const tabOrder: Array<'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'> = [
