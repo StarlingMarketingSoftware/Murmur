@@ -2958,45 +2958,61 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														aria-label="Next tab"
 													>
 														<RightArrow width="20" height="39" />
-													</button>
-												</div>
-											)}
+												</button>
+											</div>
+										)}
 
-											{/* Bottom Panels: Contacts, Sent, and Inbox - hidden at narrowest breakpoint */}
-											{!isNarrowestDesktop && (
-												<div className="mt-[35px] flex justify-center gap-[15px]">
-													<ContactsExpandedList
-														contacts={contactsAvailableForDrafting}
-														width={232}
-														height={117}
-														whiteSectionHeight={15}
-														showSearchBar={false}
-														onOpenContacts={goToContacts}
-													/>
-													<SentExpandedList
-														sent={sentEmails}
-														contacts={contacts || []}
-														width={233}
-														height={117}
-														whiteSectionHeight={15}
-														onOpenSent={goToSent}
-													/>
-													<InboxExpandedList
-														contacts={contacts || []}
-														width={233}
-														height={117}
-														whiteSectionHeight={15}
-														onOpenInbox={goToInbox}
-													/>
-												</div>
-											)}
-										</div>
-									)}
-								</div>
-							)}
-						</div>
+										{/* Research panel below send button at narrowest breakpoint (< 952px) */}
+										{isNarrowestDesktop && (
+											<div className="mt-[20px] w-full flex justify-center">
+												<ContactResearchPanel
+													contact={displayedContactForResearch}
+													hideAllText={draftCount === 0}
+													hideSummaryIfBullets={true}
+													height={400}
+													width={489}
+													boxWidth={474}
+													compactHeader
+													style={{ display: 'block' }}
+												/>
+											</div>
+										)}
 
-						{/* Contacts tab - show the contacts table */}
+										{/* Bottom Panels: Contacts, Sent, and Inbox - hidden at narrowest breakpoint */}
+										{!isNarrowestDesktop && (
+											<div className="mt-[35px] flex justify-center gap-[15px]">
+												<ContactsExpandedList
+													contacts={contactsAvailableForDrafting}
+													width={232}
+													height={117}
+													whiteSectionHeight={15}
+													showSearchBar={false}
+													onOpenContacts={goToContacts}
+												/>
+												<SentExpandedList
+													sent={sentEmails}
+													contacts={contacts || []}
+													width={233}
+													height={117}
+													whiteSectionHeight={15}
+													onOpenSent={goToSent}
+												/>
+												<InboxExpandedList
+													contacts={contacts || []}
+													width={233}
+													height={117}
+													whiteSectionHeight={15}
+													onOpenInbox={goToInbox}
+												/>
+											</div>
+										)}
+									</div>
+								)}
+							</div>
+						)}
+					</div>
+
+					{/* Contacts tab - show the contacts table */}
 						{view === 'contacts' && (
 							<div className="w-full min-h-[300px]">
 								{isNarrowDesktop ? (
