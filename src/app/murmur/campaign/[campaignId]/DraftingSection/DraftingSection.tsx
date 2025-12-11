@@ -3471,33 +3471,35 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											goToSearch={onGoToSearch}
 										/>
 
-										{/* Bottom Panels: Contacts, Drafts, and Inbox */}
-										<div className="mt-[35px] flex justify-center gap-[15px]">
-											<ContactsExpandedList
-												contacts={contactsAvailableForDrafting}
-												width={232}
-												height={117}
-												whiteSectionHeight={15}
-												showSearchBar={false}
-												onOpenContacts={goToContacts}
-											/>
-											<DraftsExpandedList
-												drafts={draftEmails}
-												contacts={contacts || []}
-												width={233}
-												height={117}
-												whiteSectionHeight={15}
-												hideSendButton={true}
-												onOpenDrafts={goToDrafting}
-											/>
-											<InboxExpandedList
-												contacts={contacts || []}
-												width={233}
-												height={117}
-												whiteSectionHeight={15}
-												onOpenInbox={goToInbox}
-											/>
-										</div>
+										{/* Bottom Panels: Contacts, Drafts, and Inbox - hidden at narrowest breakpoint (< 952px) */}
+										{!isNarrowestDesktop && (
+											<div className="mt-[35px] flex justify-center gap-[15px]">
+												<ContactsExpandedList
+													contacts={contactsAvailableForDrafting}
+													width={232}
+													height={117}
+													whiteSectionHeight={15}
+													showSearchBar={false}
+													onOpenContacts={goToContacts}
+												/>
+												<DraftsExpandedList
+													drafts={draftEmails}
+													contacts={contacts || []}
+													width={233}
+													height={117}
+													whiteSectionHeight={15}
+													hideSendButton={true}
+													onOpenDrafts={goToDrafting}
+												/>
+												<InboxExpandedList
+													contacts={contacts || []}
+													width={233}
+													height={117}
+													whiteSectionHeight={15}
+													onOpenInbox={goToInbox}
+												/>
+											</div>
+										)}
 									</div>
 								)}
 							</div>
