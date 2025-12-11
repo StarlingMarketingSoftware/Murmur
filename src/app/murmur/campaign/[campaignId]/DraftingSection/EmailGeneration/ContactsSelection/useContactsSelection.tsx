@@ -38,6 +38,11 @@ export interface ContactsSelectionProps {
 	 * Useful when these panels are rendered separately in the parent layout.
 	 */
 	hideBottomPanels?: boolean;
+	/**
+	 * If true, the draft button will not be rendered.
+	 * Useful when the button needs to be rendered separately in the parent layout for centering.
+	 */
+	hideButton?: boolean;
 }
 
 export const useContactsSelection = (props: ContactsSelectionProps) => {

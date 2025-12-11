@@ -2811,8 +2811,85 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													goToDrafts={goToDrafting}
 													goToInbox={goToInbox}
 													hideBottomPanels
+													hideButton
 												/>
 											</div>
+										</div>
+										{/* Draft Button with arrows - centered relative to full container width */}
+										<div className="flex items-center justify-center gap-[29px] mt-4 w-full">
+											{/* Left arrow */}
+											<button
+												type="button"
+												onClick={goToPreviousTab}
+												className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+												aria-label="Previous tab"
+											>
+												<LeftArrow width="20" height="39" />
+											</button>
+											{/* Draft button container */}
+											<div
+												className="relative h-[40px] flex-1"
+												style={{ maxWidth: '691px' }}
+											>
+												{contactsTabSelectedIds.size > 0 ? (
+													<>
+														<button
+															type="button"
+															onClick={() => {
+																if (contactsTabSelectedIds.size === 0) {
+																	return;
+																}
+																handleGenerateDrafts(
+																	Array.from(contactsTabSelectedIds.values())
+																);
+															}}
+															disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+															className={cn(
+																'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
+																isPendingGeneration || contactsTabSelectedIds.size === 0
+																	? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+																	: 'bg-[#F2C7C7] border-[#9A3434] hover:bg-[#E6B9B9] cursor-pointer'
+															)}
+														>
+															Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
+														</button>
+														{/* Right section "All" button */}
+														<button
+															type="button"
+															className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10"
+															onClick={(e) => {
+																e.stopPropagation();
+																const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
+																const isAllSelected =
+																	contactsTabSelectedIds.size === allIds.size &&
+																	[...allIds].every((id) => contactsTabSelectedIds.has(id));
+																if (isAllSelected) {
+																	setContactsTabSelectedIds(new Set());
+																} else {
+																	setContactsTabSelectedIds(allIds);
+																}
+															}}
+														>
+															{/* Vertical divider line */}
+															<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
+															All
+														</button>
+													</>
+												) : (
+													<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
+														Select Contacts and Draft Emails
+													</div>
+												)}
+											</div>
+											{/* Right arrow */}
+											<button
+												type="button"
+												onClick={goToNextTab}
+												className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+												aria-label="Next tab"
+											>
+												<RightArrow width="20" height="39" />
+											</button>
 										</div>
 										{/* Bottom Panels: Drafts, Sent, and Inbox - centered relative to 864px container */}
 										<div className="mt-[35px] flex justify-center gap-[15px]">

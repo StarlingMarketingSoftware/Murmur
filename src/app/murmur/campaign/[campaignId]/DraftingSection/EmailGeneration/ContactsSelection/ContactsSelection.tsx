@@ -758,6 +758,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		goToDrafts,
 		goToInbox,
 		hideBottomPanels,
+		hideButton,
 	} = props;
 	const [isDrafting, setIsDrafting] = useState(false);
 	const router = useRouter();
@@ -1251,7 +1252,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 			</DraftingTable>
 
 			{/* Draft Emails Button - below the table box */}
-			{!isDrafting && (
+			{!isDrafting && !hideButton && (
 				<div className="relative w-[475px] h-[40px] mt-4 mx-auto">
 					{selectedCount > 0 ? (
 						<>
