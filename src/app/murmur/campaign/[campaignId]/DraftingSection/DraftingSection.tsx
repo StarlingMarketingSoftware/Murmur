@@ -3471,6 +3471,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											goToSearch={onGoToSearch}
 										/>
 
+										{/* Research panel below sent box at narrowest breakpoint (< 952px) */}
+										{isNarrowestDesktop && (
+											<div className="mt-[20px] w-full flex justify-center">
+												<ContactResearchPanel
+													contact={displayedContactForResearch}
+													hideAllText={sentEmails.length === 0}
+													hideSummaryIfBullets={true}
+													height={400}
+													width={489}
+													boxWidth={474}
+													compactHeader
+													style={{ display: 'block' }}
+												/>
+											</div>
+										)}
+
 										{/* Bottom Panels: Contacts, Drafts, and Inbox - hidden at narrowest breakpoint (< 952px) */}
 										{!isNarrowestDesktop && (
 											<div className="mt-[35px] flex justify-center gap-[15px]">
