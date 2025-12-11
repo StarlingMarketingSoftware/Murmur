@@ -3692,11 +3692,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									</button>
 								)}
 							</div>
-							{/* Research panel OR Search results below Add to Campaign button - only at narrow breakpoint */}
-							{isSearchTabNarrow && (
+							{/* Research panel OR Search results below Add to Campaign button - only at narrowest breakpoint (< 952px) */}
+							{isNarrowestDesktop && (
 								<div className="mt-[70px] w-full flex justify-center">
 									{/* At narrowest breakpoint (< 952px) with search results, show search results table */}
-									{isNarrowestDesktop && hasCampaignSearched && !isSearching && searchResults && searchResults.length > 0 ? (
+									{hasCampaignSearched && !isSearching && searchResults && searchResults.length > 0 ? (
 										<div
 											className="bg-[#D8E5FB] border-[3px] border-[#143883] rounded-[7px] overflow-hidden flex flex-col"
 											style={{
