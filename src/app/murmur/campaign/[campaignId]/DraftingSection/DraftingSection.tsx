@@ -1450,7 +1450,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					{/* Main content wrapper to anchor the persistent Header Box */}
 					<div className="relative w-full flex flex-col items-center">
 						{/* Persistent Campaign Header Box for specific tabs */}
-						{/* Hide this absolute panel in narrow desktop + testing mode - we'll use inline layout instead */}
+						{/* Hide this absolute panel in narrow desktop + testing/contacts mode - we'll use inline layout instead */}
 						{/* Also hide when hideHeaderBox is true (header rendered at page level for narrowest breakpoint) */}
 						{!isMobile &&
 							!hideHeaderBox &&
@@ -1458,6 +1458,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								view
 							) &&
 							!(view === 'testing' && isNarrowDesktop) &&
+							!(view === 'contacts' && isNarrowDesktop) &&
 							!(view === 'search' && isSearchTabNarrow) && (
 								<div
 									className="absolute hidden lg:flex flex-col"
@@ -2268,7 +2269,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								{isNarrowDesktop ? (
 									<div className="flex flex-col items-center">
 										{/* Row with both columns */}
-										<div className="flex flex-row items-start justify-center gap-[20px]">
+										<div className="flex flex-row items-start justify-center gap-[10px]">
 											{/* Left column: Campaign Header + Contacts + Research */}
 											<div className="flex flex-col" style={{ gap: '10px' }}>
 												<CampaignHeaderBox
@@ -2738,24 +2739,101 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* Contacts tab - show the contacts table */}
 						{view === 'contacts' && (
 							<div className="flex items-center justify-center min-h-[300px]">
-								<ContactsSelection
-									contacts={contactsAvailableForDrafting}
-									allContacts={contacts}
-									selectedContactIds={contactsTabSelectedIds}
-									setSelectedContactIds={setContactsTabSelectedIds}
-									handleContactSelection={handleContactsTabSelection}
-									campaign={campaign}
-									onDraftEmails={async (ids) => {
-										await handleGenerateDrafts(ids);
-									}}
-									isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
-									onContactClick={handleResearchContactClick}
-									onContactHover={handleResearchContactHover}
-									onSearchFromMiniBar={handleMiniContactsSearch}
-									goToSearch={onGoToSearch}
-									goToDrafts={goToDrafting}
-									goToInbox={goToInbox}
-								/>
+								{/* Narrow desktop: grouped layout with left panel + contacts table centered together */}
+								{isNarrowDesktop ? (
+									<div className="flex flex-col items-center">
+										{/* Row with both columns */}
+										<div className="flex flex-row items-start justify-center gap-[35px]">
+											{/* Left column: Campaign Header + Email Structure + Research */}
+											<div className="flex flex-col" style={{ gap: '10px' }}>
+												<CampaignHeaderBox
+													campaignId={campaign?.id}
+													campaignName={campaign?.name || 'Untitled Campaign'}
+													toListNames={toListNames}
+													fromName={fromName}
+													contactsCount={contactsCount}
+													draftCount={draftCount}
+													sentCount={sentCount}
+													onFromClick={onOpenIdentityDialog}
+													width={330}
+												/>
+												{/* Mini Email Structure panel */}
+												<div style={{ width: '330px' }}>
+													<MiniEmailStructure
+														form={form}
+														onDraft={() =>
+															handleGenerateDrafts(
+																contactsAvailableForDrafting.map((c) => c.id)
+															)
+														}
+														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+														isPendingGeneration={isPendingGeneration}
+														generationProgress={generationProgress}
+														generationTotal={contactsAvailableForDrafting.length}
+														hideTopChrome
+														hideFooter
+														fullWidthMobile
+														hideAddTextButtons
+														height={316}
+														onOpenWriting={goToWriting}
+													/>
+												</div>
+												{/* Research panel - height set so bottom aligns with contacts table (703px) */}
+												<ContactResearchPanel
+													contact={displayedContactForResearch}
+													hideAllText={contactsAvailableForDrafting.length === 0}
+													hideSummaryIfBullets={true}
+													height={296}
+													width={330}
+													boxWidth={315}
+													compactHeader
+													style={{ display: 'block' }}
+												/>
+											</div>
+											{/* Right column: Contacts table - wrapper with items-start to left-align content */}
+											<div className="flex flex-col items-start [&>*]:items-start">
+												<ContactsSelection
+													contacts={contactsAvailableForDrafting}
+													allContacts={contacts}
+													selectedContactIds={contactsTabSelectedIds}
+													setSelectedContactIds={setContactsTabSelectedIds}
+													handleContactSelection={handleContactsTabSelection}
+													campaign={campaign}
+													onDraftEmails={async (ids) => {
+														await handleGenerateDrafts(ids);
+													}}
+													isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
+													onContactClick={handleResearchContactClick}
+													onContactHover={handleResearchContactHover}
+													onSearchFromMiniBar={handleMiniContactsSearch}
+													goToSearch={onGoToSearch}
+													goToDrafts={goToDrafting}
+													goToInbox={goToInbox}
+												/>
+											</div>
+										</div>
+									</div>
+								) : (
+									/* Regular centered layout for wider viewports */
+									<ContactsSelection
+										contacts={contactsAvailableForDrafting}
+										allContacts={contacts}
+										selectedContactIds={contactsTabSelectedIds}
+										setSelectedContactIds={setContactsTabSelectedIds}
+										handleContactSelection={handleContactsTabSelection}
+										campaign={campaign}
+										onDraftEmails={async (ids) => {
+											await handleGenerateDrafts(ids);
+										}}
+										isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
+										onContactClick={handleResearchContactClick}
+										onContactHover={handleResearchContactHover}
+										onSearchFromMiniBar={handleMiniContactsSearch}
+										goToSearch={onGoToSearch}
+										goToDrafts={goToDrafting}
+										goToInbox={goToInbox}
+									/>
+								)}
 							</div>
 						)}
 
