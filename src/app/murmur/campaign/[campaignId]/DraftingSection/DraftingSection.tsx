@@ -2890,7 +2890,77 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												approvedDraftIds={approvedDraftIds}
 												statusFilter={draftStatusFilter}
 												onStatusFilterChange={setDraftStatusFilter}
+												hideSendButton={isNarrowestDesktop}
 											/>
+
+											{/* Send Button with arrows at narrowest breakpoint (< 952px) */}
+											{isNarrowestDesktop && draftEmails.length > 0 && (
+												<div className="flex items-center justify-center gap-[20px] mt-4 w-full px-4">
+													{/* Left arrow */}
+													<button
+														type="button"
+														onClick={goToPreviousTab}
+														className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+														aria-label="Previous tab"
+													>
+														<LeftArrow width="20" height="39" />
+													</button>
+													{/* Send button container */}
+													<div
+														className="relative h-[40px] flex-1"
+														style={{ maxWidth: '407px' }}
+													>
+														<div className="w-full h-full rounded-[4px] border-[3px] border-[#000000] flex overflow-hidden">
+															<button
+																type="button"
+																className={cn(
+																	'flex-1 h-full flex items-center justify-center text-center text-black font-inter font-normal text-[17px] pl-[89px]',
+																	draftsTabSelectedIds.size > 0
+																		? 'bg-[#FFDC9F] hover:bg-[#F4C87E] cursor-pointer'
+																		: 'bg-[#FFFFFF] cursor-default'
+																)}
+																onClick={async () => {
+																	if (draftsTabSelectedIds.size === 0) return;
+																	await handleSendDrafts();
+																}}
+																disabled={draftsTabSelectedIds.size === 0 || isSendingDisabled}
+															>
+																{draftsTabSelectedIds.size > 0
+																	? `Send ${draftsTabSelectedIds.size} Selected`
+																	: 'Send'}
+															</button>
+															{/* Right section "All" button */}
+															<button
+																type="button"
+																className="w-[89px] h-full flex items-center justify-center font-inter font-normal text-[17px] text-black cursor-pointer border-l-[2px] border-[#000000] bg-[#7CB67C] hover:bg-[#6FA36F]"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	const allIds = new Set(draftEmails.map((d) => d.id));
+																	const isAllSelected =
+																		draftsTabSelectedIds.size === allIds.size &&
+																		[...allIds].every((id) => draftsTabSelectedIds.has(id));
+																	if (isAllSelected) {
+																		setDraftsTabSelectedIds(new Set());
+																	} else {
+																		setDraftsTabSelectedIds(allIds);
+																	}
+																}}
+															>
+																All
+															</button>
+														</div>
+													</div>
+													{/* Right arrow */}
+													<button
+														type="button"
+														onClick={goToNextTab}
+														className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+														aria-label="Next tab"
+													>
+														<RightArrow width="20" height="39" />
+													</button>
+												</div>
+											)}
 
 											{/* Bottom Panels: Contacts, Sent, and Inbox - hidden at narrowest breakpoint */}
 											{!isNarrowestDesktop && (
