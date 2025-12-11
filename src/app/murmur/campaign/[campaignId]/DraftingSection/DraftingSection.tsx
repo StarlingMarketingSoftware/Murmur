@@ -1459,6 +1459,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							) &&
 							!(view === 'testing' && isNarrowDesktop) &&
 							!(view === 'contacts' && isNarrowDesktop) &&
+							!(view === 'drafting' && isNarrowDesktop) &&
 							!(view === 'search' && isSearchTabNarrow) && (
 								<div
 									className="absolute hidden lg:flex flex-col"
@@ -2675,63 +2676,179 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						>
 							{/* Drafts tab - show only the drafts table centered */}
 							{view === 'drafting' && (
-								<div className="flex flex-col items-center min-h-[300px]">
-									<DraftedEmails
-										contacts={contacts || []}
-										selectedDraftIds={draftsTabSelectedIds}
-										selectedDraft={selectedDraft}
-										setSelectedDraft={setSelectedDraft}
-										setIsDraftDialogOpen={setIsDraftDialogOpen}
-										handleDraftSelection={handleDraftSelection}
-										draftEmails={draftEmails}
-										isPendingEmails={isPendingEmails}
-										setSelectedDraftIds={setDraftsTabSelectedIds}
-										onSend={handleSendDrafts}
-										isSendingDisabled={isSendingDisabled}
-										isFreeTrial={isFreeTrial || false}
-										fromName={fromName}
-										fromEmail={fromEmail}
-										subject={form.watch('subject')}
-										onContactClick={handleResearchContactClick}
-										onContactHover={handleResearchContactHover}
-										goToWriting={goToWriting}
-										goToSearch={onGoToSearch}
-										goToInbox={goToInbox}
-										onRejectDraft={handleRejectDraft}
-										onApproveDraft={handleApproveDraft}
-										onRegenerateDraft={handleRegenerateDraft}
-										rejectedDraftIds={rejectedDraftIds}
-										approvedDraftIds={approvedDraftIds}
-										statusFilter={draftStatusFilter}
-										onStatusFilterChange={setDraftStatusFilter}
-									/>
+								<div className="w-full min-h-[300px]">
+									{isNarrowDesktop ? (
+										// Narrow desktop (952px - 1279px): center BOTH the left panel and drafts table together
+										// Fixed width container: left (330) + gap (10) + right (499) = 839px, centered with mx-auto
+										<div className="flex flex-col items-center mx-auto" style={{ width: '839px' }}>
+											<div className="flex flex-row items-start gap-[10px] w-full">
+												{/* Left column: Campaign Header + Email Structure + Research - fixed 330px */}
+												<div className="flex flex-col flex-shrink-0" style={{ gap: '10px', width: '330px' }}>
+													<CampaignHeaderBox
+														campaignId={campaign?.id}
+														campaignName={campaign?.name || 'Untitled Campaign'}
+														toListNames={toListNames}
+														fromName={fromName}
+														contactsCount={contactsCount}
+														draftCount={draftCount}
+														sentCount={sentCount}
+														onFromClick={onOpenIdentityDialog}
+														width={330}
+													/>
+													{/* Mini Email Structure panel */}
+													<div style={{ width: '330px' }}>
+														<MiniEmailStructure
+															form={form}
+															onDraft={() =>
+																handleGenerateDrafts(
+																	contactsAvailableForDrafting.map((c) => c.id)
+																)
+															}
+															isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+															isPendingGeneration={isPendingGeneration}
+															generationProgress={generationProgress}
+															generationTotal={contactsAvailableForDrafting.length}
+															hideTopChrome
+															hideFooter
+															fullWidthMobile
+															hideAddTextButtons
+															height={316}
+															onOpenWriting={goToWriting}
+														/>
+													</div>
+													{/* Research panel - height set so bottom aligns with drafts table (71 + 10 + 316 + 10 + 321 = 728 = 25 margin + 703 table) */}
+													<ContactResearchPanel
+														contact={displayedContactForResearch}
+														hideAllText={draftCount === 0}
+														hideSummaryIfBullets={true}
+														height={321}
+														width={330}
+														boxWidth={315}
+														compactHeader
+														style={{ display: 'block' }}
+													/>
+												</div>
+												{/* Right column: Drafts table - fixed 499px, overflow visible for bottom panels */}
+												<div className="flex-shrink-0 [&>*]:!items-start" style={{ width: '499px', overflow: 'visible' }}>
+													<DraftedEmails
+														contacts={contacts || []}
+														selectedDraftIds={draftsTabSelectedIds}
+														selectedDraft={selectedDraft}
+														setSelectedDraft={setSelectedDraft}
+														setIsDraftDialogOpen={setIsDraftDialogOpen}
+														handleDraftSelection={handleDraftSelection}
+														draftEmails={draftEmails}
+														isPendingEmails={isPendingEmails}
+														setSelectedDraftIds={setDraftsTabSelectedIds}
+														onSend={handleSendDrafts}
+														isSendingDisabled={isSendingDisabled}
+														isFreeTrial={isFreeTrial || false}
+														fromName={fromName}
+														fromEmail={fromEmail}
+														subject={form.watch('subject')}
+														onContactClick={handleResearchContactClick}
+														onContactHover={handleResearchContactHover}
+														goToWriting={goToWriting}
+														goToSearch={onGoToSearch}
+														goToInbox={goToInbox}
+														onRejectDraft={handleRejectDraft}
+														onApproveDraft={handleApproveDraft}
+														onRegenerateDraft={handleRegenerateDraft}
+														rejectedDraftIds={rejectedDraftIds}
+														approvedDraftIds={approvedDraftIds}
+														statusFilter={draftStatusFilter}
+														onStatusFilterChange={setDraftStatusFilter}
+													/>
+												</div>
+											</div>
+											{/* Bottom Panels: Contacts, Sent, and Inbox - centered relative to container */}
+											<div className="mt-[35px] flex justify-center gap-[15px]">
+												<ContactsExpandedList
+													contacts={contactsAvailableForDrafting}
+													width={232}
+													height={117}
+													whiteSectionHeight={15}
+													showSearchBar={false}
+													onOpenContacts={goToContacts}
+												/>
+												<SentExpandedList
+													sent={sentEmails}
+													contacts={contacts || []}
+													width={233}
+													height={117}
+													whiteSectionHeight={15}
+													onOpenSent={goToSent}
+												/>
+												<InboxExpandedList
+													contacts={contacts || []}
+													width={233}
+													height={117}
+													whiteSectionHeight={15}
+													onOpenInbox={goToInbox}
+												/>
+											</div>
+										</div>
+									) : (
+										// Regular centered layout for wider viewports
+										<div className="flex flex-col items-center">
+											<DraftedEmails
+												contacts={contacts || []}
+												selectedDraftIds={draftsTabSelectedIds}
+												selectedDraft={selectedDraft}
+												setSelectedDraft={setSelectedDraft}
+												setIsDraftDialogOpen={setIsDraftDialogOpen}
+												handleDraftSelection={handleDraftSelection}
+												draftEmails={draftEmails}
+												isPendingEmails={isPendingEmails}
+												setSelectedDraftIds={setDraftsTabSelectedIds}
+												onSend={handleSendDrafts}
+												isSendingDisabled={isSendingDisabled}
+												isFreeTrial={isFreeTrial || false}
+												fromName={fromName}
+												fromEmail={fromEmail}
+												subject={form.watch('subject')}
+												onContactClick={handleResearchContactClick}
+												onContactHover={handleResearchContactHover}
+												goToWriting={goToWriting}
+												goToSearch={onGoToSearch}
+												goToInbox={goToInbox}
+												onRejectDraft={handleRejectDraft}
+												onApproveDraft={handleApproveDraft}
+												onRegenerateDraft={handleRegenerateDraft}
+												rejectedDraftIds={rejectedDraftIds}
+												approvedDraftIds={approvedDraftIds}
+												statusFilter={draftStatusFilter}
+												onStatusFilterChange={setDraftStatusFilter}
+											/>
 
-									{/* Bottom Panels: Contacts, Sent, and Inbox */}
-									<div className="mt-[35px] flex justify-center gap-[15px]">
-										<ContactsExpandedList
-											contacts={contactsAvailableForDrafting}
-											width={232}
-											height={117}
-											whiteSectionHeight={15}
-											showSearchBar={false}
-										onOpenContacts={goToContacts}
-										/>
-										<SentExpandedList
-											sent={sentEmails}
-											contacts={contacts || []}
-											width={233}
-											height={117}
-											whiteSectionHeight={15}
-											onOpenSent={goToSent}
-										/>
-										<InboxExpandedList
-											contacts={contacts || []}
-											width={233}
-											height={117}
-											whiteSectionHeight={15}
-											onOpenInbox={goToInbox}
-										/>
-									</div>
+											{/* Bottom Panels: Contacts, Sent, and Inbox */}
+											<div className="mt-[35px] flex justify-center gap-[15px]">
+												<ContactsExpandedList
+													contacts={contactsAvailableForDrafting}
+													width={232}
+													height={117}
+													whiteSectionHeight={15}
+													showSearchBar={false}
+													onOpenContacts={goToContacts}
+												/>
+												<SentExpandedList
+													sent={sentEmails}
+													contacts={contacts || []}
+													width={233}
+													height={117}
+													whiteSectionHeight={15}
+													onOpenSent={goToSent}
+												/>
+												<InboxExpandedList
+													contacts={contacts || []}
+													width={233}
+													height={117}
+													whiteSectionHeight={15}
+													onOpenInbox={goToInbox}
+												/>
+											</div>
+										</div>
+									)}
 								</div>
 							)}
 						</div>
