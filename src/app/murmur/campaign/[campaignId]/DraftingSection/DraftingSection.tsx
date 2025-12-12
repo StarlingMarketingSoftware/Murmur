@@ -2732,12 +2732,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															onOpenWriting={goToWriting}
 														/>
 													</div>
-													{/* Research panel - height set so bottom aligns with drafts table (71 + 10 + 316 + 10 + 321 = 728 = 25 margin + 703 table) */}
-													<ContactResearchPanel
-														contact={displayedContactForResearch}
-														hideAllText={draftCount === 0}
-														hideSummaryIfBullets={true}
-														height={321}
+												{/* Research panel - height set so bottom aligns with drafts table (71 + 10 + 316 + 10 + 296 = 703 = drafts table height) */}
+												<ContactResearchPanel
+													contact={displayedContactForResearch}
+													hideAllText={draftCount === 0}
+													hideSummaryIfBullets={true}
+													height={296}
 														width={330}
 														boxWidth={315}
 														compactHeader
