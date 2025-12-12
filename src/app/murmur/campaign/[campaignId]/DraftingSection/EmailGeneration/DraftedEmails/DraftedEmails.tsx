@@ -348,40 +348,45 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		const isDraftApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
 		const isDraftRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
 		const hasStatusBar = isDraftApproved || isDraftRejected;
+		const isNarrowestDesktop = props.isNarrowestDesktop ?? false;
+		const isNarrowDesktop = props.isNarrowDesktop ?? false;
+		const showBottomCounter = isNarrowestDesktop || isNarrowDesktop;
 
 		return (
 			<div className="flex flex-col items-center">
 				<div style={{ width: '499px', height: '703px', position: 'relative' }}>
-				{/* Counter box above preview - matching the table view */}
-				<div
-					style={{
-						position: 'absolute',
-						top: '-31px',
-						left: '50%',
-						transform: 'translateX(-50%)',
-						width: '95px',
-						height: '21px',
-						border: '2px solid #000000',
-						borderRadius: '8px',
-						backgroundColor: 'transparent',
-						zIndex: 10,
-						display: 'flex',
-						alignItems: 'center',
-						justifyContent: 'center',
-						gap: '8px',
-					}}
-				>
-					{/* Approved count */}
-					<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-						<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{approvedCount}</span>
-						<ApproveCheckIcon width={12} height={9} className="text-black" />
+				{/* Counter box - above preview on wide screens, bottom-left corner on narrow/narrowest breakpoint */}
+				{!showBottomCounter && (
+					<div
+						style={{
+							position: 'absolute',
+							top: '-31px',
+							left: '50%',
+							transform: 'translateX(-50%)',
+							width: '95px',
+							height: '21px',
+							border: '2px solid #000000',
+							borderRadius: '8px',
+							backgroundColor: 'transparent',
+							zIndex: 10,
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							gap: '8px',
+						}}
+					>
+						{/* Approved count */}
+						<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+							<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{approvedCount}</span>
+							<ApproveCheckIcon width={12} height={9} className="text-black" />
+						</div>
+						{/* Rejected count */}
+						<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+							<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{rejectedCount}</span>
+							<RejectXIcon width={10} height={10} className="text-black" />
+						</div>
 					</div>
-					{/* Rejected count */}
-					<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-						<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{rejectedCount}</span>
-						<RejectXIcon width={10} height={10} className="text-black" />
-					</div>
-				</div>
+				)}
 				{/* Container box with header - matching the table view */}
 				<div
 					style={{
@@ -795,6 +800,53 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						>
 							Send
 						</button>
+						{/* Counter in bottom-left corner - at narrow/narrowest breakpoint */}
+						{showBottomCounter && (
+							<>
+								{/* Left divider for counter */}
+								<div
+									style={{
+										position: 'absolute',
+										left: '35px',
+										top: hasStatusBar ? '563px' : '625px',
+										bottom: 0,
+										width: '1px',
+										backgroundColor: '#000000',
+									}}
+								/>
+								<div
+									className="absolute flex items-center justify-center gap-[8px]"
+									style={{
+										left: '35px',
+										width: '95px',
+										top: hasStatusBar ? '563px' : '625px',
+										bottom: 0,
+									}}
+								>
+									{/* Approved count */}
+									<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+										<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{approvedCount}</span>
+										<ApproveCheckIcon width={12} height={9} className="text-black" />
+									</div>
+									{/* Rejected count */}
+									<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+										<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{rejectedCount}</span>
+										<RejectXIcon width={10} height={10} className="text-black" />
+									</div>
+								</div>
+								{/* Right divider for counter */}
+								<div
+									style={{
+										position: 'absolute',
+										left: '130px',
+										top: hasStatusBar ? '563px' : '625px',
+										bottom: 0,
+										width: '1px',
+										backgroundColor: '#000000',
+									}}
+								/>
+							</>
+						)}
 						{/* Subject input */}
 						<div className="flex justify-center" style={{ marginBottom: '8px' }}>
 							<input

@@ -2775,6 +2775,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														statusFilter={draftStatusFilter}
 														onStatusFilterChange={setDraftStatusFilter}
 														hideSendButton
+														isNarrowDesktop
 													/>
 												</div>
 											</div>
@@ -2907,6 +2908,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												statusFilter={draftStatusFilter}
 												onStatusFilterChange={setDraftStatusFilter}
 												hideSendButton={isNarrowestDesktop}
+												isNarrowestDesktop={isNarrowestDesktop}
+												isNarrowDesktop={isNarrowDesktop}
 											/>
 
 											{/* Send Button with arrows at narrowest breakpoint (< 952px) */}

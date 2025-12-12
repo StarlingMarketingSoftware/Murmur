@@ -56,6 +56,10 @@ export interface DraftedEmailsProps {
 	onStatusFilterChange: (filter: 'all' | 'approved' | 'rejected') => void;
 	/** Optional: hide the send button at the bottom of the table */
 	hideSendButton?: boolean;
+	/** Optional: narrowest desktop breakpoint (< 952px) - moves counter to bottom-left in draft review */
+	isNarrowestDesktop?: boolean;
+	/** Optional: narrow desktop breakpoint (952px - 1279px) - moves counter to bottom-left in draft review */
+	isNarrowDesktop?: boolean;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {
