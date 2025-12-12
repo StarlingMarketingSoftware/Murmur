@@ -2697,7 +2697,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										// Narrow desktop (952px - 1279px): center BOTH the left panel and drafts table together
 										// Fixed width container: left (330) + gap (10) + right (499) = 839px, centered with mx-auto
 										<div className="flex flex-col items-center mx-auto" style={{ width: '839px' }}>
-											<div className="flex flex-row items-start gap-[10px] w-full">
+											<div
+												className="flex flex-row items-start gap-[10px] w-full"
+												style={{ position: 'relative' }}
+											>
 												{/* Left column: Campaign Header + Email Structure + Research - fixed 330px */}
 												<div className="flex flex-col flex-shrink-0" style={{ gap: '10px', width: '330px' }}>
 													<CampaignHeaderBox
@@ -2732,12 +2735,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															onOpenWriting={goToWriting}
 														/>
 													</div>
-													{/* Research panel - height set so bottom aligns with drafts table (71 + 10 + 316 + 10 + 321 = 728 = 25 margin + 703 table) */}
-													<ContactResearchPanel
-														contact={displayedContactForResearch}
-														hideAllText={draftCount === 0}
-														hideSummaryIfBullets={true}
-														height={321}
+												{/* Research panel - height set so bottom aligns with drafts table (71 + 10 + 316 + 10 + 296 = 703 = drafts table height) */}
+												<ContactResearchPanel
+													contact={displayedContactForResearch}
+													hideAllText={draftCount === 0}
+													hideSummaryIfBullets={true}
+													height={296}
 														width={330}
 														boxWidth={315}
 														compactHeader
@@ -2775,11 +2778,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														statusFilter={draftStatusFilter}
 														onStatusFilterChange={setDraftStatusFilter}
 														hideSendButton
+														isNarrowDesktop
+														goToPreviousTab={goToPreviousTab}
+														goToNextTab={goToNextTab}
 													/>
 												</div>
 											</div>
 											{/* Send Button with arrows - centered relative to full container width */}
-											{draftEmails.length > 0 && (
+											{draftEmails.length > 0 && !selectedDraft && (
 												<div className="flex items-center justify-center gap-[29px] mt-4 w-full">
 													{/* Left arrow */}
 													<button
@@ -2907,10 +2913,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												statusFilter={draftStatusFilter}
 												onStatusFilterChange={setDraftStatusFilter}
 												hideSendButton={isNarrowestDesktop}
+												isNarrowestDesktop={isNarrowestDesktop}
+												isNarrowDesktop={isNarrowDesktop}
+												goToPreviousTab={goToPreviousTab}
+												goToNextTab={goToNextTab}
 											/>
 
 											{/* Send Button with arrows at narrowest breakpoint (< 952px) */}
-											{isNarrowestDesktop && draftEmails.length > 0 && (
+											{isNarrowestDesktop && draftEmails.length > 0 && !selectedDraft && (
 												<div className="flex items-center justify-center gap-[20px] mt-4 w-full px-4">
 													{/* Left arrow */}
 													<button

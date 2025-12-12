@@ -77,6 +77,7 @@ const DashboardContent = () => {
 		null
 	);
 	const [activeTab, setActiveTab] = useState<'search' | 'inbox'>('search');
+	const inboxView = activeTab === 'inbox';
 
 	// Handle tab query parameter
 	useEffect(() => {
@@ -849,7 +850,7 @@ const DashboardContent = () => {
 			>
 				<div
 					className={`hero-wrapper flex flex-col items-center !z-[40] ${
-						activeTab === 'inbox' ? 'justify-start pt-[100px]' : 'justify-center'
+						activeTab === 'inbox' ? 'justify-start' : 'justify-center'
 					}`}
 				>
 					<div className="w-full">
@@ -857,7 +858,7 @@ const DashboardContent = () => {
 							className="flex justify-center items-center w-full px-4"
 							style={{
 								marginBottom: '0.75rem',
-								marginTop: activeTab === 'inbox' ? '0px' : '50px',
+								marginTop: activeTab === 'inbox' ? '136px' : '50px',
 							}}
 						>
 							<div className="premium-hero-section flex flex-col items-center justify-center w-full max-w-[600px]">
@@ -873,7 +874,7 @@ const DashboardContent = () => {
 						<div
 							className={`search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 !z-[50] ${
 								hasSearched ? 'search-bar-active' : ''
-							} ${activeTab === 'inbox' ? 'hidden' : ''}`}
+							}`}
 						>
 							<div className="search-bar-inner">
 								{hasSearched && activeSearchQuery && (
@@ -903,6 +904,10 @@ const DashboardContent = () => {
 														openSignIn();
 													}
 												} else {
+													// Switch to search tab when submitting from inbox tab
+													if (activeTab === 'inbox') {
+														setActiveTab('search');
+													}
 													form.handleSubmit(onSubmit)(e);
 												}
 											}}
@@ -928,12 +933,15 @@ const DashboardContent = () => {
 																			? 'search-wave-loading'
 																			: ''
 																	}`}
+																	style={{ transition: 'none' }}
 																>
 																<Input
-																		className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !h-[72px] pr-[70px] md:pr-[80px]"
+																		className={`search-wave-input !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent ${inboxView ? '!h-[39px] !border-0' : '!h-[72px] !border-2 !border-black'} pr-[70px] md:pr-[80px]`}
 																		placeholder=""
 																		style={{
 																			accentColor: 'transparent',
+																			transition: 'none',
+																			...(inboxView ? { backgroundColor: '#EFEFEF' } : {}),
 																		}}
 																		autoComplete="off"
 																		autoCorrect="off"
@@ -943,11 +951,14 @@ const DashboardContent = () => {
 																	/>
 																	{/* New 532x64px element - Added border-black and z-20 */}
 																	<div
-																		className={`search-sections-container absolute left-[4px] right-[68px] top-1/2 -translate-y-1/2 h-[64px] rounded-[8px] border z-20 font-secondary flex items-center ${
-																			activeSection
-																				? 'bg-[#EFEFEF] border-transparent'
-																				: 'bg-white border-black'
+																		className={`search-sections-container absolute left-[4px] right-[68px] top-1/2 -translate-y-1/2 ${inboxView ? 'h-[31px]' : 'h-[64px]'} rounded-[8px] z-20 font-secondary flex items-center ${
+																			inboxView
+																				? 'bg-[#EFEFEF] border-0'
+																				: activeSection
+																					? 'bg-[#EFEFEF] border border-transparent'
+																					: 'bg-white border border-black'
 																		}`}
+																		style={{ transition: 'none' }}
 																	>
 																		{/* Why Section */}
 																		<div
@@ -962,10 +973,10 @@ const DashboardContent = () => {
 																			}`}
 																			onClick={() => setActiveSection('why')}
 																		>
-																			<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
-																				Why
+																			<div className={`absolute left-[24px] ${inboxView ? 'top-1/2 -translate-y-1/2 text-[14px]' : 'top-[10px] text-[22px]'} font-bold text-black leading-none`}>
+																				{inboxView ? (whyValue ? whyValue.replace(/[\[\]]/g, '') : 'Why') : 'Why'}
 																			</div>
-																			<div className="absolute left-[24px] right-[4px] top-[42px] h-[12px] overflow-hidden">
+																			<div className={`absolute left-[24px] right-[4px] top-[42px] h-[12px] overflow-hidden ${inboxView ? 'hidden' : ''}`}>
 																				<div
 																					className="absolute top-0 left-0 font-semibold text-[12px] whitespace-nowrap"
 																					style={{
@@ -985,7 +996,7 @@ const DashboardContent = () => {
 																		</div>
 																		<div
 																			className={`w-[2px] h-full bg-black/10 flex-shrink-0 ${
-																				activeSection ? 'hidden' : ''
+																				activeSection || inboxView ? 'hidden' : ''
 																			}`}
 																		/>
 																		{/* What Section */}
@@ -1001,11 +1012,8 @@ const DashboardContent = () => {
 																			}`}
 																			onClick={() => setActiveSection('what')}
 																		>
-																			<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
-																				What
-																			</div>
-																			<div className="absolute left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
-																				{activeSection === 'what' ? (
+																			{inboxView ? (
+																				activeSection === 'what' ? (
 																					<input
 																						ref={whatInputRef}
 																						type="text"
@@ -1017,40 +1025,72 @@ const DashboardContent = () => {
 																								setActiveSection(null);
 																							}
 																						}}
-																						className="absolute top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																						className="absolute left-[24px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
 																						style={{
-																							height: '12px',
-																							lineHeight: '12px',
-																							padding: '0',
-																							margin: '0',
-																							transform: 'translateY(-1px)',
-																							fontFamily:
-																								'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																							fontFamily: 'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
 																						}}
-																						placeholder="Add Recipients"
+																						placeholder="What"
 																						onClick={(e) => e.stopPropagation()}
 																					/>
 																				) : (
-																					<div
-																						className="absolute top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
-																						style={{
-																							height: '12px',
-																							lineHeight: '12px',
-																							padding: '0',
-																							margin: '0',
-																							color: whatValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
-																							maskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
-																							WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
-																						}}
-																					>
-																						{whatValue || 'Add Recipients'}
+																					<div className="absolute left-[24px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
+																						{whatValue || 'What'}
 																					</div>
-																				)}
-																			</div>
+																				)
+																			) : (
+																				<>
+																					<div className="absolute left-[24px] top-[10px] text-[22px] font-bold text-black leading-none">
+																						What
+																					</div>
+																					<div className="absolute left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
+																						{activeSection === 'what' ? (
+																							<input
+																								ref={whatInputRef}
+																								type="text"
+																								value={whatValue}
+																								onChange={(e) => setWhatValue(e.target.value)}
+																								onKeyDown={(e) => {
+																									if (e.key === 'Enter') {
+																										e.preventDefault();
+																										setActiveSection(null);
+																									}
+																								}}
+																								className="absolute top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																								style={{
+																									height: '12px',
+																									lineHeight: '12px',
+																									padding: '0',
+																									margin: '0',
+																									transform: 'translateY(-1px)',
+																									fontFamily:
+																										'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																								}}
+																								placeholder="Add Recipients"
+																								onClick={(e) => e.stopPropagation()}
+																							/>
+																						) : (
+																							<div
+																								className="absolute top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
+																								style={{
+																									height: '12px',
+																									lineHeight: '12px',
+																									padding: '0',
+																									margin: '0',
+																									color: whatValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
+																									maskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
+																									WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
+																								}}
+																							>
+																								{whatValue || 'Add Recipients'}
+																							</div>
+																						)}
+																					</div>
+																				</>
+																			)}
 																		</div>
 																		<div
 																			className={`w-[2px] h-full bg-black/10 flex-shrink-0 ${
-																				activeSection ? 'hidden' : ''
+																				activeSection || inboxView ? 'hidden' : ''
 																			}`}
 																		/>
 																		{/* Where Section */}
@@ -1066,62 +1106,89 @@ const DashboardContent = () => {
 																			}`}
 																			onClick={() => setActiveSection('where')}
 																		>
-																			<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
-																				Where
-																			</div>
-																			<div className="absolute left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
-																				{activeSection === 'where' ? (
-																					<div className="absolute top-0 left-0 w-full h-full flex items-center gap-[2px]">
-																						<input
-																							ref={whereInputRef}
-																							type="text"
-																							value={whereValue}
-																							onChange={(e) =>
-																								setWhereValue(e.target.value)
+																			{inboxView ? (
+																				activeSection === 'where' ? (
+																					<input
+																						ref={whereInputRef}
+																						type="text"
+																						value={whereValue}
+																						onChange={(e) => setWhereValue(e.target.value)}
+																						onKeyDown={(e) => {
+																							if (e.key === 'Enter') {
+																								e.preventDefault();
+																								setActiveSection(null);
 																							}
-																							onKeyDown={(e) => {
-																								if (e.key === 'Enter') {
-																									e.preventDefault();
-																									setActiveSection(null);
-																								}
-																							}}
-																							className="flex-1 font-semibold text-black text-[12px] bg-transparent outline-none border-none"
-																							style={{
-																								height: '12px',
-																								lineHeight: '12px',
-																								padding: '0',
-																								margin: '0',
-																								transform: 'translateY(-1px)',
-																								fontFamily:
-																									'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																							}}
-																							placeholder="Search States"
-																							onClick={(e) => e.stopPropagation()}
-																						/>
-																					</div>
-																				) : (
-																					<div
-																						className="absolute top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
-																						style={{
-																							height: '12px',
-																							lineHeight: '12px',
-																							padding: '0',
-																							margin: '0',
-																							color: hasWhereValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
-																							maskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
-																							WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
 																						}}
-																					>
-																						{hasWhereValue ? whereValue : 'Search States'}
+																						className="absolute left-[24px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
+																						style={{
+																							fontFamily: 'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																						}}
+																						placeholder="Where"
+																						onClick={(e) => e.stopPropagation()}
+																					/>
+																				) : (
+																					<div className="absolute left-[24px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
+																						{whereValue || 'Where'}
 																					</div>
-																				)}
-																			</div>
+																				)
+																			) : (
+																				<>
+																					<div className="absolute left-[24px] top-[10px] text-[22px] font-bold text-black leading-none">
+																						Where
+																					</div>
+																					<div className="absolute left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
+																						{activeSection === 'where' ? (
+																							<div className="absolute top-0 left-0 w-full h-full flex items-center gap-[2px]">
+																								<input
+																									ref={whereInputRef}
+																									type="text"
+																									value={whereValue}
+																									onChange={(e) => setWhereValue(e.target.value)}
+																									onKeyDown={(e) => {
+																										if (e.key === 'Enter') {
+																											e.preventDefault();
+																											setActiveSection(null);
+																										}
+																									}}
+																									className="flex-1 font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																									style={{
+																										height: '12px',
+																										lineHeight: '12px',
+																										padding: '0',
+																										margin: '0',
+																										transform: 'translateY(-1px)',
+																										fontFamily:
+																											'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																									}}
+																									placeholder="Search States"
+																									onClick={(e) => e.stopPropagation()}
+																								/>
+																							</div>
+																						) : (
+																							<div
+																								className="absolute top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
+																								style={{
+																									height: '12px',
+																									lineHeight: '12px',
+																									padding: '0',
+																									margin: '0',
+																									color: hasWhereValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
+																									maskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
+																									WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
+																								}}
+																							>
+																								{hasWhereValue ? whereValue : 'Search States'}
+																							</div>
+																						)}
+																					</div>
+																				</>
+																			)}
 																		</div>
 																	</div>
 																	{/* Desktop Search Button */}
 																	<button
 																		type="submit"
-																		className="flex absolute right-[6px] items-center justify-center w-[58px] h-[62px] transition-colors z-40 cursor-pointer group"
+																		className={`flex absolute right-[6px] items-center justify-center w-[58px] ${inboxView ? 'h-[31px]' : 'h-[62px]'} z-40 cursor-pointer group`}
 																		style={{
 																			top: '50%',
 																			transform: 'translateY(-50%)',
@@ -1132,6 +1199,7 @@ const DashboardContent = () => {
 																			borderBottomLeftRadius: '0',
 																			border: '1px solid #5DAB68',
 																			borderLeft: '1px solid #5DAB68',
+																			transition: 'none',
 																		}}
 																		onMouseEnter={(e) => {
 																			e.currentTarget.style.backgroundColor =
@@ -1142,7 +1210,7 @@ const DashboardContent = () => {
 																				'rgba(93, 171, 104, 0.49)';
 																		}}
 																	>
-																		<SearchIconDesktop />
+																		<SearchIconDesktop width={inboxView ? 25 : 26} height={inboxView ? 25 : 28} />
 																	</button>
 																	{/* Mobile-only submit icon inside input */}
 																	<button
@@ -1295,8 +1363,8 @@ const DashboardContent = () => {
 						)}
 						*/}
 
-						{/* Box 92px below searchbar - only show when on search tab */}
-						{activeTab === 'search' && (
+						{/* Search tab: Toggle below searchbar */}
+						{activeTab === 'search' && !hasSearched && (
 							<div className="flex justify-center" style={{ marginTop: '92px' }}>
 								<div
 									className="flex items-center"
@@ -1322,12 +1390,11 @@ const DashboardContent = () => {
 											style={{
 												width: '85px',
 												height: '17px',
-												borderWidth: activeTab === 'search' ? '2px' : '0',
+												borderWidth: '2px',
 												borderStyle: 'solid',
 												borderColor: '#000000',
 												borderRadius: '10px',
-												backgroundColor:
-													activeTab === 'search' ? '#DAE6FE' : 'transparent',
+												backgroundColor: '#DAE6FE',
 											}}
 										>
 											Search
@@ -1359,15 +1426,14 @@ const DashboardContent = () => {
 								</div>
 							</div>
 						)}
-						{/* Inbox view - show campaigns inbox view and toggle right after logo */}
-						{activeTab === 'inbox' && (
+						{/* Inbox tab: Table first, then toggle below */}
+						{activeTab === 'inbox' && !hasSearched && (
 							<>
-								<CampaignsInboxView />
-								{/* Toggle below inbox */}
-								<div
-									className="flex justify-center"
-									style={{ marginTop: '16px', marginBottom: '20px' }}
-								>
+								<div style={{ marginTop: '20px' }}>
+									<CampaignsInboxView />
+								</div>
+								{/* Toggle below table */}
+								<div className="flex justify-center" style={{ marginTop: '34px' }}>
 									<div
 										className="flex items-center"
 										style={{
