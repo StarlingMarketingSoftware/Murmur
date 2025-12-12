@@ -54,6 +54,8 @@ export interface DraftedEmailsProps {
 	statusFilter: 'all' | 'approved' | 'rejected';
 	/** Callback to change status filter */
 	onStatusFilterChange: (filter: 'all' | 'approved' | 'rejected') => void;
+	/** Optional: hide the send button at the bottom of the table */
+	hideSendButton?: boolean;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {

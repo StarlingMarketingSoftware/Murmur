@@ -110,6 +110,12 @@ interface InboxSectionProps {
 	 * Used to temporarily display the research panel for the hovered contact.
 	 */
 	onContactHover?: (contact: ContactWithName | null) => void;
+
+	/**
+	 * When true, renders the inbox in a narrower layout (516px wide).
+	 * Used when viewport width is <= 1520px.
+	 */
+	isNarrow?: boolean;
 }
 
 /**
@@ -196,7 +202,14 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	onGoToContacts,
 	onContactSelect,
 	onContactHover,
+	isNarrow = false,
 }) => {
+	// Width constants based on narrow mode
+	const boxWidth = isNarrow ? 516 : 907;
+	const emailRowWidth = isNarrow ? 488 : 879;
+	const searchBarWidth = isNarrow ? 334 : 725;
+	const expandedEmailWidth = isNarrow ? 489 : 880;
+	const emailBodyWidth = isNarrow ? 461 : 828;
 	const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>('inbox');
 	const {
 		data: inboundEmails,
@@ -372,11 +385,11 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	if (isLoading) {
 		return (
-			<div className="w-full max-w-[907px] mx-auto px-4">
+			<div className="w-full mx-auto px-4" style={{ maxWidth: `${boxWidth}px` }}>
 				<div
 					className="flex items-center justify-center"
 					style={{
-						width: '907px',
+						width: `${boxWidth}px`,
 						height: '657px',
 						border: '3px solid #000000',
 						borderRadius: '8px',
@@ -390,11 +403,11 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	if (error) {
 		return (
-			<div className="w-full max-w-[907px] mx-auto px-4">
+			<div className="w-full mx-auto px-4" style={{ maxWidth: `${boxWidth}px` }}>
 				<div
 					className="flex items-center justify-center"
 					style={{
-						width: '907px',
+						width: `${boxWidth}px`,
 						height: '657px',
 						border: '3px solid #000000',
 						borderRadius: '8px',
@@ -415,11 +428,11 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	if (!visibleEmails || visibleEmails.length === 0) {
 		return (
-			<div className="w-full max-w-[907px] mx-auto px-4">
+			<div className="w-full mx-auto px-4" style={{ maxWidth: `${boxWidth}px` }}>
 				<div
 					className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative"
 					style={{
-						width: '907px',
+						width: `${boxWidth}px`,
 						height: '657px',
 						border: '3px solid #000000',
 						borderRadius: '8px',
@@ -507,7 +520,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							position: 'absolute',
 							top: '55px',
 							left: '14px',
-							width: '725px',
+							width: `${searchBarWidth}px`,
 							height: '48px',
 							border: '3px solid #000000',
 							borderRadius: '8px',
@@ -548,7 +561,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						style={{
 							position: 'absolute',
 							top: '55.5px', // Centered with search bar: 55px + (48px/2) - (47px/2) = 55.5px
-							right: '14px', // Right-aligned with emails (emails are 879px wide starting at 14px, so end at 893px; container is 907px, so 907-893=14px from right)
+							right: '14px', // Right-aligned with emails
 							width: '148px',
 							height: '47px',
 							border: '3px solid #000000',
@@ -637,7 +650,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							key={`inbox-placeholder-${idx}`}
 							className="select-none mb-2"
 							style={{
-								width: '879px',
+								width: `${emailRowWidth}px`,
 								height: idx >= 1 && idx <= 4 ? '52px' : '78px',
 								border: '3px solid #000000',
 								borderRadius: '8px',
@@ -757,7 +770,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	}
 
 	return (
-		<div className="w-full max-w-[907px] mx-auto px-4">
+		<div className="w-full mx-auto px-4" style={{ maxWidth: `${boxWidth}px` }}>
 			<CustomScrollbar
 				className="flex flex-col items-center relative"
 				contentClassName="flex flex-col items-center"
@@ -767,7 +780,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 				offsetRight={-6}
 				disableOverflowClass
 				style={{
-					width: '907px',
+					width: `${boxWidth}px`,
 					height: '657px',
 					border: '3px solid #000000',
 					borderRadius: '8px',
@@ -886,7 +899,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							position: 'absolute',
 							top: '55px',
 							left: '14px',
-							width: '725px',
+							width: `${searchBarWidth}px`,
 							height: '48px',
 							border: '3px solid #000000',
 							borderRadius: '8px',
@@ -925,7 +938,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						style={{
 							position: 'absolute',
 							top: '55.5px', // Centered with search bar: 55px + (48px/2) - (47px/2) = 55.5px
-							right: '14px', // Right-aligned with emails (emails are 879px wide starting at 14px, so end at 893px; container is 907px, so 907-893=14px from right)
+							right: '14px', // Right-aligned with emails
 							width: '148px',
 							height: '47px',
 							border: '3px solid #000000',
@@ -1014,7 +1027,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					<div
 						className="w-full h-full flex flex-col"
 						style={{
-							width: '880px',
+							width: `${expandedEmailWidth}px`,
 							border: '3px solid #000000',
 							borderRadius: '8px',
 							backgroundColor: '#5DA0EB',
@@ -1125,10 +1138,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							className="flex-1 overflow-y-auto flex flex-col"
 							style={{ paddingBottom: '18px' }}
 						>
-							{/* Email Body Box - 828x326px, 19px below header */}
+							{/* Email Body Box - 828x326px (or 461px when narrow), 19px below header */}
 							<div
 								style={{
-									width: '828px',
+									width: `${emailBodyWidth}px`,
 									height: '326px',
 									marginTop: '19px',
 									marginLeft: activeTab === 'sent' ? 'auto' : 0,
@@ -1198,7 +1211,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								<div
 									key={index}
 									style={{
-										width: '828px',
+										width: `${emailBodyWidth}px`,
 										height: '326px',
 										marginTop: '19px',
 										marginRight: 0,
@@ -1251,9 +1264,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								<div className="w-full flex justify-center" style={{ marginTop: '49px' }}>
 									<div
 										style={{
-											width: '828px',
-											minWidth: '828px',
-											maxWidth: '828px',
+											width: `${emailBodyWidth}px`,
+											minWidth: `${emailBodyWidth}px`,
+											maxWidth: `${emailBodyWidth}px`,
 											border: '3px solid #000000',
 											borderRadius: '8px',
 											backgroundColor: '#FFFFFF',
@@ -1298,7 +1311,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								key={email.id}
 								className="bg-white hover:bg-gray-50 cursor-pointer px-4 flex items-center mb-2"
 								style={{
-									width: '879px',
+									width: `${emailRowWidth}px`,
 									height: '78px',
 									minHeight: '78px',
 									border: '3px solid #000000',
@@ -1403,7 +1416,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								key={`inbox-placeholder-${idx}`}
 								className="select-none mb-2"
 								style={{
-									width: '879px',
+									width: `${emailRowWidth}px`,
 									height: '78px',
 									minHeight: '78px',
 									border: '3px solid #000000',

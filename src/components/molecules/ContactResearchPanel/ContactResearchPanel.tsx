@@ -438,7 +438,7 @@ top: isExpanded ? '28px' : '50%',
 									border: '1px solid #000000',
 									borderRadius: '6px',
 								}}
-							>
+							>	
 								<div className={cn(
 									"w-full h-full pl-2 pr-6 flex overflow-hidden",
 									isExpanded ? "items-start pt-2" : "items-center"
@@ -764,3 +764,232 @@ top: isExpanded ? '28px' : '50%',
 };
 
 export default ContactResearchPanel;
+
+/**
+ * Horizontal, table-width version of the research panel.
+ *
+ * Intended for medium desktop widths where the right-side `ContactResearchPanel`
+ * would be off-screen. Renders a 2x3 grid:
+ * - Top-left: contact info summary box
+ * - Remaining 5 cells: research bullets [1]-[5] in the order:
+ *   [3]  [1]
+ *   [4]  [2]
+ *   [5]  (empty if missing)
+ *
+ * The layout is responsive but is designed around ~831px width and 224px height.
+ */
+export const ContactResearchHorizontalStrip: FC<
+	Pick<ContactResearchPanelProps, 'contact' | 'className' | 'style'>
+> = ({ contact, className, style }) => {
+	const metadataSections = useMemo(
+		() => parseMetadataSections(contact?.metadata),
+		[contact?.metadata]
+	);
+
+	const sectionKeys = Object.keys(metadataSections);
+	const hasParsedSections = sectionKeys.length >= 3;
+	const hasUnparsedMetadata = !hasParsedSections && !!contact?.metadata;
+
+	// Only show if we have parsed sections OR unparsed metadata
+	if (!contact || (!hasParsedSections && !hasUnparsedMetadata)) {
+		return null;
+	}
+
+	// Colors match the vertical panel for visual consistency
+	const boxColorMap: Record<string, string> = {
+		'1': '#158BCF',
+		'2': '#43AEEC',
+		'3': '#7CC9F6',
+		'4': '#AADAF6',
+		'5': '#D7F0FF',
+	};
+
+	// Order for numbered bullets to roughly match the design mock
+	const orderedKeys: (keyof typeof boxColorMap)[] = ['3', '1', '4', '2', '5'];
+
+	const renderBulletCell = (key: keyof typeof boxColorMap) => {
+		const text = metadataSections[key];
+		const hasText = !!text;
+
+		// If this key isn't present, render a placeholder box with just fill color and stroke
+		return (
+			<div key={key} className="min-h-[82px] lg:min-h-[52px]">
+				<div
+					className="w-full h-[82px] lg:h-[52px] rounded-[8px] border-2 border-black flex items-stretch"
+					style={{
+						backgroundColor: boxColorMap[key],
+					}}
+				>
+					{hasText && (
+						<>
+							<div className="flex items-center justify-center px-2">
+								<span className="font-inter font-bold text-[11.5px] leading-none text-black">
+									[{key}]
+								</span>
+							</div>
+							<div className="flex-1 mr-[6px] my-[4px] bg-white border border-black rounded-[6px] px-[6px] py-[4px] flex items-center min-w-0">
+								<div
+									className="text-[13px] leading-[1.25] font-inter text-black horizontal-research-bullet-text"
+									style={{
+										display: '-webkit-box',
+										WebkitBoxOrient: 'vertical',
+										overflow: 'hidden',
+									}}
+								>
+									{text}
+								</div>
+							</div>
+						</>
+					)}
+				</div>
+			</div>
+		);
+	};
+
+	const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+	const displayName = fullName || contact.name || contact.company || 'Unknown';
+	const hasName = fullName.length > 0 || (contact.name && contact.name.length > 0);
+
+	const stateAbbr = getStateAbbreviation(contact.state || '') || '';
+
+	// Contact info box component (reused in both layouts)
+	const contactInfoBox = (
+		<div className="w-full h-[82px] lg:h-[52px] rounded-[8px] border-2 border-black bg-white px-3 py-[6px] flex items-center justify-between gap-3">
+			<div className="flex flex-col justify-center min-w-0">
+				<div className="font-inter font-bold text-[14px] leading-tight truncate text-black">
+					{displayName}
+				</div>
+				{hasName && contact.company && (
+					<div className="text-[11px] leading-tight text-[#4b4b4b] truncate">
+						{contact.company}
+					</div>
+				)}
+				{!hasName && contact.title && (
+					<div className="text-[11px] leading-tight text-[#4b4b4b] truncate">
+						{contact.title}
+					</div>
+				)}
+			</div>
+		<div className="flex flex-col items-start gap-[2px] flex-shrink-0">
+			<div className="flex items-center gap-1">
+				{stateAbbr && stateBadgeColorMap[stateAbbr] && (
+						<span
+							className="inline-flex items-center justify-center h-[16px] px-[6px] rounded-[4px] border border-black text-[11px] font-bold leading-none"
+							style={{ backgroundColor: stateBadgeColorMap[stateAbbr] }}
+						>
+							{stateAbbr}
+						</span>
+					)}
+					{contact.city && (
+						<span className="text-[11px] leading-none text-black truncate max-w-[120px]">
+							{contact.city}
+						</span>
+					)}
+				</div>
+				{contact.title && (
+					<div className="max-w-[160px] px-2 py-[2px] rounded-[8px] bg-[#E8EFFF] border border-black">
+						<span className="text-[10px] leading-none text-black block truncate">
+							{contact.title}
+						</span>
+					</div>
+				)}
+			</div>
+		</div>
+	);
+
+	return (
+		<div
+			className={cn(
+				// Hidden on very small screens and on wide screens where the side panel is visible.
+				'hidden sm:block xl:hidden relative z-[50] mx-auto -mt-[55px] lg:mt-0 mb-8 lg:mb-4 bg-[#D8E5FB] border-[3px] border-black rounded-[7px]',
+				'max-w-[596px] lg:max-w-[831px] min-h-[305px] lg:min-h-[224px]',
+				className
+			)}
+			style={style}
+		>
+			{/* CSS for responsive line clamp on bullet text */}
+			<style>{`
+				.horizontal-research-bullet-text {
+					-webkit-line-clamp: 4;
+				}
+				@media (min-width: 1024px) {
+					.horizontal-research-bullet-text {
+						-webkit-line-clamp: 2;
+					}
+				}
+			`}</style>
+			<div className="px-3 pt-[6px] pb-3">
+				<div className="mb-2">
+					<span className="font-secondary font-bold text-[13px] leading-none text-black">
+						Research
+					</span>
+				</div>
+
+				{hasParsedSections ? (
+					/* Normal parsed sections layout: 2-column grid */
+					<div className="grid grid-cols-2 gap-x-[12px] gap-y-[8px] auto-rows-[82px] lg:auto-rows-[52px]">
+						{/* Top-left: contact summary info box */}
+						<div className="min-h-[82px] lg:min-h-[52px]">
+							{contactInfoBox}
+						</div>
+
+						{/* Remaining cells: research bullets laid out in a 2x3 grid */}
+						{orderedKeys.map((key) => renderBulletCell(key))}
+					</div>
+				) : (
+					/* Unparsed metadata layout: contact info on left, full text on right spanning 3 rows */
+					<div className="grid grid-cols-2 gap-x-[12px]">
+						{/* Left column: contact info box */}
+						<div className="row-span-3 flex flex-col gap-y-[8px]">
+							<div className="h-[82px] lg:h-[52px]">
+								{contactInfoBox}
+							</div>
+							{/* Two placeholder boxes below contact info */}
+							<div
+								className="w-full h-[82px] lg:h-[52px] rounded-[8px] border-2 border-black"
+								style={{ backgroundColor: '#C6D9F8' }}
+							/>
+							<div
+								className="w-full h-[82px] lg:h-[52px] rounded-[8px] border-2 border-black"
+								style={{ backgroundColor: '#C6D9F8' }}
+							/>
+						</div>
+
+						{/* Right column: single tall text block spanning all 3 rows */}
+						<div id="horizontal-research-text-block" className="row-span-3">
+							<style>{`
+								#horizontal-research-text-block *::-webkit-scrollbar {
+									display: none !important;
+									width: 0 !important;
+									height: 0 !important;
+									background: transparent !important;
+								}
+								#horizontal-research-text-block * {
+									-ms-overflow-style: none !important;
+									scrollbar-width: none !important;
+								}
+							`}</style>
+							<div
+								className="w-full h-[calc(82px*3+8px*2)] lg:h-[calc(52px*3+8px*2)] rounded-[8px] border-2 border-black flex items-stretch"
+								style={{
+									backgroundColor: boxColorMap['1'],
+								}}
+							>
+								<div className="flex-1 m-[6px] bg-white border border-black rounded-[6px] px-[8px] py-[6px] overflow-hidden">
+									<div
+										className="text-[13px] leading-[1.35] font-inter text-black h-full overflow-y-auto"
+										style={{
+											wordBreak: 'break-word',
+										}}
+									>
+										{contact.metadata}
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				)}
+			</div>
+		</div>
+	);
+};

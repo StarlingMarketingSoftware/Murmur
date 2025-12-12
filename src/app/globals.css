@@ -180,6 +180,11 @@
 
 	--tw-scrollbar-track: #f3f4f6; /* gray-100 */
 	--tw-scrollbar-thumb: #d1d5db; /* gray-300 */
+
+	/* Dashboard desktop layout constants */
+	--dashboard-results-table-top: 305px;
+	--dashboard-mini-search-top: 129px;
+	--dashboard-helper-text-height: 16px;
 }
 
 .dark {
@@ -3284,6 +3289,137 @@ body {
 	max-width: 100%;
 }
 
+/* Desktop: position dashboard search results elements at fixed offsets
+   from the very top of the page when viewing dashboard search results
+   in table view (non-map). */
+@media (min-width: 1024px) {
+	/* Position the mini search bar a fixed distance from the very top
+	   of the page when viewing dashboard search results. */
+	.dashboard-main-offset.search-active .results-search-bar-wrapper {
+		position: fixed;
+		top: var(--dashboard-mini-search-top);
+		left: 0;
+		right: 0;
+		margin-left: auto;
+		margin-right: auto;
+		z-index: 65;
+	}
+
+	/* Position the helper text so its bottom edge sits 38px above
+	   the search results table. */
+	.dashboard-main-offset.search-active .results-helper-text {
+		position: fixed;
+		top: calc(
+			var(--dashboard-results-table-top) - 38px - var(--dashboard-helper-text-height)
+		);
+		left: 0;
+		right: 0;
+		margin-left: auto;
+		margin-right: auto;
+		z-index: 64;
+	}
+
+	.dashboard-main-offset.search-active .search-results-table {
+		position: fixed;
+		top: var(--dashboard-results-table-top);
+		left: 0;
+		right: 0;
+		margin-left: auto;
+		margin-right: auto;
+		z-index: 60;
+	}
+
+	.dashboard-main-offset.search-active .search-results-map-toggle {
+		position: fixed;
+		top: calc(var(--dashboard-results-table-top) - 26px); /* table top minus button height & gap */
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 61;
+		pointer-events: auto;
+	}
+
+	.dashboard-main-offset.search-active .search-results-cta-wrapper {
+		position: fixed;
+		/* table top + table height (571px) + gap below table */
+		top: calc(var(--dashboard-results-table-top) + 571px + 20px);
+		left: 0;
+		right: 0;
+		margin-left: auto;
+		margin-right: auto;
+		z-index: 60;
+		pointer-events: auto;
+	}
+
+	.dashboard-main-offset.search-active .search-results-research-panel {
+		position: fixed;
+		top: var(--dashboard-results-table-top);
+		z-index: 62;
+	}
+}
+
+/* Narrow desktop (non-mobile): keep the search results console vertically
+   anchored even when the browser width drops below the 1024px breakpoint.
+   This preserves the ~305px offset from the very top of the page for the
+   table view, matching the full desktop behavior on resized laptop windows. */
+@media (max-width: 1023px) {
+	body:not(.murmur-mobile) .dashboard-main-offset.search-active .results-search-bar-wrapper {
+		position: fixed;
+		top: var(--dashboard-mini-search-top);
+		left: 0;
+		right: 0;
+		margin-left: auto;
+		margin-right: auto;
+		z-index: 65;
+	}
+
+	body:not(.murmur-mobile) .dashboard-main-offset.search-active .results-helper-text {
+		position: fixed;
+		top: calc(
+			var(--dashboard-results-table-top) - 38px - var(--dashboard-helper-text-height)
+		);
+		left: 0;
+		right: 0;
+		margin-left: auto;
+		margin-right: auto;
+		z-index: 64;
+	}
+
+	body:not(.murmur-mobile) .dashboard-main-offset.search-active .search-results-table {
+		position: fixed;
+		top: var(--dashboard-results-table-top);
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 60;
+	}
+
+	body:not(.murmur-mobile) .dashboard-main-offset.search-active .search-results-map-toggle {
+		position: fixed;
+		top: calc(var(--dashboard-results-table-top) - 26px); /* table top minus button height & gap */
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 61;
+		pointer-events: auto;
+	}
+
+	body:not(.murmur-mobile) .dashboard-main-offset.search-active .search-results-cta-wrapper {
+		position: fixed;
+		/* table top + table height (571px) + gap below table */
+		top: calc(var(--dashboard-results-table-top) + 571px + 20px);
+		left: 0;
+		right: 0;
+		margin-left: auto;
+		margin-right: auto;
+		z-index: 60;
+		pointer-events: auto;
+	}
+
+	body:not(.murmur-mobile) .dashboard-main-offset.search-active .search-results-research-panel {
+		position: fixed;
+		top: var(--dashboard-results-table-top);
+		z-index: 62;
+	}
+}
+
 .results-align {
 	width: 100%;
 	max-width: 100%;
@@ -4524,8 +4660,8 @@ body.murmur-mobile .search-bar-wrapper .flex-wrap > .h-\[39px\] {
 	}
 }
 
-/* Desktop: constrain hero search input to 603x72 with 8px radius */
-@media (min-width: 1024px) {
+/* Tablet & desktop: constrain hero search input to 603x72 with 8px radius */
+@media (min-width: 768px) {
 	.search-bar-wrapper:not(.search-bar-active) .search-input-group {
 		width: 603px !important;
 		max-width: 603px !important;
@@ -4581,19 +4717,7 @@ body.murmur-mobile .search-input-icon-btn {
 	cursor: pointer;
 }
 
-/* Width-based fallback so it appears in responsive mode too */
-@media (max-width: 640px) {
-	.search-input-icon-btn {
-		display: inline-flex;
-		position: absolute;
-		right: 12px;
-		top: 50%;
-		transform: translateY(-50%);
-		width: 22px;
-		height: 22px;
-		z-index: 4;
-	}
-}
+/* Width-based fallback removed - desktop search icon is now always shown */
 
 .black-scrollbar-thumb::-webkit-scrollbar-thumb {
 	background-color: black;
@@ -5179,6 +5303,110 @@ body.murmur-mobile .search-input-icon-btn {
 			left: -4px;
 			transform: translateY(-8.5px) translateZ(0); /* exact pixel position */
 		}
+	}
+}
+
+/* ============================================
+   NARROW DESKTOP BREAKPOINT (<=960px)
+   Proportionally scaling table for desktop
+   Scales from 960px viewport down to 630px
+   ============================================ */
+
+/* Base narrow desktop styles - apply at 960px and below */
+@media (max-width: 960px) {
+	/* Table width scales proportionally: 
+	   At 960px viewport -> ~750px table
+	   At 630px viewport -> 460px table
+	   Using clamp for smooth scaling */
+	.narrow-desktop-table {
+		/* Scale proportionally with viewport */
+		width: clamp(460px, calc(100vw - 210px), 750px) !important;
+		max-width: clamp(460px, calc(100vw - 210px), 750px) !important;
+	}
+
+	/* Metric boxes scale proportionally */
+	.narrow-desktop-table .metric-box {
+		/* Height scales: 20px at 960px -> 18px at 630px */
+		height: clamp(18px, calc(15px + 0.5vw), 20px) !important;
+		min-height: clamp(18px, calc(15px + 0.5vw), 20px) !important;
+		/* Width scales: 80px at 960px -> 40px at 630px */
+		width: clamp(40px, calc(-8px + 9vw), 80px) !important;
+		min-width: clamp(40px, calc(-8px + 9vw), 80px) !important;
+		/* Font scales: 13px at 960px -> 11px at 630px */
+		font-size: clamp(11px, calc(9px + 0.3vw), 13px) !important;
+		padding: 0 4px !important;
+	}
+
+	/* Adjust metrics grid gap proportionally */
+	.narrow-desktop-table .metrics-grid-container {
+		/* Gap scales: 12px at 960px -> 6px at 630px */
+		gap: clamp(6px, calc(0px + 1vw), 12px) !important;
+	}
+
+	.narrow-desktop-table .metrics-header-grid {
+		gap: clamp(6px, calc(0px + 1vw), 12px) !important;
+	}
+
+	/* Hide metric separators in narrow desktop */
+	.narrow-desktop-table .metric-separator {
+		display: none !important;
+	}
+
+	/* Campaign name font scales */
+	.narrow-desktop-table .campaign-name-text {
+		font-size: clamp(14px, calc(11px + 0.5vw), 17px) !important;
+	}
+
+	/* Header labels scale */
+	.narrow-desktop-table .metrics-header-label {
+		font-size: clamp(10px, calc(7px + 0.5vw), 13px) !important;
+	}
+
+	/* Column sizing - flexible */
+	.narrow-desktop-table thead th:first-child,
+	.narrow-desktop-table tbody td:first-child {
+		width: 40% !important;
+		min-width: 0 !important;
+	}
+
+	.narrow-desktop-table thead th:nth-child(2),
+	.narrow-desktop-table tbody td:nth-child(2) {
+		width: auto !important;
+		flex: 1 !important;
+	}
+
+	/* Row height adjustments */
+	.narrow-desktop-table tbody tr {
+		min-height: 36px !important;
+	}
+}
+
+/* At the smallest end (630px and below), lock to minimum sizes */
+@media (max-width: 630px) {
+	.narrow-desktop-table {
+		width: 460px !important;
+		max-width: 460px !important;
+	}
+
+	.narrow-desktop-table .metric-box {
+		height: 18px !important;
+		min-height: 18px !important;
+		width: 40px !important;
+		min-width: 40px !important;
+		font-size: 11px !important;
+	}
+
+	.narrow-desktop-table .metrics-grid-container,
+	.narrow-desktop-table .metrics-header-grid {
+		gap: 6px !important;
+	}
+
+	.narrow-desktop-table .campaign-name-text {
+		font-size: 14px !important;
+	}
+
+	.narrow-desktop-table .metrics-header-label {
+		font-size: 10px !important;
 	}
 }
 

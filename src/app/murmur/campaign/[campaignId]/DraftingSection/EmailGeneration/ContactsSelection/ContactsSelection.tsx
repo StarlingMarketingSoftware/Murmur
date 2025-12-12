@@ -757,6 +757,8 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		goToSearch,
 		goToDrafts,
 		goToInbox,
+		hideBottomPanels,
+		hideButton,
 	} = props;
 	const [isDrafting, setIsDrafting] = useState(false);
 	const router = useRouter();
@@ -1250,7 +1252,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 			</DraftingTable>
 
 			{/* Draft Emails Button - below the table box */}
-			{!isDrafting && (
+			{!isDrafting && !hideButton && (
 				<div className="relative w-[475px] h-[40px] mt-4 mx-auto">
 					{selectedCount > 0 ? (
 						<>
@@ -1297,31 +1299,33 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 			)}
 
 			{/* Bottom Panels: Drafts, Sent, and Inbox */}
-			<div className="mt-[35px] flex justify-center gap-[15px]">
-				<DraftsExpandedList
-					drafts={drafts || []}
-					contacts={props.allContacts || props.contacts}
-					width={233}
-					height={117}
-					whiteSectionHeight={15}
-					hideSendButton={true}
-				/>
-				<SentExpandedList
-					sent={sentEmails || []}
-					contacts={props.allContacts || props.contacts}
-					width={233}
-					height={117}
-					whiteSectionHeight={15}
-				/>
-				<InboxExpandedList
-					contacts={props.allContacts || props.contacts}
-					allowedSenderEmails={allowedSenderEmails}
-					contactByEmail={contactByEmail}
-					width={233}
-					height={117}
-					whiteSectionHeight={15}
-				/>
-			</div>
+			{!hideBottomPanels && (
+				<div className="mt-[35px] flex justify-center gap-[15px]">
+					<DraftsExpandedList
+						drafts={drafts || []}
+						contacts={props.allContacts || props.contacts}
+						width={233}
+						height={117}
+						whiteSectionHeight={15}
+						hideSendButton={true}
+					/>
+					<SentExpandedList
+						sent={sentEmails || []}
+						contacts={props.allContacts || props.contacts}
+						width={233}
+						height={117}
+						whiteSectionHeight={15}
+					/>
+					<InboxExpandedList
+						contacts={props.allContacts || props.contacts}
+						allowedSenderEmails={allowedSenderEmails}
+						contactByEmail={contactByEmail}
+						width={233}
+						height={117}
+						whiteSectionHeight={15}
+					/>
+				</div>
+			)}
 		</div>
 	);
 };

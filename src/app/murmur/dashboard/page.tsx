@@ -39,7 +39,10 @@ import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
-import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
+import {
+	ContactResearchPanel,
+	ContactResearchHorizontalStrip,
+} from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
 
 const DEFAULT_STATE_SUGGESTIONS = [
@@ -84,6 +87,22 @@ const DashboardContent = () => {
 	}, [searchParams]);
 	const [userLocationName, setUserLocationName] = useState<string | null>(null);
 	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+
+	// Narrowest desktop detection (< 952px) - single column layout for map view
+	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
+
+	// Detect narrow desktop breakpoint
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+
+		const handleResize = () => {
+			setIsNarrowestDesktop(window.innerWidth < 952);
+		};
+
+		handleResize();
+		window.addEventListener('resize', handleResize);
+		return () => window.removeEventListener('resize', handleResize);
+	}, []);
 
 	const debouncedWhereValue = useDebounce(whereValue, 300);
 	const { data: locationResults, isLoading: isLoadingLocations } = useGetLocations(
@@ -642,6 +661,11 @@ const DashboardContent = () => {
 		usedContactIdsSet,
 	} = useDashboard();
 
+	// When a contact is hovered on non‑mobile in table view, we switch
+	// from the mini search bar to the horizontal research strip.
+	const showHorizontalResearchStrip =
+		isMobile === false && !!hoveredContact && !isMapView;
+
 	// Clear hover state on mobile to prevent stuck hover
 	useEffect(() => {
 		if (isMobile) {
@@ -905,8 +929,8 @@ const DashboardContent = () => {
 																			: ''
 																	}`}
 																>
-																	<Input
-																		className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent md:!h-[72px] md:pr-[80px]"
+																<Input
+																		className="search-wave-input !border-2 !border-black !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !h-[72px] pr-[70px] md:pr-[80px]"
 																		placeholder=""
 																		style={{
 																			accentColor: 'transparent',
@@ -919,28 +943,18 @@ const DashboardContent = () => {
 																	/>
 																	{/* New 532x64px element - Added border-black and z-20 */}
 																	<div
-																		className={`search-sections-container hidden md:block absolute left-[4px] top-1/2 -translate-y-1/2 w-[532px] h-[64px] rounded-[8px] border z-20 font-secondary ${
+																		className={`search-sections-container absolute left-[4px] right-[68px] top-1/2 -translate-y-1/2 h-[64px] rounded-[8px] border z-20 font-secondary flex items-center ${
 																			activeSection
 																				? 'bg-[#EFEFEF] border-transparent'
 																				: 'bg-white border-black'
 																		}`}
 																	>
-																		<div
-																			className={`absolute left-[172px] top-0 bottom-0 w-[2px] bg-black/10 ${
-																				activeSection ? 'hidden' : ''
-																			}`}
-																		/>
-																		<div
-																			className={`absolute left-[332px] top-0 bottom-0 w-[2px] bg-black/10 ${
-																				activeSection ? 'hidden' : ''
-																			}`}
-																		/>
 																		{/* Why Section */}
 																		<div
-																			className={`absolute left-0 top-[-1px] h-[64px] cursor-pointer border ${
+																			className={`relative h-full cursor-pointer border flex-1 min-w-0 ${
 																				activeSection === 'why'
-																					? 'w-[174px] bg-white border-black z-30 rounded-[8px]'
-																					: `w-[172px] border-transparent ${
+																					? 'bg-white border-black z-30 rounded-[8px]'
+																					: `border-transparent ${
 																							activeSection
 																								? 'hover:bg-[#F9F9F9]'
 																								: 'hover:bg-black/5'
@@ -951,7 +965,7 @@ const DashboardContent = () => {
 																			<div className="absolute left-[24px] top-[10px] font-bold text-black text-[22px] leading-none">
 																				Why
 																			</div>
-																			<div className="absolute left-[24px] top-[42px] w-[144px] h-[12px]">
+																			<div className="absolute left-[24px] right-[4px] top-[42px] h-[12px] overflow-hidden">
 																				<div
 																					className="absolute top-0 left-0 font-semibold text-[12px] whitespace-nowrap"
 																					style={{
@@ -969,12 +983,17 @@ const DashboardContent = () => {
 																				</div>
 																			</div>
 																		</div>
+																		<div
+																			className={`w-[2px] h-full bg-black/10 flex-shrink-0 ${
+																				activeSection ? 'hidden' : ''
+																			}`}
+																		/>
 																		{/* What Section */}
 																		<div
-																			className={`absolute left-[172px] top-[-1px] h-[64px] cursor-pointer border overflow-hidden ${
+																			className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
 																				activeSection === 'what'
-																					? 'w-[161px] bg-white border-black z-30 rounded-[8px]'
-																					: `w-[160px] border-transparent ${
+																					? 'bg-white border-black z-30 rounded-[8px]'
+																					: `border-transparent ${
 																							activeSection
 																								? 'hover:bg-[#F9F9F9]'
 																								: 'hover:bg-black/5'
@@ -1029,12 +1048,17 @@ const DashboardContent = () => {
 																				)}
 																			</div>
 																		</div>
+																		<div
+																			className={`w-[2px] h-full bg-black/10 flex-shrink-0 ${
+																				activeSection ? 'hidden' : ''
+																			}`}
+																		/>
 																		{/* Where Section */}
 																		<div
-																			className={`absolute left-[332px] top-[-1px] h-[64px] cursor-pointer border overflow-hidden ${
+																			className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
 																				activeSection === 'where'
-																					? 'w-[201px] bg-white border-black z-30 rounded-[8px]'
-																					: `w-[200px] border-transparent ${
+																					? 'bg-white border-black z-30 rounded-[8px]'
+																					: `border-transparent ${
 																							activeSection
 																								? 'hover:bg-[#F9F9F9]'
 																								: 'hover:bg-black/5'
@@ -1097,7 +1121,7 @@ const DashboardContent = () => {
 																	{/* Desktop Search Button */}
 																	<button
 																		type="submit"
-																		className="hidden md:flex absolute right-[6px] items-center justify-center w-[58px] h-[62px] transition-colors z-40 cursor-pointer group"
+																		className="flex absolute right-[6px] items-center justify-center w-[58px] h-[62px] transition-colors z-40 cursor-pointer group"
 																		style={{
 																			top: '50%',
 																			transform: 'translateY(-50%)',
@@ -1123,7 +1147,7 @@ const DashboardContent = () => {
 																	{/* Mobile-only submit icon inside input */}
 																	<button
 																		type="submit"
-																		className="search-input-icon-btn"
+																		className="search-input-icon-btn hidden"
 																		aria-label="Search"
 																	>
 																		<SearchIconMobile />
@@ -1452,7 +1476,33 @@ const DashboardContent = () => {
 					!isLoadingContacts &&
 					!isRefetchingContacts &&
 					activeTab === 'search' && (
-						<div className="results-search-bar-wrapper w-full max-w-[650px] mx-auto px-4 relative">
+						<div
+					className={`results-search-bar-wrapper w-full max-w-[650px] mx-auto px-4 ${
+							// When the horizontal research strip is active (sm–lg desktop),
+							// hide the mini search bar + helper text so the strip owns this area.
+							showHorizontalResearchStrip ? 'sm:hidden xl:block' : ''
+						} ${isMapView ? '' : 'relative'}`}
+							style={
+								isMapView
+									? {
+											position: 'fixed',
+											top: '36px',
+											left: '50%',
+											transform: 'translateX(-50%)',
+											zIndex: 110,
+											backgroundColor: '#AFD6EF',
+											height: '84px',
+											display: 'flex',
+											alignItems: 'center',
+											justifyContent: 'center',
+											width: '100%',
+											maxWidth: '100%',
+											borderBottom: '1px solid black',
+											padding: '0 16px',
+									  }
+									: undefined
+							}
+						>
 							<div
 								className={`results-search-bar-inner ${
 									hoveredContact && !isMapView ? 'invisible' : ''
@@ -1666,13 +1716,12 @@ const DashboardContent = () => {
 										{/* Generate action removed; awaiting left-side SVG submit icon */}
 									</form>
 									{!isMapView && (
-										<div className="w-full flex flex-col items-center gap-2 mt-2">
+										<div className="w-full flex flex-col items-center gap-2 mt-2 results-helper-text">
 											<span
 												className="font-secondary text-center"
 												style={{ fontSize: '13px', fontWeight: 400, color: '#7f7f7f' }}
 											>
-												Select who you want to contact, or upload your own contacts via
-												TSV.
+												Select who you want to contact
 											</span>
 											{/* Hidden: Import button
 											<div className="flex justify-center">
@@ -1688,7 +1737,7 @@ const DashboardContent = () => {
 								</Form>
 							</div>
 							{hoveredContact && !isMobile && !isMapView && (
-								<div className="absolute inset-0 z-[90] flex items-start justify-center pointer-events-none bg-white">
+								<div className="absolute inset-0 z-[90] pointer-events-none bg-white hidden xl:flex items-start justify-center">
 									<div className="w-full max-w-[1132px] mx-auto px-4 py-3 text-center">
 										<div className="font-secondary font-bold text-[19px] leading-tight truncate">
 											{`${hoveredContact.firstName || ''} ${
@@ -1895,52 +1944,53 @@ const DashboardContent = () => {
 																zIndex: 98,
 															}}
 														/>
-														{/* Map container */}
-														<div
-															style={{
-																position: 'fixed',
-																top: '120px',
-																left: '9px',
-																right: '9px',
-																bottom: '9px',
-																zIndex: 99,
-															}}
-														>
-															<div className="w-full h-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden relative">
-																<SearchResultsMap
-																	contacts={contacts || []}
-																	selectedContacts={selectedContacts}
-																	onToggleSelection={(contactId) => {
-																		if (selectedContacts.includes(contactId)) {
-																			setSelectedContacts(
-																				selectedContacts.filter((id) => id !== contactId)
-																			);
-																		} else {
-																			setSelectedContacts([
-																				...selectedContacts,
-																				contactId,
-																			]);
+													{/* Map container */}
+													<div
+														style={{
+															position: 'fixed',
+															top: '120px',
+															left: '9px',
+															right: '9px',
+															bottom: '9px',
+															zIndex: 99,
+														}}
+													>
+														<div className="w-full h-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden relative">
+															<SearchResultsMap
+																contacts={contacts || []}
+																selectedContacts={selectedContacts}
+																onToggleSelection={(contactId) => {
+																	if (selectedContacts.includes(contactId)) {
+																		setSelectedContacts(
+																			selectedContacts.filter((id) => id !== contactId)
+																		);
+																	} else {
+																		setSelectedContacts([
+																			...selectedContacts,
+																			contactId,
+																		]);
+																	}
+																	// Scroll to the contact in the side panel
+																	setTimeout(() => {
+																		const contactElement = document.querySelector(
+																			`[data-contact-id="${contactId}"]`
+																		);
+																		if (contactElement) {
+																			contactElement.scrollIntoView({
+																				behavior: 'smooth',
+																				block: 'center',
+																			});
 																		}
-																		// Scroll to the contact in the side panel
-																		setTimeout(() => {
-																			const contactElement = document.querySelector(
-																				`[data-contact-id="${contactId}"]`
-																			);
-																			if (contactElement) {
-																				contactElement.scrollIntoView({
-																					behavior: 'smooth',
-																					block: 'center',
-																				});
-																			}
-																		}, 50);
-																	}}
-																/>
-																{/* Search Results overlay box on the right side - hidden while loading */}
-																{!(
-																	isSearchPending ||
-																	isLoadingContacts ||
-																	isRefetchingContacts
-																) && (
+																	}, 50);
+																}}
+															/>
+															{/* Search Results overlay box on the right side - hidden while loading and at narrowest breakpoint */}
+															{!(
+																isSearchPending ||
+																isLoadingContacts ||
+																isRefetchingContacts
+															) &&
+																!isNarrowestDesktop && (
 																	<div
 																		className="absolute top-[10px] right-[10px] rounded-[12px] shadow-lg flex flex-col"
 																		style={{
@@ -1957,7 +2007,7 @@ const DashboardContent = () => {
 																			{/* Map label button in top-left of panel header */}
 																			<button
 																				type="button"
-																				onClick={handleCloseMapView}
+																				onClick={() => setIsMapView(false)}
 																				className="absolute left-[10px] top-[7px] flex items-center justify-center cursor-pointer"
 																				style={{
 																					width: '53px',
@@ -2543,13 +2593,14 @@ const DashboardContent = () => {
 																		);
 																	})()}
 																{/* Create Campaign button overlaid on map - only show when not loading */}
+																{/* Hidden below xl (1280px) to prevent overlap with right panel */}
 																{!isMobile &&
 																	!(
 																		isSearchPending ||
 																		isLoadingContacts ||
 																		isRefetchingContacts
 																	) && (
-																		<div className="absolute bottom-[10px] left-[10px] right-[10px] flex justify-center">
+																		<div className="absolute bottom-[10px] left-[10px] right-[10px] hidden xl:flex justify-center">
 																			<Button
 																				isLoading={
 																					isPendingCreateCampaign ||
@@ -2593,8 +2644,260 @@ const DashboardContent = () => {
 																			</Button>
 																		</div>
 																	)}
-															</div>
+															{/* Single column search results panel overlay at bottom - narrowest breakpoint (< 952px) */}
+															{isNarrowestDesktop &&
+																!(
+																	isSearchPending ||
+																	isLoadingContacts ||
+																	isRefetchingContacts
+																) && (
+																	<div
+																		className="absolute left-[10px] right-[10px] bottom-[10px] rounded-[12px] shadow-lg flex flex-col"
+																		style={{
+																			height: '45%',
+																			maxHeight: 'calc(100% - 20px)',
+																			backgroundColor: '#AFD6EF',
+																			border: '3px solid #143883',
+																			overflow: 'hidden',
+																		}}
+																	>
+																		{/* Header area */}
+																		<div className="w-full h-[42px] flex-shrink-0 bg-[#AFD6EF] flex items-center justify-center px-4 relative">
+																	{/* Map label button in top-left of panel header */}
+																	<button
+																		type="button"
+																		onClick={() => setIsMapView(false)}
+																		className="absolute left-[10px] top-[7px] flex items-center justify-center cursor-pointer"
+																		style={{
+																			width: '53px',
+																			height: '19px',
+																			backgroundColor: '#CDEFC3',
+																			borderRadius: '4px',
+																			border: '2px solid #000000',
+																			fontFamily:
+																				'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																			fontSize: '13px',
+																			fontWeight: 600,
+																			lineHeight: '1',
+																		}}
+																	>
+																		Map
+																	</button>
+																	<span className="font-inter text-[13px] font-medium text-black">
+																		{selectedContacts.length} selected
+																	</span>
+																	<button
+																		type="button"
+																		onClick={handleSelectAll}
+																		className="font-secondary text-[12px] font-medium text-black hover:underline absolute right-[10px] top-1/2 -translate-y-1/2"
+																	>
+																		{isAllSelected ? 'Deselect All' : 'Select all'}
+																	</button>
+																</div>
+																<CustomScrollbar
+																	className="flex-1 min-h-0"
+																	contentClassName="p-[6px] pb-[14px] space-y-[7px]"
+																	thumbWidth={2}
+																	thumbColor="#000000"
+																	trackColor="transparent"
+																	offsetRight={-6}
+																	disableOverflowClass
+																>
+																	{(contacts || []).map((contact) => {
+																		const isSelected = selectedContacts.includes(
+																			contact.id
+																		);
+																		const isUsed = usedContactIdsSet.has(contact.id);
+																		const firstName = contact.firstName || '';
+																		const lastName = contact.lastName || '';
+																		const fullName =
+																			contact.name ||
+																			`${firstName} ${lastName}`.trim();
+																		const company = contact.company || '';
+																		const headline =
+																			contact.headline || contact.title || '';
+																		const stateAbbr =
+																			getStateAbbreviation(contact.state || '') || '';
+																		const city = contact.city || '';
+
+																		return (
+																			<div
+																				key={contact.id}
+																				data-contact-id={contact.id}
+																				className="cursor-pointer transition-colors flex w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none relative"
+																				style={{
+																					backgroundColor: isSelected
+																						? '#C9EAFF'
+																						: '#FFFFFF',
+																				}}
+																				onClick={() => {
+																					if (isSelected) {
+																						setSelectedContacts(
+																							selectedContacts.filter(
+																								(id) => id !== contact.id
+																							)
+																						);
+																					} else {
+																						setSelectedContacts([
+																							...selectedContacts,
+																							contact.id,
+																						]);
+																					}
+																				}}
+																				onMouseEnter={() =>
+																					setHoveredContact(contact)
+																				}
+																				onMouseLeave={() => setHoveredContact(null)}
+																			>
+																				{/* Left side - Name/Company and Location */}
+																				<div className="flex-1 min-w-0 flex flex-col justify-center pl-3 pr-2">
+																					{fullName ? (
+																						<>
+																							<div className="flex items-center">
+																								{isUsed && (
+																									<span
+																										className="inline-block shrink-0 mr-2"
+																										title="Used in a previous campaign"
+																										style={{
+																											width: '16px',
+																											height: '16px',
+																											borderRadius: '50%',
+																											border: '1px solid #000000',
+																											backgroundColor: '#DAE6FE',
+																										}}
+																									/>
+																								)}
+																								<div className="font-bold text-[11px] truncate leading-tight">
+																									{fullName}
+																								</div>
+																							</div>
+																							<div className="flex items-center mt-[2px]">
+																								{isUsed && (
+																									<span
+																										className="inline-block shrink-0 mr-2"
+																										style={{
+																											width: '16px',
+																											height: '16px',
+																										}}
+																									/>
+																								)}
+																								<div className="text-[11px] text-black truncate leading-tight">
+																									{company}
+																								</div>
+																							</div>
+																						</>
+																					) : (
+																						<div className="flex items-center">
+																							{isUsed && (
+																								<span
+																									className="inline-block shrink-0 mr-2"
+																									title="Used in a previous campaign"
+																									style={{
+																										width: '16px',
+																										height: '16px',
+																										borderRadius: '50%',
+																										border: '1px solid #000000',
+																										backgroundColor: '#DAE6FE',
+																									}}
+																								/>
+																							)}
+																							<div className="font-bold text-[11px] truncate leading-tight">
+																								{company || '—'}
+																							</div>
+																						</div>
+																					)}
+																				</div>
+																				{/* Right side - Title (fixed 230px width) */}
+																				<div className="flex-shrink-0 flex flex-col justify-center pr-2" style={{ width: '240px' }}>
+																					{headline ? (
+																						<div
+																							className="overflow-hidden flex items-center px-2"
+																							style={{
+																								width: '230px',
+																								height: '19px',
+																								backgroundColor: '#E8EFFF',
+																								border: '0.7px solid #000000',
+																								borderRadius: '8px',
+																							}}
+																						>
+																							<span className="text-[14px] text-black leading-none truncate">
+																								{headline}
+																							</span>
+																						</div>
+																					) : null}
+																					{(city || stateAbbr) && (
+																						<div className="flex items-center gap-1 mt-[4px]">
+																							{stateAbbr && (
+																								<span
+																									className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																									style={{
+																										backgroundColor:
+																											stateBadgeColorMap[
+																												stateAbbr
+																											] || 'transparent',
+																										borderColor: '#000000',
+																									}}
+																								>
+																									{stateAbbr}
+																								</span>
+																							)}
+																							{city && (
+																								<span className="text-[10px] text-black leading-none truncate">
+																									{city}
+																								</span>
+																							)}
+																						</div>
+																					)}
+																				</div>
+																			</div>
+																		);
+																	})}
+																</CustomScrollbar>
+																<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
+																	<Button
+																		isLoading={
+																			isPendingCreateCampaign ||
+																			isPendingBatchUpdateContacts
+																		}
+																		variant="primary-light"
+																		bold
+																		className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
+																			selectedContacts.length === 0
+																				? 'opacity-[0.62]'
+																				: 'opacity-100'
+																		}`}
+																		style={
+																			selectedContacts.length === 0
+																				? { height: '39px', filter: 'grayscale(100%)' }
+																				: { height: '39px' }
+																		}
+																		onClick={() => {
+																			if (selectedContacts.length === 0) return;
+																			handleCreateCampaign();
+																		}}
+																	>
+																		<span className="relative z-20">Create Campaign</span>
+																		<div
+																			className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+																			onClick={(e) => {
+																				e.stopPropagation();
+																				handleSelectAll();
+																			}}
+																		>
+																			<span className="text-black text-[14px] font-medium">
+																				All
+																			</span>
+																		</div>
+																		<span
+																			aria-hidden="true"
+																			className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+																		/>
+																		</Button>
+																	</div>
+																</div>
+															)}
 														</div>
+													</div>
 													</>,
 													document.body
 												)}
@@ -2603,7 +2906,7 @@ const DashboardContent = () => {
 										<>
 											{/* Table View (default) */}
 											{/* Map button positioned above table on the right */}
-											<div className="w-full md:w-[1004px] mx-auto flex justify-end mb-[4px] relative z-[80]">
+											<div className="w-full max-w-[1004px] mx-auto flex justify-end mb-[4px] relative z-[80] search-results-map-toggle">
 												<button
 													type="button"
 													onClick={() => setIsMapView(true)}
@@ -2613,6 +2916,10 @@ const DashboardContent = () => {
 													Map
 												</button>
 											</div>
+											{/* Horizontal research strip for medium-width desktops (when side panel is hidden) */}
+											{showHorizontalResearchStrip && (
+												<ContactResearchHorizontalStrip contact={hoveredContact} />
+											)}
 											<Card className="border-0 shadow-none !p-0 w-full !my-0">
 												<CardContent className="!p-0 w-full">
 													<CustomTable
@@ -2692,14 +2999,14 @@ const DashboardContent = () => {
 											</Card>
 											{/* Desktop button (non-sticky) */}
 											{!isMobile && (
-												<div className="flex items-center justify-center w-full">
+												<div className="flex items-center justify-center w-full search-results-cta-wrapper">
 													<Button
 														isLoading={
 															isPendingCreateCampaign || isPendingBatchUpdateContacts
 														}
 														variant="primary-light"
 														bold
-														className="relative w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
+														className="relative w-full max-w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
 														onClick={() => {
 															if (selectedContacts.length === 0) return;
 															handleCreateCampaign();
@@ -2751,7 +3058,7 @@ const DashboardContent = () => {
 								{/* Right-side box */}
 								{!isMobile && hoveredContact && (
 									<div
-										className="hidden xl:block absolute top-0"
+										className="hidden xl:block search-results-research-panel"
 										style={{
 											left: 'calc(50% + 502px + 33px)',
 										}}
