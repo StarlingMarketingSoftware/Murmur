@@ -14,6 +14,10 @@ import { useState, useEffect } from 'react';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import nextDynamic from 'next/dynamic';
+import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
+import { useGetContacts } from '@/hooks/queryHooks/useContacts';
+import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { EmailStatus } from '@/constants/prismaEnums';
 
 // Dynamically import heavy components to reduce initial bundle size and prevent Vercel timeout
 const DraftingSection = nextDynamic(
@@ -73,6 +77,76 @@ const Murmur = () => {
 		'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'
 	>(getInitialView());
 
+	// Narrow desktop detection for Writing tab compact layout (952px - 1279px)
+	const [isNarrowDesktop, setIsNarrowDesktop] = useState(false);
+	// Narrowest desktop detection (< 952px) - header box above tabs
+	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
+	// Hide right panel when arrows would overlap with it (below 1522px)
+	const [hideRightPanel, setHideRightPanel] = useState(false);
+	// Hide right panel on search tab at wider breakpoint (below 1796px)
+	const [hideRightPanelOnSearch, setHideRightPanelOnSearch] = useState(false);
+	// Hide right panel on all tab at breakpoint (below 1665px)
+	const [hideRightPanelOnAll, setHideRightPanelOnAll] = useState(false);
+	// Hide right panel on inbox tab at breakpoint (below 1681px)
+	const [hideRightPanelOnInbox, setHideRightPanelOnInbox] = useState(false);
+	// Hide arrows when they would overlap with content boxes (below 1317px)
+	const [hideArrowsAtBreakpoint, setHideArrowsAtBreakpoint] = useState(false);
+	// Hide arrows on search tab at wider breakpoint (below 1557px)
+	const [hideArrowsOnSearch, setHideArrowsOnSearch] = useState(false);
+	// Hide arrows on all tab at breakpoint (at or below 1396px)
+	const [hideArrowsOnAll, setHideArrowsOnAll] = useState(false);
+	// Hide arrows on inbox tab at breakpoint (below 1476px)
+	const [hideArrowsOnInbox, setHideArrowsOnInbox] = useState(false);
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		const checkBreakpoints = () => {
+			const width = window.innerWidth;
+			setIsNarrowDesktop(width >= 952 && width < 1280);
+			setIsNarrowestDesktop(width < 952);
+			setHideRightPanel(width < 1522);
+			setHideRightPanelOnSearch(width < 1796);
+			setHideRightPanelOnAll(width <= 1665);
+			setHideRightPanelOnInbox(width < 1681);
+			setHideArrowsAtBreakpoint(width < 1317);
+			setHideArrowsOnSearch(width < 1557);
+			setHideArrowsOnAll(width <= 1396);
+			setHideArrowsOnInbox(width < 1476);
+		};
+		checkBreakpoints();
+		window.addEventListener('resize', checkBreakpoints);
+		return () => window.removeEventListener('resize', checkBreakpoints);
+	}, []);
+
+	// Fetch header data for narrowest desktop layout
+	const contactListIds = campaign?.userContactLists?.map((l) => l.id) || [];
+	const { data: headerContacts } = useGetContacts({
+		filters: { contactListIds },
+		enabled: contactListIds.length > 0 && isNarrowestDesktop && !isMobile,
+	});
+	const { data: headerEmails } = useGetEmails({
+		filters: { campaignId: campaign?.id },
+		enabled: !!campaign?.id && isNarrowestDesktop && !isMobile,
+	});
+
+	// Compute header metrics
+	const headerContactsCount = headerContacts?.length || 0;
+	const headerDraftCount = (headerEmails || []).filter((e) => e.status === EmailStatus.draft).length;
+	const headerSentCount = (headerEmails || []).filter((e) => e.status === EmailStatus.sent).length;
+	const headerToListNames = campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
+	const headerFromName = campaign?.identity?.name || '';
+
+	// Hide fixed arrows when in narrow desktop + testing view (arrows show next to draft button instead)
+	// or when width < 1317px to prevent overlap with content boxes
+	// or when on search tab and width < 1557px
+	// or when on all tab and width <= 1396px
+	// or when on inbox tab and width < 1476px
+	const hideFixedArrows =
+		(activeView === 'testing' && isNarrowDesktop) ||
+		hideArrowsAtBreakpoint ||
+		(activeView === 'search' && hideArrowsOnSearch) ||
+		(activeView === 'all' && hideArrowsOnAll) ||
+		(activeView === 'inbox' && hideArrowsOnInbox);
+
 	// Tab navigation order
 	const tabOrder: Array<'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'> = [
 		'search',
@@ -117,33 +191,37 @@ const Murmur = () => {
 	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
 	return (
 		<div className="min-h-screen">
-			{/* Left navigation arrow - fixed position */}
-			<button
-				type="button"
-				onClick={goToPreviousTab}
-				className="fixed z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
-				style={{
-					left: '33px',
-					top: '467px',
-				}}
-				aria-label="Previous tab"
-			>
-				<LeftArrow />
-			</button>
+			{/* Left navigation arrow - fixed position (hidden in narrow desktop + testing) */}
+			{!hideFixedArrows && (
+				<button
+					type="button"
+					onClick={goToPreviousTab}
+					className="fixed z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
+					style={{
+						left: '33px',
+						top: '467px',
+					}}
+					aria-label="Previous tab"
+				>
+					<LeftArrow />
+				</button>
+			)}
 
-			{/* Right navigation arrow - fixed position */}
-			<button
-				type="button"
-				onClick={goToNextTab}
-				className="fixed z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
-				style={{
-					right: '33px',
-					top: '467px',
-				}}
-				aria-label="Next tab"
-			>
-				<RightArrow />
-			</button>
+			{/* Right navigation arrow - fixed position (hidden in narrow desktop + testing) */}
+			{!hideFixedArrows && (
+				<button
+					type="button"
+					onClick={goToNextTab}
+					className="fixed z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
+					style={{
+						right: '33px',
+						top: '467px',
+					}}
+					aria-label="Next tab"
+				>
+					<RightArrow />
+				</button>
+			)}
 
 			{/* Minimal header - just Back to Home link */}
 			<div data-slot="campaign-header">
@@ -221,8 +299,28 @@ const Murmur = () => {
 						}
 					/>
 
+					{/* Campaign Header Box - shown above tabs at narrowest breakpoint (< 952px) */}
+					{!isMobile && isNarrowestDesktop && campaign && (
+						<div className="flex justify-center mb-4">
+							<CampaignHeaderBox
+								campaignId={campaign.id}
+								campaignName={campaign.name || 'Untitled Campaign'}
+								toListNames={headerToListNames}
+								fromName={headerFromName}
+								contactsCount={headerContactsCount}
+								draftCount={headerDraftCount}
+								sentCount={headerSentCount}
+								onFromClick={() => {
+									setIdentityDialogOrigin('campaign');
+									setIsIdentityDialogOpen(true);
+								}}
+								fullWidth
+							/>
+						</div>
+					)}
+
 					{/* View tabs - text-only Inter font (hidden in mobile landscape via local styles) */}
-					<div className="mt-2 flex justify-center mobile-landscape-hide">
+					<div className={cn("mt-2 flex justify-center mobile-landscape-hide", isNarrowestDesktop && !isMobile && "mt-0")}>
 						<div className="w-full max-w-[1250px] px-6">
 							<div className="flex gap-12 justify-center">
 								<button
@@ -328,6 +426,9 @@ const Murmur = () => {
 								setIdentityDialogOrigin('campaign');
 								setIsIdentityDialogOpen(true);
 							}}
+							goToPreviousTab={goToPreviousTab}
+							goToNextTab={goToNextTab}
+							hideHeaderBox={isNarrowestDesktop && !isMobile}
 						/>
 					</div>
 					{/* using this to hide the default boxes in the drafting tab so we can add in a UI specific to mobile
@@ -734,8 +835,10 @@ const Murmur = () => {
 				</div>
 			</div>
 
-			{/* Right side panel */}
-			{!isMobile && <CampaignRightPanel view={activeView} onTabChange={setActiveView} />}
+			{/* Right side panel - hidden on mobile, when width < 1522px, on search tab when width < 1796px, on all tab when width <= 1665px, or on inbox tab when width < 1681px */}
+			{!isMobile && !hideRightPanel && !(activeView === 'search' && hideRightPanelOnSearch) && !(activeView === 'all' && hideRightPanelOnAll) && !(activeView === 'inbox' && hideRightPanelOnInbox) && (
+				<CampaignRightPanel view={activeView} onTabChange={setActiveView} />
+			)}
 		</div>
 	);
 };

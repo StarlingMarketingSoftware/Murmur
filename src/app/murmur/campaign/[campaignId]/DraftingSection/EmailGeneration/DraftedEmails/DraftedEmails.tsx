@@ -1310,7 +1310,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					</div>
 				)}
 			</DraftingTable>
-			{draftEmails.length > 0 && (
+			{draftEmails.length > 0 && !props.hideSendButton && (
 				<div className="w-[499px] flex flex-col gap-2">
 					{/* Inline confirmation details */}
 					<div className={cn('w-full', !showConfirm && 'hidden')}>

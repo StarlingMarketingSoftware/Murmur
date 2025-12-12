@@ -20,6 +20,8 @@ export const CampaignsTable: FC = () => {
 	const shouldShowMobileFeatures = isMobile === true;
 	// Detect landscape to decide whether to embed delete buttons back into rows
 	const [isLandscape, setIsLandscape] = useState<boolean>(false);
+	// Detect narrow desktop viewport (<=630px) for compact mode on desktop
+	const [isNarrowDesktop, setIsNarrowDesktop] = useState<boolean>(false);
 
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
@@ -41,8 +43,22 @@ export const CampaignsTable: FC = () => {
 		};
 	}, []);
 
+	// Detect narrow desktop viewport (<=960px) for compact metrics on desktop
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		const checkNarrowDesktop = () => {
+			setIsNarrowDesktop(window.innerWidth <= 960);
+		};
+		checkNarrowDesktop();
+		window.addEventListener('resize', checkNarrowDesktop);
+		return () => window.removeEventListener('resize', checkNarrowDesktop);
+	}, []);
+
 	// Only use the external delete overlay in portrait; in landscape place delete inside each row
 	const shouldUseExternalDeleteColumn = shouldShowMobileFeatures && !isLandscape;
+
+	// Use compact metrics on mobile OR on narrow desktop (<=630px)
+	const shouldUseCompactMetrics = shouldShowMobileFeatures || (!isMobile && isNarrowDesktop);
 
 	const {
 		data,
@@ -51,7 +67,7 @@ export const CampaignsTable: FC = () => {
 		handleRowClick,
 		handleDeleteClick,
 		confirmingCampaignId,
-	} = useCampaignsTable({ compactMetrics: shouldShowMobileFeatures });
+	} = useCampaignsTable({ compactMetrics: shouldUseCompactMetrics });
 
 	// No orientation gating; we rely on device detection so landscape uses mobile layout too
 
@@ -302,7 +318,9 @@ export const CampaignsTable: FC = () => {
 							// Desktop mode: normal table with delete column
 							<CustomTable
 								variant="secondary"
-								containerClassName="border-none rounded-[8px] my-campaigns-table !bg-[#EDEDED] !w-[891px] !mx-auto !p-0"
+								containerClassName={`border-none rounded-[8px] my-campaigns-table !bg-[#EDEDED] !mx-auto !p-0 ${
+									isNarrowDesktop ? 'narrow-desktop-table' : '!w-[891px]'
+								}`}
 								headerClassName="[&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[4px] [&_th:last-child]:rounded-tr-[4px]"
 								rowClassName="!bg-[#EDEDED] !border-0"
 								handleRowClick={handleRowClick}
