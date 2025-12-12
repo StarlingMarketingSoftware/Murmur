@@ -813,9 +813,9 @@ export const ContactResearchHorizontalStrip: FC<
 
 		// If this key isn't present, render a placeholder box with just fill color and stroke
 		return (
-			<div key={key} className="min-h-[52px]">
+			<div key={key} className="min-h-[82px] lg:min-h-[52px]">
 				<div
-					className="w-full h-[52px] rounded-[8px] border-2 border-black flex items-stretch"
+					className="w-full h-[82px] lg:h-[52px] rounded-[8px] border-2 border-black flex items-stretch"
 					style={{
 						backgroundColor: boxColorMap[key],
 					}}
@@ -829,10 +829,9 @@ export const ContactResearchHorizontalStrip: FC<
 							</div>
 							<div className="flex-1 mr-[6px] my-[4px] bg-white border border-black rounded-[6px] px-[6px] py-[4px] flex items-center min-w-0">
 								<div
-									className="text-[13px] leading-[1.25] font-inter text-black"
+									className="text-[13px] leading-[1.25] font-inter text-black horizontal-research-bullet-text"
 									style={{
 										display: '-webkit-box',
-										WebkitLineClamp: 2,
 										WebkitBoxOrient: 'vertical',
 										overflow: 'hidden',
 									}}
@@ -855,7 +854,7 @@ export const ContactResearchHorizontalStrip: FC<
 
 	// Contact info box component (reused in both layouts)
 	const contactInfoBox = (
-		<div className="w-full h-[52px] rounded-[8px] border-2 border-black bg-white px-3 py-[6px] flex items-center justify-between gap-3">
+		<div className="w-full h-[82px] lg:h-[52px] rounded-[8px] border-2 border-black bg-white px-3 py-[6px] flex items-center justify-between gap-3">
 			<div className="flex flex-col justify-center min-w-0">
 				<div className="font-inter font-bold text-[14px] leading-tight truncate text-black">
 					{displayName}
@@ -871,9 +870,9 @@ export const ContactResearchHorizontalStrip: FC<
 					</div>
 				)}
 			</div>
-			<div className="flex flex-col items-end gap-[2px] flex-shrink-0">
-				<div className="flex items-center gap-1">
-					{stateAbbr && stateBadgeColorMap[stateAbbr] && (
+		<div className="flex flex-col items-start gap-[2px] flex-shrink-0">
+			<div className="flex items-center gap-1">
+				{stateAbbr && stateBadgeColorMap[stateAbbr] && (
 						<span
 							className="inline-flex items-center justify-center h-[16px] px-[6px] rounded-[4px] border border-black text-[11px] font-bold leading-none"
 							style={{ backgroundColor: stateBadgeColorMap[stateAbbr] }}
@@ -902,15 +901,23 @@ export const ContactResearchHorizontalStrip: FC<
 		<div
 			className={cn(
 				// Hidden on very small screens and on wide screens where the side panel is visible.
-				'hidden md:block xl:hidden relative mx-auto mb-4 bg-[#D8E5FB] border-[3px] border-black rounded-[7px]',
+				'hidden sm:block xl:hidden relative z-[50] mx-auto -mt-[55px] lg:mt-0 mb-8 lg:mb-4 bg-[#D8E5FB] border-[3px] border-black rounded-[7px]',
+				'max-w-[596px] lg:max-w-[831px] min-h-[305px] lg:min-h-[224px]',
 				className
 			)}
-			style={{
-				maxWidth: '831px',
-				minHeight: '224px',
-				...style,
-			}}
+			style={style}
 		>
+			{/* CSS for responsive line clamp on bullet text */}
+			<style>{`
+				.horizontal-research-bullet-text {
+					-webkit-line-clamp: 4;
+				}
+				@media (min-width: 1024px) {
+					.horizontal-research-bullet-text {
+						-webkit-line-clamp: 2;
+					}
+				}
+			`}</style>
 			<div className="px-3 pt-[6px] pb-3">
 				<div className="mb-2">
 					<span className="font-secondary font-bold text-[13px] leading-none text-black">
@@ -920,9 +927,9 @@ export const ContactResearchHorizontalStrip: FC<
 
 				{hasParsedSections ? (
 					/* Normal parsed sections layout: 2-column grid */
-					<div className="grid grid-cols-2 gap-x-[12px] gap-y-[8px] auto-rows-[52px]">
+					<div className="grid grid-cols-2 gap-x-[12px] gap-y-[8px] auto-rows-[82px] lg:auto-rows-[52px]">
 						{/* Top-left: contact summary info box */}
-						<div className="min-h-[52px]">
+						<div className="min-h-[82px] lg:min-h-[52px]">
 							{contactInfoBox}
 						</div>
 
@@ -934,19 +941,19 @@ export const ContactResearchHorizontalStrip: FC<
 					<div className="flex gap-x-[12px]">
 						{/* Left column: contact info + placeholder boxes */}
 						<div className="flex-1 flex flex-col gap-y-[8px]">
-							<div className="min-h-[52px]">
+							<div className="min-h-[82px] lg:min-h-[52px]">
 								{contactInfoBox}
 							</div>
 							{/* Two placeholder boxes below contact info */}
-							<div className="min-h-[52px]">
+							<div className="min-h-[82px] lg:min-h-[52px]">
 								<div
-									className="w-full h-[52px] rounded-[8px] border-2 border-black"
+									className="w-full h-[82px] lg:h-[52px] rounded-[8px] border-2 border-black"
 									style={{ backgroundColor: '#C6D9F8' }}
 								/>
 							</div>
-							<div className="min-h-[52px]">
+							<div className="min-h-[82px] lg:min-h-[52px]">
 								<div
-									className="w-full h-[52px] rounded-[8px] border-2 border-black"
+									className="w-full h-[82px] lg:h-[52px] rounded-[8px] border-2 border-black"
 									style={{ backgroundColor: '#C6D9F8' }}
 								/>
 							</div>
@@ -965,13 +972,20 @@ export const ContactResearchHorizontalStrip: FC<
 									-ms-overflow-style: none !important;
 									scrollbar-width: none !important;
 								}
+								/* Responsive height for unparsed text block */
+								#horizontal-research-text-block .unparsed-text-container {
+									height: calc(82px * 3 + 8px * 2);
+								}
+								@media (min-width: 1024px) {
+									#horizontal-research-text-block .unparsed-text-container {
+										height: calc(52px * 3 + 8px * 2);
+									}
+								}
 							`}</style>
 							<div
-								className="w-full rounded-[8px] border-2 border-black flex items-stretch"
+								className="w-full rounded-[8px] border-2 border-black flex items-stretch unparsed-text-container"
 								style={{
 									backgroundColor: boxColorMap['1'],
-									/* 3 rows × 52px + 2 gaps × 8px = 172px */
-									height: 'calc(52px * 3 + 8px * 2)',
 								}}
 							>
 								<div className="flex-1 m-[6px] bg-white border border-black rounded-[6px] px-[8px] py-[6px] overflow-hidden">

@@ -1477,11 +1477,11 @@ const DashboardContent = () => {
 					!isRefetchingContacts &&
 					activeTab === 'search' && (
 						<div
-							className={`results-search-bar-wrapper w-full max-w-[650px] mx-auto px-4 ${
-								// When the horizontal research strip is active (md–lg desktop),
-								// hide the mini search bar + helper text so the strip owns this area.
-								showHorizontalResearchStrip ? 'md:hidden xl:block' : ''
-							} ${isMapView ? '' : 'relative'}`}
+					className={`results-search-bar-wrapper w-full max-w-[650px] mx-auto px-4 ${
+							// When the horizontal research strip is active (sm–lg desktop),
+							// hide the mini search bar + helper text so the strip owns this area.
+							showHorizontalResearchStrip ? 'sm:hidden xl:block' : ''
+						} ${isMapView ? '' : 'relative'}`}
 							style={
 								isMapView
 									? {
