@@ -167,6 +167,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [isSearchTabNarrow, setIsSearchTabNarrow] = useState(false);
 	// All tab narrow detection (<= 1269px) - switches from 4x2 to 2x4 grid
 	const [isAllTabNarrow, setIsAllTabNarrow] = useState(false);
+	// Inbox tab narrow detection (<= 1520px) - reduces inbox box width to 516px
+	const [isInboxTabNarrow, setIsInboxTabNarrow] = useState(false);
+	// Inbox tab stacked layout detection (<= 1279px) - moves research panel below header box on the left
+	const [isInboxTabStacked, setIsInboxTabStacked] = useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		const checkBreakpoints = () => {
@@ -175,6 +179,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			setIsNarrowestDesktop(width < 952);
 			setIsSearchTabNarrow(width < 1414);
 			setIsAllTabNarrow(width <= 1269);
+			setIsInboxTabNarrow(width <= 1520);
+			setIsInboxTabStacked(width <= 1279);
 		};
 		checkBreakpoints();
 		window.addEventListener('resize', checkBreakpoints);
@@ -1464,22 +1470,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							!(view === 'contacts' && isNarrowDesktop) &&
 							!(view === 'drafting' && isNarrowDesktop) &&
 							!(view === 'sent' && isNarrowDesktop) &&
-							!(view === 'search' && isSearchTabNarrow) && (
-								<div
-									className="absolute hidden lg:flex flex-col"
-									style={{
-										right:
-											view === 'search'
-												? isSearchTabNarrow
-													? 'calc(50% + 249px + 37px)' // 37px left of narrow map box (498px / 2 = 249px)
-													: 'calc(50% + 384px + 32px)'
-												: view === 'inbox'
-												? 'calc(50% + 471.5px)'
-												: 'calc(50% + 250px + 32px)',
-										top: view === 'inbox' ? '9px' : '29px',
-										gap: '16px',
-									}}
-								>
+							!(view === 'search' && isSearchTabNarrow) &&
+							!(view === 'inbox' && isInboxTabStacked) && (
+							<div
+								className="absolute hidden lg:flex flex-col"
+								style={{
+									right:
+										view === 'search'
+											? isSearchTabNarrow
+												? 'calc(50% + 249px + 37px)' // 37px left of narrow map box (498px / 2 = 249px)
+												: 'calc(50% + 384px + 32px)'
+											: view === 'inbox'
+											? isInboxTabNarrow
+												? 'calc(50% + 276px)' // 258px (half of 516px narrow inbox) + 18px gap
+												: 'calc(50% + 471.5px)'
+											: 'calc(50% + 250px + 32px)',
+									top: view === 'inbox' ? '9px' : '29px',
+									gap: '16px',
+								}}
+							>
 									<CampaignHeaderBox
 										campaignId={campaign?.id}
 										campaignName={campaign?.name || 'Untitled Campaign'}
@@ -1951,19 +1960,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{!isMobile &&
 							['testing', 'contacts', 'drafting', 'sent', 'search', 'inbox'].includes(view) &&
 							!(view === 'search' && hasCampaignSearched) &&
-							!(view === 'search' && isSearchTabNarrow) && (
-								<div
-									className="absolute hidden xl:block"
-									style={{
-										top: '29px',
-										left:
-											view === 'search'
-												? 'calc(50% + 384px + 32px)'
-												: view === 'inbox'
-												? 'calc(50% + 453.5px + 32px)'
-												: 'calc(50% + 250px + 32px)',
-									}}
-								>
+							!(view === 'search' && isSearchTabNarrow) &&
+							!(view === 'inbox' && isInboxTabStacked) && (
+							<div
+								className="absolute hidden xl:block"
+								style={{
+									top: '29px',
+									left:
+										view === 'search'
+											? 'calc(50% + 384px + 32px)'
+											: view === 'inbox'
+											? isInboxTabNarrow
+												? 'calc(50% + 258px + 32px)' // 258px = half of 516px narrow inbox + 32px gap
+												: 'calc(50% + 453.5px + 32px)'
+											: 'calc(50% + 250px + 32px)',
+								}}
+							>
 									{view === 'testing' && showTestPreview ? (
 										<TestPreviewPanel
 											setShowTestPreview={setShowTestPreview}
@@ -4481,51 +4493,133 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* Inbox tab: reuse the dashboard inbox UI, but scoped and labeled by campaign contacts */}
 						{view === 'inbox' && (
 							<div className="mt-6 flex flex-col items-center">
-								<InboxSection
-									allowedSenderEmails={campaignContactEmails}
-									contactByEmail={campaignContactsByEmail}
-									campaignId={campaign.id}
-									onGoToDrafting={goToDrafting}
-									onGoToWriting={goToWriting}
-									onGoToContacts={goToContacts}
-									onContactSelect={(contact) => {
-										if (contact) {
-											setSelectedContactForResearch(contact);
-										}
-									}}
-									onContactHover={(contact) => {
-										setHoveredContactForResearch(contact);
-									}}
-								/>
+								{isInboxTabStacked ? (
+									// Stacked layout (<= 1279px): Header + Research on left, Inbox on right
+									<div className="flex flex-col items-center mx-auto" style={{ width: '909px' }}>
+										<div className="flex flex-row items-start gap-[18px] w-full">
+											{/* Left column: Campaign Header + Research Panel */}
+											<div className="flex flex-col flex-shrink-0" style={{ gap: '16px', width: '375px' }}>
+												<CampaignHeaderBox
+													campaignId={campaign?.id}
+													campaignName={campaign?.name || 'Untitled Campaign'}
+													toListNames={toListNames}
+													fromName={fromName}
+													contactsCount={contactsCount}
+													draftCount={draftCount}
+													sentCount={sentCount}
+													onFromClick={onOpenIdentityDialog}
+													width={375}
+												/>
+												{/* Research panel below header - full aesthetic matching other tabs */}
+											{/* Height calculated so bottom aligns with inbox: 657px inbox - 71px header - 16px gap = 570px */}
+												<ContactResearchPanel
+													contact={displayedContactForResearch}
+													hideAllText={false}
+													height={570}
+													style={{ display: 'block' }}
+												/>
+											</div>
+											{/* Right column: Inbox */}
+											<div className="flex-shrink-0">
+												<InboxSection
+													allowedSenderEmails={campaignContactEmails}
+													contactByEmail={campaignContactsByEmail}
+													campaignId={campaign.id}
+													onGoToDrafting={goToDrafting}
+													onGoToWriting={goToWriting}
+													onGoToContacts={goToContacts}
+													onContactSelect={(contact) => {
+														if (contact) {
+															setSelectedContactForResearch(contact);
+														}
+													}}
+													onContactHover={(contact) => {
+														setHoveredContactForResearch(contact);
+													}}
+													isNarrow={true}
+												/>
+											</div>
+										</div>
+										{/* Bottom Panels: Contacts, Drafts, and Sent */}
+										<div className="mt-[35px] flex justify-center gap-[15px]">
+											<ContactsExpandedList
+												contacts={contactsAvailableForDrafting}
+												width={232}
+												height={117}
+												whiteSectionHeight={15}
+												showSearchBar={false}
+												onOpenContacts={goToContacts}
+											/>
+											<DraftsExpandedList
+												drafts={draftEmails}
+												contacts={contacts || []}
+												width={233}
+												height={117}
+												whiteSectionHeight={15}
+												hideSendButton={true}
+												onOpenDrafts={goToDrafting}
+											/>
+											<SentExpandedList
+												sent={sentEmails}
+												contacts={contacts || []}
+												width={233}
+												height={117}
+												whiteSectionHeight={15}
+												onOpenSent={goToSent}
+											/>
+										</div>
+									</div>
+								) : (
+									// Normal wide layout
+									<>
+										<InboxSection
+											allowedSenderEmails={campaignContactEmails}
+											contactByEmail={campaignContactsByEmail}
+											campaignId={campaign.id}
+											onGoToDrafting={goToDrafting}
+											onGoToWriting={goToWriting}
+											onGoToContacts={goToContacts}
+											onContactSelect={(contact) => {
+												if (contact) {
+													setSelectedContactForResearch(contact);
+												}
+											}}
+											onContactHover={(contact) => {
+												setHoveredContactForResearch(contact);
+											}}
+											isNarrow={isInboxTabNarrow}
+										/>
 
-								{/* Bottom Panels: Contacts, Drafts, and Sent */}
-								<div className="mt-[35px] flex justify-center gap-[15px]">
-									<ContactsExpandedList
-										contacts={contactsAvailableForDrafting}
-										width={232}
-										height={117}
-										whiteSectionHeight={15}
-										showSearchBar={false}
-										onOpenContacts={goToContacts}
-									/>
-									<DraftsExpandedList
-										drafts={draftEmails}
-										contacts={contacts || []}
-										width={233}
-										height={117}
-										whiteSectionHeight={15}
-										hideSendButton={true}
-											onOpenDrafts={goToDrafting}
-									/>
-									<SentExpandedList
-										sent={sentEmails}
-										contacts={contacts || []}
-										width={233}
-										height={117}
-										whiteSectionHeight={15}
-										onOpenSent={goToSent}
-									/>
-								</div>
+										{/* Bottom Panels: Contacts, Drafts, and Sent */}
+										<div className="mt-[35px] flex justify-center gap-[15px]">
+											<ContactsExpandedList
+												contacts={contactsAvailableForDrafting}
+												width={232}
+												height={117}
+												whiteSectionHeight={15}
+												showSearchBar={false}
+												onOpenContacts={goToContacts}
+											/>
+											<DraftsExpandedList
+												drafts={draftEmails}
+												contacts={contacts || []}
+												width={233}
+												height={117}
+												whiteSectionHeight={15}
+												hideSendButton={true}
+												onOpenDrafts={goToDrafting}
+											/>
+											<SentExpandedList
+												sent={sentEmails}
+												contacts={contacts || []}
+												width={233}
+												height={117}
+												whiteSectionHeight={15}
+												onOpenSent={goToSent}
+											/>
+										</div>
+									</>
+								)}
 							</div>
 						)}
 
