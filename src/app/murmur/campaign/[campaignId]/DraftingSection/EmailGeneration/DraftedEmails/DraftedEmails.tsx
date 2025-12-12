@@ -426,18 +426,42 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							flexDirection: 'column', 
 							justifyContent: 'center',
 							height: '100%',
+							maxWidth: '250px',
+							overflow: 'hidden',
 						}}>
 							{hasName && companyName ? (
 								<>
-									<div className="font-inter font-bold text-black leading-none" style={{ fontSize: '17px' }}>
+									<div 
+										className="font-inter font-bold text-black leading-none whitespace-nowrap overflow-hidden"
+										style={{ 
+											fontSize: '17px',
+											WebkitMaskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
+											maskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
+										}}
+									>
 										{companyName}
 									</div>
-									<div className="font-inter font-normal text-black leading-none" style={{ fontSize: '11px', marginTop: '2px' }}>
+									<div 
+										className="font-inter font-normal text-black leading-none whitespace-nowrap overflow-hidden"
+										style={{ 
+											fontSize: '11px', 
+											marginTop: '2px',
+											WebkitMaskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
+											maskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
+										}}
+									>
 										{displayName}
 									</div>
 								</>
 							) : (
-								<div className="font-inter font-bold text-black leading-none" style={{ fontSize: '17px' }}>
+								<div 
+									className="font-inter font-bold text-black leading-none whitespace-nowrap overflow-hidden"
+									style={{ 
+										fontSize: '17px',
+										WebkitMaskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
+										maskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
+									}}
+								>
 									{companyName || displayName || 'Unknown Contact'}
 								</div>
 							)}
@@ -689,7 +713,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								position: 'absolute',
 								right: '20px',
-								top: hasStatusBar ? '578px' : '640px',
+								top: hasStatusBar ? '563px' : '625px',
 								bottom: 0,
 								width: '1px',
 								backgroundColor: '#000000',
@@ -700,7 +724,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								position: 'absolute',
 								right: '114px',
-								top: hasStatusBar ? '578px' : '640px',
+								top: hasStatusBar ? '563px' : '625px',
 								bottom: 0,
 								width: '1px',
 								backgroundColor: '#000000',
@@ -720,7 +744,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								right: '20px',
 								width: '94px',
-								top: hasStatusBar ? '578px' : '640px',
+								top: hasStatusBar ? '563px' : '625px',
 								bottom: 0,
 							}}
 						>
@@ -731,7 +755,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								position: 'absolute',
 								right: '119px',
-								top: hasStatusBar ? '578px' : '640px',
+								top: hasStatusBar ? '563px' : '625px',
 								bottom: 0,
 								width: '1px',
 								backgroundColor: '#000000',
@@ -742,7 +766,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								position: 'absolute',
 								right: '211px',
-								top: hasStatusBar ? '578px' : '640px',
+								top: hasStatusBar ? '563px' : '625px',
 								bottom: 0,
 								width: '1px',
 								backgroundColor: '#000000',
@@ -765,7 +789,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								right: '119px',
 								width: '92px',
-								top: hasStatusBar ? '578px' : '640px',
+								top: hasStatusBar ? '563px' : '625px',
 								bottom: 0,
 							}}
 						>
@@ -786,7 +810,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						<div className="flex justify-center flex-1">
 							<div
 								className="bg-white border-2 border-black rounded-[4px] overflow-hidden"
-								style={{ width: '470px', height: hasStatusBar ? '531px' : '587px' }}
+								style={{ width: '470px', height: hasStatusBar ? '516px' : '572px' }}
 							>
 								<ScrollableTextarea
 									value={editedMessage}
