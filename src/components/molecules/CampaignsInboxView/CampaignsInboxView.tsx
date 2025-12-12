@@ -87,11 +87,27 @@ export const CampaignsInboxView: FC = () => {
 	const [confirmingCampaignId, setConfirmingCampaignId] = useState<number | null>(null);
 	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+	// Breakpoint state for 2x2 metric grid layout (≤ 880px)
+	const [isNarrowLayout, setIsNarrowLayout] = useState(false);
+	// Breakpoint state for hiding vertical dividers (≤ 602px)
+	const [hideVerticalDividers, setHideVerticalDividers] = useState(false);
+
 	// useGetCampaigns returns campaigns with draftCount and sentCount already computed by the API
 	// This is the same data source used by CampaignsTable
 	const { data: campaigns, isLoading: isLoadingCampaigns } = useGetCampaigns();
 	const { data: inboundEmails } = useGetInboundEmails();
 	const { mutateAsync: deleteCampaign } = useDeleteCampaign();
+
+	// Track window width for responsive layout
+	useEffect(() => {
+		const handleResize = () => {
+			setIsNarrowLayout(window.innerWidth <= 880);
+			setHideVerticalDividers(window.innerWidth <= 602);
+		};
+		handleResize();
+		window.addEventListener('resize', handleResize);
+		return () => window.removeEventListener('resize', handleResize);
+	}, []);
 
 	// Clear timeouts on unmount
 	useEffect(() => {
@@ -168,11 +184,10 @@ export const CampaignsInboxView: FC = () => {
 
 	if (isLoadingCampaigns) {
 		return (
-			<div className="w-full max-w-[907px] mx-auto px-4">
+			<div className="w-full max-w-[907px] mx-auto px-4 flex justify-center">
 				<div
-					className="flex items-center justify-center"
+					className="flex items-center justify-center w-full max-w-[907px]"
 					style={{
-						width: '907px',
 						height: '535px',
 						border: '3px solid #000000',
 						borderRadius: '8px',
@@ -186,17 +201,16 @@ export const CampaignsInboxView: FC = () => {
 	}
 
 	return (
-		<div className="w-full max-w-[907px] mx-auto px-4">
+		<div className="w-full max-w-[907px] mx-auto px-4 flex justify-center">
 			<CustomScrollbar
-				className="flex flex-col items-center relative"
-				contentClassName="flex flex-col items-center"
+				className="flex flex-col items-center relative w-full max-w-[907px]"
+				contentClassName="flex flex-col items-center w-full"
 				thumbWidth={2}
 				thumbColor="#000000"
 				trackColor="transparent"
 				offsetRight={-6}
 				disableOverflowClass
 				style={{
-					width: '907px',
 					height: '535px',
 					border: '3px solid #000000',
 					borderRadius: '8px',
@@ -211,7 +225,8 @@ export const CampaignsInboxView: FC = () => {
 						position: 'absolute',
 						top: '13px',
 						left: '14px',
-						width: '879px',
+						right: '14px',
+						maxWidth: '879px',
 						height: '48px',
 						border: '3px solid #000000',
 						borderRadius: '8px',
@@ -276,9 +291,8 @@ export const CampaignsInboxView: FC = () => {
 					return (
 						<div
 							key={campaign.id}
-							className="cursor-pointer mb-2"
+							className="cursor-pointer mb-2 w-full max-w-[879px]"
 							style={{
-								width: '879px',
 								height: '78px',
 								minHeight: '78px',
 								border: '3px solid #000000',
@@ -296,27 +310,31 @@ export const CampaignsInboxView: FC = () => {
 							onClick={() => handleRowClick(campaign)}
 						>
 							{/* Vertical divider at 203px from left */}
-							<div
-								style={{
-									position: 'absolute',
-									left: '203px',
-									top: '0',
-									bottom: '0',
-									width: '2px',
-									backgroundColor: isConfirming ? 'transparent' : '#000000',
-								}}
-							/>
+							{!hideVerticalDividers && (
+								<div
+									style={{
+										position: 'absolute',
+										left: '203px',
+										top: '0',
+										bottom: '0',
+										width: '2px',
+										backgroundColor: isConfirming ? 'transparent' : '#000000',
+									}}
+								/>
+							)}
 							{/* Vertical divider at 295px from left (92px to the right of first divider) */}
-							<div
-								style={{
-									position: 'absolute',
-									left: '295px',
-									top: '0',
-									bottom: '0',
-									width: '1px',
-									backgroundColor: isConfirming ? 'transparent' : '#000000',
-								}}
-							/>
+							{!hideVerticalDividers && (
+								<div
+									style={{
+										position: 'absolute',
+										left: '295px',
+										top: '0',
+										bottom: '0',
+										width: '1px',
+										backgroundColor: isConfirming ? 'transparent' : '#000000',
+									}}
+								/>
+							)}
 							{/* Campaign Name */}
 							<div
 								className="flex flex-col justify-center min-w-0"
@@ -327,91 +345,164 @@ export const CampaignsInboxView: FC = () => {
 									style={{
 										color: isConfirming ? '#FFFFFF' : '#000000',
 										display: '-webkit-box',
-										WebkitLineClamp: 2,
+										WebkitLineClamp: hideVerticalDividers && campaign.visibleInboxCount && campaign.visibleInboxCount > 0 ? 1 : 2,
 										WebkitBoxOrient: 'vertical',
 										overflow: 'hidden',
 									}}
 								>
 									{campaign.name}
 								</span>
-							</div>
-
-							{/* Visible Inbox Count - positioned absolutely between the two divider lines (203px to 295px) */}
-							<div
-								style={{
-									position: 'absolute',
-									left: '205px',
-									top: '0',
-									bottom: '0',
-									width: '90px',
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center',
-									backgroundColor:
-										campaign.visibleInboxCount && campaign.visibleInboxCount > 0
-											? isConfirming
-												? 'transparent'
-												: '#EEFFF0'
-											: 'transparent',
-								}}
-							>
-								{campaign.visibleInboxCount && campaign.visibleInboxCount > 0 ? (
+								{/* New messages box below campaign name at narrow breakpoint */}
+								{hideVerticalDividers && campaign.visibleInboxCount && campaign.visibleInboxCount > 0 && (
 									<div
-										className="flex flex-col items-center justify-center"
-										style={{ color: isConfirming ? '#FFFFFF' : '#000000' }}
-									>
-										<span className="text-[12px] font-medium leading-tight">
-											{campaign.visibleInboxCount} new
-										</span>
-										<span className="text-[12px] font-medium leading-tight">
-											{campaign.visibleInboxCount === 1 ? 'message' : 'messages'}
-										</span>
-									</div>
-								) : null}
-							</div>
-
-							{/* Metric Boxes - positioned after the second divider (295px) */}
-							<div
-								style={{
-									display: 'flex',
-									alignItems: 'center',
-									marginLeft: '160px',
-									marginRight: '0px',
-								}}
-							>
-								{metrics.map((metric, index) => (
-									<div
-										key={index}
 										style={{
+											width: '163px',
+											height: '23px',
+											backgroundColor: isConfirming ? 'transparent' : '#CCF9D2',
+											borderRadius: '4px',
 											display: 'flex',
 											alignItems: 'center',
-											paddingRight: metric.hasSeparator ? '15px' : '0',
-											marginRight: metric.hasSeparator ? '15px' : '0',
-											borderRight: metric.hasSeparator
-												? `2px solid ${isConfirming ? 'transparent' : '#000000'}`
-												: 'none',
-											height: '17px',
+											justifyContent: 'center',
+											marginTop: '4px',
 										}}
 									>
+										<span
+											className="text-[12px] font-medium leading-none"
+											style={{ color: isConfirming ? '#FFFFFF' : '#000000' }}
+										>
+											{campaign.visibleInboxCount} new {campaign.visibleInboxCount === 1 ? 'message' : 'messages'}
+										</span>
+									</div>
+								)}
+							</div>
+
+							{/* Visible Inbox Count - positioned absolutely between the two divider lines (203px to 295px) - hidden at narrow breakpoint */}
+							{!hideVerticalDividers && (
+								<div
+									style={{
+										position: 'absolute',
+										left: '205px',
+										top: '0',
+										bottom: '0',
+										width: '90px',
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+										backgroundColor:
+											campaign.visibleInboxCount && campaign.visibleInboxCount > 0
+												? isConfirming
+													? 'transparent'
+													: '#EEFFF0'
+												: 'transparent',
+									}}
+								>
+									{campaign.visibleInboxCount && campaign.visibleInboxCount > 0 ? (
 										<div
-											className="metric-box inline-flex items-center justify-center leading-none truncate"
+											className="flex flex-col items-center justify-center"
+											style={{ color: isConfirming ? '#FFFFFF' : '#000000' }}
+										>
+											<span className="text-[12px] font-medium leading-tight">
+												{campaign.visibleInboxCount} new
+											</span>
+											<span className="text-[12px] font-medium leading-tight">
+												{campaign.visibleInboxCount === 1 ? 'message' : 'messages'}
+											</span>
+										</div>
+									) : null}
+								</div>
+							)}
+
+							{/* Metric Boxes - positioned after the second divider (295px), or after campaign name at narrow breakpoint */}
+							{isNarrowLayout ? (
+								/* 2x2 Grid layout for narrow screens (≤ 880px) - centered in right area */
+								<div
+									style={{
+										position: 'absolute',
+										left: hideVerticalDividers ? '175px' : '295px',
+										right: '40px', // Leave space for delete button
+										top: '0',
+										bottom: '0',
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+									}}
+								>
+									<div
+										style={{
+											display: 'grid',
+											gridTemplateColumns: 'repeat(2, 1fr)',
+											gridTemplateRows: 'repeat(2, 1fr)',
+											gap: '4px 8px',
+										}}
+									>
+										{/* Row 1: drafts (0), updated (2) */}
+										{/* Row 2: sent (1), created (3) */}
+										{[metrics[0], metrics[2], metrics[1], metrics[3]].map((metric, index) => (
+											<div
+												key={index}
+												className="metric-box inline-flex items-center justify-center leading-none truncate"
+												style={{
+													width: '92px',
+													height: '20px',
+													borderRadius: '4px',
+													backgroundColor: isConfirming ? 'transparent' : metric.fill,
+													borderColor: isConfirming ? '#A20000' : '#8C8C8C',
+													borderWidth: '1px',
+													borderStyle: 'solid',
+													color: isConfirming ? '#FFFFFF' : 'inherit',
+													fontSize: '14px',
+												}}
+											>
+												{metric.label}
+											</div>
+										))}
+									</div>
+								</div>
+							) : (
+								/* 4x1 Horizontal layout for wider screens */
+								<div
+									style={{
+										display: 'flex',
+										alignItems: 'center',
+										marginLeft: '160px',
+										marginRight: '0px',
+									}}
+								>
+									{metrics.map((metric, index) => (
+										<div
+											key={index}
 											style={{
-												width: '92px',
-												height: '20px',
-												borderRadius: '4px',
-												backgroundColor: isConfirming ? 'transparent' : metric.fill,
-												borderColor: isConfirming ? '#A20000' : '#8C8C8C',
-												borderWidth: '1px',
-												borderStyle: 'solid',
-												color: isConfirming ? '#FFFFFF' : 'inherit',
-												fontSize: '14px',
+												display: 'flex',
+												alignItems: 'center',
+												paddingRight: metric.hasSeparator ? '15px' : '0',
+												marginRight: metric.hasSeparator ? '15px' : '0',
+											borderRight:
+												metric.hasSeparator && !hideVerticalDividers
+													? `2px solid ${isConfirming ? 'transparent' : '#000000'}`
+													: 'none',
+												height: '17px',
 											}}
 										>
-											{metric.label}
+											<div
+												className="metric-box inline-flex items-center justify-center leading-none truncate"
+												style={{
+													width: '92px',
+													height: '20px',
+													borderRadius: '4px',
+													backgroundColor: isConfirming ? 'transparent' : metric.fill,
+													borderColor: isConfirming ? '#A20000' : '#8C8C8C',
+													borderWidth: '1px',
+													borderStyle: 'solid',
+													color: isConfirming ? '#FFFFFF' : 'inherit',
+													fontSize: '14px',
+												}}
+											>
+												{metric.label}
+											</div>
 										</div>
-									</div>
-								))}
-							</div>
+									))}
+								</div>
+							)}
 
 							{/* Delete Button */}
 							<button
@@ -444,13 +535,12 @@ export const CampaignsInboxView: FC = () => {
 						return (
 							<div
 								key={`placeholder-${idx}`}
-								className={`select-none mb-2 ${
+								className={`select-none mb-2 w-full max-w-[879px] ${
 									isFirstInEmptyState
 										? 'cursor-pointer hover:opacity-90 transition-opacity'
 										: ''
 								}`}
 								style={{
-									width: '879px',
 									height: isFirstInEmptyState ? '58px' : '78px',
 									minHeight: isFirstInEmptyState ? '58px' : '78px',
 									border: '3px solid #000000',

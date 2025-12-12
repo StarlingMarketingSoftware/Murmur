@@ -255,23 +255,16 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				</>
 			)}
 
-			{/* Box above Drafts table - hidden on approved/rejected tabs */}
+			{/* Counter in top right corner of Drafts table - hidden on approved/rejected tabs */}
 			{isDrafts && statusFilter === 'all' && (
 				<div
 					style={{
 						position: 'absolute',
-						top: '-31px',
-						left: '50%',
-						transform: 'translateX(-50%)',
-						width: '95px',
-						height: '21px',
-						border: '2px solid #000000',
-						borderRadius: '8px',
-						backgroundColor: 'transparent',
+						top: '5px',
+						right: '10px',
 						zIndex: 10,
 						display: 'flex',
 						alignItems: 'center',
-						justifyContent: 'center',
 						gap: '8px',
 					}}
 				>

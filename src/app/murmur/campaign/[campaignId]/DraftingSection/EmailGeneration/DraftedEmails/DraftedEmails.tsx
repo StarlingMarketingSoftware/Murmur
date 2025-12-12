@@ -21,6 +21,8 @@ import {
 } from '@/constants/ui';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
+import LeftArrow from '@/components/atoms/_svg/LeftArrow';
+import RightArrow from '@/components/atoms/_svg/RightArrow';
 
 interface ScrollableTextareaProps
 	extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -348,10 +350,52 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		const isDraftApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
 		const isDraftRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
 		const hasStatusBar = isDraftApproved || isDraftRejected;
+		const isNarrowestDesktop = props.isNarrowestDesktop ?? false;
+		const isNarrowDesktop = props.isNarrowDesktop ?? false;
+		const showBottomCounter = isNarrowestDesktop || isNarrowDesktop;
+		// Show tab navigation arrows only on narrow desktop; hide them on the
+		// narrowest breakpoint when the draft review (Approve/Reject) view is open.
+		const showTabNavArrows = showBottomCounter && !isNarrowestDesktop;
+		// Keep the tab navigation arrows aligned with the "Send" button + arrows row
+		// rendered by DraftingSection at the same breakpoint.
+		const tabNavGap = '29px';
+		const tabNavMiddleWidth = '691px';
 
 		return (
-			<div className="flex flex-col items-center" style={{ marginTop: '25px' }}>
+			<div className="flex flex-col items-center">
 				<div style={{ width: '499px', height: '703px', position: 'relative' }}>
+				{/* Counter box - above preview on wide screens, bottom-left corner on narrow/narrowest breakpoint */}
+				{!showBottomCounter && (
+					<div
+						style={{
+							position: 'absolute',
+							top: '-31px',
+							left: '50%',
+							transform: 'translateX(-50%)',
+							width: '95px',
+							height: '21px',
+							border: '2px solid #000000',
+							borderRadius: '8px',
+							backgroundColor: 'transparent',
+							zIndex: 10,
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							gap: '8px',
+						}}
+					>
+						{/* Approved count */}
+						<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+							<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{approvedCount}</span>
+							<ApproveCheckIcon width={12} height={9} className="text-black" />
+						</div>
+						{/* Rejected count */}
+						<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+							<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{rejectedCount}</span>
+							<RejectXIcon width={10} height={10} className="text-black" />
+						</div>
+					</div>
+				)}
 				{/* Container box with header - matching the table view */}
 				<div
 					style={{
@@ -396,18 +440,42 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							flexDirection: 'column', 
 							justifyContent: 'center',
 							height: '100%',
+							maxWidth: '250px',
+							overflow: 'hidden',
 						}}>
 							{hasName && companyName ? (
 								<>
-									<div className="font-inter font-bold text-black leading-none" style={{ fontSize: '17px' }}>
+									<div 
+										className="font-inter font-bold text-black leading-none whitespace-nowrap overflow-hidden"
+										style={{ 
+											fontSize: '17px',
+											WebkitMaskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
+											maskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
+										}}
+									>
 										{companyName}
 									</div>
-									<div className="font-inter font-normal text-black leading-none" style={{ fontSize: '11px', marginTop: '2px' }}>
+									<div 
+										className="font-inter font-normal text-black leading-none whitespace-nowrap overflow-hidden"
+										style={{ 
+											fontSize: '11px', 
+											marginTop: '2px',
+											WebkitMaskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
+											maskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
+										}}
+									>
 										{displayName}
 									</div>
 								</>
 							) : (
-								<div className="font-inter font-bold text-black leading-none" style={{ fontSize: '17px' }}>
+								<div 
+									className="font-inter font-bold text-black leading-none whitespace-nowrap overflow-hidden"
+									style={{ 
+										fontSize: '17px',
+										WebkitMaskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
+										maskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
+									}}
+								>
 									{companyName || displayName || 'Unknown Contact'}
 								</div>
 							)}
@@ -659,7 +727,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								position: 'absolute',
 								right: '20px',
-								top: hasStatusBar ? '578px' : '640px',
+								top: hasStatusBar ? '563px' : '625px',
 								bottom: 0,
 								width: '1px',
 								backgroundColor: '#000000',
@@ -670,7 +738,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								position: 'absolute',
 								right: '114px',
-								top: hasStatusBar ? '578px' : '640px',
+								top: hasStatusBar ? '563px' : '625px',
 								bottom: 0,
 								width: '1px',
 								backgroundColor: '#000000',
@@ -690,7 +758,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								right: '20px',
 								width: '94px',
-								top: hasStatusBar ? '578px' : '640px',
+								top: hasStatusBar ? '563px' : '625px',
 								bottom: 0,
 							}}
 						>
@@ -701,7 +769,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								position: 'absolute',
 								right: '119px',
-								top: hasStatusBar ? '578px' : '640px',
+								top: hasStatusBar ? '563px' : '625px',
 								bottom: 0,
 								width: '1px',
 								backgroundColor: '#000000',
@@ -712,7 +780,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								position: 'absolute',
 								right: '211px',
-								top: hasStatusBar ? '578px' : '640px',
+								top: hasStatusBar ? '563px' : '625px',
 								bottom: 0,
 								width: '1px',
 								backgroundColor: '#000000',
@@ -735,12 +803,59 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								right: '119px',
 								width: '92px',
-								top: hasStatusBar ? '578px' : '640px',
+								top: hasStatusBar ? '563px' : '625px',
 								bottom: 0,
 							}}
 						>
 							Send
 						</button>
+						{/* Counter in bottom-left corner - at narrow/narrowest breakpoint */}
+						{showBottomCounter && (
+							<>
+								{/* Left divider for counter */}
+								<div
+									style={{
+										position: 'absolute',
+										left: '35px',
+										top: hasStatusBar ? '563px' : '625px',
+										bottom: 0,
+										width: '1px',
+										backgroundColor: '#000000',
+									}}
+								/>
+								<div
+									className="absolute flex items-center justify-center gap-[8px]"
+									style={{
+										left: '35px',
+										width: '95px',
+										top: hasStatusBar ? '563px' : '625px',
+										bottom: 0,
+									}}
+								>
+									{/* Approved count */}
+									<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+										<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{approvedCount}</span>
+										<ApproveCheckIcon width={12} height={9} className="text-black" />
+									</div>
+									{/* Rejected count */}
+									<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+										<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{rejectedCount}</span>
+										<RejectXIcon width={10} height={10} className="text-black" />
+									</div>
+								</div>
+								{/* Right divider for counter */}
+								<div
+									style={{
+										position: 'absolute',
+										left: '130px',
+										top: hasStatusBar ? '563px' : '625px',
+										bottom: 0,
+										width: '1px',
+										backgroundColor: '#000000',
+									}}
+								/>
+							</>
+						)}
 						{/* Subject input */}
 						<div className="flex justify-center" style={{ marginBottom: '8px' }}>
 							<input
@@ -756,7 +871,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						<div className="flex justify-center flex-1">
 							<div
 								className="bg-white border-2 border-black rounded-[4px] overflow-hidden"
-								style={{ width: '470px', height: hasStatusBar ? '531px' : '587px' }}
+								style={{ width: '470px', height: hasStatusBar ? '516px' : '572px' }}
 							>
 								<ScrollableTextarea
 									value={editedMessage}
@@ -797,104 +912,144 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					</div>
 				</div>
 			</div>
-		<div className="flex items-center" style={{ marginTop: '22px' }}>
-			<button
-				type="button"
-				onClick={handleNavigatePrevious}
-				disabled={!hasDrafts}
-				aria-label="View previous draft"
-				className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-				style={{ marginRight: '20px' }}
+		<div
+			className="flex items-center justify-center"
+			style={{
+				marginTop: '22px',
+				// Ensure this row has a stable width so centering math is correct
+				// (otherwise it can shrink-to-fit in narrow layouts and appear shifted right).
+				width: '100%',
+				// For narrow desktop (two-column layout), shift left by 170px to center on page
+				// For narrowest desktop (single-column), no shift needed as layout is already centered
+				...(isNarrowDesktop ? { transform: 'translateX(-170px)' } : {}),
+				...(showTabNavArrows ? { gap: tabNavGap } : {}),
+			}}
+		>
+			{/* Tab navigation left arrow - only in narrow breakpoints */}
+			{showTabNavArrows && props.goToPreviousTab && (
+				<button
+					type="button"
+					onClick={props.goToPreviousTab}
+					className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+					aria-label="Previous tab"
+				>
+					<LeftArrow width="20" height="39" />
+				</button>
+			)}
+			{/* Inner container with draft navigation and buttons */}
+			<div
+				className="flex items-center justify-center flex-shrink-0"
+				style={showTabNavArrows ? { width: tabNavMiddleWidth } : undefined}
 			>
-				<LeftArrowReviewIcon />
-			</button>
-			<div className="flex" style={{ gap: '13px' }}>
-				<Button
+				<button
 					type="button"
-					variant="ghost"
-					className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
-					style={{
-						width: '124px',
-						height: '40px',
-						borderTopLeftRadius: '8px',
-						borderBottomLeftRadius: '8px',
-						backgroundColor: '#D5FFCB',
-					}}
-					onClick={() => {
-						if (selectedDraft) {
-							const isCurrentlyApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
-							props.onApproveDraft?.(selectedDraft.id, isCurrentlyApproved);
-							// Only navigate to next if we're approving, not toggling off
-							if (!isCurrentlyApproved) {
-								handleNavigateNext();
+					onClick={handleNavigatePrevious}
+					disabled={!hasDrafts}
+					aria-label="View previous draft"
+					className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+					style={{ marginRight: '20px' }}
+				>
+					<LeftArrowReviewIcon />
+				</button>
+				<div className="flex" style={{ gap: '13px' }}>
+					<Button
+						type="button"
+						variant="ghost"
+						className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
+						style={{
+							width: '124px',
+							height: '40px',
+							borderTopLeftRadius: '8px',
+							borderBottomLeftRadius: '8px',
+							backgroundColor: '#D5FFCB',
+						}}
+						onClick={() => {
+							if (selectedDraft) {
+								const isCurrentlyApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
+								props.onApproveDraft?.(selectedDraft.id, isCurrentlyApproved);
+								// Only navigate to next if we're approving, not toggling off
+								if (!isCurrentlyApproved) {
+									handleNavigateNext();
+								}
 							}
-						}
-					}}
-				>
-					<span>Approve</span>
-					<ApproveCheckIcon />
-				</Button>
-				<Button
-					type="button"
-					variant="ghost"
-					className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
-					style={{
-						width: '124px',
-						height: '40px',
-						backgroundColor: '#FFDC9E',
-					}}
-					onClick={handleRegenerate}
-					disabled={isRegenerating || !onRegenerateDraft}
-				>
-					{isRegenerating ? (
-						<Spinner size="small" />
-					) : (
-						'Regenerate'
-					)}
-				</Button>
-				<Button
-					type="button"
-					variant="ghost"
-					className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
-					style={{
-						width: '124px',
-						height: '40px',
-						borderTopRightRadius: '8px',
-						borderBottomRightRadius: '8px',
-						backgroundColor: '#E17272',
-					}}
-					onClick={() => {
-						if (selectedDraft) {
-							const isCurrentlyRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
-							props.onRejectDraft?.(selectedDraft.id, isCurrentlyRejected);
-							// Only navigate to next if we're rejecting, not toggling off
-							if (!isCurrentlyRejected) {
-								handleNavigateNext();
+						}}
+					>
+						<span>Approve</span>
+						<ApproveCheckIcon />
+					</Button>
+					<Button
+						type="button"
+						variant="ghost"
+						className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
+						style={{
+							width: '124px',
+							height: '40px',
+							backgroundColor: '#FFDC9E',
+						}}
+						onClick={handleRegenerate}
+						disabled={isRegenerating || !onRegenerateDraft}
+					>
+						{isRegenerating ? (
+							<Spinner size="small" />
+						) : (
+							'Regenerate'
+						)}
+					</Button>
+					<Button
+						type="button"
+						variant="ghost"
+						className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
+						style={{
+							width: '124px',
+							height: '40px',
+							borderTopRightRadius: '8px',
+							borderBottomRightRadius: '8px',
+							backgroundColor: '#E17272',
+						}}
+						onClick={() => {
+							if (selectedDraft) {
+								const isCurrentlyRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
+								props.onRejectDraft?.(selectedDraft.id, isCurrentlyRejected);
+								// Only navigate to next if we're rejecting, not toggling off
+								if (!isCurrentlyRejected) {
+									handleNavigateNext();
+								}
 							}
-						}
-					}}
+						}}
+					>
+						<span>Reject</span>
+						<RejectXIcon />
+					</Button>
+				</div>
+				<button
+					type="button"
+					onClick={handleNavigateNext}
+					disabled={!hasDrafts}
+					aria-label="View next draft"
+					className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+					style={{ marginLeft: '20px' }}
 				>
-					<span>Reject</span>
-					<RejectXIcon />
-				</Button>
+					<RightArrowReviewIcon />
+				</button>
 			</div>
-			<button
-				type="button"
-				onClick={handleNavigateNext}
-				disabled={!hasDrafts}
-				aria-label="View next draft"
-				className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-				style={{ marginLeft: '20px' }}
-			>
-				<RightArrowReviewIcon />
-			</button>
+			{/* Tab navigation right arrow - only in narrow breakpoints */}
+			{showTabNavArrows && props.goToNextTab && (
+				<button
+					type="button"
+					onClick={props.goToNextTab}
+					className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+					aria-label="Next tab"
+				>
+					<RightArrow width="20" height="39" />
+				</button>
+			)}
 		</div>
 			</div>
 		);
 	}
 
 	return (
-		<div className="flex flex-col gap-2 items-center" style={{ marginTop: '25px' }}>
+		<div className="flex flex-col gap-2 items-center">
 			{/* Right table - Generated Drafts */}
 			<DraftingTable
 				handleClick={() => handleSelectAllDrafts(filteredDrafts)}
