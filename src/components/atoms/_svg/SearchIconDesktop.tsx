@@ -1,10 +1,15 @@
 import React from 'react';
 
-export const SearchIconDesktop = () => {
+interface SearchIconDesktopProps {
+	width?: number;
+	height?: number;
+}
+
+export const SearchIconDesktop = ({ width = 26, height = 28 }: SearchIconDesktopProps) => {
 	return (
 		<svg
-			width="26"
-			height="28"
+			width={width}
+			height={height}
 			viewBox="0 0 28 30"
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
