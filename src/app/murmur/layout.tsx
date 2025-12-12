@@ -68,7 +68,7 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 					/>
 				) : (
 					<SignInButton mode="modal">
-						<button className="px-3 py-1.5 text-[12px] font-medium tracking-[0.02em] text-gray-700 hover:text-gray-900 bg-white/80 backdrop-blur-sm rounded-md border border-gray-200 hover:border-gray-300 transition-all duration-300">
+						<button className="px-3 py-1.5 text-[12px] font-medium tracking-[0.02em] text-gray-700 hover:text-gray-900 transition-all duration-300">
 							Sign in
 						</button>
 					</SignInButton>
