@@ -3846,6 +3846,11 @@ body.murmur-page.murmur-map-view {
 	);
 }
 
+/* Move Clerk user button below the map view header */
+body.murmur-page.murmur-map-view .clerk-user-button {
+	top: 44px;
+}
+
 /* Also ensure the hero wrapper can contain the growing search bar */
 .dashboard-container:not(.search-active) .hero-wrapper {
 	/* Allow hero to grow with viewport height to contain search bar */

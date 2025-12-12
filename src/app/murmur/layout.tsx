@@ -55,7 +55,7 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 	return (
 		<>
 			{/* Persistent Clerk login icon in top right corner */}
-			<div className="fixed top-3 right-4 z-50">
+			<div className="clerk-user-button fixed top-3 right-4 z-50">
 				{isSignedIn ? (
 					<UserButton
 						appearance={{
