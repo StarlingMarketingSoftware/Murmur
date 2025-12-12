@@ -87,12 +87,16 @@ const Murmur = () => {
 	const [hideRightPanelOnSearch, setHideRightPanelOnSearch] = useState(false);
 	// Hide right panel on all tab at breakpoint (below 1665px)
 	const [hideRightPanelOnAll, setHideRightPanelOnAll] = useState(false);
+	// Hide right panel on inbox tab at breakpoint (below 1681px)
+	const [hideRightPanelOnInbox, setHideRightPanelOnInbox] = useState(false);
 	// Hide arrows when they would overlap with content boxes (below 1317px)
 	const [hideArrowsAtBreakpoint, setHideArrowsAtBreakpoint] = useState(false);
 	// Hide arrows on search tab at wider breakpoint (below 1557px)
 	const [hideArrowsOnSearch, setHideArrowsOnSearch] = useState(false);
 	// Hide arrows on all tab at breakpoint (at or below 1396px)
 	const [hideArrowsOnAll, setHideArrowsOnAll] = useState(false);
+	// Hide arrows on inbox tab at breakpoint (below 1476px)
+	const [hideArrowsOnInbox, setHideArrowsOnInbox] = useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		const checkBreakpoints = () => {
@@ -102,9 +106,11 @@ const Murmur = () => {
 			setHideRightPanel(width < 1522);
 			setHideRightPanelOnSearch(width < 1796);
 			setHideRightPanelOnAll(width <= 1665);
+			setHideRightPanelOnInbox(width < 1681);
 			setHideArrowsAtBreakpoint(width < 1317);
 			setHideArrowsOnSearch(width < 1557);
 			setHideArrowsOnAll(width <= 1396);
+			setHideArrowsOnInbox(width < 1476);
 		};
 		checkBreakpoints();
 		window.addEventListener('resize', checkBreakpoints);
@@ -133,11 +139,13 @@ const Murmur = () => {
 	// or when width < 1317px to prevent overlap with content boxes
 	// or when on search tab and width < 1557px
 	// or when on all tab and width <= 1396px
+	// or when on inbox tab and width < 1476px
 	const hideFixedArrows =
 		(activeView === 'testing' && isNarrowDesktop) ||
 		hideArrowsAtBreakpoint ||
 		(activeView === 'search' && hideArrowsOnSearch) ||
-		(activeView === 'all' && hideArrowsOnAll);
+		(activeView === 'all' && hideArrowsOnAll) ||
+		(activeView === 'inbox' && hideArrowsOnInbox);
 
 	// Tab navigation order
 	const tabOrder: Array<'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'> = [
@@ -827,8 +835,8 @@ const Murmur = () => {
 				</div>
 			</div>
 
-			{/* Right side panel - hidden on mobile, when width < 1522px, on search tab when width < 1796px, or on all tab when width <= 1665px */}
-			{!isMobile && !hideRightPanel && !(activeView === 'search' && hideRightPanelOnSearch) && !(activeView === 'all' && hideRightPanelOnAll) && (
+			{/* Right side panel - hidden on mobile, when width < 1522px, on search tab when width < 1796px, on all tab when width <= 1665px, or on inbox tab when width < 1681px */}
+			{!isMobile && !hideRightPanel && !(activeView === 'search' && hideRightPanelOnSearch) && !(activeView === 'all' && hideRightPanelOnAll) && !(activeView === 'inbox' && hideRightPanelOnInbox) && (
 				<CampaignRightPanel view={activeView} onTabChange={setActiveView} />
 			)}
 		</div>

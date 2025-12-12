@@ -438,7 +438,7 @@ top: isExpanded ? '28px' : '50%',
 									border: '1px solid #000000',
 									borderRadius: '6px',
 								}}
-							>
+							>	
 								<div className={cn(
 									"w-full h-full pl-2 pr-6 flex overflow-hidden",
 									isExpanded ? "items-start pt-2" : "items-center"
