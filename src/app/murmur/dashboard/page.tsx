@@ -3156,7 +3156,7 @@ const DashboardContent = () => {
 				)}
 
 				{!hasSearched && activeTab === 'search' && (
-					<div className="campaigns-table-wrapper w-full max-w-[960px] mx-auto px-4 max-h-[180px] overflow-hidden">
+					<div className="campaigns-table-wrapper dashboard-recent-campaigns w-full max-w-[960px] mx-auto px-4">
 						<CampaignsTable />
 					</div>
 				)}
