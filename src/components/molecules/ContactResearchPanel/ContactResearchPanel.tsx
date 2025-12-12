@@ -938,29 +938,25 @@ export const ContactResearchHorizontalStrip: FC<
 					</div>
 				) : (
 					/* Unparsed metadata layout: contact info on left, full text on right spanning 3 rows */
-					<div className="flex gap-x-[12px]">
-						{/* Left column: contact info + placeholder boxes */}
-						<div className="flex-1 flex flex-col gap-y-[8px]">
-							<div className="min-h-[82px] lg:min-h-[52px]">
+					<div className="grid grid-cols-2 gap-x-[12px]">
+						{/* Left column: contact info box */}
+						<div className="row-span-3 flex flex-col gap-y-[8px]">
+							<div className="h-[82px] lg:h-[52px]">
 								{contactInfoBox}
 							</div>
 							{/* Two placeholder boxes below contact info */}
-							<div className="min-h-[82px] lg:min-h-[52px]">
-								<div
-									className="w-full h-[82px] lg:h-[52px] rounded-[8px] border-2 border-black"
-									style={{ backgroundColor: '#C6D9F8' }}
-								/>
-							</div>
-							<div className="min-h-[82px] lg:min-h-[52px]">
-								<div
-									className="w-full h-[82px] lg:h-[52px] rounded-[8px] border-2 border-black"
-									style={{ backgroundColor: '#C6D9F8' }}
-								/>
-							</div>
+							<div
+								className="w-full h-[82px] lg:h-[52px] rounded-[8px] border-2 border-black"
+								style={{ backgroundColor: '#C6D9F8' }}
+							/>
+							<div
+								className="w-full h-[82px] lg:h-[52px] rounded-[8px] border-2 border-black"
+								style={{ backgroundColor: '#C6D9F8' }}
+							/>
 						</div>
 
 						{/* Right column: single tall text block spanning all 3 rows */}
-						<div id="horizontal-research-text-block" className="flex-1">
+						<div id="horizontal-research-text-block" className="row-span-3">
 							<style>{`
 								#horizontal-research-text-block *::-webkit-scrollbar {
 									display: none !important;
@@ -972,18 +968,9 @@ export const ContactResearchHorizontalStrip: FC<
 									-ms-overflow-style: none !important;
 									scrollbar-width: none !important;
 								}
-								/* Responsive height for unparsed text block */
-								#horizontal-research-text-block .unparsed-text-container {
-									height: calc(82px * 3 + 8px * 2);
-								}
-								@media (min-width: 1024px) {
-									#horizontal-research-text-block .unparsed-text-container {
-										height: calc(52px * 3 + 8px * 2);
-									}
-								}
 							`}</style>
 							<div
-								className="w-full rounded-[8px] border-2 border-black flex items-stretch unparsed-text-container"
+								className="w-full h-[calc(82px*3+8px*2)] lg:h-[calc(52px*3+8px*2)] rounded-[8px] border-2 border-black flex items-stretch"
 								style={{
 									backgroundColor: boxColorMap['1'],
 								}}
