@@ -858,7 +858,7 @@ const DashboardContent = () => {
 							className="flex justify-center items-center w-full px-4"
 							style={{
 								marginBottom: '0.75rem',
-								marginTop: activeTab === 'inbox' ? '80px' : '50px',
+								marginTop: activeTab === 'inbox' ? '136px' : '50px',
 							}}
 						>
 							<div className="premium-hero-section flex flex-col items-center justify-center w-full max-w-[600px]">
@@ -1429,7 +1429,7 @@ const DashboardContent = () => {
 						{/* Inbox tab: Table first, then toggle below */}
 						{activeTab === 'inbox' && !hasSearched && (
 							<>
-								<div style={{ marginTop: '34px' }}>
+								<div style={{ marginTop: '20px' }}>
 									<CampaignsInboxView />
 								</div>
 								{/* Toggle below table */}
