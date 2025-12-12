@@ -60,6 +60,10 @@ export interface DraftedEmailsProps {
 	isNarrowestDesktop?: boolean;
 	/** Optional: narrow desktop breakpoint (952px - 1279px) - moves counter to bottom-left in draft review */
 	isNarrowDesktop?: boolean;
+	/** Optional: callback to navigate to the previous tab */
+	goToPreviousTab?: () => void;
+	/** Optional: callback to navigate to the next tab */
+	goToNextTab?: () => void;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {

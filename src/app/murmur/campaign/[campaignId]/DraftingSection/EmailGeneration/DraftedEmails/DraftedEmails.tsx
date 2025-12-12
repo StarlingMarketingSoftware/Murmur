@@ -21,6 +21,8 @@ import {
 } from '@/constants/ui';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
+import LeftArrow from '@/components/atoms/_svg/LeftArrow';
+import RightArrow from '@/components/atoms/_svg/RightArrow';
 
 interface ScrollableTextareaProps
 	extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -351,6 +353,13 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		const isNarrowestDesktop = props.isNarrowestDesktop ?? false;
 		const isNarrowDesktop = props.isNarrowDesktop ?? false;
 		const showBottomCounter = isNarrowestDesktop || isNarrowDesktop;
+		// Show tab navigation arrows only on narrow desktop; hide them on the
+		// narrowest breakpoint when the draft review (Approve/Reject) view is open.
+		const showTabNavArrows = showBottomCounter && !isNarrowestDesktop;
+		// Keep the tab navigation arrows aligned with the "Send" button + arrows row
+		// rendered by DraftingSection at the same breakpoint.
+		const tabNavGap = '29px';
+		const tabNavMiddleWidth = '691px';
 
 		return (
 			<div className="flex flex-col items-center">
@@ -903,97 +912,137 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					</div>
 				</div>
 			</div>
-		<div className="flex items-center" style={{ marginTop: '22px' }}>
-			<button
-				type="button"
-				onClick={handleNavigatePrevious}
-				disabled={!hasDrafts}
-				aria-label="View previous draft"
-				className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-				style={{ marginRight: '20px' }}
+		<div
+			className="flex items-center justify-center"
+			style={{
+				marginTop: '22px',
+				// Ensure this row has a stable width so centering math is correct
+				// (otherwise it can shrink-to-fit in narrow layouts and appear shifted right).
+				width: '100%',
+				// For narrow desktop (two-column layout), shift left by 170px to center on page
+				// For narrowest desktop (single-column), no shift needed as layout is already centered
+				...(isNarrowDesktop ? { transform: 'translateX(-170px)' } : {}),
+				...(showTabNavArrows ? { gap: tabNavGap } : {}),
+			}}
+		>
+			{/* Tab navigation left arrow - only in narrow breakpoints */}
+			{showTabNavArrows && props.goToPreviousTab && (
+				<button
+					type="button"
+					onClick={props.goToPreviousTab}
+					className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+					aria-label="Previous tab"
+				>
+					<LeftArrow width="20" height="39" />
+				</button>
+			)}
+			{/* Inner container with draft navigation and buttons */}
+			<div
+				className="flex items-center justify-center flex-shrink-0"
+				style={showTabNavArrows ? { width: tabNavMiddleWidth } : undefined}
 			>
-				<LeftArrowReviewIcon />
-			</button>
-			<div className="flex" style={{ gap: '13px' }}>
-				<Button
+				<button
 					type="button"
-					variant="ghost"
-					className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
-					style={{
-						width: '124px',
-						height: '40px',
-						borderTopLeftRadius: '8px',
-						borderBottomLeftRadius: '8px',
-						backgroundColor: '#D5FFCB',
-					}}
-					onClick={() => {
-						if (selectedDraft) {
-							const isCurrentlyApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
-							props.onApproveDraft?.(selectedDraft.id, isCurrentlyApproved);
-							// Only navigate to next if we're approving, not toggling off
-							if (!isCurrentlyApproved) {
-								handleNavigateNext();
+					onClick={handleNavigatePrevious}
+					disabled={!hasDrafts}
+					aria-label="View previous draft"
+					className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+					style={{ marginRight: '20px' }}
+				>
+					<LeftArrowReviewIcon />
+				</button>
+				<div className="flex" style={{ gap: '13px' }}>
+					<Button
+						type="button"
+						variant="ghost"
+						className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
+						style={{
+							width: '124px',
+							height: '40px',
+							borderTopLeftRadius: '8px',
+							borderBottomLeftRadius: '8px',
+							backgroundColor: '#D5FFCB',
+						}}
+						onClick={() => {
+							if (selectedDraft) {
+								const isCurrentlyApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
+								props.onApproveDraft?.(selectedDraft.id, isCurrentlyApproved);
+								// Only navigate to next if we're approving, not toggling off
+								if (!isCurrentlyApproved) {
+									handleNavigateNext();
+								}
 							}
-						}
-					}}
-				>
-					<span>Approve</span>
-					<ApproveCheckIcon />
-				</Button>
-				<Button
-					type="button"
-					variant="ghost"
-					className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
-					style={{
-						width: '124px',
-						height: '40px',
-						backgroundColor: '#FFDC9E',
-					}}
-					onClick={handleRegenerate}
-					disabled={isRegenerating || !onRegenerateDraft}
-				>
-					{isRegenerating ? (
-						<Spinner size="small" />
-					) : (
-						'Regenerate'
-					)}
-				</Button>
-				<Button
-					type="button"
-					variant="ghost"
-					className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
-					style={{
-						width: '124px',
-						height: '40px',
-						borderTopRightRadius: '8px',
-						borderBottomRightRadius: '8px',
-						backgroundColor: '#E17272',
-					}}
-					onClick={() => {
-						if (selectedDraft) {
-							const isCurrentlyRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
-							props.onRejectDraft?.(selectedDraft.id, isCurrentlyRejected);
-							// Only navigate to next if we're rejecting, not toggling off
-							if (!isCurrentlyRejected) {
-								handleNavigateNext();
+						}}
+					>
+						<span>Approve</span>
+						<ApproveCheckIcon />
+					</Button>
+					<Button
+						type="button"
+						variant="ghost"
+						className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
+						style={{
+							width: '124px',
+							height: '40px',
+							backgroundColor: '#FFDC9E',
+						}}
+						onClick={handleRegenerate}
+						disabled={isRegenerating || !onRegenerateDraft}
+					>
+						{isRegenerating ? (
+							<Spinner size="small" />
+						) : (
+							'Regenerate'
+						)}
+					</Button>
+					<Button
+						type="button"
+						variant="ghost"
+						className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
+						style={{
+							width: '124px',
+							height: '40px',
+							borderTopRightRadius: '8px',
+							borderBottomRightRadius: '8px',
+							backgroundColor: '#E17272',
+						}}
+						onClick={() => {
+							if (selectedDraft) {
+								const isCurrentlyRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
+								props.onRejectDraft?.(selectedDraft.id, isCurrentlyRejected);
+								// Only navigate to next if we're rejecting, not toggling off
+								if (!isCurrentlyRejected) {
+									handleNavigateNext();
+								}
 							}
-						}
-					}}
+						}}
+					>
+						<span>Reject</span>
+						<RejectXIcon />
+					</Button>
+				</div>
+				<button
+					type="button"
+					onClick={handleNavigateNext}
+					disabled={!hasDrafts}
+					aria-label="View next draft"
+					className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+					style={{ marginLeft: '20px' }}
 				>
-					<span>Reject</span>
-					<RejectXIcon />
-				</Button>
+					<RightArrowReviewIcon />
+				</button>
 			</div>
-			<button
-				type="button"
-				onClick={handleNavigateNext}
-				disabled={!hasDrafts}
-				aria-label="View next draft"
-				className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-				style={{ marginLeft: '20px' }}
-			>
-				<RightArrowReviewIcon />
-			</button>
+			{/* Tab navigation right arrow - only in narrow breakpoints */}
+			{showTabNavArrows && props.goToNextTab && (
+				<button
+					type="button"
+					onClick={props.goToNextTab}
+					className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+					aria-label="Next tab"
+				>
+					<RightArrow width="20" height="39" />
+				</button>
+			)}
 		</div>
 			</div>
 		);
