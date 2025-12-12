@@ -4493,8 +4493,43 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* Inbox tab: reuse the dashboard inbox UI, but scoped and labeled by campaign contacts */}
 						{view === 'inbox' && (
 							<div className="mt-6 flex flex-col items-center">
-								{isInboxTabStacked ? (
-									// Stacked layout (<= 1279px): Header + Research on left, Inbox on right
+								{isNarrowestDesktop ? (
+									// Narrowest layout (< 952px): Single column with Inbox on top, Research below
+									<div className="flex flex-col items-center w-full">
+										{/* Inbox section */}
+										<InboxSection
+											allowedSenderEmails={campaignContactEmails}
+											contactByEmail={campaignContactsByEmail}
+											campaignId={campaign.id}
+											onGoToDrafting={goToDrafting}
+											onGoToWriting={goToWriting}
+											onGoToContacts={goToContacts}
+											onContactSelect={(contact) => {
+												if (contact) {
+													setSelectedContactForResearch(contact);
+												}
+											}}
+											onContactHover={(contact) => {
+												setHoveredContactForResearch(contact);
+											}}
+											isNarrow={true}
+										/>
+										{/* Research panel below inbox - matches InboxSection's container structure (w-full mx-auto px-4 maxWidth 516px) */}
+										<div className="mt-[20px] w-full mx-auto px-4" style={{ maxWidth: '516px' }}>
+											<ContactResearchPanel
+												contact={displayedContactForResearch}
+												hideAllText={false}
+												hideSummaryIfBullets={true}
+												height={400}
+												width={516}
+												boxWidth={488}
+												compactHeader
+												style={{ display: 'block' }}
+											/>
+										</div>
+									</div>
+								) : isInboxTabStacked ? (
+									// Stacked layout (952px - 1279px): Header + Research on left, Inbox on right
 									<div className="flex flex-col items-center mx-auto" style={{ width: '909px' }}>
 										<div className="flex flex-row items-start gap-[18px] w-full">
 											{/* Left column: Campaign Header + Research Panel */}
@@ -4590,34 +4625,36 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isNarrow={isInboxTabNarrow}
 										/>
 
-										{/* Bottom Panels: Contacts, Drafts, and Sent */}
-										<div className="mt-[35px] flex justify-center gap-[15px]">
-											<ContactsExpandedList
-												contacts={contactsAvailableForDrafting}
-												width={232}
-												height={117}
-												whiteSectionHeight={15}
-												showSearchBar={false}
-												onOpenContacts={goToContacts}
-											/>
-											<DraftsExpandedList
-												drafts={draftEmails}
-												contacts={contacts || []}
-												width={233}
-												height={117}
-												whiteSectionHeight={15}
-												hideSendButton={true}
-												onOpenDrafts={goToDrafting}
-											/>
-											<SentExpandedList
-												sent={sentEmails}
-												contacts={contacts || []}
-												width={233}
-												height={117}
-												whiteSectionHeight={15}
-												onOpenSent={goToSent}
-											/>
-										</div>
+										{/* Bottom Panels: Contacts, Drafts, and Sent - hidden at narrowest breakpoint (< 952px) */}
+										{!isNarrowestDesktop && (
+											<div className="mt-[35px] flex justify-center gap-[15px]">
+												<ContactsExpandedList
+													contacts={contactsAvailableForDrafting}
+													width={232}
+													height={117}
+													whiteSectionHeight={15}
+													showSearchBar={false}
+													onOpenContacts={goToContacts}
+												/>
+												<DraftsExpandedList
+													drafts={draftEmails}
+													contacts={contacts || []}
+													width={233}
+													height={117}
+													whiteSectionHeight={15}
+													hideSendButton={true}
+													onOpenDrafts={goToDrafting}
+												/>
+												<SentExpandedList
+													sent={sentEmails}
+													contacts={contacts || []}
+													width={233}
+													height={117}
+													whiteSectionHeight={15}
+													onOpenSent={goToSent}
+												/>
+											</div>
+										)}
 									</>
 								)}
 							</div>
