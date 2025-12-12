@@ -223,9 +223,10 @@ const Murmur = () => {
 				</button>
 			)}
 
-			{/* Minimal header - just Back to Home link */}
+			{/* Header row with Back to Home link, centered tabs, and Clerk icon (from layout) */}
 			<div data-slot="campaign-header">
-				<div className="relative h-[50px]">
+				<div className="relative h-[50px] flex items-center justify-center">
+					{/* Back to Home link - left side */}
 					<Link
 						href={urls.murmur.dashboard.index}
 						prefetch
@@ -241,8 +242,6 @@ const Murmur = () => {
 							}
 						}}
 						style={{
-							top: '50%',
-							transform: 'translateY(-50%)',
 							gap: '20px',
 							fontWeight: 400,
 						}}
@@ -262,6 +261,94 @@ const Murmur = () => {
 						</svg>
 						<span>Back to Home</span>
 					</Link>
+
+					{/* View tabs - centered in header (hidden at narrowest breakpoint and on mobile) */}
+					<div className={cn("flex gap-12 mobile-landscape-hide", (isMobile || isNarrowestDesktop) && "hidden")}>
+						<button
+							type="button"
+							className={cn(
+								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+								activeView === 'search'
+									? 'text-black'
+									: 'text-[#6B6B6B] hover:text-black'
+							)}
+							onClick={() => setActiveView('search')}
+						>
+							Search
+						</button>
+						<button
+							type="button"
+							className={cn(
+								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+								activeView === 'contacts'
+									? 'text-black'
+									: 'text-[#6B6B6B] hover:text-black'
+							)}
+							onClick={() => setActiveView('contacts')}
+						>
+							Contacts
+						</button>
+						<button
+							type="button"
+							className={cn(
+								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+								activeView === 'testing'
+									? 'text-black'
+									: 'text-[#6B6B6B] hover:text-black'
+							)}
+							onClick={() => setActiveView('testing')}
+						>
+							Writing
+						</button>
+						<button
+							type="button"
+							className={cn(
+								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+								activeView === 'drafting'
+									? 'text-black'
+									: 'text-[#6B6B6B] hover:text-black'
+							)}
+							onClick={() => setActiveView('drafting')}
+						>
+							Drafts
+						</button>
+						<button
+							type="button"
+							className={cn(
+								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+								activeView === 'sent'
+									? 'text-black'
+									: 'text-[#6B6B6B] hover:text-black'
+							)}
+							onClick={() => setActiveView('sent')}
+						>
+							Sent
+						</button>
+						<button
+							type="button"
+							className={cn(
+								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+								activeView === 'inbox'
+									? 'text-black'
+									: 'text-[#6B6B6B] hover:text-black'
+							)}
+							onClick={() => setActiveView('inbox')}
+						>
+							Inbox
+						</button>
+						<button
+							type="button"
+							className={cn(
+								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+								activeView === 'all'
+									? 'text-black'
+									: 'text-[#6B6B6B] hover:text-black'
+							)}
+							onClick={() => setActiveView('all')}
+						>
+							All
+						</button>
+					</div>
 				</div>
 			</div>
 
@@ -299,7 +386,7 @@ const Murmur = () => {
 						}
 					/>
 
-					{/* Campaign Header Box - shown above tabs at narrowest breakpoint (< 952px) */}
+					{/* Campaign Header Box - shown at narrowest breakpoint (< 952px) */}
 					{!isMobile && isNarrowestDesktop && campaign && (
 						<div className="flex justify-center mb-4">
 							<CampaignHeaderBox
@@ -319,14 +406,14 @@ const Murmur = () => {
 						</div>
 					)}
 
-					{/* View tabs - text-only Inter font (hidden in mobile landscape via local styles) */}
-					<div className={cn("mt-2 flex justify-center mobile-landscape-hide", isNarrowestDesktop && !isMobile && "mt-0")}>
-						<div className="w-full max-w-[1250px] px-6">
-							<div className="flex gap-12 justify-center">
+					{/* View tabs - shown below header box at narrowest breakpoint (< 952px) */}
+					{!isMobile && isNarrowestDesktop && (
+						<div className="flex justify-center mb-4">
+							<div className="flex gap-6">
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'search'
 											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
@@ -338,7 +425,7 @@ const Murmur = () => {
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'contacts'
 											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
@@ -350,7 +437,7 @@ const Murmur = () => {
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'testing'
 											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
@@ -362,7 +449,7 @@ const Murmur = () => {
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'drafting'
 											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
@@ -374,7 +461,7 @@ const Murmur = () => {
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'sent'
 											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
@@ -386,7 +473,7 @@ const Murmur = () => {
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'inbox'
 											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
@@ -398,7 +485,7 @@ const Murmur = () => {
 								<button
 									type="button"
 									className={cn(
-										'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'all'
 											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
@@ -409,7 +496,7 @@ const Murmur = () => {
 								</button>
 							</div>
 						</div>
-					</div>
+					)}
 
 					<div className="mt-6 flex justify-center">
 						<DraftingSection
