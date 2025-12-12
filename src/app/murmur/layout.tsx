@@ -1,8 +1,10 @@
 'use client';
 import { useEffect } from 'react';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useAuth, UserButton, SignInButton } from '@clerk/nextjs';
 
 export default function MurmurLayout({ children }: { children: React.ReactNode }) {
+	const { isSignedIn } = useAuth();
 	// Hide footer for murmur pages and apply animations
 	useEffect(() => {
 		document.body.classList.add('murmur-page');
@@ -52,6 +54,26 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 
 	return (
 		<>
+			{/* Persistent Clerk login icon in top right corner */}
+			<div className="fixed top-3 right-4 z-50">
+				{isSignedIn ? (
+					<UserButton
+						appearance={{
+							elements: {
+								avatarBox: 'w-7 h-7 ring-1 ring-black/10',
+								userButtonTrigger:
+									'opacity-80 hover:opacity-100 transition-opacity duration-300',
+							},
+						}}
+					/>
+				) : (
+					<SignInButton mode="modal">
+						<button className="px-3 py-1.5 text-[12px] font-medium tracking-[0.02em] text-gray-700 hover:text-gray-900 bg-white/80 backdrop-blur-sm rounded-md border border-gray-200 hover:border-gray-300 transition-all duration-300">
+							Sign in
+						</button>
+					</SignInButton>
+				)}
+			</div>
 			{children}
 			<style jsx global>{`
 				/* Prevent iOS Safari zoom on focus by ensuring form controls have >=16px font-size */
