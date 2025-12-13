@@ -350,59 +350,64 @@ const Murmur = () => {
 						</button>
 					</div>
 
-					{/* Mobile tab header - only Contacts, Drafts, Sent, Inbox */}
-					{isMobile && (
-						<div className="flex gap-8 justify-center">
+				{/* Mobile header - campaign title and tabs */}
+				{isMobile && (
+					<div className="absolute inset-x-0 top-0 flex flex-col mt-4">
+						<h1 className="text-[22px] font-medium text-left pl-4 text-black mb-2" style={{ fontFamily: "'Times New Roman', Times, serif" }}>
+							{campaign?.name || 'Untitled Campaign'}
+						</h1>
+						<div className="flex gap-3 justify-center">
 							<button
 								type="button"
 								className={cn(
-									'font-inter text-[15px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+									'font-inter text-[13px] font-medium leading-none bg-[#F5DADA] border cursor-pointer rounded-full px-3 py-1',
 									activeView === 'contacts'
-										? 'text-black'
-										: 'text-[#6B6B6B] hover:text-black'
+										? 'text-black border-black'
+										: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
 								)}
 								onClick={() => setActiveView('contacts')}
 							>
-								Contacts
+								{headerContactsCount.toString().padStart(2, '0')} Contacts
 							</button>
 							<button
 								type="button"
 								className={cn(
-									'font-inter text-[15px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+									'font-inter text-[13px] font-medium leading-none bg-[#FFE3AA] border cursor-pointer rounded-full px-3 py-1',
 									activeView === 'drafting'
-										? 'text-black'
-										: 'text-[#6B6B6B] hover:text-black'
+										? 'text-black border-black'
+										: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
 								)}
 								onClick={() => setActiveView('drafting')}
 							>
-								Drafts
+								{headerDraftCount.toString().padStart(2, '0')} Drafts
 							</button>
 							<button
 								type="button"
 								className={cn(
-									'font-inter text-[15px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+									'font-inter text-[13px] font-medium leading-none bg-[#B0E0A6] border cursor-pointer rounded-full px-3 py-1',
 									activeView === 'sent'
-										? 'text-black'
-										: 'text-[#6B6B6B] hover:text-black'
+										? 'text-black border-black'
+										: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
 								)}
 								onClick={() => setActiveView('sent')}
 							>
-								Sent
+								{headerSentCount.toString().padStart(2, '0')} Sent
 							</button>
 							<button
 								type="button"
 								className={cn(
-									'font-inter text-[15px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+									'font-inter text-[13px] font-medium leading-none bg-[#E8EFFF] border cursor-pointer rounded-full px-3 py-1',
 									activeView === 'inbox'
-										? 'text-black'
-										: 'text-[#6B6B6B] hover:text-black'
+										? 'text-black border-black'
+										: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
 								)}
 								onClick={() => setActiveView('inbox')}
 							>
 								Inbox
 							</button>
 						</div>
-					)}
+					</div>
+				)}
 				</div>
 			</div>
 
