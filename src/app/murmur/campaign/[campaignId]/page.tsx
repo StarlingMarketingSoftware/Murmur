@@ -380,11 +380,11 @@ const Murmur = () => {
 
 				{/* Mobile header - campaign title and tabs */}
 				{isMobile && (
-					<div className="absolute inset-x-0 top-0 flex flex-col mt-4">
-						<h1 className="text-[22px] font-medium text-left pl-4 text-black mb-2" style={{ fontFamily: "'Times New Roman', Times, serif" }}>
+					<div className="absolute inset-x-0 top-0 flex flex-col mt-3">
+						<h1 className="text-[22px] font-medium text-left pl-4 text-black mb-2 leading-7" style={{ fontFamily: "'Times New Roman', Times, serif" }}>
 							{campaign?.name || 'Untitled Campaign'}
 						</h1>
-						<div className="flex gap-3 justify-center">
+						<div className="flex gap-3 justify-center mt-4">
 							<button
 								type="button"
 								className={cn(

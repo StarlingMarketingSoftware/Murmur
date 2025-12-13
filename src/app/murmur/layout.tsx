@@ -55,7 +55,7 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 	return (
 		<>
 			{/* Persistent Clerk login icon in top right corner */}
-			<div className="clerk-user-button fixed top-3 right-4 z-50">
+			<div className={`clerk-user-button fixed top-3 z-50 ${isMobile ? 'right-12' : 'right-4'}`}>
 				{isSignedIn ? (
 					<UserButton
 						appearance={{
@@ -74,6 +74,15 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 					</SignInButton>
 				)}
 			</div>
+			{/* Home button - mobile only */}
+			{isMobile && (
+				<div
+					className="fixed top-3 right-3 z-50 w-7 h-7 flex items-center justify-center"
+					style={{ backgroundColor: '#EAEAEA', borderRadius: '15px' }}
+				>
+					{/* SVG icon will go here */}
+				</div>
+			)}
 			{children}
 			<style jsx global>{`
 				/* Prevent iOS Safari zoom on focus by ensuring form controls have >=16px font-size */
