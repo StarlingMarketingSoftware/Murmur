@@ -12,6 +12,7 @@ import {
 } from '@/constants/ui';
 import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import { ContactWithName } from '@/types/contact';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface SentEmailsProps {
 	emails: EmailWithRelations[];
@@ -32,11 +33,17 @@ export const SentEmails: FC<SentEmailsProps> = ({
 	goToWriting,
 	goToSearch,
 }) => {
+	const isMobile = useIsMobile();
 	const { data: usedContactIds } = useGetUsedContactIds();
 	const usedContactIdsSet = useMemo(
 		() => new Set(usedContactIds || []),
 		[usedContactIds]
 	);
+
+	// Mobile-specific width values (using CSS calc for responsive sizing)
+	// 4px margins on each side for edge-to-edge feel
+	const mobileEmailRowWidth = 'calc(100vw - 24px)'; // Full width minus padding
+
 	return (
 		<DraftingTable
 			handleClick={() => {}}
@@ -49,6 +56,7 @@ export const SentEmails: FC<SentEmailsProps> = ({
 			goToDrafts={goToDrafts}
 			goToWriting={goToWriting}
 			goToSearch={goToSearch}
+			isMobile={isMobile}
 		>
 			<div className="overflow-visible w-full flex flex-col gap-2 items-center">
 				{emails.map((email) => {
@@ -79,8 +87,10 @@ export const SentEmails: FC<SentEmailsProps> = ({
 						<div
 							key={email.id}
 							className={cn(
-								'cursor-pointer transition-colors relative select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2'
+								'cursor-pointer transition-colors relative select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white p-2',
+								isMobile ? 'h-[100px]' : 'w-[489px] h-[97px]'
 							)}
+							style={isMobile ? { width: mobileEmailRowWidth } : undefined}
 							onMouseEnter={() => {
 								if (contactForResearch) {
 									onContactHover?.(contactForResearch);
@@ -95,8 +105,8 @@ export const SentEmails: FC<SentEmailsProps> = ({
 								}
 							}}
 						>
-							{/* Used-contact indicator - vertically centered */}
-							{usedContactIdsSet.has(email.contactId) && (
+							{/* Used-contact indicator - vertically centered (hidden on mobile for space) */}
+							{usedContactIdsSet.has(email.contactId) && !isMobile && (
 								<span
 									className="absolute left-[8px]"
 									title="Used in a previous campaign"
@@ -113,18 +123,30 @@ export const SentEmails: FC<SentEmailsProps> = ({
 							)}
 
 							{/* Fixed top-right info (Title + Location) - matching drafts table design */}
-							<div className="absolute top-[6px] right-[4px] flex flex-col items-start gap-[2px] pointer-events-none">
+							<div className={cn(
+								"absolute flex flex-col items-start gap-[2px] pointer-events-none",
+								isMobile ? "top-[4px] right-[4px]" : "top-[6px] right-[4px]"
+							)}>
 								{contactTitle ? (
-									<div className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden">
+									<div className={cn(
+										"rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden",
+										isMobile ? "h-[17px] max-w-[140px]" : "h-[21px] w-[240px]"
+									)}>
 										<ScrollableText
 											text={contactTitle}
-											className="text-[10px] text-black leading-none"
+											className={cn(
+												"text-black leading-none",
+												isMobile ? "text-[9px]" : "text-[10px]"
+											)}
 											scrollPixelsPerSecond={60}
 										/>
 									</div>
 								) : null}
 
-								<div className="flex items-center justify-start gap-1 h-[20px]">
+								<div className={cn(
+									"flex items-center justify-start gap-1",
+									isMobile ? "h-[16px]" : "h-[20px]"
+								)}>
 									{(() => {
 										const fullStateName = (contact?.state as string) || '';
 										const stateAbbr = getStateAbbreviation(fullStateName) || '';
@@ -147,8 +169,8 @@ export const SentEmails: FC<SentEmailsProps> = ({
 											<div
 												className="inline-flex items-center justify-center rounded-[6px] border overflow-hidden flex-shrink-0"
 												style={{
-													width: '39px',
-													height: '20px',
+													width: isMobile ? '28px' : '39px',
+													height: isMobile ? '16px' : '20px',
 													borderColor: '#000000',
 												}}
 												title="Canadian province"
@@ -161,10 +183,13 @@ export const SentEmails: FC<SentEmailsProps> = ({
 											</div>
 										) : isUSAbbr ? (
 											<span
-												className="inline-flex items-center justify-center rounded-[6px] border text-[12px] leading-none font-bold flex-shrink-0"
+												className={cn(
+													"inline-flex items-center justify-center rounded-[6px] border leading-none font-bold flex-shrink-0",
+													isMobile ? "text-[10px]" : "text-[12px]"
+												)}
 												style={{
-													width: '39px',
-													height: '20px',
+													width: isMobile ? '28px' : '39px',
+													height: isMobile ? '16px' : '20px',
 													backgroundColor:
 														stateBadgeColorMap[stateAbbr] || 'transparent',
 													borderColor: '#000000',
@@ -176,14 +201,14 @@ export const SentEmails: FC<SentEmailsProps> = ({
 											<span
 												className="inline-flex items-center justify-center rounded-[6px] border flex-shrink-0"
 												style={{
-													width: '39px',
-													height: '20px',
+													width: isMobile ? '28px' : '39px',
+													height: isMobile ? '16px' : '20px',
 													borderColor: '#000000',
 												}}
 											/>
 										);
 									})()}
-									{contact?.city ? (
+									{contact?.city && !isMobile ? (
 										<ScrollableText
 											text={contact.city}
 											className="text-[12px] font-inter font-normal text-black leading-none"
@@ -193,34 +218,45 @@ export const SentEmails: FC<SentEmailsProps> = ({
 							</div>
 
 							{/* Content flex column */}
-							<div className="flex flex-col justify-center h-full pl-[30px] gap-[2px] pr-[30px]">
+							<div className={cn(
+								"flex flex-col justify-center h-full gap-[2px]",
+								isMobile ? "pl-[8px] pr-[8px]" : "pl-[30px] pr-[30px]"
+							)}>
 								{/* Row 1 & 2: Name / Company */}
 								{(() => {
-									const topRowMargin = contactTitle
-										? 'mr-[220px]'
-										: 'mr-[120px]';
+									const topRowMargin = isMobile
+										? (contactTitle ? 'mr-[100px]' : 'mr-[40px]')
+										: (contactTitle ? 'mr-[220px]' : 'mr-[120px]');
 									if (hasSeparateName) {
 										return (
 											<>
 												{/* Name */}
 												<div
 													className={cn(
-														'flex items-center min-h-[20px]',
+														'flex items-center',
+														isMobile ? 'min-h-[18px]' : 'min-h-[20px]',
 														topRowMargin
 													)}
 												>
-													<div className="text-[15px] font-inter font-semibold truncate leading-none">
+													<div className={cn(
+														"font-inter font-semibold truncate leading-none",
+														isMobile ? "text-[14px]" : "text-[15px]"
+													)}>
 														{contactName}
 													</div>
 												</div>
 												{/* Company */}
 												<div
 													className={cn(
-														'flex items-center min-h-[20px]',
+														'flex items-center',
+														isMobile ? 'min-h-[16px]' : 'min-h-[20px]',
 														topRowMargin
 													)}
 												>
-													<div className="text-[15px] font-inter font-medium text-black leading-tight line-clamp-2">
+													<div className={cn(
+														"font-inter font-medium text-black leading-tight",
+														isMobile ? "text-[12px] truncate" : "text-[15px] line-clamp-2"
+													)}>
 														{contact?.company || ''}
 													</div>
 												</div>
@@ -232,11 +268,15 @@ export const SentEmails: FC<SentEmailsProps> = ({
 									return (
 										<div
 											className={cn(
-												'flex items-center min-h-[42px] pb-[6px]',
+												'flex items-center',
+												isMobile ? 'min-h-[34px] pb-[4px]' : 'min-h-[42px] pb-[6px]',
 												topRowMargin
 											)}
 										>
-											<div className="text-[15px] font-inter font-medium text-black leading-tight line-clamp-2">
+											<div className={cn(
+												"font-inter font-medium text-black leading-tight",
+												isMobile ? "text-[14px] truncate" : "text-[15px] line-clamp-2"
+											)}>
 												{contactName}
 											</div>
 										</div>
@@ -244,9 +284,15 @@ export const SentEmails: FC<SentEmailsProps> = ({
 								})()}
 
 								{/* Row 3: Subject */}
-								<div className="flex items-center min-h-[14px]">
+								<div className={cn(
+									"flex items-center",
+									isMobile ? "min-h-[12px]" : "min-h-[14px]"
+								)}>
 									<div
-										className="text-[14px] font-inter font-semibold text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+										className={cn(
+											"font-inter font-semibold text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2",
+											isMobile ? "text-[13px]" : "text-[14px]"
+										)}
 										style={{
 											WebkitMaskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
 											maskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
@@ -257,9 +303,15 @@ export const SentEmails: FC<SentEmailsProps> = ({
 								</div>
 
 								{/* Row 4: Message preview */}
-								<div className="flex items-center min-h-[14px]">
+								<div className={cn(
+									"flex items-center",
+									isMobile ? "min-h-[12px]" : "min-h-[14px]"
+								)}>
 									<div
-										className="text-[10px] text-gray-500 leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+										className={cn(
+											"text-gray-500 leading-none whitespace-nowrap overflow-hidden w-full pr-2",
+											isMobile ? "text-[9px]" : "text-[10px]"
+										)}
 										style={{
 											WebkitMaskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
 											maskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
@@ -272,10 +324,14 @@ export const SentEmails: FC<SentEmailsProps> = ({
 						</div>
 					);
 				})}
-				{Array.from({ length: Math.max(0, 6 - emails.length) }).map((_, idx) => (
+				{Array.from({ length: Math.max(0, (isMobile ? 4 : 6) - emails.length) }).map((_, idx) => (
 					<div
 						key={`sent-placeholder-${idx}`}
-						className="select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#5AB477] p-2"
+						className={cn(
+							'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#5AB477] p-2',
+							isMobile ? 'h-[100px]' : 'w-[489px] h-[97px]'
+						)}
+						style={isMobile ? { width: mobileEmailRowWidth } : undefined}
 					/>
 				))}
 			</div>

@@ -135,6 +135,8 @@ interface DraftingTableProps {
 	rejectedCount?: number;
 	/** Total count of all drafts */
 	totalDraftsCount?: number;
+	/** Mobile mode flag */
+	isMobile?: boolean | null;
 }
 export const DraftingTable: FC<DraftingTableProps> = ({
 	title,
@@ -157,6 +159,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	approvedCount = 0,
 	rejectedCount = 0,
 	totalDraftsCount = 0,
+	isMobile,
 }) => {
 	const router = useRouter();
 	const [isDraftsCounterHovered, setIsDraftsCounterHovered] = useState(false);
@@ -168,8 +171,11 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	const isDrafts = title === 'Drafts';
 	const isSent = title === 'Sent';
 
-	const boxWidth = isContacts || isDrafts || isSent ? '499px' : '376px';
-	const boxHeight = isContacts || isDrafts || isSent ? '703px' : '474px';
+	// Mobile-responsive box dimensions
+	const mobileBoxWidth = 'calc(100vw - 8px)'; // 4px margins on each side
+	const mobileBoxHeight = 'calc(100dvh - 160px)';
+	const boxWidth = isMobile ? mobileBoxWidth : (isContacts || isDrafts || isSent ? '499px' : '376px');
+	const boxHeight = isMobile ? mobileBoxHeight : (isContacts || isDrafts || isSent ? '703px' : '474px');
 
 	return (
 		<div style={{ width: boxWidth, height: boxHeight, position: 'relative' }}>
@@ -281,8 +287,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				</div>
 			)}
 
-			{/* New Sent Pill */}
-			{isSent && (
+			{/* New Sent Pill - hidden on mobile (use simpler header) */}
+			{isSent && !isMobile && (
 				<>
 					<div
 						style={{
@@ -345,6 +351,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					/>
 				</>
 			)}
+			{/* Mobile Sent Header - hidden on mobile per user request */}
 
 			{/* Filter tabs in gray section for Drafts */}
 			{isDrafts && hasData && onStatusFilterChange && (
@@ -428,19 +435,21 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					position: 'relative',
 					display: 'flex',
 					flexDirection: 'column',
-					background: isContacts
-						? hasData
-							? 'linear-gradient(to bottom, #ffffff 26px, #EB8586 26px)'
-							: '#FFAEAE'
-						: isDrafts
-						? hasData
-							? 'linear-gradient(to bottom, #ffffff 26px, #E7E7E7 26px, #E7E7E7 55px, #FFDC9E 55px)'
-							: '#F8D69A'
-						: isSent
-						? hasData
-							? 'linear-gradient(to bottom, #ffffff 26px, #5AB477 26px)'
-							: '#a2e1b7'
-						: 'white',
+				background: isContacts
+					? hasData
+						? 'linear-gradient(to bottom, #ffffff 26px, #EB8586 26px)'
+						: '#FFAEAE'
+					: isDrafts
+					? hasData
+						? 'linear-gradient(to bottom, #ffffff 26px, #E7E7E7 26px, #E7E7E7 55px, #FFDC9E 55px)'
+						: '#F8D69A'
+					: isSent
+					? isMobile
+						? '#5AB477' // Solid green on mobile (no white header)
+						: hasData
+						? 'linear-gradient(to bottom, #ffffff 26px, #5AB477 26px)'
+						: '#a2e1b7'
+					: 'white',
 				}}
 			>
 				{/* Header section with top rounded corners */}
@@ -686,18 +695,18 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				<CustomScrollbar
 					className="flex-1 drafting-table-content"
 					style={{
-						marginTop:
-							isContacts && topContent && hasData
-								? '115px'
-								: isContacts && hasData
-								? '105px'
-								: isContacts
-								? '68px'
-								: isDrafts
-								? '66px'
-								: isSent
-								? '32px'
-								: 0,
+					marginTop:
+						isContacts && topContent && hasData
+							? '115px'
+							: isContacts && hasData
+							? '105px'
+							: isContacts
+							? '68px'
+							: isDrafts
+							? '66px'
+							: isSent
+							? (isMobile ? '8px' : '32px') // Minimal margin on mobile (no white header)
+							: 0,
 					}}
 					thumbWidth={2}
 					thumbColor="#000000"
@@ -711,142 +720,147 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					) : hasData ? (
 						children
 					) : isDrafts || isSent ? (
-						<div
-							className="overflow-visible w-full flex flex-col items-center"
-							style={{ gap: '10px' }}
-						>
-							{Array.from({ length: 8 }).map((_, idx) => {
-								// For drafts/sent empty state: boxes 2-5 (idx 1-4) are 52px, all others are 85px
-								const boxHeight =
-									(isDrafts || isSent) && idx >= 1 && idx <= 4 ? 'h-[52px]' : 'h-[85px]';
-								const boxBgColor = isDrafts
-									? idx === 1
-										? 'bg-[#FFCF79]'
-										: idx === 2
-										? 'bg-[#FFD487]'
-										: idx === 3
-										? 'bg-[#FFD892]'
-										: idx === 4
-										? 'bg-[#FFDA97]'
-										: 'bg-[#FFCD73]'
-									: isSent
-									? idx === 1
-										? 'bg-[#52CD7A]'
-										: idx === 2
-										? 'bg-[#63D286]'
-										: idx === 3
-										? 'bg-[#79dc99]'
-										: idx === 4
-										? 'bg-[#96e7b0]'
-										: 'bg-[#53c076]'
-									: 'bg-white';
-								return (
-									<div
-										key={idx}
-										className={`select-none w-[489px] ${boxHeight} overflow-hidden rounded-[8px] border-2 border-[#000000] ${boxBgColor} p-2 flex items-center justify-center`}
-									>
-										{isDrafts && idx === 0 && (
-											<span className="text-[15px] font-semibold font-inter text-black">
-												Draft Your First Email
+					<div
+						className="overflow-visible w-full flex flex-col items-center"
+						style={{ gap: '10px', padding: isMobile ? '0 8px' : undefined }}
+					>
+						{Array.from({ length: isMobile ? 5 : 8 }).map((_, idx) => {
+							// For drafts/sent empty state: boxes 2-5 (idx 1-4) are 52px, all others are 85px
+							// On mobile: boxes are slightly taller (58px vs 52px, 90px vs 85px)
+							const placeholderBoxHeight =
+								(isDrafts || isSent) && idx >= 1 && idx <= 4 
+									? (isMobile ? 'h-[58px]' : 'h-[52px]') 
+									: (isMobile ? 'h-[90px]' : 'h-[85px]');
+							const boxBgColor = isDrafts
+								? idx === 1
+									? 'bg-[#FFCF79]'
+									: idx === 2
+									? 'bg-[#FFD487]'
+									: idx === 3
+									? 'bg-[#FFD892]'
+									: idx === 4
+									? 'bg-[#FFDA97]'
+									: 'bg-[#FFCD73]'
+								: isSent
+								? idx === 1
+									? 'bg-[#52CD7A]'
+									: idx === 2
+									? 'bg-[#63D286]'
+									: idx === 3
+									? 'bg-[#79dc99]'
+									: idx === 4
+									? 'bg-[#96e7b0]'
+									: 'bg-[#53c076]'
+								: 'bg-white';
+							const placeholderBoxWidth = isMobile ? 'w-full' : 'w-[489px]';
+							const innerButtonWidth = isMobile ? 'calc(100% - 24px)' : '376px';
+							return (
+								<div
+									key={idx}
+									className={`select-none ${placeholderBoxWidth} ${placeholderBoxHeight} overflow-hidden rounded-[8px] border-2 border-[#000000] ${boxBgColor} p-2 flex items-center justify-center`}
+								>
+									{isDrafts && idx === 0 && (
+										<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[14px]' : 'text-[15px]'}`}>
+											Draft Your First Email
+										</span>
+									)}
+									{isSent && idx === 0 && (
+										<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[14px]' : 'text-[15px]'}`}>
+											Send Your First Message
+										</span>
+									)}
+									{isDrafts && idx === 1 && (
+										<div
+											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
+											onClick={goToWriting}
+										>
+											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[12px]' : 'text-[15px]'}`}>
+												Write Your Emails
 											</span>
-										)}
-										{isSent && idx === 0 && (
-											<span className="text-[15px] font-semibold font-inter text-black">
-												Send Your First Message
+										</div>
+									)}
+									{isDrafts && idx === 2 && (
+										<div
+											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
+											onClick={goToSearch}
+										>
+											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[12px]' : 'text-[15px]'}`}>
+												Search For More Contacts
 											</span>
-										)}
-										{isDrafts && idx === 1 && (
-											<div
-												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
-												style={{ width: '375px', height: '42px' }}
-												onClick={goToWriting}
-											>
-												<span className="text-[15px] font-semibold font-inter text-black">
-													Write Your Emails
-												</span>
-											</div>
-										)}
-										{isDrafts && idx === 2 && (
-											<div
-												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
-												style={{ width: '375px', height: '42px' }}
-												onClick={goToSearch}
-											>
-												<span className="text-[15px] font-semibold font-inter text-black">
-													Search For More Contacts
-												</span>
-											</div>
-										)}
-										{isDrafts && idx === 3 && (
-											<div
-												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
-												style={{ width: '375px', height: '42px' }}
-												onClick={goToInbox}
-											>
-												<span className="text-[15px] font-semibold font-inter text-black">
-													Check Inbox
-												</span>
-											</div>
-										)}
-										{isDrafts && idx === 4 && (
-											<div
-												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
-												style={{ width: '375px', height: '42px' }}
-												onClick={() => router.push(urls.murmur.dashboard.index)}
-											>
-												<span className="text-[15px] font-semibold font-inter text-black">
-													Create New Campaign
-												</span>
-											</div>
-										)}
-										{isSent && idx === 1 && (
-											<div
-												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
-												style={{ width: '376px', height: '42px' }}
-												onClick={goToDrafts}
-											>
-												<span className="text-[15px] font-semibold font-inter text-black">
-													Review and Send Drafts
-												</span>
-											</div>
-										)}
-										{isSent && idx === 2 && (
-											<div
-												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
-												style={{ width: '376px', height: '42px' }}
-												onClick={goToWriting}
-											>
-												<span className="text-[15px] font-semibold font-inter text-black">
-													Write More Emails
-												</span>
-											</div>
-										)}
-										{isSent && idx === 3 && (
-											<div
-												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
-												style={{ width: '376px', height: '42px' }}
-												onClick={goToSearch}
-											>
-												<span className="text-[15px] font-semibold font-inter text-black">
-													Add More Contacts
-												</span>
-											</div>
-										)}
-										{isSent && idx === 4 && (
-											<div
-												className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
-												style={{ width: '376px', height: '42px' }}
-												onClick={() => router.push(urls.murmur.dashboard.index)}
-											>
-												<span className="text-[15px] font-semibold font-inter text-black">
-													Create New Campaign
-												</span>
-											</div>
-										)}
-									</div>
-								);
-							})}
-						</div>
+										</div>
+									)}
+									{isDrafts && idx === 3 && (
+										<div
+											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
+											onClick={goToInbox}
+										>
+											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[12px]' : 'text-[15px]'}`}>
+												Check Inbox
+											</span>
+										</div>
+									)}
+									{isDrafts && idx === 4 && (
+										<div
+											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
+											onClick={() => router.push(urls.murmur.dashboard.index)}
+										>
+											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[12px]' : 'text-[15px]'}`}>
+												Create New Campaign
+											</span>
+										</div>
+									)}
+									{isSent && idx === 1 && (
+										<div
+											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
+											onClick={goToDrafts}
+										>
+											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[12px]' : 'text-[15px]'}`}>
+												Review and Send Drafts
+											</span>
+										</div>
+									)}
+									{isSent && idx === 2 && (
+										<div
+											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
+											onClick={goToWriting}
+										>
+											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[12px]' : 'text-[15px]'}`}>
+												Write More Emails
+											</span>
+										</div>
+									)}
+									{isSent && idx === 3 && (
+										<div
+											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
+											onClick={goToSearch}
+										>
+											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[12px]' : 'text-[15px]'}`}>
+												Add More Contacts
+											</span>
+										</div>
+									)}
+									{isSent && idx === 4 && (
+										<div
+											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
+											onClick={() => router.push(urls.murmur.dashboard.index)}
+										>
+											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[12px]' : 'text-[15px]'}`}>
+												Create New Campaign
+											</span>
+										</div>
+									)}
+								</div>
+							);
+						})}
+					</div>
 					) : isContacts ? (
 						<div
 							className="overflow-visible w-full flex flex-col items-center pb-2"

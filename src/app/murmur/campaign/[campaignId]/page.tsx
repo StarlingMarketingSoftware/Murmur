@@ -349,6 +349,60 @@ const Murmur = () => {
 							All
 						</button>
 					</div>
+
+					{/* Mobile tab header - only Contacts, Drafts, Sent, Inbox */}
+					{isMobile && (
+						<div className="flex gap-8 justify-center">
+							<button
+								type="button"
+								className={cn(
+									'font-inter text-[15px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+									activeView === 'contacts'
+										? 'text-black'
+										: 'text-[#6B6B6B] hover:text-black'
+								)}
+								onClick={() => setActiveView('contacts')}
+							>
+								Contacts
+							</button>
+							<button
+								type="button"
+								className={cn(
+									'font-inter text-[15px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+									activeView === 'drafting'
+										? 'text-black'
+										: 'text-[#6B6B6B] hover:text-black'
+								)}
+								onClick={() => setActiveView('drafting')}
+							>
+								Drafts
+							</button>
+							<button
+								type="button"
+								className={cn(
+									'font-inter text-[15px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+									activeView === 'sent'
+										? 'text-black'
+										: 'text-[#6B6B6B] hover:text-black'
+								)}
+								onClick={() => setActiveView('sent')}
+							>
+								Sent
+							</button>
+							<button
+								type="button"
+								className={cn(
+									'font-inter text-[15px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+									activeView === 'inbox'
+										? 'text-black'
+										: 'text-[#6B6B6B] hover:text-black'
+								)}
+								onClick={() => setActiveView('inbox')}
+							>
+								Inbox
+							</button>
+						</div>
+					)}
 				</div>
 			</div>
 
