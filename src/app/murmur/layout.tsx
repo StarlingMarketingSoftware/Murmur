@@ -3,11 +3,15 @@ import { useEffect } from 'react';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useAuth, UserButton, SignInButton } from '@clerk/nextjs';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import HomeIcon from '@/components/atoms/_svg/HomeIcon';
 
 export default function MurmurLayout({ children }: { children: React.ReactNode }) {
 	const { isSignedIn } = useAuth();
+	const pathname = usePathname();
+	const isDashboard = pathname === urls.murmur.dashboard.index;
+	const showHomeButton = !isDashboard;
 	// Hide footer for murmur pages and apply animations
 	useEffect(() => {
 		document.body.classList.add('murmur-page');
@@ -58,7 +62,7 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 	return (
 		<>
 			{/* Persistent Clerk login icon in top right corner */}
-			<div className={`clerk-user-button fixed top-3 z-50 ${isMobile ? 'right-12' : 'right-4'}`}>
+			<div className={`clerk-user-button fixed top-3 z-50 ${isMobile && showHomeButton ? 'right-12' : 'right-4'}`}>
 				{isSignedIn ? (
 					<UserButton
 						appearance={{
@@ -77,8 +81,8 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 					</SignInButton>
 				)}
 			</div>
-			{/* Home button - mobile only */}
-			{isMobile && (
+			{/* Home button - mobile only, not on dashboard */}
+			{isMobile && showHomeButton && (
 				<Link
 					href={urls.murmur.dashboard.index}
 					className="fixed top-3 right-3 z-50 w-7 h-7 flex items-center justify-center"
