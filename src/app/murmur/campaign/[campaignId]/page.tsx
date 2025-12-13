@@ -178,6 +178,34 @@ const Murmur = () => {
 		}
 	};
 
+	// Mobile-specific tab navigation (only the 4 visible tabs on mobile)
+	const mobileTabOrder: Array<'contacts' | 'drafting' | 'sent' | 'inbox'> = [
+		'contacts',
+		'drafting',
+		'sent',
+		'inbox',
+	];
+
+	const goToPreviousMobileTab = () => {
+		const currentIndex = mobileTabOrder.indexOf(activeView as 'contacts' | 'drafting' | 'sent' | 'inbox');
+		if (currentIndex > 0) {
+			setActiveView(mobileTabOrder[currentIndex - 1]);
+		} else {
+			// Wrap around to the last mobile tab
+			setActiveView(mobileTabOrder[mobileTabOrder.length - 1]);
+		}
+	};
+
+	const goToNextMobileTab = () => {
+		const currentIndex = mobileTabOrder.indexOf(activeView as 'contacts' | 'drafting' | 'sent' | 'inbox');
+		if (currentIndex >= 0 && currentIndex < mobileTabOrder.length - 1) {
+			setActiveView(mobileTabOrder[currentIndex + 1]);
+		} else {
+			// Wrap around to the first mobile tab
+			setActiveView(mobileTabOrder[0]);
+		}
+	};
+
 	if (isPendingCampaign || !campaign) {
 		return silentLoad ? null : <Spinner />;
 	}
@@ -984,6 +1012,31 @@ const Murmur = () => {
 			{/* Right side panel - hidden on mobile, when width < 1522px, on search tab when width < 1796px, on all tab when width <= 1665px, or on inbox tab when width < 1681px */}
 			{!isMobile && !hideRightPanel && !(activeView === 'search' && hideRightPanelOnSearch) && !(activeView === 'all' && hideRightPanelOnAll) && !(activeView === 'inbox' && hideRightPanelOnInbox) && (
 				<CampaignRightPanel view={activeView} onTabChange={setActiveView} />
+			)}
+
+			{/* Mobile bottom navigation panel */}
+			{isMobile && (
+				<div
+					className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-1"
+					style={{ backgroundColor: '#E1EFF4' }}
+				>
+					<button
+						type="button"
+						onClick={goToPreviousMobileTab}
+						className="bg-transparent border-0 p-1 cursor-pointer hover:opacity-70 transition-opacity"
+						aria-label="Previous tab"
+					>
+						<LeftArrow width={18} height={34} color="#000000" opacity={1} />
+					</button>
+					<button
+						type="button"
+						onClick={goToNextMobileTab}
+						className="bg-transparent border-0 p-1 cursor-pointer hover:opacity-70 transition-opacity"
+						aria-label="Next tab"
+					>
+						<RightArrow width={18} height={34} color="#000000" opacity={1} />
+					</button>
+				</div>
 			)}
 		</div>
 	);
