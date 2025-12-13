@@ -3097,10 +3097,34 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						)}
 					</div>
 
-					{/* Contacts tab - show the contacts table */}
-						{view === 'contacts' && (
-							<div className="w-full min-h-[300px]">
-								{isNarrowDesktop ? (
+				{/* Contacts tab - show the contacts table */}
+					{view === 'contacts' && (
+						<div className={`w-full ${isMobile ? 'mt-6' : 'min-h-[300px]'}`}>
+							{isMobile ? (
+								// Mobile layout: Full-width contacts, no side panels
+								<div className="flex flex-col items-center w-full px-1">
+									<ContactsSelection
+										contacts={contactsAvailableForDrafting}
+										allContacts={contacts}
+										selectedContactIds={contactsTabSelectedIds}
+										setSelectedContactIds={setContactsTabSelectedIds}
+										handleContactSelection={handleContactsTabSelection}
+										campaign={campaign}
+										onDraftEmails={async (ids) => {
+											await handleGenerateDrafts(ids);
+										}}
+										isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
+										onContactClick={handleResearchContactClick}
+										onContactHover={handleResearchContactHover}
+										onSearchFromMiniBar={handleMiniContactsSearch}
+										goToSearch={onGoToSearch}
+										goToDrafts={goToDrafting}
+										goToInbox={goToInbox}
+										hideBottomPanels
+										hideButton
+									/>
+								</div>
+							) : isNarrowDesktop ? (
 									// Narrow desktop (952px - 1279px): center BOTH the left panel and contacts table together
 									// Fixed width container: left (330) + gap (35) + right (499) = 864px, centered with mx-auto
 									// Bottom panels are rendered separately and centered relative to the full container

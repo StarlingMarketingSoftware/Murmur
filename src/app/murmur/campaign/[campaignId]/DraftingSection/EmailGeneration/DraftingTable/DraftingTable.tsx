@@ -193,8 +193,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 			>
 				{isContacts ? '' : isDrafts ? '' : isSent ? '' : ''}
 			</div>
-			{/* New Contacts Pill */}
-			{isContacts && <ContactsHeaderChrome hasData={hasData} />}
+			{/* New Contacts Pill - hidden on mobile */}
+			{isContacts && !isMobile && <ContactsHeaderChrome hasData={hasData} />}
 
 			{/* New Drafts Pill - hidden on mobile */}
 			{isDrafts && !isMobile && (
@@ -436,7 +436,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					display: 'flex',
 					flexDirection: 'column',
 				background: isContacts
-					? hasData
+					? isMobile
+						? '#EB8586' // Solid pink on mobile (no white header)
+						: hasData
 						? 'linear-gradient(to bottom, #ffffff 26px, #EB8586 26px)'
 						: '#FFAEAE'
 					: isDrafts
@@ -698,7 +700,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					className="flex-1 drafting-table-content"
 					style={{
 					marginTop:
-						isContacts && topContent && hasData
+						isContacts && isMobile
+							? '8px' // Minimal margin on mobile (no white header)
+							: isContacts && topContent && hasData
 							? '115px'
 							: isContacts && hasData
 							? '105px'
