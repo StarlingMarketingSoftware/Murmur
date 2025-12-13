@@ -381,9 +381,20 @@ const Murmur = () => {
 				{/* Mobile header - campaign title and tabs */}
 				{isMobile && (
 					<div className="absolute inset-x-0 top-0 flex flex-col mt-3">
-						<h1 className="text-[22px] font-medium text-left pl-4 text-black mb-2 leading-7" style={{ fontFamily: "'Times New Roman', Times, serif" }}>
-							{campaign?.name || 'Untitled Campaign'}
-						</h1>
+						<div 
+							className="pl-4 pr-20 overflow-hidden"
+							style={{
+								maskImage: 'linear-gradient(to right, black 60%, transparent 95%)',
+								WebkitMaskImage: 'linear-gradient(to right, black 60%, transparent 95%)',
+							}}
+						>
+							<h1 
+								className="text-[22px] font-medium text-left text-black mb-2 leading-7 whitespace-nowrap" 
+								style={{ fontFamily: "'Times New Roman', Times, serif" }}
+							>
+								{campaign?.name || 'Untitled Campaign'}
+							</h1>
+						</div>
 						<div className="flex gap-3 justify-center mt-4">
 							<button
 								type="button"

@@ -2,6 +2,9 @@
 import { useEffect } from 'react';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useAuth, UserButton, SignInButton } from '@clerk/nextjs';
+import Link from 'next/link';
+import { urls } from '@/constants/urls';
+import HomeIcon from '@/components/atoms/_svg/HomeIcon';
 
 export default function MurmurLayout({ children }: { children: React.ReactNode }) {
 	const { isSignedIn } = useAuth();
@@ -76,12 +79,13 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 			</div>
 			{/* Home button - mobile only */}
 			{isMobile && (
-				<div
+				<Link
+					href={urls.murmur.dashboard.index}
 					className="fixed top-3 right-3 z-50 w-7 h-7 flex items-center justify-center"
 					style={{ backgroundColor: '#EAEAEA', borderRadius: '15px' }}
 				>
-					{/* SVG icon will go here */}
-				</div>
+					<HomeIcon />
+				</Link>
 			)}
 			{children}
 			<style jsx global>{`
