@@ -826,6 +826,39 @@ const DashboardContent = () => {
 		return null;
 	}
 
+	// Mobile dashboard: show only the campaigns inbox table (no search bar, no tab toggle).
+	if (isMobile) {
+		return (
+			<div className="min-h-screen w-full">
+				<div className="w-full">
+					<div
+						className="flex justify-center items-center w-full px-4"
+						style={{
+							marginBottom: '0.5rem',
+							marginTop: '40px',
+						}}
+					>
+						<div className="premium-hero-section flex flex-col items-center justify-center w-full max-w-[600px]">
+							<div
+								className="premium-logo-container flex items-center justify-center"
+								style={{ width: logoWidth, height: logoHeight }}
+							>
+								<MurmurLogoNew width={logoWidth} height={logoHeight} />
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div style={{ marginTop: '12px' }}>
+					<CampaignsInboxView
+						hideSearchBar
+						containerHeight="calc(100dvh - 120px - env(safe-area-inset-bottom, 0px))"
+					/>
+				</div>
+			</div>
+		);
+	}
+
 	// Reduce extra white space above the fixed mobile action button by
 	// only adding bottom padding when needed and using a smaller value on mobile
 	const bottomPadding = isMobile && hasSearched ? 'pb-[64px]' : 'pb-0 md:pb-[100px]';
