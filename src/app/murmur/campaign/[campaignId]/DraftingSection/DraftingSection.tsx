@@ -2692,8 +2692,42 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						>
 							{/* Drafts tab - show only the drafts table centered */}
 							{view === 'drafting' && (
-								<div className="w-full min-h-[300px]">
-									{isNarrowDesktop ? (
+								<div className={`w-full ${isMobile ? 'mt-6' : 'min-h-[300px]'}`}>
+									{isMobile ? (
+										// Mobile layout: Full-width drafts, no side panels
+										<div className="flex flex-col items-center w-full px-1">
+											<DraftedEmails
+												contacts={contacts || []}
+												selectedDraftIds={draftsTabSelectedIds}
+												selectedDraft={selectedDraft}
+												setSelectedDraft={setSelectedDraft}
+												setIsDraftDialogOpen={setIsDraftDialogOpen}
+												handleDraftSelection={handleDraftSelection}
+												draftEmails={draftEmails}
+												isPendingEmails={isPendingEmails}
+												setSelectedDraftIds={setDraftsTabSelectedIds}
+												onSend={handleSendDrafts}
+												isSendingDisabled={isSendingDisabled}
+												isFreeTrial={isFreeTrial || false}
+												fromName={fromName}
+												fromEmail={fromEmail}
+												subject={form.watch('subject')}
+												onContactClick={handleResearchContactClick}
+												onContactHover={handleResearchContactHover}
+												goToWriting={goToWriting}
+												goToSearch={onGoToSearch}
+												goToInbox={goToInbox}
+												onRejectDraft={handleRejectDraft}
+												onApproveDraft={handleApproveDraft}
+												onRegenerateDraft={handleRegenerateDraft}
+												rejectedDraftIds={rejectedDraftIds}
+												approvedDraftIds={approvedDraftIds}
+												statusFilter={draftStatusFilter}
+												onStatusFilterChange={setDraftStatusFilter}
+												hideSendButton
+											/>
+										</div>
+									) : isNarrowDesktop ? (
 										// Narrow desktop (952px - 1279px): center BOTH the left panel and drafts table together
 										// Fixed width container: left (330) + gap (10) + right (499) = 839px, centered with mx-auto
 										<div className="flex flex-col items-center mx-auto" style={{ width: '839px' }}>

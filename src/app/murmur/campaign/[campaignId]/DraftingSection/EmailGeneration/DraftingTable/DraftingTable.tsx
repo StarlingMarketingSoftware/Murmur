@@ -196,8 +196,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 			{/* New Contacts Pill */}
 			{isContacts && <ContactsHeaderChrome hasData={hasData} />}
 
-			{/* New Drafts Pill */}
-			{isDrafts && (
+			{/* New Drafts Pill - hidden on mobile */}
+			{isDrafts && !isMobile && (
 				<>
 					<div
 						style={{
@@ -261,8 +261,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				</>
 			)}
 
-			{/* Counter in top right corner of Drafts table - hidden on approved/rejected tabs */}
-			{isDrafts && statusFilter === 'all' && (
+			{/* Counter in top right corner of Drafts table - hidden on approved/rejected tabs and on mobile */}
+			{isDrafts && statusFilter === 'all' && !isMobile && (
 				<div
 					style={{
 						position: 'absolute',
@@ -353,8 +353,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 			)}
 			{/* Mobile Sent Header - hidden on mobile per user request */}
 
-			{/* Filter tabs in gray section for Drafts */}
-			{isDrafts && hasData && onStatusFilterChange && (
+			{/* Filter tabs in gray section for Drafts - hidden on mobile */}
+			{isDrafts && hasData && onStatusFilterChange && !isMobile && (
 				<div
 					style={{
 						position: 'absolute',
@@ -440,7 +440,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						? 'linear-gradient(to bottom, #ffffff 26px, #EB8586 26px)'
 						: '#FFAEAE'
 					: isDrafts
-					? hasData
+					? isMobile
+						? '#FFDC9E' // Solid orange on mobile (no white header or tabs)
+						: hasData
 						? 'linear-gradient(to bottom, #ffffff 26px, #E7E7E7 26px, #E7E7E7 55px, #FFDC9E 55px)'
 						: '#F8D69A'
 					: isSent
@@ -504,8 +506,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					)}
 				</div>
 
-				{/* Green section for Approved tab */}
-				{isDrafts && hasData && statusFilter === 'approved' && (
+				{/* Green section for Approved tab - hidden on mobile (no tabs) */}
+				{isDrafts && hasData && statusFilter === 'approved' && !isMobile && (
 					<div
 						style={{
 							position: 'absolute',
@@ -560,8 +562,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					</div>
 				)}
 
-				{/* Red section for Rejected tab */}
-				{isDrafts && hasData && statusFilter === 'rejected' && (
+				{/* Red section for Rejected tab - hidden on mobile (no tabs) */}
+				{isDrafts && hasData && statusFilter === 'rejected' && !isMobile && (
 					<div
 						style={{
 							position: 'absolute',
@@ -616,8 +618,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					</div>
 				)}
 
-				{/* Yellow section for All Drafts tab */}
-			{isDrafts && hasData && statusFilter === 'all' && (
+				{/* Yellow section for All Drafts tab - hidden on mobile (no tabs header needed) */}
+			{isDrafts && hasData && statusFilter === 'all' && !isMobile && (
 				<div
 					style={{
 						position: 'absolute',
@@ -703,7 +705,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							: isContacts
 							? '68px'
 							: isDrafts
-							? '66px'
+							? (isMobile ? '8px' : '66px') // Minimal margin on mobile (no white header or tabs)
 							: isSent
 							? (isMobile ? '8px' : '32px') // Minimal margin on mobile (no white header)
 							: 0,
