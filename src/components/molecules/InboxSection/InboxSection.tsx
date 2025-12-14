@@ -210,7 +210,11 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	// Width constants based on narrow mode and mobile
 	// On mobile, we use calc() values for responsive sizing (4px margins on each side = 8px total)
 	const boxWidth = isNarrow ? 516 : 907;
-	const emailRowWidth = isNarrow ? 488 : 879;
+	// NOTE: Desktop rows must fit inside the scroll container's content box.
+	// With a 3px border and 16px left/right padding on the outer container (border-box),
+	// the available inner width is: boxWidth - (2 * 3) - (2 * 16).
+	// If rows are wider than that, their left/right borders get clipped.
+	const emailRowWidth = isNarrow ? 478 : 869;
 	const searchBarWidth = isNarrow ? 334 : 725;
 	const expandedEmailWidth = isNarrow ? 489 : 880;
 	const emailBodyWidth = isNarrow ? 461 : 828;

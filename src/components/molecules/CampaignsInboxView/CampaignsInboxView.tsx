@@ -4,10 +4,14 @@ import { FC, useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Campaign } from '@prisma/client';
 import { X } from 'lucide-react';
+import { useAuth, UserButton, SignInButton } from '@clerk/nextjs';
 import { useGetCampaigns, useDeleteCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
+import EmptyMobile from '@/components/atoms/_svg/EmptyMobile';
 import { urls } from '@/constants/urls';
 import { mmdd } from '@/utils';
 
@@ -93,6 +97,8 @@ export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 	containerHeight,
 }) => {
 	const router = useRouter();
+	const isMobile = useIsMobile();
+	const { isSignedIn } = useAuth();
 	const [searchQuery, setSearchQuery] = useState('');
 	const [confirmingCampaignId, setConfirmingCampaignId] = useState<number | null>(null);
 	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -276,6 +282,61 @@ export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 							className="placeholder:text-[#737373]"
 						/>
 					</div>
+				)}
+
+				{/* Mobile Empty State - Show Murmur Logo */}
+				{isMobile && filteredCampaigns.length === 0 && (
+					<>
+						{/* Clerk button in top right of box */}
+						<div className="absolute top-3 right-3 z-10">
+							{isSignedIn ? (
+								<UserButton
+									appearance={{
+										elements: {
+											avatarBox: 'w-7 h-7 ring-1 ring-black/10',
+											userButtonTrigger:
+												'opacity-80 hover:opacity-100 transition-opacity duration-300',
+										},
+									}}
+								/>
+							) : (
+								<SignInButton mode="modal">
+									<button className="px-3 py-1.5 text-[12px] font-medium tracking-[0.02em] text-white hover:text-gray-200 transition-all duration-300">
+										Sign in
+									</button>
+								</SignInButton>
+							)}
+						</div>
+						<div className="flex flex-col items-center justify-center w-full" style={{ marginTop: '20px' }}>
+							<MurmurLogoNew width={280} height={95} />
+							<p
+								className="text-center mt-4 px-4"
+								style={{
+									fontFamily: 'Inter, sans-serif',
+									fontWeight: 800,
+									fontSize: '18px',
+									color: '#FFFFFF',
+								}}
+							>
+								OPEN MURMUR ON DESKTOP TO CREATE YOUR FIRST CAMPAIGN
+							</p>
+							<div className="mt-6 w-full flex justify-center px-4" style={{ marginLeft: '-20px' }}>
+								<EmptyMobile style={{ width: '100%', maxWidth: '320px', height: 'auto' }} />
+							</div>
+							<p
+								className="text-center mt-16 px-6"
+								style={{
+									fontFamily: 'Inter, sans-serif',
+									fontWeight: 300,
+									fontStyle: 'italic',
+									fontSize: '20px',
+									color: '#145B81',
+								}}
+							>
+								Mobile Murmur is custom designed for managing existing campaigns
+							</p>
+						</div>
+					</>
 				)}
 
 				{/* Campaign Rows */}
@@ -580,6 +641,10 @@ export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 				{Array.from({ length: Math.max(0, 5 - filteredCampaigns.length) }).map(
 					(_, idx) => {
 						const isFirstInEmptyState = filteredCampaigns.length === 0 && idx === 0;
+						// On mobile, when fully empty, hide all placeholders including the "Create New Campaign" button
+						if (isMobile && filteredCampaigns.length === 0) {
+							return null;
+						}
 						return (
 							<div
 								key={`placeholder-${idx}`}

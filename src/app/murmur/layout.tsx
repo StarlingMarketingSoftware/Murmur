@@ -123,6 +123,11 @@ export default function MurmurLayout({ children }: { children: React.ReactNode }
 						line-height: 1.2 !important;
 					}
 				}
+
+				/* Hide global Clerk button on mobile empty dashboard */
+				body.murmur-mobile-empty .clerk-user-button {
+					display: none !important;
+				}
 			`}</style>
 		</>
 	);
