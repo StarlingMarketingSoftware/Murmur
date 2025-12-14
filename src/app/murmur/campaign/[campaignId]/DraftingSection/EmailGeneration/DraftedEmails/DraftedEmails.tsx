@@ -23,6 +23,7 @@ import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface ScrollableTextareaProps
 	extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -224,6 +225,12 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	} = useDraftedEmails(props);
 	const { onContactClick, onContactHover, onRegenerateDraft } = props;
 
+	const isMobile = useIsMobile();
+
+	// Mobile-specific width values (using CSS calc for responsive sizing)
+	// 4px margins on each side for edge-to-edge feel
+	const mobileEmailRowWidth = 'calc(100vw - 24px)'; // Full width minus padding
+
 	const [showConfirm, setShowConfirm] = useState(false);
 	const [isRegenerating, setIsRegenerating] = useState(false);
 	const [isHoveringAllButton, setIsHoveringAllButton] = useState(false);
@@ -362,10 +369,14 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		const tabNavMiddleWidth = '691px';
 
 		return (
-			<div className="flex flex-col items-center">
-				<div style={{ width: '499px', height: '703px', position: 'relative' }}>
-				{/* Counter box - above preview on wide screens, bottom-left corner on narrow/narrowest breakpoint */}
-				{!showBottomCounter && (
+			<div className={cn("flex flex-col items-center", isMobile && "w-full px-1")}>
+				<div style={{ 
+					width: isMobile ? 'calc(100vw - 8px)' : '499px', 
+					height: isMobile ? 'calc(100dvh - 160px)' : '703px', 
+					position: 'relative' 
+				}}>
+				{/* Counter box - above preview on wide screens, bottom-left corner on narrow/narrowest breakpoint, hidden on mobile */}
+				{!showBottomCounter && !isMobile && (
 					<div
 						style={{
 							position: 'absolute',
@@ -440,7 +451,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							flexDirection: 'column', 
 							justifyContent: 'center',
 							height: '100%',
-							maxWidth: '250px',
+							maxWidth: isMobile ? 'calc(100% - 40px)' : '250px',
 							overflow: 'hidden',
 						}}>
 							{hasName && companyName ? (
@@ -481,7 +492,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							)}
 						</div>
 						<div
-							className="flex flex-col items-start"
+							className={cn("flex flex-col items-start", isMobile && "hidden")}
 							style={{
 								position: 'absolute',
 								right: '63px',
@@ -857,21 +868,21 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							</>
 						)}
 						{/* Subject input */}
-						<div className="flex justify-center" style={{ marginBottom: '8px' }}>
+						<div className="flex justify-center" style={{ marginBottom: '8px', padding: isMobile ? '0 8px' : undefined }}>
 							<input
 								type="text"
 								value={editedSubject}
 								onChange={(e) => setEditedSubject(e.target.value)}
 								className="font-inter text-[14px] font-extrabold bg-white border-2 border-black rounded-[4px] px-2 focus:outline-none focus:ring-0"
-								style={{ width: '469px', height: '39px' }}
+								style={{ width: isMobile ? '100%' : '469px', height: '39px' }}
 							/>
 						</div>
 
 						{/* Message editor - plain text */}
-						<div className="flex justify-center flex-1">
+						<div className="flex justify-center flex-1" style={{ padding: isMobile ? '0 8px' : undefined }}>
 							<div
 								className="bg-white border-2 border-black rounded-[4px] overflow-hidden"
-								style={{ width: '470px', height: hasStatusBar ? '516px' : '572px' }}
+								style={{ width: isMobile ? '100%' : '470px', height: hasStatusBar ? '516px' : '572px', flex: isMobile ? 1 : undefined }}
 							>
 								<ScrollableTextarea
 									value={editedMessage}
@@ -915,18 +926,18 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		<div
 			className="flex items-center justify-center"
 			style={{
-				marginTop: '22px',
+				marginTop: isMobile ? '12px' : '22px',
 				// Ensure this row has a stable width so centering math is correct
 				// (otherwise it can shrink-to-fit in narrow layouts and appear shifted right).
 				width: '100%',
 				// For narrow desktop (two-column layout), shift left by 170px to center on page
 				// For narrowest desktop (single-column), no shift needed as layout is already centered
-				...(isNarrowDesktop ? { transform: 'translateX(-170px)' } : {}),
-				...(showTabNavArrows ? { gap: tabNavGap } : {}),
+				...(isNarrowDesktop && !isMobile ? { transform: 'translateX(-170px)' } : {}),
+				...(showTabNavArrows && !isMobile ? { gap: tabNavGap } : {}),
 			}}
 		>
-			{/* Tab navigation left arrow - only in narrow breakpoints */}
-			{showTabNavArrows && props.goToPreviousTab && (
+			{/* Tab navigation left arrow - only in narrow breakpoints, hidden on mobile */}
+			{showTabNavArrows && !isMobile && props.goToPreviousTab && (
 				<button
 					type="button"
 					onClick={props.goToPreviousTab}
@@ -939,7 +950,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 			{/* Inner container with draft navigation and buttons */}
 			<div
 				className="flex items-center justify-center flex-shrink-0"
-				style={showTabNavArrows ? { width: tabNavMiddleWidth } : undefined}
+				style={showTabNavArrows && !isMobile ? { width: tabNavMiddleWidth } : undefined}
 			>
 				<button
 					type="button"
@@ -947,18 +958,21 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					disabled={!hasDrafts}
 					aria-label="View previous draft"
 					className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-					style={{ marginRight: '20px' }}
+					style={{ marginRight: isMobile ? '10px' : '20px' }}
 				>
 					<LeftArrowReviewIcon />
 				</button>
-				<div className="flex" style={{ gap: '13px' }}>
+				<div className="flex" style={{ gap: isMobile ? '6px' : '13px' }}>
 					<Button
 						type="button"
 						variant="ghost"
-						className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
+						className={cn(
+							"font-secondary font-semibold text-black border-[2px] border-black rounded-none",
+							isMobile ? "text-[12px]" : "text-[14px]"
+						)}
 						style={{
-							width: '124px',
-							height: '40px',
+							width: isMobile ? '80px' : '124px',
+							height: isMobile ? '36px' : '40px',
 							borderTopLeftRadius: '8px',
 							borderBottomLeftRadius: '8px',
 							backgroundColor: '#D5FFCB',
@@ -975,15 +989,18 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						}}
 					>
 						<span>Approve</span>
-						<ApproveCheckIcon />
+						{!isMobile && <ApproveCheckIcon />}
 					</Button>
 					<Button
 						type="button"
 						variant="ghost"
-						className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
+						className={cn(
+							"font-secondary font-semibold text-black border-[2px] border-black rounded-none",
+							isMobile ? "text-[12px]" : "text-[14px]"
+						)}
 						style={{
-							width: '124px',
-							height: '40px',
+							width: isMobile ? '80px' : '124px',
+							height: isMobile ? '36px' : '40px',
 							backgroundColor: '#FFDC9E',
 						}}
 						onClick={handleRegenerate}
@@ -992,16 +1009,19 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						{isRegenerating ? (
 							<Spinner size="small" />
 						) : (
-							'Regenerate'
+							isMobile ? 'Regen' : 'Regenerate'
 						)}
 					</Button>
 					<Button
 						type="button"
 						variant="ghost"
-						className="font-secondary text-[14px] font-semibold text-black border-[2px] border-black rounded-none"
+						className={cn(
+							"font-secondary font-semibold text-black border-[2px] border-black rounded-none",
+							isMobile ? "text-[12px]" : "text-[14px]"
+						)}
 						style={{
-							width: '124px',
-							height: '40px',
+							width: isMobile ? '80px' : '124px',
+							height: isMobile ? '36px' : '40px',
 							borderTopRightRadius: '8px',
 							borderBottomRightRadius: '8px',
 							backgroundColor: '#E17272',
@@ -1018,7 +1038,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						}}
 					>
 						<span>Reject</span>
-						<RejectXIcon />
+						{!isMobile && <RejectXIcon />}
 					</Button>
 				</div>
 				<button
@@ -1027,13 +1047,13 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					disabled={!hasDrafts}
 					aria-label="View next draft"
 					className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-					style={{ marginLeft: '20px' }}
+					style={{ marginLeft: isMobile ? '10px' : '20px' }}
 				>
 					<RightArrowReviewIcon />
 				</button>
 			</div>
-			{/* Tab navigation right arrow - only in narrow breakpoints */}
-			{showTabNavArrows && props.goToNextTab && (
+			{/* Tab navigation right arrow - only in narrow breakpoints, hidden on mobile */}
+			{showTabNavArrows && !isMobile && props.goToNextTab && (
 				<button
 					type="button"
 					onClick={props.goToNextTab}
@@ -1068,6 +1088,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				approvedCount={approvedCount}
 				rejectedCount={rejectedCount}
 				totalDraftsCount={draftEmails.length}
+				isMobile={isMobile}
 			>
 				<>
 					<div className="overflow-visible w-full flex flex-col items-center">
@@ -1116,7 +1137,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									{showConnector && (
 										<div
 											key={`connector-${draft.id}`}
-											className={cn("w-[499px] h-[10px]", connectorColor)}
+											className={cn("h-[10px]", connectorColor, isMobile ? 'w-full' : 'w-[499px]')}
 										/>
 									)}
 									{/* Normal gap spacer when not showing connector */}
@@ -1126,14 +1147,16 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									<div
 										key={draft.id}
 										className={cn(
-											'cursor-pointer relative select-none h-[97px] overflow-visible border-2 p-2 group/draft',
+											'cursor-pointer relative select-none overflow-visible border-2 p-2 group/draft',
+											isMobile ? 'h-[100px]' : 'h-[97px]',
 											isSelected
-												? cn('w-[499px] rounded-none border-[#FFFFFF]', selectedBgColor)
+												? cn('rounded-none border-[#FFFFFF]', selectedBgColor, isMobile ? 'w-full' : 'w-[499px]')
 												: cn(
-														'w-[489px] rounded-[8px] border-[#000000]',
+														'rounded-[8px] border-[#000000]',
 														isHoveringAllButton ? 'bg-[#FFEDCA]' : 'bg-white hover:bg-[#F9E5BA]'
 												  )
 										)}
+										style={!isSelected && isMobile ? { width: mobileEmailRowWidth } : !isSelected ? { width: '489px' } : undefined}
 									onMouseDown={(e) => {
 										// Prevent text selection on shift-click
 										if (e.shiftKey) {
@@ -1445,14 +1468,18 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							</>
 						);
 						})}
-						{Array.from({ length: Math.max(0, 6 - filteredDrafts.length) }).map((_, idx) => (
+						{Array.from({ length: Math.max(0, (isMobile ? 4 : 6) - filteredDrafts.length) }).map((_, idx) => (
 							<>
 								{(idx > 0 || filteredDrafts.length > 0) && (
 									<div key={`placeholder-spacer-${idx}`} className="h-[10px]" />
 								)}
 								<div
 									key={`draft-placeholder-${idx}`}
-									className="select-none w-[489px] h-[97px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#FFDC9E] p-2"
+									className={cn(
+										"select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#FFDC9E] p-2",
+										isMobile ? 'h-[100px]' : 'w-[489px] h-[97px]'
+									)}
+									style={isMobile ? { width: mobileEmailRowWidth } : undefined}
 								/>
 							</>
 						))}

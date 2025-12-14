@@ -21,6 +21,7 @@ import {
 import { useGetUsedContactIds, useGetLocations } from '@/hooks/queryHooks/useContacts';
 import { CampaignWithRelations } from '@/types';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
 import { BookingIcon } from '@/components/atoms/_svg/BookingIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
@@ -762,6 +763,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 	} = props;
 	const [isDrafting, setIsDrafting] = useState(false);
 	const router = useRouter();
+	const isMobile = useIsMobile();
 	const searchInfo = useMemo(() => parseSearchFromCampaign(campaign), [campaign]);
 
 	const { data: drafts } = useGetEmails({
@@ -880,48 +882,55 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 				goToSearch={goToSearch}
 				goToDrafts={goToDrafts}
 				goToInbox={goToInbox}
+				isMobile={isMobile}
 				topContent={
-					<div className="w-full flex flex-col items-center pt-[6px]">
-						<MiniSearchBar
-							activeSection={activeSection}
-							setActiveSection={setActiveSection}
-							whyValue={whyValue}
-							setWhyValue={setWhyValue}
-							whatValue={whatValue}
-							setWhatValue={setWhatValue}
-							whereValue={whereValue}
-							setWhereValue={setWhereValue}
-							locationResults={locationResults}
-							isLoadingLocations={isLoadingLocations}
-							debouncedWhereValue={debouncedWhereValue}
-							onSearch={handleSearch}
-						/>
-						{/* Selected count row - positioned right above contact rows */}
-						<div className="w-[489px] relative flex justify-center items-center px-1 mt-[10px] mb-[2px]">
-							<span className="text-[14px] font-inter font-medium text-black">
-								{selectedCount} Selected
-							</span>
-							<button
-								type="button"
-								className="absolute right-1 text-[14px] font-inter font-medium text-black bg-transparent border-none cursor-pointer p-0 m-0 leading-none hover:underline transition-colors"
-								onClick={handleClick}
-							>
-								{areAllSelected ? 'Deselect All' : 'Select All'}
-							</button>
+					!isMobile ? (
+						<div className="w-full flex flex-col items-center pt-[6px]">
+							<MiniSearchBar
+								activeSection={activeSection}
+								setActiveSection={setActiveSection}
+								whyValue={whyValue}
+								setWhyValue={setWhyValue}
+								whatValue={whatValue}
+								setWhatValue={setWhatValue}
+								whereValue={whereValue}
+								setWhereValue={setWhereValue}
+								locationResults={locationResults}
+								isLoadingLocations={isLoadingLocations}
+								debouncedWhereValue={debouncedWhereValue}
+								onSearch={handleSearch}
+							/>
+							{/* Selected count row - positioned right above contact rows */}
+							<div className="w-[489px] relative flex justify-center items-center px-1 mt-[10px] mb-[2px]">
+								<span className="text-[14px] font-inter font-medium text-black">
+									{selectedCount} Selected
+								</span>
+								<button
+									type="button"
+									className="absolute right-1 text-[14px] font-inter font-medium text-black bg-transparent border-none cursor-pointer p-0 m-0 leading-none hover:underline transition-colors"
+									onClick={handleClick}
+								>
+									{areAllSelected ? 'Deselect All' : 'Select All'}
+								</button>
+							</div>
 						</div>
-					</div>
+					) : undefined
 				}
 			>
-				<div className="overflow-visible w-full flex flex-col gap-4 items-center">
+				<div className={cn("overflow-visible w-full flex flex-col items-center", isMobile ? "gap-2" : "gap-4")}>
 					{contacts.map((contact) => {
 						const isUsedContact = usedContactIdsSet.has(contact.id);
+						// Mobile-specific width values (using CSS calc for responsive sizing)
+						const mobileContactRowWidth = 'calc(100vw - 24px)';
 						return (
 						<div
 							key={contact.id}
 							className={cn(
-								'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-[489px] h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none row-hover-scroll relative',
+								'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none row-hover-scroll relative',
+								!isMobile && 'w-[489px]',
 								selectedContactIds.has(contact.id) ? 'bg-[#EAAEAE]' : ''
 							)}
+							style={isMobile ? { width: mobileContactRowWidth } : undefined}
 							onMouseDown={(e) => {
 								// Prevent text selection on shift-click
 								if (e.shiftKey) {
@@ -1242,10 +1251,14 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						</div>
 					);
 					})}
-					{Array.from({ length: Math.max(0, 9 - contacts.length) }).map((_, idx) => (
+					{Array.from({ length: Math.max(0, (isMobile ? 6 : 9) - contacts.length) }).map((_, idx) => (
 						<div
 							key={`placeholder-${idx}`}
-							className="select-none w-[489px] h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#EB8586]"
+							className={cn(
+								"select-none h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#EB8586]",
+								!isMobile && "w-[489px]"
+							)}
+							style={isMobile ? { width: 'calc(100vw - 24px)' } : undefined}
 						/>
 					))}
 				</div>

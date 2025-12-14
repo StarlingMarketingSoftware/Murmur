@@ -4,10 +4,14 @@ import { FC, useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Campaign } from '@prisma/client';
 import { X } from 'lucide-react';
+import { useAuth, UserButton, SignInButton } from '@clerk/nextjs';
 import { useGetCampaigns, useDeleteCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
+import EmptyMobile from '@/components/atoms/_svg/EmptyMobile';
 import { urls } from '@/constants/urls';
 import { mmdd } from '@/utils';
 
@@ -17,6 +21,13 @@ type CampaignWithCounts = Campaign & {
 	sentCount?: number;
 	contactEmails?: string[];
 	visibleInboxCount?: number;
+};
+
+type CampaignsInboxViewProps = {
+	/** Hide the "Search Mail" input and show the table only. */
+	hideSearchBar?: boolean;
+	/** Override the outer container height (e.g. "600px" or "calc(100dvh - 120px)"). */
+	containerHeight?: string;
 };
 
 // Color functions matching useCampaignsTable exactly
@@ -81,11 +92,18 @@ const getCreatedFillColor = (createdAt: Date): string => {
 	return '#B2C9FF';
 };
 
-export const CampaignsInboxView: FC = () => {
+export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
+	hideSearchBar = false,
+	containerHeight,
+}) => {
 	const router = useRouter();
+	const isMobile = useIsMobile();
+	const { isSignedIn } = useAuth();
 	const [searchQuery, setSearchQuery] = useState('');
 	const [confirmingCampaignId, setConfirmingCampaignId] = useState<number | null>(null);
 	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+	const resolvedContainerHeight = containerHeight ?? '535px';
 
 	// Breakpoint state for 2x2 metric grid layout (≤ 880px)
 	const [isNarrowLayout, setIsNarrowLayout] = useState(false);
@@ -188,7 +206,7 @@ export const CampaignsInboxView: FC = () => {
 				<div
 					className="flex items-center justify-center w-full max-w-[907px]"
 					style={{
-						height: '535px',
+						height: resolvedContainerHeight,
 						border: '3px solid #000000',
 						borderRadius: '8px',
 						backgroundColor: '#4ca9db',
@@ -211,57 +229,115 @@ export const CampaignsInboxView: FC = () => {
 				offsetRight={-6}
 				disableOverflowClass
 				style={{
-					height: '535px',
+					height: resolvedContainerHeight,
 					border: '3px solid #000000',
 					borderRadius: '8px',
 					padding: '16px',
-					paddingTop: '76px',
+					paddingTop: hideSearchBar ? '16px' : '76px',
 					backgroundColor: '#4ca9db',
 				}}
 			>
 				{/* Search Bar */}
-				<div
-					style={{
-						position: 'absolute',
-						top: '13px',
-						left: '14px',
-						right: '14px',
-						maxWidth: '879px',
-						height: '48px',
-						border: '3px solid #000000',
-						borderRadius: '8px',
-						backgroundColor: filteredCampaigns.length === 0 ? '#2995CE' : '#FFFFFF',
-						zIndex: 10,
-						display: 'flex',
-						alignItems: 'center',
-						paddingLeft: '16px',
-					}}
-				>
-					<SearchIconDesktop />
-					<input
-						type="text"
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-						placeholder={
-							filteredCampaigns.length === 0 && !searchQuery ? '' : 'Search Mail'
-						}
-						disabled={filteredCampaigns.length === 0 && !searchQuery}
+				{!hideSearchBar && (
+					<div
 						style={{
-							flex: 1,
-							height: '100%',
-							border: 'none',
-							outline: 'none',
-							fontSize: '16px',
-							fontFamily: 'Inter, sans-serif',
-							color: '#000000',
-							backgroundColor: 'transparent',
-							marginLeft: '16px',
-							paddingRight: '16px',
-							cursor: filteredCampaigns.length === 0 && !searchQuery ? 'default' : 'text',
+							position: 'absolute',
+							top: '13px',
+							left: '14px',
+							right: '14px',
+							maxWidth: '879px',
+							height: '48px',
+							border: '3px solid #000000',
+							borderRadius: '8px',
+							backgroundColor: filteredCampaigns.length === 0 ? '#2995CE' : '#FFFFFF',
+							zIndex: 10,
+							display: 'flex',
+							alignItems: 'center',
+							paddingLeft: '16px',
 						}}
-						className="placeholder:text-[#737373]"
-					/>
-				</div>
+					>
+						<SearchIconDesktop />
+						<input
+							type="text"
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							placeholder={
+								filteredCampaigns.length === 0 && !searchQuery ? '' : 'Search Mail'
+							}
+							disabled={filteredCampaigns.length === 0 && !searchQuery}
+							style={{
+								flex: 1,
+								height: '100%',
+								border: 'none',
+								outline: 'none',
+								fontSize: '16px',
+								fontFamily: 'Inter, sans-serif',
+								color: '#000000',
+								backgroundColor: 'transparent',
+								marginLeft: '16px',
+								paddingRight: '16px',
+								cursor:
+									filteredCampaigns.length === 0 && !searchQuery ? 'default' : 'text',
+							}}
+							className="placeholder:text-[#737373]"
+						/>
+					</div>
+				)}
+
+				{/* Mobile Empty State - Show Murmur Logo */}
+				{isMobile && filteredCampaigns.length === 0 && (
+					<>
+						{/* Clerk button in top right of box */}
+						<div className="absolute top-3 right-3 z-10">
+							{isSignedIn ? (
+								<UserButton
+									appearance={{
+										elements: {
+											avatarBox: 'w-7 h-7 ring-1 ring-black/10',
+											userButtonTrigger:
+												'opacity-80 hover:opacity-100 transition-opacity duration-300',
+										},
+									}}
+								/>
+							) : (
+								<SignInButton mode="modal">
+									<button className="px-3 py-1.5 text-[12px] font-medium tracking-[0.02em] text-white hover:text-gray-200 transition-all duration-300">
+										Sign in
+									</button>
+								</SignInButton>
+							)}
+						</div>
+						<div className="flex flex-col items-center justify-center w-full" style={{ marginTop: '20px' }}>
+							<MurmurLogoNew width={280} height={95} />
+							<p
+								className="text-center mt-4 px-4"
+								style={{
+									fontFamily: 'Inter, sans-serif',
+									fontWeight: 800,
+									fontSize: '18px',
+									color: '#FFFFFF',
+								}}
+							>
+								OPEN MURMUR ON DESKTOP TO CREATE YOUR FIRST CAMPAIGN
+							</p>
+							<div className="mt-6 w-full flex justify-center px-4" style={{ marginLeft: '-20px' }}>
+								<EmptyMobile style={{ width: '100%', maxWidth: '320px', height: 'auto' }} />
+							</div>
+							<p
+								className="text-center mt-16 px-6"
+								style={{
+									fontFamily: 'Inter, sans-serif',
+									fontWeight: 300,
+									fontStyle: 'italic',
+									fontSize: '20px',
+									color: '#145B81',
+								}}
+							>
+								Mobile Murmur is custom designed for managing existing campaigns
+							</p>
+						</div>
+					</>
+				)}
 
 				{/* Campaign Rows */}
 				{filteredCampaigns.map((campaign) => {
@@ -337,37 +413,70 @@ export const CampaignsInboxView: FC = () => {
 							)}
 							{/* Campaign Name */}
 							<div
-								className="flex flex-col justify-center min-w-0"
-								style={{ width: '140px', flexShrink: 0 }}
+								className={`flex flex-col min-w-0 ${hideVerticalDividers ? 'justify-start' : 'justify-center'}`}
+								style={{ 
+									width: hideVerticalDividers ? '110px' : '140px', 
+									flexShrink: 0,
+									marginTop: hideVerticalDividers ? '-15px' : undefined,
+								}}
 							>
-								<span
-									className="font-bold text-[14px] leading-tight"
+								{/* Campaign name with fade-to-ellipsis effect */}
+								<div
 									style={{
-										color: isConfirming ? '#FFFFFF' : '#000000',
-										display: '-webkit-box',
-										WebkitLineClamp: hideVerticalDividers && campaign.visibleInboxCount && campaign.visibleInboxCount > 0 ? 1 : 2,
-										WebkitBoxOrient: 'vertical',
+										position: 'relative',
+										maxHeight: hideVerticalDividers && campaign.visibleInboxCount && campaign.visibleInboxCount > 0 ? '1.25em' : '2.5em',
 										overflow: 'hidden',
+										lineHeight: '1.25',
 									}}
 								>
-									{campaign.name}
-								</span>
+									<span
+										className="font-bold text-[14px]"
+										style={{
+											color: isConfirming ? '#FFFFFF' : '#000000',
+										}}
+									>
+										{campaign.name}
+									</span>
+									{/* Fade overlay */}
+									<span
+										style={{
+											position: 'absolute',
+											bottom: 0,
+											right: 0,
+											height: '1.25em',
+											width: '25px',
+											background: `linear-gradient(to right, transparent 0%, ${
+												isConfirming
+													? '#DC3545'
+													: campaign.visibleInboxCount && campaign.visibleInboxCount > 0
+													? '#FFFFFF'
+													: '#EAEAEA'
+											} 100%)`,
+										}}
+									/>
+								</div>
 								{/* New messages box below campaign name at narrow breakpoint */}
-								{hideVerticalDividers && campaign.visibleInboxCount && campaign.visibleInboxCount > 0 && (
+								{hideVerticalDividers && (campaign.visibleInboxCount ?? 0) > 0 && (
 									<div
 										style={{
-											width: '163px',
-											height: '23px',
+											width: 'fit-content',
+											maxWidth: '110px',
+											height: '16px',
+											padding: '0 7px',
 											backgroundColor: isConfirming ? 'transparent' : '#CCF9D2',
 											borderRadius: '4px',
 											display: 'flex',
 											alignItems: 'center',
 											justifyContent: 'center',
-											marginTop: '4px',
+											marginTop: '3px',
+											alignSelf: 'flex-start',
+											whiteSpace: 'nowrap',
+											overflow: 'hidden',
+											textOverflow: 'ellipsis',
 										}}
 									>
 										<span
-											className="text-[12px] font-medium leading-none"
+											className="text-[10px] font-medium leading-none"
 											style={{ color: isConfirming ? '#FFFFFF' : '#000000' }}
 										>
 											{campaign.visibleInboxCount} new {campaign.visibleInboxCount === 1 ? 'message' : 'messages'}
@@ -418,12 +527,12 @@ export const CampaignsInboxView: FC = () => {
 								<div
 									style={{
 										position: 'absolute',
-										left: hideVerticalDividers ? '175px' : '295px',
+										left: hideVerticalDividers ? '140px' : '295px',
 										right: '40px', // Leave space for delete button
-										top: '0',
-										bottom: '0',
+										top: hideVerticalDividers ? '10px' : '0',
+										bottom: hideVerticalDividers ? 'auto' : '0',
 										display: 'flex',
-										alignItems: 'center',
+										alignItems: hideVerticalDividers ? 'flex-start' : 'center',
 										justifyContent: 'center',
 									}}
 								>
@@ -432,7 +541,7 @@ export const CampaignsInboxView: FC = () => {
 											display: 'grid',
 											gridTemplateColumns: 'repeat(2, 1fr)',
 											gridTemplateRows: 'repeat(2, 1fr)',
-											gap: '4px 8px',
+											gap: hideVerticalDividers ? '2px 6px' : '4px 8px',
 										}}
 									>
 										{/* Row 1: drafts (0), updated (2) */}
@@ -442,15 +551,15 @@ export const CampaignsInboxView: FC = () => {
 												key={index}
 												className="metric-box inline-flex items-center justify-center leading-none truncate"
 												style={{
-													width: '92px',
-													height: '20px',
+													width: hideVerticalDividers ? '70px' : '92px',
+													height: hideVerticalDividers ? '14px' : '20px',
 													borderRadius: '4px',
 													backgroundColor: isConfirming ? 'transparent' : metric.fill,
 													borderColor: isConfirming ? '#A20000' : '#8C8C8C',
 													borderWidth: '1px',
 													borderStyle: 'solid',
 													color: isConfirming ? '#FFFFFF' : 'inherit',
-													fontSize: '14px',
+													fontSize: hideVerticalDividers ? '10px' : '14px',
 												}}
 											>
 												{metric.label}
@@ -532,6 +641,10 @@ export const CampaignsInboxView: FC = () => {
 				{Array.from({ length: Math.max(0, 5 - filteredCampaigns.length) }).map(
 					(_, idx) => {
 						const isFirstInEmptyState = filteredCampaigns.length === 0 && idx === 0;
+						// On mobile, when fully empty, hide all placeholders including the "Create New Campaign" button
+						if (isMobile && filteredCampaigns.length === 0) {
+							return null;
+						}
 						return (
 							<div
 								key={`placeholder-${idx}`}

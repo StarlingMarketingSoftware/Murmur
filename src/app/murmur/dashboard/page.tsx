@@ -44,6 +44,7 @@ import {
 	ContactResearchHorizontalStrip,
 } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
+import { useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -67,6 +68,20 @@ const DashboardContent = () => {
 	const { isSignedIn, openSignIn } = useClerk();
 	const searchParams = useSearchParams();
 	const isMobile = useIsMobile();
+	const { data: campaigns } = useGetCampaigns();
+	const hasCampaigns = campaigns && campaigns.length > 0;
+
+	// Add body class when on mobile with empty dashboard to hide global Clerk button
+	useEffect(() => {
+		if (isMobile && !hasCampaigns) {
+			document.body.classList.add('murmur-mobile-empty');
+		} else {
+			document.body.classList.remove('murmur-mobile-empty');
+		}
+		return () => {
+			document.body.classList.remove('murmur-mobile-empty');
+		};
+	}, [isMobile, hasCampaigns]);
 	const [isMobileLandscape, setIsMobileLandscape] = useState(false);
 	const [whyValue, setWhyValue] = useState('');
 	const [whatValue, setWhatValue] = useState('');
@@ -824,6 +839,42 @@ const DashboardContent = () => {
 	// Return null during initial load to prevent hydration mismatch
 	if (isMobile === null) {
 		return null;
+	}
+
+	// Mobile dashboard: show only the campaigns inbox table (no search bar, no tab toggle).
+	if (isMobile) {
+		return (
+			<div className="min-h-screen w-full">
+				{/* Only show logo above box when there are campaigns */}
+				{hasCampaigns && (
+					<div className="w-full">
+						<div
+							className="flex justify-center items-center w-full px-4"
+							style={{
+								marginBottom: '0.5rem',
+								marginTop: '40px',
+							}}
+						>
+							<div className="premium-hero-section flex flex-col items-center justify-center w-full max-w-[600px]">
+								<div
+									className="premium-logo-container flex items-center justify-center"
+									style={{ width: logoWidth, height: logoHeight }}
+								>
+									<MurmurLogoNew width={logoWidth} height={logoHeight} />
+								</div>
+							</div>
+						</div>
+					</div>
+				)}
+
+				<div style={{ marginTop: hasCampaigns ? '12px' : '40px' }}>
+					<CampaignsInboxView
+						hideSearchBar
+						containerHeight={hasCampaigns ? 'calc(100dvh - 120px - env(safe-area-inset-bottom, 0px))' : 'calc(100dvh - 60px - env(safe-area-inset-bottom, 0px))'}
+					/>
+				</div>
+			</div>
+		);
 	}
 
 	// Reduce extra white space above the fixed mobile action button by
@@ -3156,7 +3207,7 @@ const DashboardContent = () => {
 				)}
 
 				{!hasSearched && activeTab === 'search' && (
-					<div className="campaigns-table-wrapper w-full max-w-[960px] mx-auto px-4 max-h-[180px] overflow-hidden">
+					<div className="campaigns-table-wrapper dashboard-recent-campaigns w-full max-w-[960px] mx-auto px-4">
 						<CampaignsTable />
 					</div>
 				)}

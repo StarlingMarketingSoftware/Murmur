@@ -3556,6 +3556,13 @@ body.murmur-mobile .results-align {
 	z-index: 30; /* Ensure table is above other elements */
 }
 
+/* Dashboard: show only 3 visible rows, but keep internal scroll + custom scrollbar */
+.dashboard-recent-campaigns .campaigns-table-container .my-campaigns-table {
+	height: 180px !important;
+	max-height: 180px !important;
+	min-height: 180px !important;
+}
+
 /* Mobile landscape: scale campaigns table wrapper width proportionally
    Example: at 852px viewport width, table width ≈ 503px → 503/852 ≈ 59.04% */
 @media (orientation: landscape) and (max-width: 960px) {
