@@ -178,6 +178,34 @@ const Murmur = () => {
 		}
 	};
 
+	// Mobile-specific tab navigation (only the 4 visible tabs on mobile)
+	const mobileTabOrder: Array<'contacts' | 'drafting' | 'sent' | 'inbox'> = [
+		'contacts',
+		'drafting',
+		'sent',
+		'inbox',
+	];
+
+	const goToPreviousMobileTab = () => {
+		const currentIndex = mobileTabOrder.indexOf(activeView as 'contacts' | 'drafting' | 'sent' | 'inbox');
+		if (currentIndex > 0) {
+			setActiveView(mobileTabOrder[currentIndex - 1]);
+		} else {
+			// Wrap around to the last mobile tab
+			setActiveView(mobileTabOrder[mobileTabOrder.length - 1]);
+		}
+	};
+
+	const goToNextMobileTab = () => {
+		const currentIndex = mobileTabOrder.indexOf(activeView as 'contacts' | 'drafting' | 'sent' | 'inbox');
+		if (currentIndex >= 0 && currentIndex < mobileTabOrder.length - 1) {
+			setActiveView(mobileTabOrder[currentIndex + 1]);
+		} else {
+			// Wrap around to the first mobile tab
+			setActiveView(mobileTabOrder[0]);
+		}
+	};
+
 	if (isPendingCampaign || !campaign) {
 		return silentLoad ? null : <Spinner />;
 	}
@@ -349,6 +377,76 @@ const Murmur = () => {
 							All
 						</button>
 					</div>
+
+				{/* Mobile header - campaign title and tabs */}
+				{isMobile && (
+					<div className="absolute inset-x-0 top-0 flex flex-col mt-3">
+						<div 
+							className="pl-4 pr-20 overflow-hidden"
+							style={{
+								maskImage: 'linear-gradient(to right, black 60%, transparent 95%)',
+								WebkitMaskImage: 'linear-gradient(to right, black 60%, transparent 95%)',
+							}}
+						>
+							<h1 
+								className="text-[22px] font-medium text-left text-black mb-2 leading-7 whitespace-nowrap" 
+								style={{ fontFamily: "'Times New Roman', Times, serif" }}
+							>
+								{campaign?.name || 'Untitled Campaign'}
+							</h1>
+						</div>
+						<div className="flex gap-3 justify-center mt-4">
+							<button
+								type="button"
+								className={cn(
+									'font-inter text-[13px] font-medium leading-none bg-[#F5DADA] border cursor-pointer rounded-full px-3 py-1',
+									activeView === 'contacts'
+										? 'text-black border-black'
+										: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
+								)}
+								onClick={() => setActiveView('contacts')}
+							>
+								{headerContactsCount.toString().padStart(2, '0')} Contacts
+							</button>
+							<button
+								type="button"
+								className={cn(
+									'font-inter text-[13px] font-medium leading-none bg-[#FFE3AA] border cursor-pointer rounded-full px-3 py-1',
+									activeView === 'drafting'
+										? 'text-black border-black'
+										: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
+								)}
+								onClick={() => setActiveView('drafting')}
+							>
+								{headerDraftCount.toString().padStart(2, '0')} Drafts
+							</button>
+							<button
+								type="button"
+								className={cn(
+									'font-inter text-[13px] font-medium leading-none bg-[#B0E0A6] border cursor-pointer rounded-full px-3 py-1',
+									activeView === 'sent'
+										? 'text-black border-black'
+										: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
+								)}
+								onClick={() => setActiveView('sent')}
+							>
+								{headerSentCount.toString().padStart(2, '0')} Sent
+							</button>
+							<button
+								type="button"
+								className={cn(
+									'font-inter text-[13px] font-medium leading-none bg-[#E8EFFF] border cursor-pointer rounded-full px-3 py-1',
+									activeView === 'inbox'
+										? 'text-black border-black'
+										: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
+								)}
+								onClick={() => setActiveView('inbox')}
+							>
+								Inbox
+							</button>
+						</div>
+					</div>
+				)}
 				</div>
 			</div>
 
@@ -925,6 +1023,31 @@ const Murmur = () => {
 			{/* Right side panel - hidden on mobile, when width < 1522px, on search tab when width < 1796px, on all tab when width <= 1665px, or on inbox tab when width < 1681px */}
 			{!isMobile && !hideRightPanel && !(activeView === 'search' && hideRightPanelOnSearch) && !(activeView === 'all' && hideRightPanelOnAll) && !(activeView === 'inbox' && hideRightPanelOnInbox) && (
 				<CampaignRightPanel view={activeView} onTabChange={setActiveView} />
+			)}
+
+			{/* Mobile bottom navigation panel */}
+			{isMobile && (
+				<div
+					className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-1"
+					style={{ backgroundColor: '#E1EFF4' }}
+				>
+					<button
+						type="button"
+						onClick={goToPreviousMobileTab}
+						className="bg-transparent border-0 p-1 cursor-pointer hover:opacity-70 transition-opacity"
+						aria-label="Previous tab"
+					>
+						<LeftArrow width={18} height={34} color="#000000" opacity={1} />
+					</button>
+					<button
+						type="button"
+						onClick={goToNextMobileTab}
+						className="bg-transparent border-0 p-1 cursor-pointer hover:opacity-70 transition-opacity"
+						aria-label="Next tab"
+					>
+						<RightArrow width={18} height={34} color="#000000" opacity={1} />
+					</button>
+				</div>
 			)}
 		</div>
 	);

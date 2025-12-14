@@ -1,8 +1,13 @@
 import { CommonIconProps } from '@/utils';
 import { FC } from 'react';
 
-const LeftArrow: FC<CommonIconProps> = (props) => {
-	const { width = 45, height = 85, className } = props;
+interface LeftArrowProps extends CommonIconProps {
+	color?: string;
+	opacity?: number;
+}
+
+const LeftArrow: FC<LeftArrowProps> = (props) => {
+	const { width = 45, height = 85, className, color = '#A0A0A0', opacity = 0.6 } = props;
 	return (
 		<svg
 			width={width}
@@ -12,13 +17,13 @@ const LeftArrow: FC<CommonIconProps> = (props) => {
 			xmlns="http://www.w3.org/2000/svg"
 			className={className}
 		>
-			<g opacity="0.6">
+			<g opacity={opacity}>
 				<line
 					x1="43.2659"
 					y1="1.05852"
 					x2="1.18603"
 					y2="43.308"
-					stroke="#A0A0A0"
+					stroke={color}
 					strokeWidth="3"
 				/>
 				<line
@@ -26,7 +31,7 @@ const LeftArrow: FC<CommonIconProps> = (props) => {
 					y1="41.3826"
 					x2="43.3057"
 					y2="83.4649"
-					stroke="#A0A0A0"
+					stroke={color}
 					strokeWidth="3"
 				/>
 			</g>

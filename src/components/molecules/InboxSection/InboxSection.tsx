@@ -6,6 +6,7 @@ import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useMe } from '@/hooks/useMe';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import type { InboundEmailWithRelations } from '@/types';
@@ -204,12 +205,28 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	onContactHover,
 	isNarrow = false,
 }) => {
-	// Width constants based on narrow mode
+	const isMobile = useIsMobile();
+
+	// Width constants based on narrow mode and mobile
+	// On mobile, we use calc() values for responsive sizing (4px margins on each side = 8px total)
 	const boxWidth = isNarrow ? 516 : 907;
-	const emailRowWidth = isNarrow ? 488 : 879;
+	// NOTE: Desktop rows must fit inside the scroll container's content box.
+	// With a 3px border and 16px left/right padding on the outer container (border-box),
+	// the available inner width is: boxWidth - (2 * 3) - (2 * 16).
+	// If rows are wider than that, their left/right borders get clipped.
+	const emailRowWidth = isNarrow ? 478 : 869;
 	const searchBarWidth = isNarrow ? 334 : 725;
 	const expandedEmailWidth = isNarrow ? 489 : 880;
 	const emailBodyWidth = isNarrow ? 461 : 828;
+
+	// Mobile-specific width values (using CSS calc for responsive sizing)
+	// 4px margins on each side for edge-to-edge feel
+	const mobileBoxWidth = 'calc(100vw - 8px)'; // 4px margins on each side
+	const mobileEmailRowWidth = '100%'; // Full width to match search bar + toggle span
+	const mobileSearchBarWidth = 'calc(100% - 124px)'; // Leave room for inbox/sent toggle (100px + gap)
+	const mobileExpandedEmailWidth = 'calc(100% - 16px)'; // Match email row width
+	const mobileEmailBodyWidth = 'calc(100% - 40px)'; // With additional padding
+
 	const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>('inbox');
 	const {
 		data: inboundEmails,
@@ -385,12 +402,13 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	if (isLoading) {
 		return (
-			<div className="w-full mx-auto px-4" style={{ maxWidth: `${boxWidth}px` }}>
+			<div className={`w-full flex justify-center ${isMobile ? 'px-1' : 'px-4'}`}>
 				<div
 					className="flex items-center justify-center"
 					style={{
-						width: `${boxWidth}px`,
-						height: '657px',
+						width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
+						maxWidth: isMobile ? undefined : `${boxWidth}px`,
+						height: isMobile ? 'calc(100dvh - 160px)' : '657px',
 						border: '3px solid #000000',
 						borderRadius: '8px',
 					}}
@@ -403,12 +421,13 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	if (error) {
 		return (
-			<div className="w-full mx-auto px-4" style={{ maxWidth: `${boxWidth}px` }}>
+			<div className={`w-full flex justify-center ${isMobile ? 'px-1' : 'px-4'}`}>
 				<div
 					className="flex items-center justify-center"
 					style={{
-						width: `${boxWidth}px`,
-						height: '657px',
+						width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
+						maxWidth: isMobile ? undefined : `${boxWidth}px`,
+						height: isMobile ? 'calc(100dvh - 160px)' : '657px',
 						border: '3px solid #000000',
 						borderRadius: '8px',
 					}}
@@ -428,16 +447,17 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	if (!visibleEmails || visibleEmails.length === 0) {
 		return (
-			<div className="w-full mx-auto px-4" style={{ maxWidth: `${boxWidth}px` }}>
+			<div className={`w-full flex justify-center ${isMobile ? 'px-1' : 'px-4'}`}>
 				<div
 					className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative"
 					style={{
-						width: `${boxWidth}px`,
-						height: '657px',
+						width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
+						maxWidth: isMobile ? undefined : `${boxWidth}px`,
+						height: isMobile ? 'calc(100dvh - 160px)' : '657px',
 						border: '3px solid #000000',
 						borderRadius: '8px',
-						padding: '16px',
-						paddingTop: '109px', // 55px (search top) + 48px (search height) + 6px (gap) = 109px
+						padding: isMobile ? '8px' : '16px',
+						paddingTop: isMobile ? '98px' : '109px', // Adjusted for mobile
 						background: '#84b9f5',
 					}}
 				>
@@ -518,10 +538,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					<div
 						style={{
 							position: 'absolute',
-							top: '55px',
-							left: '14px',
-							width: `${searchBarWidth}px`,
-							height: '48px',
+							top: isMobile ? '45px' : '55px',
+							left: isMobile ? '8px' : '14px',
+							width: isMobile ? mobileSearchBarWidth : `${searchBarWidth}px`,
+							height: isMobile ? '42px' : '48px',
 							border: '3px solid #000000',
 							borderRadius: '8px',
 							backgroundColor: '#3277c6',
@@ -560,18 +580,18 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					<div
 						style={{
 							position: 'absolute',
-							top: '55.5px', // Centered with search bar: 55px + (48px/2) - (47px/2) = 55.5px
-							right: '14px', // Right-aligned with emails
-							width: '148px',
-							height: '47px',
+							top: isMobile ? '45.5px' : '55.5px', // Centered with search bar
+							right: isMobile ? '8px' : '14px', // Right-aligned with emails
+							width: isMobile ? '100px' : '148px',
+							height: isMobile ? '40px' : '47px',
 							border: '3px solid #000000',
 							borderRadius: '8px',
 							backgroundColor: '#3277c6',
 							zIndex: 10,
 							display: 'flex',
 							alignItems: 'center',
-							padding: '4px',
-							gap: '4px',
+							padding: isMobile ? '3px' : '4px',
+							gap: isMobile ? '2px' : '4px',
 							pointerEvents: 'none',
 						}}
 					>
@@ -581,8 +601,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							onClick={() => {}}
 							disabled
 							style={{
-								width: '70px',
-								height: '19px',
+								width: isMobile ? '46px' : '70px',
+								height: isMobile ? '16px' : '19px',
 								display: 'flex',
 								alignItems: 'center',
 								justifyContent: 'center',
@@ -600,7 +620,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						>
 							<span
 								style={{
-									fontSize: '14px',
+									fontSize: isMobile ? '11px' : '14px',
 									fontWeight: 500,
 									color: 'transparent',
 									fontFamily: 'Times New Roman, serif',
@@ -615,8 +635,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							onClick={() => {}}
 							disabled
 							style={{
-								width: '70px',
-								height: '19px',
+								width: isMobile ? '46px' : '70px',
+								height: isMobile ? '16px' : '19px',
 								display: 'flex',
 								alignItems: 'center',
 								justifyContent: 'center',
@@ -634,7 +654,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						>
 							<span
 								style={{
-									fontSize: '14px',
+									fontSize: isMobile ? '11px' : '14px',
 									fontWeight: 500,
 									color: 'transparent',
 									fontFamily: 'Times New Roman, serif',
@@ -645,13 +665,13 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						</button>
 					</div>
 
-					{Array.from({ length: 7 }).map((_, idx) => (
+					{Array.from({ length: isMobile ? 5 : 7 }).map((_, idx) => (
 						<div
 							key={`inbox-placeholder-${idx}`}
-							className="select-none mb-2"
+							className="select-none mb-2 w-full"
 							style={{
-								width: `${emailRowWidth}px`,
-								height: idx >= 1 && idx <= 4 ? '52px' : '78px',
+								width: isMobile ? mobileEmailRowWidth : `${emailRowWidth}px`,
+								height: idx >= 1 && idx <= 4 ? (isMobile ? '58px' : '52px') : (isMobile ? '90px' : '78px'),
 								border: '3px solid #000000',
 								borderRadius: '8px',
 								backgroundColor: '#3277c6',
@@ -663,7 +683,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							{idx === 0 && (
 								<span
 									style={{
-										fontSize: '16px',
+										fontSize: isMobile ? '14px' : '16px',
 										fontWeight: 500,
 										color: '#FFFFFF',
 										fontFamily: 'Inter, sans-serif',
@@ -691,8 +711,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 											: undefined
 									}
 									style={{
-										width: '314px',
-										height: '42px',
+										width: isMobile ? 'calc(100% - 24px)' : '314px',
+										height: isMobile ? '44px' : '42px',
 										border: '3px solid #000000',
 										borderRadius: '8px',
 										backgroundColor: '#FFFFFF',
@@ -711,7 +731,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									{idx === 1 && (
 										<span
 											style={{
-												fontSize: '14px',
+												fontSize: isMobile ? '12px' : '14px',
 												fontWeight: 500,
 												color: '#000000',
 												fontFamily: 'Inter, sans-serif',
@@ -724,7 +744,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									{idx === 2 && (
 										<span
 											style={{
-												fontSize: '14px',
+												fontSize: isMobile ? '12px' : '14px',
 												fontWeight: 500,
 												color: '#000000',
 												fontFamily: 'Inter, sans-serif',
@@ -737,7 +757,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									{idx === 3 && (
 										<span
 											style={{
-												fontSize: '14px',
+												fontSize: isMobile ? '12px' : '14px',
 												fontWeight: 500,
 												color: '#000000',
 												fontFamily: 'Inter, sans-serif',
@@ -750,7 +770,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									{idx === 4 && (
 										<span
 											style={{
-												fontSize: '14px',
+												fontSize: isMobile ? '12px' : '14px',
 												fontWeight: 500,
 												color: '#000000',
 												fontFamily: 'Inter, sans-serif',
@@ -770,27 +790,33 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	}
 
 	return (
-		<div className="w-full mx-auto px-4" style={{ maxWidth: `${boxWidth}px` }}>
+		<div className={`w-full flex justify-center ${isMobile ? 'px-1' : 'px-4'}`}>
 			<CustomScrollbar
 				className="flex flex-col items-center relative"
-				contentClassName="flex flex-col items-center"
+				contentClassName="flex flex-col items-center w-full"
 				thumbWidth={2}
 				thumbColor="#000000"
 				trackColor="transparent"
 				offsetRight={-6}
 				disableOverflowClass
 				style={{
-					width: `${boxWidth}px`,
-					height: '657px',
+					width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
+					maxWidth: isMobile ? undefined : `${boxWidth}px`,
+					height: isMobile ? 'calc(100dvh - 160px)' : '657px',
+					minHeight: isMobile ? 'calc(100dvh - 160px)' : '657px',
+					maxHeight: isMobile ? 'calc(100dvh - 160px)' : '657px',
 					border: '3px solid #000000',
 					borderRadius: '8px',
-					padding: selectedEmail ? '21px 13px 12px 13px' : '16px',
-					paddingTop: selectedEmail ? '21px' : '109px', // 55px (search top) + 48px (search height) + 6px (gap) = 109px
+					padding: selectedEmail ? (isMobile ? '18px 8px 8px 8px' : '21px 13px 12px 13px') : (isMobile ? '8px' : '16px'),
+					paddingTop: selectedEmail ? (isMobile ? '18px' : '21px') : (isMobile ? '62px' : '109px'), // Adjusted for mobile
 					background: selectedEmail
 						? '#437ec1'
+						: isMobile
+						? (activeTab === 'sent' ? '#5AB477' : '#6fa4e1')
 						: activeTab === 'sent'
 						? 'linear-gradient(to bottom, #FFFFFF 19px, #5AB477 19px)'
 						: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
+					overflow: isMobile ? 'hidden' : undefined,
 				}}
 			>
 				{/* Back button - shown when email is selected */}
@@ -821,8 +847,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						</svg>
 					</button>
 				)}
-				{/* Three circles at top */}
-				{!selectedEmail && (
+				{/* Three circles at top - hidden on mobile */}
+				{!selectedEmail && !isMobile && (
 					<>
 						<svg
 							width="9"
@@ -897,17 +923,17 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					<div
 						style={{
 							position: 'absolute',
-							top: '55px',
-							left: '14px',
-							width: `${searchBarWidth}px`,
-							height: '48px',
+							top: isMobile ? '12px' : '55px',
+							left: isMobile ? '8px' : '14px',
+							width: isMobile ? mobileSearchBarWidth : `${searchBarWidth}px`,
+							height: isMobile ? '42px' : '48px',
 							border: '3px solid #000000',
 							borderRadius: '8px',
 							backgroundColor: '#FFFFFF',
 							zIndex: 10,
 							display: 'flex',
 							alignItems: 'center',
-							paddingLeft: '16px',
+							paddingLeft: isMobile ? '12px' : '16px',
 						}}
 					>
 						<SearchIconDesktop />
@@ -921,12 +947,12 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								height: '100%',
 								border: 'none',
 								outline: 'none',
-								fontSize: '16px',
+								fontSize: isMobile ? '14px' : '16px',
 								fontFamily: 'Inter, sans-serif',
 								color: '#000000',
 								backgroundColor: 'transparent',
-								marginLeft: '16px',
-								paddingRight: '16px',
+								marginLeft: isMobile ? '10px' : '16px',
+								paddingRight: isMobile ? '10px' : '16px',
 							}}
 							className="placeholder:text-[#737373]"
 						/>
@@ -937,18 +963,18 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					<div
 						style={{
 							position: 'absolute',
-							top: '55.5px', // Centered with search bar: 55px + (48px/2) - (47px/2) = 55.5px
-							right: '14px', // Right-aligned with emails
-							width: '148px',
-							height: '47px',
+							top: isMobile ? '12.5px' : '55.5px', // Centered with search bar
+							right: isMobile ? '8px' : '14px', // Right-aligned with emails
+							width: isMobile ? '100px' : '148px',
+							height: isMobile ? '40px' : '47px',
 							border: '3px solid #000000',
 							borderRadius: '8px',
 							backgroundColor: '#FFFFFF',
 							zIndex: 10,
 							display: 'flex',
 							alignItems: 'center',
-							padding: '4px',
-							gap: '4px',
+							padding: isMobile ? '3px' : '4px',
+							gap: isMobile ? '2px' : '4px',
 						}}
 					>
 						{/* Inbox tab */}
@@ -956,8 +982,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							type="button"
 							onClick={() => handleTabChange('inbox')}
 							style={{
-								width: '70px',
-								height: '19px',
+								width: isMobile ? '46px' : '70px',
+								height: isMobile ? '16px' : '19px',
 								display: 'flex',
 								alignItems: 'center',
 								justifyContent: 'center',
@@ -976,7 +1002,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						>
 							<span
 								style={{
-									fontSize: '14px',
+									fontSize: isMobile ? '11px' : '14px',
 									fontWeight: 500,
 									color: '#000000',
 									fontFamily: 'Times New Roman, serif',
@@ -990,8 +1016,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							type="button"
 							onClick={() => handleTabChange('sent')}
 							style={{
-								width: '70px',
-								height: '19px',
+								width: isMobile ? '46px' : '70px',
+								height: isMobile ? '16px' : '19px',
 								display: 'flex',
 								alignItems: 'center',
 								justifyContent: 'center',
@@ -1010,7 +1036,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						>
 							<span
 								style={{
-									fontSize: '14px',
+									fontSize: isMobile ? '11px' : '14px',
 									fontWeight: 500,
 									color: '#000000',
 									fontFamily: 'Times New Roman, serif',
@@ -1027,7 +1053,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					<div
 						className="w-full h-full flex flex-col"
 						style={{
-							width: `${expandedEmailWidth}px`,
+							width: isMobile ? mobileExpandedEmailWidth : `${expandedEmailWidth}px`,
 							border: '3px solid #000000',
 							borderRadius: '8px',
 							backgroundColor: '#5DA0EB',
@@ -1036,11 +1062,11 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					>
 						{/* Top Header Section - 880x79px */}
 						<div
-							className="flex items-center px-4"
+							className={`flex items-center ${isMobile ? 'px-2' : 'px-4'}`}
 							style={{
 								width: '100%',
-								height: '79px',
-								minHeight: '79px',
+								height: isMobile ? '65px' : '79px',
+								minHeight: isMobile ? '65px' : '79px',
 								backgroundColor: '#FFFFFF',
 								borderBottom: '3px solid #000000',
 								borderBottomLeftRadius: '8px',
@@ -1050,9 +1076,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							{/* Left side: Name, Company, Subject */}
 							<div
 								className="flex flex-col justify-center min-w-0"
-								style={{ width: '200px', flexShrink: 0 }}
+								style={{ width: isMobile ? '140px' : '200px', flexShrink: 0 }}
 							>
-								<span className="font-medium truncate">
+								<span className={`font-medium truncate ${isMobile ? 'text-[13px]' : ''}`}>
 									{getCanonicalContactName(selectedEmail, contactByEmail)}
 								</span>
 								{(() => {
@@ -1062,17 +1088,17 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									);
 									if (!companyLabel) return null;
 									return (
-										<span className="font-inter text-[14px] text-gray-500 truncate">
+										<span className={`font-inter ${isMobile ? 'text-[12px]' : 'text-[14px]'} text-gray-500 truncate`}>
 											{companyLabel}
 										</span>
 									);
 								})()}
-								<div className="text-sm font-medium truncate mt-1">
+								<div className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium truncate mt-1`}>
 									{selectedEmail.subject || '(No Subject)'}
 								</div>
 							</div>
 							{/* Right side: Badges + timestamp */}
-							<div className="flex-1 flex items-center justify-end gap-2 min-w-0">
+							<div className={`flex-1 flex items-center justify-end gap-2 min-w-0 ${isMobile ? 'gap-1' : ''}`}>
 								{/* State/City and Title badges - stacked vertically */}
 								{(() => {
 									const contact = resolveContactForEmail(selectedEmail, contactByEmail);
@@ -1084,15 +1110,15 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									return (
 										<div
 											className="flex flex-col items-start gap-1 flex-shrink-0 mr-auto"
-											style={{ marginLeft: '35%' }}
+											style={{ marginLeft: isMobile ? '10%' : '35%' }}
 										>
 											{stateAbbr && (
 												<div className="flex items-center gap-1">
 													<span
-														className="inline-flex items-center justify-center rounded-[6px] border text-[12px] leading-none font-bold"
+														className={`inline-flex items-center justify-center rounded-[6px] border ${isMobile ? 'text-[10px]' : 'text-[12px]'} leading-none font-bold`}
 														style={{
-															width: '28px',
-															height: '20px',
+															width: isMobile ? '24px' : '28px',
+															height: isMobile ? '16px' : '20px',
 															backgroundColor:
 																stateBadgeColorMap[stateAbbr] || 'transparent',
 															borderColor: '#000000',
@@ -1100,17 +1126,17 @@ export const InboxSection: FC<InboxSectionProps> = ({
 													>
 														{stateAbbr}
 													</span>
-													{stateName && (
+													{!isMobile && stateName && (
 														<span className="text-[12px] text-black">{stateName}</span>
 													)}
 												</div>
 											)}
 											{headline && (
 												<div
-													className="h-[21px] max-w-[160px] rounded-[6px] px-2 flex items-center border border-black overflow-hidden"
+													className={`${isMobile ? 'h-[16px] max-w-[100px]' : 'h-[21px] max-w-[160px]'} rounded-[6px] px-2 flex items-center border border-black overflow-hidden`}
 													style={{ backgroundColor: '#e8efff' }}
 												>
-													<span className="text-[10px] text-black leading-none truncate">
+													<span className={`${isMobile ? 'text-[8px]' : 'text-[10px]'} text-black leading-none truncate`}>
 														{headline}
 													</span>
 												</div>
@@ -1119,7 +1145,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									);
 								})()}
 								{/* Timestamp */}
-								<div className="text-sm text-black whitespace-nowrap flex-shrink-0 ml-4">
+								<div className={`${isMobile ? 'text-xs' : 'text-sm'} text-black whitespace-nowrap flex-shrink-0 ${isMobile ? 'ml-1' : 'ml-4'}`}>
 									{selectedEmail.receivedAt
 										? new Date(selectedEmail.receivedAt)
 												.toLocaleTimeString([], {
@@ -1136,21 +1162,21 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						{/* Content Section */}
 						<div
 							className="flex-1 overflow-y-auto flex flex-col"
-							style={{ paddingBottom: '18px' }}
+							style={{ paddingBottom: isMobile ? '14px' : '18px' }}
 						>
 							{/* Email Body Box - 828x326px (or 461px when narrow), 19px below header */}
 							<div
 								style={{
-									width: `${emailBodyWidth}px`,
-									height: '326px',
-									marginTop: '19px',
+									width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
+									height: isMobile ? '280px' : '326px',
+									marginTop: isMobile ? '12px' : '19px',
 									marginLeft: activeTab === 'sent' ? 'auto' : 0,
 									marginRight: activeTab === 'sent' ? 0 : 'auto',
 									alignSelf: activeTab === 'sent' ? 'flex-end' : 'flex-start',
 									backgroundColor: activeTab === 'sent' ? '#FFFFFF' : '#E5F1FF',
 									border: '3px solid #000000',
 									borderRadius: '8px',
-									padding: '16px',
+									padding: isMobile ? '12px' : '16px',
 									overflowY: 'auto',
 								}}
 							>
@@ -1211,15 +1237,15 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								<div
 									key={index}
 									style={{
-										width: `${emailBodyWidth}px`,
-										height: '326px',
-										marginTop: '19px',
+										width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
+										height: isMobile ? '200px' : '326px',
+										marginTop: isMobile ? '12px' : '19px',
 										marginRight: 0,
 										alignSelf: 'flex-end',
 										backgroundColor: '#FFFFFF',
 										border: '3px solid #000000',
 										borderRadius: '8px',
-										padding: '16px',
+										padding: isMobile ? '12px' : '16px',
 										overflowY: 'auto',
 									}}
 								>
@@ -1261,12 +1287,12 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 							{/* Reply Box - only show for inbox emails */}
 							{activeTab === 'inbox' && (
-								<div className="w-full flex justify-center" style={{ marginTop: '49px' }}>
+								<div className="w-full flex justify-center" style={{ marginTop: isMobile ? '24px' : '49px' }}>
 									<div
 										style={{
-											width: `${emailBodyWidth}px`,
-											minWidth: `${emailBodyWidth}px`,
-											maxWidth: `${emailBodyWidth}px`,
+											width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
+											minWidth: isMobile ? undefined : `${emailBodyWidth}px`,
+											maxWidth: isMobile ? undefined : `${emailBodyWidth}px`,
 											border: '3px solid #000000',
 											borderRadius: '8px',
 											backgroundColor: '#FFFFFF',
@@ -1279,18 +1305,19 @@ export const InboxSection: FC<InboxSectionProps> = ({
 											placeholder=""
 											className="w-full resize-none focus:outline-none"
 											style={{
-												height: '121px',
-												padding: '16px',
+												height: isMobile ? '90px' : '121px',
+												padding: isMobile ? '12px' : '16px',
 												border: 'none',
+												fontSize: isMobile ? '14px' : '16px',
 											}}
 											disabled={isSending}
 										/>
 										<Button
 											onClick={handleSendReply}
 											disabled={!replyMessage.trim() || isSending}
-											className="w-full rounded-none bg-[#E1EDF5] text-black disabled:opacity-50 disabled:cursor-not-allowed"
+											className={`w-full rounded-none bg-[#E1EDF5] text-black disabled:opacity-50 disabled:cursor-not-allowed ${isMobile ? 'text-sm' : ''}`}
 											style={{
-												height: '36px',
+												height: isMobile ? '32px' : '36px',
 												borderTop: '3px solid #000000',
 												borderRadius: 0,
 												fontWeight: 500,
@@ -1309,11 +1336,11 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						{visibleEmails.map((email) => (
 							<div
 								key={email.id}
-								className="bg-white hover:bg-gray-50 cursor-pointer px-4 flex items-center mb-2"
+								className="bg-white hover:bg-gray-50 cursor-pointer px-4 flex items-center mb-2 w-full max-[480px]:px-2"
 								style={{
-									width: `${emailRowWidth}px`,
-									height: '78px',
-									minHeight: '78px',
+									width: isMobile ? mobileEmailRowWidth : `${emailRowWidth}px`,
+									height: isMobile ? '100px' : '78px',
+									minHeight: isMobile ? '100px' : '78px',
 									border: '3px solid #000000',
 									borderRadius: '8px',
 									backgroundColor: '#FFFFFF',
@@ -1334,18 +1361,54 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									}
 								}}
 							>
-								<div className="flex gap-3 w-full h-full">
-									{/* Left side: Name, Company, Subject */}
+								<div className={`flex ${isMobile ? 'flex-col' : 'gap-3'} w-full h-full`}>
+									{/* Top section on mobile: Name + badges + time */}
 									<div
-										className="flex flex-col justify-center min-w-0"
-										style={{ width: '200px', flexShrink: 0 }}
+										className={`flex ${isMobile ? 'flex-row items-center justify-between w-full' : 'flex-col justify-center min-w-0'}`}
+										style={isMobile ? { marginTop: '6px' } : { width: '200px', flexShrink: 0 }}
 									>
-										<div className="flex items-center gap-2">
-											<span className="font-medium truncate">
+										<div className={`flex items-center ${isMobile ? 'gap-2 flex-1 min-w-0' : 'gap-2'}`}>
+											<span className={`font-medium truncate ${isMobile ? 'text-[14px]' : ''}`}>
 												{getCanonicalContactName(email, contactByEmail)}
 											</span>
+											{/* Badges inline on mobile */}
+											{isMobile && (() => {
+												const contact = resolveContactForEmail(email, contactByEmail);
+												const stateAbbr = contact
+													? getStateAbbreviation(contact.state || '') || ''
+													: '';
+												return stateAbbr ? (
+													<span
+														className="inline-flex items-center justify-center rounded-[4px] border text-[10px] leading-none font-bold flex-shrink-0"
+														style={{
+															width: '28px',
+															height: '16px',
+															backgroundColor:
+																stateBadgeColorMap[stateAbbr] || 'transparent',
+															borderColor: '#000000',
+														}}
+													>
+														{stateAbbr}
+													</span>
+												) : null;
+											})()}
 										</div>
-										{(() => {
+										{/* Time on mobile - right aligned */}
+										{isMobile && (
+											<div className="text-[11px] text-black whitespace-nowrap flex-shrink-0">
+												{email.receivedAt
+													? new Date(email.receivedAt)
+															.toLocaleTimeString([], {
+																hour: 'numeric',
+																minute: '2-digit',
+																hour12: true,
+															})
+															.toLowerCase()
+													: ''}
+											</div>
+										)}
+										{/* Company name - only on desktop */}
+										{!isMobile && (() => {
 											const companyLabel = getContactCompanyLabel(email, contactByEmail);
 											if (!companyLabel) return null;
 											return (
@@ -1354,71 +1417,115 @@ export const InboxSection: FC<InboxSectionProps> = ({
 												</span>
 											);
 										})()}
-										<div className="text-sm font-medium truncate mt-1">
-											{email.subject || '(No Subject)'}
-										</div>
+										{/* Subject - desktop only in this position */}
+										{!isMobile && (
+											<div className="text-sm font-medium truncate mt-1">
+												{email.subject || '(No Subject)'}
+											</div>
+										)}
 									</div>
-									{/* Right side: Badges + Body preview + date in a row */}
-									<div className="flex-1 flex items-start gap-2 min-w-0 pt-[10px]">
-										{/* Title and State badges */}
-										{(() => {
-											const contact = resolveContactForEmail(email, contactByEmail);
-											const headline = contact?.headline || contact?.title || '';
-											const stateAbbr = contact
-												? getStateAbbreviation(contact.state || '') || ''
-												: '';
-											return (
-												<>
-													{headline && (
-														<div className="h-[21px] max-w-[160px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden flex-shrink-0">
-															<span className="text-[10px] text-black leading-none truncate">
-																{headline}
+									{/* Company + headline on mobile */}
+									{isMobile && (
+										<div className="flex items-center gap-2 mt-1">
+											{(() => {
+												const companyLabel = getContactCompanyLabel(email, contactByEmail);
+												const contact = resolveContactForEmail(email, contactByEmail);
+												const headline = contact?.headline || contact?.title || '';
+												return (
+													<>
+														{companyLabel && (
+															<span className="text-[12px] text-gray-500 truncate max-w-[120px]">
+																{companyLabel}
 															</span>
-														</div>
-													)}
-													{stateAbbr && (
-														<span
-															className="inline-flex items-center justify-center rounded-[6px] border text-[12px] leading-none font-bold flex-shrink-0"
-															style={{
-																width: '39px',
-																height: '20px',
-																backgroundColor:
-																	stateBadgeColorMap[stateAbbr] || 'transparent',
-																borderColor: '#000000',
-															}}
-														>
-															{stateAbbr}
-														</span>
-													)}
-												</>
-											);
-										})()}
-										{/* Email body preview */}
-										<div className="flex-1 text-sm text-[#000000] line-clamp-2 min-w-0 pt-[7px]">
-											{email.strippedText?.slice(0, 120) ||
-												email.bodyPlain?.slice(0, 120) ||
-												''}
+														)}
+														{headline && (
+															<div className="h-[16px] max-w-[140px] rounded-[4px] px-1.5 flex items-center bg-[#E8EFFF] border border-black overflow-hidden flex-shrink-0">
+																<span className="text-[9px] text-black leading-none truncate">
+																	{headline}
+																</span>
+															</div>
+														)}
+													</>
+												);
+											})()}
 										</div>
-										{/* Date */}
-										<div className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
-											{email.receivedAt
-												? new Date(email.receivedAt).toLocaleDateString()
-												: ''}
+									)}
+									{/* Subject + body preview on mobile */}
+									{isMobile && (
+										<div className="flex flex-col mt-1 min-w-0">
+											<div className="text-[13px] font-semibold truncate">
+												{email.subject || '(No Subject)'}
+											</div>
+											<div className="text-[11px] text-[#666666] line-clamp-1 min-w-0">
+												{email.strippedText?.slice(0, 80) ||
+													email.bodyPlain?.slice(0, 80) ||
+													''}
+											</div>
 										</div>
-									</div>
+									)}
+									{/* Right side - desktop only */}
+									{!isMobile && (
+										<div className="flex-1 flex items-start gap-2 min-w-0 pt-[10px]">
+											{/* Title and State badges */}
+											{(() => {
+												const contact = resolveContactForEmail(email, contactByEmail);
+												const headline = contact?.headline || contact?.title || '';
+												const stateAbbr = contact
+													? getStateAbbreviation(contact.state || '') || ''
+													: '';
+												return (
+													<>
+														{headline && (
+															<div className="h-[21px] max-w-[160px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden flex-shrink-0">
+																<span className="text-[10px] text-black leading-none truncate">
+																	{headline}
+																</span>
+															</div>
+														)}
+														{stateAbbr && (
+															<span
+																className="inline-flex items-center justify-center rounded-[6px] border text-[12px] leading-none font-bold flex-shrink-0"
+																style={{
+																	width: '39px',
+																	height: '20px',
+																	backgroundColor:
+																		stateBadgeColorMap[stateAbbr] || 'transparent',
+																	borderColor: '#000000',
+																}}
+															>
+																{stateAbbr}
+															</span>
+														)}
+													</>
+												);
+											})()}
+											{/* Email body preview */}
+											<div className="flex-1 text-sm text-[#000000] line-clamp-2 min-w-0 pt-[7px]">
+												{email.strippedText?.slice(0, 120) ||
+													email.bodyPlain?.slice(0, 120) ||
+													''}
+											</div>
+											{/* Date */}
+											<div className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
+												{email.receivedAt
+													? new Date(email.receivedAt).toLocaleDateString()
+													: ''}
+											</div>
+										</div>
+									)}
 								</div>
 							</div>
 						))}
 						{Array.from({
-							length: Math.max(0, 6 - (visibleEmails?.length ?? 0)),
+							length: Math.max(0, (isMobile ? 4 : 6) - (visibleEmails?.length ?? 0)),
 						}).map((_, idx) => (
 							<div
 								key={`inbox-placeholder-${idx}`}
-								className="select-none mb-2"
+								className="select-none mb-2 w-full"
 								style={{
-									width: `${emailRowWidth}px`,
-									height: '78px',
-									minHeight: '78px',
+									width: isMobile ? mobileEmailRowWidth : `${emailRowWidth}px`,
+									height: isMobile ? '100px' : '78px',
+									minHeight: isMobile ? '100px' : '78px',
 									border: '3px solid #000000',
 									borderRadius: '8px',
 									backgroundColor: activeTab === 'inbox' ? '#6fa4e1' : '#5AB477',

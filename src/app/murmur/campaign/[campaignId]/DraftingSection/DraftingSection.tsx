@@ -2692,8 +2692,42 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						>
 							{/* Drafts tab - show only the drafts table centered */}
 							{view === 'drafting' && (
-								<div className="w-full min-h-[300px]">
-									{isNarrowDesktop ? (
+								<div className={`w-full ${isMobile ? 'mt-6' : 'min-h-[300px]'}`}>
+									{isMobile ? (
+										// Mobile layout: Full-width drafts, no side panels
+										<div className="flex flex-col items-center w-full px-1">
+											<DraftedEmails
+												contacts={contacts || []}
+												selectedDraftIds={draftsTabSelectedIds}
+												selectedDraft={selectedDraft}
+												setSelectedDraft={setSelectedDraft}
+												setIsDraftDialogOpen={setIsDraftDialogOpen}
+												handleDraftSelection={handleDraftSelection}
+												draftEmails={draftEmails}
+												isPendingEmails={isPendingEmails}
+												setSelectedDraftIds={setDraftsTabSelectedIds}
+												onSend={handleSendDrafts}
+												isSendingDisabled={isSendingDisabled}
+												isFreeTrial={isFreeTrial || false}
+												fromName={fromName}
+												fromEmail={fromEmail}
+												subject={form.watch('subject')}
+												onContactClick={handleResearchContactClick}
+												onContactHover={handleResearchContactHover}
+												goToWriting={goToWriting}
+												goToSearch={onGoToSearch}
+												goToInbox={goToInbox}
+												onRejectDraft={handleRejectDraft}
+												onApproveDraft={handleApproveDraft}
+												onRegenerateDraft={handleRegenerateDraft}
+												rejectedDraftIds={rejectedDraftIds}
+												approvedDraftIds={approvedDraftIds}
+												statusFilter={draftStatusFilter}
+												onStatusFilterChange={setDraftStatusFilter}
+												hideSendButton
+											/>
+										</div>
+									) : isNarrowDesktop ? (
 										// Narrow desktop (952px - 1279px): center BOTH the left panel and drafts table together
 										// Fixed width container: left (330) + gap (10) + right (499) = 839px, centered with mx-auto
 										<div className="flex flex-col items-center mx-auto" style={{ width: '839px' }}>
@@ -3063,10 +3097,34 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						)}
 					</div>
 
-					{/* Contacts tab - show the contacts table */}
-						{view === 'contacts' && (
-							<div className="w-full min-h-[300px]">
-								{isNarrowDesktop ? (
+				{/* Contacts tab - show the contacts table */}
+					{view === 'contacts' && (
+						<div className={`w-full ${isMobile ? 'mt-6' : 'min-h-[300px]'}`}>
+							{isMobile ? (
+								// Mobile layout: Full-width contacts, no side panels
+								<div className="flex flex-col items-center w-full px-1">
+									<ContactsSelection
+										contacts={contactsAvailableForDrafting}
+										allContacts={contacts}
+										selectedContactIds={contactsTabSelectedIds}
+										setSelectedContactIds={setContactsTabSelectedIds}
+										handleContactSelection={handleContactsTabSelection}
+										campaign={campaign}
+										onDraftEmails={async (ids) => {
+											await handleGenerateDrafts(ids);
+										}}
+										isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
+										onContactClick={handleResearchContactClick}
+										onContactHover={handleResearchContactHover}
+										onSearchFromMiniBar={handleMiniContactsSearch}
+										goToSearch={onGoToSearch}
+										goToDrafts={goToDrafting}
+										goToInbox={goToInbox}
+										hideBottomPanels
+										hideButton
+									/>
+								</div>
+							) : isNarrowDesktop ? (
 									// Narrow desktop (952px - 1279px): center BOTH the left panel and contacts table together
 									// Fixed width container: left (330) + gap (35) + right (499) = 864px, centered with mx-auto
 									// Bottom panels are rendered separately and centered relative to the full container
@@ -3390,8 +3448,21 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 						{/* Sent tab - show the sent emails table */}
 						{view === 'sent' && (
-							<div className="w-full min-h-[300px]">
-								{isNarrowDesktop ? (
+							<div className={`w-full ${isMobile ? 'mt-6' : 'min-h-[300px]'}`}>
+								{isMobile ? (
+									// Mobile layout: Full-width sent emails, no side panels
+									<div className="flex flex-col items-center w-full px-1">
+										<SentEmails
+											emails={sentEmails}
+											isPendingEmails={isPendingEmails}
+											onContactClick={handleResearchContactClick}
+											onContactHover={handleResearchContactHover}
+											goToDrafts={goToDrafting}
+											goToWriting={goToWriting}
+											goToSearch={onGoToSearch}
+										/>
+									</div>
+								) : isNarrowDesktop ? (
 									// Narrow desktop (952px - 1279px): center BOTH the left panel and sent table together
 									// Fixed width container: left (330) + gap (10) + right (499) = 839px, centered with mx-auto
 									<div className="flex flex-col items-center mx-auto" style={{ width: '839px' }}>
@@ -4524,7 +4595,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 											isNarrow={true}
 										/>
-										{/* Research panel below inbox - matches InboxSection's container structure (w-full mx-auto px-4 maxWidth 516px) */}
+										{/* Research panel below inbox - matches InboxSection's container structure (w-full mx-auto px-4 maxWidth 516px) - hidden on mobile */}
+									{!isMobile && (
 										<div className="mt-[20px] w-full mx-auto px-4" style={{ maxWidth: '516px' }}>
 											<ContactResearchPanel
 												contact={displayedContactForResearch}
@@ -4537,6 +4609,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												style={{ display: 'block' }}
 											/>
 										</div>
+									)}
 									</div>
 								) : isInboxTabStacked ? (
 									// Stacked layout (952px - 1279px): Header + Research on left, Inbox on right
