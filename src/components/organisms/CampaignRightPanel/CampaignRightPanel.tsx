@@ -38,7 +38,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({ className, vie
 	return (
 		<div
 			className={cn(
-				'fixed top-[50px]',
+				'absolute top-[50px]',
 				'pointer-events-none',
 				'z-0',
 				'overflow-visible',
