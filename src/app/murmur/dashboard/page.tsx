@@ -1492,7 +1492,7 @@ const DashboardContent = () => {
 								<div
 									className="flex items-center"
 									style={{
-										width: '288px',
+										width: '228px',
 										height: '36px',
 										borderWidth: '3px',
 										borderStyle: 'solid',
@@ -1560,7 +1560,7 @@ const DashboardContent = () => {
 									<div
 										className="flex items-center"
 										style={{
-											width: '288px',
+											width: '228px',
 											height: '36px',
 											borderWidth: '3px',
 											borderStyle: 'solid',
