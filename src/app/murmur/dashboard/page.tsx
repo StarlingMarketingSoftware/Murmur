@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useRef, useState } from 'react';
+import { gsap } from 'gsap';
 import { useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
@@ -649,6 +650,8 @@ const DashboardContent = () => {
 	const searchContainerRef = useRef<HTMLDivElement>(null);
 	const whatInputRef = useRef<HTMLInputElement>(null);
 	const whereInputRef = useRef<HTMLInputElement>(null);
+	const activeSectionIndicatorRef = useRef<HTMLDivElement>(null);
+	const prevActiveSectionForIndicatorRef = useRef<'why' | 'what' | 'where' | null>(null);
 	const {
 		form,
 		onSubmit,
@@ -793,6 +796,69 @@ const DashboardContent = () => {
 				document.removeEventListener('mousedown', handleClickOutside);
 			};
 		}
+	}, [activeSection]);
+
+	// Animate the active section "pill" sliding between tabs (Why/What/Where)
+	useEffect(() => {
+		const indicator = activeSectionIndicatorRef.current;
+		if (!indicator) return;
+
+		const xPercentForSection = (section: 'why' | 'what' | 'where') => {
+			switch (section) {
+				case 'why':
+					return 0;
+				case 'what':
+					return 100;
+				case 'where':
+					return 200;
+				default:
+					return 0;
+			}
+		};
+
+		// Hide when no active section (default state shows dividers)
+		if (!activeSection) {
+			gsap.to(indicator, {
+				opacity: 0,
+				duration: 0.15,
+				ease: 'power2.out',
+				overwrite: 'auto',
+			});
+			prevActiveSectionForIndicatorRef.current = null;
+			return;
+		}
+
+		const nextXPercent = xPercentForSection(activeSection);
+		const prevSection = prevActiveSectionForIndicatorRef.current;
+
+		// On first open, snap to position (no slide), then fade in
+		if (!prevSection) {
+			gsap.set(indicator, { xPercent: nextXPercent });
+			gsap.to(indicator, {
+				opacity: 1,
+				duration: 0.15,
+				ease: 'power2.out',
+				overwrite: 'auto',
+			});
+			prevActiveSectionForIndicatorRef.current = activeSection;
+			return;
+		}
+
+		// Between tabs, slide with requested timing/ease (width/height remain constant)
+		gsap.to(indicator, {
+			xPercent: nextXPercent,
+			duration: 0.6,
+			ease: 'power2.out',
+			overwrite: 'auto',
+		});
+		gsap.to(indicator, {
+			opacity: 1,
+			duration: 0.15,
+			ease: 'power2.out',
+			overwrite: 'auto',
+		});
+
+		prevActiveSectionForIndicatorRef.current = activeSection;
 	}, [activeSection]);
 
 	useEffect(() => {
@@ -1011,23 +1077,29 @@ const DashboardContent = () => {
 																		}`}
 																		style={{ transition: 'none' }}
 																	>
+																	{/* Sliding active tab indicator */}
+																	<div
+																		ref={activeSectionIndicatorRef}
+																		className="absolute top-0 left-0 h-full w-1/3 bg-white border border-black rounded-[8px] pointer-events-none z-10"
+																		style={{ opacity: 0, willChange: 'transform' }}
+																	/>
 																		{/* Why Section */}
 																		<div
-																			className={`relative h-full cursor-pointer border flex-1 min-w-0 ${
-																				activeSection === 'why'
-																					? 'bg-white border-black z-30 rounded-[8px]'
-																					: `border-transparent ${
-																							activeSection
-																								? 'hover:bg-[#F9F9F9]'
-																								: 'hover:bg-black/5'
-																					  } rounded-l-[8px]`
-																			}`}
+																		className={`relative h-full cursor-pointer border flex-1 min-w-0 ${
+																			activeSection === 'why'
+																				? 'bg-transparent border-transparent rounded-[8px]'
+																				: `border-transparent ${
+																						activeSection
+																							? 'hover:bg-[#F9F9F9]'
+																							: 'hover:bg-black/5'
+																				  } rounded-l-[8px]`
+																		}`}
 																			onClick={() => setActiveSection('why')}
 																		>
-																			<div className={`absolute left-[24px] ${inboxView ? 'top-1/2 -translate-y-1/2 text-[14px]' : 'top-[10px] text-[22px]'} font-bold text-black leading-none`}>
+																			<div className={`absolute z-20 left-[24px] ${inboxView ? 'top-1/2 -translate-y-1/2 text-[14px]' : 'top-[10px] text-[22px]'} font-bold text-black leading-none`}>
 																				{inboxView ? (whyValue ? whyValue.replace(/[\[\]]/g, '') : 'Why') : 'Why'}
 																			</div>
-																			<div className={`absolute left-[24px] right-[4px] top-[42px] h-[12px] overflow-hidden ${inboxView ? 'hidden' : ''}`}>
+																			<div className={`absolute z-20 left-[24px] right-[4px] top-[42px] h-[12px] overflow-hidden ${inboxView ? 'hidden' : ''}`}>
 																				<div
 																					className="absolute top-0 left-0 font-semibold text-[12px] whitespace-nowrap"
 																					style={{
@@ -1052,15 +1124,15 @@ const DashboardContent = () => {
 																		/>
 																		{/* What Section */}
 																		<div
-																			className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
-																				activeSection === 'what'
-																					? 'bg-white border-black z-30 rounded-[8px]'
-																					: `border-transparent ${
-																							activeSection
-																								? 'hover:bg-[#F9F9F9]'
-																								: 'hover:bg-black/5'
-																					  }`
-																			}`}
+																		className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
+																			activeSection === 'what'
+																				? 'bg-transparent border-transparent rounded-[8px]'
+																				: `border-transparent ${
+																						activeSection
+																							? 'hover:bg-[#F9F9F9]'
+																							: 'hover:bg-black/5'
+																				  }`
+																		}`}
 																			onClick={() => setActiveSection('what')}
 																		>
 																			{inboxView ? (
@@ -1076,7 +1148,7 @@ const DashboardContent = () => {
 																								setActiveSection(null);
 																							}
 																						}}
-																						className="absolute left-[24px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
+																					className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
 																						style={{
 																							fontFamily: 'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
 																						}}
@@ -1084,16 +1156,16 @@ const DashboardContent = () => {
 																						onClick={(e) => e.stopPropagation()}
 																					/>
 																				) : (
-																					<div className="absolute left-[24px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
+																				<div className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
 																						{whatValue || 'What'}
 																					</div>
 																				)
 																			) : (
 																				<>
-																					<div className="absolute left-[24px] top-[10px] text-[22px] font-bold text-black leading-none">
+																				<div className="absolute z-20 left-[24px] top-[10px] text-[22px] font-bold text-black leading-none">
 																						What
 																					</div>
-																					<div className="absolute left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
+																				<div className="absolute z-20 left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
 																						{activeSection === 'what' ? (
 																							<input
 																								ref={whatInputRef}
@@ -1106,7 +1178,7 @@ const DashboardContent = () => {
 																										setActiveSection(null);
 																									}
 																								}}
-																								className="absolute top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																							className="absolute z-20 top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
 																								style={{
 																									height: '12px',
 																									lineHeight: '12px',
@@ -1121,7 +1193,7 @@ const DashboardContent = () => {
 																							/>
 																						) : (
 																							<div
-																								className="absolute top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
+																							className="absolute z-20 top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
 																								style={{
 																									height: '12px',
 																									lineHeight: '12px',
@@ -1146,15 +1218,15 @@ const DashboardContent = () => {
 																		/>
 																		{/* Where Section */}
 																		<div
-																			className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
-																				activeSection === 'where'
-																					? 'bg-white border-black z-30 rounded-[8px]'
-																					: `border-transparent ${
-																							activeSection
-																								? 'hover:bg-[#F9F9F9]'
-																								: 'hover:bg-black/5'
-																					  } rounded-r-[8px]`
-																			}`}
+																		className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
+																			activeSection === 'where'
+																				? 'bg-transparent border-transparent rounded-[8px]'
+																				: `border-transparent ${
+																						activeSection
+																							? 'hover:bg-[#F9F9F9]'
+																							: 'hover:bg-black/5'
+																				  } rounded-r-[8px]`
+																		}`}
 																			onClick={() => setActiveSection('where')}
 																		>
 																			{inboxView ? (
@@ -1170,7 +1242,7 @@ const DashboardContent = () => {
 																								setActiveSection(null);
 																							}
 																						}}
-																						className="absolute left-[24px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
+																					className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
 																						style={{
 																							fontFamily: 'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
 																						}}
@@ -1178,18 +1250,18 @@ const DashboardContent = () => {
 																						onClick={(e) => e.stopPropagation()}
 																					/>
 																				) : (
-																					<div className="absolute left-[24px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
+																				<div className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
 																						{whereValue || 'Where'}
 																					</div>
 																				)
 																			) : (
 																				<>
-																					<div className="absolute left-[24px] top-[10px] text-[22px] font-bold text-black leading-none">
+																				<div className="absolute z-20 left-[24px] top-[10px] text-[22px] font-bold text-black leading-none">
 																						Where
 																					</div>
-																					<div className="absolute left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
+																				<div className="absolute z-20 left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
 																						{activeSection === 'where' ? (
-																							<div className="absolute top-0 left-0 w-full h-full flex items-center gap-[2px]">
+																						<div className="absolute z-20 top-0 left-0 w-full h-full flex items-center gap-[2px]">
 																								<input
 																									ref={whereInputRef}
 																									type="text"
@@ -1201,7 +1273,7 @@ const DashboardContent = () => {
 																											setActiveSection(null);
 																										}
 																									}}
-																									className="flex-1 font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+																								className="z-20 flex-1 font-semibold text-black text-[12px] bg-transparent outline-none border-none"
 																									style={{
 																										height: '12px',
 																										lineHeight: '12px',
@@ -1217,7 +1289,7 @@ const DashboardContent = () => {
 																							</div>
 																						) : (
 																							<div
-																								className="absolute top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
+																							className="absolute z-20 top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
 																								style={{
 																									height: '12px',
 																									lineHeight: '12px',
