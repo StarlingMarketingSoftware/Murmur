@@ -401,19 +401,202 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	};
 
 	if (isLoading) {
+		const skeletonRowCount = isMobile ? 5 : 6;
 		return (
 			<div className={`w-full flex justify-center ${isMobile ? 'px-1' : 'px-4'}`}>
 				<div
-					className="flex items-center justify-center"
+					className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative animate-pulse"
 					style={{
 						width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
 						maxWidth: isMobile ? undefined : `${boxWidth}px`,
 						height: isMobile ? 'calc(100dvh - 160px)' : '657px',
 						border: '3px solid #000000',
 						borderRadius: '8px',
+						padding: isMobile ? '8px' : '16px',
+						paddingTop: isMobile ? '62px' : '109px',
+						background: isMobile
+							? activeTab === 'sent'
+								? '#5AB477'
+								: '#6fa4e1'
+							: activeTab === 'sent'
+							? 'linear-gradient(to bottom, #FFFFFF 19px, #5AB477 19px)'
+							: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
 					}}
+					role="status"
+					aria-busy="true"
+					aria-label="Loading emails"
 				>
-					<div className="text-gray-500">Loading emails...</div>
+					<span className="sr-only">Loading emails…</span>
+
+					{/* Header ornaments (desktop only) */}
+					{!isMobile && (
+						<>
+							{/* Three circles at top */}
+							<svg
+								width="9"
+								height="9"
+								viewBox="0 0 9 9"
+								fill="none"
+								style={{
+									position: 'absolute',
+									top: '9.5px',
+									transform: 'translateY(-50%)',
+									left: '17px',
+									zIndex: 10,
+								}}
+							>
+								<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
+							</svg>
+							<svg
+								width="9"
+								height="9"
+								viewBox="0 0 9 9"
+								fill="none"
+								style={{
+									position: 'absolute',
+									top: '9.5px',
+									transform: 'translateY(-50%)',
+									left: '78px',
+									zIndex: 10,
+								}}
+							>
+								<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
+							</svg>
+							<svg
+								width="9"
+								height="9"
+								viewBox="0 0 9 9"
+								fill="none"
+								style={{
+									position: 'absolute',
+									top: '9.5px',
+									transform: 'translateY(-50%)',
+									left: '139px',
+									zIndex: 10,
+								}}
+							>
+								<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
+							</svg>
+
+							{/* Inbox badge placeholder */}
+							<div
+								style={{
+									position: 'absolute',
+									top: '9.5px',
+									transform: 'translateY(-50%)',
+									left: '174px',
+									width: '69px',
+									height: '18px',
+									borderRadius: '11px',
+									border: '3px solid #000000',
+									backgroundColor: '#CCDFF4',
+									zIndex: 10,
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+								}}
+							>
+								<div className="h-[10px] w-[36px] rounded bg-[#D9D9D9]" />
+							</div>
+						</>
+					)}
+
+					{/* Search bar skeleton */}
+					<div
+						style={{
+							position: 'absolute',
+							top: isMobile ? '12px' : '55px',
+							left: isMobile ? '8px' : '14px',
+							width: isMobile ? mobileSearchBarWidth : `${searchBarWidth}px`,
+							height: isMobile ? '42px' : '48px',
+							border: '3px solid #000000',
+							borderRadius: '8px',
+							backgroundColor: '#FFFFFF',
+							zIndex: 10,
+							display: 'flex',
+							alignItems: 'center',
+							paddingLeft: isMobile ? '12px' : '16px',
+							gap: isMobile ? '10px' : '16px',
+							pointerEvents: 'none',
+						}}
+						aria-hidden
+					>
+						<div className="h-[14px] w-[14px] rounded bg-[#D9D9D9]" />
+						<div className="h-[14px] flex-1 rounded bg-[#E5E5E5]" />
+					</div>
+
+					{/* Inbox/Sent toggle skeleton */}
+					<div
+						style={{
+							position: 'absolute',
+							top: isMobile ? '12.5px' : '55.5px',
+							right: isMobile ? '8px' : '14px',
+							width: isMobile ? '100px' : '148px',
+							height: isMobile ? '40px' : '47px',
+							border: '3px solid #000000',
+							borderRadius: '8px',
+							backgroundColor: '#FFFFFF',
+							zIndex: 10,
+							display: 'flex',
+							alignItems: 'center',
+							padding: isMobile ? '3px' : '4px',
+							gap: isMobile ? '2px' : '4px',
+							pointerEvents: 'none',
+						}}
+						aria-hidden
+					>
+						<div
+							className="rounded-[8px] bg-[#E5E5E5]"
+							style={{
+								width: isMobile ? '46px' : '70px',
+								height: isMobile ? '16px' : '19px',
+							}}
+						/>
+						<div
+							className="rounded-[8px] bg-[#E5E5E5]"
+							style={{
+								width: isMobile ? '46px' : '70px',
+								height: isMobile ? '16px' : '19px',
+							}}
+						/>
+					</div>
+
+					{/* Email rows skeleton */}
+					{Array.from({ length: skeletonRowCount }).map((_, idx) => (
+						<div
+							key={`inbox-loading-${idx}`}
+							className="bg-white px-4 flex items-center w-full max-[480px]:px-2"
+							style={{
+								width: isMobile ? mobileEmailRowWidth : `${emailRowWidth}px`,
+								height: isMobile ? '100px' : '78px',
+								minHeight: isMobile ? '100px' : '78px',
+								border: '3px solid #000000',
+								borderRadius: '8px',
+								backgroundColor: '#FFFFFF',
+							}}
+						>
+							<div className="flex flex-col w-full">
+								<div className="flex items-center justify-between gap-3">
+									<div
+										className="h-[14px] rounded bg-[#D9D9D9]"
+										style={{ width: isMobile ? '55%' : '180px' }}
+									/>
+									<div
+										className="h-[14px] rounded bg-[#D9D9D9]"
+										style={{ width: isMobile ? '60px' : '90px' }}
+									/>
+								</div>
+								<div
+									className="mt-2 h-[12px] rounded bg-[#E5E5E5]"
+									style={{ width: isMobile ? '85%' : '260px' }}
+								/>
+								<div
+									className="mt-2 h-[10px] rounded bg-[#E5E5E5]"
+									style={{ width: isMobile ? '70%' : '320px' }}
+								/>
+							</div>
+						</div>
+					))}
 				</div>
 			</div>
 		);
