@@ -1,4 +1,5 @@
 import { FC, Fragment, useCallback, useEffect, useLayoutEffect, useState, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { gsap } from 'gsap';
 import { DraftingSectionProps, useDraftingSection, HybridBlockPrompt } from './useDraftingSection';
@@ -147,6 +148,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const router = useRouter();
 	const isMobile = useIsMobile();
+	const [isClient, setIsClient] = useState(false);
+	useEffect(() => setIsClient(true), []);
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	const isDraftPreviewOpen = view === 'drafting' && Boolean(selectedDraft);
 
@@ -403,6 +406,234 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			gsap.killTweensOf([outer, content, ghost]);
 		};
 	}, [pinnedLeftPanelTargetVariant, shouldRenderAnimatedPinnedLeftPanelShell]);
+
+	// --- Main box morph transition (Contacts/Writing/Drafts/Sent <-> Search/Inbox) ---
+	type CampaignMainBoxKey = 'writing' | 'contacts' | 'drafts' | 'sent' | 'search' | 'inbox';
+	const getCampaignMainBoxKey = useCallback((v: typeof view): CampaignMainBoxKey | null => {
+		if (v === 'testing') return 'writing';
+		if (v === 'contacts') return 'contacts';
+		if (v === 'drafting') return 'drafts';
+		if (v === 'sent') return 'sent';
+		if (v === 'search') return 'search';
+		if (v === 'inbox') return 'inbox';
+		return null;
+	}, []);
+
+	const MAIN_BOX_VISUAL: Record<
+		CampaignMainBoxKey,
+		{ borderWidthPx: number; radiusPx: number; borderColor: string }
+	> = useMemo(
+		() => ({
+			writing: { borderWidthPx: 3, radiusPx: 6, borderColor: '#000000' },
+			contacts: { borderWidthPx: 2, radiusPx: 8, borderColor: '#000000' },
+			drafts: { borderWidthPx: 3, radiusPx: 8, borderColor: '#000000' },
+			sent: { borderWidthPx: 2, radiusPx: 8, borderColor: '#19670F' },
+			search: { borderWidthPx: 3, radiusPx: 12, borderColor: '#143883' },
+			inbox: { borderWidthPx: 3, radiusPx: 8, borderColor: '#000000' },
+		}),
+		[]
+	);
+
+	const mainBoxGhostRef = useRef<HTMLDivElement | null>(null);
+	const mainBoxTransitionIdRef = useRef(0);
+	const mainBoxActiveElRef = useRef<HTMLElement | null>(null);
+
+	// Stores the LAST rendered main box (used as the "from" rect when the view changes).
+	const lastMainBoxKeyRef = useRef<CampaignMainBoxKey | null>(getCampaignMainBoxKey(view));
+	const lastMainBoxRectRef = useRef<DOMRect | null>(null);
+
+	useLayoutEffect(() => {
+		if (typeof window === 'undefined') return;
+		if (isMobile) return;
+
+		const ghost = mainBoxGhostRef.current;
+		if (!ghost) return;
+
+		const fromKey = lastMainBoxKeyRef.current;
+		const fromRect = lastMainBoxRectRef.current;
+		const toKey = getCampaignMainBoxKey(view);
+
+		// Reset any previously "held" element state.
+		const prevActive = mainBoxActiveElRef.current;
+		if (prevActive) {
+			gsap.killTweensOf(prevActive);
+			gsap.set(prevActive, {
+				opacity: 1,
+				clearProps: 'pointerEvents,maskImage,WebkitMaskImage',
+			});
+			mainBoxActiveElRef.current = null;
+		}
+
+		// Only morph when entering/leaving the Search or Inbox tabs.
+		const isMorphEndpoint = (k: CampaignMainBoxKey) => k === 'search' || k === 'inbox';
+		if (
+			!fromKey ||
+			!fromRect ||
+			!toKey ||
+			fromKey === toKey ||
+			(!isMorphEndpoint(fromKey) && !isMorphEndpoint(toKey))
+		) {
+			gsap.killTweensOf(ghost);
+			gsap.set(ghost, { opacity: 0 });
+			return;
+		}
+
+		const transitionId = ++mainBoxTransitionIdRef.current;
+
+		gsap.killTweensOf(ghost);
+
+		const fadeSeconds = 0.22;
+		const resizeSeconds = 0.22;
+		const revealOpacity = 0.72;
+		const fadeMask =
+			'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 88%, rgba(0,0,0,0) 100%)';
+
+		const tweenTo = (target: gsap.TweenTarget, vars: gsap.TweenVars) =>
+			new Promise<void>((resolve) => {
+				gsap.to(target, { ...vars, onComplete: resolve });
+			});
+		const nextFrame = () =>
+			new Promise<void>((resolve) => {
+				requestAnimationFrame(() => resolve());
+			});
+
+		(async () => {
+			const fromVisual = MAIN_BOX_VISUAL[fromKey];
+			const toVisual = MAIN_BOX_VISUAL[toKey];
+
+			// The page uses `html.murmur-compact { zoom: 0.9 }`. getBoundingClientRect()
+			// returns visual (post-zoom) coords, but position:fixed values are applied
+			// BEFORE the zoom, then zoomed again. We must divide by the zoom factor.
+			const zoomStr = window.getComputedStyle(document.documentElement).zoom;
+			const zoom = zoomStr ? parseFloat(zoomStr) : 1;
+			const z = zoom || 1; // guard against NaN
+
+			// 1) Show the ghost at the previous box position/size.
+			// Divide by zoom to convert from visual coords to CSS coords.
+			ghost.style.left = `${fromRect.left / z}px`;
+			ghost.style.top = `${fromRect.top / z}px`;
+			ghost.style.width = `${fromRect.width / z}px`;
+			ghost.style.height = `${fromRect.height / z}px`;
+			ghost.style.borderWidth = `${fromVisual.borderWidthPx}px`;
+			ghost.style.borderColor = fromVisual.borderColor;
+			ghost.style.borderRadius = `${fromVisual.radiusPx}px`;
+			ghost.style.opacity = '1';
+
+			// Immediately hide the target box *before the first paint* so the ghost is the only
+			// "lens" through which the next tab's box becomes visible.
+			let toEl = document.querySelector(
+				`[data-campaign-main-box="${toKey}"]`
+			) as HTMLElement | null;
+			if (toEl) {
+				mainBoxActiveElRef.current = toEl;
+				gsap.killTweensOf(toEl);
+				gsap.set(toEl, {
+					opacity: 0,
+					pointerEvents: 'none',
+					maskImage: fadeMask,
+					WebkitMaskImage: fadeMask,
+				});
+			} else {
+				// Some boxes can mount a tick later; wait a frame and retry.
+				await nextFrame();
+				if (mainBoxTransitionIdRef.current !== transitionId) return;
+				toEl = document.querySelector(
+					`[data-campaign-main-box="${toKey}"]`
+				) as HTMLElement | null;
+				if (toEl) {
+					mainBoxActiveElRef.current = toEl;
+					gsap.killTweensOf(toEl);
+					gsap.set(toEl, {
+						opacity: 0,
+						pointerEvents: 'none',
+						maskImage: fadeMask,
+						WebkitMaskImage: fadeMask,
+					});
+				}
+			}
+			if (!toEl) {
+				await tweenTo(ghost, { opacity: 0, duration: fadeSeconds, ease: 'power2.out' });
+				return;
+			}
+
+			const toRect = toEl.getBoundingClientRect();
+
+			// 2) Morph the ghost into place FIRST (to prevent a "double image" where the
+			// target box appears at its final position while the ghost is still traveling).
+			await tweenTo(ghost, {
+				left: `${toRect.left / z}px`,
+				top: `${toRect.top / z}px`,
+				width: `${toRect.width / z}px`,
+				height: `${toRect.height / z}px`,
+				borderWidth: `${toVisual.borderWidthPx}px`,
+				borderColor: toVisual.borderColor,
+				borderRadius: `${toVisual.radiusPx}px`,
+				duration: resizeSeconds,
+				ease: 'power2.inOut',
+			});
+			if (mainBoxTransitionIdRef.current !== transitionId) return;
+
+			// 2b) Now reveal the target box *only when the ghost is aligned*.
+			await tweenTo(toEl, {
+				opacity: revealOpacity,
+				duration: fadeSeconds,
+				ease: 'power1.out',
+			});
+			if (mainBoxTransitionIdRef.current !== transitionId) return;
+
+			// Prep stable state under the ghost.
+			gsap.set(toEl, { maskImage: 'none', WebkitMaskImage: 'none' });
+
+			// 3) Ghost fades away, new box fades in.
+			await Promise.all([
+				tweenTo(ghost, { opacity: 0, duration: fadeSeconds * 1.35, ease: 'power2.out' }),
+				tweenTo(toEl, { opacity: 1, duration: fadeSeconds * 1.35, ease: 'power2.out' }),
+			]);
+			if (mainBoxTransitionIdRef.current !== transitionId) return;
+
+			gsap.set(toEl, { clearProps: 'pointerEvents,maskImage,WebkitMaskImage' });
+		})();
+
+		return () => {
+			// Invalidate any in-flight async work from this effect instance.
+			mainBoxTransitionIdRef.current = transitionId + 1;
+			gsap.killTweensOf(ghost);
+			const el = mainBoxActiveElRef.current;
+			if (el) {
+				gsap.killTweensOf(el);
+				gsap.set(el, { opacity: 1, clearProps: 'pointerEvents,maskImage,WebkitMaskImage' });
+			}
+			gsap.set(ghost, { opacity: 0 });
+			mainBoxActiveElRef.current = null;
+		};
+	}, [view, isMobile, MAIN_BOX_VISUAL, getCampaignMainBoxKey]);
+
+	// After every view/layout change, record the current main box rect so we can morph from it next time.
+	useLayoutEffect(() => {
+		if (typeof window === 'undefined') return;
+		if (isMobile) return;
+
+		const key = getCampaignMainBoxKey(view);
+		lastMainBoxKeyRef.current = key;
+
+		if (!key) return;
+		const el = document.querySelector(`[data-campaign-main-box="${key}"]`) as HTMLElement | null;
+		if (!el) return;
+
+		const rect = el.getBoundingClientRect();
+		if (rect.width > 0 && rect.height > 0) {
+			lastMainBoxRectRef.current = rect;
+		}
+	}, [
+		view,
+		isMobile,
+		isNarrowDesktop,
+		isNarrowestDesktop,
+		isSearchTabNarrow,
+		isInboxTabNarrow,
+		isInboxTabStacked,
+		getCampaignMainBoxKey,
+	]);
 
 	const handleGoToDashboard = useCallback(() => {
 		router.push('/murmur/dashboard');
@@ -2926,6 +3157,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										// Mobile layout: Full-width drafts, no side panels
 										<div className="flex flex-col items-center w-full px-1">
 											<DraftedEmails
+												mainBoxId="drafts"
 												contacts={contacts || []}
 												selectedDraftIds={draftsTabSelectedIds}
 												selectedDraft={selectedDraft}
@@ -3013,6 +3245,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												{/* Right column: Drafts table - fixed 499px, overflow visible for bottom panels */}
 												<div className="flex-shrink-0 [&>*]:!items-start" style={{ width: '499px', overflow: 'visible' }}>
 													<DraftedEmails
+														mainBoxId="drafts"
 														contacts={contacts || []}
 														selectedDraftIds={draftsTabSelectedIds}
 														selectedDraft={selectedDraft}
@@ -3148,6 +3381,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										// Regular centered layout for wider viewports
 										<div className="flex flex-col items-center">
 											<DraftedEmails
+											mainBoxId="drafts"
 												contacts={contacts || []}
 												selectedDraftIds={draftsTabSelectedIds}
 												selectedDraft={selectedDraft}
@@ -3333,6 +3567,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								// Mobile layout: Full-width contacts, no side panels
 								<div className="flex flex-col items-center w-full px-1">
 									<ContactsSelection
+										mainBoxId="contacts"
 										contacts={contactsAvailableForDrafting}
 										allContacts={contacts}
 										selectedContactIds={contactsTabSelectedIds}
@@ -3408,6 +3643,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											{/* Right column: Contacts table - fixed 499px, overflow visible for bottom panels */}
 											<div className="flex-shrink-0 [&>*]:!items-start" style={{ width: '499px', overflow: 'visible' }}>
 												<ContactsSelection
+													mainBoxId="contacts"
 													contacts={contactsAvailableForDrafting}
 													allContacts={contacts}
 													selectedContactIds={contactsTabSelectedIds}
@@ -3534,6 +3770,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									/* Regular centered layout for wider viewports, hide bottom panels at narrowest breakpoint */
 									<div className="flex flex-col items-center">
 										<ContactsSelection
+										mainBoxId="contacts"
 											contacts={contactsAvailableForDrafting}
 											allContacts={contacts}
 											selectedContactIds={contactsTabSelectedIds}
@@ -3682,6 +3919,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									// Mobile layout: Full-width sent emails, no side panels
 									<div className="flex flex-col items-center w-full px-1">
 										<SentEmails
+											mainBoxId="sent"
 											emails={sentEmails}
 											isPendingEmails={isPendingEmails}
 											onContactClick={handleResearchContactClick}
@@ -3745,6 +3983,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											{/* Right column: Sent table - fixed 499px, overflow visible for bottom panels */}
 											<div className="flex-shrink-0 [&>*]:!items-start" style={{ width: '499px', overflow: 'visible' }}>
 												<SentEmails
+													mainBoxId="sent"
 													emails={sentEmails}
 													isPendingEmails={isPendingEmails}
 													onContactClick={handleResearchContactClick}
@@ -3787,6 +4026,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									// Regular centered layout for wider viewports
 									<div className="flex flex-col items-center">
 										<SentEmails
+											mainBoxId="sent"
 											emails={sentEmails}
 											isPendingEmails={isPendingEmails}
 											onContactClick={handleResearchContactClick}
@@ -4164,6 +4404,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									{/* Outer container box */}
 									<div
 										className="relative rounded-[12px] overflow-hidden"
+										data-campaign-main-box="search"
 										style={{
 											width: isSearchTabNarrow ? '498px' : '768px',
 											height: '815px',
@@ -6497,6 +6738,36 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					</div>
 				)}
 			</div>
+
+			{/* Main-box ghost: portal to <body> so "fixed" aligns with viewport (avoid transformed-parent offsets) */}
+			{isClient &&
+				createPortal(
+					<div
+						ref={mainBoxGhostRef}
+						aria-hidden="true"
+						style={{
+							position: 'fixed',
+							left: 0,
+							top: 0,
+							width: 0,
+							height: 0,
+							boxSizing: 'border-box',
+							border: '3px solid #000000',
+							borderRadius: '8px',
+							background: 'rgba(255, 255, 255, 0.18)',
+							backdropFilter: 'blur(1.5px)',
+							WebkitBackdropFilter: 'blur(1.5px)',
+							opacity: 0,
+							pointerEvents: 'none',
+							zIndex: 2000,
+						}}
+					/>,
+					// Use <html> instead of <body> because Murmur applies fallback scaling
+					// via `html.murmur-compact body { transform: scale(...) }` on browsers
+					// that don't support `zoom` (e.g. Firefox). A transformed <body> would
+					// offset `position: fixed` children and break rect alignment.
+					document.documentElement
+				)}
 
 			<UpgradeSubscriptionDrawer
 				message="You have run out of drafting credits! Please upgrade your plan."

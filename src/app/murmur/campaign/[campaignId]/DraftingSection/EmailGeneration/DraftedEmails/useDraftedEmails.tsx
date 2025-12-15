@@ -64,6 +64,11 @@ export interface DraftedEmailsProps {
 	goToPreviousTab?: () => void;
 	/** Optional: callback to navigate to the next tab */
 	goToNextTab?: () => void;
+	/**
+	 * Optional: marks this drafts table as the "main box" for cross-tab morph animations.
+	 * When provided, this value is forwarded to the underlying DraftingTable `mainBoxId`.
+	 */
+	mainBoxId?: string;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {
