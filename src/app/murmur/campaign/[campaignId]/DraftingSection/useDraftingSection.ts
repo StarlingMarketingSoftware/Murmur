@@ -74,6 +74,16 @@ export interface DraftingSectionProps {
 	 * When true, the internal CampaignHeaderBox is hidden (used when the header is rendered at the page level).
 	 */
 	hideHeaderBox?: boolean;
+	/**
+	 * When true, this DraftingSection is fading out as part of a tab transition.
+	 * Used to hide elements that should remain stable (like research panel) in the exiting view.
+	 */
+	isTransitioningOut?: boolean;
+	/**
+	 * When true, this DraftingSection is fading in as part of a tab transition
+	 * where the research panel should appear stable (not fade).
+	 */
+	isTransitioningIn?: boolean;
 }
 
 type GeneratedEmail = {
