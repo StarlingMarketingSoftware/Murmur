@@ -1402,6 +1402,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									: 'w-[96.27vw] max-w-[499px] min-h-[703px] transition flex mx-auto flex-col border-[3px] border-black rounded-md bg-[#A6E2A8]'
 							} relative overflow-visible`}
 							style={!compactLeftOnly ? { backgroundColor: '#A6E2A8' } : undefined}
+							data-campaign-main-box={compactLeftOnly ? undefined : 'writing'}
 							data-hpi-container
 							onFocus={handleContainerFocus}
 							onBlur={handleContainerBlur}

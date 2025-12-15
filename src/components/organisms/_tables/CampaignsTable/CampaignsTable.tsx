@@ -255,11 +255,11 @@ export const CampaignsTable: FC = () => {
 							<div className="mobile-campaigns-outer-container">
 								<div className="mobile-scroll-wrapper" ref={mobileScrollWrapperRef}>
 									<div className="mobile-table-wrapper" ref={mobileTableWrapperRef}>
-										<CustomTable
-											variant="secondary"
-											containerClassName="my-campaigns-table mobile-table-no-scroll !bg-[#EDEDED]"
-											headerClassName="[&_tr]:!bg-[#EDEDED] [&_th]:!bg-[#EDEDED] [&_th]:!border-b-[#EDEDED]"
-											rowClassName="!bg-[#EDEDED] !border-b-[#EDEDED]"
+							<CustomTable
+								variant="secondary"
+								containerClassName="my-campaigns-table mobile-table-no-scroll !bg-[#EDEDED]"
+								headerClassName="[&_tr]:!bg-[#EDEDED] [&_th]:!bg-[#EDEDED] [&_th]:!border-b-[#EDEDED]"
+								rowClassName="!bg-[#EDEDED] !border-b-[#EDEDED] hover:!bg-[#E0E0E0] transition-colors duration-200"
 											handleRowClick={handleRowClick}
 											columns={
 												shouldUseExternalDeleteColumn
@@ -322,7 +322,7 @@ export const CampaignsTable: FC = () => {
 									isNarrowDesktop ? 'narrow-desktop-table' : '!w-[891px]'
 								}`}
 								headerClassName="[&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[4px] [&_th:last-child]:rounded-tr-[4px]"
-								rowClassName="!bg-[#EDEDED] !border-0"
+								rowClassName="!bg-[#EDEDED] !border-0 hover:!bg-[#E0E0E0] transition-colors duration-200"
 								handleRowClick={handleRowClick}
 								columns={columns}
 								data={data}

@@ -760,6 +760,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		goToInbox,
 		hideBottomPanels,
 		hideButton,
+		mainBoxId,
 	} = props;
 	const [isDrafting, setIsDrafting] = useState(false);
 	const router = useRouter();
@@ -879,6 +880,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 				noDataDescription="Select contacts to generate personalized emails"
 				isPending={false}
 				title="Contacts"
+				mainBoxId={mainBoxId}
 				goToSearch={goToSearch}
 				goToDrafts={goToDrafts}
 				goToInbox={goToInbox}
