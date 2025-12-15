@@ -1225,16 +1225,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	const dragBounds = useRef({ min: 0, max: 0 });
 
-	useEffect(() => {
+	// Use useLayoutEffect to calculate position BEFORE browser paints, preventing any visual jump
+	useLayoutEffect(() => {
 		if (selectedModeKey === 'none') {
 			setHighlightStyle({
 				left: 0,
 				width: 0,
 				opacity: 0,
 			});
-			if (isInitialRender) {
-				setIsInitialRender(false);
-			}
 			return;
 		}
 		let targetButton;
@@ -1253,9 +1251,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 				width: 80.38,
 				opacity: 1,
 			});
-			if (isInitialRender) {
-				setIsInitialRender(false);
-			}
 		}
 
 		if (fullModeButtonRef.current && manualModeButtonRef.current) {
@@ -1269,7 +1264,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 				80.38 / 2;
 			dragBounds.current = { min, max };
 		}
-	}, [selectedModeKey, isInitialRender]);
+	}, [selectedModeKey]);
+
+	// Delay enabling transitions until after the first paint
+	useEffect(() => {
+		if (isInitialRender) {
+			requestAnimationFrame(() => {
+				setIsInitialRender(false);
+			});
+		}
+	}, [isInitialRender]);
 
 	const restrictToHorizontalAxisAndBounds = ({
 		transform,
@@ -2102,7 +2106,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 						{!compactLeftOnly && !isPendingGeneration && !hideDraftButton && (
 							<div
 								className={cn(
-									'relative h-[40px] mt-[10px] mx-auto',
+									'relative h-[40px] mt-4 mx-auto',
 									isNarrowDesktop
 										? 'w-full max-w-[691px] px-4'
 										: isNarrowestDesktop

@@ -30,6 +30,104 @@ type CampaignsInboxViewProps = {
 	containerHeight?: string;
 };
 
+type CampaignsInboxViewSkeletonProps = {
+	hideSearchBar: boolean;
+	containerHeight: string;
+};
+
+const CampaignsInboxViewSkeleton: FC<CampaignsInboxViewSkeletonProps> = ({
+	hideSearchBar,
+	containerHeight,
+}) => {
+	return (
+		<div className="w-full max-w-[907px] mx-auto px-4 flex justify-center">
+			<div
+				className="relative flex flex-col items-center w-full max-w-[907px] overflow-hidden"
+				style={{
+					height: containerHeight,
+					border: '3px solid #000000',
+					borderRadius: '8px',
+					padding: '16px',
+					paddingTop: hideSearchBar ? '16px' : '76px',
+					backgroundColor: '#4ca9db',
+				}}
+				aria-busy="true"
+				aria-label="Loading campaigns"
+			>
+				<span className="sr-only">Loading campaigns</span>
+
+				{/* Search Bar skeleton */}
+				{!hideSearchBar && (
+					<div
+						className="animate-pulse"
+						style={{
+							position: 'absolute',
+							top: '13px',
+							left: '14px',
+							right: '14px',
+							maxWidth: '879px',
+							height: '48px',
+							border: '3px solid #000000',
+							borderRadius: '8px',
+							backgroundColor: '#FFFFFF',
+							zIndex: 10,
+							display: 'flex',
+							alignItems: 'center',
+							paddingLeft: '16px',
+						}}
+					>
+						<div className="w-[18px] h-[18px] rounded-[3px] bg-black/20" />
+						<div className="ml-4 h-[14px] w-[180px] rounded-[4px] bg-black/15" />
+					</div>
+				)}
+
+				{/* Campaign row skeletons */}
+				<div className="w-full flex flex-col items-center">
+					{Array.from({ length: 5 }).map((_, idx) => (
+						<div
+							key={`campaign-skeleton-${idx}`}
+							className="select-none mb-2 w-full max-w-[879px] overflow-hidden"
+							style={{
+								height: '78px',
+								minHeight: '78px',
+								border: '3px solid #000000',
+								borderRadius: '8px',
+								backgroundColor: '#EAEAEA',
+								display: 'flex',
+								alignItems: 'center',
+								padding: '0 16px',
+							}}
+						>
+							<div className="flex items-center w-full gap-4 animate-pulse">
+								{/* Campaign name */}
+								<div className="flex flex-col gap-2 min-w-0 flex-[2]">
+									<div className="h-[14px] bg-black/20 rounded w-[70%]" />
+									<div className="h-[10px] bg-black/15 rounded w-[45%]" />
+								</div>
+
+								{/* Metrics */}
+								<div className="flex-[3] flex justify-end">
+									<div className="grid grid-cols-2 min-[880px]:grid-cols-4 gap-x-2 gap-y-2">
+										{Array.from({ length: 4 }).map((__, metricIdx) => (
+											<div
+												key={`campaign-skeleton-metric-${idx}-${metricIdx}`}
+												className="h-[20px] w-[70px] min-[880px]:w-[92px] rounded-[4px] bg-black/10 border border-black/25"
+											/>
+										))}
+									</div>
+								</div>
+
+								{/* Delete icon placeholder */}
+								<div className="w-[24px] h-[24px] rounded-[4px] bg-black/20" />
+							</div>
+						</div>
+					))}
+				</div>
+			</div>
+		</div>
+	);
+};
+
 // Color functions matching useCampaignsTable exactly
 const getDraftFillColor = (value: number): string => {
 	const v = Math.max(0, Math.min(value, 50));
@@ -202,19 +300,10 @@ export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 
 	if (isLoadingCampaigns) {
 		return (
-			<div className="w-full max-w-[907px] mx-auto px-4 flex justify-center">
-				<div
-					className="flex items-center justify-center w-full max-w-[907px]"
-					style={{
-						height: resolvedContainerHeight,
-						border: '3px solid #000000',
-						borderRadius: '8px',
-						backgroundColor: '#4ca9db',
-					}}
-				>
-					<div className="text-white font-medium">Loading campaigns...</div>
-				</div>
-			</div>
+			<CampaignsInboxViewSkeleton
+				hideSearchBar={hideSearchBar}
+				containerHeight={resolvedContainerHeight}
+			/>
 		);
 	}
 

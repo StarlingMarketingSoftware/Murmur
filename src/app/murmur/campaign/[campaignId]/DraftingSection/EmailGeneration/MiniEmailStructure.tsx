@@ -350,8 +350,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	const [highlightStyle, setHighlightStyle] = useState<{ left: number; opacity: number }>(
 		{ left: 0, opacity: 1 }
 	);
+	const [isInitialRender, setIsInitialRender] = useState(true);
 
-	useEffect(() => {
+	// Use useLayoutEffect to calculate position BEFORE browser paints, preventing any visual jump
+	useLayoutEffect(() => {
 		let target: HTMLButtonElement | null = null;
 		if (draftingMode === 'ai') target = aiButtonRef.current;
 		else if (draftingMode === 'hybrid') target = hybridButtonRef.current;
@@ -363,6 +365,15 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 			setHighlightStyle({ left: 0, opacity: 0 });
 		}
 	}, [draftingMode]);
+
+	// Delay enabling transitions until after the first paint
+	useEffect(() => {
+		if (isInitialRender) {
+			requestAnimationFrame(() => {
+				setIsInitialRender(false);
+			});
+		}
+	}, [isInitialRender]);
 
 	const getModeBackgroundColor = () => {
 		if (draftingMode === 'hybrid') return 'rgba(74, 74, 217, 0.31)';
@@ -712,14 +723,14 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							<div className="flex items-center gap-4 mb-1 w-[95%] mx-auto mt-1">
 								<span className="font-inter font-semibold text-[13px]">Mode</span>
 								<div ref={modeContainerRef} className="relative flex items-center gap-6">
-									<div
-										className="absolute top-1/2 -translate-y-1/2 z-10 pointer-events-none"
-										style={{
-											left: highlightStyle.left,
-											transition: 'left 0.25s ease-in-out',
-											opacity: highlightStyle.opacity,
-										}}
-									>
+								<div
+									className="absolute top-1/2 -translate-y-1/2 z-10 pointer-events-none"
+									style={{
+										left: highlightStyle.left,
+										transition: isInitialRender ? 'none' : 'left 0.25s ease-in-out',
+										opacity: highlightStyle.opacity,
+									}}
+								>
 										<div
 											style={{
 												width: '80.38px',
