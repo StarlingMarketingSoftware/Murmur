@@ -3527,7 +3527,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* Bottom Panels: Contacts, Drafts, and Inbox - centered relative to container */}
-										<div className="mt-[35px] flex justify-center gap-[15px]">
+										<div className="mt-[91px] flex justify-center gap-[15px]">
 											<ContactsExpandedList
 												contacts={contactsAvailableForDrafting}
 												width={232}
@@ -3610,7 +3610,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 										{/* Bottom Panels: Contacts, Drafts, and Inbox - hidden at narrowest breakpoint (< 952px) */}
 										{!isNarrowestDesktop && (
-											<div className="mt-[35px] flex justify-center gap-[15px]">
+											<div className="mt-[91px] flex justify-center gap-[15px]">
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
 													width={232}
@@ -4659,7 +4659,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* Bottom Panels: Contacts, Drafts, and Sent */}
-										<div className="mt-[35px] flex justify-center gap-[15px]">
+										<div className="mt-[91px] flex justify-center gap-[15px]">
 											<ContactsExpandedList
 												contacts={contactsAvailableForDrafting}
 												width={232}
@@ -4710,7 +4710,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 										{/* Bottom Panels: Contacts, Drafts, and Sent - hidden at narrowest breakpoint (< 952px) */}
 										{!isNarrowestDesktop && (
-											<div className="mt-[35px] flex justify-center gap-[15px]">
+											<div className="mt-[112px] flex justify-center gap-[15px]">
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
 													width={232}
