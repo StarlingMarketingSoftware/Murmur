@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { useDashboard } from './useDashboard';
@@ -68,6 +68,8 @@ const DEFAULT_STATE_SUGGESTIONS = [
 const DashboardContent = () => {
 	const { isSignedIn, openSignIn } = useClerk();
 	const searchParams = useSearchParams();
+	const router = useRouter();
+	const pathname = usePathname();
 	const isMobile = useIsMobile();
 	const { data: campaigns } = useGetCampaigns();
 	const hasCampaigns = campaigns && campaigns.length > 0;
@@ -92,16 +94,18 @@ const DashboardContent = () => {
 	const [activeSection, setActiveSection] = useState<'why' | 'what' | 'where' | null>(
 		null
 	);
-	const [activeTab, setActiveTab] = useState<'search' | 'inbox'>('search');
+	const initialTabFromQuery = searchParams.get('tab') === 'inbox' ? 'inbox' : 'search';
+	const [activeTab, setActiveTab] = useState<'search' | 'inbox'>(initialTabFromQuery);
 	const inboxView = activeTab === 'inbox';
 
 	// Handle tab query parameter
 	useEffect(() => {
 		const tabParam = searchParams.get('tab');
-		if (tabParam === 'search' || tabParam === 'inbox') {
+		if ((tabParam === 'search' || tabParam === 'inbox') && tabParam !== activeTab) {
+			// URL is the source of truth when it changes externally (back/forward, deep link)
 			setActiveTab(tabParam);
 		}
-	}, [searchParams]);
+	}, [searchParams, activeTab]);
 	const [userLocationName, setUserLocationName] = useState<string | null>(null);
 	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
@@ -647,6 +651,12 @@ const DashboardContent = () => {
 	const logoHeight = isMobile ? '50px' : '79px';
 	const hasProblematicBrowser = isProblematicBrowser();
 	useMe(); // Hook call for side effects
+	const tabToggleTrackRef = useRef<HTMLDivElement>(null);
+	const tabTogglePillRef = useRef<HTMLDivElement>(null);
+	const tabbedLandingBoxRef = useRef<HTMLDivElement>(null);
+	const dashboardContentRef = useRef<HTMLDivElement>(null);
+	const isTabSwitchAnimatingRef = useRef(false);
+	const tabSwitchTimelineRef = useRef<gsap.core.Timeline | null>(null);
 	const searchContainerRef = useRef<HTMLDivElement>(null);
 	const whatInputRef = useRef<HTMLInputElement>(null);
 	const whereInputRef = useRef<HTMLInputElement>(null);
@@ -679,6 +689,152 @@ const DashboardContent = () => {
 		isSearchPending,
 		usedContactIdsSet,
 	} = useDashboard();
+
+	const TAB_PILL_COLORS = {
+		search: '#DAE6FE',
+		inbox: '#CBE7D1',
+	} as const;
+
+	const getTabPillXFor = (tab: 'search' | 'inbox') => {
+		const track = tabToggleTrackRef.current;
+		const pill = tabTogglePillRef.current;
+
+		// Fallbacks match the fixed design values used in the markup below.
+		const trackWidth = track?.getBoundingClientRect().width ?? 228;
+		const pillWidth = pill?.getBoundingClientRect().width ?? 85;
+
+		const half = trackWidth / 2;
+		const inset = (half - pillWidth) / 2;
+
+		return tab === 'search' ? inset : half + inset;
+	};
+
+	const updateTabQueryParam = (tab: 'search' | 'inbox') => {
+		const current = searchParams.get('tab');
+		if (current === tab) return;
+		const params = new URLSearchParams(searchParams.toString());
+		params.set('tab', tab);
+		router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+	};
+
+	// Keep the Search/Inbox pill positioned correctly (no animation) whenever it mounts
+	// or the tab changes outside of our GSAP transition.
+	useEffect(() => {
+		if (hasSearched) return;
+		const pill = tabTogglePillRef.current;
+		if (!pill) return;
+		if (isTabSwitchAnimatingRef.current) return;
+
+		gsap.set(pill, {
+			yPercent: -50,
+			x: getTabPillXFor(activeTab),
+			backgroundColor: TAB_PILL_COLORS[activeTab],
+		});
+	}, [activeTab, hasSearched]);
+
+	useEffect(() => {
+		if (hasSearched) return;
+		const handleResize = () => {
+			if (isTabSwitchAnimatingRef.current) return;
+			const pill = tabTogglePillRef.current;
+			if (!pill) return;
+			gsap.set(pill, { x: getTabPillXFor(activeTab) });
+		};
+		window.addEventListener('resize', handleResize);
+		return () => window.removeEventListener('resize', handleResize);
+	}, [activeTab, hasSearched]);
+
+	const transitionToTab = (
+		nextTab: 'search' | 'inbox',
+		opts?: { animate?: boolean; after?: () => void }
+	) => {
+		if (nextTab === activeTab) {
+			opts?.after?.();
+			return;
+		}
+
+		const animate = opts?.animate ?? true;
+		const pill = tabTogglePillRef.current;
+		const dashboardContent = dashboardContentRef.current;
+
+		// If we can't animate (e.g. refs not mounted), just switch.
+		if (!animate || !pill) {
+			setActiveTab(nextTab);
+			updateTabQueryParam(nextTab);
+			opts?.after?.();
+			return;
+		}
+
+		// Kill any in-flight transition.
+		if (tabSwitchTimelineRef.current) {
+			tabSwitchTimelineRef.current.kill();
+			tabSwitchTimelineRef.current = null;
+		}
+
+		isTabSwitchAnimatingRef.current = true;
+
+		const nextX = getTabPillXFor(nextTab);
+
+		const tl = gsap.timeline({
+			onComplete: () => {
+				isTabSwitchAnimatingRef.current = false;
+				tabSwitchTimelineRef.current = null;
+				opts?.after?.();
+			},
+		});
+		tabSwitchTimelineRef.current = tl;
+
+		// Pill: slide + color tween (power2.out, 0.5s)
+		tl.to(
+			pill,
+			{
+				x: nextX,
+				backgroundColor: TAB_PILL_COLORS[nextTab],
+				duration: 0.5,
+				ease: 'power2.out',
+				overwrite: 'auto',
+			},
+			0
+		);
+
+		// Whole page: smooth fade out
+		if (dashboardContent) {
+			tl.to(
+				dashboardContent,
+				{
+					opacity: 0,
+					duration: 0.2,
+					ease: 'power2.out',
+					overwrite: 'auto',
+				},
+				0
+			);
+		}
+
+		// Swap the tab at the midpoint
+		tl.call(
+			() => {
+				setActiveTab(nextTab);
+				updateTabQueryParam(nextTab);
+			},
+			[],
+			0.2
+		);
+
+		// Whole page: smooth fade in
+		if (dashboardContent) {
+			tl.to(
+				dashboardContent,
+				{
+					opacity: 1,
+					duration: 0.25,
+					ease: 'power2.out',
+					overwrite: 'auto',
+				},
+				0.2
+			);
+		}
+	};
 
 	// When a contact is hovered on non‑mobile in table view, we switch
 	// from the mini search bar to the horizontal research strip.
@@ -950,6 +1106,7 @@ const DashboardContent = () => {
 	return (
 		<AppLayout>
 			<div
+				ref={dashboardContentRef}
 				className={`relative min-h-screen dashboard-main-offset w-full max-w-full ${bottomPadding} ${
 					hasSearched ? 'search-active' : ''
 				}`}
@@ -1023,7 +1180,12 @@ const DashboardContent = () => {
 												} else {
 													// Switch to search tab when submitting from inbox tab
 													if (activeTab === 'inbox') {
-														setActiveTab('search');
+														transitionToTab('search', {
+															after: () => {
+																form.handleSubmit(onSubmit)();
+															},
+														});
+														return;
 													}
 													form.handleSubmit(onSubmit)(e);
 												}
@@ -1486,11 +1648,12 @@ const DashboardContent = () => {
 						)}
 						*/}
 
-						{/* Search tab: Toggle below searchbar */}
-						{activeTab === 'search' && !hasSearched && (
+						{/* Search/Inbox tab toggle - only shown here for search tab */}
+						{!hasSearched && activeTab === 'search' && (
 							<div className="flex justify-center" style={{ marginTop: '92px' }}>
 								<div
-									className="flex items-center"
+									ref={tabToggleTrackRef}
+									className="relative flex items-center"
 									style={{
 										width: '228px',
 										height: '36px',
@@ -1498,67 +1661,63 @@ const DashboardContent = () => {
 										borderStyle: 'solid',
 										borderColor: '#7A7A7A',
 										borderRadius: '10px',
+										backgroundColor: '#FFFFFF',
 									}}
 								>
-									<span
-										className="flex items-center justify-center cursor-pointer"
+									{/* Sliding pill indicator - positioned at search (left) */}
+									<div
+										ref={tabTogglePillRef}
 										style={{
-											flex: 1,
-											height: '100%',
+											position: 'absolute',
+											top: '50%',
+											left: 0,
+											width: '85px',
+											height: '17px',
+											borderWidth: '2px',
+											borderStyle: 'solid',
+											borderColor: '#000000',
+											borderRadius: '10px',
+											backgroundColor: '#DAE6FE',
+											pointerEvents: 'none',
+											transform: 'translateX(14.5px) translateY(-50%)',
+											willChange: 'transform, background-color',
 										}}
-										onClick={() => setActiveTab('search')}
+									/>
+									<button
+										type="button"
+										className="relative z-10 flex-1 h-full flex items-center justify-center font-medium"
+										onClick={() => transitionToTab('search')}
+										aria-pressed={true}
 									>
-										<span
-											className="flex items-center justify-center font-medium"
-											style={{
-												width: '85px',
-												height: '17px',
-												borderWidth: '2px',
-												borderStyle: 'solid',
-												borderColor: '#000000',
-												borderRadius: '10px',
-												backgroundColor: '#DAE6FE',
-											}}
-										>
-											Search
-										</span>
-									</span>
-									<span
-										className="flex items-center justify-center cursor-pointer"
-										style={{
-											flex: 1,
-											height: '100%',
-										}}
-										onClick={() => setActiveTab('inbox')}
+										Search
+									</button>
+									<button
+										type="button"
+										className="relative z-10 flex-1 h-full flex items-center justify-center font-medium"
+										onClick={() => transitionToTab('inbox')}
+										aria-pressed={false}
 									>
-										<span
-											className="flex items-center justify-center font-medium"
-											style={{
-												width: '85px',
-												height: '17px',
-												borderWidth: '0',
-												borderStyle: 'solid',
-												borderColor: '#000000',
-												borderRadius: '10px',
-												backgroundColor: 'transparent',
-											}}
-										>
-											Inbox
-										</span>
-									</span>
+										Inbox
+									</button>
 								</div>
 							</div>
 						)}
-						{/* Inbox tab: Table first, then toggle below */}
-						{activeTab === 'inbox' && !hasSearched && (
-							<>
-								<div style={{ marginTop: '20px' }}>
-									<CampaignsInboxView />
-								</div>
-								{/* Toggle below table */}
+
+						{/* Inbox tab: CampaignsInboxView + toggle - inside hero-wrapper for proper positioning */}
+						{!hasSearched && activeTab === 'inbox' && (
+							<div
+								ref={tabbedLandingBoxRef}
+								style={{
+									marginTop: '20px',
+									willChange: 'transform, opacity',
+								}}
+							>
+								<CampaignsInboxView />
+								{/* Toggle below table for inbox tab */}
 								<div className="flex justify-center" style={{ marginTop: '34px' }}>
 									<div
-										className="flex items-center"
+										ref={tabToggleTrackRef}
+										className="relative flex items-center"
 										style={{
 											width: '228px',
 											height: '36px',
@@ -1566,57 +1725,47 @@ const DashboardContent = () => {
 											borderStyle: 'solid',
 											borderColor: '#7A7A7A',
 											borderRadius: '10px',
+											backgroundColor: '#FFFFFF',
 										}}
 									>
-										<span
-											className="flex items-center justify-center cursor-pointer"
+										{/* Sliding pill indicator - positioned at inbox (right) */}
+										<div
+											ref={tabTogglePillRef}
 											style={{
-												flex: 1,
-												height: '100%',
+												position: 'absolute',
+												top: '50%',
+												left: 0,
+												width: '85px',
+												height: '17px',
+												borderWidth: '2px',
+												borderStyle: 'solid',
+												borderColor: '#000000',
+												borderRadius: '10px',
+												backgroundColor: '#CBE7D1',
+												pointerEvents: 'none',
+												transform: 'translateX(128.5px) translateY(-50%)',
+												willChange: 'transform, background-color',
 											}}
-											onClick={() => setActiveTab('search')}
+										/>
+										<button
+											type="button"
+											className="relative z-10 flex-1 h-full flex items-center justify-center font-medium"
+											onClick={() => transitionToTab('search')}
+											aria-pressed={false}
 										>
-											<span
-												className="flex items-center justify-center font-medium"
-												style={{
-													width: '85px',
-													height: '17px',
-													borderWidth: '0',
-													borderStyle: 'solid',
-													borderColor: '#000000',
-													borderRadius: '10px',
-													backgroundColor: 'transparent',
-												}}
-											>
-												Search
-											</span>
-										</span>
-										<span
-											className="flex items-center justify-center cursor-pointer"
-											style={{
-												flex: 1,
-												height: '100%',
-											}}
-											onClick={() => setActiveTab('inbox')}
+											Search
+										</button>
+										<button
+											type="button"
+											className="relative z-10 flex-1 h-full flex items-center justify-center font-medium"
+											onClick={() => transitionToTab('inbox')}
+											aria-pressed={true}
 										>
-											<span
-												className="flex items-center justify-center font-medium"
-												style={{
-													width: '85px',
-													height: '17px',
-													borderWidth: '2px',
-													borderStyle: 'solid',
-													borderColor: '#000000',
-													borderRadius: '10px',
-													backgroundColor: '#DAE6FE',
-												}}
-											>
-												Inbox
-											</span>
-										</span>
+											Inbox
+										</button>
 									</div>
 								</div>
-							</>
+							</div>
 						)}
 					</div>
 				</div>
@@ -3278,8 +3427,15 @@ const DashboardContent = () => {
 					</>
 				)}
 
+				{/* CampaignsTable for search tab - rendered outside hero-wrapper */}
 				{!hasSearched && activeTab === 'search' && (
-					<div className="campaigns-table-wrapper dashboard-recent-campaigns w-full max-w-[960px] mx-auto px-4">
+					<div
+						ref={tabbedLandingBoxRef}
+						className="campaigns-table-wrapper dashboard-recent-campaigns w-full max-w-[960px] mx-auto px-4"
+						style={{
+							willChange: 'transform, opacity',
+						}}
+					>
 						<CampaignsTable />
 					</div>
 				)}
