@@ -749,7 +749,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 										</div>
 									) : (
 										/* Normal view: 4-row layout */
-										<div className="grid grid-cols-1 grid-rows-4 h-full pr-[150px] pl-[22px]">
+										<div className={cn("grid grid-cols-1 grid-rows-4 h-full pl-[22px]", isAllTab ? "pr-[170px]" : "pr-[180px]")}>
 											{/* Row 1: Name */}
 											<div className="row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
 												<div

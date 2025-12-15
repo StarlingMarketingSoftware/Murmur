@@ -219,12 +219,12 @@ const Murmur = () => {
 	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
 	return (
 		<div className="min-h-screen">
-			{/* Left navigation arrow - fixed position (hidden in narrow desktop + testing) */}
+			{/* Left navigation arrow - absolute position (hidden in narrow desktop + testing) */}
 			{!hideFixedArrows && (
 				<button
 					type="button"
 					onClick={goToPreviousTab}
-					className="fixed z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
+					className="absolute z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
 					style={{
 						left: '33px',
 						top: '467px',
@@ -235,12 +235,12 @@ const Murmur = () => {
 				</button>
 			)}
 
-			{/* Right navigation arrow - fixed position (hidden in narrow desktop + testing) */}
+			{/* Right navigation arrow - absolute position (hidden in narrow desktop + testing) */}
 			{!hideFixedArrows && (
 				<button
 					type="button"
 					onClick={goToNextTab}
-					className="fixed z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
+					className="absolute z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
 					style={{
 						right: '33px',
 						top: '467px',
