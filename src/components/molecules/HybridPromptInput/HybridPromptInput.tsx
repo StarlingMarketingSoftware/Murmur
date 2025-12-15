@@ -2106,7 +2106,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 						{!compactLeftOnly && !isPendingGeneration && !hideDraftButton && (
 							<div
 								className={cn(
-									'relative h-[40px] mt-[10px] mx-auto',
+									'relative h-[40px] mt-4 mx-auto',
 									isNarrowDesktop
 										? 'w-full max-w-[691px] px-4'
 										: isNarrowestDesktop

@@ -2388,7 +2388,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										{/* Draft button with arrows - spans full width below both columns */}
 										{!isPendingGeneration && (
-											<div className="flex items-center justify-center gap-[29px] mt-[10px] w-full">
+											<div className="flex items-center justify-center gap-[29px] mt-4 w-full">
 												{/* Left arrow */}
 												<button
 													type="button"
@@ -2511,7 +2511,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										/>
 										{/* Draft button with arrows at narrowest breakpoint */}
 										{isNarrowestDesktop && !isPendingGeneration && (
-											<div className="flex items-center justify-center gap-[20px] mt-[10px] w-full">
+											<div className="flex items-center justify-center gap-[20px] mt-4 w-full">
 												{/* Left arrow */}
 												<button
 													type="button"
