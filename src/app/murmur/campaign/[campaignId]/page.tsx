@@ -672,7 +672,7 @@ const Murmur = () => {
 													goToPreviousTab={goToPreviousTab}
 													goToNextTab={goToNextTab}
 													hideHeaderBox={isNarrowestDesktop && !isMobile}
-													isTransitioningOut={bothSharePosition}
+													isTransitioningOut={bothSharePosition ?? undefined}
 												/>
 											</div>
 										)}
@@ -708,7 +708,7 @@ const Murmur = () => {
 												goToPreviousTab={goToPreviousTab}
 												goToNextTab={goToNextTab}
 												hideHeaderBox={isNarrowestDesktop && !isMobile}
-												isTransitioningIn={bothSharePosition}
+												isTransitioningIn={bothSharePosition ?? undefined}
 											/>
 										</div>
 									</>
