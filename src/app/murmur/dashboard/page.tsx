@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { createPortal } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { useDashboard } from './useDashboard';
 import { urls } from '@/constants/urls';
@@ -99,13 +99,16 @@ const DashboardContent = () => {
 	const inboxView = activeTab === 'inbox';
 
 	// Handle tab query parameter
+	// Only react to *URL changes*. If we also depend on `activeTab`, this effect can run
+	// immediately after a click-driven tab switch (before `router.replace` updates the URL),
+	// momentarily forcing the UI back to the previous tab (the "flash" you were seeing).
+	const tabParam = searchParams.get('tab');
 	useEffect(() => {
-		const tabParam = searchParams.get('tab');
-		if ((tabParam === 'search' || tabParam === 'inbox') && tabParam !== activeTab) {
+		if (tabParam === 'search' || tabParam === 'inbox') {
 			// URL is the source of truth when it changes externally (back/forward, deep link)
 			setActiveTab(tabParam);
 		}
-	}, [searchParams, activeTab]);
+	}, [tabParam]);
 	const [userLocationName, setUserLocationName] = useState<string | null>(null);
 	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
@@ -784,26 +787,28 @@ const DashboardContent = () => {
 		});
 		tabSwitchTimelineRef.current = tl;
 
-		// Pill: slide + color tween (power2.out, 0.5s)
+		// Pill: slide + color tween
 		tl.to(
 			pill,
 			{
 				x: nextX,
 				backgroundColor: TAB_PILL_COLORS[nextTab],
-				duration: 0.5,
+				duration: 0.6,
 				ease: 'power2.out',
 				overwrite: 'auto',
 			},
 			0
 		);
 
-		// Whole page: smooth fade out
+		// Whole page: fade out
+		const fadeOutDuration = 0.22;
+		const fadeInDuration = 0.26;
 		if (dashboardContent) {
 			tl.to(
 				dashboardContent,
 				{
 					opacity: 0,
-					duration: 0.2,
+					duration: fadeOutDuration,
 					ease: 'power2.out',
 					overwrite: 'auto',
 				},
@@ -811,27 +816,31 @@ const DashboardContent = () => {
 			);
 		}
 
-		// Swap the tab at the midpoint
+		// Swap the tab only once opacity has hit 0.
+		// Use flushSync so React commits the new tab before we fade back in,
+		// avoiding a single-frame "flash" of the previous tab during the fade-in.
 		tl.call(
 			() => {
-				setActiveTab(nextTab);
+				flushSync(() => {
+					setActiveTab(nextTab);
+				});
 				updateTabQueryParam(nextTab);
 			},
 			[],
-			0.2
+			fadeOutDuration
 		);
 
-		// Whole page: smooth fade in
+		// Whole page: fade in
 		if (dashboardContent) {
 			tl.to(
 				dashboardContent,
 				{
 					opacity: 1,
-					duration: 0.25,
-					ease: 'power2.out',
+					duration: fadeInDuration,
+					ease: 'power1.inOut',
 					overwrite: 'auto',
 				},
-				0.2
+				fadeOutDuration
 			);
 		}
 	};
