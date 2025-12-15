@@ -870,50 +870,80 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					) : isContacts ? (
 						<div
 							className="overflow-visible w-full flex flex-col items-center pb-2"
-							style={{ gap: '11px' }}
+							style={{ gap: isMobile ? '10px' : '11px', padding: isMobile ? '0 8px' : undefined }}
 						>
-							{Array.from({ length: 9 }).map((_, idx) => (
-								<div
-									key={idx}
-									className={`select-none w-[459px] h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] flex items-center justify-center ${
-										idx === 0
-											? 'bg-[#E54D50]'
-											: idx === 2
-											? 'bg-[#E72528]'
-											: idx === 3
-											? 'bg-[#E85052]'
-											: idx === 4
-											? 'bg-[#F87C7D]'
-											: idx === 5
-											? 'bg-[#EB8586]'
-											: 'bg-[#E15E60]'
-									}`}
-								>
-									{idx === 0 && (
-										<span className="text-[15px] font-semibold font-inter text-black">
-											All Contacts Drafted
-										</span>
-									)}
-									{idx >= 2 && idx <= 5 && (
-										<div
-											className="w-[403px] h-[42px] bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
-											onClick={() => {
-												if (idx === 2) goToSearch?.();
-												if (idx === 3) goToDrafts?.();
-												if (idx === 4) goToInbox?.();
-												if (idx === 5) router.push(urls.murmur.dashboard.index);
-											}}
-										>
-											<span className="text-[15px] font-semibold font-inter text-black">
-												{idx === 2 && 'Add More Contacts'}
-												{idx === 3 && 'Send Drafts'}
-												{idx === 4 && 'Check Inbox'}
-												{idx === 5 && 'Create New Campaign'}
+							{Array.from({ length: isMobile ? 5 : 9 }).map((_, idx) => {
+								const contactsPlaceholderBoxWidth = isMobile ? 'w-full' : 'w-[459px]';
+								const contactsPlaceholderBoxHeight = isMobile 
+									? (idx === 0 ? 'h-[90px]' : 'h-[58px]')
+									: 'h-[52px]';
+								const contactsInnerButtonWidth = isMobile ? 'calc(100% - 24px)' : '403px';
+								return (
+									<div
+										key={idx}
+										className={`select-none ${contactsPlaceholderBoxWidth} ${contactsPlaceholderBoxHeight} overflow-hidden rounded-[8px] border-2 border-[#000000] flex items-center justify-center ${
+											idx === 0
+												? 'bg-[#E54D50]'
+												: idx === 2
+												? 'bg-[#E72528]'
+												: idx === 3
+												? 'bg-[#E85052]'
+												: idx === 4
+												? 'bg-[#F87C7D]'
+												: idx === 5
+												? 'bg-[#EB8586]'
+												: 'bg-[#E15E60]'
+										}`}
+									>
+										{idx === 0 && (
+											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[14px]' : 'text-[15px]'}`}>
+												All Contacts Drafted
 											</span>
-										</div>
-									)}
-								</div>
-							))}
+										)}
+										{isMobile ? (
+											idx >= 1 && idx <= 4 && (
+												<div
+													className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+													style={{ width: contactsInnerButtonWidth, height: '44px' }}
+													onClick={() => {
+														if (idx === 1) goToSearch?.();
+														if (idx === 2) goToDrafts?.();
+														if (idx === 3) goToInbox?.();
+														if (idx === 4) router.push(urls.murmur.dashboard.index);
+													}}
+												>
+													<span className="text-[12px] font-semibold font-inter text-black">
+														{idx === 1 && 'Add More Contacts'}
+														{idx === 2 && 'Send Drafts'}
+														{idx === 3 && 'Check Inbox'}
+														{idx === 4 && 'Create New Campaign'}
+													</span>
+												</div>
+											)
+										) : (
+											idx >= 2 && idx <= 5 && (
+												<div
+													className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+													style={{ width: contactsInnerButtonWidth, height: '42px' }}
+													onClick={() => {
+														if (idx === 2) goToSearch?.();
+														if (idx === 3) goToDrafts?.();
+														if (idx === 4) goToInbox?.();
+														if (idx === 5) router.push(urls.murmur.dashboard.index);
+													}}
+												>
+													<span className="text-[15px] font-semibold font-inter text-black">
+														{idx === 2 && 'Add More Contacts'}
+														{idx === 3 && 'Send Drafts'}
+														{idx === 4 && 'Check Inbox'}
+														{idx === 5 && 'Create New Campaign'}
+													</span>
+												</div>
+											)
+										)}
+									</div>
+								);
+							})}
 						</div>
 					) : (
 						<div className="flex flex-col items-center justify-center h-full text-gray-500 px-4">
