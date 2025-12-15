@@ -456,7 +456,7 @@ export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 					return (
 						<div
 							key={campaign.id}
-							className="cursor-pointer mb-2 w-full max-w-[879px]"
+							className="cursor-pointer mb-2 w-full max-w-[879px] transition-all duration-200 hover:brightness-[0.97] hover:shadow-md"
 							style={{
 								height: '78px',
 								minHeight: '78px',
