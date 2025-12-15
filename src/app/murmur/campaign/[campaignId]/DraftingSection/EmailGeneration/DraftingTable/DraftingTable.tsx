@@ -709,7 +709,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 							: isContacts
 							? '68px'
 							: isDrafts
-							? (isMobile ? '8px' : '66px') // Minimal margin on mobile (no white header or tabs)
+							? (isMobile ? '8px' : hasData ? '66px' : '32px') // 66px with data (tabs shown), 32px when empty (no tabs)
 							: isSent
 							? (isMobile ? '8px' : '32px') // Minimal margin on mobile (no white header)
 							: 0,

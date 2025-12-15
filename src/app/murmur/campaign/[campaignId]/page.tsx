@@ -10,7 +10,7 @@ import { urls } from '@/constants/urls';
 import Link from 'next/link';
 import { cn } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import nextDynamic from 'next/dynamic';
@@ -18,6 +18,11 @@ import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/Camp
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus } from '@/constants/prismaEnums';
+
+type ViewType = 'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
+
+// Transition duration in ms - kept short for that premium, snappy feel
+const TRANSITION_DURATION = 280;
 
 // Dynamically import heavy components to reduce initial bundle size and prevent Vercel timeout
 const DraftingSection = nextDynamic(
@@ -63,7 +68,7 @@ const Murmur = () => {
 	);
 	
 	// Determine initial view based on tab query parameter
-	const getInitialView = (): 'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all' => {
+	const getInitialView = (): ViewType => {
 		if (tabParam === 'inbox') return 'inbox';
 		if (tabParam === 'contacts') return 'contacts';
 		if (tabParam === 'drafting') return 'drafting';
@@ -73,9 +78,42 @@ const Murmur = () => {
 		return 'testing';
 	};
 	
-	const [activeView, setActiveView] = useState<
-		'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'
-	>(getInitialView());
+	const [activeView, setActiveViewInternal] = useState<ViewType>(getInitialView());
+	
+	// Track previous view for crossfade transitions
+	const [previousView, setPreviousView] = useState<ViewType | null>(null);
+	const [isTransitioning, setIsTransitioning] = useState(false);
+	const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	
+	// Wrapped setActiveView that handles transitions
+	const setActiveView = useCallback((newView: ViewType) => {
+		if (newView === activeView) return;
+		
+		// Clear any pending transition
+		if (transitionTimeoutRef.current) {
+			clearTimeout(transitionTimeoutRef.current);
+		}
+		
+		// Start transition: keep previous view visible while fading
+		setPreviousView(activeView);
+		setIsTransitioning(true);
+		setActiveViewInternal(newView);
+		
+		// End transition after animation completes
+		transitionTimeoutRef.current = setTimeout(() => {
+			setPreviousView(null);
+			setIsTransitioning(false);
+		}, TRANSITION_DURATION);
+	}, [activeView]);
+	
+	// Cleanup timeout on unmount
+	useEffect(() => {
+		return () => {
+			if (transitionTimeoutRef.current) {
+				clearTimeout(transitionTimeoutRef.current);
+			}
+		};
+	}, []);
 
 	// Narrow desktop detection for Writing tab compact layout (952px - 1279px)
 	const [isNarrowDesktop, setIsNarrowDesktop] = useState(false);
@@ -597,28 +635,91 @@ const Murmur = () => {
 					)}
 
 					<div className="mt-6 flex justify-center">
-						<DraftingSection
-							campaign={campaign}
-							view={activeView}
-							goToDrafting={() => setActiveView('drafting')}
-							goToAll={() => setActiveView('all')}
-							goToWriting={() => setActiveView('testing')}
-							onGoToSearch={() => setActiveView('search')}
-							goToContacts={() => setActiveView('contacts')}
-							goToInbox={() => setActiveView('inbox')}
-							goToSent={() => setActiveView('sent')}
-							onOpenIdentityDialog={() => {
-								setIdentityDialogOrigin('campaign');
-								setIsIdentityDialogOpen(true);
-							}}
-							goToPreviousTab={goToPreviousTab}
-							goToNextTab={goToNextTab}
-							hideHeaderBox={isNarrowestDesktop && !isMobile}
-						/>
+						{/* Crossfade transition container */}
+						<div className="relative w-full">
+							{/* Previous view - fading out */}
+							{isTransitioning && previousView && (
+								<div
+									className="absolute inset-0 w-full"
+									style={{
+										animation: `viewFadeOut ${TRANSITION_DURATION}ms ease-out forwards`,
+										zIndex: 1,
+									}}
+								>
+									<DraftingSection
+										campaign={campaign}
+										view={previousView}
+										goToDrafting={() => setActiveView('drafting')}
+										goToAll={() => setActiveView('all')}
+										goToWriting={() => setActiveView('testing')}
+										onGoToSearch={() => setActiveView('search')}
+										goToContacts={() => setActiveView('contacts')}
+										goToInbox={() => setActiveView('inbox')}
+										goToSent={() => setActiveView('sent')}
+										onOpenIdentityDialog={() => {
+											setIdentityDialogOrigin('campaign');
+											setIsIdentityDialogOpen(true);
+										}}
+										goToPreviousTab={goToPreviousTab}
+										goToNextTab={goToNextTab}
+										hideHeaderBox={isNarrowestDesktop && !isMobile}
+									/>
+								</div>
+							)}
+							
+							{/* Current view - fading in */}
+							<div
+								className="w-full"
+								style={{
+									animation: isTransitioning
+										? `viewFadeIn ${TRANSITION_DURATION}ms ease-out forwards`
+										: undefined,
+									zIndex: 2,
+								}}
+							>
+								<DraftingSection
+									campaign={campaign}
+									view={activeView}
+									goToDrafting={() => setActiveView('drafting')}
+									goToAll={() => setActiveView('all')}
+									goToWriting={() => setActiveView('testing')}
+									onGoToSearch={() => setActiveView('search')}
+									goToContacts={() => setActiveView('contacts')}
+									goToInbox={() => setActiveView('inbox')}
+									goToSent={() => setActiveView('sent')}
+									onOpenIdentityDialog={() => {
+										setIdentityDialogOrigin('campaign');
+										setIsIdentityDialogOpen(true);
+									}}
+									goToPreviousTab={goToPreviousTab}
+									goToNextTab={goToNextTab}
+									hideHeaderBox={isNarrowestDesktop && !isMobile}
+								/>
+							</div>
+						</div>
 					</div>
-					{/* using this to hide the default boxes in the drafting tab so we can add in a UI specific to mobile
-							and to define mobile landscape header layout without touching globals */}
+				{/* Crossfade transition animations and mobile-specific styles */}
 					<style jsx global>{`
+						/* View transition animations - smooth, clean crossfade */
+						@keyframes viewFadeIn {
+							0% {
+								opacity: 0;
+							}
+							100% {
+								opacity: 1;
+							}
+						}
+						
+						@keyframes viewFadeOut {
+							0% {
+								opacity: 1;
+							}
+							100% {
+								opacity: 0;
+							}
+						}
+						
+						/* Mobile styles below */
 						body.murmur-mobile [data-drafting-container] {
 							display: none !important;
 						}
