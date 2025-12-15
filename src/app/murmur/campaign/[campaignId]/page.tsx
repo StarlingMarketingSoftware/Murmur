@@ -4,7 +4,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useCampaignDetail } from './useCampaignDetail';
-import { Spinner } from '@/components/atoms/Spinner/Spinner';
+import { CampaignPageSkeleton } from '@/components/molecules/CampaignPageSkeleton/CampaignPageSkeleton';
 import { useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import Link from 'next/link';
@@ -23,7 +23,7 @@ import { EmailStatus } from '@/constants/prismaEnums';
 const DraftingSection = nextDynamic(
 	() => import('./DraftingSection/DraftingSection').then((mod) => mod.DraftingSection),
 	{
-		loading: () => <Spinner />,
+		loading: () => <CampaignPageSkeleton />,
 	}
 );
 
@@ -207,7 +207,7 @@ const Murmur = () => {
 	};
 
 	if (isPendingCampaign || !campaign) {
-		return silentLoad ? null : <Spinner />;
+		return silentLoad ? null : <CampaignPageSkeleton />;
 	}
 
 	if (isMobile === null) {
