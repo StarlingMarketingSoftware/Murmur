@@ -637,65 +637,83 @@ const Murmur = () => {
 					<div className="mt-6 flex justify-center">
 						{/* Crossfade transition container */}
 						<div className="relative w-full">
-							{/* Previous view - fading out */}
-							{isTransitioning && previousView && (
-								<div
-									className="absolute inset-0 w-full"
-									style={{
-										animation: `viewFadeOut ${TRANSITION_DURATION}ms ease-out forwards`,
-										zIndex: 1,
-									}}
-								>
-									<DraftingSection
-										campaign={campaign}
-										view={previousView}
-										goToDrafting={() => setActiveView('drafting')}
-										goToAll={() => setActiveView('all')}
-										goToWriting={() => setActiveView('testing')}
-										onGoToSearch={() => setActiveView('search')}
-										goToContacts={() => setActiveView('contacts')}
-										goToInbox={() => setActiveView('inbox')}
-										goToSent={() => setActiveView('sent')}
-										onOpenIdentityDialog={() => {
-											setIdentityDialogOrigin('campaign');
-											setIsIdentityDialogOpen(true);
-										}}
-										goToPreviousTab={goToPreviousTab}
-										goToNextTab={goToNextTab}
-										hideHeaderBox={isNarrowestDesktop && !isMobile}
-									/>
-								</div>
-							)}
-							
-							{/* Current view - fading in */}
-							<div
-								className="w-full"
-								style={{
-									animation: isTransitioning
-										? `viewFadeIn ${TRANSITION_DURATION}ms ease-out forwards`
-										: undefined,
-									zIndex: 2,
-								}}
-							>
-								<DraftingSection
-									campaign={campaign}
-									view={activeView}
-									goToDrafting={() => setActiveView('drafting')}
-									goToAll={() => setActiveView('all')}
-									goToWriting={() => setActiveView('testing')}
-									onGoToSearch={() => setActiveView('search')}
-									goToContacts={() => setActiveView('contacts')}
-									goToInbox={() => setActiveView('inbox')}
-									goToSent={() => setActiveView('sent')}
-									onOpenIdentityDialog={() => {
-										setIdentityDialogOrigin('campaign');
-										setIsIdentityDialogOpen(true);
-									}}
-									goToPreviousTab={goToPreviousTab}
-									goToNextTab={goToNextTab}
-									hideHeaderBox={isNarrowestDesktop && !isMobile}
-								/>
-							</div>
+							{/* Determine if both views share the same research panel position */}
+							{(() => {
+								const standardPositionTabs: ViewType[] = ['testing', 'contacts', 'drafting', 'sent'];
+								const bothSharePosition = isTransitioning && previousView && 
+									standardPositionTabs.includes(previousView) && 
+									standardPositionTabs.includes(activeView);
+								
+								return (
+									<>
+										{/* Previous view - fading out */}
+										{isTransitioning && previousView && (
+											<div
+												className="absolute inset-0 w-full"
+												style={{
+													animation: `viewFadeOut ${TRANSITION_DURATION}ms ease-out forwards`,
+													zIndex: 1,
+												}}
+											>
+												<DraftingSection
+													campaign={campaign}
+													view={previousView}
+													goToDrafting={() => setActiveView('drafting')}
+													goToAll={() => setActiveView('all')}
+													goToWriting={() => setActiveView('testing')}
+													onGoToSearch={() => setActiveView('search')}
+													goToContacts={() => setActiveView('contacts')}
+													goToInbox={() => setActiveView('inbox')}
+													goToSent={() => setActiveView('sent')}
+													onOpenIdentityDialog={() => {
+														setIdentityDialogOrigin('campaign');
+														setIsIdentityDialogOpen(true);
+													}}
+													goToPreviousTab={goToPreviousTab}
+													goToNextTab={goToNextTab}
+													hideHeaderBox={isNarrowestDesktop && !isMobile}
+													isTransitioningOut={bothSharePosition}
+												/>
+											</div>
+										)}
+										
+										{/* Current view - fading in (skip fade when research panel should stay stable) */}
+										<div
+											className="w-full"
+											style={{
+												// When both views share the research panel position, use a different animation
+												// that doesn't fade the whole container - only fade in non-research content
+												animation: isTransitioning
+													? bothSharePosition
+														? `viewFadeInStableResearch ${TRANSITION_DURATION}ms ease-out forwards`
+														: `viewFadeIn ${TRANSITION_DURATION}ms ease-out forwards`
+													: undefined,
+												zIndex: 2,
+											}}
+										>
+											<DraftingSection
+												campaign={campaign}
+												view={activeView}
+												goToDrafting={() => setActiveView('drafting')}
+												goToAll={() => setActiveView('all')}
+												goToWriting={() => setActiveView('testing')}
+												onGoToSearch={() => setActiveView('search')}
+												goToContacts={() => setActiveView('contacts')}
+												goToInbox={() => setActiveView('inbox')}
+												goToSent={() => setActiveView('sent')}
+												onOpenIdentityDialog={() => {
+													setIdentityDialogOrigin('campaign');
+													setIsIdentityDialogOpen(true);
+												}}
+												goToPreviousTab={goToPreviousTab}
+												goToNextTab={goToNextTab}
+												hideHeaderBox={isNarrowestDesktop && !isMobile}
+												isTransitioningIn={bothSharePosition}
+											/>
+										</div>
+									</>
+								);
+							})()}
 						</div>
 					</div>
 				{/* Crossfade transition animations and mobile-specific styles */}
@@ -717,6 +735,28 @@ const Murmur = () => {
 							100% {
 								opacity: 0;
 							}
+						}
+						
+						/* Animation for transitions where research panel should stay stable
+						   The container stays at full opacity so the research panel doesn't fade,
+						   but we use CSS to fade in the rest of the content */
+						@keyframes viewFadeInStableResearch {
+							0% {
+								opacity: 1;
+							}
+							100% {
+								opacity: 1;
+							}
+						}
+						
+						/* When using stable research transition, fade the main content instead */
+						[data-research-panel-container] {
+							/* Research panel container - stays stable */
+						}
+						
+						/* Fade in non-research-panel content when transitioning */
+						.view-fade-in-content > *:not([data-research-panel-container]) {
+							animation: viewFadeIn 280ms ease-out forwards;
 						}
 						
 						/* Mobile styles below */

@@ -1,5 +1,6 @@
-import { FC, Fragment, useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import { FC, Fragment, useCallback, useEffect, useLayoutEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { gsap } from 'gsap';
 import { DraftingSectionProps, useDraftingSection, HybridBlockPrompt } from './useDraftingSection';
 import { Form } from '@/components/ui/form';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
@@ -98,6 +99,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		goToPreviousTab,
 		goToNextTab,
 		hideHeaderBox,
+		isTransitioningOut,
+		isTransitioningIn,
 	} = props;
 	const {
 		campaign,
@@ -186,6 +189,221 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		window.addEventListener('resize', checkBreakpoints);
 		return () => window.removeEventListener('resize', checkBreakpoints);
 	}, []);
+
+	// --- Pinned left panel height transition (ContactsExpandedList <-> MiniEmailStructure) ---
+	type PinnedLeftPanelVariant = 'contacts' | 'mini';
+
+	const pinnedLeftPanelTargetVariant: PinnedLeftPanelVariant = useMemo(() => {
+		if (view === 'testing' || view === 'search') return 'contacts';
+		return 'mini';
+	}, [view]);
+
+	// The pinned left panel is sometimes conditionally removed (breakpoints, other tabs).
+	// Track mounts so we don't "animate in" from stale state when it re-appears.
+	const pinnedLeftPanelWasMountedRef = useRef(false);
+	const pinnedLeftPanelTransitionIdRef = useRef(0);
+
+	const pinnedLeftPanelRenderedVariantRef = useRef<PinnedLeftPanelVariant>(
+		pinnedLeftPanelTargetVariant
+	);
+	const [pinnedLeftPanelRenderedVariant, setPinnedLeftPanelRenderedVariant] =
+		useState<PinnedLeftPanelVariant>(pinnedLeftPanelTargetVariant);
+
+	const pinnedLeftPanelOuterRef = useRef<HTMLDivElement | null>(null);
+	const pinnedLeftPanelContentRef = useRef<HTMLDivElement | null>(null);
+	const pinnedLeftPanelGhostRef = useRef<HTMLDivElement | null>(null);
+
+	const PINNED_LEFT_PANEL_HEIGHT_PX: Record<PinnedLeftPanelVariant, number> = {
+		contacts: 557,
+		mini: 373,
+	};
+
+	// Match the visible box styling so the ghost frame doesn't "snap" away.
+	// ContactsExpandedList: rounded-md (~6px) + 1px border
+	// MiniEmailStructure: 8px radius + 3px border
+	const PINNED_LEFT_PANEL_VISUAL: Record<
+		PinnedLeftPanelVariant,
+		{ borderWidthPx: number; radiusPx: number }
+	> = {
+		contacts: { borderWidthPx: 1, radiusPx: 6 },
+		mini: { borderWidthPx: 3, radiusPx: 8 },
+	};
+
+	// Mirror the exact render conditions for the absolute pinned left column and for this shell.
+	// We only animate when the shell is actually rendered.
+	const shouldRenderAbsolutePinnedLeftColumn =
+		!isMobile &&
+		!hideHeaderBox &&
+		['testing', 'contacts', 'drafting', 'sent', 'search', 'inbox'].includes(view) &&
+		!(view === 'testing' && isNarrowDesktop) &&
+		!(view === 'contacts' && isNarrowDesktop) &&
+		!(view === 'drafting' && isNarrowDesktop) &&
+		!(view === 'sent' && isNarrowDesktop) &&
+		!(view === 'search' && isSearchTabNarrow) &&
+		!(view === 'inbox' && isInboxTabStacked);
+
+	const shouldRenderAnimatedPinnedLeftPanelShell =
+		shouldRenderAbsolutePinnedLeftColumn && view !== 'inbox' && !isDraftPreviewOpen;
+
+	useLayoutEffect(() => {
+		if (typeof window === 'undefined') return;
+
+		// If the shell isn't rendered right now, keep state in sync and mark "not mounted".
+		if (!shouldRenderAnimatedPinnedLeftPanelShell) {
+			pinnedLeftPanelWasMountedRef.current = false;
+			if (pinnedLeftPanelRenderedVariantRef.current !== pinnedLeftPanelTargetVariant) {
+				pinnedLeftPanelRenderedVariantRef.current = pinnedLeftPanelTargetVariant;
+				setPinnedLeftPanelRenderedVariant(pinnedLeftPanelTargetVariant);
+			}
+			return;
+		}
+
+		const outer = pinnedLeftPanelOuterRef.current;
+		const content = pinnedLeftPanelContentRef.current;
+		const ghost = pinnedLeftPanelGhostRef.current;
+
+		if (!outer || !content || !ghost) {
+			pinnedLeftPanelWasMountedRef.current = false;
+			if (pinnedLeftPanelRenderedVariantRef.current !== pinnedLeftPanelTargetVariant) {
+				pinnedLeftPanelRenderedVariantRef.current = pinnedLeftPanelTargetVariant;
+				setPinnedLeftPanelRenderedVariant(pinnedLeftPanelTargetVariant);
+			}
+			return;
+		}
+
+		// First mount (or remount after breakpoint): hard sync, no transition.
+		if (!pinnedLeftPanelWasMountedRef.current) {
+			pinnedLeftPanelWasMountedRef.current = true;
+			gsap.killTweensOf([outer, content, ghost]);
+			gsap.set(ghost, { opacity: 0 });
+			gsap.set(content, { opacity: 1, clearProps: 'pointerEvents' });
+			gsap.set(outer, { clearProps: 'height' });
+
+			if (pinnedLeftPanelRenderedVariantRef.current !== pinnedLeftPanelTargetVariant) {
+				pinnedLeftPanelRenderedVariantRef.current = pinnedLeftPanelTargetVariant;
+				setPinnedLeftPanelRenderedVariant(pinnedLeftPanelTargetVariant);
+			}
+			return;
+		}
+
+		const currentVariant = pinnedLeftPanelRenderedVariantRef.current;
+		if (currentVariant === pinnedLeftPanelTargetVariant) {
+			// If a previous transition was interrupted, snap back to a stable state.
+			gsap.killTweensOf([outer, content, ghost]);
+			gsap.set(ghost, { opacity: 0 });
+			gsap.set(content, {
+				opacity: 1,
+				clearProps: 'pointerEvents,height,maskImage,WebkitMaskImage',
+			});
+			gsap.set(outer, { overflow: 'visible', clearProps: 'height,borderRadius' });
+			return;
+		}
+
+		const transitionId = ++pinnedLeftPanelTransitionIdRef.current;
+
+		gsap.killTweensOf([outer, content, ghost]);
+
+		const fadeSeconds = 0.22;
+		const resizeSeconds = 0.22;
+		const toHeight = PINNED_LEFT_PANEL_HEIGHT_PX[pinnedLeftPanelTargetVariant];
+		const fromHeight =
+			outer.getBoundingClientRect().height || PINNED_LEFT_PANEL_HEIGHT_PX[currentVariant];
+
+		const tweenTo = (target: gsap.TweenTarget, vars: gsap.TweenVars) =>
+			new Promise<void>((resolve) => {
+				gsap.to(target, { ...vars, onComplete: resolve });
+			});
+
+		const nextFrame = () =>
+			new Promise<void>((resolve) => {
+				requestAnimationFrame(() => resolve());
+			});
+
+		(async () => {
+			// 1) Panel A fades out
+			gsap.set(ghost, { opacity: 0 });
+			gsap.set(content, { pointerEvents: 'none' });
+			await tweenTo(content, {
+				opacity: 0,
+				duration: fadeSeconds,
+				ease: 'power1.out',
+			});
+			if (pinnedLeftPanelTransitionIdRef.current !== transitionId) return;
+
+			// Swap to Panel B (kept mostly hidden) so the resize can "reveal" it.
+			pinnedLeftPanelRenderedVariantRef.current = pinnedLeftPanelTargetVariant;
+			setPinnedLeftPanelRenderedVariant(pinnedLeftPanelTargetVariant);
+			await nextFrame();
+			if (pinnedLeftPanelTransitionIdRef.current !== transitionId) return;
+
+			// 2) Ghost box animates height (fixed top, same X) while revealing Panel B inside.
+			const revealOpacity = 0.72;
+			const fadeMask =
+				'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 88%, rgba(0,0,0,0) 100%)';
+
+			const fromVisual = PINNED_LEFT_PANEL_VISUAL[currentVariant];
+			const toVisual = PINNED_LEFT_PANEL_VISUAL[pinnedLeftPanelTargetVariant];
+
+			gsap.set(ghost, {
+				opacity: 1,
+				borderWidth: `${fromVisual.borderWidthPx}px`,
+				borderRadius: `${fromVisual.radiusPx}px`,
+			});
+			gsap.set(outer, {
+				height: fromHeight,
+				overflow: 'hidden',
+				borderRadius: `${fromVisual.radiusPx}px`,
+			});
+			gsap.set(content, {
+				opacity: 0,
+				height: '100%',
+				maskImage: fadeMask,
+				WebkitMaskImage: fadeMask,
+			});
+
+			await Promise.all([
+				tweenTo(outer, {
+					height: toHeight,
+					borderRadius: `${toVisual.radiusPx}px`,
+					duration: resizeSeconds,
+					ease: 'power2.inOut',
+				}),
+				tweenTo(ghost, {
+					borderWidth: `${toVisual.borderWidthPx}px`,
+					borderRadius: `${toVisual.radiusPx}px`,
+					duration: resizeSeconds,
+					ease: 'power2.inOut',
+				}),
+				tweenTo(content, {
+					opacity: revealOpacity,
+					duration: resizeSeconds,
+					ease: 'power1.out',
+				}),
+			]);
+			if (pinnedLeftPanelTransitionIdRef.current !== transitionId) return;
+
+			// Prep stable state *under the ghost* so nothing pops right at the end.
+			// (At this point the box has reached its final height, so un-clipping is safe.)
+			gsap.set(outer, { overflow: 'visible' });
+			gsap.set(content, { maskImage: 'none', WebkitMaskImage: 'none', height: 'auto' });
+
+			// 3) Ghost fades away, Panel B finishes fading in.
+			await Promise.all([
+				tweenTo(ghost, { opacity: 0, duration: fadeSeconds * 1.35, ease: 'power2.out' }),
+				tweenTo(content, { opacity: 1, duration: fadeSeconds * 1.35, ease: 'power2.out' }),
+			]);
+			if (pinnedLeftPanelTransitionIdRef.current !== transitionId) return;
+
+			// Keep the wrapper height as-is to avoid any end-of-transition layout snap.
+			gsap.set(content, { clearProps: 'pointerEvents' });
+		})();
+
+		return () => {
+			pinnedLeftPanelTransitionIdRef.current++;
+			gsap.killTweensOf([outer, content, ghost]);
+		};
+	}, [pinnedLeftPanelTargetVariant, shouldRenderAnimatedPinnedLeftPanelShell]);
+
 	const handleGoToDashboard = useCallback(() => {
 		router.push('/murmur/dashboard');
 	}, [router]);
@@ -1461,17 +1679,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* Persistent Campaign Header Box for specific tabs */}
 						{/* Hide this absolute panel in narrow desktop + testing/contacts mode - we'll use inline layout instead */}
 						{/* Also hide when hideHeaderBox is true (header rendered at page level for narrowest breakpoint) */}
-						{!isMobile &&
-							!hideHeaderBox &&
-							['testing', 'contacts', 'drafting', 'sent', 'search', 'inbox'].includes(
-								view
-							) &&
-							!(view === 'testing' && isNarrowDesktop) &&
-							!(view === 'contacts' && isNarrowDesktop) &&
-							!(view === 'drafting' && isNarrowDesktop) &&
-							!(view === 'sent' && isNarrowDesktop) &&
-							!(view === 'search' && isSearchTabNarrow) &&
-							!(view === 'inbox' && isInboxTabStacked) && (
+						{shouldRenderAbsolutePinnedLeftColumn && (
 							<div
 								className="absolute hidden lg:flex flex-col"
 								style={{
@@ -1499,395 +1707,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										sentCount={sentCount}
 										onFromClick={onOpenIdentityDialog}
 									/>
-									{view === 'testing' || view === 'search' ? (
-										<>
-											{/* Regular full-size layout for wider viewports */}
-											<div
-												style={{
-													width: '375px',
-													height: '557px',
-													overflow: 'visible',
-												}}
-											>
-												{/* Show research panel instead of contacts list when search tab is narrow */}
-												{view === 'search' && isSearchTabNarrow ? (
-													<ContactResearchPanel
-														contact={displayedContactForResearch}
-														hideAllText={contactsAvailableForDrafting.length === 0}
-													/>
-												) : (
-													<ContactsExpandedList
-														contacts={contactsAvailableForDrafting}
-														campaign={campaign}
-														selectedContactIds={contactsTabSelectedIds}
-														onContactSelectionChange={(updater) =>
-															setContactsTabSelectedIds((prev) => updater(new Set(prev)))
-														}
-														onContactClick={handleResearchContactClick}
-														onContactHover={handleResearchContactHover}
-														onDraftSelected={async (ids) => {
-															await handleGenerateDrafts(ids);
-														}}
-														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
-														isPendingGeneration={isPendingGeneration}
-														width={375}
-														height={557}
-														minRows={8}
-														onSearchFromMiniBar={handleMiniContactsSearch}
-													/>
-												)}
-											</div>
-											{view === 'testing' && isPromptInputFocused && (suggestionText1 || suggestionText2) && (
-												<div
-													ref={suggestionBoxRef}
-													tabIndex={-1}
-													onBlur={(e) => {
-														// Check if focus is moving outside the suggestion box and prompt input
-														const relatedTarget = e.relatedTarget as HTMLElement | null;
-														const promptInputContainer = document.querySelector('[data-hpi-container]');
-														if (
-															!suggestionBoxRef.current?.contains(relatedTarget) &&
-															!promptInputContainer?.contains(relatedTarget)
-														) {
-															setIsPromptInputFocused(false);
-														}
-													}}
-													style={{
-														width: '405px',
-														height: '319px',
-														position: 'absolute',
-														top: '115px',
-														left: '-15px',
-														zIndex: 10,
-														background:
-															'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
-														border: '2px solid #000000',
-														borderRadius: '7px',
-														overflow: 'hidden',
-													}}
-												>
-													<div
-														style={{
-															height: '28px',
-															display: 'flex',
-															alignItems: 'center',
-															paddingLeft: '9px',
-														}}
-													>
-														<span className="font-inter font-bold text-[12px] leading-none text-black">
-															Suggestion
-														</span>
-													</div>
-													{/* Inner box */}
-													<div
-														style={{
-															position: 'absolute',
-															top: '34px',
-															left: '50%',
-															transform: 'translateX(-50%)',
-															width: '369px',
-															height: '44px',
-															backgroundColor: '#FFFFFF',
-															border: '2px solid #000000',
-															borderRadius: '7px',
-														}}
-													>
-														{/* Score label */}
-														<div
-															style={{
-																position: 'absolute',
-																top: '6px',
-																left: '10px',
-																fontFamily: 'Inter, system-ui, sans-serif',
-																fontWeight: 700,
-																fontSize: '12px',
-																lineHeight: '14px',
-																color: '#000000',
-															}}
-														>
-															{promptScoreDisplayLabel}
-														</div>
-														{/* Small box inside (progress track) */}
-														<div
-															style={{
-																position: 'absolute',
-																bottom: '3px',
-																left: '4px',
-																width: '223px',
-																height: '12px',
-																backgroundColor: '#FFFFFF',
-																border: '2px solid #000000',
-																borderRadius: '8px',
-																overflow: 'hidden',
-															}}
-														>
-															<div
-																style={{
-																	position: 'absolute',
-																	top: 0,
-																	bottom: 0,
-																	left: 0,
-																	borderRadius: '999px',
-																	backgroundColor: '#36B24A',
-																	width: `${promptScoreFillPercent}%`,
-																	maxWidth: '100%',
-																	transition: 'width 250ms ease-out',
-																}}
-															/>
-														</div>
-													</div>
-													{/* Small box below the first inner box */}
-													<div
-														onClick={() => {
-															if (hasPreviousPrompt) {
-																undoUpscalePrompt();
-															}
-														}}
-														style={{
-															position: 'absolute',
-															top: '83px',
-															left: '22px',
-															width: '39px',
-															height: '32px',
-															backgroundColor: '#C2C2C2',
-															border: '2px solid #000000',
-															borderRadius: '8px',
-															display: 'flex',
-															alignItems: 'center',
-															justifyContent: 'center',
-															cursor: hasPreviousPrompt ? 'pointer' : 'not-allowed',
-															opacity: hasPreviousPrompt ? 1 : 0.5,
-														}}
-													>
-														<UndoIcon width="24" height="24" />
-													</div>
-													{/* Box to the right of the small box */}
-													<div
-														onClick={() => {
-															if (!isUpscalingPrompt) {
-																upscalePrompt();
-															}
-														}}
-														style={{
-															position: 'absolute',
-															top: '83px',
-															left: '66px',
-															width: '196px',
-															height: '32px',
-															backgroundColor: '#D7F0FF',
-															border: '2px solid #000000',
-															borderRadius: '8px',
-															display: 'flex',
-															alignItems: 'center',
-															justifyContent: 'space-between',
-															paddingLeft: '10px',
-															paddingRight: '10px',
-															cursor: isUpscalingPrompt ? 'wait' : 'pointer',
-														}}
-													>
-														<span
-															style={{
-																fontFamily: 'Inter, system-ui, sans-serif',
-																fontSize: '17px',
-																fontWeight: 500,
-																color: '#000000',
-																lineHeight: '1',
-															}}
-														>
-															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
-														</span>
-														<div style={{ flexShrink: 0 }}>
-															<UpscaleIcon width="24" height="24" />
-														</div>
-													</div>
-													{/* Box below the two small boxes */}
-													<div
-														style={{
-															position: 'absolute',
-															top: '123px', // 83px + 32px + 8px
-															left: '50%',
-															transform: 'translateX(-50%)',
-															width: '362px',
-															height: '56px',
-															backgroundColor: '#A6E0B4',
-															border: '2px solid #000000',
-															borderRadius: '8px',
-														}}
-													>
-														{/* Section indicator */}
-														<div
-															className="absolute font-inter font-bold"
-															style={{
-																top: '4.5px',
-																left: '8px',
-																fontSize: '11.5px',
-																color: '#000000',
-															}}
-														>
-															[1]
-														</div>
-														{/* Inner box */}
-														<div
-															style={{
-																position: 'absolute',
-																top: '0',
-																bottom: '0',
-																margin: 'auto',
-																left: '25px',
-																width: '324px',
-																height: '48px',
-																backgroundColor: '#FFFFFF',
-																border: '2px solid #000000',
-																borderRadius: '8px',
-																display: 'flex',
-																alignItems: 'center',
-																padding: '4px 8px',
-																overflow: 'hidden',
-															}}
-														>
-															<div
-																style={{
-																	fontFamily: 'Inter, system-ui, sans-serif',
-																	fontSize: '11px',
-																	lineHeight: '1.3',
-																	color: '#000000',
-																	wordBreak: 'break-word',
-																	whiteSpace: 'normal',
-																	overflow: 'hidden',
-																	textOverflow: 'ellipsis',
-																}}
-															>
-																{suggestionText1 || ''}
-															</div>
-														</div>
-													</div>
-													{/* Second box below */}
-													<div
-														style={{
-															position: 'absolute',
-															top: '187px', // 123px + 56px + 8px
-															left: '50%',
-															transform: 'translateX(-50%)',
-															width: '362px',
-															height: '56px',
-															backgroundColor: '#5BCB75',
-															border: '2px solid #000000',
-															borderRadius: '8px',
-														}}
-													>
-														{/* Section indicator */}
-														<div
-															className="absolute font-inter font-bold"
-															style={{
-																top: '4.5px',
-																left: '8px',
-																fontSize: '11.5px',
-																color: '#000000',
-															}}
-														>
-															[2]
-														</div>
-														{/* Inner box */}
-														<div
-															style={{
-																position: 'absolute',
-																top: '0',
-																bottom: '0',
-																margin: 'auto',
-																left: '25px',
-																width: '324px',
-																height: '48px',
-																backgroundColor: '#FFFFFF',
-																border: '2px solid #000000',
-																borderRadius: '8px',
-																display: 'flex',
-																alignItems: 'center',
-																padding: '4px 8px',
-																overflow: 'hidden',
-															}}
-														>
-															<div
-																style={{
-																	fontFamily: 'Inter, system-ui, sans-serif',
-																	fontSize: '11px',
-																	lineHeight: '1.3',
-																	color: '#000000',
-																	wordBreak: 'break-word',
-																	whiteSpace: 'normal',
-																	overflow: 'hidden',
-																	textOverflow: 'ellipsis',
-																}}
-															>
-																{suggestionText2 || ''}
-															</div>
-														</div>
-													</div>
-													{/* Third box below */}
-													<div
-														style={{
-															position: 'absolute',
-															top: '251px', // 187px + 56px + 8px
-															left: '50%',
-															transform: 'translateX(-50%)',
-															width: '362px',
-															height: '56px',
-															backgroundColor: '#359D4D',
-															border: '2px solid #000000',
-															borderRadius: '8px',
-														}}
-													>
-														{/* Section indicator */}
-														<div
-															className="absolute font-inter font-bold"
-															style={{
-																top: '4.5px',
-																left: '8px',
-																fontSize: '11.5px',
-																color: '#000000',
-															}}
-														>
-															[3]
-														</div>
-														{/* Inner box */}
-														<div
-															style={{
-																position: 'absolute',
-																top: '0',
-																bottom: '0',
-																margin: 'auto',
-																left: '25px',
-																width: '324px',
-																height: '48px',
-																backgroundColor: '#FFFFFF',
-																border: '2px solid #000000',
-																borderRadius: '8px',
-																display: 'flex',
-																alignItems: 'center',
-																padding: '4px 8px',
-																overflow: 'hidden',
-															}}
-														>
-															<div
-																style={{
-																	fontFamily: 'Inter, system-ui, sans-serif',
-																	fontSize: '11px',
-																	lineHeight: '1.3',
-																	color: '#000000',
-																	wordBreak: 'break-word',
-																	whiteSpace: 'normal',
-																	overflow: 'hidden',
-																	textOverflow: 'ellipsis',
-																}}
-															>
-																{suggestionText3 || ''}
-															</div>
-														</div>
-													</div>
-												</div>
-											)}
-										</>
-									) : view !== 'inbox' ? (
-										isDraftPreviewOpen ? (
+									{view !== 'inbox' &&
+										(isDraftPreviewOpen ? (
 											<div
 												style={{
 													width: '376px',
@@ -1915,55 +1736,459 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										) : (
 											<div
+												ref={pinnedLeftPanelOuterRef}
 												style={{
 													width: '375px',
-													height: '373px',
-													// Fixed-height mini structure that uses the compact layout
-													// inside; no scaling, just a tighter signature area.
 													overflow: 'visible',
+													position: 'relative',
 												}}
 											>
-												<MiniEmailStructure
-													form={form}
-													onDraft={() =>
-														handleGenerateDrafts(
-															contactsAvailableForDrafting.map((c) => c.id)
-														)
-													}
-													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
-													isPendingGeneration={isPendingGeneration}
-													generationProgress={generationProgress}
-													generationTotal={contactsAvailableForDrafting.length}
-													hideTopChrome
-													hideFooter
-													fullWidthMobile
-													hideAddTextButtons
-													hideAllText={
-														// Hide all structure text to show chrome-only skeleton:
-														// - When the Drafts tab has no drafts
-														// - When the Sent tab is in its empty state
-														// - When the Contacts tab has no contacts to show
-														(view === 'drafting' && draftCount === 0) ||
-														(view === 'sent' && sentCount === 0) ||
-														(view === 'contacts' &&
-															contactsAvailableForDrafting.length === 0)
-													}
-													onOpenWriting={goToWriting}
+												{/* Ghost box: visible only during the height morph */}
+												<div
+													ref={pinnedLeftPanelGhostRef}
+													aria-hidden="true"
+													style={{
+														position: 'absolute',
+														inset: 0,
+														border: '3px solid #000000',
+														borderRadius: '8px',
+														background: 'rgba(255, 255, 255, 0.18)',
+														backdropFilter: 'blur(1.5px)',
+														WebkitBackdropFilter: 'blur(1.5px)',
+														opacity: 0,
+														pointerEvents: 'none',
+														zIndex: 2,
+													}}
 												/>
+												<div
+													ref={pinnedLeftPanelContentRef}
+													style={{ position: 'relative', zIndex: 1 }}
+												>
+													{pinnedLeftPanelRenderedVariant === 'contacts' ? (
+														<ContactsExpandedList
+															contacts={contactsAvailableForDrafting}
+															campaign={campaign}
+															selectedContactIds={contactsTabSelectedIds}
+															onContactSelectionChange={(updater) =>
+																setContactsTabSelectedIds((prev) =>
+																	updater(new Set(prev))
+																)
+															}
+															onContactClick={handleResearchContactClick}
+															onContactHover={handleResearchContactHover}
+															onDraftSelected={async (ids) => {
+																await handleGenerateDrafts(ids);
+															}}
+															isDraftDisabled={
+																isGenerationDisabled() || isPendingGeneration
+															}
+															isPendingGeneration={isPendingGeneration}
+															width={375}
+															height={557}
+															minRows={8}
+															onSearchFromMiniBar={handleMiniContactsSearch}
+														/>
+													) : (
+														<MiniEmailStructure
+															form={form}
+															onDraft={() =>
+																handleGenerateDrafts(
+																	contactsAvailableForDrafting.map((c) => c.id)
+																)
+															}
+															isDraftDisabled={
+																isGenerationDisabled() || isPendingGeneration
+															}
+															isPendingGeneration={isPendingGeneration}
+															generationProgress={generationProgress}
+															generationTotal={contactsAvailableForDrafting.length}
+															hideTopChrome
+															hideFooter
+															fullWidthMobile
+															hideAddTextButtons
+															hideAllText={
+																// Hide all structure text to show chrome-only skeleton:
+																// - When the Drafts tab has no drafts
+																// - When the Sent tab is in its empty state
+																// - When the Contacts tab has no contacts to show
+																(view === 'drafting' && draftCount === 0) ||
+																(view === 'sent' && sentCount === 0) ||
+																(view === 'contacts' &&
+																	contactsAvailableForDrafting.length === 0)
+															}
+															onOpenWriting={goToWriting}
+														/>
+													)}
+												</div>
 											</div>
-										)
-									) : null}
+										))}
+
+									{view === 'testing' &&
+										isPromptInputFocused &&
+										(suggestionText1 || suggestionText2) && (
+											<div
+												ref={suggestionBoxRef}
+												tabIndex={-1}
+												onBlur={(e) => {
+													// Check if focus is moving outside the suggestion box and prompt input
+													const relatedTarget = e.relatedTarget as HTMLElement | null;
+													const promptInputContainer = document.querySelector(
+														'[data-hpi-container]'
+													);
+													if (
+														!suggestionBoxRef.current?.contains(relatedTarget) &&
+														!promptInputContainer?.contains(relatedTarget)
+													) {
+														setIsPromptInputFocused(false);
+													}
+												}}
+												style={{
+													width: '405px',
+													height: '319px',
+													position: 'absolute',
+													top: '115px',
+													left: '-15px',
+													zIndex: 10,
+													background:
+														'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
+													border: '2px solid #000000',
+													borderRadius: '7px',
+													overflow: 'hidden',
+												}}
+											>
+												<div
+													style={{
+														height: '28px',
+														display: 'flex',
+														alignItems: 'center',
+														paddingLeft: '9px',
+													}}
+												>
+													<span className="font-inter font-bold text-[12px] leading-none text-black">
+														Suggestion
+													</span>
+												</div>
+												{/* Inner box */}
+												<div
+													style={{
+														position: 'absolute',
+														top: '34px',
+														left: '50%',
+														transform: 'translateX(-50%)',
+														width: '369px',
+														height: '44px',
+														backgroundColor: '#FFFFFF',
+														border: '2px solid #000000',
+														borderRadius: '7px',
+													}}
+												>
+													{/* Score label */}
+													<div
+														style={{
+															position: 'absolute',
+															top: '6px',
+															left: '10px',
+															fontFamily: 'Inter, system-ui, sans-serif',
+															fontWeight: 700,
+															fontSize: '12px',
+															lineHeight: '14px',
+															color: '#000000',
+														}}
+													>
+														{promptScoreDisplayLabel}
+													</div>
+													{/* Small box inside (progress track) */}
+													<div
+														style={{
+															position: 'absolute',
+															bottom: '3px',
+															left: '4px',
+															width: '223px',
+															height: '12px',
+															backgroundColor: '#FFFFFF',
+															border: '2px solid #000000',
+															borderRadius: '8px',
+															overflow: 'hidden',
+														}}
+													>
+														<div
+															style={{
+																position: 'absolute',
+																top: 0,
+																bottom: 0,
+																left: 0,
+																borderRadius: '999px',
+																backgroundColor: '#36B24A',
+																width: `${promptScoreFillPercent}%`,
+																maxWidth: '100%',
+																transition: 'width 250ms ease-out',
+															}}
+														/>
+													</div>
+												</div>
+												{/* Small box below the first inner box */}
+												<div
+													onClick={() => {
+														if (hasPreviousPrompt) {
+															undoUpscalePrompt();
+														}
+													}}
+													style={{
+														position: 'absolute',
+														top: '83px',
+														left: '22px',
+														width: '39px',
+														height: '32px',
+														backgroundColor: '#C2C2C2',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+														display: 'flex',
+														alignItems: 'center',
+														justifyContent: 'center',
+														cursor: hasPreviousPrompt ? 'pointer' : 'not-allowed',
+														opacity: hasPreviousPrompt ? 1 : 0.5,
+													}}
+												>
+													<UndoIcon width="24" height="24" />
+												</div>
+												{/* Box to the right of the small box */}
+												<div
+													onClick={() => {
+														if (!isUpscalingPrompt) {
+															upscalePrompt();
+														}
+													}}
+													style={{
+														position: 'absolute',
+														top: '83px',
+														left: '66px',
+														width: '196px',
+														height: '32px',
+														backgroundColor: '#D7F0FF',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+														display: 'flex',
+														alignItems: 'center',
+														justifyContent: 'space-between',
+														paddingLeft: '10px',
+														paddingRight: '10px',
+														cursor: isUpscalingPrompt ? 'wait' : 'pointer',
+													}}
+												>
+													<span
+														style={{
+															fontFamily: 'Inter, system-ui, sans-serif',
+															fontSize: '17px',
+															fontWeight: 500,
+															color: '#000000',
+															lineHeight: '1',
+														}}
+													>
+														{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
+													</span>
+													<div style={{ flexShrink: 0 }}>
+														<UpscaleIcon width="24" height="24" />
+													</div>
+												</div>
+												{/* Box below the two small boxes */}
+												<div
+													style={{
+														position: 'absolute',
+														top: '123px', // 83px + 32px + 8px
+														left: '50%',
+														transform: 'translateX(-50%)',
+														width: '362px',
+														height: '56px',
+														backgroundColor: '#A6E0B4',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+													}}
+												>
+													{/* Section indicator */}
+													<div
+														className="absolute font-inter font-bold"
+														style={{
+															top: '4.5px',
+															left: '8px',
+															fontSize: '11.5px',
+															color: '#000000',
+														}}
+													>
+														[1]
+													</div>
+													{/* Inner box */}
+													<div
+														style={{
+															position: 'absolute',
+															top: '0',
+															bottom: '0',
+															margin: 'auto',
+															left: '25px',
+															width: '324px',
+															height: '48px',
+															backgroundColor: '#FFFFFF',
+															border: '2px solid #000000',
+															borderRadius: '8px',
+															display: 'flex',
+															alignItems: 'center',
+															padding: '4px 8px',
+															overflow: 'hidden',
+														}}
+													>
+														<div
+															style={{
+																fontFamily: 'Inter, system-ui, sans-serif',
+																fontSize: '11px',
+																lineHeight: '1.3',
+																color: '#000000',
+																wordBreak: 'break-word',
+																whiteSpace: 'normal',
+																overflow: 'hidden',
+																textOverflow: 'ellipsis',
+															}}
+														>
+															{suggestionText1 || ''}
+														</div>
+													</div>
+												</div>
+												{/* Second box below */}
+												<div
+													style={{
+														position: 'absolute',
+														top: '187px', // 123px + 56px + 8px
+														left: '50%',
+														transform: 'translateX(-50%)',
+														width: '362px',
+														height: '56px',
+														backgroundColor: '#5BCB75',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+													}}
+												>
+													{/* Section indicator */}
+													<div
+														className="absolute font-inter font-bold"
+														style={{
+															top: '4.5px',
+															left: '8px',
+															fontSize: '11.5px',
+															color: '#000000',
+														}}
+													>
+														[2]
+													</div>
+													{/* Inner box */}
+													<div
+														style={{
+															position: 'absolute',
+															top: '0',
+															bottom: '0',
+															margin: 'auto',
+															left: '25px',
+															width: '324px',
+															height: '48px',
+															backgroundColor: '#FFFFFF',
+															border: '2px solid #000000',
+															borderRadius: '8px',
+															display: 'flex',
+															alignItems: 'center',
+															padding: '4px 8px',
+															overflow: 'hidden',
+														}}
+													>
+														<div
+															style={{
+																fontFamily: 'Inter, system-ui, sans-serif',
+																fontSize: '11px',
+																lineHeight: '1.3',
+																color: '#000000',
+																wordBreak: 'break-word',
+																whiteSpace: 'normal',
+																overflow: 'hidden',
+																textOverflow: 'ellipsis',
+															}}
+														>
+															{suggestionText2 || ''}
+														</div>
+													</div>
+												</div>
+												{/* Third box below */}
+												<div
+													style={{
+														position: 'absolute',
+														top: '251px', // 187px + 56px + 8px
+														left: '50%',
+														transform: 'translateX(-50%)',
+														width: '362px',
+														height: '56px',
+														backgroundColor: '#359D4D',
+														border: '2px solid #000000',
+														borderRadius: '8px',
+													}}
+												>
+													{/* Section indicator */}
+													<div
+														className="absolute font-inter font-bold"
+														style={{
+															top: '4.5px',
+															left: '8px',
+															fontSize: '11.5px',
+															color: '#000000',
+														}}
+													>
+														[3]
+													</div>
+													{/* Inner box */}
+													<div
+														style={{
+															position: 'absolute',
+															top: '0',
+															bottom: '0',
+															margin: 'auto',
+															left: '25px',
+															width: '324px',
+															height: '48px',
+															backgroundColor: '#FFFFFF',
+															border: '2px solid #000000',
+															borderRadius: '8px',
+															display: 'flex',
+															alignItems: 'center',
+															padding: '4px 8px',
+															overflow: 'hidden',
+														}}
+													>
+														<div
+															style={{
+																fontFamily: 'Inter, system-ui, sans-serif',
+																fontSize: '11px',
+																lineHeight: '1.3',
+																color: '#000000',
+																wordBreak: 'break-word',
+																whiteSpace: 'normal',
+																overflow: 'hidden',
+																textOverflow: 'ellipsis',
+															}}
+														>
+															{suggestionText3 || ''}
+														</div>
+													</div>
+												</div>
+											</div>
+										)}
 								</div>
 							)}
 
 						{/* Shared Research / Test Preview panel to the right of the drafting tables / writing view */}
+						{/* Hide when transitioning out from standard-position tabs to prevent double-fade */}
 						{!isMobile &&
 							['testing', 'contacts', 'drafting', 'sent', 'search', 'inbox'].includes(view) &&
 							!(view === 'search' && hasCampaignSearched) &&
 							!(view === 'search' && isSearchTabNarrow) &&
-							!(view === 'inbox' && isInboxTabStacked) && (
+							!(view === 'inbox' && isInboxTabStacked) &&
+							!(isTransitioningOut && ['testing', 'contacts', 'drafting', 'sent'].includes(view)) && (
 							<div
 								className="absolute hidden xl:block"
+								data-research-panel-container
 								style={{
 									top: '29px',
 									left:
@@ -1974,6 +2199,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												? 'calc(50% + 258px + 32px)' // 258px = half of 516px narrow inbox + 32px gap
 												: 'calc(50% + 453.5px + 32px)'
 											: 'calc(50% + 250px + 32px)',
+									// Counter-animate when transitioning in to keep research panel stable
+									...(isTransitioningIn && ['testing', 'contacts', 'drafting', 'sent'].includes(view) ? {
+										animation: 'researchPanelStable 280ms ease-out forwards',
+									} : {}),
 								}}
 							>
 									{view === 'testing' && showTestPreview ? (
