@@ -118,6 +118,11 @@ interface DraftingTableProps {
 	noDataDescription: string;
 	isPending: boolean;
 	title: string;
+	/**
+	 * Optional: marks this table as the "main box" for cross-tab morph animations.
+	 * When provided, the wrapper will be tagged with `data-campaign-main-box`.
+	 */
+	mainBoxId?: string;
 	footer?: ReactNode;
 	topContent?: ReactNode;
 	goToWriting?: () => void;
@@ -147,6 +152,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	noDataMessage,
 	noDataDescription,
 	isPending,
+	mainBoxId,
 	footer,
 	topContent,
 	goToWriting,
@@ -178,7 +184,10 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	const boxHeight = isMobile ? mobileBoxHeight : (isContacts || isDrafts || isSent ? '703px' : '474px');
 
 	return (
-		<div style={{ width: boxWidth, height: boxHeight, position: 'relative' }}>
+		<div
+			data-campaign-main-box={mainBoxId}
+			style={{ width: boxWidth, height: boxHeight, position: 'relative' }}
+		>
 			{/* Centered number above block */}
 			<div
 				data-drafting-top-number

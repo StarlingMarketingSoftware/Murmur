@@ -43,6 +43,11 @@ export interface ContactsSelectionProps {
 	 * Useful when the button needs to be rendered separately in the parent layout for centering.
 	 */
 	hideButton?: boolean;
+	/**
+	 * Optional: marks this contacts table as the "main box" for cross-tab morph animations.
+	 * When provided, this value is forwarded to the underlying DraftingTable `mainBoxId`.
+	 */
+	mainBoxId?: string;
 }
 
 export const useContactsSelection = (props: ContactsSelectionProps) => {

@@ -405,6 +405,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		return (
 			<div className={`w-full flex justify-center ${isMobile ? 'px-1' : 'px-4'}`}>
 				<div
+					data-campaign-main-box="inbox"
 					className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative animate-pulse"
 					style={{
 						width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
@@ -606,6 +607,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		return (
 			<div className={`w-full flex justify-center ${isMobile ? 'px-1' : 'px-4'}`}>
 				<div
+					data-campaign-main-box="inbox"
 					className="flex items-center justify-center"
 					style={{
 						width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
@@ -632,6 +634,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		return (
 			<div className={`w-full flex justify-center ${isMobile ? 'px-1' : 'px-4'}`}>
 				<div
+					data-campaign-main-box="inbox"
 					className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative"
 					style={{
 						width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
@@ -974,62 +977,77 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	return (
 		<div className={`w-full flex justify-center ${isMobile ? 'px-1' : 'px-4'}`}>
-			<CustomScrollbar
-				className="flex flex-col items-center relative"
-				contentClassName="flex flex-col items-center w-full"
-				thumbWidth={2}
-				thumbColor="#000000"
-				trackColor="transparent"
-				offsetRight={-6}
-				disableOverflowClass
-				style={{
-					width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
-					maxWidth: isMobile ? undefined : `${boxWidth}px`,
-					height: isMobile ? 'calc(100dvh - 160px)' : '657px',
-					minHeight: isMobile ? 'calc(100dvh - 160px)' : '657px',
-					maxHeight: isMobile ? 'calc(100dvh - 160px)' : '657px',
-					border: '3px solid #000000',
-					borderRadius: '8px',
-					padding: selectedEmail ? (isMobile ? '18px 8px 8px 8px' : '21px 13px 12px 13px') : (isMobile ? '8px' : '16px'),
-					paddingTop: selectedEmail ? (isMobile ? '18px' : '21px') : (isMobile ? '62px' : '109px'), // Adjusted for mobile
-					background: selectedEmail
-						? '#437ec1'
-						: isMobile
-						? (activeTab === 'sent' ? '#5AB477' : '#6fa4e1')
-						: activeTab === 'sent'
-						? 'linear-gradient(to bottom, #FFFFFF 19px, #5AB477 19px)'
-						: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
-					overflow: isMobile ? 'hidden' : undefined,
-				}}
-			>
-				{/* Back button - shown when email is selected */}
-				{selectedEmail && (
-					<button
-						type="button"
-						onClick={() => {
-							setSelectedEmailId(null);
-							setReplyMessage('');
-						}}
-						className="absolute cursor-pointer bg-transparent border-0 p-0 z-10"
-						style={{
-							top: '3px',
-							left: '21px',
-						}}
-					>
-						<svg
-							width="34"
-							height="15"
-							viewBox="0 0 34 15"
-							fill="none"
-							xmlns="http://www.w3.org/2000/svg"
+			<div data-campaign-main-box="inbox">
+				<CustomScrollbar
+					className="flex flex-col items-center relative"
+					contentClassName="flex flex-col items-center w-full"
+					thumbWidth={2}
+					thumbColor="#000000"
+					trackColor="transparent"
+					offsetRight={-6}
+					disableOverflowClass
+					style={{
+						width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
+						maxWidth: isMobile ? undefined : `${boxWidth}px`,
+						height: isMobile ? 'calc(100dvh - 160px)' : '657px',
+						minHeight: isMobile ? 'calc(100dvh - 160px)' : '657px',
+						maxHeight: isMobile ? 'calc(100dvh - 160px)' : '657px',
+						border: '3px solid #000000',
+						borderRadius: '8px',
+						padding: selectedEmail
+							? isMobile
+								? '18px 8px 8px 8px'
+								: '21px 13px 12px 13px'
+							: isMobile
+							? '8px'
+							: '16px',
+						paddingTop: selectedEmail
+							? isMobile
+								? '18px'
+								: '21px'
+							: isMobile
+							? '62px'
+							: '109px', // Adjusted for mobile
+						background: selectedEmail
+							? '#437ec1'
+							: isMobile
+							? activeTab === 'sent'
+								? '#5AB477'
+								: '#6fa4e1'
+							: activeTab === 'sent'
+							? 'linear-gradient(to bottom, #FFFFFF 19px, #5AB477 19px)'
+							: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
+						overflow: isMobile ? 'hidden' : undefined,
+					}}
+				>
+					{/* Back button - shown when email is selected */}
+					{selectedEmail && (
+						<button
+							type="button"
+							onClick={() => {
+								setSelectedEmailId(null);
+								setReplyMessage('');
+							}}
+							className="absolute cursor-pointer bg-transparent border-0 p-0 z-10"
+							style={{
+								top: '3px',
+								left: '21px',
+							}}
 						>
-							<path
-								d="M0.292892 6.65666C-0.0976295 7.04719 -0.0976295 7.68035 0.292892 8.07088L6.65685 14.4348C7.04738 14.8254 7.68054 14.8254 8.07107 14.4348C8.46159 14.0443 8.46159 13.4111 8.07107 13.0206L2.41421 7.36377L8.07107 1.70692C8.46159 1.31639 8.46159 0.683226 8.07107 0.292702C7.68054 -0.0978227 7.04738 -0.0978227 6.65685 0.292702L0.292892 6.65666ZM34 7.36377V6.36377L1 6.36377V7.36377V8.36377L34 8.36377V7.36377Z"
-								fill="white"
-							/>
-						</svg>
-					</button>
-				)}
+							<svg
+								width="34"
+								height="15"
+								viewBox="0 0 34 15"
+								fill="none"
+								xmlns="http://www.w3.org/2000/svg"
+							>
+								<path
+									d="M0.292892 6.65666C-0.0976295 7.04719 -0.0976295 7.68035 0.292892 8.07088L6.65685 14.4348C7.04738 14.8254 7.68054 14.8254 8.07107 14.4348C8.46159 14.0443 8.46159 13.4111 8.07107 13.0206L2.41421 7.36377L8.07107 1.70692C8.46159 1.31639 8.46159 0.683226 8.07107 0.292702C7.68054 -0.0978227 7.04738 -0.0978227 6.65685 0.292702L0.292892 6.65666ZM34 7.36377V6.36377L1 6.36377V7.36377V8.36377L34 8.36377V7.36377Z"
+									fill="white"
+								/>
+							</svg>
+						</button>
+					)}
 				{/* Three circles at top - hidden on mobile */}
 				{!selectedEmail && !isMobile && (
 					<>
@@ -1717,7 +1735,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						))}
 					</>
 				)}
-			</CustomScrollbar>
+				</CustomScrollbar>
+			</div>
 		</div>
 	);
 };

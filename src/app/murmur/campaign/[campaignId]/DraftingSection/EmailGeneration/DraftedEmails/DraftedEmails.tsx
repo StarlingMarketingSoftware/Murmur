@@ -1079,6 +1079,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				noDataDescription='Click "Generate Drafts" to create emails for the selected contacts'
 				isPending={isPendingEmails}
 				title="Drafts"
+				mainBoxId={props.mainBoxId}
 				goToWriting={props.goToWriting}
 				goToSearch={props.goToSearch}
 				goToInbox={props.goToInbox}
