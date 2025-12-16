@@ -320,6 +320,8 @@ interface SearchResultsMapProps {
 	onStateSelect?: (stateName: string) => void;
 	enableStateInteractions?: boolean;
 	lockedStateName?: string | null;
+	/** When true, hides the state outlines (useful while search is loading). */
+	isLoading?: boolean;
 }
 
 const mapContainerStyle = {
@@ -385,6 +387,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	onStateSelect,
 	enableStateInteractions,
 	lockedStateName,
+	isLoading,
 }) => {
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
@@ -636,8 +639,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map || !isStateLayerReady) return;
 
-		// Clear if no result states
-		if (!resultStateKeysSignature) {
+		// Clear outlines while loading or if no result states
+		if (isLoading || !resultStateKeysSignature) {
 			clearResultsOutline();
 			return;
 		}
@@ -707,6 +710,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [
 		map,
 		isStateLayerReady,
+		isLoading,
 		resultStateKeys,
 		resultStateKeysSignature,
 		clearResultsOutline,
@@ -716,6 +720,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// When state interactions are enabled, the Data layer already renders the selected state border.
 	useEffect(() => {
 		if (!map || !isStateLayerReady) return;
+
+		// Clear while loading
+		if (isLoading) {
+			clearSearchedStateOutline();
+			return;
+		}
 
 		if (enableStateInteractions) {
 			clearSearchedStateOutline();
@@ -770,6 +780,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [
 		map,
 		isStateLayerReady,
+		isLoading,
 		lockedStateKey,
 		enableStateInteractions,
 		clearSearchedStateOutline,

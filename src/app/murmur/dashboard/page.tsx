@@ -2358,6 +2358,7 @@ const DashboardContent = () => {
 																contacts={contacts || []}
 																selectedContacts={selectedContacts}
 																lockedStateName={searchedStateAbbr}
+																isLoading={isSearchPending || isLoadingContacts || isRefetchingContacts}
 																onMarkerClick={(contact) => {
 																	// If the marker is outside the searched state, include it in the
 																	// right-hand map panel list (without changing what the map shows).
