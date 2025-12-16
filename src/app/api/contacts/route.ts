@@ -18,7 +18,7 @@ import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vector
 import { GEMINI_MODEL_OPTIONS } from '@/constants';
 import { StripeSubscriptionStatus } from '@/types';
 
-const VECTOR_SEARCH_LIMIT_DEFAULT = 50;
+const VECTOR_SEARCH_LIMIT_DEFAULT = 500;
 
 const createContactSchema = z.object({
 	firstName: z.string().optional(),
@@ -486,7 +486,7 @@ export async function GET(req: NextRequest) {
 			if (mentionsMusicVenues) {
 				const finalLimit = Math.max(
 					1,
-					Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200)
+					Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500)
 				);
 				const fetchTake = Math.min(finalLimit * 4, 500);
 
@@ -698,7 +698,7 @@ export async function GET(req: NextRequest) {
 			if (mentionsFestivals) {
 				const finalLimit = Math.max(
 					1,
-					Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200)
+					Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500)
 				);
 				const fetchTake = Math.min(finalLimit * 4, 500);
 
@@ -910,7 +910,7 @@ export async function GET(req: NextRequest) {
 			if (mentionsRestaurants) {
 				const finalLimit = Math.max(
 					1,
-					Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200)
+					Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500)
 				);
 				const fetchTake = Math.min(finalLimit * 4, 500);
 
@@ -1242,7 +1242,7 @@ export async function GET(req: NextRequest) {
 			if (mentionsCoffee) {
 				const finalLimit = Math.max(
 					1,
-					Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200)
+					Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500)
 				);
 				const fetchTake = Math.min(finalLimit * 6, 800);
 
@@ -1389,7 +1389,7 @@ export async function GET(req: NextRequest) {
 
 		// Special-case: wine/beer/spirits queries - return only beverage venue titles
 		if (isWineBeerSpiritsQuery) {
-			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200));
+			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500));
 			const beveragePrefixes = ['Wineries', 'Distilleries', 'Breweries', 'Cideries'];
 
 			const baseWhere: Prisma.ContactWhereInput = {
@@ -1476,7 +1476,7 @@ export async function GET(req: NextRequest) {
 
 		// Special-case: Booking searches - filter to specific title prefixes and respect strict state if present
 		if (isBookingSearch) {
-			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200));
+			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500));
 
 			const baseWhere: Prisma.ContactWhereInput = {
 				id: addedContactIds.length > 0 ? { notIn: addedContactIds } : undefined,
@@ -1605,7 +1605,7 @@ export async function GET(req: NextRequest) {
 
 		// Special-case: Promotion searches prioritize Radio Stations across all states
 		if (isPromotionSearch) {
-			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200));
+			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500));
 			const radioTitleWhere: Prisma.StringFilter = {
 				mode: 'insensitive',
 				contains: 'radio station',
@@ -1860,7 +1860,7 @@ export async function GET(req: NextRequest) {
 			}
 			const requestedLimit = Math.max(
 				1,
-				Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 200)
+				Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500)
 			);
 			const effectiveVectorLimit = postTrainingProfile.requirePositive
 				? Math.min(Math.max(requestedLimit + 20, Math.ceil(requestedLimit * 1.2)), 200)

@@ -388,11 +388,11 @@ export const searchSimilarContacts = async (
 	const kValue =
 		options?.penaltyTerms && options.penaltyTerms.length > 0
 			? locationStrategy === 'strict'
-				? Math.min(limit * 2, 200)
-				: Math.min(limit * 6, 200)
+				? Math.min(limit * 2, 500)
+				: Math.min(limit * 6, 500)
 			: locationStrategy === 'strict'
 			? limit
-			: Math.min(limit * 3, 50);
+			: Math.min(limit * 3, 500);
 
 	const results = await elasticsearch.search<ContactDocument>({
 		index: INDEX_NAME,

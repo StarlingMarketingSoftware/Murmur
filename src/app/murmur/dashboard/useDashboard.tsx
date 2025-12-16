@@ -86,7 +86,7 @@ export const useDashboard = () => {
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
 	const [activeExcludeUsedContacts, setActiveExcludeUsedContacts] = useState(false);
 	const [currentTab, setCurrentTab] = useState<TabValue>('search');
-	const [limit, setLimit] = useState(50);
+	const [limit, setLimit] = useState(500);
 	const [apolloContacts, setApolloContacts] = useState<ContactWithName[]>([]);
 	const [tableInstance, setTableInstance] = useState<Table<ContactWithName>>();
 	const [usedContactIdsSet, setUsedContactIdsSet] = useState<Set<number>>(new Set());
@@ -210,7 +210,7 @@ export const useDashboard = () => {
 		// Update search parameters
 		setActiveSearchQuery(data.searchText);
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? false);
-		setLimit(50);
+		setLimit(500);
 		setHasSearched(true);
 		setIsMapView(true);
 	};
