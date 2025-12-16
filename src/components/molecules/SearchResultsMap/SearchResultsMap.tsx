@@ -1110,6 +1110,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lastContactsCountRef = useRef(0);
 	// Track first contact ID to detect when search results have changed
 	const lastFirstContactIdRef = useRef<number | null>(null);
+	// Track last locked state to detect new searches
+	const lastLockedStateKeyRef = useRef<string | null>(null);
 
 	// Helper to fit map bounds with padding
 	const fitMapToBounds = useCallback(
@@ -1149,6 +1151,54 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[getContactCoords]
 	);
 
+	// Helper to fit map to a state's bounds
+	const fitMapToState = useCallback(
+		(mapInstance: google.maps.Map, stateKey: string) => {
+			const dataLayer = stateLayerRef.current;
+			if (!dataLayer) return false;
+
+			let stateBounds: google.maps.LatLngBounds | null = null;
+
+			dataLayer.forEach((feature) => {
+				if (stateBounds) return; // Already found
+				const featureKey = normalizeStateKey(
+					(feature.getProperty('NAME') as string) || (feature.getId() as string)
+				);
+				if (!featureKey || featureKey !== stateKey) return;
+				
+				const geometry = feature.getGeometry();
+				if (!geometry) return;
+
+				stateBounds = new google.maps.LatLngBounds();
+				geometry.forEachLatLng((latLng) => {
+					stateBounds!.extend(latLng);
+				});
+			});
+
+			if (!stateBounds) return false;
+
+			// Fit to state bounds with padding for a comfortable zoomed view
+			mapInstance.fitBounds(stateBounds, {
+				top: 100,
+				right: 100,
+				bottom: 100,
+				left: 100,
+			});
+
+			// Ensure we don't zoom in too much (especially for small states like DC, RI)
+			const listener = google.maps.event.addListener(mapInstance, 'idle', () => {
+				const currentZoom = mapInstance.getZoom();
+				if (currentZoom && currentZoom > 8) {
+					mapInstance.setZoom(8);
+				}
+				google.maps.event.removeListener(listener);
+			});
+
+			return true;
+		},
+		[]
+	);
+
 	const onLoad = useCallback(
 		(mapInstance: google.maps.Map) => {
 			setMap(mapInstance);
@@ -1161,15 +1211,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			});
 
-			// Fit bounds on initial load if we have contacts
-			if (contactsWithCoords.length > 0) {
-				fitMapToBounds(mapInstance, contactsWithCoords);
-				hasFitBoundsRef.current = true;
-				lastContactsCountRef.current = contactsWithCoords.length;
-				lastFirstContactIdRef.current = contactsWithCoords[0]?.id ?? null;
-			}
+			// Note: Initial bounds fitting is handled by the useEffect that watches contactsWithCoords
+			// and lockedStateKey. This ensures we wait for the state layer to be ready before
+			// fitting to state bounds.
 		},
-		[contactsWithCoords, fitMapToBounds]
+		[]
 	);
 
 	const onUnmount = useCallback(() => {
@@ -1179,6 +1225,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		hasFitBoundsRef.current = false;
 		lastContactsCountRef.current = 0;
 		lastFirstContactIdRef.current = null;
+		lastLockedStateKeyRef.current = null;
 	}, [clearResultsOutline, clearSearchedStateOutline]);
 
 	// Fit bounds when contacts with coordinates change
@@ -1189,6 +1236,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const currentFirstId = contactsWithCoords[0]?.id ?? null;
 		const isNewSearch = currentFirstId !== lastFirstContactIdRef.current;
 
+		// Check if the locked state changed (indicating a new search in a different state)
+		const isNewStateSearch = lockedStateKey !== lastLockedStateKeyRef.current;
+
 		// Fit bounds if:
 		// 1. We haven't fit bounds yet (initial load after geocoding)
 		// 2. This is a completely new search (first contact ID changed)
@@ -1197,16 +1247,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const shouldFitBounds =
 			!hasFitBoundsRef.current ||
 			isNewSearch ||
+			isNewStateSearch ||
 			contactsWithCoords.length > lastContactsCountRef.current ||
 			Math.abs(contactsWithCoords.length - lastContactsCountRef.current) > 5;
 
 		if (shouldFitBounds) {
-			fitMapToBounds(map, contactsWithCoords);
+			// If there's a locked state (searched state) and this is a new search or new state,
+			// zoom to that state first for a better initial view
+			if (lockedStateKey && isStateLayerReady && (isNewSearch || isNewStateSearch || !hasFitBoundsRef.current)) {
+				const didFitToState = fitMapToState(map, lockedStateKey);
+				if (!didFitToState) {
+					// Fallback to fitting to contacts if state geometry not found
+					fitMapToBounds(map, contactsWithCoords);
+				}
+			} else {
+				fitMapToBounds(map, contactsWithCoords);
+			}
 			hasFitBoundsRef.current = true;
 			lastContactsCountRef.current = contactsWithCoords.length;
 			lastFirstContactIdRef.current = currentFirstId;
+			lastLockedStateKeyRef.current = lockedStateKey;
 		}
-	}, [map, contactsWithCoords, fitMapToBounds]);
+	}, [map, contactsWithCoords, fitMapToBounds, fitMapToState, lockedStateKey, isStateLayerReady]);
 
 	// Reset bounds tracking when contacts prop is empty (preparing for new search)
 	useEffect(() => {
@@ -1214,6 +1276,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			hasFitBoundsRef.current = false;
 			lastContactsCountRef.current = 0;
 			lastFirstContactIdRef.current = null;
+			lastLockedStateKeyRef.current = null;
 		}
 	}, [contacts]);
 
