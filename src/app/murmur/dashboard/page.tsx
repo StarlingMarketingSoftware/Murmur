@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal, flushSync } from 'react-dom';
@@ -40,6 +40,7 @@ import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
+import { ContactWithName } from '@/types/contact';
 import {
 	ContactResearchPanel,
 	ContactResearchHorizontalStrip,
@@ -713,9 +714,135 @@ const DashboardContent = () => {
 	// Map-side panel should default to only the searched state, while the map itself keeps
 	// showing all results. Clicking an out-of-state marker adds it to this panel list.
 	const [mapPanelExtraContactIds, setMapPanelExtraContactIds] = useState<number[]>([]);
+	const mapViewContainerRef = useRef<HTMLDivElement | null>(null);
+	const [mapResearchPanelSide, setMapResearchPanelSide] = useState<'left' | 'right'>('right');
+	const MAP_RESEARCH_PANEL_FADE_MS = 170;
+	const [mapResearchPanelContact, setMapResearchPanelContact] =
+		useState<ContactWithName | null>(null);
+	const [isMapResearchPanelVisible, setIsMapResearchPanelVisible] = useState(false);
+	const mapResearchPanelUnmountTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const mapResearchPanelShowRafRef = useRef<number | null>(null);
+	const mapResearchPanelContactRef = useRef<ContactWithName | null>(null);
 	useEffect(() => {
 		setMapPanelExtraContactIds([]);
 	}, [activeSearchQuery]);
+
+	// Cleanup animation timers on unmount
+	useEffect(() => {
+		return () => {
+			if (mapResearchPanelUnmountTimeoutRef.current) {
+				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
+				mapResearchPanelUnmountTimeoutRef.current = null;
+			}
+			if (mapResearchPanelShowRafRef.current != null) {
+				cancelAnimationFrame(mapResearchPanelShowRafRef.current);
+				mapResearchPanelShowRafRef.current = null;
+			}
+		};
+	}, []);
+
+	// Fade the map research panel in/out instead of abruptly mounting/unmounting.
+	useEffect(() => {
+		if (!isMapView) {
+			setIsMapResearchPanelVisible(false);
+			setMapResearchPanelContact(null);
+			mapResearchPanelContactRef.current = null;
+			setMapResearchPanelSide('right');
+			return;
+		}
+
+		const isMapLoading = isSearchPending || isLoadingContacts || isRefetchingContacts;
+
+		// Hide during loading
+		if (isMapLoading) {
+			if (!mapResearchPanelContactRef.current) return;
+			setIsMapResearchPanelVisible(false);
+			if (mapResearchPanelUnmountTimeoutRef.current) {
+				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
+			}
+			mapResearchPanelUnmountTimeoutRef.current = setTimeout(() => {
+				setMapResearchPanelContact(null);
+				mapResearchPanelContactRef.current = null;
+				setMapResearchPanelSide('right');
+			}, MAP_RESEARCH_PANEL_FADE_MS);
+			return;
+		}
+
+		if (hoveredContact) {
+			// Cancel any pending unmount so we can keep the panel visible.
+			if (mapResearchPanelUnmountTimeoutRef.current) {
+				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
+				mapResearchPanelUnmountTimeoutRef.current = null;
+			}
+			if (mapResearchPanelShowRafRef.current != null) {
+				cancelAnimationFrame(mapResearchPanelShowRafRef.current);
+				mapResearchPanelShowRafRef.current = null;
+			}
+
+			const wasClosed = mapResearchPanelContactRef.current == null;
+			setMapResearchPanelContact(hoveredContact);
+			mapResearchPanelContactRef.current = hoveredContact;
+
+			if (wasClosed) {
+				// Mount at opacity 0, then fade in on next frame.
+				setIsMapResearchPanelVisible(false);
+				mapResearchPanelShowRafRef.current = requestAnimationFrame(() => {
+					setIsMapResearchPanelVisible(true);
+				});
+			} else {
+				setIsMapResearchPanelVisible(true);
+			}
+			return;
+		}
+
+		// No hovered contact: fade out, then unmount.
+		if (!mapResearchPanelContactRef.current) return;
+		setIsMapResearchPanelVisible(false);
+		if (mapResearchPanelUnmountTimeoutRef.current) {
+			clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
+		}
+		mapResearchPanelUnmountTimeoutRef.current = setTimeout(() => {
+			setMapResearchPanelContact(null);
+			mapResearchPanelContactRef.current = null;
+			setMapResearchPanelSide('right');
+		}, MAP_RESEARCH_PANEL_FADE_MS);
+	}, [hoveredContact, isMapView, isSearchPending, isLoadingContacts, isRefetchingContacts]);
+
+	const handleMapMarkerHover = useCallback(
+		(contact: ContactWithName | null, meta?: { clientX: number; clientY: number }) => {
+			setHoveredContact(contact);
+
+			// Default back to the right side whenever hover ends or we can't compute geometry.
+			// NOTE: Don't reset the side immediately on hover end; we fade out first.
+			if (!contact) {
+				return;
+			}
+			if (!meta) {
+				setMapResearchPanelSide('right');
+				return;
+			}
+
+			const container = mapViewContainerRef.current;
+			if (!container) {
+				setMapResearchPanelSide('right');
+				return;
+			}
+
+			const rect = container.getBoundingClientRect();
+			const x = meta.clientX - rect.left;
+
+			// Keep in sync with the panel's rendered styles below.
+			const PANEL_WIDTH_PX = 310;
+			const PANEL_RIGHT_OFFSET_PX = 460;
+			const PANEL_LEFT_X = rect.width - PANEL_RIGHT_OFFSET_PX - PANEL_WIDTH_PX;
+			const PANEL_RIGHT_X = rect.width - PANEL_RIGHT_OFFSET_PX;
+			const PADDING_PX = 26; // give the dot a little breathing room
+
+			const overlapsRightPanelZone = x >= PANEL_LEFT_X - PADDING_PX && x <= PANEL_RIGHT_X + PADDING_PX;
+			setMapResearchPanelSide(overlapsRightPanelZone ? 'left' : 'right');
+		},
+		[setHoveredContact]
+	);
 
 	const searchedStateAbbr = useMemo(
 		() => extractStateAbbrFromSearchQuery(activeSearchQuery),
@@ -2358,10 +2485,14 @@ const DashboardContent = () => {
 															zIndex: 99,
 														}}
 													>
-														<div className="w-full h-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden relative">
+														<div
+															ref={mapViewContainerRef}
+															className="w-full h-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden relative"
+														>
 															<SearchResultsMap
 																contacts={contacts || []}
 																selectedContacts={selectedContacts}
+																onMarkerHover={handleMapMarkerHover}
 																lockedStateName={searchedStateAbbr}
 																isLoading={isSearchPending || isLoadingContacts || isRefetchingContacts}
 																onMarkerClick={(contact) => {
@@ -2509,10 +2640,14 @@ const DashboardContent = () => {
 																								]);
 																							}
 																						}}
-																						onMouseEnter={() =>
-																							setHoveredContact(contact)
-																						}
-																						onMouseLeave={() => setHoveredContact(null)}
+																						onMouseEnter={() => {
+																							setMapResearchPanelSide('right');
+																							setHoveredContact(contact);
+																						}}
+																						onMouseLeave={() => {
+																							setHoveredContact(null);
+																							setMapResearchPanelSide('right');
+																						}}
 																					>
 																						{/* Centered used contact dot */}
 																						{fullName && isUsed && (
@@ -2714,13 +2849,9 @@ const DashboardContent = () => {
 																		</div>
 																	</div>
 																)}
-																{!(
-																	isSearchPending ||
-																	isLoadingContacts ||
-																	isRefetchingContacts
-																) &&
-																	hoveredContact &&
+																{mapResearchPanelContact &&
 																	(() => {
+																		const hoveredContact = mapResearchPanelContact!;
 																		const parseMetadataSections = (
 																			metadata: string | null | undefined
 																		) => {
@@ -2777,13 +2908,18 @@ const DashboardContent = () => {
 																				className="absolute rounded-[8px] shadow-lg flex flex-col"
 																				style={{
 																					top: '68px',
-																					right: '460px',
+																					...(mapResearchPanelSide === 'left'
+																						? { left: '10px' }
+																						: { right: '460px' }),
 																					width: '310px',
 																					height: containerHeight,
 																					maxHeight: 'calc(100% - 20px)',
 																					backgroundColor: 'rgba(216, 229, 251, 0.8)',
 																					border: '2px solid #143883',
 																					overflow: 'hidden',
+																					opacity: isMapResearchPanelVisible ? 1 : 0,
+																					transition: `opacity ${MAP_RESEARCH_PANEL_FADE_MS}ms ease-in-out`,
+																					pointerEvents: isMapResearchPanelVisible ? 'auto' : 'none',
 																				}}
 																			>
 																				{/* Header */}

@@ -3,16 +3,10 @@
 import { FC, Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GoogleMap, useJsApiLoader, MarkerF, OverlayView } from '@react-google-maps/api';
 import { ContactWithName } from '@/types/contact';
-import {
-	generateMapTooltipIconUrl,
-	calculateTooltipWidth,
-	MAP_TOOLTIP_HEIGHT,
-	MAP_TOOLTIP_ANCHOR_X,
-	MAP_TOOLTIP_ANCHOR_Y,
-} from '@/components/atoms/_svg/MapTooltipIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
 type LatLngLiteral = { lat: number; lng: number };
+type MarkerHoverMeta = { clientX: number; clientY: number };
 
 type ClippingCoord = [number, number]; // [lng, lat]
 type ClippingRing = ClippingCoord[];
@@ -475,6 +469,7 @@ interface SearchResultsMapProps {
 	contacts: ContactWithName[];
 	selectedContacts: number[];
 	onMarkerClick?: (contact: ContactWithName) => void;
+	onMarkerHover?: (contact: ContactWithName | null, meta?: MarkerHoverMeta) => void;
 	onToggleSelection?: (contactId: number) => void;
 	onStateSelect?: (stateName: string) => void;
 	enableStateInteractions?: boolean;
@@ -542,6 +537,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
 	selectedContacts,
 	onMarkerClick,
+	onMarkerHover,
 	onToggleSelection,
 	onStateSelect,
 	enableStateInteractions,
@@ -550,6 +546,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 }) => {
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
+	const hoveredMarkerIdRef = useRef<number | null>(null);
 	const [map, setMap] = useState<google.maps.Map | null>(null);
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
 	const [zoomLevel, setZoomLevel] = useState(4); // Default zoom level
@@ -1281,7 +1278,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [contacts]);
 
 	const handleMarkerClick = (contact: ContactWithName) => {
-		setSelectedMarker(contact);
 		onMarkerClick?.(contact);
 		// Toggle selection when clicking on a marker
 		onToggleSelection?.(contact.id);
@@ -1329,6 +1325,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [isLoaded, markerScale, strokeWeight]);
 
+	// Slightly larger icons when hovered (no text tooltip)
+	const hoveredDefaultMarkerIcon = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: '#D21E1F',
+			fillOpacity: 1,
+			strokeColor: '#FFFFFF',
+			strokeWeight: strokeWeight + 0.4,
+			scale: markerScale * 1.18,
+		};
+	}, [isLoaded, markerScale, strokeWeight]);
+
+	const hoveredSelectedMarkerIcon = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: '#0E8530',
+			fillOpacity: 1,
+			strokeColor: '#FFFFFF',
+			strokeWeight: strokeWeight + 0.4,
+			scale: markerScale * 1.18,
+		};
+	}, [isLoaded, markerScale, strokeWeight]);
+
 	// Invisible larger marker for hover hit area
 	const invisibleHitAreaIcon = useMemo(() => {
 		if (!isLoaded) return undefined;
@@ -1365,28 +1386,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			icon: backgroundDotIcon,
 		});
 	}, [backgroundDotIcon]);
-
-	// Generate hover tooltip icon with contact name and company
-	const getHoverMarkerIcon = useCallback(
-		(contact: ContactWithName) => {
-			if (!isLoaded) return undefined;
-
-			// Get name - use firstName/lastName, fall back to name field
-			const name =
-				`${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
-				contact.name ||
-				'';
-			const company = contact.company || '';
-			const width = calculateTooltipWidth(name, company);
-
-			return {
-				url: generateMapTooltipIconUrl(name, company),
-				scaledSize: new google.maps.Size(width, MAP_TOOLTIP_HEIGHT),
-				anchor: new google.maps.Point(MAP_TOOLTIP_ANCHOR_X, MAP_TOOLTIP_ANCHOR_Y),
-			};
-		},
-		[isLoaded]
-	);
 
 	// Compute initial center based on contacts (if available)
 	// Must be before early returns to satisfy React hooks rules
@@ -1449,38 +1448,57 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				if (!coords) return null;
 				const isHovered = hoveredMarkerId === contact.id;
 				const isSelected = selectedContacts.includes(contact.id);
+				const dotIcon = isSelected
+					? isHovered
+						? hoveredSelectedMarkerIcon
+						: selectedMarkerIcon
+					: isHovered
+						? hoveredDefaultMarkerIcon
+						: defaultMarkerIcon;
 				return (
 					<Fragment key={contact.id}>
 						{/* Invisible larger hit area for hover detection - this controls all hover state */}
 						<MarkerF
 							position={coords}
 							icon={invisibleHitAreaIcon}
-							onMouseOver={() => setHoveredMarkerId(contact.id)}
-							onMouseOut={() => setHoveredMarkerId(null)}
+							onMouseOver={(e) => {
+								hoveredMarkerIdRef.current = contact.id;
+								setHoveredMarkerId(contact.id);
+								const domEvent = e?.domEvent as MouseEvent | TouchEvent | undefined;
+								let meta: MarkerHoverMeta | undefined;
+								if (domEvent && 'clientX' in domEvent && 'clientY' in domEvent) {
+									meta = { clientX: domEvent.clientX, clientY: domEvent.clientY };
+								} else if (
+									domEvent &&
+									'touches' in domEvent &&
+									domEvent.touches &&
+									domEvent.touches.length > 0
+								) {
+									meta = {
+										clientX: domEvent.touches[0].clientX,
+										clientY: domEvent.touches[0].clientY,
+									};
+								}
+								onMarkerHover?.(contact, meta);
+							}}
+							onMouseOut={() => {
+								setHoveredMarkerId((prev) => (prev === contact.id ? null : prev));
+								if (hoveredMarkerIdRef.current === contact.id) {
+									hoveredMarkerIdRef.current = null;
+									onMarkerHover?.(null);
+								}
+							}}
 							onClick={() => handleMarkerClick(contact)}
 							clickable={true}
 							zIndex={3}
 						/>
-						{/* Dot marker - only when NOT hovered, green if selected, red if not */}
-						{!isHovered && (
-							<MarkerF
-								position={coords}
-								onClick={() => handleMarkerClick(contact)}
-								icon={isSelected ? selectedMarkerIcon : defaultMarkerIcon}
-								clickable={false}
-								zIndex={1}
-							/>
-						)}
-						{/* Hover tooltip - only when hovered */}
-						{isHovered && (
-							<MarkerF
-								position={coords}
-								onClick={() => handleMarkerClick(contact)}
-								icon={getHoverMarkerIcon(contact)}
-								clickable={false}
-								zIndex={2}
-							/>
-						)}
+						{/* Dot marker (slightly larger on hover) */}
+						<MarkerF
+							position={coords}
+							icon={dotIcon}
+							clickable={false}
+							zIndex={isHovered ? 2 : 1}
+						/>
 					</Fragment>
 				);
 			})}
