@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal, flushSync } from 'react-dom';
@@ -64,6 +64,24 @@ const DEFAULT_STATE_SUGGESTIONS = [
 		generalDescription: 'contact venues, restaurants and more, to book shows',
 	},
 ];
+
+const extractStateAbbrFromSearchQuery = (query: string): string | null => {
+	// Search queries are typically formatted like: "[Promotion] Radio Stations (Maine)"
+	// or "[Booking] Venues (Portland, ME)". We only infer state from the parenthetical
+	// to avoid false positives (e.g. the word "in" -> "IN").
+	if (!query) return null;
+	const match = query.match(/\(([^)]+)\)/);
+	const locationText = match?.[1]?.trim();
+	if (!locationText) return null;
+
+	const stateCandidate = locationText.includes(',')
+		? locationText.split(',').pop()?.trim() || ''
+		: locationText;
+	if (!stateCandidate) return null;
+
+	const abbr = getStateAbbreviation(stateCandidate).trim().toUpperCase();
+	return /^[A-Z]{2}$/.test(abbr) ? abbr : null;
+};
 
 const DashboardContent = () => {
 	const { isSignedIn, openSignIn } = useClerk();
@@ -684,7 +702,6 @@ const DashboardContent = () => {
 		hasSearched,
 		handleResetSearch,
 		handleSelectAll,
-		isAllSelected,
 		setHoveredContact,
 		hoveredContact,
 		isMapView,
@@ -692,6 +709,45 @@ const DashboardContent = () => {
 		isSearchPending,
 		usedContactIdsSet,
 	} = useDashboard();
+
+	// Map-side panel should default to only the searched state, while the map itself keeps
+	// showing all results. Clicking an out-of-state marker adds it to this panel list.
+	const [mapPanelExtraContactIds, setMapPanelExtraContactIds] = useState<number[]>([]);
+	useEffect(() => {
+		setMapPanelExtraContactIds([]);
+	}, [activeSearchQuery]);
+
+	const searchedStateAbbr = useMemo(
+		() => extractStateAbbrFromSearchQuery(activeSearchQuery),
+		[activeSearchQuery]
+	);
+
+	const mapPanelContacts = useMemo(() => {
+		const allContacts = contacts || [];
+		if (!searchedStateAbbr) return allContacts;
+
+		const inState = allContacts.filter((contact) => {
+			const contactStateAbbr = getStateAbbreviation(contact.state || '').trim().toUpperCase();
+			return contactStateAbbr === searchedStateAbbr;
+		});
+
+		if (mapPanelExtraContactIds.length === 0) return inState;
+
+		const byId = new Map(allContacts.map((c) => [c.id, c]));
+		const inStateIds = new Set(inState.map((c) => c.id));
+		const extras = mapPanelExtraContactIds
+			.filter((id) => !inStateIds.has(id))
+			.map((id) => byId.get(id))
+			.filter((c): c is NonNullable<typeof c> => Boolean(c));
+
+		return [...inState, ...extras];
+	}, [contacts, mapPanelExtraContactIds, searchedStateAbbr]);
+
+	// Check if all panel contacts are selected (for map view "Select all" button)
+	const isAllPanelContactsSelected = useMemo(() => {
+		if (mapPanelContacts.length === 0) return false;
+		return mapPanelContacts.every((contact) => selectedContacts.includes(contact.id));
+	}, [mapPanelContacts, selectedContacts]);
 
 	const TAB_PILL_COLORS = {
 		search: '#DAE6FE',
@@ -2306,6 +2362,22 @@ const DashboardContent = () => {
 															<SearchResultsMap
 																contacts={contacts || []}
 																selectedContacts={selectedContacts}
+																lockedStateName={searchedStateAbbr}
+																isLoading={isSearchPending || isLoadingContacts || isRefetchingContacts}
+																onMarkerClick={(contact) => {
+																	// If the marker is outside the searched state, include it in the
+																	// right-hand map panel list (without changing what the map shows).
+																	if (!searchedStateAbbr) return;
+																	const contactStateAbbr = getStateAbbreviation(
+																		contact.state || ''
+																	)
+																		.trim()
+																		.toUpperCase();
+																	if (contactStateAbbr === searchedStateAbbr) return;
+																	setMapPanelExtraContactIds((prev) =>
+																		prev.includes(contact.id) ? prev : [...prev, contact.id]
+																	);
+																}}
 																onToggleSelection={(contactId) => {
 																	if (selectedContacts.includes(contactId)) {
 																		setSelectedContacts(
@@ -2318,7 +2390,7 @@ const DashboardContent = () => {
 																		]);
 																	}
 																	// Scroll to the contact in the side panel
-																	setTimeout(() => {
+																	const tryScroll = (attempt = 0) => {
 																		const contactElement = document.querySelector(
 																			`[data-contact-id="${contactId}"]`
 																		);
@@ -2327,8 +2399,13 @@ const DashboardContent = () => {
 																				behavior: 'smooth',
 																				block: 'center',
 																			});
+																			return;
 																		}
-																	}, 50);
+																		if (attempt < 10) {
+																			setTimeout(() => tryScroll(attempt + 1), 50);
+																		}
+																	};
+																	setTimeout(() => tryScroll(0), 0);
 																}}
 															/>
 															{/* Search Results overlay box on the right side - hidden while loading and at narrowest breakpoint */}
@@ -2376,10 +2453,10 @@ const DashboardContent = () => {
 																			</span>
 																			<button
 																				type="button"
-																				onClick={handleSelectAll}
+																				onClick={() => handleSelectAll(mapPanelContacts)}
 																				className="font-secondary text-[12px] font-medium text-black hover:underline absolute right-[10px] top-1/2 translate-y-[4px]"
 																			>
-																				{isAllSelected ? 'Deselect All' : 'Select all'}
+																				{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
 																			</button>
 																		</div>
 																		<CustomScrollbar
@@ -2391,7 +2468,7 @@ const DashboardContent = () => {
 																			offsetRight={-6}
 																			disableOverflowClass
 																		>
-																			{(contacts || []).map((contact) => {
+																			{mapPanelContacts.map((contact) => {
 																				const isSelected = selectedContacts.includes(
 																					contact.id
 																				);
@@ -2622,7 +2699,7 @@ const DashboardContent = () => {
 																					className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 																					onClick={(e) => {
 																						e.stopPropagation();
-																						handleSelectAll();
+																						handleSelectAll(mapPanelContacts);
 																					}}
 																				>
 																					<span className="text-black text-[14px] font-medium">
@@ -2977,7 +3054,7 @@ const DashboardContent = () => {
 																					className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 																					onClick={(e) => {
 																						e.stopPropagation();
-																						handleSelectAll();
+																						handleSelectAll(mapPanelContacts);
 																					}}
 																				>
 																					<span className="text-black text-[14px] font-medium">
@@ -3035,10 +3112,10 @@ const DashboardContent = () => {
 																	</span>
 																	<button
 																		type="button"
-																		onClick={handleSelectAll}
+																		onClick={() => handleSelectAll(mapPanelContacts)}
 																		className="font-secondary text-[12px] font-medium text-black hover:underline absolute right-[10px] top-1/2 -translate-y-1/2"
 																	>
-																		{isAllSelected ? 'Deselect All' : 'Select all'}
+																		{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
 																	</button>
 																</div>
 																<CustomScrollbar
@@ -3050,7 +3127,7 @@ const DashboardContent = () => {
 																	offsetRight={-6}
 																	disableOverflowClass
 																>
-																	{(contacts || []).map((contact) => {
+																	{mapPanelContacts.map((contact) => {
 																		const isSelected = selectedContacts.includes(
 																			contact.id
 																		);
@@ -3228,7 +3305,7 @@ const DashboardContent = () => {
 																			className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 																			onClick={(e) => {
 																				e.stopPropagation();
-																				handleSelectAll();
+																				handleSelectAll(mapPanelContacts);
 																			}}
 																		>
 																			<span className="text-black text-[14px] font-medium">
@@ -3273,7 +3350,7 @@ const DashboardContent = () => {
 														initialSelectAll={false}
 														isSelectable
 														setSelectedRows={setSelectedContacts}
-														data={contacts}
+														data={mapPanelContacts}
 														columns={columns}
 														searchable={false}
 														tableRef={tableRef}
@@ -3334,11 +3411,11 @@ const DashboardContent = () => {
 														}
 														headerInlineAction={
 															<button
-																onClick={handleSelectAll}
+																onClick={() => handleSelectAll(mapPanelContacts)}
 																className="text-[14px] font-secondary font-normal text-black hover:underline"
 																type="button"
 															>
-																{isAllSelected ? 'Deselect All' : 'Select all'}
+																{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
 															</button>
 														}
 													/>
@@ -3364,7 +3441,7 @@ const DashboardContent = () => {
 															className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 															onClick={(e) => {
 																e.stopPropagation();
-																handleSelectAll();
+																handleSelectAll(mapPanelContacts);
 															}}
 														>
 															<span className="text-black text-[14px] font-medium">
