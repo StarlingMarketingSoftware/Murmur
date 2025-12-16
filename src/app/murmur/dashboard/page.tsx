@@ -744,6 +744,12 @@ const DashboardContent = () => {
 		return [...inState, ...extras];
 	}, [contacts, mapPanelExtraContactIds, searchedStateAbbr]);
 
+	// Check if all panel contacts are selected (for map view "Select all" button)
+	const isAllPanelContactsSelected = useMemo(() => {
+		if (mapPanelContacts.length === 0) return false;
+		return mapPanelContacts.every((contact) => selectedContacts.includes(contact.id));
+	}, [mapPanelContacts, selectedContacts]);
+
 	const TAB_PILL_COLORS = {
 		search: '#DAE6FE',
 		inbox: '#CBE7D1',
@@ -2448,10 +2454,10 @@ const DashboardContent = () => {
 																			</span>
 																			<button
 																				type="button"
-																				onClick={handleSelectAll}
+																				onClick={() => handleSelectAll(mapPanelContacts)}
 																				className="font-secondary text-[12px] font-medium text-black hover:underline absolute right-[10px] top-1/2 translate-y-[4px]"
 																			>
-																				{isAllSelected ? 'Deselect All' : 'Select all'}
+																				{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
 																			</button>
 																		</div>
 																		<CustomScrollbar
@@ -2694,7 +2700,7 @@ const DashboardContent = () => {
 																					className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 																					onClick={(e) => {
 																						e.stopPropagation();
-																						handleSelectAll();
+																						handleSelectAll(mapPanelContacts);
 																					}}
 																				>
 																					<span className="text-black text-[14px] font-medium">
@@ -3049,7 +3055,7 @@ const DashboardContent = () => {
 																					className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 																					onClick={(e) => {
 																						e.stopPropagation();
-																						handleSelectAll();
+																						handleSelectAll(mapPanelContacts);
 																					}}
 																				>
 																					<span className="text-black text-[14px] font-medium">
@@ -3107,10 +3113,10 @@ const DashboardContent = () => {
 																	</span>
 																	<button
 																		type="button"
-																		onClick={handleSelectAll}
+																		onClick={() => handleSelectAll(mapPanelContacts)}
 																		className="font-secondary text-[12px] font-medium text-black hover:underline absolute right-[10px] top-1/2 -translate-y-1/2"
 																	>
-																		{isAllSelected ? 'Deselect All' : 'Select all'}
+																		{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
 																	</button>
 																</div>
 																<CustomScrollbar
@@ -3122,7 +3128,7 @@ const DashboardContent = () => {
 																	offsetRight={-6}
 																	disableOverflowClass
 																>
-																	{(contacts || []).map((contact) => {
+																	{mapPanelContacts.map((contact) => {
 																		const isSelected = selectedContacts.includes(
 																			contact.id
 																		);
@@ -3300,7 +3306,7 @@ const DashboardContent = () => {
 																			className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 																			onClick={(e) => {
 																				e.stopPropagation();
-																				handleSelectAll();
+																				handleSelectAll(mapPanelContacts);
 																			}}
 																		>
 																			<span className="text-black text-[14px] font-medium">
@@ -3345,7 +3351,7 @@ const DashboardContent = () => {
 														initialSelectAll={false}
 														isSelectable
 														setSelectedRows={setSelectedContacts}
-														data={contacts}
+														data={mapPanelContacts}
 														columns={columns}
 														searchable={false}
 														tableRef={tableRef}
@@ -3406,11 +3412,11 @@ const DashboardContent = () => {
 														}
 														headerInlineAction={
 															<button
-																onClick={handleSelectAll}
+																onClick={() => handleSelectAll(mapPanelContacts)}
 																className="text-[14px] font-secondary font-normal text-black hover:underline"
 																type="button"
 															>
-																{isAllSelected ? 'Deselect All' : 'Select all'}
+																{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
 															</button>
 														}
 													/>
@@ -3436,7 +3442,7 @@ const DashboardContent = () => {
 															className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 															onClick={(e) => {
 																e.stopPropagation();
-																handleSelectAll();
+																handleSelectAll(mapPanelContacts);
 															}}
 														>
 															<span className="text-black text-[14px] font-medium">

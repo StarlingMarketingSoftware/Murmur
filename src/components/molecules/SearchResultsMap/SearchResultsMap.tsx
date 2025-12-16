@@ -883,6 +883,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Only show dots within the United States (using state polygons as land mask).
 			if (!isPointInUSA(clampedLat, lng, usStates)) continue;
 
+			// Alaska is huge but sparsely populated - reduce dot density there by ~70%
+			const isInAlaska = clampedLat > 51 && lng < -130;
+			if (isInAlaska && rand() < 0.7) continue;
+
 			if (selection) {
 				// Quick bbox reject so we only do point-in-polygon work near the selected region.
 				if (!selectionBbox || isLatLngInBbox(clampedLat, lng, selectionBbox)) {
