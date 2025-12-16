@@ -35,7 +35,7 @@ export type ProductionContactRow = {
 };
 
 async function importProductionContacts() {
-	const filePath = path.join(process.cwd(), 'public', 'contactLists', 'Contact.xlsx');
+	const filePath = path.join(process.cwd(), 'public', 'contactLists', 'newContacts.xlsx');
 
 	console.log('Reading production contacts from:', filePath);
 
@@ -80,8 +80,14 @@ async function importProductionContacts() {
 					companyType: row.companyType || null,
 					companyIndustry: row.companyIndustry || null,
 					companyPostalCode: row.companyPostalCode || null,
-					latitude: (row.latitude || row.Latitude) ? parseFloat(row.latitude || row.Latitude || '0') || null : null,
-					longitude: (row.longitude || row.Longitude) ? parseFloat(row.longitude || row.Longitude || '0') || null : null,
+					latitude:
+						row.latitude || row.Latitude
+							? parseFloat(row.latitude || row.Latitude || '0') || null
+							: null,
+					longitude:
+						row.longitude || row.Longitude
+							? parseFloat(row.longitude || row.Longitude || '0') || null
+							: null,
 					emailValidationStatus: EmailVerificationStatus.valid,
 					hasVectorEmbedding: true,
 				};
