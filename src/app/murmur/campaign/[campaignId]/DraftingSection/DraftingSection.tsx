@@ -1110,7 +1110,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			verificationStatus:
 				process.env.NODE_ENV === 'production' ? EmailVerificationStatus.valid : undefined,
 			useVectorSearch: true,
-			limit: 50,
+			limit: 500,
 		},
 		enabled:
 			hasCampaignSearched &&

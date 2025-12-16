@@ -73,6 +73,7 @@
 		"nodemailer": "^6.10.0",
 		"openai": "^5.8.2",
 		"papaparse": "^5.5.3",
+		"polygon-clipping": "^0.15.7",
 		"postcss": "^8.5.3",
 		"query-string": "^9.1.2",
 		"radix-ui": "^1.4.2",

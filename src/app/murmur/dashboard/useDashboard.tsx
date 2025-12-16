@@ -86,7 +86,7 @@ export const useDashboard = () => {
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
 	const [activeExcludeUsedContacts, setActiveExcludeUsedContacts] = useState(false);
 	const [currentTab, setCurrentTab] = useState<TabValue>('search');
-	const [limit, setLimit] = useState(50);
+	const [limit, setLimit] = useState(500);
 	const [apolloContacts, setApolloContacts] = useState<ContactWithName[]>([]);
 	const [tableInstance, setTableInstance] = useState<Table<ContactWithName>>();
 	const [usedContactIdsSet, setUsedContactIdsSet] = useState<Set<number>>(new Set());
@@ -210,7 +210,7 @@ export const useDashboard = () => {
 		// Update search parameters
 		setActiveSearchQuery(data.searchText);
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? false);
-		setLimit(50);
+		setLimit(500);
 		setHasSearched(true);
 		setIsMapView(true);
 	};
@@ -221,7 +221,7 @@ export const useDashboard = () => {
 		form.reset();
 	};
 
-	const handleSelectAll = () => {
+	const handleSelectAll = (panelContacts?: ContactWithName[]) => {
 		if (!contacts || contacts.length === 0) return;
 
 		if (!isMapView && tableInstance) {
@@ -233,7 +233,30 @@ export const useDashboard = () => {
 			return;
 		}
 
-		// In map view (or when no table instance), toggle via selectedContacts state
+		// In map view with panel contacts, toggle only the panel contacts
+		if (panelContacts && panelContacts.length > 0) {
+			const panelContactIds = panelContacts.map((c) => c.id);
+			const panelContactIdsSet = new Set(panelContactIds);
+			const allPanelSelected = panelContactIds.every((id) =>
+				selectedContacts.includes(id)
+			);
+
+			if (allPanelSelected) {
+				// Deselect only panel contacts, keep other selections
+				setSelectedContacts(
+					selectedContacts.filter((id) => !panelContactIdsSet.has(id))
+				);
+			} else {
+				// Select all panel contacts, keep existing selections
+				const existingNonPanelSelections = selectedContacts.filter(
+					(id) => !panelContactIdsSet.has(id)
+				);
+				setSelectedContacts([...existingNonPanelSelections, ...panelContactIds]);
+			}
+			return;
+		}
+
+		// Fallback: toggle via selectedContacts state for all contacts
 		if (isAllSelected) {
 			setSelectedContacts([]);
 		} else {
